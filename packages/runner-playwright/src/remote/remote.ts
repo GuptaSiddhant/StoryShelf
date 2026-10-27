@@ -21,15 +21,32 @@ const SUPPORT: RemoteSupport = {
  * throws when the runner is created for a bad name, engine, protocol or endpoint.
  *
  * ```ts
+ * // A fixed service:
  * remote({
  *   name: "mygrid",
  *   engines: ["chromium", "firefox", "webkit"],
- *   connect: () => ({ protocol: "playwright", endpoint: "wss://grid.example/", exposeNetwork: "<loopback>" }),
+ *   protocol: "playwright",
+ *   reach: "loopback", // its browser can route back to this host
+ *   connect: { endpoint: "wss://grid.example/" },
  *   sessions: 4,
+ * });
+ *
+ * // A service that must be woken first, with a lease handed back to `release`:
+ * remote<{ id: string }>({
+ *   name: "pool",
+ *   engines: ["chromium"],
+ *   protocol: "playwright",
+ *   reach: "loopback",
+ *   sessions: 4,
+ *   connect: async ({ shardIndex, signal }) => {
+ *     const server = await wake(shardIndex, signal);
+ *     return { endpoint: server.endpoint, lease: { id: server.id } };
+ *   },
+ *   release: async (lease, { outcome }) => await suspend(lease.id, outcome),
  * });
  * ```
  */
-export function remote(options: RemoteOptions): RemoteBrowser {
+export function remote<TLease = unknown>(options: RemoteOptions<TLease>): RemoteBrowser {
   return defineRemote(options, SUPPORT);
 }
 

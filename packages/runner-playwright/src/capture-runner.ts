@@ -2,7 +2,7 @@
 
 import {
   createTargetOffers,
-  releaseAllLeases,
+  shutdownRemote,
   type CaptureRunner,
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
@@ -83,7 +83,7 @@ export function createPlaywrightCaptureRunner(
       offers.lifecycle(async () => await verifyTargets(declared, locals)),
     ),
     async render(input: PlaywrightRenderInput) {
-      const active: ActiveRun = { cancelled: false, browser: null };
+      const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await renderAll(
@@ -100,7 +100,7 @@ export function createPlaywrightCaptureRunner(
       return await extractAll(input, driver, defaultTarget);
     },
     async runTests(input: PlaywrightTestsInput) {
-      const active: ActiveRun = { cancelled: false, browser: null };
+      const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await runTestEntries(
@@ -117,6 +117,7 @@ export function createPlaywrightCaptureRunner(
       await Promise.all(
         activeRuns.matching(buildId, runId).map(async (active) => {
           active.cancelled = true;
+          active.abort?.abort();
           await closeBrowser(active.browser);
         }),
       );
@@ -129,7 +130,7 @@ function withLeaseRelease(lifecycle: AdapterLifecycle): AdapterLifecycle {
   return {
     ...lifecycle,
     teardown: async () => {
-      await releaseAllLeases();
+      await shutdownRemote();
       await lifecycle.teardown();
     },
   };

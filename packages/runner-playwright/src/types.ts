@@ -84,7 +84,12 @@ export type LaunchTarget = (
 /** Which run a browser is for, so a remote service can route and lease per shard. */
 export interface LaunchContext {
   buildId: string;
+  /** The shard's id; the build id when not sharded. */
+  runId: string;
   shardIndex?: number | undefined;
+  purpose: "render" | "extract" | "tests";
+  /** Aborts a pending `connect` when the run is cancelled. */
+  signal?: AbortSignal | undefined;
 }
 
 /** What the pipeline needs of a target beyond starting it. */
@@ -138,4 +143,6 @@ export interface ExtractedEntry {
 export interface ActiveRun {
   cancelled: boolean;
   browser: Browser | null;
+  /** Aborted by `cancel`, so a `connect` still pending stops too. */
+  abort?: AbortController | undefined;
 }

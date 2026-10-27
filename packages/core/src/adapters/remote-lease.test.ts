@@ -1,79 +1,137 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TargetLaunchError } from "./capture-target.ts";
-import { defineRemote, remoteTargetsOf, type RemoteOptions } from "./remote-browser.ts";
-import { connectLeased, releaseAllLeases } from "./remote-lease.ts";
+import {
+  defineRemote,
+  remoteTargetsOf,
+  type RemoteConnectContext,
+  type RemoteLeasedConnection,
+  type RemoteOptions,
+} from "./remote-browser.ts";
+import {
+  RemoteConnectError,
+  connectLeased,
+  onRemoteShutdown,
+  shutdownRemote,
+} from "./remote-lease.ts";
 
 const SUPPORT = { engines: ["chromium"], protocols: ["playwright"], label: "remote()" } as const;
-const CTX = { buildId: "b1", shardIndex: 2 };
+const CTX = { buildId: "b1", runId: "s2", shardIndex: 2, purpose: "render" } as const;
 const reasonOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-function entryOf(options: Partial<RemoteOptions>) {
-  const remote = defineRemote(
+type Lease = { id: string; token: string };
+
+function entryOf(overrides: Partial<RemoteOptions<Lease>> = {}) {
+  const remote = defineRemote<Lease>(
     {
       name: "farm",
       engines: ["chromium"],
       sessions: 2,
-      connectRetries: 2,
-      connectBackoffMs: 1,
-      connect: () => ({
-        protocol: "playwright",
-        endpoint: "ws://127.0.0.1:1/",
-        exposeNetwork: "<loopback>",
-      }),
-      ...options,
+      protocol: "playwright",
+      reach: "loopback",
+      retry: { attempts: 2, backoffMs: 1 },
+      connect: { endpoint: "ws://127.0.0.1:1/" },
+      ...overrides,
     },
     SUPPORT,
   );
   return remoteTargetsOf(remote)[0] as ReturnType<typeof remoteTargetsOf>[number];
 }
 
-const acquired = (id: string) => ({
-  protocol: "playwright" as const,
-  endpoint: `ws://127.0.0.1:${id}/secret-path`,
-  exposeNetwork: "<loopback>",
+const connection = (id: string): RemoteLeasedConnection<Lease> => ({
+  endpoint: `ws://127.0.0.1:1/${id}/secret-path`,
   lease: { id, token: "lease-token" },
 });
 
-describe("connectLeased", () => {
-  it("acquires with the render's identity, opens the leased connection and releases once", async () => {
-    const acquire = vi.fn(async () => await Promise.resolve(acquired("a")));
+const connecting =
+  (id = "a") =>
+  async (): Promise<RemoteLeasedConnection<Lease>> =>
+    await Promise.resolve(connection(id));
+
+const noLeaseConnect = async (): Promise<RemoteLeasedConnection<Lease>> =>
+  await Promise.resolve({ endpoint: "ws://127.0.0.1:3/" });
+
+const halfWoken = async (): Promise<RemoteLeasedConnection<Lease>> =>
+  await Promise.reject(new RemoteConnectError("half woken", { lease: { id: "h", token: "t" } }));
+
+const open = <T>(value: T) => ({
+  open: async () => await Promise.resolve(value),
+  reasonOf,
+});
+
+afterEach(async () => {
+  await shutdownRemote();
+});
+
+describe("connectLeased with a function connect", () => {
+  it("tells connect which run it is for, opens the leased connection and releases once", async () => {
+    const connect = vi.fn(
+      async (_context: RemoteConnectContext) => await Promise.resolve(connection("a")),
+    );
     const release = vi.fn();
-    const open = vi.fn(async (_connection: unknown) => await Promise.resolve("browser"));
-    const { value, lease } = await connectLeased(entryOf({ acquire, release }), CTX, {
-      open,
+    const opened = vi.fn(async (_connection: unknown) => await Promise.resolve("browser"));
+    const { value, lease } = await connectLeased(entryOf({ connect, release }), CTX, {
+      open: opened,
       reasonOf,
     });
     expect(value).toBe("browser");
-    expect(acquire).toHaveBeenCalledWith({ engine: "chromium", buildId: "b1", shardIndex: 2 });
-    expect((open.mock.calls as unknown as [unknown][])[0]?.[0]).toMatchObject({
-      endpoint: "ws://127.0.0.1:a/secret-path",
+    const context = connect.mock.calls[0]?.[0] as RemoteConnectContext;
+    expect(context).toMatchObject({
+      engine: "chromium",
+      buildId: "b1",
+      runId: "s2",
+      shardIndex: 2,
+      purpose: "render",
+      attempt: 1,
     });
+    expect(context.signal.aborted).toBe(false);
+    expect(opened.mock.calls[0]?.[0]).toMatchObject({ endpoint: "ws://127.0.0.1:1/a/secret-path" });
     expect(release).not.toHaveBeenCalled();
     await lease.end("finished");
     await lease.end("failed");
     expect(release).toHaveBeenCalledTimes(1);
-    expect(release).toHaveBeenCalledWith({ id: "a", token: "lease-token" }, "finished");
+    expect(release).toHaveBeenCalledWith(
+      { id: "a", token: "lease-token" },
+      { outcome: "finished", error: undefined },
+    );
   });
 
-  it("without acquire, connects with connect() and holds nothing", async () => {
-    const open = vi.fn(async () => await Promise.resolve(1));
-    const { lease } = await connectLeased(entryOf({}), CTX, { open, reasonOf });
+  it("passes the error that failed the render to release", async () => {
+    const release = vi.fn();
+    const { lease } = await connectLeased(
+      entryOf({ connect: connecting(), release }),
+      CTX,
+      open(1),
+    );
+    const cause = new Error("render failed");
+    await lease.end("failed", cause);
+    expect(release).toHaveBeenCalledWith(expect.anything(), { outcome: "failed", error: cause });
+  });
+
+  it("with a fixed connection connects to it and holds nothing", async () => {
+    const { lease } = await connectLeased(entryOf(), CTX, open(1));
     await expect(lease.end("finished")).resolves.toBeUndefined();
   });
 
   it("gives concurrent shards distinct leases, each released once", async () => {
     let next = 0;
-    const acquire = vi.fn(async () => await Promise.resolve(acquired(String((next += 1)))));
+    const connect = vi.fn(async () => {
+      next += 1;
+      const id = String(next);
+      return await Promise.resolve(connection(id));
+    });
     const release = vi.fn();
-    const entry = entryOf({ acquire, release });
+    const entry = entryOf({ connect, release });
     const opened = await Promise.all(
       [1, 2, 3].map(
         async (shardIndex) =>
           await connectLeased(
             entry,
-            { buildId: "b1", shardIndex },
-            { open: async (c) => await Promise.resolve(c.endpoint), reasonOf },
+            { ...CTX, shardIndex },
+            {
+              open: async (c) => await Promise.resolve(c.endpoint),
+              reasonOf,
+            },
           ),
       ),
     );
@@ -82,126 +140,247 @@ describe("connectLeased", () => {
     expect(release).toHaveBeenCalledTimes(3);
   });
 
-  it("releases a lease whose handshake failed as failed, then acquires again for the retry", async () => {
+  it("releases a lease whose handshake failed as failed, then connects again with the next attempt number", async () => {
     let next = 0;
-    const acquire = vi.fn(async () => await Promise.resolve(acquired(String((next += 1)))));
+    const connect = vi.fn(async (_context: RemoteConnectContext) => {
+      next += 1;
+      return await Promise.resolve(connection(String(next)));
+    });
     const release = vi.fn();
-    const open = vi
+    const handshake = vi
       .fn<(c: unknown) => Promise<string>>()
       .mockRejectedValueOnce(new Error("ECONNREFUSED"))
       .mockResolvedValueOnce("ok");
-    const { lease } = await connectLeased(entryOf({ acquire, release }), CTX, { open, reasonOf });
-    expect(acquire).toHaveBeenCalledTimes(2);
+    const { lease } = await connectLeased(entryOf({ connect, release }), CTX, {
+      open: handshake,
+      reasonOf,
+    });
+    expect(connect.mock.calls.map((call) => call[0].attempt)).toEqual([1, 2]);
     expect(release).toHaveBeenCalledTimes(1);
-    expect(release.mock.calls[0]?.[1]).toBe("failed");
+    expect(release.mock.calls[0]?.[1]).toMatchObject({ outcome: "failed" });
     await lease.end("finished");
     expect(release).toHaveBeenCalledTimes(2);
   });
 
-  it("leaks no lease when the handshake never succeeds", async () => {
-    const acquire = vi.fn(async () => await Promise.resolve(acquired("x")));
+  it("leaks no lease when the handshake never succeeds, and marks a permanent one unavailable", async () => {
     const release = vi.fn();
-    const open = vi.fn(async () => await Promise.reject(new Error("401 Unauthorized")));
-    const error = (await connectLeased(entryOf({ acquire, release }), CTX, {
-      open,
+    const handshake = vi.fn(async () => await Promise.reject(new Error("401 Unauthorized")));
+    const error = (await connectLeased(entryOf({ connect: connecting("x"), release }), CTX, {
+      open: handshake,
       reasonOf,
     }).catch((caught: unknown) => caught)) as TargetLaunchError;
     expect(error).toBeInstanceOf(TargetLaunchError);
     expect(error.transient).toBe(false);
-    expect(acquire).toHaveBeenCalledTimes(1);
+    expect(handshake).toHaveBeenCalledTimes(1);
     expect(release).toHaveBeenCalledTimes(1);
   });
 
-  it("retries a throwing acquire and ends as a transient launch error with a clear reason", async () => {
-    const acquire = vi.fn(async () => await Promise.reject(new Error("wake failed")));
+  it("skips release when connect returns no lease, warning once per target", async () => {
+    const warn = vi.fn();
     const release = vi.fn();
-    const open = vi.fn();
-    const error = (await connectLeased(entryOf({ acquire, release }), CTX, {
-      open,
+    for (let index = 0; index < 2; index += 1) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- two sequential connects
+      const { lease } = await connectLeased(
+        entryOf({ name: "nolease", connect: noLeaseConnect, release }),
+        CTX,
+        {
+          ...open(1),
+          logger: { warn } as never,
+        },
+      );
+      // oxlint-disable-next-line eslint/no-await-in-loop -- two sequential connects
+      await lease.end("finished");
+    }
+    expect(release).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("connectLeased errors", () => {
+  it("retries a throwing connect and ends as a transient launch error with a clear reason", async () => {
+    const connect = vi.fn(async () => await Promise.reject(new Error("wake failed")));
+    const handshake = vi.fn();
+    const error = (await connectLeased(entryOf({ connect, release: vi.fn() }), CTX, {
+      open: handshake,
       reasonOf,
     }).catch((caught: unknown) => caught)) as TargetLaunchError;
-    expect(acquire).toHaveBeenCalledTimes(3);
-    expect(open).not.toHaveBeenCalled();
-    expect(release).not.toHaveBeenCalled();
+    expect(connect).toHaveBeenCalledTimes(3);
+    expect(handshake).not.toHaveBeenCalled();
     expect(error.transient).toBe(true);
     expect(error.reason).toBe("acquire failed: wake failed");
   });
 
-  it("does not retry an acquire error that says transient: false", async () => {
-    const acquire = vi.fn(
+  it("does not retry an error that says transient: false, and marks the target unavailable", async () => {
+    const connect = vi.fn(
       async () =>
-        await Promise.reject(Object.assign(new Error("computer gone"), { transient: false })),
+        await Promise.reject(Object.assign(new Error("credentials expired"), { transient: false })),
     );
-    const error = (await connectLeased(entryOf({ acquire }), CTX, {
-      open: vi.fn(),
-      reasonOf,
-    }).catch((caught: unknown) => caught)) as TargetLaunchError;
-    expect(acquire).toHaveBeenCalledTimes(1);
+    const error = (await connectLeased(entryOf({ connect }), CTX, open(1)).catch(
+      (caught: unknown) => caught,
+    )) as TargetLaunchError;
+    expect(connect).toHaveBeenCalledTimes(1);
     expect(error.transient).toBe(false);
   });
 
-  it("times acquire out, and releases a lease that arrives late", async () => {
-    const release = vi.fn();
-    const acquire = vi.fn(
+  it("keeps the target offered for a permanent error scoped to the job", async () => {
+    const connect = vi.fn(
       async () =>
-        await new Promise<ReturnType<typeof acquired>>((resolve) => {
+        await Promise.reject(
+          new RemoteConnectError("server gone", { transient: false, scope: "job" }),
+        ),
+    );
+    const error = (await connectLeased(entryOf({ connect }), CTX, open(1)).catch(
+      (caught: unknown) => caught,
+    )) as TargetLaunchError;
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(error.transient).toBe(true);
+    expect(error.reason).toBe("server gone");
+  });
+
+  it("releases a lease the failed connect carried on its error", async () => {
+    const release = vi.fn();
+    await connectLeased(
+      entryOf({ connect: halfWoken, release, retry: { attempts: 0 } }),
+      CTX,
+      open(1),
+    ).catch(() => {});
+    expect(release).toHaveBeenCalledWith(
+      { id: "h", token: "t" },
+      { outcome: "failed", error: expect.any(RemoteConnectError) },
+    );
+  });
+
+  it("times connect out, aborting its signal, and releases a lease that arrives late", async () => {
+    const release = vi.fn();
+    let signal: AbortSignal | undefined;
+    const connect = vi.fn(
+      async (context: RemoteConnectContext) =>
+        await new Promise<RemoteLeasedConnection<Lease>>((resolve) => {
+          signal = context.signal;
           setTimeout(() => {
-            resolve(acquired("late"));
+            resolve(connection("late"));
           }, 30);
         }),
     );
-    const entry = entryOf({ acquire, release, acquireTimeoutMs: 5, connectRetries: 0 });
-    const error = (await connectLeased(entry, CTX, { open: vi.fn(), reasonOf }).catch(
+    const entry = entryOf({
+      connect,
+      release,
+      timeouts: { acquireMs: 5 },
+      retry: { attempts: 0 },
+    });
+    const error = (await connectLeased(entry, CTX, open(1)).catch(
       (caught: unknown) => caught,
     )) as TargetLaunchError;
     expect(error.reason).toContain("acquire timed out after 5 ms");
     expect(error.transient).toBe(true);
+    expect(signal?.aborted).toBe(true);
     await vi.waitFor(() => {
-      expect(release).toHaveBeenCalledWith({ id: "late", token: "lease-token" }, "failed");
+      expect(release).toHaveBeenCalledWith(
+        { id: "late", token: "lease-token" },
+        { outcome: "failed", error: undefined },
+      );
     });
   });
 
-  it("refuses a connection whose reach differs from connect(), releasing it", async () => {
-    const release = vi.fn();
-    const acquire = vi.fn(
-      async () =>
-        await Promise.resolve({ protocol: "playwright" as const, endpoint: "ws://h:1/", lease: 1 }),
+  it("stops without retrying when the run is cancelled while connect is pending", async () => {
+    const controller = new AbortController();
+    const connect = vi.fn(
+      async ({ signal }: RemoteConnectContext) =>
+        await new Promise<RemoteLeasedConnection<Lease>>((_, reject) => {
+          signal.addEventListener("abort", () => {
+            reject(new Error("aborted"));
+          });
+        }),
     );
-    const error = (await connectLeased(entryOf({ acquire, release }), CTX, {
-      open: vi.fn(),
-      reasonOf,
-    }).catch((caught: unknown) => caught)) as TargetLaunchError;
-    expect(error.transient).toBe(false);
-    expect(error.reason).toContain("reach");
-    expect(release).toHaveBeenCalledWith(1, "failed");
+    const pending = connectLeased(
+      entryOf({ connect }),
+      { ...CTX, signal: controller.signal },
+      open(1),
+    );
+    controller.abort();
+    const error = (await pending.catch((caught: unknown) => caught)) as TargetLaunchError;
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(error.reason).toBe("cancelled while connecting");
+    expect(error.transient).toBe(true);
   });
 
-  it("logs a failing release without the lease and does not throw", async () => {
+  it.each([
+    [
+      "extra fields",
+      { endpoint: "ws://h:1/", exposeNetwork: "<loopback>" },
+      /protocol and reach are declared/u,
+    ],
+    ["a wrong scheme", { endpoint: "https://h:1/" }, /not a ws: or wss: URL/u],
+  ])(
+    "refuses a connection with %s, permanently for the job, releasing its lease",
+    async (_label, extra, message) => {
+      const release = vi.fn();
+      const connect = async () => await Promise.resolve({ ...extra, lease: 7 } as never);
+      const error = (await connectLeased(entryOf({ connect, release }), CTX, open(1)).catch(
+        (caught: unknown) => caught,
+      )) as TargetLaunchError;
+      expect(error.transient).toBe(true);
+      expect(error.reason).toMatch(message);
+      expect(release).toHaveBeenCalledWith(7, { outcome: "failed", error: undefined });
+    },
+  );
+});
+
+describe("release", () => {
+  it("logs a failing release without the lease or the message, and does not throw", async () => {
     const warn = vi.fn();
     const release = vi.fn(() => {
       throw new Error("sleep failed token=lease-token");
     });
-    const acquire = vi.fn(async () => await Promise.resolve(acquired("a")));
-    const { lease } = await connectLeased(entryOf({ acquire, release }), CTX, {
-      open: async () => await Promise.resolve(1),
-      reasonOf,
+    const { lease } = await connectLeased(entryOf({ connect: connecting(), release }), CTX, {
+      ...open(1),
       logger: { warn } as never,
     });
     await expect(lease.end("finished")).resolves.toBeUndefined();
     expect(JSON.stringify(warn.mock.calls)).not.toContain("lease-token");
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({ outcome: "finished", err: "Error" });
   });
 
-  it("releases every held lease as cancelled on shutdown", async () => {
+  it("gives up on a release that hangs, after releaseMs", async () => {
+    const warn = vi.fn();
+    const release = vi.fn(async () => await new Promise<void>(() => {}));
+    const { lease } = await connectLeased(
+      entryOf({ connect: connecting(), release, timeouts: { releaseMs: 5 } }),
+      CTX,
+      { ...open(1), logger: { warn } as never },
+    );
+    await lease.end("finished");
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({ err: "ReleaseTimeout" });
+  });
+});
+
+describe("shutdownRemote", () => {
+  it("aborts a pending connect, releases every held lease as cancelled, then runs the hooks", async () => {
     const release = vi.fn();
-    const acquire = vi.fn(async () => await Promise.resolve(acquired("s")));
-    await connectLeased(entryOf({ acquire, release }), CTX, {
-      open: async () => await Promise.resolve(1),
-      reasonOf,
+    const order: string[] = [];
+    const hook = onRemoteShutdown(async () => {
+      order.push(`hook after ${release.mock.calls.length} release`);
+      await Promise.resolve();
     });
-    await releaseAllLeases();
+    await connectLeased(entryOf({ connect: connecting("s"), release }), CTX, open(1));
+    const pendingConnect = vi.fn(
+      async ({ signal }: RemoteConnectContext) =>
+        await new Promise<RemoteLeasedConnection<Lease>>((_, reject) => {
+          signal.addEventListener("abort", () => {
+            reject(new Error("aborted"));
+          });
+        }),
+    );
+    const pending = connectLeased(entryOf({ connect: pendingConnect }), CTX, open(1)).catch(
+      (caught: unknown) => caught,
+    );
+    await shutdownRemote();
+    expect(await pending).toBeInstanceOf(TargetLaunchError);
     expect(release).toHaveBeenCalledTimes(1);
-    expect(release.mock.calls[0]?.[1]).toBe("cancelled");
-    await releaseAllLeases();
+    expect(release.mock.calls[0]?.[1]).toMatchObject({ outcome: "cancelled" });
+    expect(order).toEqual(["hook after 1 release"]);
+    await shutdownRemote();
     expect(release).toHaveBeenCalledTimes(1);
+    hook();
   });
 });

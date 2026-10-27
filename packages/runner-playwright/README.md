@@ -64,7 +64,7 @@ createPlaywrightCaptureRunner({
 });
 ```
 
-- `playwrightServer`, `azurePlaywright`, `browserstack` and the generic `remote({ name, engines, connect, sessions })` use `browserType.connect` (all three engines); a `connect` that answers `protocol: "cdp"` uses `chromium.connectOverCDP` (Chromium only, lower fidelity). Every preset is plain configuration: no vendor SDK is installed.
+- `playwrightServer`, `azurePlaywright`, `browserstack` and the generic `remote({ name, engines, protocol, reach, connect, sessions })` use `browserType.connect` (all three engines); `protocol: "cdp"` uses `chromium.connectOverCDP` (Chromium only, lower fidelity). Every preset is plain configuration: no vendor SDK is installed.
 - `exposeNetwork: "<loopback>"` routes the remote browser's requests for the host's loopback Storybook server back through the connection (a self-hosted Playwright server, Azure). A service that cannot is a `reach: "url"` target and needs a signed Storybook URL.
 - The target's environment (browser version, platform, device scale factor, fonts digest) is measured inside the browser, never from the host. Page concurrency is the service's `sessions`, shared per target across the process; connection failures are retried with backoff before the render sees them.
 - With no local entry in `browsers` the host needs no installed browsers (only `playwright-core`).

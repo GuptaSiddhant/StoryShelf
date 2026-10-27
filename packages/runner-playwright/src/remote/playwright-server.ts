@@ -17,10 +17,10 @@ export interface PlaywrightServerOptions {
   headers?: Record<string, string>;
   /**
    * Route the remote browser's requests for the loopback Storybook server back through the
-   * connection (default `"<loopback>"`). `false` when the server cannot, which makes every target
-   * need a signed Storybook URL.
+   * connection (default `"<loopback>"`, the only pattern supported). `false` when the server
+   * cannot, which makes every target need a signed Storybook URL.
    */
-  exposeNetwork?: string | false;
+  exposeNetwork?: "<loopback>" | false;
   /** Parallel pages the farm should take from this runner (default 1: set it to the farm's cap). */
   sessions?: number;
   /** Engines to offer (default all three; the server must have them installed). */
@@ -44,14 +44,11 @@ export function playwrightServer(options: PlaywrightServerOptions): RemoteBrowse
   return remote({
     name: options.name ?? "grid",
     engines: options.engines ?? ["chromium", "firefox", "webkit"],
-    connect: () => ({
-      protocol: "playwright",
-      endpoint: options.endpoint,
-      headers,
-      ...(exposeNetwork === false ? {} : { exposeNetwork }),
-    }),
+    protocol: "playwright",
+    reach: exposeNetwork === false ? "url" : "loopback",
+    connect: { endpoint: options.endpoint, headers },
     sessions: options.sessions ?? 1,
     platform: options.platform,
-    connectTimeoutMs: options.connectTimeoutMs,
+    timeouts: { connectMs: options.connectTimeoutMs },
   });
 }

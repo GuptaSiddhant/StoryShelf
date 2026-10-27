@@ -31,15 +31,19 @@ export async function runTestEntries(
   if (rawInput.tests.length === 0) return [];
   const { input, name, remote } = planRun(rawInput, driver, defaultTarget);
   assertReachable(name, remote, input.storybookUrl);
-  const browser = await driver.launch(name, input.logger, launchContextOf(input));
+  const browser = await driver.launch(
+    name,
+    input.logger,
+    launchContextOf(input, "tests", active.abort?.signal),
+  );
   const server = await serve(input, browser);
   active.browser = browser;
   return await finishing(
     async () => await runAll(browser, server.url, input, active),
-    async (failed) => {
+    async (failed, error) => {
       active.browser = null;
       await Promise.all([
-        safeCloseBrowser(browser, outcomeOf(active, failed)),
+        safeCloseBrowser(browser, outcomeOf(active, failed), error),
         safeCloseServer(server),
       ]);
     },

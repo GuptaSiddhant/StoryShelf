@@ -29,19 +29,16 @@ function targetOf(endpoint: string, retries = 0) {
     name: "farm",
     engines: ["chromium"],
     sessions: 1,
-    connectRetries: retries,
-    connectBackoffMs: 1,
-    connectTimeoutMs: 3000,
-    connect: () => ({
-      protocol: "playwright",
-      endpoint,
-      headers: { authorization: "Bearer sekret-token" },
-    }),
+    retry: { attempts: retries, backoffMs: 1 },
+    timeouts: { connectMs: 3000 },
+    protocol: "playwright",
+    reach: "url",
+    connect: { endpoint, headers: { authorization: "Bearer sekret-token" } },
   });
   return remoteTargetsOf(service)[0] as NonNullable<ReturnType<typeof remoteTargetsOf>[0]>;
 }
 
-const CTX = { buildId: "b1" };
+const CTX = { buildId: "b1", runId: "b1", purpose: "render" } as const;
 const servers: Server[] = [];
 
 afterEach(async () => {

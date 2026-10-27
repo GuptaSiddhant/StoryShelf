@@ -19,18 +19,27 @@ import puppeteer from "puppeteer-core";
  */
 export async function connectRemote(entry: RemoteTarget, logger?: Logger): Promise<Browser> {
   const { remote, target } = entry;
-  const connection = remote.connect(entry.engine);
+  if (typeof remote.connect === "function") {
+    throw new TargetLaunchError(
+      target,
+      "a function connect (acquire/release) is only supported by the Playwright runner",
+    );
+  }
+  const connection = remote.connect;
   try {
-    return await retryConnect(async () => await connectOnce(connection, remote.connectTimeoutMs), {
-      retries: remote.connectRetries,
-      backoffMs: remote.connectBackoffMs,
-      onRetry: (error, retry, delayMs) => {
-        logger?.warn(
-          { target, retry, delayMs, reason: reasonOf(error, connection) },
-          "remote browser connect failed, retrying",
-        );
+    return await retryConnect(
+      async () => await connectOnce(connection, remote.timeouts.connectMs),
+      {
+        retries: remote.retry.attempts,
+        backoffMs: remote.retry.backoffMs,
+        onRetry: (error, retry, delayMs) => {
+          logger?.warn(
+            { target, retry, delayMs, reason: reasonOf(error, connection) },
+            "remote browser connect failed, retrying",
+          );
+        },
       },
-    });
+    );
   } catch (error) {
     throw new TargetLaunchError(target, reasonOf(error, connection), {
       cause: new Error(reasonOf(error, connection)),

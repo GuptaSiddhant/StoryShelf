@@ -26,16 +26,16 @@ export function azurePlaywright(options: AzurePlaywrightOptions): RemoteBrowser 
   return remote({
     name: options.name ?? "azure",
     engines: options.engines ?? ["chromium", "firefox", "webkit"],
-    connect: () => ({
-      protocol: "playwright",
+    protocol: "playwright",
+    // The service routes requests for the host's loopback back through the connection.
+    reach: "loopback",
+    connect: {
       endpoint: withParams(options.endpoint, {
         os,
         "api-version": options.apiVersion ?? "2025-09-01",
       }),
       headers: { authorization: `Bearer ${options.token}` },
-      // The service routes requests for the host's loopback back through the connection.
-      exposeNetwork: "<loopback>",
-    }),
+    },
     sessions: options.sessions ?? 1,
     platform: os,
   });

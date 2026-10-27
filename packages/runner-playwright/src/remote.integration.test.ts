@@ -141,7 +141,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
         name: "cdp",
         engines: ["chromium"],
         sessions: 2,
-        connect: () => ({ protocol: "cdp", endpoint: `http://127.0.0.1:${port}` }),
+        protocol: "cdp",
+        reach: "url",
+        connect: { endpoint: `http://127.0.0.1:${port}` },
       });
       const runner = createPlaywrightCaptureRunner({ browsers: [cdp] });
       const input = {
@@ -302,7 +304,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
         name: "cdp",
         engines: ["chromium"],
         sessions: 2,
-        connect: () => ({ protocol: "cdp", endpoint: `http://127.0.0.1:${debugPort}` }),
+        protocol: "cdp",
+        reach: "url",
+        connect: { endpoint: `http://127.0.0.1:${debugPort}` },
       });
       app = createShelfApp({
         database: createSqliteDatabase(join(tmp, "shelf.db")),

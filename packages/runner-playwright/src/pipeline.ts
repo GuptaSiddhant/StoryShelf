@@ -60,7 +60,7 @@ export async function renderAll(
   assertReachable(name, remote, input.storybookUrl);
   // Launch first: a target that will not start must fail before a static server is bound.
   const launch = async (): Promise<Browser> =>
-    await driver.launch(name, input.logger, launchContextOf(input));
+    await driver.launch(name, input.logger, launchContextOf(input, "render", active.abort?.signal));
   const browser = await launch();
   const server = await serve(input, browser);
   input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
@@ -77,15 +77,24 @@ export async function renderAll(
 }
 
 /** What a remote service's `acquire` is told about the run a browser is for. */
-export function launchContextOf(input: {
-  buildId: string;
-  shardIndex?: number | undefined;
-}): LaunchContext {
-  return { buildId: input.buildId, shardIndex: input.shardIndex };
+export function launchContextOf(
+  input: { buildId: string; runId?: string | undefined; shardIndex?: number | undefined },
+  purpose: LaunchContext["purpose"],
+  signal?: AbortSignal,
+): LaunchContext {
+  return {
+    buildId: input.buildId,
+    runId: input.runId ?? input.buildId,
+    shardIndex: input.shardIndex,
+    purpose,
+    signal,
+  };
 }
 
 /** The input with its target resolved, and the session gate when the target is remote. */
-export function planRun<T extends { target?: CaptureTarget | undefined }>(
+export function planRun<
+  T extends { target?: CaptureTarget | undefined; logger?: PlaywrightRenderInput["logger"] },
+>(
   rawInput: T,
   driver: TargetDriver,
   defaultTarget: CaptureTarget,
@@ -96,7 +105,14 @@ export function planRun<T extends { target?: CaptureTarget | undefined }>(
 } {
   const name = rawInput.target ?? defaultTarget;
   const remote = driver.remote(name);
-  const gate = remote && sessionGateFor(name, remote.remote.sessions);
+  const gate =
+    remote &&
+    sessionGateFor(name, remote.remote.sessions, (value) => {
+      rawInput.logger?.warn(
+        { target: name, value: String(value) },
+        "sessions() returned an invalid value; keeping the last good one",
+      );
+    });
   return { input: { ...rawInput, target: name, gate }, name, remote };
 }
 
@@ -113,13 +129,13 @@ export async function extractAll(
   if (!first) return {};
   const name = input.target ?? defaultTarget;
   assertReachable(name, driver.remote(name), input.storybookUrl);
-  const browser = await driver.launch(name, input.logger, launchContextOf(input));
+  const browser = await driver.launch(name, input.logger, launchContextOf(input, "extract"));
   const server = await serve(input, browser);
   return await finishing(
     async () => await readParameters(browser, server.url, first.id, input.adapter),
-    async (failed) => {
+    async (failed, error) => {
       await Promise.all([
-        safeCloseBrowser(browser, failed ? "failed" : "finished"),
+        safeCloseBrowser(browser, failed ? "failed" : "finished", error),
         safeCloseServer(server),
       ]);
     },
@@ -211,12 +227,12 @@ async function runWithBrowser(
       await runAllCaptures(input, active, ctx, captures, failures, relaunch);
       return { captures, failures };
     },
-    async (failed) => {
+    async (failed, error) => {
       active.browser = null;
       await ctx.pagePool?.dispose();
       // ctx.browser is the latest one: recycling replaces the browser mid-run.
       await Promise.all([
-        safeCloseBrowser(ctx.browser, outcomeOf(active, failed)),
+        safeCloseBrowser(ctx.browser, outcomeOf(active, failed), error),
         safeCloseServer(server),
       ]);
     },

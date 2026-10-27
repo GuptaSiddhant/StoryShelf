@@ -40,14 +40,16 @@ export function cdp(options: CdpOptions): RemoteBrowser {
     {
       name: options.name,
       engines: options.engines ?? ["chromium"],
-      connect: () => ({
-        protocol: "cdp",
+      protocol: "cdp",
+      // The browser cannot route back to this host: every target needs a signed Storybook URL.
+      reach: "url",
+      connect: {
         endpoint: options.endpoint,
         ...(options.headers === undefined ? {} : { headers: options.headers }),
-      }),
+      },
       sessions: options.sessions ?? 1,
       platform: options.platform,
-      connectTimeoutMs: options.connectTimeoutMs,
+      timeouts: { connectMs: options.connectTimeoutMs },
     },
     SUPPORT,
   );

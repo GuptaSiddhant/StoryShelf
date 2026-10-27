@@ -25,14 +25,18 @@ export async function closeBrowser(browser: Browser | null): Promise<void> {
   await tryCloseBrowser(browser, "cancelled");
 }
 
-async function tryCloseBrowser(browser: Browser, outcome: RemoteLeaseOutcome): Promise<void> {
+async function tryCloseBrowser(
+  browser: Browser,
+  outcome: RemoteLeaseOutcome,
+  error?: unknown,
+): Promise<void> {
   try {
     await browser.close();
   } catch {
     // The run's own `finally` performs final cleanup; cancel must never throw.
   }
   // The first outcome wins: a render cancelled mid-way closes its browser as `cancelled` first.
-  await leases.get(browser)?.end(outcome);
+  await leases.get(browser)?.end(outcome, error);
 }
 
 /** The outcome a render's `finally` reports: a cancel wins over a failure, a failure over a finish. */
@@ -44,16 +48,16 @@ export function outcomeOf(active: { cancelled: boolean }, failed: boolean): Remo
 /** Run `work`, then `finish` with whether it threw, so a browser is closed with how its run went. */
 export async function finishing<T>(
   work: () => Promise<T>,
-  finish: (failed: boolean) => Promise<void>,
+  finish: (failed: boolean, error?: unknown) => Promise<void>,
 ): Promise<T> {
-  let failed = false;
+  let failure: { error: unknown } | undefined;
   try {
     return await work();
   } catch (error) {
-    failed = true;
+    failure = { error };
     throw error;
   } finally {
-    await finish(failed);
+    await finish(failure !== undefined, failure?.error);
   }
 }
 
@@ -61,8 +65,9 @@ export async function finishing<T>(
 export async function safeCloseBrowser(
   browser: Browser,
   outcome: RemoteLeaseOutcome = "finished",
+  error?: unknown,
 ): Promise<void> {
-  await tryCloseBrowser(browser, outcome);
+  await tryCloseBrowser(browser, outcome, error);
 }
 
 /** Best-effort close for the static server. */

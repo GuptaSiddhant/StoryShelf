@@ -2,8 +2,8 @@
 import {
   connectLeased,
   scrubConnection,
+  type ConnectLeasedContext,
   type RemoteConnection,
-  type RemoteLeaseContext,
   type RemoteTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
@@ -13,16 +13,16 @@ import { loadPlaywright } from "./launch.ts";
 import { playwrightVersion } from "./version.ts";
 
 /**
- * Connect to `entry`'s service and return its browser, holding the service's lease (`acquire`)
- * until the browser is closed through `closeBrowser`/`safeCloseBrowser`. Connection-level failures
- * are retried with backoff, so a provider outage or a full plan costs time and not a story
- * crash; what is left is a `TargetLaunchError`, which fails the job at once (a wrong version or
- * credential also marks the target unavailable, a service that is merely down does not). Nothing
- * in a message carries the endpoint, its credentials or the lease.
+ * Connect to `entry`'s service and return its browser, holding the service's lease (a function
+ * `connect`'s `lease`) until the browser is closed through `closeBrowser`/`safeCloseBrowser`.
+ * Connection-level failures are retried with backoff, so a provider outage or a full plan costs
+ * time and not a story crash; what is left is a `TargetLaunchError`, which fails the job at once
+ * (a wrong version or credential also marks the target unavailable, a service that is merely down
+ * does not). Nothing in a message carries the endpoint, its credentials or the lease.
  */
 export async function connectRemote(
   entry: RemoteTarget,
-  context: Pick<RemoteLeaseContext, "buildId" | "shardIndex">,
+  context: ConnectLeasedContext,
   logger?: Logger,
 ): Promise<Browser> {
   const playwright = await loadPlaywright();
@@ -41,21 +41,22 @@ async function connectOnce(
   connection: RemoteConnection,
 ): Promise<Browser> {
   const { headers, endpoint } = connection;
-  if (connection.protocol === "cdp") {
+  const timeout = entry.remote.timeouts.connectMs;
+  if (entry.remote.protocol === "cdp") {
     return await playwright.chromium.connectOverCDP(endpoint, {
-      timeout: entry.remote.connectTimeoutMs,
+      timeout,
       ...(headers === undefined ? {} : { headers }),
     });
   }
   return await playwright[entry.engine === "chrome" ? "chromium" : entry.engine].connect(endpoint, {
-    timeout: entry.remote.connectTimeoutMs,
+    timeout,
     ...(headers === undefined ? {} : { headers }),
-    ...(connection.exposeNetwork === undefined ? {} : { exposeNetwork: connection.exposeNetwork }),
+    ...(entry.reach === "loopback" ? { exposeNetwork: "<loopback>" } : {}),
   });
 }
 
 /** What failed, in one line, with the version mismatch spelled out and the credentials removed. */
-function reasonOf(error: unknown, connection: RemoteConnection): string {
+function reasonOf(error: unknown, connection: RemoteConnection & { lease?: unknown }): string {
   const text = error instanceof Error ? error.message : String(error);
   const mismatch = versionMismatch(text);
   if (mismatch !== null) {

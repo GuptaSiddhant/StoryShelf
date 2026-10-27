@@ -15,10 +15,14 @@ const gates = new Map<string, SessionGate>();
  * concurrent shards share the cap instead of multiplying it. A later call with another `sessions`
  * keeps the first gate: the size is the runner's configuration and does not change under it.
  */
-export function sessionGateFor(target: string, sessions: number | (() => number)): SessionGate {
+export function sessionGateFor(
+  target: string,
+  sessions: number | (() => number),
+  onInvalid?: (value: unknown) => void,
+): SessionGate {
   let gate = gates.get(target);
   if (gate === undefined) {
-    gate = createSessionGate(sessions);
+    gate = createSessionGate(sessions, onInvalid);
     gates.set(target, gate);
   }
   return gate;
@@ -28,9 +32,23 @@ export function sessionGateFor(target: string, sessions: number | (() => number)
  * A gate of its own (not shared through {@link sessionGateFor}); `size` below 1 counts as 1. A
  * function is read on every use, so a cap that grows lets waiting work in at the next release.
  */
-export function createSessionGate(size: number | (() => number)): SessionGate {
-  const limitNow = (): number =>
-    Math.max(1, Math.floor(typeof size === "function" ? size() : size));
+export function createSessionGate(
+  size: number | (() => number),
+  onInvalid?: (value: unknown) => void,
+): SessionGate {
+  let last = 1;
+  let warned = false;
+  // A function returning garbage (NaN, a string) keeps the last good cap instead of blocking every page.
+  const limitNow = (): number => {
+    const raw: unknown = typeof size === "function" ? size() : size;
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      last = Math.max(1, Math.floor(raw));
+    } else if (!warned) {
+      warned = true;
+      onInvalid?.(raw);
+    }
+    return last;
+  };
   let active = 0;
   const waiting: (() => void)[] = [];
   const release = (): void => {

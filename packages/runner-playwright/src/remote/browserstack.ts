@@ -38,8 +38,9 @@ export function browserstack(options: BrowserStackOptions): RemoteBrowser {
   return remote({
     name: options.name ?? "browserstack",
     engines: options.engines ?? ["chromium", "firefox", "webkit"],
-    connect: (engine) => ({
-      protocol: "playwright",
+    protocol: "playwright",
+    reach: "url",
+    connect: ({ engine }) => ({
       endpoint: `wss://cdp.browserstack.com/playwright?caps=${encodeURIComponent(
         JSON.stringify(capabilities(options, engine)),
       )}`,

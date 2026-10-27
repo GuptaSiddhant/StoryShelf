@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createLatch, deferred } from "../test-helpers/index.ts";
 import { createSessionGate, sessionGateFor } from "./session-gate.ts";
 
@@ -71,5 +71,22 @@ describe("session gates", () => {
     expect(await peakOf(gate, 10)).toBe(3);
     cap = 1;
     expect(await peakOf(gate, 6)).toBe(1);
+  });
+
+  it("keeps the last good cap when a function returns garbage, telling the caller once", async () => {
+    let value: unknown = 2;
+    const invalid = vi.fn();
+    const gate = createSessionGate(() => value as number, invalid);
+    expect(gate.size).toBe(2);
+    value = Number.NaN;
+    expect(gate.size).toBe(2);
+    value = "many";
+    expect(gate.size).toBe(2);
+    expect(invalid).toHaveBeenCalledTimes(1);
+    expect(await peakOf(gate, 8)).toBe(2);
+  });
+
+  it("counts a function returning below one as one", () => {
+    expect(createSessionGate(() => 0).size).toBe(1);
   });
 });

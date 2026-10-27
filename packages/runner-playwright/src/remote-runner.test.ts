@@ -1,4 +1,8 @@
-import { TargetLaunchError, type StoryEntry } from "@storyshelf/core/adapter/capture-runner";
+import {
+  TargetLaunchError,
+  type RemoteConnectContext,
+  type StoryEntry,
+} from "@storyshelf/core/adapter/capture-runner";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -124,14 +128,14 @@ const farm = (overrides: Partial<Parameters<typeof remote>[0]> = {}) =>
     name: "grid",
     engines: ["chromium", "firefox"],
     sessions: 2,
-    connectBackoffMs: 1,
+    retry: { backoffMs: 1 },
     platform: "windows",
-    connect: () => ({
-      protocol: "playwright",
+    protocol: "playwright",
+    reach: "loopback",
+    connect: {
       endpoint: "wss://farm.example/?key=sekret-key",
       headers: { authorization: "Bearer sekret-token" },
-      exposeNetwork: "<loopback>",
-    }),
+    },
     ...overrides,
   });
 
@@ -201,7 +205,9 @@ describe("a remote target", () => {
         farm({
           name: "cdp",
           engines: ["chromium"],
-          connect: () => ({ protocol: "cdp", endpoint: "wss://cdp.example/" }),
+          protocol: "cdp",
+          reach: "url",
+          connect: { endpoint: "wss://cdp.example/" },
         }),
       ],
     });
@@ -243,7 +249,9 @@ describe("a remote target", () => {
         browsers: [
           farm({
             engines: ["chromium"],
-            connect: () => ({ protocol: "cdp", endpoint: "wss://x/" }),
+            protocol: "cdp",
+            reach: "url",
+            connect: { endpoint: "wss://x/" },
           }),
         ],
       }).extractParameters?.({ buildId: "b1", storybookDir, stories: STORIES }),
@@ -273,7 +281,9 @@ describe("a remote target", () => {
   });
 
   it("keeps a target offered when the service is down, but fails the job at once with no endpoint in the message", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm({ connectRetries: 1 })] });
+    const runner = createPlaywrightCaptureRunner({
+      browsers: [farm({ retry: { attempts: 1, backoffMs: 1 } })],
+    });
     fake.state.failure = new Error("connect ECONNREFUSED wss://farm.example/?key=sekret-key");
     const error: unknown = await runner.render(input()).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(TargetLaunchError);
@@ -320,33 +330,37 @@ describe("a remote target", () => {
   });
 });
 
-const leased = (overrides: Partial<Parameters<typeof remote>[0]> = {}) => {
-  const seen: { engine: string; buildId: string; shardIndex?: number | undefined }[] = [];
-  const released: { lease: unknown; outcome: string }[] = [];
+const leased = (overrides: Partial<Parameters<typeof remote<{ id: string }>>[0]> = {}) => {
+  const seen: RemoteConnectContext[] = [];
+  const released: { lease: unknown; outcome: string; error?: unknown }[] = [];
   let next = 0;
-  const service = farm({
-    acquire: async (context) => {
+  const service = remote<{ id: string }>({
+    name: "grid",
+    engines: ["chromium", "firefox"],
+    sessions: 2,
+    retry: { attempts: 1, backoffMs: 1 },
+    protocol: "playwright",
+    reach: "loopback",
+    connect: async (context) => {
       seen.push(context);
       next += 1;
       const id = next;
       await Promise.resolve();
       return {
-        protocol: "playwright",
         endpoint: `wss://farm-${id}.example/?key=sekret-${id}`,
-        exposeNetwork: "<loopback>",
         lease: { id: `lease-${id}` },
       };
     },
-    release: (lease, outcome) => {
-      released.push({ lease, outcome });
+    release: (lease, info) => {
+      released.push({ lease, ...info });
     },
     ...overrides,
   });
   return { service, seen, released };
 };
 
-describe("a remote target with acquire and release", () => {
-  it("acquires per shard with its identity, connects to what it returned and releases as finished", async () => {
+describe("a remote target with a function connect and release", () => {
+  it("connects per shard with its identity, to what it returned, and releases as finished", async () => {
     const { service, seen, released } = leased();
     const runner = createPlaywrightCaptureRunner({ browsers: [service] });
     await Promise.all(
@@ -360,9 +374,17 @@ describe("a remote target with acquire and release", () => {
     expect(
       seen.map((context) => context.shardIndex).toSorted((a, b) => (a ?? 0) - (b ?? 0)),
     ).toEqual([1, 2]);
-    expect(seen.every((context) => context.buildId === "b1" && context.engine === "chromium")).toBe(
-      true,
-    );
+    expect(seen.map((context) => context.runId).toSorted()).toEqual(["s1", "s2"]);
+    expect(
+      seen.every(
+        (context) =>
+          context.buildId === "b1" &&
+          context.engine === "chromium" &&
+          context.purpose === "render" &&
+          context.attempt === 1 &&
+          !context.signal.aborted,
+      ),
+    ).toBe(true);
     expect(fake.state.connects.map((connect) => connect.endpoint).toSorted()).toEqual([
       "wss://farm-1.example/?key=sekret-1",
       "wss://farm-2.example/?key=sekret-2",
@@ -371,23 +393,25 @@ describe("a remote target with acquire and release", () => {
     expect(new Set(released.map((entry) => JSON.stringify(entry.lease))).size).toBe(2);
   });
 
-  it("releases as failed when the render throws, once", async () => {
-    const { service, released } = leased();
-    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
-    await expect(
-      runner.render(
-        input({ target: "chromium@grid", onCapture: () => Promise.reject(new Error("sink down")) }),
-      ),
-    ).resolves.toBeDefined();
-    // A per-capture sink failure is a render failure row, not a crash: the lease still ends once.
-    expect(released).toHaveLength(1);
-    const broken = createPlaywrightCaptureRunner({
-      browsers: [leased({ connectRetries: 0 }).service],
-    });
-    fake.state.failure = new Error("401 Unauthorized");
-    await expect(broken.render(input({ target: "chromium@grid" }))).rejects.toBeInstanceOf(
-      TargetLaunchError,
+  it("tells an unsharded render apart: no shard index, the build id as its run", async () => {
+    const { service, seen } = leased();
+    await createPlaywrightCaptureRunner({ browsers: [service] }).render(
+      input({ target: "chromium@grid" }),
     );
+    expect(seen[0]?.shardIndex).toBeUndefined();
+    expect(seen[0]?.runId).toBe("b1");
+  });
+
+  it("releases as failed when the handshake fails after connect returned, once", async () => {
+    const { service, released } = leased();
+    fake.state.failure = new Error("401 Unauthorized");
+    await expect(
+      createPlaywrightCaptureRunner({ browsers: [service] }).render(
+        input({ target: "chromium@grid" }),
+      ),
+    ).rejects.toBeInstanceOf(TargetLaunchError);
+    expect(released).toHaveLength(1);
+    expect(released[0]?.outcome).toBe("failed");
   });
 
   it("releases as cancelled when the build is cancelled mid-render", async () => {
@@ -404,10 +428,31 @@ describe("a remote target with acquire and release", () => {
     expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
   });
 
-  it("fails the render with a clear reason, holding nothing, when acquire throws", async () => {
+  it("aborts a connect still pending when the build is cancelled, and does not retry it", async () => {
+    const aborted = vi.fn();
     const { service, released } = leased({
-      connectRetries: 1,
-      acquire: () => Promise.reject(new Error("wake failed")),
+      retry: { attempts: 3, backoffMs: 1 },
+      connect: async ({ signal }) =>
+        await new Promise((_, reject) => {
+          signal.addEventListener("abort", () => {
+            aborted();
+            reject(new Error("aborted"));
+          });
+        }),
+    });
+    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await runner.cancel("b1", "s1");
+    await expect(rendering).rejects.toBeInstanceOf(TargetLaunchError);
+    expect(aborted).toHaveBeenCalledTimes(1);
+    expect(released).toEqual([]);
+  });
+
+  it("fails the render with a clear reason, holding nothing, when connect throws", async () => {
+    const { service, released } = leased({
+      retry: { attempts: 1, backoffMs: 1 },
+      connect: () => Promise.reject(new Error("wake failed")),
     });
     const runner = createPlaywrightCaptureRunner({ browsers: [service] });
     const error = (await runner
