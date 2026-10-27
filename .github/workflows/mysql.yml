@@ -1,0 +1,43 @@
+name: MySQL compatibility
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mysql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mysql:
+    name: MySQL 8 migrations and queue
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test-password
+          MYSQL_DATABASE: storyshelf_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ptest-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+      - name: Run MySQL suite against disposable database
+        env:
+          LIVE_CLOUD: "1"
+          MYSQL_DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/storyshelf_test
+          MYSQL_SCHEMA_MUTATION_TEST: "1"
+        run: nubx turbo test --filter='@storyshelf/db-mysql' --force --env-mode=loose

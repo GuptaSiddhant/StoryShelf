@@ -195,3 +195,8 @@ export PATH="$HOME/.nub/bin:$PATH"
 LIVE_CLOUD=1 TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... \
   nubx turbo test --filter='@storyshelf/db-sqlite' --force
 ```
+
+MySQL 8 compatibility also runs in CI against a disposable MySQL service. The live MySQL suite's
+upgrade test drops columns before rerunning migrations; it is skipped unless
+`MYSQL_SCHEMA_MUTATION_TEST=1` is set. Set that flag only for a disposable database, never a
+shared cloud database. The regular live suite still tests setup, CRUD and queue behavior.
