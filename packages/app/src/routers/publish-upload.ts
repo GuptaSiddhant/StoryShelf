@@ -9,6 +9,8 @@ import {
   publishRoute,
   publishStoredZip,
   resolvePublishLimits,
+  ZipInvalidError,
+  ZipLimitError,
 } from "@storyshelf/core/capture";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import { BuildModel } from "@storyshelf/core/models";
@@ -71,8 +73,17 @@ async function publishInline(build: Build): Promise<void> {
     logger.info({ buildId: build.id }, "upload statics persisted inline");
     await publish?.completer.complete(build.id, { ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error({ err: error, buildId: build.id }, "inline publish failed");
-    await publish?.completer.complete(build.id, { ok: false, error: message });
+    if (error instanceof ZipInvalidError || error instanceof ZipLimitError) {
+      await discardZip(build.projectId, build.id);
+      throw new HTTPException(422, { message: error.message });
+    }
+    await failInlinePublish(build, error);
   }
+}
+
+async function failInlinePublish(build: Build, error: unknown): Promise<void> {
+  const { logger, publish } = getStore();
+  const message = error instanceof Error ? error.message : String(error);
+  logger.error({ err: error, buildId: build.id }, "inline publish failed");
+  await publish?.completer.complete(build.id, { ok: false, error: message });
 }

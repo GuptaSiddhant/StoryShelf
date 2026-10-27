@@ -28,3 +28,5 @@ export {
   type PublishLimits,
 } from "./limits.ts";
 export { publishStoredZip, PUBLISH_SCRATCH_ID, type PublishZipOptions } from "./run.ts";
+
+export { ZipInvalidError } from "./invalid-zip.ts";

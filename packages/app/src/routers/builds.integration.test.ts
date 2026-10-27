@@ -3,6 +3,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookZipPath } from "@storyshelf/core/utils";
+import AdmZip from "adm-zip";
 import { Readable } from "node:stream";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
@@ -201,12 +202,14 @@ describe("streaming build upload (JSON + PUT)", () => {
   it("streams the zip with PUT and stores byte-identical content", async () => {
     const { storage, app } = await setupSeeded();
     const created = await createViaJson(app, defaultPayload);
-    const payload = Buffer.from("PK-zip-bytes-".repeat(5000));
+    const zip = new AdmZip();
+    zip.addFile("iframe.html", Buffer.from("PK-zip-bytes-".repeat(5000)));
+    const payload = zip.toBuffer();
 
     const response = await app.request(created.uploadUrl, {
       method: "PUT",
       headers: { "content-type": "application/zip" },
-      body: payload,
+      body: new Uint8Array(payload),
     });
 
     expect(response.status).toBe(202);
@@ -216,7 +219,9 @@ describe("streaming build upload (JSON + PUT)", () => {
   it("streams a node Readable end to end", async () => {
     const { storage, app } = await setupSeeded();
     const created = await createViaJson(app, defaultPayload);
-    const payload = Buffer.from("readable-bytes-".repeat(2000));
+    const zip = new AdmZip();
+    zip.addFile("iframe.html", Buffer.from("readable-bytes-".repeat(2000)));
+    const payload = zip.toBuffer();
 
     const response = await app.request(created.uploadUrl, {
       method: "PUT",

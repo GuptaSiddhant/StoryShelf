@@ -136,8 +136,9 @@ export function registerBuilds(app: ShelfRouter): void {
     );
     const route = await planOrDiscard(zipBytes, project.id, build.id);
     const reqId = c.get("requestId");
+    const published = await publishUpload(route, build, reqId);
     await getStore().enqueueCapture?.(build.id, reqId);
-    return c.json(await publishUpload(route, build, reqId), 202);
+    return c.json(published, 202);
   });
 
   app.openapi(dedupRoute, async (c) => {
@@ -334,6 +335,10 @@ const uploadZipRoute = createRoute({
       content: { "application/json": { schema: buildSchema } },
       description:
         "Zip stored. A zip up to maxInlineUnzipSize (default 50 MB) is extracted inline in this request; a larger one is published by a background job. With testing off, the build becomes approved when publishing finishes on the project's default branch (failed if it cannot be published) and stays pending on other branches; with testing on, capture sets the status.",
+    },
+    422: {
+      content: { "text/plain": { schema: z.string() } },
+      description: "The inline zip is invalid, unsafe, or exceeds the extraction limits",
     },
     413: {
       content: {
