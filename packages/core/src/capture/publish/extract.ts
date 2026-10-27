@@ -9,6 +9,7 @@ import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { Transform, type Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { Parse, type Entry } from "unzipper";
+import { ZipInvalidError } from "./invalid-zip.ts";
 import { ZipLimitError, type ExtractionLimits } from "./limits.ts";
 
 /** What an extraction produced. */
@@ -77,7 +78,9 @@ class Extraction {
       parser.on("entry", (entry: Entry) => {
         this.#entry(entry);
       });
-      parser.on("error", this.#fail);
+      parser.on("error", () => {
+        this.#fail(new ZipInvalidError("Invalid Storybook zip"));
+      });
       parser.on("close", () => {
         settle(null);
       });

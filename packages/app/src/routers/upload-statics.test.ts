@@ -157,6 +157,39 @@ describe("upload inline statics", () => {
     expect(left).toBeNull();
   });
 
+  it("queues capture only after inline publication finishes", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const reached = Promise.withResolvers<boolean>();
+    const release = Promise.withResolvers<boolean>();
+    const originalWrite = storage.write.bind(storage);
+    storage.write = async (key, data) => {
+      if (key.endsWith("/manifest.json")) {
+        reached.resolve(true);
+        await release.promise;
+      }
+      await originalWrite(key, data);
+    };
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      testing: { runner: stubRunner() },
+      config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
+    });
+    const { slug } = await setupProject(app);
+    const upload = uploadZip(app, slug, storybookZip());
+    try {
+      await reached.promise;
+      expect(await queuedCaptures(db)).toEqual([]);
+    } finally {
+      release.resolve(true);
+    }
+    const { buildId, status } = await upload;
+    expect(status).toBe(202);
+    expect(await queuedCaptures(db)).toContain(buildId);
+  });
+
   it("defers large zips to capture", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
@@ -260,7 +293,7 @@ describe("upload inline statics", () => {
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
   });
 
-  it("fails a hosting-only build whose zip breaks a cap, and publishes nothing", async () => {
+  it("rejects an inline zip that breaks a cap without publishing", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({
@@ -271,8 +304,9 @@ describe("upload inline statics", () => {
     });
     const { slug, id: projectId } = await setupProject(app);
     const { buildId, status } = await uploadZip(app, slug, storybookZip());
-    expect(status).toBe(202);
-    expect((await new BuildModel(db).get(buildId))?.status).toBe("failed");
+    expect(status).toBe(422);
+    expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
+    expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/manifest.json`)).toBe(false);
   });
 
@@ -292,7 +326,7 @@ describe("upload inline statics", () => {
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
   });
 
-  it("still returns 202 when inline extraction fails", async () => {
+  it("rejects an invalid inline zip without queuing capture, and allows a corrected upload", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({
@@ -304,11 +338,20 @@ describe("upload inline statics", () => {
     });
     const { slug, id: projectId } = await setupProject(app);
     const garbage = Buffer.from("definitely-not-a-zip");
-    const { buildId, status } = await uploadZip(app, slug, garbage, String(garbage.length));
-    expect(status).toBe(202);
-    expect(await queuedCaptures(db)).toContain(buildId);
+    const { buildId, status, body } = await uploadZip(app, slug, garbage, String(garbage.length));
+    expect(status).toBe(422);
+    expect(body).toContain("Invalid Storybook zip");
+    expect(await queuedCaptures(db)).not.toContain(buildId);
+    expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
-    // Capture will backfill, so a failed inline publish leaves the status to it.
     expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
+
+    const corrected = await app.request(`/api/v1/projects/${slug}/builds/${buildId}/zip`, {
+      method: "PUT",
+      headers: { "content-type": "application/zip" },
+      body: new Uint8Array(storybookZip()),
+    });
+    expect(corrected.status).toBe(202);
+    expect(await queuedCaptures(db)).toContain(buildId);
   });
 });

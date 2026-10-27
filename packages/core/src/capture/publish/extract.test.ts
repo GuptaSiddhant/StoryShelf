@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { zipStream, type ZipSource } from "../../utils/zip-write.ts";
 import { extractZipStream } from "./extract.ts";
+import { ZipInvalidError } from "./invalid-zip.ts";
 import { ZipLimitError } from "./limits.ts";
 
 const LIMITS = { maxEntries: 100, maxBytes: 1024 * 1024 };
@@ -97,6 +98,6 @@ describe("extractZipStream", () => {
   it("rejects bytes that are not a zip", async () => {
     await expect(
       extractZipStream(Readable.from([Buffer.from("definitely-not-a-zip")]), root, LIMITS),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(ZipInvalidError);
   });
 });

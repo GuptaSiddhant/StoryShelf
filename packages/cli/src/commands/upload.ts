@@ -10,7 +10,7 @@ import {
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
-import { createClient, type BuildCreated } from "../client.ts";
+import { createClient, RequestError, type BuildCreated } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
 import { isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
@@ -378,6 +378,13 @@ async function uploadBuild(
   try {
     await putZipStream(client, created, cwd, collected.buildDir);
   } catch (error) {
+    if (error instanceof RequestError && error.status === 422) {
+      error.message +=
+        `\nThe server rejected the Storybook archive. Check its contents and the server's ` +
+        `maxZipEntries and maxUnzippedBytes limits, then run storyshelf upload again. ` +
+        `That creates a new build; to reuse build ${created.build.id}, PUT a corrected ZIP to ${created.uploadUrl}.`;
+      throw error;
+    }
     if (!isOverInlineLimit(error)) {
       throw error;
     }

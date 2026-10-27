@@ -48,7 +48,7 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Projects    | `/api/v1/projects`                                                                        | Create and manage Storybook projects                     |
 | Builds      | `/api/v1/projects/{slug}/builds`                                                          | Upload builds, list, retry, review                       |
 | Snapshots   | `/api/v1/projects/{slug}/builds/{id}/snapshots`                                           | Inspect and approve/reject individual screenshots        |
-| Comments    | `/api/v1/projects/{slug}/builds/{id}/comments`                                            | Review discussion threads (build, story, snapshot)      |
+| Comments    | `/api/v1/projects/{slug}/builds/{id}/comments`                                            | Review discussion threads (build, story, snapshot)       |
 | Reviews     | `/api/v1/projects/{slug}/builds/{id}/reviews`, `…/changeset`                              | Build-level verdicts (approver and admin), the changeset |
 | Label types | `/api/v1/projects/{slug}/label-types`                                                     | Project-defined build label schemas                      |
 | Members     | `/api/v1/projects/{slug}/members`                                                         | Project-scoped roles                                     |
@@ -79,13 +79,13 @@ The core CI flow in three calls:
      -H "Content-Type: application/json" \
      -d "{\"gitSha\":\"$GITHUB_SHA\",\"gitBranch\":\"$GITHUB_REF_NAME\"}")
    UPLOAD_URL=$(echo "$CREATE" | jq -r .uploadUrl)
-   curl -sS -X PUT "$STORYSHELF_URL$UPLOAD_URL" \
+   curl -sS --fail-with-body -X PUT "$STORYSHELF_URL$UPLOAD_URL" \
      -H "Authorization: Bearer $STORYSHELF_TOKEN" \
      -H "Content-Type: application/zip" \
      --data-binary @storybook-static.zip
    ```
 
-   The PUT responds with the `Build` (`status: "pending"`, `HTTP 202`) — capture runs asynchronously. Uploads larger than the server's `maxUploadBytes` (default 1 GiB) are rejected with `413`.
+   The PUT responds with the `Build` and `HTTP 202`; its status depends on the project and whether publishing has finished. When testing is enabled, capture runs asynchronously. Uploads larger than the server's `maxUploadBytes` (default 1 GiB) are rejected with `413`. An invalid inline zip, or one exceeding extraction caps, is rejected with `422`; upload a corrected archive to the same build.
 
 3. **Follow the build to its terminal state**
 

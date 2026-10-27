@@ -5,6 +5,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Changed: invalid inline Storybook ZIP uploads return 422 (#253).** Malformed, unsafe or over-limit archives are rejected immediately without queuing capture; a corrected archive can be uploaded to the same build. Background publishing remains asynchronous.
+
 **Fixed: a signed Storybook URL lifetime that cannot fit a capture fails the build once.** The "lifetime too short" and "story too large for a slice" errors are now a `SignedUrlLifetimeError`: crash isolation no longer treats them as a story crash, and the capture job is not redelivered, since another try would fail the same way. The build is failed with the message that says to increase or clear the project override.
 
 **Fixed: signed Storybook URLs no longer expire before their render timeout.** Render passes honor the configured token lifetime, using smaller slices and shorter timeouts when necessary. A legacy override too short for a capture or an unsplittable story now fails with guidance to increase or clear it.

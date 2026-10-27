@@ -88,7 +88,7 @@ Publishing a Storybook zip is bounded by three options (see [Published Storybook
 - `maxZipEntries` (default 50 000): the most entries a zip may hold.
 - `maxUnzippedBytes` (default 2 GiB): the most uncompressed bytes a zip may expand to, counted while extracting.
 
-A zip over a cap, or with an absolute or `..` path, fails the publish. `scratchDir` now always defaults to `<os.tmpdir()>/storyshelf`, since publishing extracts zips there with or without `testing`.
+An inline zip over an extraction cap, with an absolute or `..` path, or malformed is rejected with `422`; a background publish failure fails the build. `scratchDir` now always defaults to `<os.tmpdir()>/storyshelf`, since publishing extracts zips there with or without `testing`.
 
 ### The `testing` option and hosting only
 
