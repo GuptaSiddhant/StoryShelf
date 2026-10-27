@@ -6,11 +6,7 @@
  * token (the usual case, and every target without a signed URL) is one render call, as before.
  */
 import type { CaptureTarget, CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
-import {
-  MIN_CAPTURES_PER_SLICE,
-  PER_CAPTURE_BUDGET_MS,
-  STORYBOOK_URL_TTL_GRACE,
-} from "../utils/storybook-token.ts";
+import { PER_CAPTURE_BUDGET_MS, STORYBOOK_URL_TTL_GRACE } from "../utils/storybook-token.ts";
 import type { StoryEntry } from "./adapter.ts";
 import { renderBudgetMs, renderWithTimeout } from "./render.ts";
 import type { RenderRequest } from "./render.ts";
@@ -25,7 +21,7 @@ export interface SliceInput {
   storybookUrl: StorybookUrlSource | undefined;
   /** Captures one story expands to (its viewports and modes). */
   captureCount: (story: StoryEntry) => number;
-  /** An explicit budget fixes one call's timeout; slices then are not budgeted separately. */
+  /** An explicit budget limits each call; a signed URL may require a shorter timeout. */
   renderTimeoutMs: number | undefined;
 }
 
@@ -34,7 +30,12 @@ export async function renderInSlices(input: SliceInput): Promise<RenderResult> {
   const slices = slicesOf(input);
   const results: RenderResult[] = [];
   for (const slice of slices) {
-    const budgetMs = renderBudgetMs(slice.expected, input.renderTimeoutMs);
+    const requestedBudgetMs = renderBudgetMs(slice.expected, input.renderTimeoutMs);
+    const ttl = input.storybookUrl?.ttlSeconds?.(input.browser, requestedBudgetMs);
+    const budgetMs =
+      ttl === undefined
+        ? requestedBudgetMs
+        : Math.min(requestedBudgetMs, (ttl - STORYBOOK_URL_TTL_GRACE) * 1000);
     // oxlint-disable-next-line no-await-in-loop -- each slice needs a token minted just before it
     const storybookUrl = await input.storybookUrl?.(input.browser, { budgetMs });
     results.push(
@@ -69,25 +70,36 @@ function slicesOf(input: SliceInput): Slice[] {
     renderBudgetMs(expected, input.renderTimeoutMs),
   );
   const budgetSeconds = renderBudgetMs(expected, input.renderTimeoutMs) / 1000;
-  if (
-    ttl === undefined ||
-    input.renderTimeoutMs !== undefined ||
-    budgetSeconds + STORYBOOK_URL_TTL_GRACE <= ttl
-  ) {
+  if (ttl === undefined || budgetSeconds + STORYBOOK_URL_TTL_GRACE <= ttl) {
     return whole;
   }
-  const limit = Math.max(
-    MIN_CAPTURES_PER_SLICE,
-    Math.floor(((ttl - STORYBOOK_URL_TTL_GRACE) * 1000) / PER_CAPTURE_BUDGET_MS),
-  );
-  return cut(stories, counts, limit);
+  return cut(stories, counts, sliceLimit(ttl));
+}
+
+function sliceLimit(ttl: number): number {
+  const limit = Math.floor(((ttl - STORYBOOK_URL_TTL_GRACE) * 1000) / PER_CAPTURE_BUDGET_MS);
+  if (limit < 1) {
+    throw new Error(
+      "Signed Storybook URL lifetime is too short for one capture and its grace period; increase or clear the project lifetime override.",
+    );
+  }
+  return limit;
+}
+
+function checkedCount(count: number, limit: number): number {
+  if (count > limit) {
+    throw new Error(
+      `A story expands to ${count} captures, exceeding the signed URL slice limit of ${limit}; increase or clear the project lifetime override.`,
+    );
+  }
+  return count;
 }
 
 function cut(stories: StoryEntry[], counts: number[], limit: number): Slice[] {
   const slices: Slice[] = [];
   let current: Slice = { stories: [], expected: 0 };
   for (const [index, story] of stories.entries()) {
-    const count = counts[index] ?? 0;
+    const count = checkedCount(counts[index] ?? 0, limit);
     if (current.stories.length > 0 && current.expected + count > limit) {
       slices.push(current);
       current = { stories: [], expected: 0 };
