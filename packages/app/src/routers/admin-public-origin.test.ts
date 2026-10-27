@@ -46,7 +46,8 @@ async function csrfFrom(app: Awaited<ReturnType<typeof seedApp>>): Promise<strin
 
 /** The toast queued by the response's flash cookie, if any. */
 function flashOf(response: Response): { message: string; tone: string } | undefined {
-  const raw = /storyshelf_flash=([^;]+)/u.exec(response.headers.get("set-cookie") ?? "")?.[1];
+  const raw = /storyshelf_flash=(?<payload>[^;]+)/u.exec(response.headers.get("set-cookie") ?? "")
+    ?.groups?.["payload"];
   return raw
     ? (JSON.parse(decodeURIComponent(raw)) as { message: string; tone: string })
     : undefined;
