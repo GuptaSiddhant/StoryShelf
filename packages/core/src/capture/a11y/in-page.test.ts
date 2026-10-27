@@ -51,11 +51,11 @@ describe("inPageReadA11yParameters (as serialized)", () => {
     expect(read()).toEqual({ params: { config: {}, options: { rules: [] } }, dropped: 0 });
   });
 
-  it("returns undefined for a parameter that is only a function", () => {
+  it("reports a parameter that is only a function as dropped", () => {
     scope["__STORYBOOK_PREVIEW__"] = {
       currentRender: { story: { parameters: { a11y: () => 1 } } },
     };
-    expect(read()).toBeUndefined();
+    expect(read()).toEqual({ params: undefined, dropped: 1 });
   });
 
   it("returns undefined without a preview, without a11y, or when unreadable", () => {

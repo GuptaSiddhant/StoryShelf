@@ -5,6 +5,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Changed: accessibility checks warn when story configuration contains values that cannot cross from the preview (#242).** The warning includes the story ID and omitted-value count; axe uses the remaining configuration.
+
 **Changed: invalid inline Storybook ZIP uploads return 422 (#253).** Malformed, unsafe or over-limit archives are rejected immediately without queuing capture; a corrected archive can be uploaded to the same build. Background publishing remains asynchronous.
 
 **Fixed: a signed Storybook URL lifetime that cannot fit a capture fails the build once.** The "lifetime too short" and "story too large for a slice" errors are now a `SignedUrlLifetimeError`: crash isolation no longer treats them as a story crash, and the capture job is not redelivered, since another try would fail the same way. The build is failed with the message that says to increase or clear the project override.

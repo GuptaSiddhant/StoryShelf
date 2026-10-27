@@ -52,12 +52,29 @@ describe("checkA11y", () => {
     },
   );
 
-  it("logs one debug line when function values were dropped", async () => {
+  it("warns with the story id and count when values were dropped", async () => {
     const { page } = fakePage({ params: {}, dropped: 2 }, undefined, []);
-    const debug = vi.fn();
-    await checkA11y(page, { debug } as never);
-    expect(debug).toHaveBeenCalledTimes(1);
-    expect(debug.mock.calls[0]?.[0]).toEqual({ dropped: 2 });
+    const warn = vi.fn();
+    await checkA11y(page, { warn } as never, "button--primary");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toEqual({ storyId: "button--primary", dropped: 2 });
+  });
+
+  it("does not warn when no values were dropped", async () => {
+    const { page } = fakePage({ params: {}, dropped: 0 }, undefined, []);
+    const warn = vi.fn();
+    await checkA11y(page, { warn } as never, "button--primary");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("warns when the entire parameter was omitted", async () => {
+    const { page } = fakePage({ params: undefined, dropped: 1 }, undefined, []);
+    const warn = vi.fn();
+    await checkA11y(page, { warn } as never, "button--primary");
+    expect(warn).toHaveBeenCalledWith(
+      { storyId: "button--primary", dropped: 1 },
+      expect.stringContaining("omitted"),
+    );
   });
 
   it("reports one visible annotation when injection fails", async () => {
