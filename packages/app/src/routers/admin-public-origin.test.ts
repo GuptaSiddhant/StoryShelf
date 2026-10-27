@@ -44,6 +44,14 @@ async function csrfFrom(app: Awaited<ReturnType<typeof seedApp>>): Promise<strin
   return /name="csrf-token" content="([^"]+)"/u.exec(html)?.[1] ?? "";
 }
 
+/** The toast queued by the response's flash cookie, if any. */
+function flashOf(response: Response): { message: string; tone: string } | undefined {
+  const raw = /storyshelf_flash=([^;]+)/u.exec(response.headers.get("set-cookie") ?? "")?.[1];
+  return raw
+    ? (JSON.parse(decodeURIComponent(raw)) as { message: string; tone: string })
+    : undefined;
+}
+
 function report(
   app: Awaited<ReturnType<typeof seedApp>>,
   token: string,
@@ -145,6 +153,10 @@ describe("public origin on the System page", () => {
         expect(await new SiteSettingsModel(db).get(PUBLIC_ORIGIN_KEY)).toBeNull();
         const response = await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
         expect(response.status).toBeLessThan(400);
+        expect(flashOf(response)).toEqual({
+          message: expect.stringContaining("PUBLIC_BASE_URL") as string,
+          tone: "warning",
+        });
         expect(await new SiteSettingsModel(db).get(PUBLIC_ORIGIN_KEY)).toBeNull();
         const html = await (await app.request("/admin")).text();
         expect(html).toContain(new URL(fixed).host);
