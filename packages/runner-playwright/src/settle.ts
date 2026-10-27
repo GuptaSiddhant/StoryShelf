@@ -116,7 +116,11 @@ export function inPageRecorder(): void {
       if (typeof phase === "string") state.phase = phase;
     },
     storyRendered: markSettled,
-    storyFinished: () => {
+    storyFinished: (payload) => {
+      const status = (payload as { status?: unknown } | undefined)?.status;
+      if (status === "error" && state["playError"] === undefined) {
+        state["playError"] = "Storybook reported that the test failed";
+      }
       state.finished = true;
       markSettled();
     },
