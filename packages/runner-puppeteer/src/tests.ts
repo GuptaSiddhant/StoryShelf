@@ -126,7 +126,7 @@ async function openAndWait(
   if (input.navigationTimeoutMs) page.setDefaultTimeout(input.navigationTimeoutMs);
   const adapter = input.adapter ?? new StorybookAdapter();
   await page.goto(adapter.buildUrl(baseUrl, test.id), { waitUntil: "load" });
-  return await waitForSettled(page, input.playTimeoutMs ?? DEFAULT_TEST_TIMEOUT_MS);
+  return await waitForSettled(page, input.playTimeoutMs ?? DEFAULT_TEST_TIMEOUT_MS, true);
 }
 
 /** Read Storybook's own account of the run: a thrown play body or render error fails the test. */

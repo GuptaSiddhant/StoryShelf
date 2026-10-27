@@ -61,6 +61,34 @@ describe("inPageRecorder (as serialized into the page)", () => {
     expect(report).toMatchObject({ settled: true, hooked: true, phase: "rendering" });
   });
 
+  it("waits for test completion after render and records a late play failure", async () => {
+    const channel = fakeChannel();
+    scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;
+    record();
+    channel.emit("storyRendered", "a--b");
+    expect(await wait({ timeoutMs: 0, requireFinished: true })).toMatchObject({
+      settled: false,
+      hooked: true,
+    });
+    channel.emit("playFunctionThrewException", new Error("late failure"));
+    channel.emit("storyFinished", { storyId: "a--b", status: "error" });
+    expect(await wait({ timeoutMs: 500, requireFinished: true })).toMatchObject({
+      settled: true,
+      playError: "late failure",
+    });
+  });
+
+  it("finishes a test on a render error even when no finished event follows", async () => {
+    const channel = fakeChannel();
+    scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;
+    record();
+    channel.emit("storyMissing", "missing");
+    expect(await wait({ timeoutMs: 500, requireFinished: true })).toMatchObject({
+      settled: true,
+      renderError: "missing",
+    });
+  });
+
   it("takes the channel from the preview when the global is absent", async () => {
     const channel = fakeChannel();
     scope["__STORYBOOK_PREVIEW__"] = { channel };

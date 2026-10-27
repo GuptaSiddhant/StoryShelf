@@ -7,6 +7,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 **Fixed: a signed Storybook URL lifetime that cannot fit a capture fails the build once.** The "lifetime too short" and "story too large for a slice" errors are now a `SignedUrlLifetimeError`: crash isolation no longer treats them as a story crash, and the capture job is not redelivered, since another try would fail the same way. The build is failed with the message that says to increase or clear the project override.
 
+**Fixed: Storybook interaction tests now wait for their completion event.** A rendered story is no longer reported as a passing test while its asynchronous test body is still running.
+
 **Fixed: signed Storybook URLs no longer expire before their render timeout.** Render passes honor the configured token lifetime, using smaller slices and shorter timeouts when necessary. A legacy override too short for a capture or an unsplittable story now fails with guidance to increase or clear it.
 
 **Breaking: custom database adapters must implement `updateWhere` (#293).** The condition must be evaluated in the same database statement as the update; it returns the current row, or null if the row is absent. Capture status updates use it to prevent a late write from overwriting a cancelled build. The built-in SQLite, PostgreSQL and MySQL adapters implement the operation.
