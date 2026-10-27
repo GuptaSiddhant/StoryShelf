@@ -38,5 +38,7 @@ Each current ADR below lists the archived ones it supersedes.
 | 0016 | AI Insights                                              | 0026                               |
 | 0017 | MCP Server                                               | 0027                               |
 | 0018 | Design Providers                                         | 0029                               |
+| 0037 | Portability and Trust in Visual Results (proposed)       | —                                  |
+| 0038 | Environment Migration and Baseline Review               | —                                  |
 
 Work that implements ADRs 0005 to 0007, 0013 and 0014 is tracked in GitHub issues #212 to #236.
