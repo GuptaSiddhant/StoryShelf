@@ -196,7 +196,7 @@ LIVE_CLOUD=1 TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... \
   nubx turbo test --filter='@storyshelf/db-sqlite' --force
 ```
 
-Database compatibility runs on pull requests, pushes to main, nightly, and on demand in
+Database compatibility runs nightly and on demand in
 `.github/workflows/nightly-db.yml`. It tests SQLite and local file-backed libSQL, plus PostgreSQL
 16 and MySQL 8 services. This does not substitute for the cloud-provider tests above. The live MySQL suite's
 upgrade test drops columns before rerunning migrations; it is skipped unless
