@@ -5,54 +5,28 @@
  * (finish, failure, cancel, shutdown) and never logged.
  */
 import type { Logger } from "../logger.ts";
-import { isRetryableConnectError, retryConnect } from "../utils/connect-retry.ts";
+import { retryConnect } from "../utils/connect-retry.ts";
 import { TargetLaunchError } from "./capture-target.ts";
 import {
   hasSchemeFor,
   schemesOf,
   type RemoteConnectContext,
   type RemoteConnection,
-  type RemoteLeaseOutcome,
   type RemoteLeasedConnection,
   type RemoteTarget,
 } from "./remote-browser.ts";
+import { endAttempt, startAttempt, type Attempt } from "./remote-lease-attempt.ts";
+import {
+  RemoteConnectError,
+  classify,
+  connectErrorOf,
+  stoppedError,
+} from "./remote-lease-error.ts";
+import { holdLease, noLease, withDeadline, type HeldConnection } from "./remote-lease-held.ts";
 
-/** What a connect failure means for the retry loop and for the target. */
-export interface RemoteConnectErrorOptions {
-  /** `false` stops the retries and fails the job (default `true`: retried). */
-  transient?: boolean | undefined;
-  /**
-   * For `transient: false`: `target` (default) also marks the target unavailable until restart,
-   * `job` fails only this job and keeps the target offered (a per-shard server that is gone).
-   */
-  scope?: "target" | "job" | undefined;
-  /** A lease the failed `connect` already took, released as `failed`. */
-  lease?: unknown;
-  cause?: unknown;
-}
-
-/** An error a function `connect` throws to say how the runner should treat the failure. */
-export class RemoteConnectError extends Error {
-  override readonly name = "RemoteConnectError";
-  readonly transient: boolean;
-  readonly scope: "target" | "job";
-  readonly lease: unknown;
-
-  constructor(message: string, options: RemoteConnectErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
-    this.transient = options.transient ?? true;
-    this.scope = options.scope ?? "target";
-    this.lease = options.lease;
-  }
-}
-
-/** A connection held until its render ends. */
-export interface HeldConnection {
-  /** The connection to open (with its lease, for scrubbing): the function's result, or the fixed object. */
-  readonly connection: RemoteConnection & { lease?: unknown };
-  /** Release the lease with how the render ended; later calls do nothing (the first outcome wins). */
-  end(outcome: RemoteLeaseOutcome, error?: unknown): Promise<void>;
-}
+export { RemoteConnectError, type RemoteConnectErrorOptions } from "./remote-lease-error.ts";
+export type { HeldConnection } from "./remote-lease-held.ts";
+export { onRemoteShutdown, shutdownRemote } from "./remote-lease-shutdown.ts";
 
 /** Which run a connection is for. */
 export interface ConnectLeasedContext {
@@ -73,30 +47,9 @@ export interface ConnectLeasedOptions<T> {
   reasonOf: (error: unknown, connection: RemoteConnection & { lease?: unknown }) => string;
 }
 
-/** A `connect` attempt in flight: aborted by its deadline, a cancel or shutdown. */
-interface Attempt {
-  readonly controller: AbortController;
-  stopped: boolean;
-  stop(): void;
-  /** Stop listening to the run's signal, so retries do not pile up listeners on it. */
-  detach(): void;
-}
-
-/** Marks the error of a `connect` abandoned because the run was cancelled or the process is shutting down. */
-const STOPPED = Symbol("remote connect stopped");
-
-function stoppedError(): Error {
-  return Object.assign(new Error("cancelled while connecting"), { [STOPPED]: true });
-}
-
 type ConnectFn = (
   context: RemoteConnectContext,
 ) => RemoteLeasedConnection | Promise<RemoteLeasedConnection>;
-
-const held = new Set<HeldConnection>();
-const attempts = new Set<Attempt>();
-const shutdownHooks = new Set<() => Promise<void>>();
-const warnedNoLease = new Set<string>();
 
 /**
  * Connect (calling `connect` when it is a function) and open the connection, as one retried
@@ -150,47 +103,6 @@ export async function connectLeased<T>(
   }
 }
 
-/**
- * Stop everything remote this process holds, for a runner shutting down: abort pending `connect`
- * calls, release every lease still held as `cancelled`, then run the shutdown hooks (pools close
- * their resources). A server is not left running by a process that is gone.
- */
-export async function shutdownRemote(): Promise<void> {
-  for (const attempt of attempts) {
-    attempt.stop();
-  }
-  await Promise.all(
-    [...held].map(async (lease) => {
-      await lease.end("cancelled");
-    }),
-  );
-  await Promise.all(
-    [...shutdownHooks].map(async (hook) => {
-      await hook();
-    }),
-  );
-}
-
-/** Run `hook` on shutdown; returns the function that unregisters it. */
-export function onRemoteShutdown(hook: () => Promise<void>): () => void {
-  shutdownHooks.add(hook);
-  return () => {
-    shutdownHooks.delete(hook);
-  };
-}
-
-/** What a connect error means: whether to retry it, and whether it marks the target unavailable. */
-function classify(error: unknown): { retry: boolean; unavailable: boolean } {
-  if (typeof error === "object" && error !== null && STOPPED in error) {
-    return { retry: false, unavailable: false };
-  }
-  if (error instanceof RemoteConnectError) {
-    return { retry: error.transient, unavailable: !error.transient && error.scope !== "job" };
-  }
-  const retry = isRetryableConnectError(error);
-  return { retry, unavailable: !retry };
-}
-
 async function acquire(
   entry: RemoteTarget,
   context: ConnectLeasedContext,
@@ -206,8 +118,7 @@ async function acquire(
     const result = await called(entry, context, attemptNo, attempt, logger);
     return await adopt(entry, result, logger);
   } finally {
-    attempts.delete(attempt);
-    attempt.detach();
+    endAttempt(attempt);
   }
 }
 
@@ -266,23 +177,6 @@ async function failedConnect(
   return attempt.stopped ? stoppedError() : converted;
 }
 
-function connectErrorOf(error: unknown): RemoteConnectError {
-  const flags = (typeof error === "object" && error !== null ? error : {}) as {
-    transient?: unknown;
-    scope?: unknown;
-    lease?: unknown;
-  };
-  return new RemoteConnectError(
-    `acquire failed: ${error instanceof Error ? error.message : String(error)}`,
-    {
-      cause: error,
-      transient: flags.transient !== false,
-      scope: flags.scope === "job" ? "job" : "target",
-      lease: flags.lease,
-    },
-  );
-}
-
 /** Check what a function `connect` returned against what the service declared, then hold it. */
 async function adopt(
   entry: RemoteTarget,
@@ -316,50 +210,6 @@ function problemWith(entry: RemoteTarget, result: RemoteLeasedConnection): strin
     : `connect returned an endpoint that is not a ${schemesOf(protocol)} URL`;
 }
 
-function startAttempt(parent: AbortSignal | undefined): Attempt {
-  const controller = new AbortController();
-  const onAbort = (): void => {
-    attempt.stop();
-  };
-  const attempt: Attempt = {
-    controller,
-    stopped: false,
-    stop: () => {
-      attempt.stopped = true;
-      controller.abort();
-    },
-    detach: () => {
-      parent?.removeEventListener("abort", onAbort);
-    },
-  };
-  attempts.add(attempt);
-  if (parent?.aborted === true) {
-    attempt.stop();
-  } else {
-    parent?.addEventListener("abort", onAbort, { once: true });
-  }
-  return attempt;
-}
-
-/** `pending`, or the error `onTimeout` makes after `ms`. */
-async function withDeadline<T>(
-  pending: Promise<T>,
-  ms: number,
-  onTimeout: () => Error,
-): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(onTimeout());
-    }, ms);
-  });
-  try {
-    return await Promise.race([pending, deadline]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 /** A connection that arrives after its deadline is released at once. */
 async function releaseLate(
   entry: RemoteTarget,
@@ -369,79 +219,5 @@ async function releaseLate(
   const late = await pending.catch(() => null);
   if (late?.lease !== undefined) {
     await holdLease(entry, late.lease, { endpoint: "" }, logger).end("failed");
-  }
-}
-
-function noLease(connection: RemoteConnection): HeldConnection {
-  return {
-    connection,
-    end: async () => {
-      await Promise.resolve();
-    },
-  };
-}
-
-function holdLease(
-  entry: RemoteTarget,
-  lease: unknown,
-  connection: RemoteConnection,
-  logger: Logger | undefined,
-): HeldConnection {
-  const { release, timeouts } = entry.remote;
-  if (lease === undefined) {
-    if (release !== undefined && !warnedNoLease.has(entry.target)) {
-      warnedNoLease.add(entry.target);
-      logger?.warn(
-        { target: entry.target },
-        "remote release is set but connect returned no lease, so release is skipped",
-      );
-    }
-    return noLease(connection);
-  }
-  let ended = false;
-  const connectionHeld: HeldConnection = {
-    connection: { ...connection, lease },
-    end: async (outcome, error) => {
-      if (ended) {
-        return;
-      }
-      ended = true;
-      held.delete(connectionHeld);
-      await runRelease(
-        entry,
-        async () => {
-          await release?.(lease as never, { outcome, error });
-        },
-        timeouts.releaseMs,
-        { logger, outcome },
-      );
-    },
-  };
-  held.add(connectionHeld);
-  return connectionHeld;
-}
-
-async function runRelease(
-  entry: RemoteTarget,
-  call: () => Promise<void>,
-  timeoutMs: number,
-  log: { logger: Logger | undefined; outcome: RemoteLeaseOutcome },
-): Promise<void> {
-  try {
-    await withDeadline(call(), timeoutMs, () =>
-      Object.assign(new Error(`release timed out after ${timeoutMs} ms`), {
-        name: "ReleaseTimeout",
-      }),
-    );
-  } catch (error) {
-    // Never the lease or the error text: either can carry a credential.
-    log.logger?.warn(
-      {
-        target: entry.target,
-        outcome: log.outcome,
-        err: error instanceof Error ? error.name : "Error",
-      },
-      "remote browser release failed",
-    );
   }
 }
