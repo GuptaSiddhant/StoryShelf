@@ -47,29 +47,6 @@ export function registerStorybook(app: ShelfRouter): void {
     return c.redirect(`/projects/${slug}/storybook/build/${build.id}/`, 302);
   });
 
-  // Resolver: latest build bearing a label (`build` is a reserved label key).
-  app.get("/projects/:slug/storybook/:key/:value", async (c) => {
-    const slug = c.req.param("slug");
-    const key = c.req.param("key");
-    if (key === "build") {
-      return c.notFound();
-    }
-    const value = c.req.param("value");
-    const project = await new ProjectModel(getStore().db).getBySlug(slug);
-    if (!project) {
-      notFound("Project not found");
-    }
-    const buildId = await new LabelModel(getStore().db).latestBuildId(project.id, key, value);
-    if (!buildId) {
-      notFound("No build carries that label");
-    }
-    const build = await new BuildModel(getStore().db).get(buildId);
-    if (!build || !(await publishedAccess(build, project))) {
-      return c.redirect("/auth/login", 302);
-    }
-    return c.redirect(`/projects/${slug}/storybook/build/${buildId}/`, 302);
-  });
-
   // Short link canonical is /_/:id/ with trailing slash (so relative ./sb-manager/... resolves).
   // 26-char ULID → that exact build, whatever its status (visibility check only).
   // Any other id → project slug → latest approved build on the default branch, else 404
@@ -165,6 +142,35 @@ export function registerStorybook(app: ShelfRouter): void {
         cacheControl: "public, max-age=31536000, immutable",
       })) ?? c.notFound()
     );
+  });
+
+  // Resolver: latest build bearing a label (`build` is a reserved label key).
+  app.get("/projects/:slug/storybook/:key/*", async (c) => {
+    const slug = c.req.param("slug");
+    const key = c.req.param("key");
+    if (key === "build") {
+      return c.notFound();
+    }
+    let value: string;
+    try {
+      value = decodeURIComponent(c.req.path.split("/").slice(5).join("/"));
+    } catch {
+      return c.notFound();
+    }
+    if (!value) return c.notFound();
+    const project = await new ProjectModel(getStore().db).getBySlug(slug);
+    if (!project) {
+      notFound("Project not found");
+    }
+    const buildId = await new LabelModel(getStore().db).latestBuildId(project.id, key, value);
+    if (!buildId) {
+      notFound("No build carries that label");
+    }
+    const build = await new BuildModel(getStore().db).get(buildId);
+    if (!build || !(await publishedAccess(build, project))) {
+      return c.redirect("/auth/login", 302);
+    }
+    return c.redirect(`/projects/${slug}/storybook/build/${buildId}/`, 302);
   });
 }
 
