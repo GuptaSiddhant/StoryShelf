@@ -185,6 +185,7 @@ async function renderShard(
     const result = await renderAndPersist(target, payload, {
       storybookDir,
       runId: shard.id,
+      shardIndex: shard.ordinal,
       progress,
     });
     const durationMs = Math.round(performance.now() - started);
@@ -200,7 +201,12 @@ async function renderShard(
 async function renderAndPersist(
   target: ShardTarget,
   payload: ShardPayload,
-  run: { storybookDir: string; runId: string; progress: CaptureProgress | undefined },
+  run: {
+    storybookDir: string;
+    runId: string;
+    shardIndex: number;
+    progress: CaptureProgress | undefined;
+  },
 ): Promise<Omit<ShardResult, "durationMs">> {
   const stories = payload.browsers.flatMap((engine) => engine.stories);
   const browsers = payload.browsers.map((engine) => engine.browser);
@@ -213,6 +219,7 @@ async function renderAndPersist(
       affectedPaths: null,
       progress: run.progress,
       runId: run.runId,
+      shardIndex: run.shardIndex,
     }),
     payload.browsers,
   );

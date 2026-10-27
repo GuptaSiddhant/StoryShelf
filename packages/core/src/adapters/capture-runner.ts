@@ -40,9 +40,14 @@ export {
   remoteTargetsOf,
   scrubConnection,
 } from "./remote-browser.ts";
+export { connectLeased, releaseAllLeases } from "./remote-lease.ts";
+export type { ConnectLeasedOptions, HeldConnection } from "./remote-lease.ts";
 export type {
   RemoteBrowser,
   RemoteConnection,
+  RemoteLeaseContext,
+  RemoteLeaseOutcome,
+  RemoteLeasedConnection,
   RemoteOptions,
   RemoteProtocol,
   RemoteSupport,
@@ -168,6 +173,8 @@ export interface CaptureRunner extends Adapter<{
      * build (its shards) can be in flight in one process. Absent, the build id is used.
      */
     runId?: string | undefined;
+    /** The shard's 1-based position in the build's plan, for a remote service that routes per shard. */
+    shardIndex?: number | undefined;
     /** Root of the already-extracted Storybook build. */
     storybookDir: string;
     /** Stories to render. */

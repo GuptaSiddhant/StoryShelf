@@ -138,6 +138,45 @@ What a bare `run-server` does, measured against the pinned version:
 
 For several pools, declare one `playwrightServer` per pool with its own `name` and endpoint (`firefox@pool-b`, `chromium@pool-a`): each target maps to its endpoint, so no job routing is needed.
 
+## Scale to zero: `acquire` and `release`
+
+`connect` is synchronous, so a provider that has to start, wake or pick something before a connection cannot do it there. Give `remote()` two optional hooks instead:
+
+```ts
+remote({
+  name: "pool",
+  engines: ["chromium"],
+  // Describes the shape of the connection (here: it can route back to this host); not used to connect.
+  connect: () => ({ protocol: "playwright", endpoint: "wss://pool.invalid/", exposeNetwork: "<loopback>" }),
+  sessions: 4,
+  acquireTimeoutMs: 20_000,
+  // Before each connection: wake or start a server, pick one per shard.
+  acquire: async ({ engine, buildId, shardIndex }) => {
+    const server = await pool.wake(shardIndex ?? 0); // your provider's client
+    return {
+      protocol: "playwright",
+      endpoint: server.endpoint,
+      headers: { authorization: `Bearer ${server.token}` },
+      exposeNetwork: "<loopback>",
+      lease: server.id, // handed back to release, never logged
+    };
+  },
+  // Once, after the render that used the connection finished, failed or was cancelled.
+  release: async (lease, outcome) => {
+    await pool.suspend(lease); // outcome: "finished" | "failed" | "cancelled"
+  },
+});
+```
+
+- `acquire` runs once per connection: a render, a shard, or a browser recycle. Calls can overlap, so shards of one build can each get their own server. `shardIndex` is the shard's 1-based position in the plan and is absent outside a sharded render.
+- `release` runs exactly once for every successful `acquire`: when the render ends, fails or is cancelled, when a handshake fails after `acquire` (as `failed`, before the retry acquires again), and for leases still held when the runner shuts down (`cancelled`). A throw in `release` is logged without the lease or the error text and never fails the render.
+- A throw in `acquire` is retried like a failed handshake (`connectRetries`, `connectBackoffMs`) and then fails the job with a `TargetLaunchError` reading `acquire failed: <message>`. It is treated as a service that may come back (the target stays offered); throw an error with `transient: false` for one that will not (a deleted server), which also marks the target unavailable. `acquireTimeoutMs` (default `connectTimeoutMs`) bounds each call, and a lease that arrives after the timeout is released at once.
+- The connection `acquire` returns must keep the reach `connect` declared (`exposeNetwork` set or not): the planner decided between the loopback server and a signed URL from it, so a mismatch fails the render.
+- `sessions` can be a function, read each time a page is about to start, for a provider whose cap changes with the servers it has woken.
+- The endpoint, headers and anything inside `lease` are scrubbed from error text and never logged. Keep credentials in the endpoint, headers or lease, not in the error messages you throw.
+
+The hooks are available on `remote()` for the Playwright runner. The Puppeteer runner's `cdp()` does not take them.
+
 ## Other services
 
 - **Browserless** and other CDP services: `cdp({ name, endpoint, headers, sessions })` on the Puppeteer runner, or `remote({ connect: () => ({ protocol: "cdp", ... }) })` on the Playwright runner (Chromium only, and noticeably lower fidelity than Playwright's own protocol, which is acceptable because the target is its own engine with its own baselines). Both need a Storybook URL.

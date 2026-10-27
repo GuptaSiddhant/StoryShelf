@@ -61,4 +61,15 @@ describe("session gates", () => {
     expect(sessionGateFor("firefox@gate-test", 4)).not.toBe(first);
     expect(await peakOf(sessionGateFor("chromium@gate-test", 2), 10)).toBe(2);
   });
+
+  it("reads a function size on every use, so a scaling provider can raise or lower the cap", async () => {
+    let cap = 1;
+    const gate = createSessionGate(() => cap);
+    expect(gate.size).toBe(1);
+    cap = 3;
+    expect(gate.size).toBe(3);
+    expect(await peakOf(gate, 10)).toBe(3);
+    cap = 1;
+    expect(await peakOf(gate, 6)).toBe(1);
+  });
 });

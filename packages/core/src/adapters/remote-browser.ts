@@ -28,16 +28,55 @@ export interface RemoteConnection {
   exposeNetwork?: string;
 }
 
+/** Which render a connection is for, handed to {@link RemoteOptions.acquire}. */
+export interface RemoteLeaseContext {
+  engine: BrowserName;
+  buildId: string;
+  /** The shard's 1-based position in the build's plan; absent outside a sharded render. */
+  shardIndex?: number | undefined;
+}
+
+/** How a leased connection ended, handed to {@link RemoteOptions.release}. */
+export type RemoteLeaseOutcome = "finished" | "failed" | "cancelled";
+
+/** A connection together with whatever the provider needs back to release it. */
+export interface RemoteLeasedConnection extends RemoteConnection {
+  /** Opaque to the runner, passed to `release` once and never logged (it may carry credentials). */
+  lease?: unknown;
+}
+
 /** What {@link defineRemote} takes: what `remote()` exposes to operators. */
 export interface RemoteOptions {
   /** The target name half (`chromium@<name>`): lowercase letters, digits and hyphens, at most 32. */
   name: string;
   /** The engines to offer (a subset of what the service has). */
   engines: readonly BrowserName[];
-  /** The connection for an engine. Pure: it is called once at creation to validate it. */
+  /**
+   * The connection for an engine. Pure: it is called once at creation to validate it and to tell
+   * whether the browser reaches this host (`exposeNetwork`). Without `acquire` it is also what every
+   * render connects with; with `acquire` it only describes the shape of what `acquire` returns.
+   */
   connect: (engine: BrowserName) => RemoteConnection;
-  /** Parallel sessions the plan allows: the page cap of the target, per process (decision 4). */
-  sessions: number;
+  /**
+   * Called before each connection (one per render, shard or browser recycle; concurrent calls are
+   * allowed) and may be async: wake a server, start a pod, pick one per shard. Returns the
+   * connection to use in place of `connect`'s, and a `lease` handed back to `release`. A throw is
+   * retried like a failed handshake (`connectRetries`, `connectBackoffMs`) and ends as a
+   * transient `TargetLaunchError`, unless the error has `transient: false`. It must keep the
+   * reach of `connect`'s connection (`exposeNetwork` set or not), or the render fails.
+   */
+  acquire?: ((context: RemoteLeaseContext) => Promise<RemoteLeasedConnection>) | undefined;
+  /**
+   * Called exactly once for every successful `acquire`, when the connection's render finished,
+   * failed or was cancelled, and for leases still held when the runner shuts down (`cancelled`).
+   * A throw is logged, never fails the render. Only valid together with `acquire`.
+   */
+  release?: ((lease: unknown, outcome: RemoteLeaseOutcome) => Promise<void> | void) | undefined;
+  /**
+   * Parallel sessions the plan allows: the page cap of the target, per process (decision 4). A
+   * function is read each time a page is about to start, for a provider that scales.
+   */
+  sessions: number | (() => number);
   /** OS the service renders on, reported when the page cannot tell (`linux-x64`, `windows`, …). */
   platform?: string | undefined;
   /** Connect retries before the render fails (default 3). */
@@ -49,6 +88,8 @@ export interface RemoteOptions {
    * extra connections instead of refusing them, so a busy farm shows up as this timeout.
    */
   connectTimeoutMs?: number | undefined;
+  /** How long one `acquire` call waits in ms (default `connectTimeoutMs`); the handshake has its own. */
+  acquireTimeoutMs?: number | undefined;
 }
 
 /** One remote service, validated: an entry of a runner's `browsers`. */
@@ -56,6 +97,9 @@ export interface RemoteBrowser extends Required<
   Pick<RemoteOptions, "name" | "engines" | "connect" | "sessions">
 > {
   readonly kind: "remote";
+  readonly acquire: RemoteOptions["acquire"];
+  readonly release: RemoteOptions["release"];
+  readonly acquireTimeoutMs: number;
   readonly platform: string | undefined;
   readonly connectRetries: number;
   readonly connectBackoffMs: number;
@@ -94,18 +138,10 @@ const SCHEMES: Record<RemoteProtocol, readonly string[]> = {
  * connection of every engine (protocol, endpoint scheme, CDP being Chromium only).
  */
 export function defineRemote(options: RemoteOptions, support: RemoteSupport): RemoteBrowser {
-  const { label } = support;
-  if (!TARGET_NAME_PATTERN.test(options.name)) {
-    throw new Error(
-      `${label}: name "${options.name}" must be lowercase letters, digits and hyphens, start with a letter or digit and be at most 32 characters`,
-    );
-  }
-  if (!Number.isInteger(options.sessions) || options.sessions < 1) {
-    throw new Error(`${label} "${options.name}": sessions must be a positive integer`);
-  }
+  checkOptions(options, support);
   checkEngines(options, support);
   for (const engine of options.engines) {
-    checkConnection(label, options, engine, support);
+    checkConnection(support.label, options, engine, support);
   }
   return {
     kind: "remote",
@@ -117,7 +153,25 @@ export function defineRemote(options: RemoteOptions, support: RemoteSupport): Re
     connectRetries: options.connectRetries ?? 3,
     connectBackoffMs: options.connectBackoffMs ?? 500,
     connectTimeoutMs: options.connectTimeoutMs ?? 30_000,
+    acquire: options.acquire,
+    release: options.release,
+    acquireTimeoutMs: options.acquireTimeoutMs ?? options.connectTimeoutMs ?? 30_000,
   };
+}
+
+function checkOptions(options: RemoteOptions, { label }: RemoteSupport): void {
+  if (!TARGET_NAME_PATTERN.test(options.name)) {
+    throw new Error(
+      `${label}: name "${options.name}" must be lowercase letters, digits and hyphens, start with a letter or digit and be at most 32 characters`,
+    );
+  }
+  const sessions = typeof options.sessions === "function" ? options.sessions() : options.sessions;
+  if (!Number.isInteger(sessions) || sessions < 1) {
+    throw new Error(`${label} "${options.name}": sessions must be a positive integer`);
+  }
+  if (options.release !== undefined && options.acquire === undefined) {
+    throw new Error(`${label} "${options.name}": release needs acquire`);
+  }
 }
 
 /** The targets a service offers, in the order of its `engines`. */
@@ -148,7 +202,11 @@ export function isRemoteBrowser(value: unknown): value is RemoteBrowser {
  * a key in its path or query), its host and path, its query values and every header value.
  */
 export function scrubConnection(text: string, connection: RemoteConnection): string {
-  const secrets = [connection.endpoint, ...Object.values(connection.headers ?? {})];
+  const secrets = [
+    connection.endpoint,
+    ...Object.values(connection.headers ?? {}),
+    ...leaseSecrets((connection as RemoteLeasedConnection).lease),
+  ];
   try {
     const url = new URL(connection.endpoint);
     // Drivers echo the endpoint without its query; the host and a path that acts as a key stay hidden.
@@ -171,6 +229,17 @@ export function scrubConnection(text: string, connection: RemoteConnection): str
     scrubbed = scrubbed.replaceAll(secret, "[redacted]");
   }
   return scrubbed;
+}
+
+/** Strings of a lease that may carry credentials: its own text, or every string it holds. */
+function leaseSecrets(lease: unknown, depth = 0): string[] {
+  if (typeof lease === "string") {
+    return [lease];
+  }
+  if (typeof lease !== "object" || lease === null || depth > 3) {
+    return [];
+  }
+  return Object.values(lease).flatMap((value) => leaseSecrets(value, depth + 1));
 }
 
 function checkEngines(options: RemoteOptions, support: RemoteSupport): void {

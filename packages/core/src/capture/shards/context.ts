@@ -60,6 +60,7 @@ export function matrixInputOf(
     recordLog?: MatrixInput["recordLog"];
     progress?: CaptureProgress | undefined;
     runId?: string | undefined;
+    shardIndex?: number | undefined;
   },
 ): MatrixInput {
   const { options } = target;
@@ -81,5 +82,6 @@ export function matrixInputOf(
     recordLog: parts.recordLog,
     progress: parts.progress,
     runId: parts.runId,
+    shardIndex: parts.shardIndex,
   };
 }

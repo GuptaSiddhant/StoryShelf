@@ -164,3 +164,42 @@ describe("scrubConnection", () => {
     expect(scrubConnection("a b", { protocol: "cdp", endpoint: "b" })).toBe("a b");
   });
 });
+
+const acquire = async () => await Promise.resolve({ ...keyed(), lease: "x" });
+const release = (): void => {};
+
+describe("lifecycle hooks", () => {
+  it("keeps acquire, release and the acquire timeout on the entry", () => {
+    const remote = defineRemote(options({ acquire, release, connectTimeoutMs: 1000 }), all);
+    expect(remote.acquire).toBe(acquire);
+    expect(remote.release).toBe(release);
+    expect(remote.acquireTimeoutMs).toBe(1000);
+    expect(defineRemote(options({ acquireTimeoutMs: 5 }), all).acquireTimeoutMs).toBe(5);
+    expect(defineRemote(options(), all).acquireTimeoutMs).toBe(30_000);
+  });
+
+  it("refuses release without acquire", () => {
+    expect(() => defineRemote(options({ release: () => {} }), all)).toThrow(
+      'remote() "grid": release needs acquire',
+    );
+  });
+
+  it("takes sessions as a function and validates what it returns", () => {
+    let cap = 2;
+    const remote = defineRemote(options({ sessions: () => cap }), all);
+    expect(typeof remote.sessions).toBe("function");
+    expect(() => defineRemote(options({ sessions: () => 0 }), all)).toThrow(
+      "sessions must be a positive integer",
+    );
+    cap = 3;
+  });
+
+  it("scrubs strings of a lease that carry credentials", () => {
+    const connection = {
+      ...keyed(),
+      lease: { token: "lease-secret-1", nested: { key: "deep-secret-2" } },
+    };
+    const scrubbed = scrubConnection("failed with lease-secret-1 and deep-secret-2", connection);
+    expect(scrubbed).toBe("failed with [redacted] and [redacted]");
+  });
+});

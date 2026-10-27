@@ -16,10 +16,12 @@ const fake = vi.hoisted(() => {
     active: 0,
     peak: 0,
     closed: 0,
+    gate: null as Promise<void> | null,
   };
   const page = {
     goto: async (url: string): Promise<void> => {
       state.gotos.push(url);
+      await state.gate;
       state.active += 1;
       state.peak = Math.max(state.peak, state.active);
       await new Promise((resolve) => setTimeout(resolve, 5));
@@ -102,12 +104,20 @@ beforeEach(async () => {
     active: 0,
     peak: 0,
     closed: 0,
+    gate: null,
   });
 });
 
 afterEach(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
+
+/** Park every page navigation until `open()`, so a render stays in flight. */
+function holdRenders(): { open: () => void } {
+  const { promise, resolve } = Promise.withResolvers<null>();
+  fake.state.gate = promise.then(() => {});
+  return { open: () => resolve(null) };
+}
 
 const farm = (overrides: Partial<Parameters<typeof remote>[0]> = {}) =>
   remote({
@@ -307,5 +317,120 @@ describe("a remote target", () => {
       "ready",
       "ready",
     ]);
+  });
+});
+
+const leased = (overrides: Partial<Parameters<typeof remote>[0]> = {}) => {
+  const seen: { engine: string; buildId: string; shardIndex?: number | undefined }[] = [];
+  const released: { lease: unknown; outcome: string }[] = [];
+  let next = 0;
+  const service = farm({
+    acquire: async (context) => {
+      seen.push(context);
+      next += 1;
+      const id = next;
+      await Promise.resolve();
+      return {
+        protocol: "playwright",
+        endpoint: `wss://farm-${id}.example/?key=sekret-${id}`,
+        exposeNetwork: "<loopback>",
+        lease: { id: `lease-${id}` },
+      };
+    },
+    release: (lease, outcome) => {
+      released.push({ lease, outcome });
+    },
+    ...overrides,
+  });
+  return { service, seen, released };
+};
+
+describe("a remote target with acquire and release", () => {
+  it("acquires per shard with its identity, connects to what it returned and releases as finished", async () => {
+    const { service, seen, released } = leased();
+    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    await Promise.all(
+      [1, 2].map(
+        async (shardIndex) =>
+          await runner.render(
+            input({ shardIndex, runId: `s${shardIndex}`, target: "chromium@grid" }),
+          ),
+      ),
+    );
+    expect(
+      seen.map((context) => context.shardIndex).toSorted((a, b) => (a ?? 0) - (b ?? 0)),
+    ).toEqual([1, 2]);
+    expect(seen.every((context) => context.buildId === "b1" && context.engine === "chromium")).toBe(
+      true,
+    );
+    expect(fake.state.connects.map((connect) => connect.endpoint).toSorted()).toEqual([
+      "wss://farm-1.example/?key=sekret-1",
+      "wss://farm-2.example/?key=sekret-2",
+    ]);
+    expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+    expect(new Set(released.map((entry) => JSON.stringify(entry.lease))).size).toBe(2);
+  });
+
+  it("releases as failed when the render throws, once", async () => {
+    const { service, released } = leased();
+    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    await expect(
+      runner.render(
+        input({ target: "chromium@grid", onCapture: () => Promise.reject(new Error("sink down")) }),
+      ),
+    ).resolves.toBeDefined();
+    // A per-capture sink failure is a render failure row, not a crash: the lease still ends once.
+    expect(released).toHaveLength(1);
+    const broken = createPlaywrightCaptureRunner({
+      browsers: [leased({ connectRetries: 0 }).service],
+    });
+    fake.state.failure = new Error("401 Unauthorized");
+    await expect(broken.render(input({ target: "chromium@grid" }))).rejects.toBeInstanceOf(
+      TargetLaunchError,
+    );
+  });
+
+  it("releases as cancelled when the build is cancelled mid-render", async () => {
+    const { service, released } = leased();
+    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const hold = holdRenders();
+    const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
+    await vi.waitFor(() => {
+      expect(fake.state.gotos.length).toBeGreaterThan(0);
+    });
+    await runner.cancel("b1", "s1");
+    hold.open();
+    await rendering.catch(() => {});
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+
+  it("fails the render with a clear reason, holding nothing, when acquire throws", async () => {
+    const { service, released } = leased({
+      connectRetries: 1,
+      acquire: () => Promise.reject(new Error("wake failed")),
+    });
+    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const error = (await runner
+      .render(input({ target: "chromium@grid" }))
+      .catch((caught: unknown) => caught)) as TargetLaunchError;
+    expect(error).toBeInstanceOf(TargetLaunchError);
+    expect(error.reason).toBe("acquire failed: wake failed");
+    expect(error.transient).toBe(true);
+    expect(fake.state.connects).toEqual([]);
+    expect(released).toEqual([]);
+  });
+
+  it("releases leases still held when the runner shuts down", async () => {
+    const { service, released } = leased();
+    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const hold = holdRenders();
+    const rendering = runner.render(input({ target: "chromium@grid", runId: "s9" }));
+    await vi.waitFor(() => {
+      expect(fake.state.gotos.length).toBeGreaterThan(0);
+    });
+    await runner.lifecycle?.teardown();
+    hold.open();
+    await rendering.catch(() => {});
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
   });
 });

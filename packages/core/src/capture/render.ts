@@ -29,6 +29,8 @@ export interface RenderRequest {
   buildId: string;
   /** This render's cancel handle within the build (see `CaptureRunner.render`). */
   runId?: string | undefined;
+  /** The shard's 1-based position in the build's plan (see `CaptureRunner.render`). */
+  shardIndex?: number | undefined;
   storybookDir: string;
   stories: Parameters<CaptureRunner["render"]>[0]["stories"];
   viewports: Parameters<CaptureRunner["render"]>[0]["viewports"];

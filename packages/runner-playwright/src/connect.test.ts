@@ -41,6 +41,7 @@ function targetOf(endpoint: string, retries = 0) {
   return remoteTargetsOf(service)[0] as NonNullable<ReturnType<typeof remoteTargetsOf>[0]>;
 }
 
+const CTX = { buildId: "b1" };
 const servers: Server[] = [];
 
 afterEach(async () => {
@@ -71,7 +72,7 @@ describe("connectRemote", () => {
     ].join("\n");
     const url = await serve("428 Precondition Required", box);
     const warn = vi.fn();
-    const error: unknown = await connectRemote(targetOf(url, 3), { warn } as never).catch(
+    const error: unknown = await connectRemote(targetOf(url, 3), CTX, { warn } as never).catch(
       (caught: unknown) => caught,
     );
     expect(error).toBeInstanceOf(TargetLaunchError);
@@ -85,7 +86,7 @@ describe("connectRemote", () => {
 
   it("refuses credentials once, without leaking them", async () => {
     const url = await serve("401 Unauthorized", "no");
-    const error = (await connectRemote(targetOf(url, 3)).catch(
+    const error = (await connectRemote(targetOf(url, 3), CTX).catch(
       (caught: unknown) => caught,
     )) as TargetLaunchError;
     expect(error.transient).toBe(false);
@@ -102,7 +103,7 @@ describe("connectRemote", () => {
       });
     });
     const warn = vi.fn();
-    const error = (await connectRemote(targetOf(url, 2), { warn } as never).catch(
+    const error = (await connectRemote(targetOf(url, 2), CTX, { warn } as never).catch(
       (caught: unknown) => caught,
     )) as TargetLaunchError;
     expect(error).toBeInstanceOf(TargetLaunchError);

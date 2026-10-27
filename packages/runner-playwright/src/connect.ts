@@ -1,44 +1,38 @@
 /** Connecting to a remote browser: retried when the service is unreachable or full, a clear error when it is not. */
 import {
-  TargetLaunchError,
+  connectLeased,
   scrubConnection,
   type RemoteConnection,
+  type RemoteLeaseContext,
   type RemoteTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
-import { isRetryableConnectError, retryConnect } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
+import { holdLease } from "./browser.ts";
 import { loadPlaywright } from "./launch.ts";
 import { playwrightVersion } from "./version.ts";
 
 /**
- * Connect to `entry`'s service and return its browser. Connection-level failures are retried with
- * backoff, so a provider outage or a full plan costs time and not a story crash; what is left
- * is a {@link TargetLaunchError}, which fails the job at once (a wrong version or credential also
- * marks the target unavailable, a service that is merely down does not). Nothing in a message
- * carries the endpoint or its credentials.
+ * Connect to `entry`'s service and return its browser, holding the service's lease (`acquire`)
+ * until the browser is closed through `closeBrowser`/`safeCloseBrowser`. Connection-level failures
+ * are retried with backoff, so a provider outage or a full plan costs time and not a story
+ * crash; what is left is a `TargetLaunchError`, which fails the job at once (a wrong version or
+ * credential also marks the target unavailable, a service that is merely down does not). Nothing
+ * in a message carries the endpoint, its credentials or the lease.
  */
-export async function connectRemote(entry: RemoteTarget, logger?: Logger): Promise<Browser> {
-  const { remote, target } = entry;
-  const connection = remote.connect(entry.engine);
-  try {
-    const playwright = await loadPlaywright();
-    return await retryConnect(async () => await connectOnce(playwright, entry, connection), {
-      retries: remote.connectRetries,
-      backoffMs: remote.connectBackoffMs,
-      onRetry: (error, retry, delayMs) => {
-        logger?.warn(
-          { target, retry, delayMs, reason: reasonOf(error, connection) },
-          "remote browser connect failed, retrying",
-        );
-      },
-    });
-  } catch (error) {
-    throw new TargetLaunchError(target, reasonOf(error, connection), {
-      cause: scrubbedCause(error, connection),
-      transient: isRetryableConnectError(error),
-    });
-  }
+export async function connectRemote(
+  entry: RemoteTarget,
+  context: Pick<RemoteLeaseContext, "buildId" | "shardIndex">,
+  logger?: Logger,
+): Promise<Browser> {
+  const playwright = await loadPlaywright();
+  const { value, lease } = await connectLeased(entry, context, {
+    logger,
+    open: async (connection) => await connectOnce(playwright, entry, connection),
+    reasonOf,
+  });
+  holdLease(value, lease);
+  return value;
 }
 
 async function connectOnce(
@@ -86,10 +80,4 @@ function versionMismatch(text: string): string | null {
     return null;
   }
   return `Playwright version mismatch: the server runs v${server} but this runner's playwright-core is ${playwrightVersion()}; run the server at exactly ${playwrightVersion()} (see the self-hosted farm guide)`;
-}
-
-function scrubbedCause(error: unknown, connection: RemoteConnection): Error {
-  const copy = new Error(reasonOf(error, connection));
-  copy.name = error instanceof Error ? error.name : "Error";
-  return copy;
 }
