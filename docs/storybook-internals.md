@@ -224,7 +224,7 @@ heartbeat and event buffering until `isReady`. A static production build has **n
   `@storybook/addons`.
 - **v8+**: packages consolidated; import shims like `storybook/internal/channels`;
   `features.buildStoriesJson` → the `STORYBOOK_BUILD_STORIES_JSON` env the CLI injects at
-  `cli/src/commands/storybook-build.ts` so v8 emits `stories.json`.
+  `cli/src/commands/storybook-build.ts`; whether a build emits `stories.json` depends on its version and configuration. The Storybook 8 fixture did not emit it with this setting.
 - **v9/v10**: `open-service` — an _internal_, schema-driven service subsystem relaying state between
   manager/preview/server over the channel (`code/core/src/shared/open-service/`); it is an internal
   Storybook feature, **not** a stable external integration API (all services are marked
@@ -367,6 +367,6 @@ and an adapter `screenshotSelector` per view mode.
 | `.executePlay(storyId)`                                           | Used only when a preview offers it (none of 8/9/10 does)             |
 | `.storyStoreValue.loadStory({ storyId })` → `playFunction`        | `StoryStore` → prepared story's play function (the path 8/9/10 take) |
 | `.storyStore.fromId(id).play({ canvasElement })`                  | Last-resort fallback                                                 |
-| CLI `STORYBOOK_BUILD_STORIES_JSON=true`                           | Forces v8 to emit `stories.json`                                     |
+| CLI `STORYBOOK_BUILD_STORIES_JSON=true`                           | Requests `stories.json` when supported by the Storybook build        |
 | `discover()` filters `subtype === 'test'`                         | CSF-Next `.test()` story marking                                     |
-| `parameters.*` (chromatic/storyshelf keys)                        | Story index `parameters` section                                     |
+| `parameters.*` (chromatic/storyshelf keys)                        | Index parameters when present, otherwise preview `extract()`          |
