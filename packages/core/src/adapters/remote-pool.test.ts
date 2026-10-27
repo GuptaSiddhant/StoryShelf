@@ -183,6 +183,21 @@ describe("refCounted", () => {
     expect(open).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps retrying the failed close when the reopening fails too", async () => {
+    const clock = manualClock();
+    const { made, open, close, connect } = pool({ idleMs: 10, schedule: clock.schedule });
+    close.mockRejectedValueOnce(new Error("suspend failed"));
+    const a = await connect(ctx());
+    await made.release(a.lease as PoolLease, info);
+    await clock.advance(10);
+    expect(close).toHaveBeenCalledTimes(1);
+    open.mockRejectedValueOnce(new Error("wake failed"));
+    await expect(connect(ctx())).rejects.toThrow("wake failed");
+    await clock.advance(10);
+    expect(close).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenLastCalledWith({ host: "computer-1" });
+  });
+
   it("opens again on the next connect after a failed close, not reusing the resource", async () => {
     const { made, open, close, connect } = pool({ idleMs: 5 });
     close.mockRejectedValue(new Error("suspend failed"));

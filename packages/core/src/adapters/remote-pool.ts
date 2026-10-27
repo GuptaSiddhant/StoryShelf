@@ -184,6 +184,10 @@ class Pool<TResource> {
         },
         async (error: unknown) => {
           this.#state = this.#hasStale ? "unknown" : "idle";
+          if (this.#hasStale) {
+            // Reopening cancelled the retry of the failed close; it is still owed.
+            this.#armIdle();
+          }
           await this.#closeLeftover(error);
           throw error;
         },
