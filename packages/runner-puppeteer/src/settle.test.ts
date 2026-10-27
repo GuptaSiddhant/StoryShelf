@@ -8,6 +8,7 @@ import {
   settleTimeoutOf,
   waitForSettled,
 } from "./settle.ts";
+import { verdictOf } from "./tests.ts";
 
 /** Rebuild a function from its source in a scope with no module bindings, as `page.evaluate` does. */
 function asSerialized<T extends (...args: never[]) => unknown>(fn: T): T {
@@ -59,6 +60,48 @@ describe("inPageRecorder (as serialized into the page)", () => {
     channel.emit("storyRendered", "a--b");
     const report = await wait({ timeoutMs: 500 });
     expect(report).toMatchObject({ settled: true, hooked: true, phase: "rendering" });
+  });
+
+  it("waits for test completion after render and records a late play failure", async () => {
+    const channel = fakeChannel();
+    scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;
+    record();
+    channel.emit("storyRendered", "a--b");
+    expect(await wait({ timeoutMs: 0, requireFinished: true })).toMatchObject({
+      settled: false,
+      hooked: true,
+    });
+    channel.emit("playFunctionThrewException", new Error("late failure"));
+    channel.emit("storyFinished", { storyId: "a--b", status: "error" });
+    expect(await wait({ timeoutMs: 500, requireFinished: true })).toMatchObject({
+      settled: true,
+      playError: "late failure",
+    });
+  });
+
+  it("records a failure when only the completion status reports an error", async () => {
+    const channel = fakeChannel();
+    scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;
+    record();
+    channel.emit("storyRendered", "a--b");
+    channel.emit("storyFinished", { storyId: "a--b", status: "error" });
+    const report = await wait({ timeoutMs: 500, requireFinished: true });
+    expect(report).toMatchObject({
+      settled: true,
+      playError: "Storybook reported that the test failed",
+    });
+    expect(verdictOf("a--b", report, 500, 1)).toMatchObject({ status: "failed" });
+  });
+
+  it("finishes a test on a render error even when no finished event follows", async () => {
+    const channel = fakeChannel();
+    scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;
+    record();
+    channel.emit("storyMissing", "missing");
+    expect(await wait({ timeoutMs: 500, requireFinished: true })).toMatchObject({
+      settled: true,
+      renderError: "missing",
+    });
   });
 
   it("takes the channel from the preview when the global is absent", async () => {

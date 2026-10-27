@@ -41,9 +41,16 @@ export async function installSettleRecorder(page: Page): Promise<void> {
 }
 
 /** Wait until Storybook says the story is done (or `timeoutMs` passes); never throws. */
-export async function waitForSettled(page: Page, timeoutMs: number): Promise<SettleReport> {
+export async function waitForSettled(
+  page: Page,
+  timeoutMs: number,
+  requireFinished = false,
+): Promise<SettleReport> {
   try {
-    const report: unknown = await page.evaluate(inPageWaitSettled, { timeoutMs });
+    const report: unknown = await page.evaluate(inPageWaitSettled, {
+      timeoutMs,
+      ...(requireFinished ? { requireFinished } : {}),
+    });
     return isSettleReport(report) ? report : unsettled(false);
   } catch {
     return unsettled(false);
@@ -73,6 +80,7 @@ export function inPageRecorder(): void {
   type State = Record<string, unknown> & {
     hooked: boolean;
     settled: boolean;
+    finished: boolean;
     phase: string | null;
     unhandled: string[];
     hook: () => boolean;
@@ -82,6 +90,7 @@ export function inPageRecorder(): void {
   const state: State = {
     hooked: false,
     settled: false,
+    finished: false,
     phase: null,
     unhandled: [],
     hook: () => false,
@@ -107,7 +116,14 @@ export function inPageRecorder(): void {
       if (typeof phase === "string") state.phase = phase;
     },
     storyRendered: markSettled,
-    storyFinished: markSettled,
+    storyFinished: (payload) => {
+      const status = (payload as { status?: unknown } | undefined)?.status;
+      if (status === "error" && state["playError"] === undefined) {
+        state["playError"] = "Storybook reported that the test failed";
+      }
+      state.finished = true;
+      markSettled();
+    },
     storyThrewException: failRender,
     storyErrored: failRender,
     storyMissing: failRender,
@@ -144,6 +160,7 @@ export function inPageRecorder(): void {
 /** Arguments serialized into the page for {@link inPageWaitSettled}. */
 export interface SettleArgs {
   timeoutMs: number;
+  requireFinished?: boolean;
 }
 
 /**
@@ -151,10 +168,14 @@ export interface SettleArgs {
  * to listen to, or `timeoutMs` passed. Self-contained for the same reason as the recorder.
  */
 // oxlint-disable-next-line eslint/max-statements, eslint/max-lines-per-function -- must stay one self-contained function (see above)
-export async function inPageWaitSettled({ timeoutMs }: SettleArgs): Promise<SettleReport> {
+export async function inPageWaitSettled({
+  timeoutMs,
+  requireFinished,
+}: SettleArgs): Promise<SettleReport> {
   type State = {
     hooked: boolean;
     settled: boolean;
+    finished: boolean;
     phase: string | null;
     unhandled: string[];
     hook: () => boolean;
@@ -178,13 +199,18 @@ export async function inPageWaitSettled({ timeoutMs }: SettleArgs): Promise<Sett
   // After `load` every script has run: no channel by now means there will never be one.
   if (!state.hook() && globalThis.document?.readyState === "complete") return report(false, false);
   while (performance.now() - started < timeoutMs) {
-    if (state.settled) return report(true, true);
+    if (state.settled && (!requireFinished || state.finished || state.renderError !== undefined)) {
+      return report(true, true);
+    }
     // oxlint-disable-next-line eslint/no-await-in-loop -- polling the recorded state
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 10);
     });
   }
-  return report(state.settled, state.hook());
+  return report(
+    state.settled && (!requireFinished || state.finished || state.renderError !== undefined),
+    state.hook(),
+  );
 }
 
 /** After the signal: let web fonts finish and two frames paint, so the screenshot sees the final DOM. */

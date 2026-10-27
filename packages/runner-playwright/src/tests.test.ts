@@ -33,6 +33,7 @@ function entry(slug: string): StoryEntry {
 function harness(reports: Record<string, SettleReport | Error>) {
   const urls: string[] = [];
   const timeouts: number[] = [];
+  const requireFinished: (boolean | undefined)[] = [];
   const closed = { pages: 0, browser: 0 };
   const newPage = async () => {
     let current = "";
@@ -46,9 +47,13 @@ function harness(reports: Record<string, SettleReport | Error>) {
         urls.push(url);
         current = decodeURIComponent(url).split("id=")[1]?.split("&")[0]?.split(":")[1] ?? "";
       },
-      evaluate: async (fn: unknown, arg: { timeoutMs: number }): Promise<unknown> => {
+      evaluate: async (
+        fn: unknown,
+        arg: { timeoutMs: number; requireFinished?: boolean },
+      ): Promise<unknown> => {
         if (fn !== inPageWaitSettled) return undefined;
         timeouts.push(arg.timeoutMs);
+        requireFinished.push(arg.requireFinished);
         const report = reports[current];
         if (report instanceof Error) throw report;
         return report;
@@ -68,7 +73,7 @@ function harness(reports: Record<string, SettleReport | Error>) {
     launch: async () => browser as never,
     remote: (): undefined => {},
   };
-  return { driver, urls, timeouts, closed };
+  return { driver, urls, timeouts, closed, requireFinished };
 }
 
 const active = (): ActiveRun => ({ cancelled: false, browser: null });
@@ -111,6 +116,7 @@ describe("runTestEntries", () => {
       "chromium",
     );
     expect(withTimeout.timeouts).toEqual([1234]);
+    expect(withTimeout.requireFinished).toEqual([true]);
     const withDefault = harness({ ok: settled });
     await runTestEntries(
       { buildId: "b", storybookDir: dir, tests: [entry("ok")], concurrency: 1 },
