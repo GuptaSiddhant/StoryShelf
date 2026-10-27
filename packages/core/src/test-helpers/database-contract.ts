@@ -1,4 +1,5 @@
 import { getTableColumns, ne } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 /**
  * Published database contract suite for first- and third-party adapters.
  *
@@ -63,37 +64,32 @@ export function databaseContractSuite(label: string, make: DatabaseFactory): voi
         config: {},
         logger: createShelfLogger({ level: "silent" }),
       });
+      const table = adapter.tables.projects;
+      const id = `conditional-contract-${randomUUID()}`;
       try {
-        const table = adapter.tables.projects;
         const now = new Date().toISOString();
         await adapter.insert(table, {
-          id: "conditional-contract",
+          id,
           name: "before",
-          slug: "conditional-contract",
+          slug: id,
           createdAt: now,
           updatedAt: now,
         });
         const condition = ne(getTableColumns(table)["name"]!, "locked");
-        const first = await adapter.updateWhere(
-          table,
-          "conditional-contract",
-          { name: "locked" },
-          condition,
-        );
+        const first = await adapter.updateWhere(table, id, { name: "locked" }, condition);
         expect(first?.["name"]).toBe("locked");
-        const refused = await adapter.updateWhere(
-          table,
-          "conditional-contract",
-          { name: "after" },
-          condition,
-        );
+        const refused = await adapter.updateWhere(table, id, { name: "after" }, condition);
         expect(refused?.["name"]).toBe("locked");
-        expect((await adapter.get(table, "conditional-contract"))?.["name"]).toBe("locked");
+        expect((await adapter.get(table, id))?.["name"]).toBe("locked");
         expect(await adapter.updateWhere(table, "missing", { name: "x" }, condition)).toBeNull();
       } finally {
-        await adapter.lifecycle?.teardown();
+        try {
+          await adapter.remove(table, id);
+        } finally {
+          await adapter.lifecycle?.teardown();
+        }
       }
-    }, 30000);
+    }, 30_000);
 
     it("keeps the lifecycle rule (absent or all three hooks)", async () => {
       const adapter = await make();
