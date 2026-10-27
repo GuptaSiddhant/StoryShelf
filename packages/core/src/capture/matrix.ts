@@ -27,7 +27,7 @@ import type { RenderRequest } from "./render.ts";
 import type { EngineWork } from "./shard-plan.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
 import { resolveStoryViewports } from "./storybook.ts";
-import { renderInSlices } from "./token-chunks.ts";
+import { renderInSlices, SignedUrlLifetimeError } from "./token-chunks.ts";
 
 /** Inputs shared by every engine's pass. */
 export interface MatrixInput {
@@ -187,8 +187,9 @@ async function attemptPass(
     const pass = await renderPass(input, browser, mirror, stories, [], spooled);
     return { captures: pass.captures, failures: pass.failures };
   } catch (error) {
-    // The browser never started: no story is at fault, so it is not isolated or retried.
-    if (error instanceof TargetLaunchError) {
+    // The browser never started, or the signed URL lifetime cannot fit the pass: no story is at
+    // fault, so it is not isolated or retried.
+    if (error instanceof TargetLaunchError || error instanceof SignedUrlLifetimeError) {
       throw error;
     }
     mirror.log("warn", "render pass crashed, isolating the story at fault", {

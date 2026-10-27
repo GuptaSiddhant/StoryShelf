@@ -4,7 +4,7 @@ import { MIN_CAPTURES_PER_SLICE } from "../utils/storybook-token.ts";
 import type { StoryEntry } from "./adapter.ts";
 import type { RenderRequest } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
-import { renderInSlices } from "./token-chunks.ts";
+import { renderInSlices, SignedUrlLifetimeError } from "./token-chunks.ts";
 
 const env = (name: string) => ({ browserVersion: name }) as never;
 
@@ -74,7 +74,7 @@ describe("renderInSlices", () => {
 
   it("rejects a lifetime too short for a capture and grace", async () => {
     const { run, mint } = setup(60, 1);
-    await expect(run()).rejects.toThrow(/increase or clear/u);
+    await expect(run()).rejects.toBeInstanceOf(SignedUrlLifetimeError);
     expect(mint).not.toHaveBeenCalled();
   });
 
@@ -90,7 +90,7 @@ describe("renderInSlices", () => {
         captureCount: () => 21,
         renderTimeoutMs: undefined,
       }),
-    ).rejects.toThrow(/slice limit/u);
+    ).rejects.toBeInstanceOf(SignedUrlLifetimeError);
   });
 
   it("caps an explicit render timeout to the token lifetime minus grace", async () => {
