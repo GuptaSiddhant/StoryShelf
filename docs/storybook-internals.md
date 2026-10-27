@@ -224,7 +224,7 @@ heartbeat and event buffering until `isReady`. A static production build has **n
   `@storybook/addons`.
 - **v8+**: packages consolidated; import shims like `storybook/internal/channels`;
   `features.buildStoriesJson` → the `STORYBOOK_BUILD_STORIES_JSON` env the CLI injects at
-  `cli/src/commands/storybook-build.ts`; whether a build emits `stories.json` depends on its version and configuration. The Storybook 8 fixture did not emit it with this setting.
+  `packages/cli/src/commands/storybook-build.ts`; whether a build emits `stories.json` depends on its version and configuration. The Storybook 8 fixture did not emit it with this setting.
 - **v9/v10**: `open-service` — an _internal_, schema-driven service subsystem relaying state between
   manager/preview/server over the channel (`code/core/src/shared/open-service/`); it is an internal
   Storybook feature, **not** a stable external integration API (all services are marked

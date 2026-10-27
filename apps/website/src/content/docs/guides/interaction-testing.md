@@ -113,7 +113,7 @@ For the background on the preview page this reads from, see [How Storybook works
 
 StoryShelf reads the story index from `stories.json` when available, otherwise `index.json`. If an entry includes parameters, StoryShelf uses them. When it does not, the runner reads the resolved story parameters from the preview's `__STORYBOOK_PREVIEW__.extract()` once per capture run. The Storybook 8, 9, and 10 fixtures use an `index.json` that omits parameters, so this runtime extraction supplies them.
 
-You **do not** need to edit `.storybook/main.ts`. When `storyshelf upload` builds Storybook, it sets `STORYBOOK_BUILD_STORIES_JSON=true`; whether a build emits `stories.json` depends on Storybook's version and configuration. A build without that file uses `index.json` and runtime extraction instead.
+You **do not** need to edit `.storybook/main.ts`. When `storyshelf upload` builds Storybook, it sets `STORYBOOK_BUILD_STORIES_JSON=true`; whether a build emits `stories.json` depends on Storybook's version and configuration. A build without that file uses `index.json`; the runner extracts parameters at runtime only when the selected story entry does not include them.
 
 ## Build status and GitHub
 
