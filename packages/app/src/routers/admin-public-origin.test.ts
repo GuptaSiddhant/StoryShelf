@@ -1,5 +1,9 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { NotificationChannelModel } from "@storyshelf/core/models";
+import {
+  NotificationChannelModel,
+  PUBLIC_ORIGIN_KEY,
+  SiteSettingsModel,
+} from "@storyshelf/core/models";
 import {
   createTestBuild,
   createTestProject,
@@ -15,11 +19,12 @@ const silent = createShelfLogger({ level: "silent" });
 const ORIGIN = "https://shelf.example.com";
 
 async function seedApp(options: {
+  db?: ReturnType<typeof makeDatabase>["db"];
   config?: Record<string, unknown>;
   role?: "admin" | "member" | null;
   notifiers?: NonNullable<Parameters<typeof createShelfApp>[0]["notifications"]>["notifiers"];
 }) {
-  const { db } = makeDatabase();
+  const db = options.db ?? makeDatabase().db;
   const { storage } = makeStorage();
   const role = options.role === undefined ? "admin" : options.role;
   const app = createShelfApp({
@@ -120,17 +125,36 @@ describe("public origin on the System page", () => {
     expect(html).toContain("Nothing to confirm.");
   });
 
-  it("learns and stores nothing when the configuration answers, and refuses a typed origin", async () => {
-    const app = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
-    const token = await csrfFrom(app);
-    expect((await report(app, token, { origin: ORIGIN })).status).toBe(204);
-    const response = await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
-    expect(response.status).toBeLessThan(400);
-    const html = await (await app.request("/admin")).text();
-    expect(html).toContain("configured.example.com");
-    expect(html).not.toContain("shelf.acme.io");
-    expect(html).not.toContain(ORIGIN);
-  });
+  it.each([
+    ["configuration", "https://configured.example.com", {}],
+    ["platform", "https://platform.example.com", { RAILWAY_PUBLIC_DOMAIN: "platform.example.com" }],
+  ])(
+    "learns and stores nothing when the %s answers, and refuses a typed origin",
+    async (_source, fixed, env) => {
+      for (const [name, value] of Object.entries(env)) {
+        vi.stubEnv(name, value);
+      }
+      try {
+        const { db } = makeDatabase();
+        const app = await seedApp({
+          db,
+          config: Object.keys(env).length === 0 ? { publicBaseUrl: fixed } : {},
+        });
+        const token = await csrfFrom(app);
+        expect((await report(app, token, { origin: ORIGIN })).status).toBe(204);
+        expect(await new SiteSettingsModel(db).get(PUBLIC_ORIGIN_KEY)).toBeNull();
+        const response = await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
+        expect(response.status).toBeLessThan(400);
+        expect(await new SiteSettingsModel(db).get(PUBLIC_ORIGIN_KEY)).toBeNull();
+        const html = await (await app.request("/admin")).text();
+        expect(html).toContain(new URL(fixed).host);
+        expect(html).not.toContain("shelf.acme.io");
+        expect(html).not.toContain(ORIGIN);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
 
   it("lets an admin confirm, replace and forget the stored origin", async () => {
     const app = await seedApp({});
