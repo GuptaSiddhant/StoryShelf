@@ -1,5 +1,7 @@
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import {
+  A11yViolationsDetails,
   a11yCarrierOf,
   a11yFindingsOf,
   a11ySummaryNote,
@@ -86,6 +88,16 @@ describe("axe unavailable markers", () => {
     const note = a11ySummaryNote(a11ySummaryOf([DOWN]));
     expect(note).toContain("No findings recorded.");
     expect(note).toContain("axe did not run on 1 snapshot.");
+  });
+
+  it("shows the library disclosure when axe could not run without labeling it a finding", async () => {
+    const app = new Hono().get("/", (c): Response | Promise<Response> =>
+      c.html(<A11yViolationsDetails snapshot={DOWN} />),
+    );
+    const html = await (await app.request("/")).text();
+    expect(html).toContain("axe did not run on chromium");
+    expect(html).toContain("Execution context was destroyed");
+    expect(html).not.toContain("a11y 1");
   });
 
   it("prefers a sibling with findings over a snapshot whose axe run failed", () => {
