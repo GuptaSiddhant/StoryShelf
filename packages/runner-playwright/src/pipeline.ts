@@ -66,7 +66,7 @@ export async function renderAll(
   input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
   const measured = remote
     ? await measureRemote(browser, remote.remote, input.logger).catch(async (error: unknown) => {
-        await Promise.all([safeCloseBrowser(browser, "failed"), safeCloseServer(server)]);
+        await Promise.all([safeCloseBrowser(browser, "failed", error), safeCloseServer(server)]);
         throw error;
       })
     : undefined;
@@ -183,7 +183,7 @@ export async function serve(
     };
   }
   return await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
-    await safeCloseBrowser(browser, "failed");
+    await safeCloseBrowser(browser, "failed", error);
     throw error;
   });
 }
@@ -320,6 +320,8 @@ async function recycleBrowser(
   if (active.cancelled) throw new Error("Capture cancelled");
   await ctx.pagePool?.dispose();
   await safeCloseBrowser(ctx.browser);
+  // A cancel that arrived while the old browser closed must not start a new one.
+  if (active.cancelled) throw new Error("Capture cancelled");
   ctx.browser = await relaunch();
   if (ctx.pagePool) ctx.pagePool = new PagePool(ctx.browser);
   active.browser = ctx.browser;

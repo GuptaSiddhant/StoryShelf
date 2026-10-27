@@ -49,7 +49,7 @@ Credentials are operator-level: they are passed in the server's code, from the e
 | `playwrightServer(...)`    | `@storyshelf/runner-playwright/remote` | Playwright | `exposeNetwork` (default)     |
 | `azurePlaywright(...)`     | `@storyshelf/runner-playwright/remote` | Playwright | `exposeNetwork`               |
 | `browserstack(...)`        | `@storyshelf/runner-playwright/remote` | Playwright | a Storybook URL               |
-| `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | either     | as the connection says        |
+| `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
 | `cdp(...)`                 | `@storyshelf/runner-puppeteer/remote`  | CDP        | a Storybook URL               |
 
 `remote()` is the generic constructor every preset is sugar over, so a provider without a preset needs no new release. A fixed service declares how it is reached and where:

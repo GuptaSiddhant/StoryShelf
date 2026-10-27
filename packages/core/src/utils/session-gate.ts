@@ -51,12 +51,12 @@ export function createSessionGate(
   };
   let active = 0;
   const waiting: (() => void)[] = [];
+  // A cap that grew lets in as many waiters as it now has room for, not one per release.
   const release = (): void => {
-    const next = active > limitNow() ? undefined : waiting.shift();
-    if (next === undefined) {
-      active -= 1;
-    } else {
-      next();
+    active -= 1;
+    while (active < limitNow() && waiting.length > 0) {
+      active += 1;
+      waiting.shift()?.();
     }
   };
   const acquire = async (): Promise<void> => {

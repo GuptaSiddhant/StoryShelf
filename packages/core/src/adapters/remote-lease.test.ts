@@ -326,6 +326,32 @@ describe("connectLeased errors", () => {
   );
 });
 
+describe("cancellation", () => {
+  it("never calls connect with a signal that is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const connect = vi.fn(connecting());
+    const error = (await connectLeased(
+      entryOf({ connect }),
+      { ...CTX, signal: controller.signal },
+      open(1),
+    ).catch((caught: unknown) => caught)) as TargetLaunchError;
+    expect(connect).not.toHaveBeenCalled();
+    expect(error.reason).toBe("cancelled while connecting");
+  });
+
+  it("stops listening to the run's signal once an attempt is over", async () => {
+    const controller = new AbortController();
+    const remove = vi.spyOn(controller.signal, "removeEventListener");
+    await connectLeased(
+      entryOf({ connect: connecting() }),
+      { ...CTX, signal: controller.signal },
+      open(1),
+    );
+    expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+  });
+});
+
 describe("release", () => {
   it("logs a failing release without the lease or the message, and does not throw", async () => {
     const warn = vi.fn();

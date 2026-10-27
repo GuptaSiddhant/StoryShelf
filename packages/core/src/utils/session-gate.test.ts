@@ -89,4 +89,28 @@ describe("session gates", () => {
   it("counts a function returning below one as one", () => {
     expect(createSessionGate(() => 0).size).toBe(1);
   });
+
+  it("lets in every waiter a grown cap has room for on the next release, not one", async () => {
+    let cap = 1;
+    const gate = createSessionGate(() => cap);
+    const first = deferred();
+    const running = [gate.run(async () => await first.promise)];
+    const counter = { started: 0 };
+    const barrier = deferred();
+    for (let index = 0; index < 4; index += 1) {
+      running.push(
+        gate.run(async () => {
+          counter.started += 1;
+          await barrier.promise;
+        }),
+      );
+    }
+    cap = 4;
+    first.resolve();
+    await running[0];
+    await Promise.resolve();
+    expect(counter.started).toBe(4);
+    barrier.resolve();
+    await Promise.all(running);
+  });
 });

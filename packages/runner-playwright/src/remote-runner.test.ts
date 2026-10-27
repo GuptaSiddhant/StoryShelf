@@ -430,10 +430,12 @@ describe("a remote target with a function connect and release", () => {
 
   it("aborts a connect still pending when the build is cancelled, and does not retry it", async () => {
     const aborted = vi.fn();
+    const started = vi.fn();
     const { service, released } = leased({
       retry: { attempts: 3, backoffMs: 1 },
       connect: async ({ signal }) =>
         await new Promise((_, reject) => {
+          started();
           signal.addEventListener("abort", () => {
             aborted();
             reject(new Error("aborted"));
@@ -442,7 +444,9 @@ describe("a remote target with a function connect and release", () => {
     });
     const runner = createPlaywrightCaptureRunner({ browsers: [service] });
     const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => {
+      expect(started).toHaveBeenCalledTimes(1);
+    });
     await runner.cancel("b1", "s1");
     await expect(rendering).rejects.toBeInstanceOf(TargetLaunchError);
     expect(aborted).toHaveBeenCalledTimes(1);

@@ -274,6 +274,8 @@ async function recycleBrowser(
   if (active.cancelled) throw new Error("Capture cancelled");
   await ctx.pagePool?.dispose();
   await safeCloseBrowser(ctx.browser);
+  // A cancel that arrived while the old browser closed must not start a new one.
+  if (active.cancelled) throw new Error("Capture cancelled");
   ctx.browser = await relaunch();
   if (ctx.pagePool) ctx.pagePool = new PagePool(ctx.browser);
   active.browser = ctx.browser;

@@ -311,10 +311,12 @@ describe("a remote CDP target with a function connect and release", () => {
 
   it("aborts a connect still pending on cancel, and does not retry it", async () => {
     const aborted = vi.fn();
+    const started = vi.fn();
     const { service } = leased({
       retry: { attempts: 3, backoffMs: 1 },
       connect: async ({ signal }: RemoteConnectContext) =>
         await new Promise((_, reject) => {
+          started();
           signal.addEventListener("abort", () => {
             aborted();
             reject(new Error("aborted"));
@@ -323,7 +325,9 @@ describe("a remote CDP target with a function connect and release", () => {
     });
     const runner = createPuppeteerCaptureRunner({ browsers: [service] });
     const rendering = runner.render(input({ runId: "s1", storybookUrl: URL_ROOT }));
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => {
+      expect(started).toHaveBeenCalledTimes(1);
+    });
     await runner.cancel("b1", "s1");
     await expect(rendering).rejects.toBeInstanceOf(TargetLaunchError);
     expect(aborted).toHaveBeenCalledTimes(1);

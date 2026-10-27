@@ -34,6 +34,34 @@ function pool(overrides: Partial<Parameters<typeof refCounted<Computer>>[0]> = {
   return { made, open, close, connect };
 }
 
+/** A clock the test moves by hand: tasks run when `advance` passes their time. */
+function manualClock() {
+  let now = 0;
+  let nextId = 0;
+  const tasks = new Map<number, { at: number; run: () => void }>();
+  return {
+    schedule: (run: () => void, ms: number): (() => void) => {
+      nextId += 1;
+      const id = nextId;
+      tasks.set(id, { at: now + ms, run });
+      return () => {
+        tasks.delete(id);
+      };
+    },
+    advance: async (ms: number): Promise<void> => {
+      now += ms;
+      for (const [id, task] of tasks) {
+        if (task.at <= now) {
+          tasks.delete(id);
+          task.run();
+        }
+      }
+      // Let what the task started (a close, an open) settle before the test looks.
+      await new Promise((resolve) => setImmediate(resolve));
+    },
+  };
+}
+
 afterEach(async () => {
   await shutdownRemote();
   for (const made of pools) made.dispose();
@@ -49,42 +77,46 @@ describe("refCounted", () => {
   });
 
   it("closes the resource idleMs after the last release, not before", async () => {
-    const { made, close, connect } = pool({ idleMs: 30 });
+    const clock = manualClock();
+    const { made, close, connect } = pool({ idleMs: 30, schedule: clock.schedule });
     const a = await connect(ctx());
     const b = await connect(ctx());
     await made.release(a.lease as PoolLease, info);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await clock.advance(100);
     expect(close).not.toHaveBeenCalled();
     await made.release(b.lease as PoolLease, info);
-    await vi.waitFor(() => {
-      expect(close).toHaveBeenCalledWith({ host: "computer-1" });
-    });
+    await clock.advance(29);
+    expect(close).not.toHaveBeenCalled();
+    await clock.advance(1);
+    expect(close).toHaveBeenCalledWith({ host: "computer-1" });
   });
 
   it("reuses an idle resource that has not closed yet, cancelling the timer", async () => {
-    const { made, open, close, connect } = pool({ idleMs: 30 });
+    const clock = manualClock();
+    const { made, open, close, connect } = pool({ idleMs: 30, schedule: clock.schedule });
     const a = await connect(ctx());
     await made.release(a.lease as PoolLease, info);
+    await clock.advance(29);
     const b = await connect(ctx());
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await clock.advance(100);
     expect(open).toHaveBeenCalledTimes(1);
     expect(close).not.toHaveBeenCalled();
     await made.release(b.lease as PoolLease, info);
   });
 
   it("makes a connect that arrives during close wait, then open again", async () => {
+    const clock = manualClock();
     const closing = deferred();
-    const { made, open, close, connect } = pool({ idleMs: 5 });
+    const { made, open, close, connect } = pool({ idleMs: 5, schedule: clock.schedule });
     close.mockImplementationOnce(async () => {
       await closing.promise;
     });
     const a = await connect(ctx());
     await made.release(a.lease as PoolLease, info);
-    await vi.waitFor(() => {
-      expect(close).toHaveBeenCalledTimes(1);
-    });
+    await clock.advance(5);
+    expect(close).toHaveBeenCalledTimes(1);
     const next = connect(ctx());
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await clock.advance(20);
     expect(open).toHaveBeenCalledTimes(1);
     closing.resolve();
     expect((await next).endpoint).toBe("wss://computer-2/run");
@@ -124,8 +156,8 @@ describe("refCounted", () => {
     const two = new AbortController();
     const first = connect(ctx(one.signal)).catch((caught: unknown) => caught);
     const second = connect(ctx(two.signal)).catch((caught: unknown) => caught);
+    // Both waiters registered when connect was called; an abort is delivered synchronously.
     one.abort();
-    await new Promise((resolve) => setTimeout(resolve, 5));
     expect(seen?.aborted).toBe(false);
     two.abort();
     await Promise.all([first, second]);
@@ -189,9 +221,11 @@ describe("refCounted", () => {
     expect(close).toHaveBeenCalledWith({ host: "computer-1" });
 
     let aborted = false;
+    const entered = deferred();
     open.mockImplementationOnce(
       async (_context, signal) =>
         await new Promise<Computer>((resolve) => {
+          entered.resolve();
           signal.addEventListener("abort", () => {
             aborted = true;
             resolve({ host: "woken" });
@@ -199,7 +233,7 @@ describe("refCounted", () => {
         }),
     );
     const pending = connect(ctx()).catch((caught: unknown) => caught);
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await entered.promise;
     await shutdownRemote();
     await pending;
     expect(aborted).toBe(true);

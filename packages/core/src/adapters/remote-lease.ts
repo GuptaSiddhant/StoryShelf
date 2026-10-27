@@ -78,6 +78,8 @@ interface Attempt {
   readonly controller: AbortController;
   stopped: boolean;
   stop(): void;
+  /** Stop listening to the run's signal, so retries do not pile up listeners on it. */
+  detach(): void;
 }
 
 /** Marks the error of a `connect` abandoned because the run was cancelled or the process is shutting down. */
@@ -205,6 +207,7 @@ async function acquire(
     return await adopt(entry, result, logger);
   } finally {
     attempts.delete(attempt);
+    attempt.detach();
   }
 }
 
@@ -216,6 +219,10 @@ async function called(
   attempt: Attempt,
   logger: Logger | undefined,
 ): Promise<RemoteLeasedConnection> {
+  if (attempt.stopped) {
+    // Cancelled during a backoff: never call the provider with a signal that is already aborted.
+    throw stoppedError();
+  }
   const pending = invoke(entry.remote.connect as ConnectFn, {
     engine: entry.engine,
     buildId: context.buildId,
@@ -311,6 +318,9 @@ function problemWith(entry: RemoteTarget, result: RemoteLeasedConnection): strin
 
 function startAttempt(parent: AbortSignal | undefined): Attempt {
   const controller = new AbortController();
+  const onAbort = (): void => {
+    attempt.stop();
+  };
   const attempt: Attempt = {
     controller,
     stopped: false,
@@ -318,18 +328,16 @@ function startAttempt(parent: AbortSignal | undefined): Attempt {
       attempt.stopped = true;
       controller.abort();
     },
+    detach: () => {
+      parent?.removeEventListener("abort", onAbort);
+    },
   };
   attempts.add(attempt);
   if (parent?.aborted === true) {
     attempt.stop();
+  } else {
+    parent?.addEventListener("abort", onAbort, { once: true });
   }
-  parent?.addEventListener(
-    "abort",
-    () => {
-      attempt.stop();
-    },
-    { once: true },
-  );
   return attempt;
 }
 

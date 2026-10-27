@@ -34,6 +34,11 @@ export interface RefCountedOptions<TResource> {
   closeTimeoutMs?: number | undefined;
   /** Where close failures go (error class only, never the message). */
   logger?: Logger | undefined;
+  /**
+   * Runs `run` after `ms` and returns what cancels it (default: an unref'd `setTimeout`). A seam
+   * for tests to drive the idle timer without real time.
+   */
+  schedule?: ((run: () => void, ms: number) => () => void) | undefined;
 }
 
 /** What the pool hands to `release`: an opaque token for one connection. */
@@ -108,7 +113,7 @@ class Pool<TResource> {
   #slot: Slot<TResource> | undefined;
   #stale: TResource | undefined;
   #hasStale = false;
-  #timer: NodeJS.Timeout | undefined;
+  #cancelIdle: (() => void) | undefined;
   #opening: Promise<void> | undefined;
   #openController: AbortController | undefined;
   #waiters = new Set<AbortSignal>();
@@ -129,7 +134,7 @@ class Pool<TResource> {
         // oxlint-disable-next-line eslint/no-await-in-loop -- waiters share the one open
         await this.#waitOpen(context.signal);
       } else if (this.#state === "open" && this.#slot !== undefined) {
-        clearTimeout(this.#timer);
+        this.#clearIdle();
         this.#slot.count += 1;
         return this.#slot;
       } else {
@@ -148,7 +153,7 @@ class Pool<TResource> {
 
   /** Close now, aborting a pending open first. */
   async flush(): Promise<void> {
-    clearTimeout(this.#timer);
+    this.#clearIdle();
     this.#openController?.abort();
     await this.#opening?.catch(() => {});
     if (this.#state === "closing") {
@@ -160,11 +165,11 @@ class Pool<TResource> {
   }
 
   dispose(): void {
-    clearTimeout(this.#timer);
+    this.#clearIdle();
   }
 
   #startOpen(context: RemoteConnectContext): void {
-    clearTimeout(this.#timer);
+    this.#clearIdle();
     const controller = new AbortController();
     this.#openController = controller;
     this.#state = "opening";
@@ -210,13 +215,18 @@ class Pool<TResource> {
   }
 
   #armIdle(): void {
-    clearTimeout(this.#timer);
-    this.#timer = setTimeout(() => {
+    this.#clearIdle();
+    const schedule = this.#options.schedule ?? scheduleTimeout;
+    this.#cancelIdle = schedule(() => {
       if ((this.#slot?.count ?? 0) === 0) {
         this.#close().catch(() => {});
       }
     }, this.#options.idleMs);
-    this.#timer.unref();
+  }
+
+  #clearIdle(): void {
+    this.#cancelIdle?.();
+    this.#cancelIdle = undefined;
   }
 
   async #close(): Promise<void> {
@@ -271,6 +281,15 @@ class Pool<TResource> {
       );
     }
   }
+}
+
+/** The default scheduler: an unref'd timer, so an idle pool never keeps the process alive. */
+function scheduleTimeout(run: () => void, ms: number): () => void {
+  const timer = setTimeout(run, ms);
+  timer.unref();
+  return () => {
+    clearTimeout(timer);
+  };
 }
 
 async function timed(run: () => Promise<void>, ms: number): Promise<void> {
