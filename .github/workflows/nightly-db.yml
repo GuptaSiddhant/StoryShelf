@@ -1,0 +1,89 @@
+name: Database compatibility
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-compatibility-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mysql:
+    name: MySQL 8 migrations and queue
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test-password
+          MYSQL_DATABASE: storyshelf_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ptest-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+      - name: Run MySQL suite against disposable database
+        env:
+          LIVE_CLOUD: "1"
+          MYSQL_DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/storyshelf_test
+          MYSQL_SCHEMA_MUTATION_TEST: "1"
+        run: nubx turbo test --filter='@storyshelf/db-mysql' --force --env-mode=loose
+
+  postgres:
+    name: PostgreSQL migrations and queue
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: storyshelf_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d storyshelf_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+      - name: Run PostgreSQL suite against disposable database
+        env:
+          LIVE_CLOUD: "1"
+          DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
+        run: nubx turbo test --filter='@storyshelf/db-postgres' --force --env-mode=loose
+
+  sqlite:
+    name: SQLite and local libSQL migrations and queue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+      - name: Run SQLite suite with a disposable local libSQL database
+        env:
+          LIVE_CLOUD: "1"
+          TURSO_DATABASE_URL: file:/tmp/storyshelf-ci.sqlite
+        run: nubx turbo test --filter='@storyshelf/db-sqlite' --force --env-mode=loose

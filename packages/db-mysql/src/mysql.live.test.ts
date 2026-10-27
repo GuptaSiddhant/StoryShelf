@@ -7,6 +7,7 @@
  * (ADR 0006 retires the external queue transports only once it passes on Postgres, MySQL and Turso).
  *
  * Required env when live:
+ * - `MYSQL_SCHEMA_MUTATION_TEST=1` — opt in to destructive migration testing on a disposable database only.
  * - `MYSQL_DATABASE_URL` — connection string (`mysql://user:pass@host:3306/db`; PlanetScale/TiDB
  *   need TLS options, see the deployment guide).
  */
@@ -53,41 +54,43 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
     await db?.lifecycle?.teardown();
   });
 
-  it("back-fills later columns on an existing schema", async () => {
-    const upgradeId = `upgrade-${randomUUID()}`;
-    const now = new Date().toISOString();
-    await liveDb().insert(schema.projects, {
-      id: upgradeId,
-      name: "Upgrade",
-      slug: upgradeId,
-      createdAt: now,
-      updatedAt: now,
-    });
-    for (const statement of [
-      `ALTER TABLE projects
+  it.skipIf(process.env["MYSQL_SCHEMA_MUTATION_TEST"] !== "1")(
+    "back-fills later columns on an existing schema",
+    async () => {
+      const upgradeId = `upgrade-${randomUUID()}`;
+      const now = new Date().toISOString();
+      await liveDb().insert(schema.projects, {
+        id: upgradeId,
+        name: "Upgrade",
+        slug: upgradeId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      for (const statement of [
+        `ALTER TABLE projects
         DROP COLUMN run_a11y,
         DROP COLUMN run_tests,
         DROP COLUMN review_enabled,
         DROP COLUMN review_approvals,
         DROP COLUMN storybook_url_ttl_seconds`,
-      "ALTER TABLE snapshots DROP COLUMN duration_ms, DROP COLUMN a11y_violations",
-      "ALTER TABLE comments DROP COLUMN story_id",
-      "ALTER TABLE notification_channels DROP COLUMN last_error, DROP COLUMN last_error_at",
-    ]) {
-      // oxlint-disable-next-line no-await-in-loop -- ordered schema rewrites
-      await liveDb().all(sql.raw(statement));
-    }
+        "ALTER TABLE snapshots DROP COLUMN duration_ms, DROP COLUMN a11y_violations",
+        "ALTER TABLE comments DROP COLUMN story_id",
+        "ALTER TABLE notification_channels DROP COLUMN last_error, DROP COLUMN last_error_at",
+      ]) {
+        // oxlint-disable-next-line no-await-in-loop -- ordered schema rewrites
+        await liveDb().all(sql.raw(statement));
+      }
 
-    await liveDb().lifecycle?.setup({ config: {}, logger: silentLogger });
+      await liveDb().lifecycle?.setup({ config: {}, logger: silentLogger });
 
-    const project = (await liveDb().get(schema.projects, upgradeId)) as Project | null;
-    expect(project?.runA11y).toBe(true);
-    expect(project?.runTests).toBe(false);
-    expect(project?.reviewEnabled).toBe(true);
-    expect(project?.reviewApprovals).toBe(1);
-    expect(project?.storybookUrlTtlSeconds ?? null).toBeNull();
-    const columns = await liveDb().all<{ tableName: string; columnName: string }>(
-      sql.raw(`
+      const project = (await liveDb().get(schema.projects, upgradeId)) as Project | null;
+      expect(project?.runA11y).toBe(true);
+      expect(project?.runTests).toBe(false);
+      expect(project?.reviewEnabled).toBe(true);
+      expect(project?.reviewApprovals).toBe(1);
+      expect(project?.storybookUrlTtlSeconds ?? null).toBeNull();
+      const columns = await liveDb().all<{ tableName: string; columnName: string }>(
+        sql.raw(`
       SELECT table_name AS tableName, column_name AS columnName FROM information_schema.columns
       WHERE table_schema = DATABASE()
         AND (
@@ -97,16 +100,17 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
         )
       ORDER BY table_name, column_name
     `),
-    );
-    expect(columns.map((row) => `${row.tableName}.${row.columnName}`)).toEqual([
-      "comments.story_id",
-      "notification_channels.last_error",
-      "notification_channels.last_error_at",
-      "snapshots.a11y_violations",
-      "snapshots.duration_ms",
-    ]);
-    await liveDb().remove(schema.projects, upgradeId);
-  });
+      );
+      expect(columns.map((row) => `${row.tableName}.${row.columnName}`)).toEqual([
+        "comments.story_id",
+        "notification_channels.last_error",
+        "notification_channels.last_error_at",
+        "snapshots.a11y_violations",
+        "snapshots.duration_ms",
+      ]);
+      await liveDb().remove(schema.projects, upgradeId);
+    },
+  );
 
   it("migrates and round-trips a project", async () => {
     const now = new Date().toISOString();
