@@ -111,6 +111,33 @@ describe("storybook routes", () => {
     },
   );
 
+  it.each(["branch/%E0%A4%A", "branch/", "branch/unknown"])(
+    "rejects an invalid or unknown label path %s",
+    async (labelPath) => {
+      const { app } = await seededApp();
+      const response = await app.request(`/projects/test-project/storybook/${labelPath}`);
+      expect(response.status).toBe(404);
+    },
+  );
+
+  it("redirects an unauthenticated visitor from a private label", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ public: false }));
+    await new LabelModel(db).attach("p1", "b1", "branch", "feature/login");
+    const app = createShelfApp({
+      database: db,
+      storage,
+      auth: stubAuth(null),
+      logger: silentLogger,
+    });
+    const url = createUrlBuilder("").storybookLabel("test-project", "branch", "feature/login");
+    const response = await app.request(url);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/auth/login");
+  });
+
   it("returns 404 when no approved default-branch build exists", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
