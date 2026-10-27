@@ -157,6 +157,39 @@ describe("upload inline statics", () => {
     expect(left).toBeNull();
   });
 
+  it("queues capture only after inline publication finishes", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const reached = Promise.withResolvers<boolean>();
+    const release = Promise.withResolvers<boolean>();
+    const originalWrite = storage.write.bind(storage);
+    storage.write = async (key, data) => {
+      if (key.endsWith("/manifest.json")) {
+        reached.resolve(true);
+        await release.promise;
+      }
+      await originalWrite(key, data);
+    };
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      testing: { runner: stubRunner() },
+      config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
+    });
+    const { slug } = await setupProject(app);
+    const upload = uploadZip(app, slug, storybookZip());
+    try {
+      await reached.promise;
+      expect(await queuedCaptures(db)).toEqual([]);
+    } finally {
+      release.resolve(true);
+    }
+    const { buildId, status } = await upload;
+    expect(status).toBe(202);
+    expect(await queuedCaptures(db)).toContain(buildId);
+  });
+
   it("defers large zips to capture", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

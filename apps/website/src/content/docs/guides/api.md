@@ -79,13 +79,13 @@ The core CI flow in three calls:
      -H "Content-Type: application/json" \
      -d "{\"gitSha\":\"$GITHUB_SHA\",\"gitBranch\":\"$GITHUB_REF_NAME\"}")
    UPLOAD_URL=$(echo "$CREATE" | jq -r .uploadUrl)
-   curl -sS -X PUT "$STORYSHELF_URL$UPLOAD_URL" \
+   curl -sS --fail-with-body -X PUT "$STORYSHELF_URL$UPLOAD_URL" \
      -H "Authorization: Bearer $STORYSHELF_TOKEN" \
      -H "Content-Type: application/zip" \
      --data-binary @storybook-static.zip
    ```
 
-   The PUT responds with the `Build` (`status: "pending"`, `HTTP 202`) — capture runs asynchronously. Uploads larger than the server's `maxUploadBytes` (default 1 GiB) are rejected with `413`. An invalid inline zip, or one exceeding extraction caps, is rejected with `422`; upload a corrected archive to the same build.
+   The PUT responds with the `Build` and `HTTP 202`; its status depends on the project and whether publishing has finished. When testing is enabled, capture runs asynchronously. Uploads larger than the server's `maxUploadBytes` (default 1 GiB) are rejected with `413`. An invalid inline zip, or one exceeding extraction caps, is rejected with `422`; upload a corrected archive to the same build.
 
 3. **Follow the build to its terminal state**
 
