@@ -36,8 +36,10 @@ export function PublicOriginCard(props: {
   origin: PublicOriginView;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { resolved, stored, learns } = props.origin;
-  // A configured or platform origin outranks what a browser reports, so there is nothing to learn.
-  const reports = learns && (resolved === null || resolved.source === "admin");
+  // A configured or platform origin outranks what a browser reports: there is nothing to learn or
+  // to confirm, so neither the beacon nor the forms are offered (#315).
+  const fixed = resolved !== null && resolved.source !== "admin";
+  const reports = learns && !fixed;
   return (
     <Card>
       <SectionTitle>Public origin</SectionTitle>
@@ -53,10 +55,19 @@ export function PublicOriginCard(props: {
         <Resolved resolved={resolved} />
       )}
       {reports ? <div data-report-origin="/admin/public-origin/report" /> : null}
-      {learns && stored !== null ? <StoredForm stored={stored} /> : null}
-      {learns && stored === null ? <EnterForm /> : null}
+      {fixed ? null : <OriginForms learns={learns} stored={stored} />}
     </Card>
   );
+}
+
+function OriginForms(props: {
+  learns: boolean;
+  stored: StoredPublicOrigin | null;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  if (!props.learns) {
+    return <></>;
+  }
+  return props.stored === null ? <EnterForm /> : <StoredForm stored={props.stored} />;
 }
 
 function NothingResolved(props: {
@@ -90,6 +101,7 @@ function Resolved(props: {
     <HStack>
       <code>{resolved.url}</code>
       <Badge tone="success">{SOURCE_LABELS[resolved.source]}</Badge>
+      {resolved.source === "admin" ? null : <Meta>Nothing to confirm.</Meta>}
     </HStack>
   );
 }

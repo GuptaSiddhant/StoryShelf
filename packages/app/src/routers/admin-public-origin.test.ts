@@ -115,6 +115,21 @@ describe("public origin on the System page", () => {
     expect(html).toContain("configured.example.com");
     expect(html).toContain("configured (PUBLIC_BASE_URL)");
     expect(html).not.toContain("data-report-origin");
+    // Nothing to confirm: no stored-origin form and no entry form either (#315).
+    expect(html).not.toContain('action="/admin/public-origin"');
+    expect(html).toContain("Nothing to confirm.");
+  });
+
+  it("learns and stores nothing when the configuration answers, and refuses a typed origin", async () => {
+    const app = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
+    const token = await csrfFrom(app);
+    expect((await report(app, token, { origin: ORIGIN })).status).toBe(204);
+    const response = await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
+    expect(response.status).toBeLessThan(400);
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain("configured.example.com");
+    expect(html).not.toContain("shelf.acme.io");
+    expect(html).not.toContain(ORIGIN);
   });
 
   it("lets an admin confirm, replace and forget the stored origin", async () => {
