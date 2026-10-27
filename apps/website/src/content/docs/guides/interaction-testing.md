@@ -42,7 +42,7 @@ The runner does `page.goto(iframe.html?id=...&viewMode=story)` → `waitForSelec
 
 ### When the screenshot is taken
 
-The runner subscribes to the preview's channel before the story renders and waits for Storybook's own signal (`storyRendered`, or the error event of a story that fails to render) instead of a fixed sleep. After the signal it lets web fonts load and two frames paint (at most 250 ms), then waits `delay` if you set one. A story with no `delay` therefore no longer waits a fixed 500 ms, and a slow story is waited for until it is done.
+The runner subscribes to the preview's channel before the story renders and waits for Storybook's own signal (`storyRendered`, or the error event of a story that fails to render) instead of a fixed sleep. After the signal it lets web fonts load and two frames paint (at most 250 ms), then waits `delay` if you set one. If StoryShelf runs `play` explicitly, it does so after this wait and before the screenshot. A story with no `delay` therefore no longer waits a fixed 500 ms, and a slow story is waited for until it is done.
 
 If the page never sends the signal (a Storybook without the channel, or a story that never finishes rendering), the runner falls back to the earlier behaviour: after 5 seconds (the play timeout, when plays run and it is longer) it waits `delay ?? 500` ms and takes the screenshot, and the log notes that the story did not signal. A story that throws while rendering or in `play` is still photographed; one log line names the render phase and Storybook's message.
 
@@ -111,17 +111,9 @@ Each test is an index entry with `subtype: "test"`. StoryShelf never screenshots
 
 For the background on the preview page this reads from, see [How Storybook works](/concepts/how-storybook-works/).
 
-Storybook 8's `index.json` (v5) omits `parameters`; StoryShelf prefers `stories.json` (which has them) then falls back to runtime `page.evaluate(() => __STORYBOOK_PREVIEW__.extract()[id].parameters)` for SB 8 without `buildStoriesJson`.
+StoryShelf reads the story index from `stories.json` when available, otherwise `index.json`. If an entry includes parameters, StoryShelf uses them. When it does not, the runner reads the resolved story parameters from the preview's `__STORYBOOK_PREVIEW__.extract()` once per capture run. The Storybook 8, 9, and 10 fixtures use an `index.json` that omits parameters, so this runtime extraction supplies them.
 
-You **do not** need to edit `.storybook/main.ts`. When `storyshelf upload` builds Storybook for you, it sets `STORYBOOK_BUILD_STORIES_JSON=true` automatically. If you build outside `upload` (`storybook build -o storybook-static` then `upload` without rebuild), the runtime fallback still covers it. For a persistent file, you may add:
-
-```ts
-// .storybook/main.ts
-export default {
-  // ...
-  features: { buildStoriesJson: true },
-};
-```
+You **do not** need to edit `.storybook/main.ts`. When `storyshelf upload` builds Storybook, it sets `STORYBOOK_BUILD_STORIES_JSON=true`; whether a build emits `stories.json` depends on Storybook's version and configuration. A build without that file uses `index.json`; the runner extracts parameters at runtime only when the selected story entry does not include them.
 
 ## Build status and GitHub
 
@@ -131,4 +123,4 @@ export default {
 
 Retry a flaky capture with **Retry** on the build page (`POST /api/v1/projects/:slug/builds/:id/retry`).
 
-See **Project settings → Tests** for the toggle, **ADR 0017** for the full decision, and **Configuration** for `buildStoriesJson` details.
+See **Project settings → Tests** for the toggle and **ADR 0017** for the full decision.

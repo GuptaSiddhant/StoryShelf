@@ -16,6 +16,7 @@ const stubDatabase: DatabaseAdapter = {
   tables: stubTables(),
   insert: unreachable,
   update: unreachable,
+  updateWhere: unreachable,
   get: unreachable,
   remove: unreachable,
   list: unreachable,
