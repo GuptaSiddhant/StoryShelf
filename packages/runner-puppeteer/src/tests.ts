@@ -9,9 +9,9 @@ import {
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { createPageLimiter, isTimeoutError, type SessionGate } from "@storyshelf/core/utils";
 import type { Browser, Page } from "puppeteer-core";
-import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { acquirePage } from "./pages.ts";
-import { assertReachable, planRun, serve } from "./pipeline.ts";
+import { assertReachable, launchContextOf, planRun, serve } from "./pipeline.ts";
 import { waitForSettled, type SettleReport } from "./settle.ts";
 import type { ActiveRun, PuppeteerTestsInput, TargetDriver } from "./types.ts";
 
@@ -31,15 +31,23 @@ export async function runTestEntries(
   if (rawInput.tests.length === 0) return [];
   const { input, name, remote } = planRun(rawInput, driver, defaultTarget);
   assertReachable(name, remote, input.storybookUrl);
-  const browser = await driver.launch(name, input.logger);
+  const browser = await driver.launch(
+    name,
+    input.logger,
+    launchContextOf(input, "tests", active.abort?.signal),
+  );
   const server = await serve(input, browser);
   active.browser = browser;
-  try {
-    return await runAll(browser, server.url, input, active);
-  } finally {
-    active.browser = null;
-    await Promise.all([safeCloseBrowser(browser), safeCloseServer(server)]);
-  }
+  return await finishing(
+    async () => await runAll(browser, server.url, input, active),
+    async (failed, error) => {
+      active.browser = null;
+      await Promise.all([
+        safeCloseBrowser(browser, outcomeOf(active, failed), error),
+        safeCloseServer(server),
+      ]);
+    },
+  );
 }
 
 async function runAll(

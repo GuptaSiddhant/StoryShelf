@@ -2,9 +2,11 @@
 
 import {
   createTargetOffers,
+  shutdownRemote,
   type CaptureRunner,
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
+import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
 import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { verifyLocalTargets } from "./availability.ts";
 import { activeRuns, closeBrowser } from "./browser.ts";
@@ -54,10 +56,10 @@ export function createPuppeteerCaptureRunner(
   // Until `lifecycle.setup` verifies them, every declared target reads as ready.
   const offers = createTargetOffers(declared);
   const driver: TargetDriver = {
-    launch: offers.guard(async (target, logger) => {
+    launch: offers.guard(async (target, logger, context) => {
       const remote = remotes.find((entry) => entry.target === target);
       return remote
-        ? await connectRemote(remote, logger)
+        ? await connectRemote(remote, context, logger)
         : await launchLocal(
             locals.find((entry) => entry.target === target) as LocalTarget,
             options.args,
@@ -85,9 +87,11 @@ export function createPuppeteerCaptureRunner(
         return offers.current();
       },
     },
-    lifecycle: offers.lifecycle(async () => await Promise.resolve(verifyTargets(declared, locals))),
+    lifecycle: withShutdown(
+      offers.lifecycle(async () => await Promise.resolve(verifyTargets(declared, locals))),
+    ),
     async render(input: PuppeteerRenderInput) {
-      const active: ActiveRun = { cancelled: false, browser: null };
+      const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await renderAll(
@@ -101,7 +105,7 @@ export function createPuppeteerCaptureRunner(
       }
     },
     async runTests(input: PuppeteerTestsInput) {
-      const active: ActiveRun = { cancelled: false, browser: null };
+      const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await runTestEntries(
@@ -118,6 +122,7 @@ export function createPuppeteerCaptureRunner(
       await Promise.all(
         activeRuns.matching(buildId, runId).map(async (active) => {
           active.cancelled = true;
+          active.abort?.abort();
           await closeBrowser(active.browser);
         }),
       );
@@ -132,6 +137,17 @@ function verifyTargets(
 ): RunnerTarget[] {
   const checked = new Map(verifyLocalTargets(locals).map((entry) => [entry.target, entry]));
   return declared.map((entry) => checked.get(entry.target) ?? entry);
+}
+
+/** Teardown also releases every lease still held and closes every pool, so a stopped process leaves no server running. */
+function withShutdown(lifecycle: AdapterLifecycle): AdapterLifecycle {
+  return {
+    ...lifecycle,
+    teardown: async () => {
+      await shutdownRemote();
+      await lifecycle.teardown();
+    },
+  };
 }
 
 function envPositiveInt(name: string): number | undefined {

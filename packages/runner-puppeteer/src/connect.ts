@@ -1,51 +1,36 @@
 /** Connecting to a remote browser: retried when the service is unreachable or full, a clear error when it is not. */
 import {
-  TargetLaunchError,
+  connectLeased,
   scrubConnection,
+  type ConnectLeasedContext,
   type RemoteConnection,
   type RemoteTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
-import { isRetryableConnectError, retryConnect } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
+import { holdLease } from "./browser.ts";
 
 /**
- * Connect to `entry`'s service and return its browser. Connection-level failures are retried with
- * backoff, so a provider outage or a full plan costs time and not a story crash; what is left is
- * a {@link TargetLaunchError}, which fails the job at once (a refused credential also marks the
- * target unavailable, a service that is merely down does not). No message carries the endpoint
- * or its credentials.
+ * Connect to `entry`'s service and return its browser, holding the service's lease (a function
+ * `connect`'s `lease`) until the browser is closed through `closeBrowser`/`safeCloseBrowser`.
+ * Connection-level failures are retried with backoff, so a provider outage or a full plan costs
+ * time and not a story crash; what is left is a `TargetLaunchError`, which fails the job at once
+ * (a refused credential also marks the target unavailable, a service that is merely down does
+ * not). No message carries the endpoint, its credentials or the lease.
  */
-export async function connectRemote(entry: RemoteTarget, logger?: Logger): Promise<Browser> {
-  const { remote, target } = entry;
-  if (typeof remote.connect === "function") {
-    throw new TargetLaunchError(
-      target,
-      "a function connect (acquire/release) is only supported by the Playwright runner",
-    );
-  }
-  const connection = remote.connect;
-  try {
-    return await retryConnect(
-      async () => await connectOnce(connection, remote.timeouts.connectMs),
-      {
-        retries: remote.retry.attempts,
-        backoffMs: remote.retry.backoffMs,
-        onRetry: (error, retry, delayMs) => {
-          logger?.warn(
-            { target, retry, delayMs, reason: reasonOf(error, connection) },
-            "remote browser connect failed, retrying",
-          );
-        },
-      },
-    );
-  } catch (error) {
-    throw new TargetLaunchError(target, reasonOf(error, connection), {
-      cause: new Error(reasonOf(error, connection)),
-      transient: isRetryableConnectError(error),
-    });
-  }
+export async function connectRemote(
+  entry: RemoteTarget,
+  context: ConnectLeasedContext,
+  logger?: Logger,
+): Promise<Browser> {
+  const { value, lease } = await connectLeased(entry, context, {
+    logger,
+    open: async (connection) => await connectOnce(connection, entry.remote.timeouts.connectMs),
+    reasonOf,
+  });
+  holdLease(value, lease);
+  return value;
 }
 
 async function connectOnce(connection: RemoteConnection, timeoutMs: number): Promise<Browser> {
@@ -58,7 +43,7 @@ async function connectOnce(connection: RemoteConnection, timeoutMs: number): Pro
 }
 
 /** What failed, in one line, with the endpoint and credentials removed. */
-function reasonOf(error: unknown, connection: RemoteConnection): string {
+function reasonOf(error: unknown, connection: RemoteConnection & { lease?: unknown }): string {
   const text = error instanceof Error ? error.message : String(error);
   const line =
     text

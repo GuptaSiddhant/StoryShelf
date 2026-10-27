@@ -215,7 +215,19 @@ remote({
 - A `close` that throws or exceeds `closeTimeoutMs` (default 30 s) leaves the resource `unknown`: the next connection calls `open` again and the idle timer retries the close. The error's class is logged, never its message.
 - **Shutdown.** `lifecycle.teardown()` (what the app runs on SIGTERM) aborts pending `connect` signals, releases every held lease as `cancelled`, then closes every pool at once, ignoring `idleMs`. There is no `close()` on the runner. Pools register themselves in a process-wide registry, so two apps in one process would close each other's pools, and tests must call `pool.dispose()`.
 
-The hooks need the Playwright runner. `cdp()` on the Puppeteer runner takes a fixed connection only.
+**On the Puppeteer runner.** `cdp()` takes the same lifecycle: pass `connect` as a function (with `release`, `retry`, `timeouts`) instead of `endpoint`, and import `RemoteConnectError` and `refCounted` from `@storyshelf/runner-puppeteer/remote`. The context, release outcomes, error handling and shutdown behave as above (`purpose` is `render` or `tests`; Puppeteer has no parameter pre-pass). What differs is the protocol: CDP drives Chromium only, so `reach` is always `url` and every render needs a signed Storybook URL (a confirmed public origin and a server secret). The server must speak CDP (Chrome or Chromium with remote debugging), not Playwright's `run-server`. Puppeteer's `connect` cannot be aborted mid-handshake, so `signal` only stops a `connect` that is still pending; an open handshake runs to `timeouts.connectMs`.
+
+```ts
+import { cdp, refCounted } from "@storyshelf/runner-puppeteer/remote";
+
+const chrome = refCounted({ open: wakeChrome, close: suspendChrome, idleMs: 120_000 });
+cdp({
+  name: "pool",
+  sessions: 4,
+  connect: chrome.connect((resource) => ({ endpoint: `wss://${resource.host}/devtools/browser` })),
+  release: chrome.release,
+});
+```
 
 ## Upgrading from 0.7
 
