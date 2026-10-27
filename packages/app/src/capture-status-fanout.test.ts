@@ -364,7 +364,7 @@ describe("git channel status fan-out", () => {
       ).json()) as { id: string; slug: string };
       await addGitChannel(app, project.slug, { provider: "github-a", secret: "bad-token" });
 
-      await uploadBuild(app, project.slug);
+      const build = await uploadBuild(app, project.slug);
 
       await vi.waitFor(async () => {
         const list = await app.request(`/api/v1/projects/${project.slug}/notification-channels`);
@@ -375,6 +375,8 @@ describe("git channel status fan-out", () => {
         expect(channel?.lastError).toBe("HTTP 401: Bad credentials");
         expect(channel?.lastErrorAt).not.toBeNull();
       });
+      await upTo({ app, slug: project.slug, buildId: build.id, wanted: "approved" });
+      await app.lifecycle.teardown();
     } finally {
       vi.unstubAllEnvs();
     }
