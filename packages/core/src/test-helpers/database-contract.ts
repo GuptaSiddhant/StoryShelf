@@ -1,5 +1,3 @@
-import { getTableColumns, ne } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
 /**
  * Published database contract suite for first- and third-party adapters.
  *
@@ -12,6 +10,8 @@ import { randomUUID } from "node:crypto";
  * databaseContractSuite("sqlite", () => createSqliteDatabase(":memory:"));
  * ```
  */
+import { getTableColumns, ne } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { REQUIRED_TABLE_KEYS } from "../adapters/database.ts";

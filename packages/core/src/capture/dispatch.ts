@@ -21,6 +21,7 @@ import { leaseProgress, type CaptureProgress } from "./progress.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
 import type { FinalSummary } from "./shards/reduce.ts";
 import { hasApprovedBuildForSha } from "./skip-checks.ts";
+import { SignedUrlLifetimeError } from "./token-chunks.ts";
 
 /** Build the queue's job runner: post pending, apply skip rules, capture, report. */
 export function createDispatchJob(
@@ -218,10 +219,21 @@ async function runAndReport(ctx: JobContext, job: CaptureDispatchJob): Promise<v
     );
     await finishUnlessSharded(ctx, summary);
   } catch (error: unknown) {
-    await finishAttempt(ctx, "failed", errorText(error));
-    await deps.buildState.request(build.id);
-    throw error;
+    await reportFailure(ctx, error);
   }
+}
+
+/** Record a failed run, then rethrow so the job is redelivered, unless another try cannot help. */
+async function reportFailure(ctx: JobContext, error: unknown): Promise<void> {
+  const { deps, build } = ctx;
+  await finishAttempt(ctx, "failed", errorText(error));
+  await deps.buildState.request(build.id);
+  if (error instanceof SignedUrlLifetimeError) {
+    // A configuration problem: another delivery would fail the same way. The build is failed.
+    deps.logger.error({ buildId: build.id, err: error }, "capture not retried");
+    return;
+  }
+  throw error;
 }
 
 /** Load the build + project for a job, running orphan jobs directly. */

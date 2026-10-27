@@ -25,6 +25,14 @@ export interface SliceInput {
   renderTimeoutMs: number | undefined;
 }
 
+/**
+ * The project's signed URL lifetime cannot hold what the pass must capture (a configuration
+ * problem): retrying or isolating stories cannot help, so the job fails once with this message.
+ */
+export class SignedUrlLifetimeError extends Error {
+  override readonly name = "SignedUrlLifetimeError";
+}
+
 /** Render the pass, minting a fresh signed URL for each slice; results are concatenated. */
 export async function renderInSlices(input: SliceInput): Promise<RenderResult> {
   const slices = slicesOf(input);
@@ -79,7 +87,7 @@ function slicesOf(input: SliceInput): Slice[] {
 function sliceLimit(ttl: number): number {
   const limit = Math.floor(((ttl - STORYBOOK_URL_TTL_GRACE) * 1000) / PER_CAPTURE_BUDGET_MS);
   if (limit < 1) {
-    throw new Error(
+    throw new SignedUrlLifetimeError(
       "Signed Storybook URL lifetime is too short for one capture and its grace period; increase or clear the project lifetime override.",
     );
   }
@@ -88,7 +96,7 @@ function sliceLimit(ttl: number): number {
 
 function checkedCount(count: number, limit: number): number {
   if (count > limit) {
-    throw new Error(
+    throw new SignedUrlLifetimeError(
       `A story expands to ${count} captures, exceeding the signed URL slice limit of ${limit}; increase or clear the project lifetime override.`,
     );
   }

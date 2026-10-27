@@ -18,6 +18,7 @@ import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { createBuildStatePublisher } from "./build-state/publisher.ts";
 import { createDispatchJob, type DispatchDeps } from "./dispatch.ts";
+import { SignedUrlLifetimeError } from "./token-chunks.ts";
 
 const SECRET = "test-secret-0123456789abcdef";
 
@@ -254,6 +255,25 @@ describe("createDispatchJob attempt history", () => {
     expect(attempts[0]?.error).toContain("renderer exploded");
     const logs = await new CaptureLogModel(db, tables(db)).listByAttempt(attempts[0]?.id ?? "");
     expect(logs.map((row) => row.message)).toContain("capture failed");
+  });
+
+  it("fails the build without a retry when the signed URL lifetime cannot fit the pass", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const { project, build } = await seedBuild(db);
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const render = vi.fn(async () => {
+      await Promise.resolve();
+      throw new SignedUrlLifetimeError("increase or clear the project lifetime override");
+    });
+    const runJob = createDispatchJob(depsFor(db, storage, fakeRunner(render)));
+
+    await expect(runJob({ buildId: build.id })).resolves.toBeUndefined();
+
+    const attempts = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
+    expect(attempts[0]?.status).toBe("failed");
+    expect(attempts[0]?.error).toContain("increase or clear");
+    expect((await new BuildModel(db, tables(db)).get(build.id))?.status).toBe("failed");
   });
 });
 

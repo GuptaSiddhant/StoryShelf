@@ -19,6 +19,7 @@ import { verifyStorybookToken } from "../utils/storybook-token.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
 import { buildScratchDir } from "./scratch.ts";
 import { parseTestResults, summarizeTests } from "./tests.ts";
+import { SignedUrlLifetimeError } from "./token-chunks.ts";
 
 function tables(db: DatabaseAdapter) {
   return {
@@ -692,6 +693,13 @@ describe("executeCaptureJob", () => {
       await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(
         /Cannot launch firefox: executable does not exist/u,
       );
+      expect(render).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not isolate a signed URL lifetime failure as a story crash", async () => {
+      const { buildId, render, options } = await setupBrowsers({ browsers: '["firefox"]' });
+      render.mockRejectedValue(new SignedUrlLifetimeError("increase or clear the override"));
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(/increase or clear/u);
       expect(render).toHaveBeenCalledTimes(1);
     });
 
