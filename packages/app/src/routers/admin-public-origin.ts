@@ -20,6 +20,16 @@ export function registerPublicOriginRoutes(app: ShelfRouter): void {
   app.post("/admin/public-origin/clear", handleClear);
 }
 
+/** What an admin is told when the origin is not theirs to set. */
+const FIXED_ORIGIN_MESSAGE =
+  "The public origin comes from PUBLIC_BASE_URL or the hosting platform, so there is nothing to confirm";
+
+/** Whether the configuration or the platform answers: an origin an admin cannot confirm or replace. */
+async function isFixed(): Promise<boolean> {
+  const source = (await getStore().publicOrigin?.resolve())?.source;
+  return source === "config" || source === "platform";
+}
+
 /** The origin a report names, once it matches what the browser says it used; throws 400 otherwise. */
 async function reportedOrigin(c: Context): Promise<string> {
   const body = (await c.req.json().catch(() => null)) as { origin?: unknown } | null;
@@ -35,7 +45,7 @@ async function reportedOrigin(c: Context): Promise<string> {
 async function handleReport(c: Context): Promise<Response> {
   requireSiteAdmin(c);
   const { authEnabled, publicOrigin, user } = getStore();
-  if (!authEnabled || publicOrigin === undefined) {
+  if (!authEnabled || publicOrigin === undefined || (await isFixed())) {
     return c.body(null, 204);
   }
   const reported = await reportedOrigin(c);
@@ -58,6 +68,9 @@ async function resumeIfResolved(wasResolved: boolean): Promise<void> {
 
 /** Store what an admin typed; the message says why not when it is no origin. */
 async function storeTyped(c: Context): Promise<string> {
+  if (await isFixed()) {
+    return FIXED_ORIGIN_MESSAGE;
+  }
   const { publicOrigin, user } = getStore();
   const origin = (await c.req.formData()).get("origin");
   try {
