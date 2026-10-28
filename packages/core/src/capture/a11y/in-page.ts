@@ -10,7 +10,7 @@ import type { A11yRunPlan } from "./options.ts";
 /** What {@link inPageReadA11yParameters} found: the plain-data `parameters.a11y` and what was dropped. */
 export interface A11yParametersRead {
   params: unknown;
-  /** Function values (and items that held nothing else) left out because a page cannot hand them over. */
+  /** Function, symbol and undefined values left out because a page cannot hand them over. */
   dropped: number;
 }
 
@@ -53,7 +53,7 @@ export function inPageReadA11yParameters(): A11yParametersRead | undefined {
   };
   try {
     const params = clean(a11y, 0);
-    return params === DROP ? undefined : { params, dropped: state.dropped };
+    return { params: params === DROP ? undefined : params, dropped: state.dropped };
   } catch {
     return undefined;
   }

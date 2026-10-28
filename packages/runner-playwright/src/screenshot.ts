@@ -37,7 +37,7 @@ async function runCapture(
   const story = await navigateAndEnrich(ctx, page, inputStory, viewport);
   await waitUntilReady(ctx, page, story);
   if (ctx.executePlay) await runPlay(page, story.id, ctx.playTimeoutMs ?? 10_000);
-  const a11yViolations = await getA11y(ctx, page);
+  const a11yViolations = await getA11y(ctx, page, story);
   await settlePage(page, story);
   const plan = await resolvePlan(page, viewport, story);
   if (plan.viewport.width !== viewport.width || plan.viewport.height !== viewport.height)
@@ -99,9 +99,9 @@ function logSettle(ctx: CaptureContext, story: StoryEntry, report: SettleReport)
     ctx.logger?.warn(detail, "story reported an error while rendering");
   }
 }
-async function getA11y(ctx: CaptureContext, page: Page): Promise<string[]> {
+async function getA11y(ctx: CaptureContext, page: Page, story: StoryEntry): Promise<string[]> {
   // checkA11y reports its own failures as an annotation, so it never throws.
-  return ctx.runA11y ? await checkA11y(page, ctx.logger) : [];
+  return ctx.runA11y ? await checkA11y(page, ctx.logger, story.id) : [];
 }
 async function settlePage(page: Page, story: StoryEntry): Promise<void> {
   const burst = story.parameters?.burst ?? 1;
