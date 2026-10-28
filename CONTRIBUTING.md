@@ -46,6 +46,8 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package and its de
 
 Each push to `main` builds the public packages and publishes commit-based previews through pkg.pr.new. The workflow does not publish to npm. For example, install the latest main preview with `npm install https://pkg.pr.new/GuptaSiddhant/StoryShelf/@storyshelf/core@main`, or replace `main` with a commit SHA to pin a specific build. Each preview package has a `0.0.0-preview-<sha>` version, and its workspace dependencies point to previews from the same commit.
 
+Run the CLI preview with `npx https://pkg.pr.new/GuptaSiddhant/StoryShelf/storyshelf@main`.
+
 The [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new) must be installed on this repository for the workflow to publish. Preview availability and retention are managed by pkg.pr.new; use stable npm releases for durable dependencies. The separate `release.yml` workflow remains responsible for npm and JSR releases.
 
 ## Handling secrets
