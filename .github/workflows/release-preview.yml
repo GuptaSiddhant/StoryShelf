@@ -30,4 +30,4 @@ jobs:
         run: node scripts/rewrite-workspace-protocol.mjs
 
       - name: Publish previews
-        run: nubx pkg-pr-new publish --comment=off --no-template --no-compact --previewVersion --bin=storyshelf './packages/*'
+        run: nub exec pkg-pr-new publish --comment=off --no-template --no-compact --previewVersion --bin=storyshelf './packages/*'
