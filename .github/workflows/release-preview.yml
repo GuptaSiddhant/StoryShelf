@@ -21,12 +21,6 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      # Stamp before build so compiled version metadata matches the packaged preview.
-      - name: Prepare preview version
-        run: |
-          node --test scripts/prepare-preview.test.mjs
-          node scripts/prepare-preview.mjs "$GITHUB_SHA" --apply
-
       - name: Build packages
         run: nub run build --filter='./packages/*'
 
