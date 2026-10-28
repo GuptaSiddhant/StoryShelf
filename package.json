@@ -80,6 +80,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "pkg-pr-new": "0.0.92",
     "rolldown": "*",
     "tsdown": "catalog:",
     "turbo": "^2.11.2",

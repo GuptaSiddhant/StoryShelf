@@ -1,0 +1,39 @@
+name: Package previews
+
+# Preview each commit merged or pushed to the default branch without publishing to npm.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and publish package previews
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      # Stamp before build so compiled version metadata matches the packaged preview.
+      - name: Prepare preview version
+        run: |
+          node --test scripts/prepare-preview.test.mjs
+          node scripts/prepare-preview.mjs "$GITHUB_SHA"
+
+      - name: Build packages
+        run: nub run build --filter='./packages/*'
+
+      # npm pack cannot resolve catalog:; pkg.pr.new will replace sibling workspace
+      # dependencies with preview URLs when it packs all packages together.
+      - name: Rewrite workspace and catalog references
+        run: node scripts/rewrite-workspace-protocol.mjs
+
+      - name: Publish previews
+        run: nubx pkg-pr-new publish --comment=off --no-template --no-compact --previewVersion './packages/*'

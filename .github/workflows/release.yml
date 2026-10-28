@@ -7,9 +7,6 @@ on:
     tags:
       - "v*.*.*"
       - "v*.*.*-*"
-  # Keep nightly publishing in release.yml: npm's trusted publisher is tied to this workflow.
-  schedule:
-    - cron: "0 2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -25,7 +22,6 @@ jobs:
   # (not on each other), so a bad tag/tree fails fast before either registry
   # is touched — while npm and JSR still never block each other.
   validate:
-    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -79,58 +75,6 @@ jobs:
         # automatically — no NODE_AUTH_TOKEN. Requires a trusted publisher
         # configured per package on npmjs.com (one-time).
         run: node scripts/publish-npm.mjs "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.dist_tag }}"
-
-  # The workflow run's creation date keeps retries on the same version even after midnight.
-  # npm's `nightly` dist-tag keeps these prereleases away from `latest`.
-  publish-nightly:
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
-    steps:
-      - name: Checkout scheduled revision
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Setup Nub
-        uses: nubjs/setup-nub@v0
-
-      - name: Check npm version for OIDC
-        run: node scripts/check-npm-oidc.mjs
-
-      - name: Install dependencies
-        run: nub ci
-
-      - name: Verify packages
-        run: nubx turbo verify --filter='./packages/*' --force
-
-      - name: Test nightly versioning
-        run: node --test scripts/nightly-version.test.mjs
-
-      - name: Stamp nightly versions
-        id: nightly
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          created_at=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID" --jq .created_at)
-          node scripts/nightly-version.mjs "$created_at"
-
-      - name: Build nightly packages
-        run: nub run build --filter='./packages/*'
-
-      - name: Rewrite workspace protocol for npm manifest
-        run: node scripts/rewrite-workspace-protocol.mjs
-
-      - name: Publish nightly packages to npm
-        env:
-          NIGHTLY_VERSION: ${{ steps.nightly.outputs.version }}
-        run: node scripts/publish-npm.mjs "$NIGHTLY_VERSION" nightly
 
   # GitHub Release. Runs only after a successful npm publish (same semantics
   # as when these steps lived at the tail of publish-npm); JSR outcome can't

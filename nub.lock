@@ -119,6 +119,9 @@ importers:
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2003
+      pkg-pr-new:
+        specifier: 0.0.92
+        version: 0.0.92
       rolldown:
         specifier: '*'
         version: 1.2.11
@@ -6322,6 +6325,10 @@ packages:
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
+
+  pkg-pr-new@0.0.92:
+    resolution: {integrity: sha512-l9HE4y0LmS5n3pw9vKby7m9O+SBzjWF5HXGH6Z8jdPWW7OW7hFMKsFOrgubc0JuPz8gYEuIw1mLaU3GEmPuukQ==}
+    hasBin: true
 
   playwright-core@1.63.0:
     resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
@@ -12913,6 +12920,8 @@ snapshots:
       pngjs: 7.0.0
 
   pkce-challenge@5.0.1: {}
+
+  pkg-pr-new@0.0.92: {}
 
   playwright-core@1.63.0: {}
 

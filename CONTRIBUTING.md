@@ -42,11 +42,11 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package and its de
 4. **Open a pull request** against `main`. CI must be green.
 5. **Merges are squash merges.** One task is one commit on `main`, titled `feat(<task-id>): <short description>`. Reference the issue with `Closes #<n>`.
 
-## Nightly npm packages
+## Package previews
 
-The Release workflow publishes public packages nightly to npm's `nightly` dist-tag after package verification. Versions use the workflow run's UTC creation date, for example `0.0.0-2026102801`; every package and its internal workspace dependencies use that exact version. Install an explicit nightly with `npm install @storyshelf/core@nightly`. Stable releases continue to use their existing tags.
+Each push to `main` builds the public packages and publishes commit-based previews through pkg.pr.new. The workflow does not publish to npm. For example, install the latest main preview with `npm install https://pkg.pr.new/GuptaSiddhant/StoryShelf/@storyshelf/core@main`, or replace `main` with a commit SHA to pin a specific build. Each preview package has a `0.0.0-preview-<sha>` version, and its workspace dependencies point to previews from the same commit.
 
-There is one nightly version per UTC day. Re-running the same workflow run keeps its original version and skips package versions already published, so a partial publish can resume. Nightly publication uses the same npm trusted publisher configured for `release.yml` as stable releases; it does not create a Git tag, GitHub Release, or JSR publication.
+The [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new) must be installed on this repository for the workflow to publish. Preview availability and retention are managed by pkg.pr.new; use stable npm releases for durable dependencies. The separate `release.yml` workflow remains responsible for npm and JSR releases.
 
 ## Handling secrets
 
