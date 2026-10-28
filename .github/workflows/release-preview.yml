@@ -25,7 +25,7 @@ jobs:
       - name: Prepare preview version
         run: |
           node --test scripts/prepare-preview.test.mjs
-          node scripts/prepare-preview.mjs "$GITHUB_SHA"
+          node scripts/prepare-preview.mjs "$GITHUB_SHA" --apply
 
       - name: Build packages
         run: nub run build --filter='./packages/*'
