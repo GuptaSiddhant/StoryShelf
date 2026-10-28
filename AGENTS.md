@@ -6,6 +6,14 @@ Guidance for AI coding agents (and humans) working in the StoryShelf monorepo.
 
 A self-hosted visual testing platform for Storybook. Self-hosted Chromatic alternative. See `docs/architecture.md` for the full architecture.
 
+## Architecture direction
+
+Protect the self-hosted, vendor-independent visual testing workflow. When changing durable data,
+review state, capture environments or integrations, assess recovery, portability and whether a
+result accurately reports what was compared. Do not represent proposed ADRs as implemented
+behavior. ADR 0037 proposes portability work; ADR 0038 records the agreed direction for environment
+migration and review. ADRs 0003 and 0009 describe current behavior until those changes are implemented.
+
 ## Toolchain
 
 - **Package manager: nub/nubx** — not npm/yarn/pnpm. Lockfile is `nub.lock`.
