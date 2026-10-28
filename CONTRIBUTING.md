@@ -37,9 +37,16 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package and its de
    ```
 
    Only touch the files listed in the issue's "Files to Modify". `nub.lock` is per worktree, so never run installs concurrently in the same tree.
+
 3. **Commit with [conventional commits](https://www.conventionalcommits.org/)** (`feat:`, `fix:`, `docs:`, `chore:` …). The pre-commit hook enforces the format.
 4. **Open a pull request** against `main`. CI must be green.
 5. **Merges are squash merges.** One task is one commit on `main`, titled `feat(<task-id>): <short description>`. Reference the issue with `Closes #<n>`.
+
+## Nightly npm packages
+
+The Release workflow publishes public packages nightly to npm's `nightly` dist-tag after package verification. Versions use the workflow run's UTC creation date, for example `0.0.0-2026102801`; every package and its internal workspace dependencies use that exact version. Install an explicit nightly with `npm install @storyshelf/core@nightly`. Stable releases continue to use their existing tags.
+
+There is one nightly version per UTC day. Re-running the same workflow run keeps its original version and skips package versions already published, so a partial publish can resume. Nightly publication uses the same npm trusted publisher configured for `release.yml` as stable releases; it does not create a Git tag, GitHub Release, or JSR publication.
 
 ## Handling secrets
 
