@@ -454,7 +454,7 @@ export function createShelfDbBridge(
         adapterName: "storyshelf",
         supportsDates: false,
         supportsJSON: false,
-        adapterConfig: { transaction: Boolean(db.transact) },
+        adapterConfig: { transaction: typeof db.transact === "function" },
       },
     } as never;
   };
