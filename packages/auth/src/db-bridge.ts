@@ -450,7 +450,12 @@ export function createShelfDbBridge(
         }
         return await callback(ops as never);
       },
-      options: { adapterName: "storyshelf", supportsDates: false, supportsJSON: false },
+      options: {
+        adapterName: "storyshelf",
+        supportsDates: false,
+        supportsJSON: false,
+        adapterConfig: { transaction: Boolean(db.transact) },
+      },
     } as never;
   };
 }

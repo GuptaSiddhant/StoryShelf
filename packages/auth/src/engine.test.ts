@@ -60,7 +60,7 @@ async function testEngine(
                 domain: "example.com",
                 issuer: "http://localhost:3000",
                 entryPoint: "https://idp.example.com/sso",
-                cert: "FAKE-CERT",
+                cert: "RkFLRUNFUlQ=",
                 entityID: "https://idp.example.com/metadata",
               }),
             ],
