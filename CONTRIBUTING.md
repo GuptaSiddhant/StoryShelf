@@ -37,9 +37,19 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package and its de
    ```
 
    Only touch the files listed in the issue's "Files to Modify". `nub.lock` is per worktree, so never run installs concurrently in the same tree.
+
 3. **Commit with [conventional commits](https://www.conventionalcommits.org/)** (`feat:`, `fix:`, `docs:`, `chore:` …). The pre-commit hook enforces the format.
 4. **Open a pull request** against `main`. CI must be green.
 5. **Merges are squash merges.** One task is one commit on `main`, titled `feat(<task-id>): <short description>`. Reference the issue with `Closes #<n>`.
+
+## Package previews
+
+Each push to `main` builds the public packages and publishes commit-based previews through pkg.pr.new. The workflow does not publish to npm. For example, install the latest main preview with `npm install https://pkg.pr.new/GuptaSiddhant/StoryShelf/@storyshelf/core@main`, or replace `main` with a commit SHA to pin a specific build. Each preview package has a `0.0.0-preview-<sha>` version, and its workspace dependencies point to previews from the same commit.
+
+Run the CLI preview with `npx https://pkg.pr.new/GuptaSiddhant/StoryShelf/storyshelf@main`.
+pkg.pr.new assigns the preview version when packing, after the build, so compiled version metadata retains the repository's package version. In particular, CLI-generated projects use the repository version for npm dependencies rather than attempting to install preview versions from npm.
+
+The [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new) must be installed on this repository for the workflow to publish. Preview availability and retention are managed by pkg.pr.new; use stable npm releases for durable dependencies. The separate `release.yml` workflow remains responsible for npm and JSR releases.
 
 ## Handling secrets
 
