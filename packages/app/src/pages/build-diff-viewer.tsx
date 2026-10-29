@@ -1,6 +1,7 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
+import type { BaselineReference } from "../routers/baseline-reference.ts";
 import { Badge, Button, CompareStage, Segmented, VStack, statusTone } from "../ui/components.tsx";
 import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
 import { A11yViolationsNotice, a11yCarrierOf } from "./a11y-violations.tsx";
@@ -11,6 +12,7 @@ import {
   snapshotPageUrl,
   snapshotVariant,
 } from "./build-diff-model.ts";
+import { BaselineReferenceNotice } from "./build-diff-reference.tsx";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
@@ -25,6 +27,7 @@ export interface DiffViewerProps {
   /** The selected story/mode's snapshots on every engine (browser tabs when more than one). */
   siblings?: Snapshot[];
   hasBaseline: Record<string, boolean>;
+  reference?: BaselineReference;
   /** Set when the baseline changed after this snapshot's diff was computed. */
   drifted?: "stale" | "removed";
   /** Linked packages the story uses (provenance badges + upstream deep links). */
@@ -110,6 +113,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
           <ViewComponentButton project={project} selected={selected} base={publishedBaseDomain} />
         </p>
       </div>
+      {props.reference ? <BaselineReferenceNotice reference={props.reference} /> : null}
       <BrowserTabs project={project} build={build} selected={selected} siblings={siblings} />
       {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
       <EnvironmentChangeSnapshotNotice snapshot={selected} migrated={build.isDefault} />
