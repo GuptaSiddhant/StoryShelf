@@ -38,6 +38,26 @@ Opt in to per-project subdomains by setting `PUBLISHED_BASE_DOMAIN` and adding a
 
 Then `https://<slug>.stories.example.com` serves the latest published Storybook, and `https://<buildId>.<slug>.stories.example.com` serves a specific build.
 
+## Published Storybook compression
+
+Published-file gzip is off by default. To enable it on the StoryShelf server, set:
+
+```ts
+createShelfApp({
+  database,
+  storage,
+  config: { publishedCompression: true },
+});
+```
+
+Set `publishedCompression: false` or omit it to disable generation and serving of variants. Authorized public, signed-in and signed URL requests keep their existing access rules; signed URLs still answer `private, no-store`. The first eligible request receives the original while gzip is generated in the background. Later requests that accept gzip can receive the stored variant. Missing, invalid or unavailable variants always fall back to the original. Legacy files without a content hash remain uncompressed.
+
+Only compressible files up to 8 MiB are eligible. At most two generation jobs and four variant checks run per storage adapter in each process; work above those limits is skipped and can be attempted on a later request. A variant check that takes longer than 250 ms falls back to the original. Variant storage is additional to the original, shared by content hash, and useful for warm transfer size and latency at the cost of CPU, memory and persistent storage. Savings depend on the files and the workload; the first response is uncompressed.
+
+Variants are disposable derived data under `derived/published-gzip/`; originals and manifests stay authoritative. Build retention removes variants when their original content is collected, and subsequent build purges scan up to 128 variants per pass for orphans. The adapter's list operation enumerates the variant namespace before the bounded checks. Variants may be omitted from backups and will regenerate after restore; missing variants do not affect published files.
+
+Playwright's separate `staticCompression: true` option covers only its temporary loopback server and uses an in-memory per-run cache with smaller limits; see [Remote browsers](/guides/remote-browsers/). A reverse proxy can provide compression instead; leave the application options off if the proxy handles it, and preserve authorization and the signed URL cache policy.
+
 ## Auth
 
 - **Local accounts** — invite-only email/password via the auth engine (`AUTH_PASSWORD` bootstraps the admin).

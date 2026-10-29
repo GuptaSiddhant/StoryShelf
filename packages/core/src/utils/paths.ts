@@ -94,6 +94,12 @@ export function storybookDir(projectId: string, buildId: string): string {
   return `${projectId}/builds/${buildId}/storybook`;
 }
 
+/** Disposable gzip representation of a content-addressed published file. */
+export function publishedGzipPath(hash: string): string {
+  if (!/^[a-f0-9]{64}$/u.test(hash)) throw new Error("Invalid published content hash");
+  return `derived/published-gzip/${hash}.gz`;
+}
+
 /** Storage path for an uploaded Storybook zip. */
 export function storybookZipPath(projectId: string, buildId: string): string {
   assertSegments([projectId, buildId]);

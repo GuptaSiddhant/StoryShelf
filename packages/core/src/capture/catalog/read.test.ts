@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeStorage } from "../../test-helpers/fake-adapters.ts";
 import { storybookDir } from "../../utils/paths.ts";
-import { readPublishedFile } from "./read.ts";
+import { readPublishedFile, readPublishedFileInfo } from "./read.ts";
 
 describe("readPublishedFile", () => {
   it("reads through the manifest to the content-addressed file", async () => {
@@ -11,6 +11,10 @@ describe("readPublishedFile", () => {
     expect((await readPublishedFile(storage, "p", "b", "index.json"))?.toString()).toBe(
       "from content",
     );
+    expect(await readPublishedFileInfo(storage, "p", "b", "index.json")).toEqual({
+      bytes: Buffer.from("from content"),
+      contentHash: "h1",
+    });
   });
 
   it("falls back to the per-build copy when the manifest does not list the file", async () => {
@@ -18,6 +22,9 @@ describe("readPublishedFile", () => {
     objects.set(`${storybookDir("p", "b")}/manifest.json`, Buffer.from("{}"));
     objects.set(`${storybookDir("p", "b")}/index.json`, Buffer.from("legacy"));
     expect((await readPublishedFile(storage, "p", "b", "index.json"))?.toString()).toBe("legacy");
+    expect(await readPublishedFileInfo(storage, "p", "b", "index.json")).toEqual({
+      bytes: Buffer.from("legacy"),
+    });
   });
 
   it("falls back when the manifest is unreadable, and is null when the file is gone", async () => {

@@ -19,7 +19,7 @@ export {
   type EntryChanges,
 } from "./components.ts";
 export { parseStorybookIndex, parseStorybookIndexText } from "./parse.ts";
-export { readPublishedFile } from "./read.ts";
+export { readPublishedFile, readPublishedFileInfo } from "./read.ts";
 export type { Catalog, CatalogComponent, CatalogEntry } from "./types.ts";
 export {
   catalogPresence,

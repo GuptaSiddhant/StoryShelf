@@ -29,6 +29,7 @@ export {
   screenshotPath,
   storybookDir,
   storybookZipPath,
+  publishedGzipPath,
 } from "./paths.ts";
 export {
   AdaptiveConcurrency,

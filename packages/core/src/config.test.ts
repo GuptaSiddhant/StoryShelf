@@ -10,6 +10,12 @@ describe("validateConfig", () => {
     expect(validateConfig({}).serverTiming).toBeUndefined();
   });
 
+  it("validates the published compression opt-in", () => {
+    expect(validateConfig({}).publishedCompression).toBeUndefined();
+    expect(validateConfig({ publishedCompression: true }).publishedCompression).toBe(true);
+    expect(() => validateConfig({ publishedCompression: "true" })).toThrow("Invalid ShelfConfig");
+  });
+
   it("rejects non-boolean serverTiming", () => {
     expect(() => validateConfig({ serverTiming: "yes" })).toThrow("Invalid ShelfConfig");
   });
