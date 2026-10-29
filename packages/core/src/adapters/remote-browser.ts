@@ -69,6 +69,8 @@ export interface RemoteOptions<TLease = unknown> {
   engines: readonly BrowserName[];
   /** Parallel sessions the plan allows: the page cap of the target, per process (decision 4). A function is read live. */
   sessions: number | (() => number);
+  /** Maximum concurrent pages on each browser connection; independent of the shared session gate. */
+  maxPagesPerConnection?: number | undefined;
   /** Declared, never inferred: how the runner talks to the service. */
   protocol: RemoteProtocol;
   /**
@@ -117,6 +119,7 @@ export interface RemoteBrowser {
   readonly name: string;
   readonly engines: readonly BrowserName[];
   readonly sessions: number | (() => number);
+  readonly maxPagesPerConnection?: number | undefined;
   readonly protocol: RemoteProtocol;
   readonly reach: TargetReach;
   readonly connect: RemoteOptions["connect"];
@@ -170,6 +173,7 @@ const KNOWN = new Set([
   "name",
   "engines",
   "sessions",
+  "maxPagesPerConnection",
   "protocol",
   "reach",
   "connect",
@@ -197,6 +201,7 @@ export function defineRemote<TLease = unknown>(
     name: options.name,
     engines: [...options.engines],
     sessions: options.sessions,
+    maxPagesPerConnection: options.maxPagesPerConnection,
     protocol: options.protocol,
     reach: options.reach,
     connect: options.connect,
@@ -314,6 +319,12 @@ function checkOptions(options: RemoteOptions, { label }: RemoteSupport): void {
     );
   }
   checkSessions(options.sessions, where);
+  if (
+    options.maxPagesPerConnection !== undefined &&
+    (!Number.isInteger(options.maxPagesPerConnection) || options.maxPagesPerConnection < 1)
+  ) {
+    throw new Error(`${where}: maxPagesPerConnection must be a positive integer`);
+  }
   checkNumbers(options, where);
   if (options.release !== undefined && typeof options.connect !== "function") {
     throw new Error(`${where}: release needs a function connect (a fixed connection has no lease)`);

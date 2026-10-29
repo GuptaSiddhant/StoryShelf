@@ -11,7 +11,13 @@ import { createPageLimiter, isTimeoutError, type SessionGate } from "@storyshelf
 import type { Browser, Page } from "playwright-core";
 import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { acquirePage } from "./pages.ts";
-import { assertReachable, launchContextOf, planRun, serve } from "./pipeline.ts";
+import {
+  assertReachable,
+  connectionConcurrency,
+  launchContextOf,
+  planRun,
+  serve,
+} from "./pipeline.ts";
 import { waitForSettled, type SettleReport } from "./settle.ts";
 import type { ActiveRun, PlaywrightTestsInput, TargetDriver } from "./types.ts";
 
@@ -53,12 +59,16 @@ export async function runTestEntries(
 async function runAll(
   browser: Browser,
   baseUrl: string,
-  input: PlaywrightTestsInput & { target: CaptureTarget; gate?: SessionGate | undefined },
+  input: PlaywrightTestsInput & {
+    target: CaptureTarget;
+    gate?: SessionGate | undefined;
+    maxPagesPerConnection?: number | undefined;
+  },
   active: ActiveRun,
 ): Promise<TestOutcome[]> {
   const outcomes = new Map<string, TestOutcome>();
   const pages = createPageLimiter({
-    concurrency: input.concurrency,
+    concurrency: connectionConcurrency(input),
     ...(input.gate === undefined ? {} : { gate: input.gate }),
     browser: engineOf(input.target),
     logger: input.logger,

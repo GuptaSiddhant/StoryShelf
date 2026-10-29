@@ -99,7 +99,11 @@ export function planRun<
   driver: TargetDriver,
   defaultTarget: CaptureTarget,
 ): {
-  input: T & { target: CaptureTarget; gate?: SessionGate | undefined };
+  input: T & {
+    target: CaptureTarget;
+    gate?: SessionGate | undefined;
+    maxPagesPerConnection?: number | undefined;
+  };
   name: CaptureTarget;
   remote: RemoteTarget | undefined;
 } {
@@ -113,7 +117,26 @@ export function planRun<
         "sessions() returned an invalid value; keeping the last good one",
       );
     });
-  return { input: { ...rawInput, target: name, gate }, name, remote };
+  return {
+    input: {
+      ...rawInput,
+      target: name,
+      gate,
+      maxPagesPerConnection: remote?.remote.maxPagesPerConnection,
+    },
+    name,
+    remote,
+  };
+}
+
+/** Apply the connection's cap without changing the target-wide session budget. */
+export function connectionConcurrency(input: {
+  concurrency?: number | undefined;
+  maxPagesPerConnection?: number | undefined;
+}): number | undefined {
+  return input.maxPagesPerConnection === undefined
+    ? input.concurrency
+    : Math.min(input.concurrency ?? Infinity, input.maxPagesPerConnection);
 }
 
 /**
@@ -171,7 +194,7 @@ function assertStorybookRoot(target: CaptureTarget, storybookUrl: string): void 
 
 /** The loopback server, or the URL given; a server that cannot start closes the browser it was for. */
 export async function serve(
-  input: Pick<RunInput, "storybookDir" | "storybookUrl">,
+  input: Pick<RunInput, "storybookDir" | "storybookUrl" | "staticCompression">,
   browser: Browser,
 ): Promise<Serving> {
   if (input.storybookUrl !== undefined) {
@@ -182,7 +205,9 @@ export async function serve(
       },
     };
   }
-  return await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
+  return await createStaticServer(input.storybookDir, {
+    compression: input.staticCompression,
+  }).catch(async (error: unknown) => {
     await safeCloseBrowser(browser, "failed", error);
     throw error;
   });
@@ -273,7 +298,7 @@ async function runAllCaptures(
   // Batches drain in-flight pages, so the browser can be swapped between them.
   const batches = chunk(jobs, input.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY);
   const pages = createPageLimiter({
-    concurrency: input.concurrency,
+    concurrency: connectionConcurrency(input),
     ...(input.gate === undefined ? {} : { gate: input.gate }),
     browser: engineOf(input.target ?? "chromium"),
     logger: input.logger,

@@ -43,6 +43,8 @@ export interface PlaywrightRenderInput {
   recycleBrowserEvery?: number;
   /** Reuse pages between captures instead of opening one per capture (opt-in; default off). */
   reusePages?: boolean;
+  /** Enable bounded gzip caching on the local capture server. */
+  staticCompression?: boolean | undefined;
   /** Streaming hand-off: receives each capture instead of it being collected in the result. */
   onCapture?: (capture: RenderedSnapshot) => Promise<void>;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
@@ -65,6 +67,7 @@ export interface PlaywrightTestsInput {
   concurrency?: number;
   /** Per-page navigation timeout in ms. */
   navigationTimeoutMs?: number;
+  staticCompression?: boolean | undefined;
   adapter?: StorySourceAdapter;
 }
 
@@ -72,7 +75,7 @@ export interface PlaywrightTestsInput {
 export type ExtractInput = Pick<
   PlaywrightRenderInput,
   "buildId" | "storybookDir" | "stories" | "logger" | "target" | "storybookUrl" | "adapter"
->;
+> & { staticCompression?: boolean | undefined };
 
 /** Starts (or connects to) a browser for a target; a failure is a `TargetLaunchError`. */
 export type LaunchTarget = (
@@ -100,7 +103,10 @@ export interface TargetDriver {
 }
 
 /** The render input as the pipeline runs it: with the session gate of a remote target. */
-export type RunInput = PlaywrightRenderInput & { gate?: SessionGate | undefined };
+export type RunInput = PlaywrightRenderInput & {
+  gate?: SessionGate | undefined;
+  maxPagesPerConnection?: number | undefined;
+};
 
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {

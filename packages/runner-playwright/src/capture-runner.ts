@@ -44,6 +44,8 @@ export function createPlaywrightCaptureRunner(
     recycleBrowserEvery?: number;
     /** Reuse pages between captures (opt-in); falls back to `STORYSHELF_REUSE_PAGES=1`. */
     reusePages?: boolean;
+    /** Gzip small loopback Storybook assets when requested by the browser (default off). */
+    staticCompression?: boolean;
   } = {},
 ): CaptureRunner {
   const { declared, locals, remotes } = flattenBrowsers(options.browsers ?? ["chromium"]);
@@ -87,7 +89,14 @@ export function createPlaywrightCaptureRunner(
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await renderAll(
-          { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
+          {
+            concurrency,
+            navigationTimeoutMs,
+            recycleBrowserEvery,
+            reusePages,
+            staticCompression: options.staticCompression,
+            ...input,
+          },
           active,
           driver,
           defaultTarget,
@@ -97,14 +106,23 @@ export function createPlaywrightCaptureRunner(
       }
     },
     async extractParameters(input: ExtractInput) {
-      return await extractAll(input, driver, defaultTarget);
+      return await extractAll(
+        { ...input, staticCompression: options.staticCompression },
+        driver,
+        defaultTarget,
+      );
     },
     async runTests(input: PlaywrightTestsInput) {
       const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await runTestEntries(
-          { concurrency, navigationTimeoutMs, ...input },
+          {
+            concurrency,
+            navigationTimeoutMs,
+            staticCompression: options.staticCompression,
+            ...input,
+          },
           active,
           driver,
           defaultTarget,

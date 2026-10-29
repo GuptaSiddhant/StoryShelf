@@ -280,6 +280,22 @@ describe("a remote target", () => {
     expect(fake.state.peak).toBe(2);
   });
 
+  it("limits pages on each connection independently of the shared session gate", async () => {
+    const runner = createPlaywrightCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 1 })],
+      concurrency: 8,
+    });
+    const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
+    await runner.render(input({ stories }));
+    expect(fake.state.peak).toBe(1);
+    fake.state.peak = 0;
+    await Promise.all([
+      runner.render(input({ buildId: "x", stories })),
+      runner.render(input({ buildId: "y", stories })),
+    ]);
+    expect(fake.state.peak).toBe(2);
+  });
+
   it("keeps a target offered when the service is down, but fails the job at once with no endpoint in the message", async () => {
     const runner = createPlaywrightCaptureRunner({
       browsers: [farm({ retry: { attempts: 1, backoffMs: 1 } })],
