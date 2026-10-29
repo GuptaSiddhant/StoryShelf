@@ -65,6 +65,26 @@ describe("defineRemote", () => {
     ["a long name", { name: "a".repeat(33) }, /at most 32/u],
     ["no sessions", { sessions: 0 }, /sessions must be a positive integer/u],
     ["fractional sessions", { sessions: 1.5 }, /sessions must be a positive integer/u],
+    [
+      "zero pages per connection",
+      { maxPagesPerConnection: 0 },
+      /maxPagesPerConnection must be a positive integer/u,
+    ],
+    [
+      "fractional pages per connection",
+      { maxPagesPerConnection: 1.5 },
+      /maxPagesPerConnection must be a positive integer/u,
+    ],
+    [
+      "NaN pages per connection",
+      { maxPagesPerConnection: Number.NaN },
+      /maxPagesPerConnection must be a positive integer/u,
+    ],
+    [
+      "infinite pages per connection",
+      { maxPagesPerConnection: Infinity },
+      /maxPagesPerConnection must be a positive integer/u,
+    ],
     ["sessions returning zero", { sessions: () => 0 }, /sessions must be a positive integer/u],
     ["no engines", { engines: [] }, /at least one engine/u],
     ["an unknown engine", { engines: ["opera" as BrowserName] }, /unknown engine "opera"/u],

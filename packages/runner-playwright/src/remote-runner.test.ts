@@ -21,6 +21,7 @@ const fake = vi.hoisted(() => {
     peak: 0,
     closed: 0,
     gate: null as Promise<void> | null,
+    activeGate: null as Promise<null> | null,
   };
   const page = {
     goto: async (url: string): Promise<void> => {
@@ -28,6 +29,7 @@ const fake = vi.hoisted(() => {
       await state.gate;
       state.active += 1;
       state.peak = Math.max(state.peak, state.active);
+      await state.activeGate;
       await new Promise((resolve) => setTimeout(resolve, 5));
       state.active -= 1;
     },
@@ -109,6 +111,7 @@ beforeEach(async () => {
     peak: 0,
     closed: 0,
     gate: null,
+    activeGate: null,
   });
 });
 
@@ -260,10 +263,12 @@ describe("a remote target", () => {
 
   it("opens a new session when the browser is recycled", async () => {
     const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
-    await createPlaywrightCaptureRunner({ browsers: [farm()], recycleBrowserEvery: 2 }).render(
-      input({ stories }),
-    );
+    await createPlaywrightCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 1 })],
+      recycleBrowserEvery: 2,
+    }).render(input({ stories }));
     expect(fake.state.connects).toHaveLength(3);
+    expect(fake.state.peak).toBe(1);
   });
 
   it("holds every render of the target to its sessions, however many run at once", async () => {
@@ -277,6 +282,31 @@ describe("a remote target", () => {
       runner.render(input({ buildId: "y", stories })),
       runner.render(input({ buildId: "z", stories })),
     ]);
+    expect(fake.state.peak).toBe(2);
+  });
+
+  it("limits pages on each connection independently of the shared session gate", async () => {
+    const runner = createPlaywrightCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 1 })],
+      concurrency: 8,
+    });
+    const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
+    await runner.render(input({ stories }));
+    expect(fake.state.peak).toBe(1);
+    fake.state.peak = 0;
+    const barrier = Promise.withResolvers<null>();
+    fake.state.activeGate = barrier.promise;
+    const pending = Promise.all([
+      runner.render(input({ buildId: "x", stories })),
+      runner.render(input({ buildId: "y", stories })),
+    ]);
+    try {
+      await vi.waitFor(() => expect(fake.state.active).toBe(2));
+      expect(fake.state.peak).toBe(2);
+    } finally {
+      barrier.resolve(null);
+      await pending;
+    }
     expect(fake.state.peak).toBe(2);
   });
 

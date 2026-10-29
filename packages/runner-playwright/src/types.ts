@@ -72,7 +72,7 @@ export interface PlaywrightTestsInput {
 export type ExtractInput = Pick<
   PlaywrightRenderInput,
   "buildId" | "storybookDir" | "stories" | "logger" | "target" | "storybookUrl" | "adapter"
->;
+> & { staticCompression?: boolean | undefined };
 
 /** Starts (or connects to) a browser for a target; a failure is a `TargetLaunchError`. */
 export type LaunchTarget = (
@@ -100,7 +100,11 @@ export interface TargetDriver {
 }
 
 /** The render input as the pipeline runs it: with the session gate of a remote target. */
-export type RunInput = PlaywrightRenderInput & { gate?: SessionGate | undefined };
+export type RunInput = PlaywrightRenderInput & {
+  gate?: SessionGate | undefined;
+  maxPagesPerConnection?: number | undefined;
+  staticCompression?: boolean | undefined;
+};
 
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {

@@ -23,6 +23,8 @@ export interface PlaywrightServerOptions {
   exposeNetwork?: "<loopback>" | false;
   /** Parallel pages the farm should take from this runner (default 1: set it to the farm's cap). */
   sessions?: number;
+  /** Maximum concurrent pages on each connection; the shared sessions limit still applies. */
+  maxPagesPerConnection?: number;
   /** Engines to offer (default all three; the server must have them installed). */
   engines?: readonly BrowserName[];
   /** OS the server runs on, reported when the page cannot tell. */
@@ -48,6 +50,7 @@ export function playwrightServer(options: PlaywrightServerOptions): RemoteBrowse
     reach: exposeNetwork === false ? "url" : "loopback",
     connect: { endpoint: options.endpoint, headers },
     sessions: options.sessions ?? 1,
+    maxPagesPerConnection: options.maxPagesPerConnection,
     platform: options.platform,
     timeouts: { connectMs: options.connectTimeoutMs },
   });
