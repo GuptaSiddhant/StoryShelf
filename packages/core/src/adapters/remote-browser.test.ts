@@ -77,7 +77,7 @@ describe("defineRemote", () => {
     ],
     [
       "NaN pages per connection",
-      { maxPagesPerConnection: NaN },
+      { maxPagesPerConnection: Number.NaN },
       /maxPagesPerConnection must be a positive integer/u,
     ],
     [
