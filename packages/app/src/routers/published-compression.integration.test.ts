@@ -194,4 +194,40 @@ describe("published gzip access", () => {
         ]);
     }
   }, 15_000);
+
+  it("does not block ordinary serving when a variant check is cancelled", async () => {
+    const { anonymous, session, publicApp, token, storage } = await setup(true);
+    const gate = Promise.withResolvers<boolean>();
+    const exists = storage.exists.bind(storage);
+    const check = vi
+      .spyOn(storage, "exists")
+      .mockImplementation(async (key) =>
+        key.startsWith("derived/") ? await gate.promise : await exists(key),
+      );
+    const abort = new AbortController();
+    try {
+      const pending = anonymous.request(`/_s/${token}/iframe.html`, {
+        headers,
+        signal: abort.signal,
+      });
+      await vi.waitFor(() => expect(check).toHaveBeenCalledWith(publishedGzipPath(hash)), {
+        timeout: 10_000,
+      });
+      abort.abort();
+      const plain = await anonymous.request(`/_s/${token}/iframe.html`, {
+        headers: { "accept-encoding": "identity" },
+      });
+      expect(plain.status).toBe(200);
+      expect(Buffer.from(await plain.arrayBuffer())).toEqual(file);
+      gate.reject(new Error("variant storage unavailable"));
+      await Promise.resolve(pending).catch(() => null);
+    } finally {
+      gate.resolve(false);
+      await Promise.all([
+        anonymous.lifecycle.teardown(),
+        session.lifecycle.teardown(),
+        publicApp.lifecycle.teardown(),
+      ]);
+    }
+  }, 15_000);
 });
