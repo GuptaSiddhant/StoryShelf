@@ -102,6 +102,40 @@ describe("published gzip variants", () => {
     }
   });
 
+  it("recovers after an asynchronous generation failure", async () => {
+    const { storage, objects } = makeStorage();
+    const bytes = Buffer.from("asset".repeat(10_000));
+    const hash = hashOf(bytes);
+    const gate = Promise.withResolvers<null>();
+    objects.set(`content/${hash}`, bytes);
+    const originalWrite = storage.write.bind(storage);
+    const write = vi.spyOn(storage, "write").mockImplementationOnce(async () => {
+      await gate.promise;
+    });
+    await expect(publishedGzip(storage, hash, bytes, "text/plain")).resolves.toBeUndefined();
+    await vi.waitFor(() => expect(write).toHaveBeenCalledOnce());
+    gate.reject(new Error("storage failed after the request"));
+    write.mockImplementation(originalWrite);
+    await vi.waitFor(
+      async () => {
+        await publishedGzip(storage, hash, bytes, "text/plain");
+        expect(objects.has(publishedGzipPath(hash))).toBe(true);
+      },
+      { timeout: 10_000 },
+    );
+  }, 15_000);
+
+  it("fails open when variant reads do not finish", async () => {
+    const { storage, objects } = makeStorage();
+    const bytes = Buffer.from("asset".repeat(100));
+    const hash = hashOf(bytes);
+    objects.set(`content/${hash}`, bytes);
+    const exists = storage.exists.bind(storage);
+    storage.exists = async (key) =>
+      key.startsWith("derived/") ? await new Promise<boolean>(() => {}) : await exists(key);
+    await expect(publishedGzip(storage, hash, bytes, "text/plain")).resolves.toBeUndefined();
+  });
+
   it("removes a variant if the source disappears while it is written", async () => {
     const { storage, objects } = makeStorage();
     const bytes = Buffer.from("asset".repeat(1000));
