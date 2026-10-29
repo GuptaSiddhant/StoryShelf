@@ -80,13 +80,32 @@ async function findVariant(
   try {
     const path = publishedGzipPath(hash);
     if (!(await storage.exists(path))) return undefined;
-    const bytes = await storage.read(path);
-    if (bytes.length === 0 || bytes.length >= original.length) return undefined;
+    const bytes = await readBounded(storage, path, original.length);
+    if (!bytes || bytes.length === 0) return undefined;
     const decoded = await decompress(bytes, { maxOutputLength: original.length });
     return decoded.equals(original) ? bytes : undefined;
   } catch {
     return undefined;
   }
+}
+
+/** Do not allocate an unbounded buffer when a damaged storage object is oversized. */
+async function readBounded(
+  storage: StorageAdapter,
+  path: string,
+  limit: number,
+): Promise<Buffer | undefined> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of await storage.readStream(path)) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+    size += bytes.length;
+    if (size >= limit) {
+      return undefined;
+    }
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks, size);
 }
 
 /** No queue: at capacity a future request may try again. */

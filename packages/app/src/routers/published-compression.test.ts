@@ -74,6 +74,17 @@ describe("published gzip variants", () => {
     expect(objects.get(`content/${hash}`)).toEqual(bytes);
   });
 
+  it("rejects an oversized stored variant without reading it as a whole object", async () => {
+    const { storage, objects } = makeStorage();
+    const bytes = Buffer.from("asset".repeat(1000));
+    const hash = hashOf(bytes);
+    objects.set(`content/${hash}`, bytes);
+    objects.set(publishedGzipPath(hash), Buffer.alloc(bytes.length + 1));
+    const read = vi.spyOn(storage, "read");
+    expect(await publishedGzip(storage, hash, bytes, "text/plain")).toBeUndefined();
+    expect(read).not.toHaveBeenCalledWith(publishedGzipPath(hash));
+  });
+
   it("coalesces a variant and refuses extra work when both job slots are occupied", async () => {
     const { storage, objects } = makeStorage();
     const files = ["one", "two", "three"].map((value) => Buffer.from(value.repeat(10_000)));

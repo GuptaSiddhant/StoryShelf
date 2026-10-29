@@ -85,14 +85,17 @@ describe("published gzip access", () => {
       expect(Buffer.from(await first.arrayBuffer())).toEqual(file);
       await vi.waitFor(() => expect(objects.has(publishedGzipPath(hash))).toBe(true));
       const read = vi.spyOn(storage, "read");
+      const readStream = vi.spyOn(storage, "readStream");
       const refused = await anonymous.request("/_s/invalid/iframe.html", { headers });
       expect(refused.status).toBe(404);
       expect(read).not.toHaveBeenCalledWith(publishedGzipPath(hash));
+      expect(readStream).not.toHaveBeenCalledWith(publishedGzipPath(hash));
       const privateFile = await anonymous.request("/projects/one/storybook/build/b1/iframe.html", {
         headers,
       });
       expect(privateFile.status).not.toBe(200);
       expect(read).not.toHaveBeenCalledWith(publishedGzipPath(hash));
+      expect(readStream).not.toHaveBeenCalledWith(publishedGzipPath(hash));
       const signed = await anonymous.request(route, { headers });
       const authorized = await session.request("/projects/one/storybook/build/b1/iframe.html", {
         headers,
