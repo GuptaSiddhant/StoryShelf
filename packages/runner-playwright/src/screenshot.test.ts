@@ -1,6 +1,7 @@
 import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { describe, expect, it, vi } from "vitest";
+import { TransientCaptureError } from "./capture-retry.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { inPagePaint, inPageWaitSettled, type SettleReport } from "./settle.ts";
@@ -54,6 +55,44 @@ function story(delay?: number): StoryEntry {
 const settled: SettleReport = { settled: true, hooked: true, phase: "completed", elapsedMs: 40 };
 
 describe("waiting for the story to be ready", () => {
+  it("classifies a navigation timeout and discards its page", async () => {
+    const { ctx, page } = harness(settled);
+    const close = vi.spyOn(page, "close");
+    page.goto = async () => {
+      throw Object.assign(new Error("navigation timeout"), { name: "TimeoutError" });
+    };
+    await expect(captureScreenshot(ctx, story(), viewport)).rejects.toMatchObject({
+      phase: "navigation",
+    });
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("classifies a page crash and discards the page", async () => {
+    const { ctx, page } = harness(settled);
+    let crash: (() => void) | undefined;
+    Object.assign(page, {
+      on: (_event: string, listener: () => void) => {
+        crash = listener;
+      },
+      off: () => {},
+    });
+    page.goto = async () => {
+      crash?.();
+      throw new Error("page crashed");
+    };
+    await expect(captureScreenshot(ctx, story(), viewport)).rejects.toBeInstanceOf(
+      TransientCaptureError,
+    );
+  });
+
+  it("bypasses the reusable page pool when a fresh retry is requested", async () => {
+    const { ctx } = harness(settled);
+    const pool = { acquire: vi.fn() };
+    ctx.pagePool = pool as never;
+    await captureScreenshot(ctx, story(), viewport, true);
+    expect(pool.acquire).not.toHaveBeenCalled();
+  });
+
   it("does not sleep when Storybook says it finished and no delay is set", async () => {
     const { ctx, waits, evaluated } = harness(settled);
     await captureScreenshot(ctx, story(), viewport);

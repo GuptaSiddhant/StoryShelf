@@ -29,6 +29,7 @@ const SUPPORT: RemoteSupport = {
  *   reach: "loopback", // its browser can route back to this host
  *   connect: { endpoint: "wss://grid.example/" },
  *   sessions: 4,
+ *   maxPagesPerConnection: 2,
  * });
  *
  * // A service that must be woken first, with a lease handed back to `release`:
