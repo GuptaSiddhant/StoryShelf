@@ -4,7 +4,8 @@ import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runn
 import { getScreenshotPlan } from "@storyshelf/core/capture";
 import type { Page } from "playwright-core";
 import { checkA11y } from "./a11y.ts";
-import { acquirePage } from "./pages.ts";
+import { capturePhase, TransientCaptureError } from "./capture-retry.ts";
+import { acquirePage, type PageLease } from "./pages.ts";
 import { runPlay } from "./play.ts";
 import { runtimeParametersForStory } from "./runtime-params.ts";
 import { awaitPaint, settleTimeoutOf, waitForSettled, type SettleReport } from "./settle.ts";
@@ -15,17 +16,45 @@ export async function captureScreenshot(
   ctx: CaptureContext,
   inputStory: StoryEntry,
   viewport: Viewport,
+  fresh = false,
 ): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
-  const lease = await acquirePage(ctx, viewport);
+  const lease = await acquirePage(fresh ? { browser: ctx.browser } : ctx, viewport);
+  return await captureLeased(ctx, inputStory, viewport, lease);
+}
+
+async function captureLeased(
+  ctx: CaptureContext,
+  inputStory: StoryEntry,
+  viewport: Viewport,
+  lease: PageLease,
+): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
   let reusable = false;
+  const crash = watchCrash(lease.page);
   if (ctx.navigationTimeoutMs) lease.page.setDefaultTimeout(ctx.navigationTimeoutMs);
   try {
     const result = await runCapture(lease.page, ctx, inputStory, viewport);
     reusable = true;
     return result;
+  } catch (error) {
+    throw crash.classify(error);
   } finally {
+    crash.dispose();
     await lease.release(reusable);
   }
+}
+
+function watchCrash(page: Page): { classify(error: unknown): unknown; dispose(): void } {
+  let crashed = false;
+  const onCrash = (): void => {
+    crashed = true;
+  };
+  page.on?.("crash", onCrash);
+  return {
+    classify: (error) => (crashed ? new TransientCaptureError("crash", error) : error),
+    dispose: () => {
+      page.off?.("crash", onCrash);
+    },
+  };
 }
 
 async function runCapture(
@@ -52,9 +81,13 @@ async function navigateAndEnrich(
   story: StoryEntry,
   viewport: Viewport,
 ): Promise<StoryEntry> {
-  await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id, viewport.globals), {
-    waitUntil: "networkidle",
-  });
+  await capturePhase(
+    "navigation",
+    async () =>
+      await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id, viewport.globals), {
+        waitUntil: "networkidle",
+      }),
+  );
   await ctx.adapter.waitForReady?.(page);
   if (story.parameters) return story;
   const rpPage = page as unknown as RuntimeParamsPage;
@@ -164,11 +197,15 @@ async function burstShots(
   }
   const preferred = shots[Math.floor(shots.length / 2)] ?? shots[0];
   if (preferred) return preferred;
-  const fallback: unknown = await page.screenshot({
-    animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
-    ...(plan.fullPage ? { fullPage: true } : {}),
-    ...(plan.clip ? { clip: plan.clip } : {}),
-  });
+  const fallback: unknown = await capturePhase(
+    "screenshot",
+    async () =>
+      await page.screenshot({
+        animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
+        ...(plan.fullPage ? { fullPage: true } : {}),
+        ...(plan.clip ? { clip: plan.clip } : {}),
+      }),
+  );
   // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- Buffer narrowing
   return fallback as unknown as Buffer;
 }
@@ -177,11 +214,15 @@ async function shotOne(
   plan: ReturnType<typeof getScreenshotPlan>,
   story: StoryEntry,
 ): Promise<Buffer> {
-  const shot: unknown = await page.screenshot({
-    animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
-    ...(plan.fullPage ? { fullPage: true } : {}),
-    ...(plan.clip ? { clip: plan.clip } : {}),
-  });
+  const shot: unknown = await capturePhase(
+    "screenshot",
+    async () =>
+      await page.screenshot({
+        animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
+        ...(plan.fullPage ? { fullPage: true } : {}),
+        ...(plan.clip ? { clip: plan.clip } : {}),
+      }),
+  );
   // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- Buffer narrowing
   return shot as unknown as Buffer;
 }

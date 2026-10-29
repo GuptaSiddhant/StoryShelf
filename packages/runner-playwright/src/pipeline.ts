@@ -27,6 +27,7 @@ import {
 } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import { TransientCaptureError } from "./capture-retry.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
@@ -70,7 +71,13 @@ export async function renderAll(
         throw error;
       })
     : undefined;
-  const result = await runWithBrowser(input, active, browser, server, launch);
+  const result = await runWithBrowser(
+    { ...input, retryRemoteCapture: remote !== undefined },
+    active,
+    browser,
+    server,
+    launch,
+  );
   // Echo the target so persisted rows are attributable without the request.
   for (const row of [...result.captures, ...result.failures]) row.browser = name;
   return { ...result, environment: measured ?? (await localEnvironment(browser)) };
@@ -264,11 +271,7 @@ async function runWithBrowser(
   );
 }
 
-function buildContext(
-  browser: Browser,
-  baseUrl: string,
-  input: PlaywrightRenderInput,
-): CaptureContext {
+function buildContext(browser: Browser, baseUrl: string, input: RunInput): CaptureContext {
   return {
     browser,
     adapter: input.adapter ?? new StorybookAdapter(),
@@ -355,7 +358,7 @@ async function recycleBrowser(
 
 /** Capture one story x viewport; resolves to whether it timed out (failures are recorded, not thrown). */
 async function captureOne(
-  input: PlaywrightRenderInput,
+  input: RunInput,
   active: ActiveRun,
   ctx: CaptureContext,
   story: StoryEntry,
@@ -364,11 +367,11 @@ async function captureOne(
 ): Promise<boolean> {
   if (active.cancelled) throw new Error("Capture cancelled");
   try {
-    await pushCapture(ctx, story, viewport, out.captures, out.failures, input);
+    await pushCapture(ctx, story, viewport, out.captures, out.failures, input, active);
     return false;
   } catch (error) {
     pushRenderFailure(out.failures, input, story.id, viewport.name, error);
-    return isTimeoutError(error);
+    return isTimeoutError(error instanceof TransientCaptureError ? error.cause : error);
   }
 }
 
@@ -378,10 +381,11 @@ async function pushCapture(
   viewport: Viewport,
   captures: RenderedSnapshot[],
   failures: RenderResult["failures"],
-  input: PlaywrightRenderInput,
+  input: RunInput,
+  active: ActiveRun,
 ): Promise<void> {
   const started = performance.now();
-  const result = await captureScreenshot(ctx, story, viewport);
+  const result = await screenshotWithRetry(ctx, story, viewport, input, active);
   const snapshot: RenderedSnapshot = {
     story: result.story,
     viewportName: viewport.name,
@@ -395,6 +399,58 @@ async function pushCapture(
   else captures.push(snapshot);
   if (result.a11yViolations.length > 0)
     handleA11y(input, failures, story, viewport, result.a11yViolations);
+}
+
+/** Retry capture only: delivery and accessibility reporting must never be repeated. */
+export async function screenshotWithRetry(
+  ctx: CaptureContext,
+  story: StoryEntry,
+  viewport: Viewport,
+  input: RunInput,
+  active: ActiveRun,
+): ReturnType<typeof captureScreenshot> {
+  try {
+    const result = await captureScreenshot(ctx, story, viewport);
+    if (active.cancelled || active.abort?.signal.aborted) throw new Error("Capture cancelled");
+    return result;
+  } catch (error) {
+    if (
+      !input.retryRemoteCapture ||
+      !(error instanceof TransientCaptureError) ||
+      active.cancelled ||
+      active.abort?.signal.aborted ||
+      !ctx.browser.isConnected()
+    )
+      throw error;
+    return await freshScreenshot(ctx, story, viewport, input, active, error);
+  }
+}
+
+async function freshScreenshot(
+  ctx: CaptureContext,
+  story: StoryEntry,
+  viewport: Viewport,
+  input: RunInput,
+  active: ActiveRun,
+  firstError: TransientCaptureError,
+): ReturnType<typeof captureScreenshot> {
+  const detail = {
+    storyId: story.id,
+    viewport: viewport.name,
+    phase: firstError.phase,
+    attempt: 2,
+  };
+  input.logger?.warn(detail, "retrying remote capture on a fresh page");
+  try {
+    const result = await captureScreenshot(ctx, story, viewport, true);
+    if (active.cancelled || active.abort?.signal.aborted)
+      throw new Error("Capture cancelled", { cause: firstError });
+    input.logger?.info(detail, "remote capture retry succeeded");
+    return result;
+  } catch (retryError) {
+    input.logger?.warn(detail, "remote capture retry failed");
+    throw retryError;
+  }
 }
 function handleA11y(
   input: PlaywrightRenderInput,

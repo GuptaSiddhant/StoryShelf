@@ -104,6 +104,7 @@ export type RunInput = PlaywrightRenderInput & {
   gate?: SessionGate | undefined;
   maxPagesPerConnection?: number | undefined;
   staticCompression?: boolean | undefined;
+  retryRemoteCapture?: boolean | undefined;
 };
 
 /** Browser + adapter context shared by screenshot helpers. */

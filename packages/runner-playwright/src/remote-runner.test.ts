@@ -22,6 +22,10 @@ const fake = vi.hoisted(() => {
     closed: 0,
     gate: null as Promise<void> | null,
     activeGate: null as Promise<null> | null,
+    screenshotErrors: [] as Error[],
+    screenshots: 0,
+    pagesOpened: 0,
+    connected: true,
   };
   const page = {
     goto: async (url: string): Promise<void> => {
@@ -53,14 +57,23 @@ const fake = vi.hoisted(() => {
       return {};
     },
     locator: () => ({ boundingBox: async (): Promise<null> => await Promise.resolve(null) }),
-    screenshot: async (): Promise<Buffer> => await Promise.resolve(Buffer.from([0])),
+    screenshot: async (): Promise<Buffer> => {
+      state.screenshots += 1;
+      const failure = state.screenshotErrors.shift();
+      if (failure) throw failure;
+      return await Promise.resolve(Buffer.from([0]));
+    },
     close: async (): Promise<void> => {
       await Promise.resolve();
     },
   };
   const browser = () => ({
     version: (): string => "131.0.1",
-    newPage: async () => await Promise.resolve(page),
+    isConnected: (): boolean => state.connected,
+    newPage: async () => {
+      state.pagesOpened += 1;
+      return await Promise.resolve(page);
+    },
     close: async (): Promise<void> => {
       state.closed += 1;
       await Promise.resolve();
@@ -112,6 +125,10 @@ beforeEach(async () => {
     closed: 0,
     gate: null,
     activeGate: null,
+    screenshotErrors: [],
+    screenshots: 0,
+    pagesOpened: 0,
+    connected: true,
   });
 });
 
@@ -151,6 +168,47 @@ const input = (extra: Record<string, unknown> = {}) => ({
 });
 
 describe("a remote target", () => {
+  it("retries a screenshot timeout before delivering one capture", async () => {
+    fake.state.screenshotErrors.push(
+      Object.assign(new Error("screenshot timed out"), { name: "TimeoutError" }),
+    );
+    const onCapture = vi.fn(async () => {});
+    const runner = createPlaywrightCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const result = await runner.render(input({ stories: [STORIES[0]], onCapture }));
+    expect(result.failures).toEqual([]);
+    expect(fake.state.screenshots).toBe(2);
+    expect(onCapture).toHaveBeenCalledOnce();
+    // The remote environment probe also uses a page, in addition to the two capture pages.
+    expect(fake.state.pagesOpened).toBeGreaterThanOrEqual(3);
+  });
+
+  it("does not repeat capture or delivery when the callback fails", async () => {
+    const onCapture = vi.fn(async () => {
+      throw Object.assign(new Error("storage write failed"), { name: "TimeoutError" });
+    });
+    const runner = createPlaywrightCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const result = await runner.render(input({ stories: [STORIES[0]], onCapture }));
+    expect(result.failures[0]?.error).toContain("storage write failed");
+    expect(fake.state.screenshots).toBe(1);
+    expect(onCapture).toHaveBeenCalledOnce();
+  });
+
+  it("keeps sibling captures on the existing connection when one screenshot times out", async () => {
+    fake.state.screenshotErrors.push(
+      Object.assign(new Error("screenshot timeout"), { name: "TimeoutError" }),
+    );
+    const runner = createPlaywrightCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 2 })],
+      concurrency: 4,
+    });
+    const result = await runner.render(input());
+    expect(result.failures).toEqual([]);
+    expect(result.captures).toHaveLength(2);
+    expect(fake.state.screenshots).toBe(3);
+    expect(fake.state.connects).toHaveLength(1);
+    expect(fake.state.peak).toBeLessThanOrEqual(2);
+  });
+
   it("connects with the headers and exposeNetwork, per engine, and renders over loopback", async () => {
     const runner = createPlaywrightCaptureRunner({ browsers: [farm()] });
     const result = await runner.render(input({ target: "firefox@grid" }));

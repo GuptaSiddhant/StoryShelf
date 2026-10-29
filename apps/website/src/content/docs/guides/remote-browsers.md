@@ -187,6 +187,7 @@ remote<{ id: string }>({
 - `sessions` can be a function, read each time a render pass starts and a page waits for a slot, for a provider whose cap follows the servers it has woken. A value that is not a finite number keeps the last good one (and logs once); below 1 counts as 1.
 - Playwright's `remote()` and `playwrightServer()` accept `maxPagesPerConnection`, a positive integer that limits the pages on each connection independently of the target-wide `sessions` budget. Two pages per connection worked as a starting point on one 2 GB browser host; measure and tune it for your workload. The local loopback Storybook server allows successful files to be cached for one hour within a capture run. Signed Storybook URLs retain their own cache and access policies.
 - `createPlaywrightCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
+- Playwright remote captures retry one navigation timeout, screenshot timeout or observed page crash on a fresh page and context, within the same page limits. A disconnected browser is reported as a failure instead of being replaced while sibling captures may be active. Play/assertion failures, cancellation and capture-delivery failures are not retried; retry attempts and outcomes are logged.
 
 **Errors**
 
