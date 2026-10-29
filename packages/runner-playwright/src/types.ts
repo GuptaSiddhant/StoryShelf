@@ -43,8 +43,6 @@ export interface PlaywrightRenderInput {
   recycleBrowserEvery?: number;
   /** Reuse pages between captures instead of opening one per capture (opt-in; default off). */
   reusePages?: boolean;
-  /** Enable bounded gzip caching on the local capture server. */
-  staticCompression?: boolean | undefined;
   /** Streaming hand-off: receives each capture instead of it being collected in the result. */
   onCapture?: (capture: RenderedSnapshot) => Promise<void>;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
@@ -67,7 +65,6 @@ export interface PlaywrightTestsInput {
   concurrency?: number;
   /** Per-page navigation timeout in ms. */
   navigationTimeoutMs?: number;
-  staticCompression?: boolean | undefined;
   adapter?: StorySourceAdapter;
 }
 
@@ -106,6 +103,7 @@ export interface TargetDriver {
 export type RunInput = PlaywrightRenderInput & {
   gate?: SessionGate | undefined;
   maxPagesPerConnection?: number | undefined;
+  staticCompression?: boolean | undefined;
 };
 
 /** Browser + adapter context shared by screenshot helpers. */

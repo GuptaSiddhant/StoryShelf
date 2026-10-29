@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { get } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -152,6 +154,62 @@ describe("createStaticServer", () => {
         // oxlint-disable-next-line eslint/no-await-in-loop -- consume each response before the next
         await res.arrayBuffer();
       }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("releases the budget for files gzip cannot shrink", async () => {
+    for (let index = 0; index < 9; index += 1)
+      writeFileSync(join(dir, `noise-${index}.js`), randomBytes(512 * 1024));
+    writeFileSync(join(dir, "after.js"), "let a = 1;\n".repeat(100));
+    const server = await createStaticServer(dir, { compression: true });
+    try {
+      for (let index = 0; index < 9; index += 1) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- release each reservation before the next
+        const res = await fetch(`${server.url}/noise-${index}.js`, {
+          headers: { "accept-encoding": "gzip" },
+        });
+        expect(res.headers.get("content-encoding")).toBeNull();
+        // oxlint-disable-next-line eslint/no-await-in-loop -- drain each response before the next
+        await res.arrayBuffer();
+      }
+      const after = await fetch(`${server.url}/after.js`, {
+        headers: { "accept-encoding": "gzip" },
+      });
+      expect(after.headers.get("content-encoding")).toBe("gzip");
+      await after.arrayBuffer();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("handles malformed, wildcard and absent accept-encoding", async () => {
+    writeFileSync(join(dir, "large.js"), "let a = 1;\n".repeat(100));
+    const server = await createStaticServer(dir, { compression: true });
+    try {
+      for (const [header, expected] of [
+        ["gzip;q=abc", null],
+        ["gzip;q=2", null],
+        ["gzip;q=", null],
+        ["*;q=0", null],
+        ["*", "gzip"],
+      ] as const) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- drain each response before the next
+        const res = await fetch(`${server.url}/large.js`, {
+          headers: { "accept-encoding": header },
+        });
+        expect(res.headers.get("content-encoding")).toBe(expected);
+        // oxlint-disable-next-line eslint/no-await-in-loop -- drain each response before the next
+        await res.arrayBuffer();
+      }
+      const encoding = await new Promise<string | undefined>((resolve, reject) => {
+        get(`${server.url}/large.js`, (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.headers["content-encoding"]));
+        }).on("error", reject);
+      });
+      expect(encoding).toBeUndefined();
     } finally {
       await server.close();
     }

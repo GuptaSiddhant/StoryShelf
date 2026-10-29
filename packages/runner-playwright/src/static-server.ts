@@ -9,6 +9,7 @@ import { gzip } from "node:zlib";
 const compress = promisify(gzip);
 const MAX_COMPRESS_FILE = 512 * 1024;
 const MAX_COMPRESS_CACHE = 4 * 1024 * 1024;
+const MAX_UNCOMPRESSIBLE_FILES = 128;
 
 /** Optional settings for the capture-only server. */
 export interface StaticServerOptions {
@@ -128,13 +129,19 @@ function isCompressible(mime: string): boolean {
 /** Budget reservations include in-flight reads so concurrent requests stay bounded. */
 class CompressionCache {
   private readonly entries = new Map<string, Promise<Buffer | undefined>>();
+  private readonly uncompressible = new Set<string>();
   private reserved = 0;
 
   async get(file: string): Promise<Buffer | undefined> {
+    if (this.uncompressible.has(file)) return undefined;
     const existing = this.entries.get(file);
     if (existing) return await existing;
-    const size = (await stat(file)).size;
+    return await this.reserve(file, (await stat(file)).size);
+  }
+
+  private async reserve(file: string, size: number): Promise<Buffer | undefined> {
     // Another request can populate the cache while stat is pending.
+    if (this.uncompressible.has(file)) return undefined;
     const pending = this.entries.get(file);
     if (pending) return await pending;
     if (size > MAX_COMPRESS_FILE || this.reserved + size > MAX_COMPRESS_CACHE) return undefined;
@@ -148,6 +155,7 @@ class CompressionCache {
     try {
       const compressed = await compress(await readFile(file));
       if (compressed.length < size) return compressed;
+      if (this.uncompressible.size < MAX_UNCOMPRESSIBLE_FILES) this.uncompressible.add(file);
     } catch {
       // Fall back to the original file if compression fails.
     }

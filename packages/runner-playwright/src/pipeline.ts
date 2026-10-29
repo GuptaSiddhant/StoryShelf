@@ -51,7 +51,7 @@ interface Serving {
 
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
-  rawInput: PlaywrightRenderInput,
+  rawInput: RunInput,
   active: ActiveRun,
   driver: TargetDriver,
   defaultTarget: CaptureTarget,

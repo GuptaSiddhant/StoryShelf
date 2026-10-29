@@ -32,13 +32,18 @@ const caps = async (service: ReturnType<typeof remote>, engine: BrowserName) => 
 
 describe("playwrightServer", () => {
   it("offers all three engines, routing the loopback Storybook through the connection", async () => {
-    const service = playwrightServer({ endpoint: "ws://playwright:3000/", sessions: 8 });
+    const service = playwrightServer({
+      endpoint: "ws://playwright:3000/",
+      sessions: 8,
+      maxPagesPerConnection: 2,
+    });
     expect(summary(service)).toEqual([
       "chromium@grid loopback",
       "firefox@grid loopback",
       "webkit@grid loopback",
     ]);
     expect(service.sessions).toBe(8);
+    expect(service.maxPagesPerConnection).toBe(2);
     expect(service.protocol).toBe("playwright");
     expect(await connectionOf(service, "chromium")).toEqual({
       endpoint: "ws://playwright:3000/",

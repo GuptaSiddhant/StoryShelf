@@ -29,7 +29,7 @@ const TEST_VIEWPORT = { name: "test", width: 1280, height: 720 };
 
 /** Run every test entry once and report pass or fail for each; a failing test never throws. */
 export async function runTestEntries(
-  rawInput: PlaywrightTestsInput,
+  rawInput: PlaywrightTestsInput & { staticCompression?: boolean | undefined },
   active: ActiveRun,
   driver: TargetDriver,
   defaultTarget: CaptureTarget,

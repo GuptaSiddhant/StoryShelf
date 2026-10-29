@@ -21,6 +21,7 @@ const fake = vi.hoisted(() => {
     peak: 0,
     closed: 0,
     gate: null as Promise<void> | null,
+    activeGate: null as Promise<null> | null,
   };
   const page = {
     goto: async (url: string): Promise<void> => {
@@ -28,6 +29,7 @@ const fake = vi.hoisted(() => {
       await state.gate;
       state.active += 1;
       state.peak = Math.max(state.peak, state.active);
+      await state.activeGate;
       await new Promise((resolve) => setTimeout(resolve, 5));
       state.active -= 1;
     },
@@ -109,6 +111,7 @@ beforeEach(async () => {
     peak: 0,
     closed: 0,
     gate: null,
+    activeGate: null,
   });
 });
 
@@ -291,10 +294,19 @@ describe("a remote target", () => {
     await runner.render(input({ stories }));
     expect(fake.state.peak).toBe(1);
     fake.state.peak = 0;
-    await Promise.all([
+    const barrier = Promise.withResolvers<null>();
+    fake.state.activeGate = barrier.promise;
+    const pending = Promise.all([
       runner.render(input({ buildId: "x", stories })),
       runner.render(input({ buildId: "y", stories })),
     ]);
+    try {
+      await vi.waitFor(() => expect(fake.state.active).toBe(2));
+      expect(fake.state.peak).toBe(2);
+    } finally {
+      barrier.resolve(null);
+      await pending;
+    }
     expect(fake.state.peak).toBe(2);
   });
 

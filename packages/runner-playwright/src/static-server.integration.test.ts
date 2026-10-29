@@ -1,22 +1,25 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chromium } from "playwright-core";
+import { chromium, type Browser } from "playwright-core";
 import { describe, expect, it } from "vitest";
-import { createStaticServer } from "./static-server.ts";
+import { createStaticServer, type StaticServer } from "./static-server.ts";
 
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("loopback HTTP cache", () => {
   it("reuses responses in one context but starts cold in a new context", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "storyshelf-cache-"));
-    await writeFile(join(dir, "index.html"), '<script src="/asset.js"></script>');
-    await writeFile(join(dir, "asset.js"), "globalThis.assetLoaded = true;");
-    const server = await createStaticServer(dir);
-    const browser = await chromium.launch(
-      process.env["CHROMIUM_EXECUTABLE_PATH"]
-        ? { executablePath: process.env["CHROMIUM_EXECUTABLE_PATH"] }
-        : {},
-    );
+    let dir: string | undefined;
+    let server: StaticServer | undefined;
+    let browser: Browser | undefined;
     try {
+      dir = await mkdtemp(join(tmpdir(), "storyshelf-cache-"));
+      await writeFile(join(dir, "index.html"), '<script src="/asset.js"></script>');
+      await writeFile(join(dir, "asset.js"), "globalThis.assetLoaded = true;");
+      server = await createStaticServer(dir);
+      browser = await chromium.launch(
+        process.env["CHROMIUM_EXECUTABLE_PATH"]
+          ? { executablePath: process.env["CHROMIUM_EXECUTABLE_PATH"] }
+          : {},
+      );
       const context = await browser.newContext();
       const page = await context.newPage();
       const cdp = await context.newCDPSession(page);
@@ -38,9 +41,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("loopback HTTP cache", (
       await fresh.close();
       await context.close();
     } finally {
-      await browser.close();
-      await server.close();
-      await rm(dir, { recursive: true, force: true });
+      await browser?.close().catch(() => {});
+      await server?.close().catch(() => {});
+      if (dir) await rm(dir, { recursive: true, force: true });
     }
   });
 });

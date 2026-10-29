@@ -70,6 +70,21 @@ describe("defineRemote", () => {
       { maxPagesPerConnection: 0 },
       /maxPagesPerConnection must be a positive integer/u,
     ],
+    [
+      "fractional pages per connection",
+      { maxPagesPerConnection: 1.5 },
+      /maxPagesPerConnection must be a positive integer/u,
+    ],
+    [
+      "NaN pages per connection",
+      { maxPagesPerConnection: NaN },
+      /maxPagesPerConnection must be a positive integer/u,
+    ],
+    [
+      "infinite pages per connection",
+      { maxPagesPerConnection: Infinity },
+      /maxPagesPerConnection must be a positive integer/u,
+    ],
     ["sessions returning zero", { sessions: () => 0 }, /sessions must be a positive integer/u],
     ["no engines", { engines: [] }, /at least one engine/u],
     ["an unknown engine", { engines: ["opera" as BrowserName] }, /unknown engine "opera"/u],
