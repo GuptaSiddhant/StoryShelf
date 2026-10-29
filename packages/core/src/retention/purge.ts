@@ -13,6 +13,7 @@ import { PackageUsageModel } from "../models/usage.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
 import { pendingCandidates } from "./pending.ts";
+import { sweepPublishedGzip } from "./published-gzip-sweep.ts";
 import { sweepScreenshotContent } from "./screenshot-sweep.ts";
 
 export {
@@ -23,6 +24,7 @@ export {
   type SweepTables,
 } from "./screenshot-sweep.ts";
 import { col } from "../models/columns.ts";
+import { publishedGzipPath } from "../utils/paths.ts";
 export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
 
 /** Table handles for retention queries. */
@@ -227,12 +229,17 @@ export class Retention {
           await this.storage.delete(`content/${row.hash}`).catch(() => {
             // ignore storage delete failure
           });
+          // Variants are disposable; never let their deletion affect authoritative data.
+          if (/^[a-f0-9]{64}$/u.test(row.hash)) {
+            await this.storage.delete(publishedGzipPath(row.hash)).catch(() => {});
+          }
           await this.db.remove(contentRefs, row.hash);
         }
       }
     } catch {
       // ignore — content_refs may not exist
     }
+    await sweepPublishedGzip(this.storage).catch(() => {});
     return files.length;
   }
 

@@ -13,20 +13,30 @@ export async function readPublishedFile(
   buildId: string,
   rel: string,
 ): Promise<Buffer | null> {
+  return (await readPublishedFileInfo(storage, projectId, buildId, rel))?.bytes ?? null;
+}
+
+/** Published bytes and, for content-addressed files, their manifest identity. */
+export async function readPublishedFileInfo(
+  storage: StorageAdapter,
+  projectId: string,
+  buildId: string,
+  rel: string,
+): Promise<{ bytes: Buffer; contentHash?: string } | null> {
   const dir = storybookDir(projectId, buildId);
   const viaManifest = await readViaManifest(storage, dir, rel);
   if (viaManifest) {
     return viaManifest;
   }
   const legacy = posix.join(dir, rel);
-  return (await storage.exists(legacy)) ? await storage.read(legacy) : null;
+  return (await storage.exists(legacy)) ? { bytes: await storage.read(legacy) } : null;
 }
 
 async function readViaManifest(
   storage: StorageAdapter,
   dir: string,
   rel: string,
-): Promise<Buffer | null> {
+): Promise<{ bytes: Buffer; contentHash: string } | null> {
   try {
     const manifestPath = posix.join(dir, "manifest.json");
     if (!(await storage.exists(manifestPath))) {
@@ -37,8 +47,11 @@ async function readViaManifest(
       string
     >;
     const hash = manifest[rel];
-    const path = hash ? `content/${hash}` : undefined;
-    return path && (await storage.exists(path)) ? await storage.read(path) : null;
+    if (!hash) return null;
+    const path = `content/${hash}`;
+    return (await storage.exists(path))
+      ? { bytes: await storage.read(path), contentHash: hash }
+      : null;
   } catch {
     // an unreadable manifest falls back to the per-build copy
     return null;

@@ -134,6 +134,8 @@ export interface ShelfConfig {
    * Opt-in, off by default — some deployments prefer no timing headers.
    */
   serverTiming?: boolean;
+  /** Persist gzip variants for published Storybook files (default off). */
+  publishedCompression?: boolean;
   /**
    * Largest zip (bytes) extracted inline in the upload request; a larger zip is published by a
    * `publish` job (or refused with 413 on a host that runs no consumer). The count is taken
@@ -229,6 +231,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     branchGcIntervalMs: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
+    publishedCompression: z.boolean().optional(),
     maxInlineUnzipSize: z.number().int().min(0).optional(),
     maxZipEntries: z.number().int().positive().optional(),
     maxUnzippedBytes: z.number().int().positive().optional(),

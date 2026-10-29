@@ -5,11 +5,12 @@
  * signed URL route (`/_s/:token/*`) all end here, each bringing the access {@link publishedAccess}
  * granted.
  */
-import { readPublishedFile } from "@storyshelf/core/capture";
+import { readPublishedFileInfo } from "@storyshelf/core/capture";
 import { isSafeSegment, mimeFor } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { getStore } from "../store.ts";
 import { publishedCorsHeaders, type PublishedAccess } from "./published-access.ts";
+import { acceptsGzip, publishedGzip } from "./published-compression.ts";
 
 /** Headers of every signed URL answer: a token URL must not be cached, indexed or leaked by `Referer`. */
 export const SIGNED_URL_HEADERS = {
@@ -61,15 +62,23 @@ export async function servePublishedFile(
   request: PublishedFileRequest,
 ): Promise<Response | null> {
   const { projectId, buildId, rel, access } = request;
-  const file = await readPublishedFile(getStore().storage, projectId, buildId, rel);
+  const { storage, config } = getStore();
+  const file = await readPublishedFileInfo(storage, projectId, buildId, rel);
   if (!file) {
     return null;
   }
   const headers =
     access === "token" ? SIGNED_URL_HEADERS : { "cache-control": request.cacheControl };
-  return c.body(new Uint8Array(file), 200, {
+  const mime = mimeFor(rel);
+  const compressed =
+    config.publishedCompression && acceptsGzip(c.req.header("accept-encoding"))
+      ? await publishedGzip(storage, file.contentHash, file.bytes, mime)
+      : undefined;
+  return c.body(new Uint8Array(compressed ?? file.bytes), 200, {
     ...headers,
     ...publishedCorsHeaders(access),
-    "content-type": mimeFor(rel),
+    "content-type": mime,
+    ...(config.publishedCompression ? { vary: "Accept-Encoding" } : {}),
+    ...(compressed ? { "content-encoding": "gzip" } : {}),
   });
 }
