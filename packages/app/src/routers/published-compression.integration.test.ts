@@ -164,4 +164,34 @@ describe("published gzip access", () => {
       ]);
     }
   });
+
+  it("does not block shutdown or surface a delayed generation failure", async () => {
+    const { anonymous, session, publicApp, token, storage } = await setup(true);
+    const gate = Promise.withResolvers<null>();
+    const write = vi.spyOn(storage, "write").mockImplementation(async () => {
+      await gate.promise;
+    });
+    let stopped = false;
+    try {
+      const response = await anonymous.request(`/_s/${token}/iframe.html`, { headers });
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(file);
+      await vi.waitFor(() => expect(write).toHaveBeenCalledOnce(), { timeout: 10_000 });
+      await Promise.all([
+        anonymous.lifecycle.teardown(),
+        session.lifecycle.teardown(),
+        publicApp.lifecycle.teardown(),
+      ]);
+      stopped = true;
+      gate.reject(new Error("storage stopped"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      gate.resolve(null);
+      if (!stopped)
+        await Promise.all([
+          anonymous.lifecycle.teardown(),
+          session.lifecycle.teardown(),
+          publicApp.lifecycle.teardown(),
+        ]);
+    }
+  }, 15_000);
 });
