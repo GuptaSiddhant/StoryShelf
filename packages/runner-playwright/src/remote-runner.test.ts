@@ -260,10 +260,12 @@ describe("a remote target", () => {
 
   it("opens a new session when the browser is recycled", async () => {
     const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
-    await createPlaywrightCaptureRunner({ browsers: [farm()], recycleBrowserEvery: 2 }).render(
-      input({ stories }),
-    );
+    await createPlaywrightCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 1 })],
+      recycleBrowserEvery: 2,
+    }).render(input({ stories }));
     expect(fake.state.connects).toHaveLength(3);
+    expect(fake.state.peak).toBe(1);
   });
 
   it("holds every render of the target to its sessions, however many run at once", async () => {
