@@ -111,6 +111,40 @@ export interface TxStore {
   count(table: Table, where?: SQL): Promise<number>;
 }
 
+/** An owner of durable protection for a build. Historical comparisons are not build owners. */
+export interface BuildReferenceOwner {
+  type: "baseline" | "investigation";
+  id: string;
+  projectId: string;
+}
+
+/**
+ * An explicit database capability; an ordinary transaction does not establish this contract.
+ * Implementations serialize admissions, reference changes, and deletion claims across processes.
+ * Their tests must use independent connections, including promotion/purge and pin/purge races.
+ */
+export interface BuildReferenceLifecycle {
+  /**
+   * Atomically replace one owner's complete reference set and make its domain writes. Both old and
+   * new builds must be locked in stable order, checked for project ownership and availability,
+   * and committed with the domain mutation. Unknown or tombstoned builds reject admission.
+   */
+  replaceReferences<T>(
+    owner: BuildReferenceOwner,
+    buildIds: readonly string[],
+    writeDomain: (tx: TxStore) => Promise<T>,
+  ): Promise<T>;
+  /**
+   * In the same concurrency domain as admissions, irreversibly tombstone a build only if no
+   * protecting reference remains. Existing tombstones are resumable and never become available.
+   * Storage deletion must happen after this operation commits, outside database locks.
+   */
+  claimDeletion(
+    projectId: string,
+    buildId: string,
+  ): Promise<"claimed" | "protected" | "deleting" | "missing">;
+}
+
 /** Database-specific metadata: the family plus what the backing platform can carry. */
 export interface DatabaseAdapterMetadata {
   readonly category: "database";
@@ -124,6 +158,11 @@ export interface DatabaseAdapterMetadata {
 
 /** Database abstraction over Drizzle tables, agnostic of dialect and driver. */
 export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
+  /**
+   * Present only when the adapter implements the cross-process retention safety contract.
+   * `transact` by itself is not evidence of this capability.
+   */
+  readonly buildReferenceLifecycle?: BuildReferenceLifecycle;
   /** Table handles for this adapter's dialect, enforced with type safety. */
   readonly tables: Tables;
   /** Insert a row and return the inserted record. */
