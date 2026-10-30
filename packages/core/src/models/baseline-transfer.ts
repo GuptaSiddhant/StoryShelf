@@ -121,6 +121,7 @@ export class BaselineTransferModel {
     const { entry, storagePath } = planned;
     const fields = {
       snapshotId: null,
+      sourceBuildId: null,
       screenshotPath: storagePath,
       infraHash: entry.infraHash,
       fingerprint: entry.fingerprint ?? null,

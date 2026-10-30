@@ -143,6 +143,7 @@ describe("createSqliteDatabase", () => {
     const present = new Set(rows.map((row) => String(row[1])));
     expect(present.has("baseline_id")).toBe(true);
     expect(present.has("baseline_version")).toBe(true);
+    expect(present.has("source_build_id")).toBe(true);
 
     await closeDb(db);
   });

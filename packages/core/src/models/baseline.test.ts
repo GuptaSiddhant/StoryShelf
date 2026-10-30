@@ -313,3 +313,46 @@ describe("BaselineModel", () => {
     });
   });
 });
+
+describe("baseline source build provenance", () => {
+  it("records the rendered source and preserves it through an inherited promotion", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, undefined, storage);
+    await storage.write("shot", PNG);
+    await db.insert(db.tables.snapshots, {
+      id: "rendered",
+      projectId: "p1",
+      storyId: "story",
+      viewportName: "desktop",
+      browser: "chromium",
+      screenshotPath: "shot",
+      buildId: "source",
+      inherited: false,
+    });
+    const main = await model.upsert("p1", "story", "desktop", "main", "rendered", "shot");
+    expect(main.sourceBuildId).toBe("source");
+    await db.insert(db.tables.snapshots, {
+      id: "inherited",
+      projectId: "p1",
+      storyId: "story",
+      viewportName: "desktop",
+      browser: "chromium",
+      screenshotPath: main.screenshotPath,
+      buildId: "reuse",
+      inherited: true,
+      sourceBuildId: main.sourceBuildId,
+    });
+    const feature = await model.upsert(
+      "p1",
+      "story",
+      "desktop",
+      "feature",
+      "inherited",
+      main.screenshotPath,
+    );
+    expect(feature.sourceBuildId).toBe("source");
+    await model.upsert("p1", "story", "desktop", "main", "unknown", "shot");
+    expect((await model.getFor("p1", "story", "desktop", "main"))?.sourceBuildId).toBeNull();
+    expect((await model.getFor("p1", "story", "desktop", "feature"))?.sourceBuildId).toBe("source");
+  });
+});

@@ -13,6 +13,7 @@ export const baselines = sqliteTable(
     viewportName: text("viewport_name").notNull().default("desktop"),
     branch: text("branch").notNull(),
     snapshotId: text("snapshot_id"),
+    sourceBuildId: text("source_build_id"),
     screenshotPath: text("screenshot_path").notNull(),
     infraHash: text("infra_hash"),
     fingerprint: text("fingerprint"),
@@ -41,6 +42,7 @@ export interface Baseline {
   viewportName: string;
   branch: string;
   snapshotId: string | null;
+  sourceBuildId: string | null;
   screenshotPath: string;
   infraHash: string | null;
   fingerprint: string | null;

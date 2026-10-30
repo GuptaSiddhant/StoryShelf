@@ -44,6 +44,7 @@ export const snapshots = pgTable(
     inherited: boolean("inherited").notNull().default(false),
     baselineId: text("baseline_id"),
     baselineVersion: text("baseline_version"),
+    sourceBuildId: text("source_build_id"),
     mode: text("mode"),
     browser: text("browser").notNull().default("chromium"),
     durationMs: integer("duration_ms"),
@@ -89,6 +90,7 @@ export interface Snapshot {
   inherited: boolean;
   baselineId: string | null;
   baselineVersion: string | null;
+  sourceBuildId: string | null;
   mode?: string | null;
   browser?: string;
   durationMs: number | null;

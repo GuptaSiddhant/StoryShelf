@@ -53,6 +53,7 @@ export class SnapshotModel {
       infraHash: input.infraHash ?? null,
       envChange: input.envChange ?? null,
       inherited: input.inherited ?? false,
+      sourceBuildId: input.inherited ? (input.sourceBuildId ?? null) : buildId,
       baselineId: input.baselineId ?? null,
       baselineVersion: input.baselineVersion ?? null,
       mode: input.mode ?? null,
@@ -181,6 +182,7 @@ export interface SnapshotCreateInput {
   /** JSON `EnvironmentChange` when accepted as an environment migration. */
   envChange?: string | null;
   inherited?: boolean;
+  sourceBuildId?: string | null;
   baselineId?: string | null;
   baselineVersion?: string | null;
   /** Resolved mode definition as JSON (display/capture only). */

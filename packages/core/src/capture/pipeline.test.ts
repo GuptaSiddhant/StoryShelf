@@ -567,6 +567,19 @@ describe("persistCapture", () => {
     expect(build?.status).toBe("approved");
   });
 
+  it("copies the source build when creating an inherited snapshot", async () => {
+    const { ctx } = await makeContext({ captures: [] });
+    await seedBaseline(ctx);
+    await ctx.db.update(ctx.db.tables.baselines, "bl1", { sourceBuildId: "original-build" });
+    const baseline = (await ctx.db.get(ctx.db.tables.baselines, "bl1")) as unknown as Baseline;
+    await persistCapture({
+      ...ctx,
+      inherited: [{ story: storyOf("a"), viewport: DEFAULT_VIEWPORT, baseline }],
+    });
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(rows[0]?.sourceBuildId).toBe("original-build");
+  });
+
   it("mixes rendered and inherited snapshots in one build", async () => {
     const { ctx } = await makeContext({
       captures: [captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],

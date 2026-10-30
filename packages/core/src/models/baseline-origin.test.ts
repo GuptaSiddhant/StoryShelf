@@ -49,6 +49,20 @@ describe("baseline image origin", () => {
     expect(await resolveBaselineOrigin(original, reader())).toEqual(build);
     expect(await resolveBaselineOrigin(child, reader())).toEqual(build);
   });
+  it("uses persisted source even when older snapshot rows are gone", async () => {
+    expect(
+      await resolveBaselineOrigin({ ...original, sourceBuildId: "source" }, reader([], [])),
+    ).toEqual(build);
+    expect(
+      await resolveBaselineOrigin(
+        child,
+        reader([{ ...original, sourceBuildId: "source" }], [inherited]),
+      ),
+    ).toEqual(build);
+    expect(
+      await resolveBaselineOrigin({ ...original, sourceBuildId: "missing" }, reader([], [])),
+    ).toBeNull();
+  });
   it("does not guess when inherited provenance is missing or moved", async () => {
     expect(
       await resolveBaselineOrigin(child, reader([{ ...original, updatedAt: "v2" }])),

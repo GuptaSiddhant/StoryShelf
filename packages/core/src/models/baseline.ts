@@ -7,6 +7,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import type { Baseline } from "../schema/baseline.ts";
+import type { Snapshot } from "../schema/snapshot.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import { isContentPath } from "../utils/paths.ts";
 import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts";
@@ -137,6 +138,14 @@ export class BaselineModel {
     infraHash?: string | null,
     options: BaselineUpsertOptions = {},
   ): Promise<Baseline> {
+    const sourceBuildId = await this.sourceBuildId(
+      projectId,
+      storyId,
+      viewport,
+      snapshotId,
+      sourcePath,
+      options.browser,
+    );
     const write = async (): Promise<Baseline> =>
       await this.#upsertAt(
         projectId,
@@ -144,6 +153,7 @@ export class BaselineModel {
         viewport,
         branch,
         snapshotId,
+        sourceBuildId,
         await this.contentFor(projectId, sourcePath),
         infraHash,
         options,
@@ -155,12 +165,37 @@ export class BaselineModel {
       : await withContentClaim(this.storage, projectId, write);
   }
 
+  private async sourceBuildId(
+    projectId: string,
+    storyId: string,
+    viewport: string,
+    snapshotId: string,
+    sourcePath: string,
+    browser: string = DEFAULT_BROWSER,
+  ): Promise<string | null> {
+    const snapshot = (await this.db.get(
+      this.db.tables.snapshots,
+      snapshotId,
+    )) as unknown as Snapshot | null;
+    if (
+      !snapshot ||
+      snapshot.projectId !== projectId ||
+      snapshot.storyId !== storyId ||
+      snapshot.viewportName !== viewport ||
+      (snapshot.browser ?? DEFAULT_BROWSER) !== browser ||
+      snapshot.screenshotPath !== sourcePath
+    )
+      return null;
+    return snapshot.inherited ? (snapshot.sourceBuildId ?? null) : snapshot.buildId;
+  }
+
   async #upsertAt(
     projectId: string,
     storyId: string,
     viewport: string,
     branch: string,
     snapshotId: string,
+    sourceBuildId: string | null,
     screenshotPath: string,
     infraHash: string | null | undefined,
     options: BaselineUpsertOptions,
@@ -172,6 +207,7 @@ export class BaselineModel {
     if (existing) {
       baseline = (await this.db.update(this.tables.baselines, existing.id, {
         snapshotId,
+        sourceBuildId,
         screenshotPath,
         infraHash: infraHash ?? existing.infraHash ?? null,
         fingerprint: options.fingerprint ?? existing.fingerprint ?? null,
@@ -205,6 +241,7 @@ export class BaselineModel {
         viewportName: viewport,
         branch,
         snapshotId,
+        sourceBuildId,
         screenshotPath,
         infraHash: infraHash ?? null,
         fingerprint: options.fingerprint ?? null,
