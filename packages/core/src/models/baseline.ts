@@ -214,6 +214,7 @@ export class BaselineModel {
         {
           id: existing?.id ?? ulid(),
           existingId: existing?.id ?? null,
+          existingVersion: existing?.updatedAt ?? null,
           projectId,
           storyId,
           viewport,

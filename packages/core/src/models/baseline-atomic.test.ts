@@ -6,6 +6,7 @@ import { upsertAtomicBaseline, type AtomicBaselineInput } from "./baseline-atomi
 const input: AtomicBaselineInput = {
   id: "baseline",
   existingId: null,
+  existingVersion: null,
   projectId: "p",
   storyId: "story",
   viewport: "desktop",
@@ -78,5 +79,26 @@ describe("atomic baseline promotion", () => {
     await expect(upsertAtomicBaseline(lifecycle, tables, input)).rejects.toThrow(
       "Baseline changed",
     );
+  });
+  it("rejects a concurrent update to the same baseline identity", async () => {
+    const { db, lifecycle, tables } = setup();
+    await insertSource(db);
+    await db.insert(db.tables.baselines, {
+      id: "baseline",
+      projectId: "p",
+      storyId: "story",
+      viewportName: "desktop",
+      branch: "main",
+      browser: "chromium",
+      updatedAt: "new-version",
+    });
+    await expect(
+      upsertAtomicBaseline(lifecycle, tables, {
+        ...input,
+        existingId: "baseline",
+        existingVersion: "old-version",
+      }),
+    ).rejects.toThrow("Baseline changed");
+    expect((await db.get(db.tables.baselines, "baseline"))?.["updatedAt"]).toBe("new-version");
   });
 });

@@ -10,6 +10,7 @@ import { col } from "./columns.ts";
 export interface AtomicBaselineInput {
   id: string;
   existingId: string | null;
+  existingVersion: string | null;
   projectId: string;
   storyId: string;
   viewport: string;
@@ -53,7 +54,10 @@ async function writeBaseline(
     limit: 1,
   })) as unknown as Baseline[];
   const existing = rows[0] ?? null;
-  if ((existing?.id ?? null) !== input.existingId)
+  if (
+    (existing?.id ?? null) !== input.existingId ||
+    (existing?.updatedAt ?? null) !== input.existingVersion
+  )
     throw new Error("Baseline changed during promotion; retry");
   if (input.sourceBuildId) await assertSource(tx, tables.snapshots, input);
   const now = new Date().toISOString();
