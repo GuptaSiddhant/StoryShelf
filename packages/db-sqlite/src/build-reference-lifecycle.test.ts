@@ -254,8 +254,8 @@ describe("SQLite reference lifecycle primitive", () => {
       let exited: Promise<unknown[]> | undefined;
       await lifecycle.replaceReferences(owner, ["one"], async () => {
         const script = `import('./src/build-reference-lifecycle.ts').then(async ({ createBuildReferenceLifecycle }) => {
-          await import('node:fs').then(({ writeFileSync }) => writeFileSync(process.argv[1] + '.ready', 'ready'));
-          const result = await createBuildReferenceLifecycle(process.argv[1]).claimDeletion('p', 'one');
+          const { writeFileSync } = await import('node:fs');
+          const result = await createBuildReferenceLifecycle(process.argv[1], () => writeFileSync(process.argv[1] + '.ready', 'blocked')).claimDeletion('p', 'one');
           await import('node:fs').then(({ writeFileSync }) => writeFileSync(process.argv[1] + '.result', result));
         }).catch((error) => { process.stderr.write(String(error)); process.exitCode = 1; });`;
         child = spawn(process.execPath, ["--experimental-strip-types", "-e", script, path], {

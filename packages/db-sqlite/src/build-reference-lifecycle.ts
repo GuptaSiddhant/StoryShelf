@@ -13,22 +13,26 @@ import { createCallback } from "./index.ts";
 import { schema } from "./schema/index.ts";
 
 /** Not yet exposed by the adapter: all domain mutations and cleanup must be wired first. */
-export function createBuildReferenceLifecycle(path: string): BuildReferenceLifecycle {
+export function createBuildReferenceLifecycle(
+  path: string,
+  onContention?: () => void,
+): BuildReferenceLifecycle {
   return {
     replaceReferences: async (owner, buildIds, writeDomain) =>
       await replaceManyReferences(path, [{ owner, buildIds }], writeDomain),
     replaceManyReferences: async (changes, writeDomain) =>
       await replaceManyReferences(path, changes, writeDomain),
-    claimDeletion: async (projectId, buildId) => await claimDeletion(path, projectId, buildId),
+    claimDeletion: async (projectId, buildId) =>
+      await claimDeletion(path, projectId, buildId, onContention),
   };
 }
 
-async function open(path: string): Promise<DatabaseSync> {
+async function open(path: string, onContention?: () => void): Promise<DatabaseSync> {
   if (path === ":memory:") throw new Error("Reference lifecycle requires a shared SQLite file");
   const db = new DatabaseSync(path, { returnArrays: true });
   try {
     db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 0");
-    await acquireWrite(db);
+    await acquireWrite(db, onContention);
     return db;
   } catch (error) {
     db.close();
@@ -37,7 +41,7 @@ async function open(path: string): Promise<DatabaseSync> {
 }
 
 /** Avoid blocking this process's event loop while a different connection holds the write lock. */
-async function acquireWrite(db: DatabaseSync): Promise<void> {
+async function acquireWrite(db: DatabaseSync, onContention?: () => void): Promise<void> {
   const deadline = Date.now() + 5000;
   while (true) {
     try {
@@ -50,6 +54,7 @@ async function acquireWrite(db: DatabaseSync): Promise<void> {
         Date.now() >= deadline
       )
         throw error;
+      onContention?.();
       // oxlint-disable-next-line eslint/no-await-in-loop -- wait for a competing writer to finish
       await delay(10);
     }
@@ -127,8 +132,9 @@ async function claimDeletion(
   path: string,
   projectId: string,
   buildId: string,
+  onContention?: () => void,
 ): Promise<"claimed" | "protected" | "deleting" | "missing"> {
-  const db = await open(path);
+  const db = await open(path, onContention);
   try {
     const build = db
       .prepare("SELECT retention_state FROM builds WHERE project_id = ? AND id = ?")

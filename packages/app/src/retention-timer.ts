@@ -45,7 +45,7 @@ export function startBranchGcTimer(
 }
 
 // oxlint-disable-next-line typescript/promise-function-async
-function createBranchGcRunner(
+export function createBranchGcRunner(
   db: DatabaseAdapter,
   storage: StorageAdapter,
   logger: Logger,
