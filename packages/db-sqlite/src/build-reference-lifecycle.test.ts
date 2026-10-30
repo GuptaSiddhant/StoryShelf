@@ -1,4 +1,6 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { BaselineModel } from "@storyshelf/core/models";
+import { makeStorage } from "@storyshelf/core/test-helpers";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -78,6 +80,52 @@ describe("SQLite reference lifecycle primitive", () => {
       }
       expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
       expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
+    });
+  });
+  it("commits baseline promotions together with their source references", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const lifecycle = createBuildReferenceLifecycle(path);
+      Object.assign(db, { buildReferenceLifecycle: lifecycle });
+      const { storage } = makeStorage();
+      const png = Buffer.from([1, 2, 3]);
+      await storage.write("one.png", png);
+      await storage.write("two.png", png);
+      const base = {
+        projectId: "p",
+        storyId: "story",
+        storyName: "Story",
+        storyTitle: "Story",
+        viewportName: "desktop",
+        browser: "chromium",
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await db.insert(schema.snapshots, {
+          ...base,
+          id: "snap-one",
+          buildId: "one",
+          screenshotPath: "one.png",
+        });
+        await db.insert(schema.snapshots, {
+          ...base,
+          id: "snap-two",
+          buildId: "two",
+          screenshotPath: "two.png",
+        });
+        const model = new BaselineModel(db, undefined, storage);
+        const created = await model.upsert("p", "story", "desktop", "main", "snap-one", "one.png");
+        expect(created.sourceBuildId).toBe("one");
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+        const updated = await model.upsert("p", "story", "desktop", "main", "snap-two", "two.png");
+        expect(updated.id).toBe(created.id);
+        expect(updated.sourceBuildId).toBe("two");
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+        expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
     });
   });
   it("does not block the event loop when two connections compete in one process", async () => {

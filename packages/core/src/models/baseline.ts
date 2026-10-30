@@ -12,6 +12,7 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { isContentPath } from "../utils/paths.ts";
 import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
+import { upsertAtomicBaseline } from "./baseline-atomic.ts";
 import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
 
@@ -154,6 +155,7 @@ export class BaselineModel {
         branch,
         snapshotId,
         sourceBuildId,
+        sourcePath,
         await this.contentFor(projectId, sourcePath),
         infraHash,
         options,
@@ -196,6 +198,7 @@ export class BaselineModel {
     branch: string,
     snapshotId: string,
     sourceBuildId: string | null,
+    originalPath: string,
     screenshotPath: string,
     infraHash: string | null | undefined,
     options: BaselineUpsertOptions,
@@ -203,6 +206,48 @@ export class BaselineModel {
     const browser = options.browser ?? DEFAULT_BROWSER;
 
     const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
+    const lifecycle = this.db.buildReferenceLifecycle;
+    if (lifecycle) {
+      const baseline = await upsertAtomicBaseline(
+        lifecycle,
+        { baselines: this.tables.baselines, snapshots: this.db.tables.snapshots },
+        {
+          id: existing?.id ?? ulid(),
+          existingId: existing?.id ?? null,
+          projectId,
+          storyId,
+          viewport,
+          branch,
+          browser,
+          snapshotId,
+          sourceBuildId,
+          originalPath,
+          screenshotPath,
+          infraHash,
+          fingerprint: options.fingerprint,
+          mode: options.mode,
+        },
+      );
+      if (this.webhookTables) {
+        await emitWebhookEvent(
+          this.db,
+          this.webhookTables,
+          projectId,
+          existing ? "baseline:updated" : "baseline:created",
+          {
+            baselineId: baseline.id,
+            storyId,
+            viewport,
+            browser,
+            mode: options.mode ?? null,
+            branch,
+            snapshotId,
+          },
+          this.secret,
+        );
+      }
+      return baseline;
+    }
     let baseline: Baseline;
     if (existing) {
       baseline = (await this.db.update(this.tables.baselines, existing.id, {
