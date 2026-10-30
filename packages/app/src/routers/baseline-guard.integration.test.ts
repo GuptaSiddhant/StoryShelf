@@ -486,3 +486,119 @@ describe("review pages for changed baselines", () => {
     expect(await page(app, REVIEW)).not.toContain("Baseline changed since this build");
   });
 });
+
+describe("secondary default-branch comparison", () => {
+  it("shows the current main image separately and preserves the approval target", async () => {
+    const { app, db, objects } = await setup({ baselineId: "bl-feature", baselineVersion: T1 });
+    await db.insert(db.tables.baselines, {
+      id: "bl-feature",
+      projectId: "p1",
+      storyId: "a",
+      viewportName: "desktop",
+      branch: "feature/x",
+      snapshotId: null,
+      screenshotPath: "feature-base.png",
+      createdAt: T1,
+      updatedAt: T1,
+    });
+    objects.set("feature-base.png", Buffer.from("feature-base"));
+    const response = await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1");
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Compare with current default branch");
+    const url = `${BASE}/f1/snapshots/sf1/baseline?reference=default&id=bl-main&version=${encodeURIComponent(T1)}`;
+    const image = await app.request(url);
+    expect(await image.text()).toBe("main-v1");
+    expect(image.headers.get("cache-control")).toBe("private, no-store");
+    expect((await post(app, "f1/snapshots/sf1/approve")).status).toBe(200);
+    const feature = await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x");
+    expect(feature?.snapshotId).toBe("sf1");
+    expect((await new BaselineModel(db).getFor("p1", "a", "desktop", "main"))?.snapshotId).toBe(
+      "s0",
+    );
+  });
+
+  it("rejects an old default-baseline URL after main advances", async () => {
+    const { app, db } = await setup({ baselineId: "bl-main", baselineVersion: T1 });
+    await moveMainBaseline(db);
+    const response = await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1");
+    expect(await response.text()).toContain("Compare with current default branch");
+    const old = `${BASE}/f1/snapshots/sf1/baseline?reference=default&id=bl-main&version=${encodeURIComponent(T1)}`;
+    expect((await app.request(old)).status).toBe(404);
+    expect((await post(app, "f1/snapshots/sf1/approve")).status).toBe(409);
+  });
+
+  it("explains a missing current default image", async () => {
+    const { app, db, objects } = await setup({ baselineId: null, baselineVersion: "none" });
+    objects.delete("baselines/main/a.png");
+    const response = await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1");
+    const html = await response.text();
+    expect(html).toContain("No baseline at capture");
+    expect(html).toContain("current default-branch baseline image is unavailable");
+    expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("changed");
+  });
+});
+
+describe("per-snapshot baseline presentation", () => {
+  it.each(["approved", "new", "rejected"])(
+    "reports no original baseline for a first %s snapshot",
+    async (status) => {
+      const { app, db } = await setup({ baselineId: null, baselineVersion: "none" });
+      await db.update(db.tables.snapshots, "sf1", { status });
+      const response = await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1");
+      const html = await response.text();
+      expect(html).toContain("No baseline at capture");
+      expect(html).not.toContain('alt="Baseline for T / A"');
+    },
+  );
+  it("labels sources per selected snapshot in a mixed build", async () => {
+    const { app, db, objects } = await setup();
+    await db.insert(db.tables.baselines, {
+      id: "bl-feature",
+      projectId: "p1",
+      storyId: "b",
+      viewportName: "desktop",
+      branch: "feature/x",
+      snapshotId: null,
+      screenshotPath: "feature.png",
+      createdAt: T1,
+      updatedAt: T1,
+    });
+    objects.set("feature.png", Buffer.from("feature"));
+    await db.insert(db.tables.snapshots, {
+      id: "sf2",
+      projectId: "p1",
+      buildId: "f1",
+      storyId: "b",
+      storyName: "B",
+      storyTitle: "T",
+      viewportName: "desktop",
+      screenshotPath: "shots/f1/a.png",
+      status: "changed",
+      baselineId: "bl-feature",
+      baselineVersion: T1,
+      createdAt: T1,
+      updatedAt: T1,
+    });
+    const main = await (
+      await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
+    ).text();
+    const feature = await (
+      await app.request("/projects/test-project/builds/f1/diff?snapshot=sf2")
+    ).text();
+    expect(main).toContain("Default branch");
+    expect(feature).toContain("Accepted branch");
+    expect(feature).toContain("Reference build and commit are unavailable");
+  });
+});
+
+describe("missing primary baseline image", () => {
+  it("does not describe an existing baseline as a new story", async () => {
+    const { app, objects } = await setup();
+    objects.delete("baselines/main/a.png");
+    const html = await (
+      await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
+    ).text();
+    expect(html).toContain("The original baseline image is unavailable.");
+    expect(html).not.toContain("New story — no baseline yet");
+  });
+});

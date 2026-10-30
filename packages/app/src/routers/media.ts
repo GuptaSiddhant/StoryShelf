@@ -1,4 +1,9 @@
-import { BaselineModel, DesignCredentialModel, DesignNodeModel } from "@storyshelf/core/models";
+import {
+  BaselineModel,
+  DesignCredentialModel,
+  DesignNodeModel,
+  baselineStatus,
+} from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { Snapshot } from "@storyshelf/core/schema";
@@ -75,18 +80,40 @@ export function registerMedia(app: ShelfRouter): void {
       notFound("Build not found");
     }
     const baselines = new BaselineModel(getStore().db, undefined, getStore().storage);
-    const baseline = await baselines.resolve(
-      project.id,
-      snapshot.storyId,
-      snapshot.viewportName,
-      build.gitBranch,
-      project.gitDefaultBranch,
-      snapshot.browser,
-    );
+    const baseline =
+      c.req.query("reference") === "default"
+        ? await baselines.getFor(
+            project.id,
+            snapshot.storyId,
+            snapshot.viewportName,
+            project.gitDefaultBranch,
+            snapshot.browser,
+          )
+        : await baselines.resolve(
+            project.id,
+            snapshot.storyId,
+            snapshot.viewportName,
+            build.gitBranch,
+            project.gitDefaultBranch,
+            snapshot.browser,
+          );
+    if (
+      c.req.query("reference") === "default" &&
+      (baseline?.id !== c.req.query("id") || baseline?.updatedAt !== c.req.query("version"))
+    ) {
+      notFound("Default baseline changed; reload the comparison");
+    }
     if (!baseline) {
       notFound("No baseline for this snapshot");
     }
-    return imageResponse(await baselines.read(baseline));
+    if (
+      c.req.query("reference") !== "default" &&
+      snapshot.baselineVersion !== null &&
+      baselineStatus(snapshot, baseline) !== "current"
+    ) {
+      notFound("Original baseline is no longer available");
+    }
+    return imageResponse(await baselines.read(baseline), "private, no-store");
   });
 }
 

@@ -1,9 +1,11 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
+import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
 import { Badge, Button, CompareStage, Segmented, VStack, statusTone } from "../ui/components.tsx";
 import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
 import { A11yViolationsNotice, a11yCarrierOf } from "./a11y-violations.tsx";
+import { DefaultComparisonView } from "./build-diff-default.tsx";
 import { EnvironmentChangeSnapshotNotice } from "./build-diff-environment.tsx";
 import {
   diffPercent,
@@ -11,6 +13,7 @@ import {
   snapshotPageUrl,
   snapshotVariant,
 } from "./build-diff-model.ts";
+import { BaselineReferenceNotice } from "./build-diff-reference.tsx";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
@@ -25,6 +28,8 @@ export interface DiffViewerProps {
   /** The selected story/mode's snapshots on every engine (browser tabs when more than one). */
   siblings?: Snapshot[];
   hasBaseline: Record<string, boolean>;
+  reference?: BaselineReference;
+  defaultComparison?: DefaultComparison | null;
   /** Set when the baseline changed after this snapshot's diff was computed. */
   drifted?: "stale" | "removed";
   /** Linked packages the story uses (provenance badges + upstream deep links). */
@@ -86,8 +91,7 @@ function ViewComponentButton(props: {
 
 /** Story heading plus the comparison stage for the selected snapshot. */
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, hasBaseline, drifted, usage, design, publishedBaseDomain } =
-    props;
+  const { project, build, selected, drifted, usage, design, publishedBaseDomain } = props;
   const siblings = props.siblings ?? [selected];
   const percent = diffPercent(selected);
   return (
@@ -110,6 +114,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
           <ViewComponentButton project={project} selected={selected} base={publishedBaseDomain} />
         </p>
       </div>
+      {props.reference ? <BaselineReferenceNotice reference={props.reference} /> : null}
       <BrowserTabs project={project} build={build} selected={selected} siblings={siblings} />
       {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
       <EnvironmentChangeSnapshotNotice snapshot={selected} migrated={build.isDefault} />
@@ -118,17 +123,52 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
         <LinkedUsage usage={usage} publishedBaseDomain={publishedBaseDomain} />
       ) : null}
       {design && design.length > 0 ? <DesignStrip items={design} /> : null}
-      <CompareStage
-        baselineSrc={
-          hasBaseline[selected.id] ? snapshotImageUrl(project, build, selected, "baseline") : null
-        }
-        currentSrc={snapshotImageUrl(project, build, selected, "image")}
-        diffSrc={selected.diffPath ? snapshotImageUrl(project, build, selected, "diff") : null}
-        subject={`${selected.storyTitle} / ${selected.storyName}`}
-        diffEmpty={diffEmptyText(selected.status)}
-        diffMeta={percent ?? undefined}
-      />
+      <PrimaryComparison {...props} />
+      <SecondaryComparison {...props} />
       {design && design.length > 0 ? <DesignReferences items={design} /> : null}
     </VStack>
+  );
+}
+
+function SecondaryComparison(
+  props: DiffViewerProps,
+): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  if (!props.defaultComparison) return null;
+  return (
+    <DefaultComparisonView
+      {...props}
+      snapshot={props.selected}
+      comparison={props.defaultComparison}
+    />
+  );
+}
+
+function baselineUrl(props: DiffViewerProps): string | null {
+  const { hasBaseline, selected, reference, project, build } = props;
+  return hasBaseline[selected.id] &&
+    reference?.kind !== "none" &&
+    !(reference?.kind === "known" && !reference.imageAvailable) &&
+    !(reference?.kind === "unavailable" && selected.baselineVersion !== null)
+    ? snapshotImageUrl(project, build, selected, "baseline")
+    : null;
+}
+
+function PrimaryComparison(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, selected, reference } = props;
+  return (
+    <CompareStage
+      baselineSrc={baselineUrl(props)}
+      baselineEmpty={
+        reference?.kind === "unavailable" ||
+        (reference?.kind === "known" && !reference.imageAvailable)
+          ? "The original baseline image is unavailable."
+          : undefined
+      }
+      currentSrc={snapshotImageUrl(project, build, selected, "image")}
+      diffSrc={selected.diffPath ? snapshotImageUrl(project, build, selected, "diff") : null}
+      subject={`${selected.storyTitle} / ${selected.storyName}`}
+      diffEmpty={diffEmptyText(selected.status)}
+      diffMeta={diffPercent(selected) ?? undefined}
+    />
   );
 }
