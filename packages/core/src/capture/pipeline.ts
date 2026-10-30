@@ -273,6 +273,7 @@ async function persistInheritedSnapshot(
     infraHash,
     mode: modeJsonOf(inherited.viewport),
     inherited: true,
+    sourceBuildId: inherited.baseline.sourceBuildId ?? null,
     baselineId: inherited.baseline.id,
     baselineVersion: inherited.baseline.updatedAt,
   });

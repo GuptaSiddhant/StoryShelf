@@ -6,6 +6,8 @@ export interface Baseline {
   viewportName: string;
   branch: string;
   snapshotId: string | null;
+  /** Build that actually rendered this image; null for unknown or imported origins. */
+  sourceBuildId?: string | null;
   screenshotPath: string;
   infraHash: string | null;
   /** JSON `Fingerprint` behind `infraHash`; null on baselines recorded before fingerprints. */

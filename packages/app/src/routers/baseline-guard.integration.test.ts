@@ -602,3 +602,52 @@ describe("missing primary baseline image", () => {
     expect(html).not.toContain("New story — no baseline yet");
   });
 });
+
+describe("inherited baseline origin", () => {
+  it("shows the rendering build when real baseline and snapshot records prove the chain", async () => {
+    const { app, db } = await setup();
+    await db.insert(db.tables.builds, {
+      ...featureBuild("original"),
+      gitSha: "abcdef123456",
+      gitBranch: "main",
+    });
+    await db.insert(db.tables.builds, featureBuild("reuse"));
+    const identity = {
+      projectId: "p1",
+      storyId: "a",
+      storyName: "A",
+      storyTitle: "T",
+      viewportName: "desktop",
+      browser: "chromium",
+      screenshotPath: "baselines/main/a.png",
+      status: "unchanged",
+      createdAt: T1,
+      updatedAt: T1,
+    };
+    await db.insert(db.tables.snapshots, {
+      ...identity,
+      id: "rendered",
+      buildId: "original",
+      inherited: false,
+    });
+    await db.insert(db.tables.baselines, {
+      ...identity,
+      id: "parent",
+      snapshotId: "rendered",
+      branch: "older",
+    });
+    await db.insert(db.tables.snapshots, {
+      ...identity,
+      id: "inherited",
+      buildId: "reuse",
+      inherited: true,
+      baselineId: "parent",
+      baselineVersion: T1,
+    });
+    await db.update(db.tables.baselines, "bl-main", { snapshotId: "inherited" });
+    const html = await (
+      await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
+    ).text();
+    expect(html).toContain("Reference build original, commit abcdef1");
+  });
+});

@@ -57,6 +57,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   { table: "snapshots", column: "baseline_id", definition: "VARCHAR(64)" },
   { table: "snapshots", column: "baseline_version", definition: "TEXT" },
+  { table: "snapshots", column: "source_build_id", definition: "TEXT" },
   { table: "snapshots", column: "design_url", definition: "TEXT" },
   { table: "snapshots", column: "env_change", definition: "TEXT" },
   { table: "snapshots", column: "mode", definition: "VARCHAR(64)" },
@@ -69,6 +70,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "snapshots", column: "a11y_violations", definition: "TEXT" },
   { table: "baselines", column: "infra_hash", definition: "TEXT" },
   { table: "baselines", column: "fingerprint", definition: "TEXT" },
+  { table: "baselines", column: "source_build_id", definition: "TEXT" },
   { table: "baselines", column: "mode", definition: "VARCHAR(64)" },
   {
     table: "baselines",

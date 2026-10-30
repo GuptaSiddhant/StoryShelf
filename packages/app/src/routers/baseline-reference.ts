@@ -1,5 +1,11 @@
-import { BaselineModel, BuildModel, SnapshotModel, baselineStatus } from "@storyshelf/core/models";
-import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
+import {
+  BaselineModel,
+  BuildModel,
+  SnapshotModel,
+  baselineStatus,
+  resolveBaselineOrigin,
+} from "@storyshelf/core/models";
+import type { Baseline, Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { getStore } from "../store.ts";
 
 /** Reference information is only reliable while the recorded baseline version still exists. */
@@ -32,19 +38,20 @@ export async function loadBaselineReference(
     snapshot.browser,
   );
   if (!baseline || baselineStatus(snapshot, baseline) !== "current") return { kind: "unavailable" };
-  const source = baseline.snapshotId ? await new SnapshotModel(db).get(baseline.snapshotId) : null;
-  // An inherited snapshot did not produce the image, and its actual origin is not recorded.
-  const reference =
-    source && !source.inherited && source.projectId === project.id
-      ? await new BuildModel(db).get(source.buildId)
-      : null;
+  const snapshots = new SnapshotModel(db);
+  const builds = new BuildModel(db);
+  const reference = await resolveBaselineOrigin(baseline, {
+    baseline: async (id) => (await db.get(db.tables.baselines, id)) as unknown as Baseline | null,
+    snapshot: async (id) => await snapshots.get(id),
+    build: async (id) => await builds.get(id),
+  });
   return {
     kind: "known",
     branch: baseline.branch,
     defaultBranch: baseline.branch === project.gitDefaultBranch,
     updatedAt: baseline.updatedAt,
     imageAvailable: await imageExists(baseline.screenshotPath),
-    build: reference?.projectId === project.id ? reference : null,
+    build: reference,
   };
 }
 
