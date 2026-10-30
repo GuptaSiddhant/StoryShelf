@@ -1,7 +1,14 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { DefaultComparison } from "../routers/baseline-reference.ts";
+import { HStack } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import { snapshotImageUrl } from "./build-diff-model.ts";
+
+const comparisonImage = css`
+  /* default-comparison-image */
+  max-width: 100%;
+`;
 
 /* eslint-disable promise-function-async -- Hono JSX components may return HTML or a promise */
 export function DefaultComparisonView(props: {
@@ -32,20 +39,20 @@ export function DefaultComparisonView(props: {
             : "Recorded capture environment fingerprints match; some components may be unknown."}
       </p>
       {comparison.available ? (
-        <div style="display:flex;gap:1rem;align-items:start">
+        <HStack align="start">
           <figure>
             <figcaption>Current default-branch baseline</figcaption>
-            <img src={baseline} alt="Current default-branch baseline" style="max-width:100%" />
+            <img src={baseline} alt="Current default-branch baseline" class={comparisonImage} />
           </figure>
           <figure>
             <figcaption>This build</figcaption>
             <img
               src={snapshotImageUrl(project, build, snapshot, "image")}
               alt="This build's screenshot"
-              style="max-width:100%"
+              class={comparisonImage}
             />
           </figure>
-        </div>
+        </HStack>
       ) : (
         <p>The current default-branch baseline image is unavailable.</p>
       )}
