@@ -118,6 +118,12 @@ export interface BuildReferenceOwner {
   projectId: string;
 }
 
+/** One owner's complete new reference set for an atomic multi-owner mutation. */
+export interface BuildReferenceChange {
+  owner: BuildReferenceOwner;
+  buildIds: readonly string[];
+}
+
 /**
  * An explicit database capability; an ordinary transaction does not establish this contract.
  * Implementations serialize admissions, reference changes, and deletion claims across processes.
@@ -132,6 +138,11 @@ export interface BuildReferenceLifecycle {
   replaceReferences<T>(
     owner: BuildReferenceOwner,
     buildIds: readonly string[],
+    writeDomain: (tx: TxStore) => Promise<T>,
+  ): Promise<T>;
+  /** Atomically replace several owners' reference sets and the shared domain writes. */
+  replaceManyReferences<T>(
+    changes: readonly BuildReferenceChange[],
     writeDomain: (tx: TxStore) => Promise<T>,
   ): Promise<T>;
   /**

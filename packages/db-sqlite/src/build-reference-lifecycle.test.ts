@@ -1,5 +1,5 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { BaselineModel } from "@storyshelf/core/models";
+import { BaselineModel, BaselineTransferModel } from "@storyshelf/core/models";
 import { makeStorage } from "@storyshelf/core/test-helpers";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -82,6 +82,39 @@ describe("SQLite reference lifecycle primitive", () => {
       expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
     });
   });
+  it("does not partially update owners when a multi-owner admission fails", async () => {
+    await withDatabase(async (path) => {
+      const lifecycle = createBuildReferenceLifecycle(path);
+      const other = { ...owner, id: "other" };
+      await lifecycle.replaceManyReferences(
+        [
+          { owner, buildIds: ["one"] },
+          { owner: other, buildIds: ["two"] },
+        ],
+        async () => await Promise.resolve(),
+      );
+      await expect(
+        lifecycle.replaceManyReferences(
+          [
+            { owner, buildIds: [] },
+            { owner: other, buildIds: ["missing"] },
+          ],
+          async () => await Promise.resolve(),
+        ),
+      ).rejects.toThrow("unavailable");
+      expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+      expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
+      await expect(
+        lifecycle.replaceManyReferences(
+          [
+            { owner, buildIds: [] },
+            { owner, buildIds: [] },
+          ],
+          async () => await Promise.resolve(),
+        ),
+      ).rejects.toThrow("Duplicate reference owner");
+    });
+  });
   it("commits baseline promotions together with their source references", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
@@ -155,6 +188,40 @@ describe("SQLite reference lifecycle primitive", () => {
         expect(await model.removeForBranch("p", "feature")).toBe(1);
         expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
         expect(await model.removeForBranch("p", "main")).toBe(1);
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
+  it("atomically releases the prior source when an archive replaces a baseline", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const lifecycle = createBuildReferenceLifecycle(path);
+      Object.assign(db, { buildReferenceLifecycle: lifecycle });
+      const { storage } = makeStorage();
+      await storage.write("shot.png", Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      try {
+        await db.insert(schema.snapshots, {
+          id: "snap",
+          projectId: "p",
+          buildId: "one",
+          storyId: "story",
+          storyName: "Story",
+          storyTitle: "Story",
+          viewportName: "desktop",
+          browser: "chromium",
+          screenshotPath: "shot.png",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const model = new BaselineModel(db, undefined, storage);
+        await model.upsert("p", "story", "desktop", "main", "snap", "shot.png");
+        const transfer = new BaselineTransferModel(db, storage);
+        const chunks: Buffer[] = [];
+        for await (const chunk of await transfer.export("p")) chunks.push(chunk);
+        expect((await transfer.import("p", Buffer.concat(chunks))).updated).toBe(1);
+        expect((await model.getFor("p", "story", "desktop", "main"))?.sourceBuildId).toBeNull();
         expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
       } finally {
         await db.lifecycle?.teardown();

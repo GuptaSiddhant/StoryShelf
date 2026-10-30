@@ -1,5 +1,6 @@
 /** SQLite's write-serialized admission and irreversible deletion claim primitive. */
 import type {
+  BuildReferenceChange,
   BuildReferenceLifecycle,
   BuildReferenceOwner,
   TxStore,
@@ -15,7 +16,9 @@ import { schema } from "./schema/index.ts";
 export function createBuildReferenceLifecycle(path: string): BuildReferenceLifecycle {
   return {
     replaceReferences: async (owner, buildIds, writeDomain) =>
-      await replaceReferences(path, owner, buildIds, writeDomain),
+      await replaceManyReferences(path, [{ owner, buildIds }], writeDomain),
+    replaceManyReferences: async (changes, writeDomain) =>
+      await replaceManyReferences(path, changes, writeDomain),
     claimDeletion: async (projectId, buildId) => await claimDeletion(path, projectId, buildId),
   };
 }
@@ -67,17 +70,23 @@ function transactionStore(db: DatabaseSync): TxStore {
   });
 }
 
-async function replaceReferences<T>(
+async function replaceManyReferences<T>(
   path: string,
-  owner: BuildReferenceOwner,
-  buildIds: readonly string[],
+  changes: readonly BuildReferenceChange[],
   writeDomain: (tx: TxStore) => Promise<T>,
 ): Promise<T> {
+  const owners = changes.map((change) =>
+    JSON.stringify([change.owner.projectId, change.owner.type, change.owner.id]),
+  );
+  if (new Set(owners).size !== owners.length) throw new Error("Duplicate reference owner");
   return await inTransaction(path, async (db) => {
-    const ids = [...new Set(buildIds)].toSorted();
-    checkAvailable(db, owner.projectId, ids);
+    const normalized = changes.map((change) => ({
+      owner: change.owner,
+      ids: [...new Set(change.buildIds)].toSorted(),
+    }));
+    for (const change of normalized) checkAvailable(db, change.owner.projectId, change.ids);
     const result = await writeDomain(transactionStore(db));
-    saveReferences(db, owner, ids);
+    for (const change of normalized) saveReferences(db, change.owner, change.ids);
     return result;
   });
 }
