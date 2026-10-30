@@ -271,7 +271,7 @@ async function persistInheritedSnapshot(
       target: browser,
       width: inherited.viewport.width,
       height: inherited.viewport.height,
-      captureFingerprint: inherited.baseline.fingerprint,
+      captureFingerprint: inherited.baseline.fingerprint ?? null,
       sourceSnapshotId: await sourceSnapshotId(ctx.db, inherited.baseline),
     },
   );

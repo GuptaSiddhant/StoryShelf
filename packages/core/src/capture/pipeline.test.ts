@@ -7,6 +7,7 @@ import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
+import { parseComparisonReference } from "./comparison-reference.ts";
 import { persistCapture, type CaptureContext } from "./pipeline.ts";
 
 const DEFAULT_VIEWPORT: Viewport = { name: "mobile", width: 320, height: 480 };
@@ -520,7 +521,7 @@ describe("persistCapture", () => {
     expect(row?.comparisonImagePath).toMatch(/^p1\/builds\/b1\/comparisons\//u);
     const frozen = await ctx.storage.read(row?.comparisonImagePath as string);
     expect(frozen).toEqual(await ctx.storage.read("/baselines/bl1.png"));
-    expect(JSON.parse(row?.comparisonMetadata as string)).toMatchObject({
+    expect(parseComparisonReference(row?.comparisonMetadata as string)).toMatchObject({
       baselineId: "bl1",
       baselineVersion: "2026-01-01T00:00:00.000Z",
     });
