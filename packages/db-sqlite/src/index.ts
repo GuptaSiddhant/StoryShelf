@@ -83,7 +83,7 @@ function executeStatement(
   return { rows: stmt.all(...args) };
 }
 
-function createCallback(sqlite: DatabaseSync): AsyncRemoteCallback {
+export function createCallback(sqlite: DatabaseSync): AsyncRemoteCallback {
   const callback = (async (sql: string, params: unknown[], method: ProxyMethod) => {
     await Promise.resolve();
     return executeStatement(sqlite, sql, params, method);

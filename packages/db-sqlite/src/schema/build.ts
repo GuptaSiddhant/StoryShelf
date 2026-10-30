@@ -18,6 +18,7 @@ export const builds = sqliteTable(
     message: text("message"),
     public: integer("public", { mode: "boolean" }).notNull().default(false),
     status: text("status").$type<BuildStatus>().notNull().default("pending"),
+    retentionState: text("retention_state").notNull().default("available"),
     snapshotCount: integer("snapshot_count").notNull().default(0),
     changedCount: integer("changed_count").notNull().default(0),
     approvedCount: integer("approved_count").notNull().default(0),
@@ -50,6 +51,7 @@ export interface Build {
   message: string | null;
   public: boolean;
   status: BuildStatus;
+  retentionState: string;
   snapshotCount: number;
   changedCount: number;
   approvedCount: number;
