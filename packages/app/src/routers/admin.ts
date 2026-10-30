@@ -7,7 +7,12 @@ import { reencryptWithCurrent } from "../credentials.ts";
 import { notifySystem } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { requireSiteAdmin } from "./helpers.ts";
-import { forbidden as forbiddenResponse, purgeInputSchema, purgeSchema } from "./schemas.ts";
+import {
+  errorSchema,
+  forbidden as forbiddenResponse,
+  purgeInputSchema,
+  purgeSchema,
+} from "./schemas.ts";
 const purgeRoute = createRoute({
   method: "post",
   tags: ["Admin"],
@@ -18,6 +23,10 @@ const purgeRoute = createRoute({
     200: {
       content: { "application/json": { schema: purgeSchema } },
       description: "Retention purge run",
+    },
+    503: {
+      content: { "application/json": { schema: errorSchema } },
+      description: "Testing retention requires atomic build lifecycle support",
     },
     ...forbiddenResponse,
   },
@@ -68,6 +77,17 @@ export function registerAdmin(app: ShelfRouter): void {
 
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin(c);
+    // Until the database provides atomic reference admission and tombstones, deletion in a
+    // testing deployment can race a baseline promotion. Do not expose unsafe purge.
+    if (getStore().testing) {
+      return c.json(
+        {
+          message:
+            "Build purge is unavailable for testing deployments until the database adapter supports safe baseline retention. Builds are retained; contact your administrator.",
+        },
+        503,
+      );
+    }
     const body = c.req.valid("json");
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
     const removedBuilds = await purgeBuilds(ttlDays);
@@ -78,11 +98,14 @@ export function registerAdmin(app: ShelfRouter): void {
       removedBaselines: branch.removedBaselines,
       ttlDays,
     });
-    return c.json({
-      removedBuilds,
-      removedBranches: branch.removedBranches,
-      removedBaselines: branch.removedBaselines,
-    });
+    return c.json(
+      {
+        removedBuilds,
+        removedBranches: branch.removedBranches,
+        removedBaselines: branch.removedBaselines,
+      },
+      200,
+    );
   });
 }
 
