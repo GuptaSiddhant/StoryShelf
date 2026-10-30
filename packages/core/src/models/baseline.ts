@@ -338,27 +338,48 @@ export class BaselineModel {
     }
   }
 
+  /** Drop the reference and row together when the adapter supports lifecycle protection. */
+  private async removeRecord(baseline: Baseline): Promise<void> {
+    const lifecycle = this.db.buildReferenceLifecycle;
+    if (lifecycle) {
+      await lifecycle.replaceReferences(
+        { type: "baseline", projectId: baseline.projectId, id: baseline.id },
+        [],
+        async (tx) => {
+          const current = (await tx.get(
+            this.tables.baselines,
+            baseline.id,
+          )) as unknown as Baseline | null;
+          if (!current) return;
+          if (
+            current.updatedAt !== baseline.updatedAt ||
+            current.snapshotId !== baseline.snapshotId ||
+            current.sourceBuildId !== baseline.sourceBuildId ||
+            current.screenshotPath !== baseline.screenshotPath
+          ) {
+            throw new Error("Baseline changed during removal; retry");
+          }
+          await tx.remove(this.tables.baselines, baseline.id);
+        },
+      );
+      await this.discardFile(baseline);
+      return;
+    }
+    await this.discardFile(baseline);
+    await this.db.remove(this.tables.baselines, baseline.id);
+  }
+
   async removeOrphans(projectId: string, validStoryIds: Set<string>): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => !validStoryIds.has(baseline.storyId));
-    await Promise.all(
-      toRemove.map(async (baseline) => {
-        await this.discardFile(baseline);
-        await this.db.remove(this.tables.baselines, baseline.id);
-      }),
-    );
+    await Promise.all(toRemove.map(async (baseline) => await this.removeRecord(baseline)));
     return toRemove.length;
   }
 
   async removeForBranch(projectId: string, branch: string): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => baseline.branch === branch);
-    await Promise.all(
-      toRemove.map(async (baseline) => {
-        await this.discardFile(baseline);
-        await this.db.remove(this.tables.baselines, baseline.id);
-      }),
-    );
+    await Promise.all(toRemove.map(async (baseline) => await this.removeRecord(baseline)));
     return toRemove.length;
   }
 

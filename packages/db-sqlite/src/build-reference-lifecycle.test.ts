@@ -128,6 +128,39 @@ describe("SQLite reference lifecycle primitive", () => {
       }
     });
   });
+  it("releases a source only after the last baseline owner is removed", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const lifecycle = createBuildReferenceLifecycle(path);
+      Object.assign(db, { buildReferenceLifecycle: lifecycle });
+      const { storage } = makeStorage();
+      await storage.write("shot.png", Buffer.from([1, 2, 3]));
+      try {
+        await db.insert(schema.snapshots, {
+          id: "snap",
+          projectId: "p",
+          buildId: "one",
+          storyId: "story",
+          storyName: "Story",
+          storyTitle: "Story",
+          viewportName: "desktop",
+          browser: "chromium",
+          screenshotPath: "shot.png",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const model = new BaselineModel(db, undefined, storage);
+        await model.upsert("p", "story", "desktop", "main", "snap", "shot.png");
+        await model.upsert("p", "story", "desktop", "feature", "snap", "shot.png");
+        expect(await model.removeForBranch("p", "feature")).toBe(1);
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+        expect(await model.removeForBranch("p", "main")).toBe(1);
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
   it("does not block the event loop when two connections compete in one process", async () => {
     await withDatabase(async (path) => {
       const first = createBuildReferenceLifecycle(path);
