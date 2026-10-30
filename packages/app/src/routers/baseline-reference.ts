@@ -8,6 +8,7 @@ import {
 } from "@storyshelf/core/models";
 import type { Baseline, Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { getStore } from "../store.ts";
+import { readComparisonImage } from "./comparison-image.ts";
 
 /** Reference information is only reliable while the recorded baseline version still exists. */
 export type BaselineReference =
@@ -89,7 +90,9 @@ async function frozenReference(
     branch: frozen.branch,
     defaultBranch: frozen.defaultBranch,
     updatedAt: frozen.baselineVersion,
-    imageAvailable: await imageExists(snapshot.comparisonImagePath),
+    imageAvailable: Boolean(
+      await readComparisonImage(snapshot.comparisonImagePath, frozen.imageSha256),
+    ),
     build: reference?.projectId === project.id ? reference : null,
   };
 }

@@ -667,7 +667,7 @@ describe("frozen comparison history", () => {
         defaultBranch: true,
         sourceBuildId: null,
         sourceSnapshotId: null,
-        imageSha256: "a".repeat(64),
+        imageSha256: "0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5",
         baselineFingerprint: null,
         captureFingerprint: null,
         mode: null,
@@ -686,5 +686,7 @@ describe("frozen comparison history", () => {
     expect(html).toContain("Default branch");
     expect(html).toContain('alt="Baseline for T / A"');
     expect((await post(app, "f1/snapshots/sf1/approve")).status).toBe(409);
+    objects.set(path, Buffer.from("replaced"));
+    expect((await app.request(`${BASE}/f1/snapshots/sf1/baseline`)).status).toBe(404);
   });
 });
