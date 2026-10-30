@@ -71,6 +71,23 @@ describe("baseline image origin", () => {
     expect(await resolveBaselineOrigin({ ...original, snapshotId: null }, reader())).toBeNull();
     expect(await resolveBaselineOrigin(original, reader([original], [rendered], []))).toBeNull();
   });
+  it("bounds inheritance traversal to 32 baseline records", async () => {
+    const baselines = Array.from({ length: 33 }, (_, index) => ({
+      ...original,
+      id: `base-${index}`,
+      snapshotId: `snap-${index}`,
+    }));
+    const snapshots = baselines.map((row, index) => ({
+      ...rendered,
+      id: row.snapshotId!,
+      inherited: index < 32,
+      baselineId: `base-${index + 1}`,
+      baselineVersion: "v1",
+    }));
+    expect(await resolveBaselineOrigin(baselines[0]!, reader(baselines, snapshots))).toBeNull();
+    snapshots[31] = { ...snapshots[31]!, inherited: false };
+    expect(await resolveBaselineOrigin(baselines[0]!, reader(baselines, snapshots))).toEqual(build);
+  });
   it("rejects incompatible images, identities, projects and cyclic chains", async () => {
     for (const changed of [
       { screenshotPath: "other" },

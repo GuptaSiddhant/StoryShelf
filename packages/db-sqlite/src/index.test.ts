@@ -448,6 +448,7 @@ describe("createSqliteDatabase", () => {
       raw.exec(`
         ALTER TABLE snapshots DROP COLUMN env_change;
         ALTER TABLE baselines DROP COLUMN fingerprint;
+        ALTER TABLE baselines DROP COLUMN source_build_id;
         INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
         INSERT INTO baselines (id, project_id, story_id, viewport_name, branch, screenshot_path, infra_hash, created_at, updated_at) VALUES ('b1', 'p', 's', 'desktop', 'main', 'x', 'old-hash', 't', 't');
       `);
@@ -460,7 +461,11 @@ describe("createSqliteDatabase", () => {
         infraHash: string | null;
         fingerprint: string | null;
       }[];
-      expect(baseline).toMatchObject({ infraHash: "old-hash", fingerprint: null });
+      expect(baseline).toMatchObject({
+        infraHash: "old-hash",
+        fingerprint: null,
+        sourceBuildId: null,
+      });
       const columns = (
         await db.all<unknown[]>(sql`SELECT name FROM pragma_table_info('snapshots')`)
       ).map((row) => String(row[0]));
