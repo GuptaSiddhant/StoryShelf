@@ -108,7 +108,43 @@ export class BaselineTransferModel {
       }
       return created;
     };
+    const lifecycle = this.db.buildReferenceLifecycle;
+    if (lifecycle) {
+      const touched = plan
+        .map((planned) => existing.get(baselineIdentity(planned.entry)))
+        .filter((row): row is Baseline => row !== undefined);
+      const changes = touched.map((row) => ({
+        owner: { type: "baseline" as const, id: row.id, projectId },
+        buildIds: [],
+      }));
+      return await lifecycle.replaceManyReferences(changes, async (store) => {
+        await this.assertUnchangedIdentities(store, touched);
+        return await run(store);
+      });
+    }
     return this.db.transact ? await this.db.transact(run) : await run(this.db);
+  }
+
+  private async assertUnchangedIdentities(store: TxStore, rows: Baseline[]): Promise<void> {
+    const current = await Promise.all(
+      rows.map(
+        async (row) =>
+          (await store.get(this.tables.baselines, row.id)) as unknown as Baseline | null,
+      ),
+    );
+    for (const [index, row] of rows.entries()) {
+      const found = current[index];
+      if (
+        !found ||
+        found.projectId !== row.projectId ||
+        found.storyId !== row.storyId ||
+        found.viewportName !== row.viewportName ||
+        found.branch !== row.branch ||
+        (found.browser ?? DEFAULT_BROWSER) !== (row.browser ?? DEFAULT_BROWSER)
+      ) {
+        throw new Error("Baseline changed during import; retry");
+      }
+    }
   }
 
   /** Write one planned row; resolves true when it was created. */

@@ -128,7 +128,7 @@ export async function loadBaselineView(
   );
   const view: BaselineView = { hasBaseline: {}, drifted: {} };
   for (const { snapshot, current } of entries) {
-    view.hasBaseline[snapshot.id] = Boolean(current);
+    view.hasBaseline[snapshot.id] = Boolean(snapshot.comparisonImagePath ?? current);
     const status = baselineStatus(snapshot, current);
     if (
       !build.isDefault &&

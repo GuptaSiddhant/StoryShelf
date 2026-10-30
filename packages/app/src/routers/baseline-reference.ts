@@ -7,6 +7,7 @@ import {
 } from "@storyshelf/core/models";
 import type { Baseline, Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { getStore } from "../store.ts";
+import { readComparisonImage, validFrozenReference } from "./comparison-image.ts";
 
 /** Reference information is only reliable while the recorded baseline version still exists. */
 export type BaselineReference =
@@ -22,6 +23,17 @@ export type BaselineReference =
     };
 
 export async function loadBaselineReference(
+  project: Project,
+  build: Build,
+  snapshot: Snapshot,
+): Promise<BaselineReference> {
+  if (snapshot.comparisonImagePath || snapshot.comparisonMetadata) {
+    return await frozenReference(project, build, snapshot);
+  }
+  return await legacyReference(project, build, snapshot);
+}
+
+async function legacyReference(
   project: Project,
   build: Build,
   snapshot: Snapshot,
@@ -52,6 +64,27 @@ export async function loadBaselineReference(
     updatedAt: baseline.updatedAt,
     imageAvailable: await imageExists(baseline.screenshotPath),
     build: reference,
+  };
+}
+
+async function frozenReference(
+  project: Project,
+  build: Build,
+  snapshot: Snapshot,
+): Promise<BaselineReference> {
+  const frozen = validFrozenReference(snapshot, project.id, build.id);
+  if (!frozen) return { kind: "unavailable" };
+  const { reference: metadata, path } = frozen;
+  const reference = metadata.sourceBuildId
+    ? await new BuildModel(getStore().db).get(metadata.sourceBuildId)
+    : null;
+  return {
+    kind: "known",
+    branch: metadata.branch,
+    defaultBranch: metadata.defaultBranch,
+    updatedAt: metadata.baselineVersion,
+    imageAvailable: Boolean(await readComparisonImage(path, metadata.imageSha256)),
+    build: reference?.projectId === project.id ? reference : null,
   };
 }
 

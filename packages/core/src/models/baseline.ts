@@ -12,6 +12,7 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { isContentPath } from "../utils/paths.ts";
 import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
+import { upsertAtomicBaseline } from "./baseline-atomic.ts";
 import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
 
@@ -154,6 +155,7 @@ export class BaselineModel {
         branch,
         snapshotId,
         sourceBuildId,
+        sourcePath,
         await this.contentFor(projectId, sourcePath),
         infraHash,
         options,
@@ -196,6 +198,7 @@ export class BaselineModel {
     branch: string,
     snapshotId: string,
     sourceBuildId: string | null,
+    originalPath: string,
     screenshotPath: string,
     infraHash: string | null | undefined,
     options: BaselineUpsertOptions,
@@ -203,6 +206,49 @@ export class BaselineModel {
     const browser = options.browser ?? DEFAULT_BROWSER;
 
     const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
+    const lifecycle = this.db.buildReferenceLifecycle;
+    if (lifecycle) {
+      const baseline = await upsertAtomicBaseline(
+        lifecycle,
+        { baselines: this.tables.baselines, snapshots: this.db.tables.snapshots },
+        {
+          id: existing?.id ?? ulid(),
+          existingId: existing?.id ?? null,
+          existingVersion: existing?.updatedAt ?? null,
+          projectId,
+          storyId,
+          viewport,
+          branch,
+          browser,
+          snapshotId,
+          sourceBuildId,
+          originalPath,
+          screenshotPath,
+          infraHash,
+          fingerprint: options.fingerprint,
+          mode: options.mode,
+        },
+      );
+      if (this.webhookTables) {
+        await emitWebhookEvent(
+          this.db,
+          this.webhookTables,
+          projectId,
+          existing ? "baseline:updated" : "baseline:created",
+          {
+            baselineId: baseline.id,
+            storyId,
+            viewport,
+            browser,
+            mode: options.mode ?? null,
+            branch,
+            snapshotId,
+          },
+          this.secret,
+        );
+      }
+      return baseline;
+    }
     let baseline: Baseline;
     if (existing) {
       baseline = (await this.db.update(this.tables.baselines, existing.id, {
@@ -293,27 +339,48 @@ export class BaselineModel {
     }
   }
 
+  /** Drop the reference and row together when the adapter supports lifecycle protection. */
+  private async removeRecord(baseline: Baseline): Promise<void> {
+    const lifecycle = this.db.buildReferenceLifecycle;
+    if (lifecycle) {
+      await lifecycle.replaceReferences(
+        { type: "baseline", projectId: baseline.projectId, id: baseline.id },
+        [],
+        async (tx) => {
+          const current = (await tx.get(
+            this.tables.baselines,
+            baseline.id,
+          )) as unknown as Baseline | null;
+          if (!current) return;
+          if (
+            current.updatedAt !== baseline.updatedAt ||
+            current.snapshotId !== baseline.snapshotId ||
+            current.sourceBuildId !== baseline.sourceBuildId ||
+            current.screenshotPath !== baseline.screenshotPath
+          ) {
+            throw new Error("Baseline changed during removal; retry");
+          }
+          await tx.remove(this.tables.baselines, baseline.id);
+        },
+      );
+      await this.discardFile(baseline);
+      return;
+    }
+    await this.discardFile(baseline);
+    await this.db.remove(this.tables.baselines, baseline.id);
+  }
+
   async removeOrphans(projectId: string, validStoryIds: Set<string>): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => !validStoryIds.has(baseline.storyId));
-    await Promise.all(
-      toRemove.map(async (baseline) => {
-        await this.discardFile(baseline);
-        await this.db.remove(this.tables.baselines, baseline.id);
-      }),
-    );
+    await Promise.all(toRemove.map(async (baseline) => await this.removeRecord(baseline)));
     return toRemove.length;
   }
 
   async removeForBranch(projectId: string, branch: string): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => baseline.branch === branch);
-    await Promise.all(
-      toRemove.map(async (baseline) => {
-        await this.discardFile(baseline);
-        await this.db.remove(this.tables.baselines, baseline.id);
-      }),
-    );
+    await Promise.all(toRemove.map(async (baseline) => await this.removeRecord(baseline)));
     return toRemove.length;
   }
 

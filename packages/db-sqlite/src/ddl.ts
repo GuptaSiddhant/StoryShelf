@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS builds (
   message TEXT,
   public INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending',
+  retention_state TEXT NOT NULL DEFAULT 'available',
   snapshot_count INTEGER NOT NULL DEFAULT 0,
   changed_count INTEGER NOT NULL DEFAULT 0,
   approved_count INTEGER NOT NULL DEFAULT 0,
@@ -52,6 +53,14 @@ CREATE TABLE IF NOT EXISTS builds (
 );
 CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha);
 CREATE INDEX IF NOT EXISTS builds_git_branch_idx ON builds (git_branch);
+CREATE TABLE IF NOT EXISTS build_references (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  owner_type TEXT NOT NULL CHECK (owner_type IN ('baseline', 'investigation')),
+  owner_id TEXT NOT NULL,
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE RESTRICT,
+  PRIMARY KEY (project_id, owner_type, owner_id, build_id)
+);
+CREATE INDEX IF NOT EXISTS build_references_build_idx ON build_references (build_id);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -169,6 +178,8 @@ CREATE TABLE IF NOT EXISTS snapshots (
   baseline_id TEXT,
   baseline_version TEXT,
   source_build_id TEXT,
+  comparison_image_path TEXT,
+  comparison_metadata TEXT,
   mode TEXT,
   browser TEXT NOT NULL DEFAULT 'chromium',
   duration_ms INTEGER,

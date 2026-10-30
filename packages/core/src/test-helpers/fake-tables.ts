@@ -275,6 +275,8 @@ const snapshots = defineTable("snapshots", {
   baselineId: "baseline_id",
   baselineVersion: "baseline_version",
   sourceBuildId: "source_build_id",
+  comparisonImagePath: "comparison_image_path",
+  comparisonMetadata: "comparison_metadata",
   mode: "mode",
   browser: "browser",
   createdAt: "created_at",

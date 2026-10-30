@@ -144,6 +144,8 @@ describe("createSqliteDatabase", () => {
     expect(present.has("baseline_id")).toBe(true);
     expect(present.has("baseline_version")).toBe(true);
     expect(present.has("source_build_id")).toBe(true);
+    expect(present.has("comparison_image_path")).toBe(true);
+    expect(present.has("comparison_metadata")).toBe(true);
 
     await closeDb(db);
   });
@@ -431,6 +433,31 @@ describe("createSqliteDatabase", () => {
         });
       await expect(second("firefox")).resolves.toBeDefined();
       await expect(second("chromium")).rejects.toThrow();
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("adds the lifecycle state to an existing build without marking it deleting", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-lifecycle-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        DROP TABLE build_references;
+        ALTER TABLE builds DROP COLUMN retention_state;
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO builds (id, project_id, git_sha, git_branch, created_at, updated_at) VALUES ('b', 'p', 'sha', 'main', 't', 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      expect((await db.get(schema.builds, "b"))?.["retentionState"]).toBe("available");
+      expect((await tableNames(db)).has("build_references")).toBe(true);
       await closeDb(db);
     } finally {
       rmSync(dir, { recursive: true, force: true });

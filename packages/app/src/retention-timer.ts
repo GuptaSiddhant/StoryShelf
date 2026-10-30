@@ -30,6 +30,7 @@ export function startBranchGcTimer(
   storage: StorageAdapter,
   config: ShelfConfig,
   logger: Logger,
+  testing = false,
 ): BranchGcTimer | null {
   const ttlDays = config.branchTtlDays ?? DEFAULT_BRANCH_TTL_DAYS;
   if (ttlDays === null) {
@@ -39,7 +40,7 @@ export function startBranchGcTimer(
   if (intervalMs <= 0) {
     return null;
   }
-  const run = createBranchGcRunner(db, storage, logger, ttlDays);
+  const run = createBranchGcRunner(db, storage, logger, ttlDays, testing);
   return scheduleBranchGc(run, intervalMs);
 }
 
@@ -49,9 +50,17 @@ function createBranchGcRunner(
   storage: StorageAdapter,
   logger: Logger,
   ttlDays: number,
+  testing: boolean,
 ): () => Promise<void> {
+  // oxlint-disable-next-line eslint/max-statements -- the sweep and its error boundary are kept together
   return async (): Promise<void> => {
     try {
+      // Baseline removal must be coordinated with references before testing deployments can GC.
+      // Keep independent AI-data cleanup running even while branch GC is disabled.
+      if (testing) {
+        await purgeAiData(db, new Date(), logger);
+        return;
+      }
       const projects = await new ProjectModel(db).list();
       const retention = new Retention(
         db,
@@ -86,16 +95,12 @@ function createBranchGcRunner(
 
 function scheduleBranchGc(run: () => Promise<void>, intervalMs: number): BranchGcTimer {
   const firstDelay = Math.min(3_600_000, intervalMs);
-  const timeout = setTimeout(() => {
-    // oxlint-disable-next-line no-void -- fire-and-forget interval task
-    void run();
-  }, firstDelay);
+  // oxlint-disable-next-line typescript/no-misused-promises, typescript/strict-void-return -- run catches failures; returning it allows deterministic completion in tests
+  const timeout = setTimeout(() => run(), firstDelay);
   timeout.unref?.();
 
-  const interval = setInterval(() => {
-    // oxlint-disable-next-line no-void -- fire-and-forget interval task
-    void run();
-  }, intervalMs);
+  // oxlint-disable-next-line typescript/no-misused-promises, typescript/strict-void-return -- run catches failures
+  const interval = setInterval(() => run(), intervalMs);
   interval.unref?.();
 
   return {

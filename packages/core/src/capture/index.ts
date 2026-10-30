@@ -190,3 +190,9 @@ export {
   type ForkDecision,
   type ForkHost,
 } from "./forked/decision.ts";
+
+export {
+  isComparisonImagePath,
+  parseComparisonReference,
+  type ComparisonReference,
+} from "./comparison-reference.ts";

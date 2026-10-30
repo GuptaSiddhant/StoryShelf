@@ -11,6 +11,12 @@ import type { Project } from "../schema/project.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import { mapLimit } from "../utils/map-limit.ts";
 import { diffPath } from "../utils/paths.ts";
+import {
+  freezeComparison,
+  isComparisonImagePath,
+  parseComparisonReference,
+  sourceSnapshotId,
+} from "./comparison-reference.ts";
 import { diffStoredScreenshots, writeDiffOverlay } from "./diff-record.ts";
 import { diffStatus, PERSIST_CONCURRENCY } from "./pipeline.ts";
 
@@ -92,6 +98,13 @@ async function rediffSnapshot(
   );
   const patch = baseline ? await diffPatch(deps, project, build, row, baseline) : noBaselinePatch();
   await new SnapshotModel(deps.db).update(row.id, patch);
+  if (
+    row.comparisonImagePath &&
+    row.comparisonImagePath !== patch.comparisonImagePath &&
+    isComparisonImagePath(row.comparisonImagePath, project.id, build.id)
+  ) {
+    await deps.storage.delete(row.comparisonImagePath).catch(() => {});
+  }
   return patch.status === row.status ? "same" : "changed";
 }
 
@@ -104,6 +117,8 @@ function noBaselinePatch(): Partial<Snapshot> {
     diffPassed: null,
     baselineId: null,
     baselineVersion: NO_BASELINE,
+    comparisonImagePath: null,
+    comparisonMetadata: null,
   };
 }
 
@@ -114,10 +129,22 @@ async function diffPatch(
   row: Snapshot,
   baseline: Baseline,
 ): Promise<Partial<Snapshot>> {
+  const comparison = await freezeComparison(deps.storage, project.id, build.id, baseline, {
+    defaultBranch: project.gitDefaultBranch,
+    mode: row.mode ?? null,
+    target: row.browser ?? "chromium",
+    width: row.viewportWidth ?? null,
+    height: row.viewportHeight ?? null,
+    captureFingerprint:
+      parseComparisonReference(row.comparisonMetadata)?.captureFingerprint ?? null,
+    sourceSnapshotId: await sourceSnapshotId(deps.db, baseline),
+  });
   const result = await diffStoredScreenshots(
     deps.storage,
     project,
-    baseline.screenshotPath,
+    baseline.screenshotPath === row.screenshotPath
+      ? row.screenshotPath
+      : comparison.comparisonImagePath,
     row.screenshotPath,
   );
   const target = diffPath(project.id, build.id, row.storyId, row.viewportName, row.browser);
@@ -130,5 +157,6 @@ async function diffPatch(
     diffPassed: result.passed,
     baselineId: baseline.id,
     baselineVersion: baseline.updatedAt,
+    ...comparison,
   };
 }

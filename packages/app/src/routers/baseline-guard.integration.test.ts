@@ -651,3 +651,53 @@ describe("inherited baseline origin", () => {
     expect(html).toContain("Reference build original, commit abcdef1");
   });
 });
+
+describe("frozen comparison history", () => {
+  it("serves the original image and branch after the active baseline is removed", async () => {
+    const { app, db, objects } = await setup();
+    const path = "p1/builds/f1/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.png";
+    objects.set(path, Buffer.from("original"));
+    await db.update(db.tables.snapshots, "sf1", {
+      comparisonImagePath: path,
+      comparisonMetadata: JSON.stringify({
+        version: 1,
+        baselineId: "bl-main",
+        baselineVersion: T1,
+        branch: "main",
+        defaultBranch: true,
+        sourceBuildId: null,
+        sourceSnapshotId: null,
+        imageSha256: "0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5",
+        baselineFingerprint: null,
+        captureFingerprint: null,
+        mode: null,
+        target: "chromium",
+        width: 1280,
+        height: 720,
+      }),
+    });
+    await db.remove(db.tables.baselines, "bl-main");
+    const response = await app.request(`${BASE}/f1/snapshots/sf1/baseline`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("original");
+    const html = await (
+      await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
+    ).text();
+    expect(html).toContain("Default branch");
+    expect(html).toContain('alt="Baseline for T / A"');
+    expect((await post(app, "f1/snapshots/sf1/approve")).status).toBe(409);
+    for (const unsafePath of [
+      "p2/builds/f1/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.png",
+      "p1/builds/other/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.png",
+    ]) {
+      objects.set(unsafePath, Buffer.from("original"));
+      // oxlint-disable-next-line eslint/no-await-in-loop -- exercise each access-control boundary
+      await db.update(db.tables.snapshots, "sf1", { comparisonImagePath: unsafePath });
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each request observes the preceding update
+      expect((await app.request(`${BASE}/f1/snapshots/sf1/baseline`)).status).toBe(404);
+    }
+    await db.update(db.tables.snapshots, "sf1", { comparisonImagePath: path });
+    objects.set(path, Buffer.from("replaced"));
+    expect((await app.request(`${BASE}/f1/snapshots/sf1/baseline`)).status).toBe(404);
+  });
+});

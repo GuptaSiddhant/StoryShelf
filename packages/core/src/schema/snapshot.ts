@@ -29,6 +29,9 @@ export interface Snapshot {
   inherited: boolean;
   /** Build that rendered the screenshot; inherited captures carry the original source. */
   sourceBuildId?: string | null;
+  /** Frozen comparison image and metadata, owned by this snapshot’s build. */
+  comparisonImagePath?: string | null;
+  comparisonMetadata?: string | null;
   /** Baseline row the diff was computed against (null: no baseline, or legacy row). */
   baselineId: string | null;
   /** That baseline's `updatedAt` at diff time; compared on approval to detect drift. */

@@ -174,7 +174,13 @@ function startBranchGcInterval(
   options: ShelfOptions,
   runtime: ServerRuntime,
 ): { stop(): void } | null {
-  return startBranchGcTimer(options.database, options.storage, runtime.config, runtime.logger);
+  return startBranchGcTimer(
+    options.database,
+    options.storage,
+    runtime.config,
+    runtime.logger,
+    Boolean(options.testing),
+  );
 }
 
 /** Run auth boot validation, returning a failure result instead of throwing. */

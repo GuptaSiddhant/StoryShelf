@@ -11,6 +11,7 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
+import { readComparisonImage, validFrozenReference } from "./comparison-image.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 
@@ -78,6 +79,20 @@ export function registerMedia(app: ShelfRouter): void {
     const build = await new BuildModel(getStore().db).get(snapshot.buildId);
     if (!build) {
       notFound("Build not found");
+    }
+    if (
+      c.req.query("reference") !== "default" &&
+      (snapshot.comparisonImagePath || snapshot.comparisonMetadata)
+    ) {
+      const frozen = validFrozenReference(snapshot, project.id, build.id);
+      if (!frozen) {
+        notFound("Original baseline is unavailable");
+      }
+      const image = await readComparisonImage(frozen.path, frozen.reference.imageSha256);
+      if (!image) {
+        notFound("Original baseline image is unavailable");
+      }
+      return imageResponse(image, "private, no-store");
     }
     const baselines = new BaselineModel(getStore().db, undefined, getStore().storage);
     const baseline =

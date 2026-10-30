@@ -37,6 +37,10 @@ const SNAPSHOT_BASELINE_ID_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_id TEXT";
 const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
+const SNAPSHOT_COMPARISON_IMAGE_ALTER =
+  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS comparison_image_path TEXT";
+const SNAPSHOT_COMPARISON_METADATA_ALTER =
+  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS comparison_metadata TEXT";
 const SNAPSHOT_SOURCE_BUILD_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS source_build_id TEXT";
 const BASELINE_SOURCE_BUILD_ALTER =
@@ -110,12 +114,18 @@ async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, SNAPSHOT_INHERITED_ALTER);
   await execIgnore(run, SNAPSHOT_BASELINE_ID_ALTER);
   await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
-  await execIgnore(run, SNAPSHOT_SOURCE_BUILD_ALTER);
+  await migrateComparisonColumns(run);
   await execIgnore(run, SNAPSHOT_DESIGN_URL_ALTER);
   await execIgnore(run, SNAPSHOT_ENV_CHANGE_ALTER);
   await execIgnore(run, SNAPSHOT_DURATION_ALTER);
   await execIgnore(run, SNAPSHOT_A11Y_ALTER);
   await migrateCaptureIdentityColumns(run);
+}
+
+async function migrateComparisonColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, SNAPSHOT_SOURCE_BUILD_ALTER);
+  await execIgnore(run, SNAPSHOT_COMPARISON_IMAGE_ALTER);
+  await execIgnore(run, SNAPSHOT_COMPARISON_METADATA_ALTER);
 }
 
 async function migrateCaptureIdentityColumns(run: MigrationRunner): Promise<void> {

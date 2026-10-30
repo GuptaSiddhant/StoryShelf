@@ -101,6 +101,22 @@ describe("rediffBuild", () => {
     expect(row?.baselineVersion).toBe(T2);
   });
 
+  it("freezes the new reference and removes the previous owned copy after rediff", async () => {
+    const old = "p1/builds/f1/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.png";
+    const { db, storage, objects } = await setup({ comparisonImagePath: old });
+    objects.set(old, Buffer.from("previous"));
+    await rediffBuild({ db, storage }, project, build);
+    const row = await db.get(db.tables.snapshots, "s1");
+    expect(row?.comparisonImagePath).not.toBe(old);
+    expect(objects.has(old)).toBe(false);
+    expect(await storage.read(row?.comparisonImagePath as string)).toEqual(png(GREEN));
+    expect(JSON.parse(row?.comparisonMetadata as string)).toMatchObject({
+      baselineVersion: T2,
+      width: null,
+      height: null,
+    });
+  });
+
   it("flags a previously unchanged snapshot when the baseline moved away from it", async () => {
     const { db, storage, objects } = await setup({ status: "unchanged" });
     objects.set("baselines/main/a.png", png(RED));
