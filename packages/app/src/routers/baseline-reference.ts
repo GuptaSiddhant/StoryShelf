@@ -1,4 +1,3 @@
-import { isComparisonImagePath, parseComparisonReference } from "@storyshelf/core/capture";
 import {
   BaselineModel,
   BuildModel,
@@ -8,7 +7,7 @@ import {
 } from "@storyshelf/core/models";
 import type { Baseline, Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { getStore } from "../store.ts";
-import { readComparisonImage } from "./comparison-image.ts";
+import { readComparisonImage, validFrozenReference } from "./comparison-image.ts";
 
 /** Reference information is only reliable while the recorded baseline version still exists. */
 export type BaselineReference =
@@ -73,26 +72,18 @@ async function frozenReference(
   build: Build,
   snapshot: Snapshot,
 ): Promise<BaselineReference> {
-  const frozen = parseComparisonReference(snapshot.comparisonMetadata);
-  if (
-    !frozen ||
-    !snapshot.comparisonImagePath ||
-    !isComparisonImagePath(snapshot.comparisonImagePath, project.id, build.id) ||
-    frozen.baselineId !== snapshot.baselineId ||
-    frozen.baselineVersion !== snapshot.baselineVersion
-  )
-    return { kind: "unavailable" };
-  const reference = frozen.sourceBuildId
-    ? await new BuildModel(getStore().db).get(frozen.sourceBuildId)
+  const frozen = validFrozenReference(snapshot, project.id, build.id);
+  if (!frozen) return { kind: "unavailable" };
+  const { reference: metadata, path } = frozen;
+  const reference = metadata.sourceBuildId
+    ? await new BuildModel(getStore().db).get(metadata.sourceBuildId)
     : null;
   return {
     kind: "known",
-    branch: frozen.branch,
-    defaultBranch: frozen.defaultBranch,
-    updatedAt: frozen.baselineVersion,
-    imageAvailable: Boolean(
-      await readComparisonImage(snapshot.comparisonImagePath, frozen.imageSha256),
-    ),
+    branch: metadata.branch,
+    defaultBranch: metadata.defaultBranch,
+    updatedAt: metadata.baselineVersion,
+    imageAvailable: Boolean(await readComparisonImage(path, metadata.imageSha256)),
     build: reference?.projectId === project.id ? reference : null,
   };
 }

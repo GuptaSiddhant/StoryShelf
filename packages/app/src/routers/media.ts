@@ -1,4 +1,3 @@
-import { isComparisonImagePath, parseComparisonReference } from "@storyshelf/core/capture";
 import {
   BaselineModel,
   DesignCredentialModel,
@@ -12,7 +11,7 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
-import { readComparisonImage } from "./comparison-image.ts";
+import { readComparisonImage, validFrozenReference } from "./comparison-image.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 
@@ -85,17 +84,11 @@ export function registerMedia(app: ShelfRouter): void {
       c.req.query("reference") !== "default" &&
       (snapshot.comparisonImagePath || snapshot.comparisonMetadata)
     ) {
-      const frozen = parseComparisonReference(snapshot.comparisonMetadata);
-      if (
-        !frozen ||
-        !snapshot.comparisonImagePath ||
-        !isComparisonImagePath(snapshot.comparisonImagePath, project.id, build.id) ||
-        frozen.baselineId !== snapshot.baselineId ||
-        frozen.baselineVersion !== snapshot.baselineVersion
-      ) {
+      const frozen = validFrozenReference(snapshot, project.id, build.id);
+      if (!frozen) {
         notFound("Original baseline is unavailable");
       }
-      const image = await readComparisonImage(snapshot.comparisonImagePath, frozen.imageSha256);
+      const image = await readComparisonImage(frozen.path, frozen.reference.imageSha256);
       if (!image) {
         notFound("Original baseline image is unavailable");
       }

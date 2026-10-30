@@ -686,6 +686,17 @@ describe("frozen comparison history", () => {
     expect(html).toContain("Default branch");
     expect(html).toContain('alt="Baseline for T / A"');
     expect((await post(app, "f1/snapshots/sf1/approve")).status).toBe(409);
+    for (const unsafePath of [
+      "p2/builds/f1/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.png",
+      "p1/builds/other/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.png",
+    ]) {
+      objects.set(unsafePath, Buffer.from("original"));
+      // oxlint-disable-next-line eslint/no-await-in-loop -- exercise each access-control boundary
+      await db.update(db.tables.snapshots, "sf1", { comparisonImagePath: unsafePath });
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each request observes the preceding update
+      expect((await app.request(`${BASE}/f1/snapshots/sf1/baseline`)).status).toBe(404);
+    }
+    await db.update(db.tables.snapshots, "sf1", { comparisonImagePath: path });
     objects.set(path, Buffer.from("replaced"));
     expect((await app.request(`${BASE}/f1/snapshots/sf1/baseline`)).status).toBe(404);
   });
