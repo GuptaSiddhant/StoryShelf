@@ -95,16 +95,12 @@ function createBranchGcRunner(
 
 function scheduleBranchGc(run: () => Promise<void>, intervalMs: number): BranchGcTimer {
   const firstDelay = Math.min(3_600_000, intervalMs);
-  const timeout = setTimeout(() => {
-    // oxlint-disable-next-line no-void -- fire-and-forget interval task
-    void run();
-  }, firstDelay);
+  // oxlint-disable-next-line typescript/no-misused-promises, typescript/strict-void-return -- run catches failures; returning it allows deterministic completion in tests
+  const timeout = setTimeout(() => run(), firstDelay);
   timeout.unref?.();
 
-  const interval = setInterval(() => {
-    // oxlint-disable-next-line no-void -- fire-and-forget interval task
-    void run();
-  }, intervalMs);
+  // oxlint-disable-next-line typescript/no-misused-promises, typescript/strict-void-return -- run catches failures
+  const interval = setInterval(() => run(), intervalMs);
   interval.unref?.();
 
   return {

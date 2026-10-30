@@ -287,7 +287,7 @@ describe("content-addressed screenshots", () => {
     expect(contentObjects(objects)).toHaveLength(1);
   });
 
-  it("uploads nothing and reads no image when a story is unchanged", async () => {
+  it("reuses unchanged content and freezes the comparison for the consuming build", async () => {
     const { run, storage, objects, snapshotOf } = world();
     await run({ shot: RED, environment: ENV_A, isDefault: true });
     const write = vi.spyOn(storage, "write");
@@ -297,8 +297,10 @@ describe("content-addressed screenshots", () => {
     const snapshot = await snapshotOf("b2");
 
     expect(snapshot).toMatchObject({ status: "unchanged", diffPassed: true, diffPixels: 0 });
-    expect(write).not.toHaveBeenCalled();
-    expect(read).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write).toHaveBeenCalledWith(snapshot?.comparisonImagePath, RED);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(snapshot?.comparisonImagePath).toMatch(/^p1\/builds\/b2\/comparisons\//u);
     expect(contentObjects(objects)).toHaveLength(1);
   });
 

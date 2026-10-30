@@ -2,7 +2,6 @@ import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { Retention } from "@storyshelf/core/retention";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { setImmediate as nextTurn } from "node:timers/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
@@ -25,6 +24,11 @@ describe("background retention", () => {
         createdAt: "2025-01-01",
         updatedAt: "2025-01-01",
       });
+      await db.insert(db.tables.aiUsage, {
+        id: "expired",
+        projectId: "p",
+        createdAt: "2020-01-01T00:00:00.000Z",
+      });
       const purge = vi.spyOn(Retention.prototype, "purgeStaleBranches");
       const schedule = vi.spyOn(globalThis, "setTimeout");
       const app = {} as ShelfRouter;
@@ -45,9 +49,9 @@ describe("background retention", () => {
       const scheduled = schedule.mock.calls.find((args) => args[1] === 120_000)?.[0];
       expect(typeof scheduled).toBe("function");
       if (typeof scheduled !== "function") throw new Error("retention timer was not scheduled");
-      scheduled();
-      await nextTurn();
+      await (scheduled as () => Promise<void>)();
       expect(purge.mock.calls.length > 0).toBe(!testing);
+      expect(await db.get(db.tables.aiUsage, "expired")).toBeNull();
       await (app as unknown as { lifecycle: { teardown(): Promise<void> } }).lifecycle.teardown();
     },
   );
