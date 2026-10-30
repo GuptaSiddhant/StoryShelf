@@ -4,6 +4,7 @@ import type { Baseline } from "../schema/baseline.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import {
   freezeComparison,
+  isComparisonImagePath,
   parseComparisonReference,
   sourceSnapshotId,
 } from "./comparison-reference.ts";
@@ -27,6 +28,19 @@ const settings = {
   sourceSnapshotId: null,
 };
 describe("frozen comparison reference", () => {
+  it("only accepts comparison paths for the consuming build", () => {
+    const valid = "p/builds/b/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.png";
+    expect(isComparisonImagePath(valid, "p", "b")).toBe(true);
+    expect(isComparisonImagePath(valid, "other", "b")).toBe(false);
+    expect(isComparisonImagePath(valid, "p", "other")).toBe(false);
+    for (const path of [
+      "p/builds/b/comparisons/../x.png",
+      "p/builds/b/comparisons/01arz3ndektsv4rrffq69g5fav.png",
+      "p/builds/b/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.jpg",
+      "",
+    ])
+      expect(isComparisonImagePath(path, "p", "b")).toBe(false);
+  });
   it("retains the original image and provenance when the baseline changes", async () => {
     const { storage } = makeStorage();
     const original = Buffer.from("original image");
