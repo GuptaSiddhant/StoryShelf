@@ -45,6 +45,8 @@ export const snapshots = pgTable(
     baselineId: text("baseline_id"),
     baselineVersion: text("baseline_version"),
     sourceBuildId: text("source_build_id"),
+    comparisonImagePath: text("comparison_image_path"),
+    comparisonMetadata: text("comparison_metadata"),
     mode: text("mode"),
     browser: text("browser").notNull().default("chromium"),
     durationMs: integer("duration_ms"),
@@ -91,6 +93,8 @@ export interface Snapshot {
   baselineId: string | null;
   baselineVersion: string | null;
   sourceBuildId: string | null;
+  comparisonImagePath: string | null;
+  comparisonMetadata: string | null;
   mode?: string | null;
   browser?: string;
   durationMs: number | null;

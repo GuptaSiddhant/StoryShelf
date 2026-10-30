@@ -144,6 +144,8 @@ describe("createSqliteDatabase", () => {
     expect(present.has("baseline_id")).toBe(true);
     expect(present.has("baseline_version")).toBe(true);
     expect(present.has("source_build_id")).toBe(true);
+    expect(present.has("comparison_image_path")).toBe(true);
+    expect(present.has("comparison_metadata")).toBe(true);
 
     await closeDb(db);
   });

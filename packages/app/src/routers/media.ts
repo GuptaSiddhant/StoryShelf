@@ -1,3 +1,4 @@
+import { isComparisonImagePath, parseComparisonReference } from "@storyshelf/core/capture";
 import {
   BaselineModel,
   DesignCredentialModel,
@@ -78,6 +79,29 @@ export function registerMedia(app: ShelfRouter): void {
     const build = await new BuildModel(getStore().db).get(snapshot.buildId);
     if (!build) {
       notFound("Build not found");
+    }
+    if (
+      c.req.query("reference") !== "default" &&
+      (snapshot.comparisonImagePath || snapshot.comparisonMetadata)
+    ) {
+      const frozen = parseComparisonReference(snapshot.comparisonMetadata);
+      if (
+        !frozen ||
+        !snapshot.comparisonImagePath ||
+        !isComparisonImagePath(snapshot.comparisonImagePath, project.id, build.id) ||
+        frozen.baselineId !== snapshot.baselineId ||
+        frozen.baselineVersion !== snapshot.baselineVersion
+      ) {
+        notFound("Original baseline is unavailable");
+      }
+      try {
+        return imageResponse(
+          await getStore().storage.read(snapshot.comparisonImagePath),
+          "private, no-store",
+        );
+      } catch {
+        notFound("Original baseline image is unavailable");
+      }
     }
     const baselines = new BaselineModel(getStore().db, undefined, getStore().storage);
     const baseline =

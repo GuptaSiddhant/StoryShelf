@@ -54,6 +54,8 @@ export class SnapshotModel {
       envChange: input.envChange ?? null,
       inherited: input.inherited ?? false,
       sourceBuildId: input.inherited ? (input.sourceBuildId ?? null) : buildId,
+      comparisonImagePath: input.comparisonImagePath ?? null,
+      comparisonMetadata: input.comparisonMetadata ?? null,
       baselineId: input.baselineId ?? null,
       baselineVersion: input.baselineVersion ?? null,
       mode: input.mode ?? null,
@@ -183,6 +185,8 @@ export interface SnapshotCreateInput {
   envChange?: string | null;
   inherited?: boolean;
   sourceBuildId?: string | null;
+  comparisonImagePath?: string | null;
+  comparisonMetadata?: string | null;
   baselineId?: string | null;
   baselineVersion?: string | null;
   /** Resolved mode definition as JSON (display/capture only). */

@@ -1,3 +1,4 @@
+import { isComparisonImagePath, parseComparisonReference } from "@storyshelf/core/capture";
 import {
   BaselineModel,
   BuildModel,
@@ -22,6 +23,17 @@ export type BaselineReference =
     };
 
 export async function loadBaselineReference(
+  project: Project,
+  build: Build,
+  snapshot: Snapshot,
+): Promise<BaselineReference> {
+  if (snapshot.comparisonImagePath || snapshot.comparisonMetadata) {
+    return await frozenReference(project, build, snapshot);
+  }
+  return await legacyReference(project, build, snapshot);
+}
+
+async function legacyReference(
   project: Project,
   build: Build,
   snapshot: Snapshot,
@@ -52,6 +64,33 @@ export async function loadBaselineReference(
     updatedAt: baseline.updatedAt,
     imageAvailable: await imageExists(baseline.screenshotPath),
     build: reference,
+  };
+}
+
+async function frozenReference(
+  project: Project,
+  build: Build,
+  snapshot: Snapshot,
+): Promise<BaselineReference> {
+  const frozen = parseComparisonReference(snapshot.comparisonMetadata);
+  if (
+    !frozen ||
+    !snapshot.comparisonImagePath ||
+    !isComparisonImagePath(snapshot.comparisonImagePath, project.id, build.id) ||
+    frozen.baselineId !== snapshot.baselineId ||
+    frozen.baselineVersion !== snapshot.baselineVersion
+  )
+    return { kind: "unavailable" };
+  const reference = frozen.sourceBuildId
+    ? await new BuildModel(getStore().db).get(frozen.sourceBuildId)
+    : null;
+  return {
+    kind: "known",
+    branch: frozen.branch,
+    defaultBranch: frozen.defaultBranch,
+    updatedAt: frozen.baselineVersion,
+    imageAvailable: await imageExists(snapshot.comparisonImagePath),
+    build: reference?.projectId === project.id ? reference : null,
   };
 }
 

@@ -179,6 +179,8 @@ CREATE TABLE IF NOT EXISTS snapshots (
   baseline_id VARCHAR(64),
   baseline_version TEXT,
   source_build_id TEXT,
+  comparison_image_path TEXT,
+  comparison_metadata TEXT,
   mode VARCHAR(64),
   browser VARCHAR(64) NOT NULL DEFAULT 'chromium',
   duration_ms INT,

@@ -17,6 +17,7 @@ import { diffPath } from "../utils/paths.ts";
 import { storeScreenshot } from "../utils/screenshot-store.ts";
 import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
+import { freezeComparison, sourceSnapshotId } from "./comparison-reference.ts";
 import { diffStoredScreenshots, writeDiffOverlay } from "./diff-record.ts";
 import {
   buildFingerprint,
@@ -259,7 +260,23 @@ async function persistInheritedSnapshot(
   // Nothing rendered, so there is no new fingerprint: the snapshot carries the baseline's.
   const infraHash = inherited.baseline.infraHash;
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
+  const comparison = await freezeComparison(
+    ctx.storage,
+    ctx.project.id,
+    ctx.build.id,
+    inherited.baseline,
+    {
+      defaultBranch: ctx.project.gitDefaultBranch,
+      mode: modeJsonOf(inherited.viewport),
+      target: browser,
+      width: inherited.viewport.width,
+      height: inherited.viewport.height,
+      captureFingerprint: inherited.baseline.fingerprint,
+      sourceSnapshotId: await sourceSnapshotId(ctx.db, inherited.baseline),
+    },
+  );
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
+    ...comparison,
     browser,
     storyId: inherited.story.id,
     storyName: inherited.story.name,
@@ -473,7 +490,16 @@ async function createWithBaseline(
 ): Promise<void> {
   const now = fingerprintOf(capture, viewport);
   const change = environmentChange(baseline, now);
-  const input = { ctx, capture, viewport, screenshot, baseline, now, change };
+  const comparison = await freezeComparison(ctx.storage, ctx.project.id, ctx.build.id, baseline, {
+    defaultBranch: ctx.project.gitDefaultBranch,
+    mode: modeJsonOf(viewport),
+    target: browserOf(capture),
+    width: viewport.width,
+    height: viewport.height,
+    captureFingerprint: now.json,
+    sourceSnapshotId: await sourceSnapshotId(ctx.db, baseline),
+  });
+  const input = { ctx, capture, viewport, screenshot, baseline, now, change, comparison };
   if (change && ctx.build.isDefault) {
     await persistMigration(input, change);
   } else {
@@ -489,6 +515,7 @@ interface BaselineCapture {
   baseline: Baseline;
   now: CaptureFingerprint;
   change: EnvironmentChange | null;
+  comparison: { comparisonImagePath: string; comparisonMetadata: string };
 }
 
 /** The fingerprint to write on the baseline: the capture's, keeping components it did not report. */
@@ -516,6 +543,7 @@ function snapshotInput(input: BaselineCapture): Parameters<SnapshotModel["create
     mode: modeJsonOf(viewport),
     baselineId: baseline.id,
     baselineVersion: baseline.updatedAt,
+    ...input.comparison,
   };
 }
 
@@ -552,7 +580,7 @@ async function persistDiff(input: BaselineCapture): Promise<void> {
   const result = await diffStoredScreenshots(
     ctx.storage,
     ctx.project,
-    baseline.screenshotPath,
+    baseline.screenshotPath === screenshot ? screenshot : input.comparison.comparisonImagePath,
     screenshot,
     capture.story.parameters?.diffThreshold,
   );
