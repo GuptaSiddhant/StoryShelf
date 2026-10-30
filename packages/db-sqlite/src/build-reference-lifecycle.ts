@@ -6,6 +6,7 @@ import type {
 } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync } from "node:sqlite";
+import { setTimeout as delay } from "node:timers/promises";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { createCallback } from "./index.ts";
 import { schema } from "./schema/index.ts";
@@ -15,20 +16,40 @@ export function createBuildReferenceLifecycle(path: string): BuildReferenceLifec
   return {
     replaceReferences: async (owner, buildIds, writeDomain) =>
       await replaceReferences(path, owner, buildIds, writeDomain),
-    claimDeletion: async (projectId, buildId) =>
-      await Promise.resolve(claimDeletion(path, projectId, buildId)),
+    claimDeletion: async (projectId, buildId) => await claimDeletion(path, projectId, buildId),
   };
 }
 
-function open(path: string): DatabaseSync {
+async function open(path: string): Promise<DatabaseSync> {
   if (path === ":memory:") throw new Error("Reference lifecycle requires a shared SQLite file");
   const db = new DatabaseSync(path, { returnArrays: true });
   try {
-    db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; BEGIN IMMEDIATE");
+    db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 0");
+    await acquireWrite(db);
     return db;
   } catch (error) {
     db.close();
     throw error;
+  }
+}
+
+/** Avoid blocking this process's event loop while a different connection holds the write lock. */
+async function acquireWrite(db: DatabaseSync): Promise<void> {
+  const deadline = Date.now() + 5000;
+  while (true) {
+    try {
+      db.exec("BEGIN IMMEDIATE");
+      return;
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !error.message.includes("database is locked") ||
+        Date.now() >= deadline
+      )
+        throw error;
+      // oxlint-disable-next-line eslint/no-await-in-loop -- wait for a competing writer to finish
+      await delay(10);
+    }
   }
 }
 
@@ -62,7 +83,7 @@ async function replaceReferences<T>(
 }
 
 async function inTransaction<T>(path: string, work: (db: DatabaseSync) => Promise<T>): Promise<T> {
-  const db = open(path);
+  const db = await open(path);
   try {
     const result = await work(db);
     db.exec("COMMIT");
@@ -93,12 +114,12 @@ function checkAvailable(db: DatabaseSync, projectId: string, ids: string[]): voi
   }
 }
 
-function claimDeletion(
+async function claimDeletion(
   path: string,
   projectId: string,
   buildId: string,
-): "claimed" | "protected" | "deleting" | "missing" {
-  const db = open(path);
+): Promise<"claimed" | "protected" | "deleting" | "missing"> {
+  const db = await open(path);
   try {
     const build = db
       .prepare("SELECT retention_state FROM builds WHERE project_id = ? AND id = ?")

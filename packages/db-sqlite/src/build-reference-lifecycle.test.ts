@@ -80,6 +80,24 @@ describe("SQLite reference lifecycle primitive", () => {
       expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
     });
   });
+  it("does not block the event loop when two connections compete in one process", async () => {
+    await withDatabase(async (path) => {
+      const first = createBuildReferenceLifecycle(path);
+      const second = createBuildReferenceLifecycle(path);
+      const entered = Promise.withResolvers<boolean>();
+      const release = Promise.withResolvers<boolean>();
+      const admission = first.replaceReferences(owner, ["one"], async () => {
+        entered.resolve(true);
+        await release.promise;
+      });
+      await entered.promise;
+      const deletion = second.claimDeletion("p", "one");
+      await delay(30);
+      release.resolve(true);
+      await admission;
+      expect(await deletion).toBe("protected");
+    });
+  });
   it("serializes a deletion claim against an in-flight admission in another process", async () => {
     await withDatabase(async (path) => {
       const lifecycle = createBuildReferenceLifecycle(path);
