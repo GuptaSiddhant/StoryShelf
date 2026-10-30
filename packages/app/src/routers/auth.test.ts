@@ -31,7 +31,7 @@ async function testEngine(): Promise<{ db: DatabaseAdapter; shelf: ShelfAuth }> 
           domain: "example.com",
           issuer: BASE_URL,
           entryPoint: "https://idp.example.com/sso",
-          cert: "FAKE-CERT",
+          cert: "RkFLRUNFUlQ=",
           entityID: "https://idp.example.com/metadata",
         }),
       ],

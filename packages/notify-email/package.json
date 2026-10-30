@@ -84,7 +84,7 @@
     "@types/node": "catalog:",
     "@types/nodemailer": "^8.0.2",
     "@vitest/coverage-v8": "catalog:",
-    "nodemailer": "^10.0.12",
+    "nodemailer": "^10.2.1",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
@@ -93,7 +93,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "nodemailer": "^10.0.12"
+    "nodemailer": "^10.2.1"
   },
   "peerDependenciesMeta": {
     "nodemailer": {

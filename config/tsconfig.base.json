@@ -3,6 +3,10 @@
     "target": "esnext",
     "lib": ["es2024", "DOM", "DOM.Iterable"],
     "moduleResolution": "Bundler",
+    "paths": {
+      "drizzle-orm": ["../node_modules/drizzle-orm"],
+      "drizzle-orm/*": ["../node_modules/drizzle-orm/*"]
+    },
     "module": "Preserve",
     "declaration": true,
     "isolatedModules": true,

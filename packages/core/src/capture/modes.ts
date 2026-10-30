@@ -16,7 +16,7 @@ const HEX_COLOR = /^#(?<hex>[0-9a-fA-F]{3,8})$/u;
  * whitespace/case edits. Throws for names with no usable characters.
  */
 export function modeSlug(name: string): string {
-  const slug = name.toLowerCase().replace(SLUG_STRIP, "-").replace(SLUG_EDGES, "");
+  const slug = name.toLowerCase().replaceAll(SLUG_STRIP, "-").replaceAll(SLUG_EDGES, "");
   if (slug === "") {
     throw new Error(`Invalid mode name: ${JSON.stringify(name)}`);
   }
