@@ -590,3 +590,15 @@ describe("per-snapshot baseline presentation", () => {
     expect(feature).toContain("Reference build and commit are unavailable");
   });
 });
+
+describe("missing primary baseline image", () => {
+  it("does not describe an existing baseline as a new story", async () => {
+    const { app, objects } = await setup();
+    objects.delete("baselines/main/a.png");
+    const html = await (
+      await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
+    ).text();
+    expect(html).toContain("The original baseline image is unavailable.");
+    expect(html).not.toContain("New story — no baseline yet");
+  });
+});

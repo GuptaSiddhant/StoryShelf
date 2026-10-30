@@ -40,10 +40,7 @@ export function DefaultComparisonView(props: {
       </p>
       {comparison.available ? (
         <HStack align="start">
-          <figure>
-            <figcaption>Current default-branch baseline</figcaption>
-            <img src={baseline} alt="Current default-branch baseline" class={comparisonImage} />
-          </figure>
+          <BaselineImage src={baseline} />
           <figure>
             <figcaption>This build</figcaption>
             <img
@@ -57,5 +54,19 @@ export function DefaultComparisonView(props: {
         <p>The current default-branch baseline image is unavailable.</p>
       )}
     </details>
+  );
+}
+
+function BaselineImage(props: { src: string }): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <figure>
+      <figcaption>Current default-branch baseline</figcaption>
+      <img
+        src={props.src}
+        alt="Current default-branch baseline"
+        loading="lazy"
+        class={comparisonImage}
+      />
+    </figure>
   );
 }

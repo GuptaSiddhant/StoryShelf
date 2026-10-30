@@ -159,7 +159,8 @@ function PrimaryComparison(props: DiffViewerProps): HtmlEscapedString | Promise<
     <CompareStage
       baselineSrc={baselineUrl(props)}
       baselineEmpty={
-        reference?.kind === "unavailable"
+        reference?.kind === "unavailable" ||
+        (reference?.kind === "known" && !reference.imageAvailable)
           ? "The original baseline image is unavailable."
           : undefined
       }

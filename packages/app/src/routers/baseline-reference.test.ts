@@ -99,3 +99,48 @@ describe("current default comparison", () => {
     expect(result?.environment).toBe("unknown");
   });
 });
+
+describe("default comparison availability", () => {
+  it("omits the comparison on the default branch and when no baseline exists", async () => {
+    const getFor = vi.spyOn(BaselineModel.prototype, "getFor").mockResolvedValue(null);
+    expect(
+      await runWithStore(
+        store,
+        async () => await loadDefaultComparison(project, { ...build, gitBranch: "main" }, snapshot),
+      ),
+    ).toBeNull();
+    expect(getFor).not.toHaveBeenCalled();
+    expect(
+      await runWithStore(store, async () => await loadDefaultComparison(project, build, snapshot)),
+    ).toBeNull();
+  });
+  it("offers an advanced baseline even with the same id and reports matching fingerprints", async () => {
+    vi.spyOn(BaselineModel.prototype, "getFor").mockResolvedValue({
+      ...baseline,
+      updatedAt: "t2",
+      infraHash: "hash",
+    });
+    const result = await runWithStore(
+      store,
+      async () => await loadDefaultComparison(project, build, { ...snapshot, infraHash: "hash" }),
+    );
+    expect(result).toMatchObject({ version: "t2", environment: "matching" });
+  });
+  it.each([false, "error"] as const)("reports unavailable storage (%s)", async (behavior) => {
+    vi.spyOn(BaselineModel.prototype, "getFor").mockResolvedValue({ ...baseline, updatedAt: "t2" });
+    const unavailable = {
+      ...store,
+      storage: {
+        exists: async () => {
+          if (behavior === "error") throw new Error("storage unavailable");
+          return false;
+        },
+      },
+    } as unknown as Store;
+    const result = await runWithStore(
+      unavailable,
+      async () => await loadDefaultComparison(project, build, snapshot),
+    );
+    expect(result?.available).toBe(false);
+  });
+});
