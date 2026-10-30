@@ -12,7 +12,16 @@ const snapshot = {
   storyId: "story",
   viewportName: "desktop",
 } as Snapshot;
-const baseline = { id: "base", updatedAt: "t1", branch: "main", snapshotId: "source" } as Baseline;
+const baseline = {
+  id: "base",
+  projectId: "p",
+  storyId: "story",
+  viewportName: "desktop",
+  screenshotPath: "image",
+  updatedAt: "t1",
+  branch: "main",
+  snapshotId: "source",
+} as Baseline;
 const store = { db: { tables: {} }, storage: { exists: async () => true } } as unknown as Store;
 const load = async (row: Snapshot = snapshot) =>
   await runWithStore(store, async () => await loadBaselineReference(project, build, row));
@@ -36,6 +45,9 @@ describe("baseline reference", () => {
     vi.spyOn(BaselineModel.prototype, "resolve").mockResolvedValue(baseline);
     vi.spyOn(SnapshotModel.prototype, "get").mockResolvedValue({
       projectId: "p",
+      storyId: "story",
+      viewportName: "desktop",
+      screenshotPath: "image",
       buildId: "b",
       inherited: false,
     } as Snapshot);
@@ -51,6 +63,37 @@ describe("baseline reference", () => {
       build: { id: "b" },
     });
   });
+  it("identifies the rendering build for a verifiable inherited image", async () => {
+    const parent = { ...baseline, id: "parent", snapshotId: "rendered", updatedAt: "older" };
+    const identity = {
+      projectId: "p",
+      storyId: "story",
+      viewportName: "desktop",
+      screenshotPath: "image",
+    };
+    vi.spyOn(BaselineModel.prototype, "resolve").mockResolvedValue(baseline);
+    vi.spyOn(SnapshotModel.prototype, "get").mockImplementation(async (id) =>
+      id === "source"
+        ? ({
+            ...identity,
+            inherited: true,
+            buildId: "reuse",
+            baselineId: "parent",
+            baselineVersion: "older",
+          } as Snapshot)
+        : ({ ...identity, inherited: false, buildId: "rendered-build" } as Snapshot),
+    );
+    vi.spyOn(BuildModel.prototype, "get").mockResolvedValue({
+      id: "rendered-build",
+      projectId: "p",
+    } as Build);
+    const testStore = { ...store, db: { tables: {}, get: async () => parent } } as unknown as Store;
+    const result = await runWithStore(
+      testStore,
+      async () => await loadBaselineReference(project, build, snapshot),
+    );
+    expect(result).toMatchObject({ kind: "known", build: { id: "rendered-build" } });
+  });
   it("does not identify an inherited snapshot's build as the image source", async () => {
     vi.spyOn(BaselineModel.prototype, "resolve").mockResolvedValue({
       ...baseline,
@@ -58,6 +101,9 @@ describe("baseline reference", () => {
     });
     vi.spyOn(SnapshotModel.prototype, "get").mockResolvedValue({
       projectId: "p",
+      storyId: "story",
+      viewportName: "desktop",
+      screenshotPath: "image",
       buildId: "b",
       inherited: true,
     } as Snapshot);
