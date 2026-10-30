@@ -54,11 +54,7 @@ async function writeBaseline(
     limit: 1,
   })) as unknown as Baseline[];
   const existing = rows[0] ?? null;
-  if (
-    (existing?.id ?? null) !== input.existingId ||
-    (existing?.updatedAt ?? null) !== input.existingVersion
-  )
-    throw new Error("Baseline changed during promotion; retry");
+  assertBaselineUnchanged(existing, input);
   if (input.sourceBuildId) await assertSource(tx, tables.snapshots, input);
   const now = nextBaselineVersion(existing?.updatedAt ?? null, new Date());
   const fields = {
@@ -82,6 +78,14 @@ async function writeBaseline(
         browser: input.browser,
         createdAt: now,
       })) as unknown as Baseline;
+}
+
+function assertBaselineUnchanged(existing: Baseline | null, input: AtomicBaselineInput): void {
+  if (
+    (existing?.id ?? null) !== input.existingId ||
+    (existing?.updatedAt ?? null) !== input.existingVersion
+  )
+    throw new Error("Baseline changed during promotion; retry");
 }
 
 /** Keep the version advancing even when updates share a millisecond or clocks move backwards. */
