@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BuildReferenceLifecycle } from "../adapters/database.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
-import { upsertAtomicBaseline, type AtomicBaselineInput } from "./baseline-atomic.ts";
+import {
+  nextBaselineVersion,
+  upsertAtomicBaseline,
+  type AtomicBaselineInput,
+} from "./baseline-atomic.ts";
 
 const input: AtomicBaselineInput = {
   id: "baseline",
@@ -44,6 +48,14 @@ async function insertSource(db: ReturnType<typeof setup>["db"]): Promise<void> {
 }
 
 describe("atomic baseline promotion", () => {
+  it("advances the baseline version for updates in the same millisecond or after clock rollback", () => {
+    const previous = "2026-01-01T00:00:00.000Z";
+    expect(nextBaselineVersion(previous, new Date(previous))).toBe("2026-01-01T00:00:00.001Z");
+    expect(nextBaselineVersion(previous, new Date("2025-01-01T00:00:00.000Z"))).toBe(
+      "2026-01-01T00:00:00.001Z",
+    );
+    expect(nextBaselineVersion(null, new Date(previous))).toBe(previous);
+  });
   it("admits the source build and writes its baseline inside the lifecycle callback", async () => {
     const { db, lifecycle, tables } = setup();
     await insertSource(db);

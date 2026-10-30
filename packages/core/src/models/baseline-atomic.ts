@@ -60,7 +60,7 @@ async function writeBaseline(
   )
     throw new Error("Baseline changed during promotion; retry");
   if (input.sourceBuildId) await assertSource(tx, tables.snapshots, input);
-  const now = new Date().toISOString();
+  const now = nextBaselineVersion(existing?.updatedAt ?? null, new Date());
   const fields = {
     snapshotId: input.snapshotId,
     sourceBuildId: input.sourceBuildId,
@@ -82,6 +82,14 @@ async function writeBaseline(
         browser: input.browser,
         createdAt: now,
       })) as unknown as Baseline;
+}
+
+/** Keep the version advancing even when updates share a millisecond or clocks move backwards. */
+export function nextBaselineVersion(previous: string | null, now: Date): string {
+  const last = previous === null ? Number.NaN : Date.parse(previous);
+  return new Date(
+    Number.isFinite(last) ? Math.max(now.getTime(), last + 1) : now.getTime(),
+  ).toISOString();
 }
 
 async function assertSource(tx: TxStore, table: Table, input: AtomicBaselineInput): Promise<void> {
