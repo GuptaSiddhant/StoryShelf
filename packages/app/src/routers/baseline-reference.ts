@@ -12,6 +12,7 @@ export type BaselineReference =
       defaultBranch: boolean;
       updatedAt: string;
       build: Build | null;
+      imageAvailable: boolean;
     };
 
 export async function loadBaselineReference(
@@ -42,6 +43,58 @@ export async function loadBaselineReference(
     branch: baseline.branch,
     defaultBranch: baseline.branch === project.gitDefaultBranch,
     updatedAt: baseline.updatedAt,
+    imageAvailable: await imageExists(baseline.screenshotPath),
     build: reference?.projectId === project.id ? reference : null,
   };
+}
+
+export interface DefaultComparison {
+  id: string;
+  version: string;
+  branch: string;
+  available: boolean;
+  environment: "unknown" | "matching" | "different";
+}
+
+/** A separate, read-only view of the current default-branch reference. */
+export async function loadDefaultComparison(
+  project: Project,
+  build: Build,
+  snapshot: Snapshot,
+): Promise<DefaultComparison | null> {
+  if (build.gitBranch === project.gitDefaultBranch) return null;
+  const { db } = getStore();
+  const baseline = await new BaselineModel(db).getFor(
+    project.id,
+    snapshot.storyId,
+    snapshot.viewportName,
+    project.gitDefaultBranch,
+    snapshot.browser,
+  );
+  if (
+    !baseline ||
+    (baseline.id === snapshot.baselineId && baseline.updatedAt === snapshot.baselineVersion)
+  )
+    return null;
+  const environment =
+    !baseline.infraHash || !snapshot.infraHash
+      ? "unknown"
+      : baseline.infraHash === snapshot.infraHash
+        ? "matching"
+        : "different";
+  return {
+    id: baseline.id,
+    version: baseline.updatedAt,
+    branch: baseline.branch,
+    available: await imageExists(baseline.screenshotPath),
+    environment,
+  };
+}
+
+async function imageExists(path: string): Promise<boolean> {
+  try {
+    return await getStore().storage.exists(path);
+  } catch {
+    return false;
+  }
 }

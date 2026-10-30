@@ -2,7 +2,7 @@ import { BaselineModel, BuildModel, SnapshotModel } from "@storyshelf/core/model
 import type { Baseline, Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runWithStore, type Store } from "../store.ts";
-import { loadBaselineReference } from "./baseline-reference.ts";
+import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
 
 const project = { id: "p", gitDefaultBranch: "main" } as Project;
 const build = { gitBranch: "feature" } as Build;
@@ -13,7 +13,7 @@ const snapshot = {
   viewportName: "desktop",
 } as Snapshot;
 const baseline = { id: "base", updatedAt: "t1", branch: "main", snapshotId: "source" } as Baseline;
-const store = { db: { tables: {} } } as Store;
+const store = { db: { tables: {} }, storage: { exists: async () => true } } as unknown as Store;
 const load = async (row: Snapshot = snapshot) =>
   await runWithStore(store, async () => await loadBaselineReference(project, build, row));
 afterEach(() => vi.restoreAllMocks());
@@ -62,5 +62,40 @@ describe("baseline reference", () => {
       inherited: true,
     } as Snapshot);
     expect(await load()).toMatchObject({ kind: "known", defaultBranch: false, build: null });
+  });
+});
+
+describe("current default comparison", () => {
+  it("reports a different environment and keeps the default reference separate", async () => {
+    vi.spyOn(BaselineModel.prototype, "getFor").mockResolvedValue({
+      ...baseline,
+      infraHash: "old",
+    });
+    const result = await runWithStore(
+      store,
+      async () =>
+        await loadDefaultComparison(project, build, {
+          ...snapshot,
+          baselineId: "other",
+          infraHash: "new",
+        }),
+    );
+    expect(result).toMatchObject({ id: "base", environment: "different", available: true });
+  });
+  it("does not offer a redundant comparison and reports unknown environments", async () => {
+    vi.spyOn(BaselineModel.prototype, "getFor").mockResolvedValue(baseline);
+    expect(
+      await runWithStore(store, async () => await loadDefaultComparison(project, build, snapshot)),
+    ).toBeNull();
+    const result = await runWithStore(
+      store,
+      async () =>
+        await loadDefaultComparison(project, build, {
+          ...snapshot,
+          baselineId: "other",
+          infraHash: null,
+        }),
+    );
+    expect(result?.environment).toBe("unknown");
   });
 });

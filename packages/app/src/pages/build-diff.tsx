@@ -4,7 +4,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
-import type { BaselineReference } from "../routers/baseline-reference.ts";
+import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
 import { EmptyState } from "../ui/components.tsx";
 import { DocumentLayout, type NavConfig, type RenderedContent } from "../ui/document.tsx";
 import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
@@ -30,6 +30,7 @@ export interface BuildDiffData {
   canReview: boolean;
   hasBaseline: Record<string, boolean>;
   reference?: BaselineReference;
+  defaultComparison?: DefaultComparison | null;
   /** Open snapshots whose baseline changed after their diff was computed. */
   drifted: Record<string, "stale" | "removed">;
   /** AI triage panel data; omitted/null hides the panel. */
@@ -53,6 +54,7 @@ interface DiffReviewGridProps {
   canReview: boolean;
   hasBaseline: Record<string, boolean>;
   reference?: BaselineReference;
+  defaultComparison?: DefaultComparison | null;
   drifted: Record<string, "stale" | "removed">;
   usage: LinkedUsageItem[];
   design: DesignItem[];
@@ -87,6 +89,7 @@ function DiffReviewGrid(
               siblings={groupOf(snapshots, selected.id)?.members}
               hasBaseline={hasBaseline}
               reference={props.reference}
+              defaultComparison={props.defaultComparison}
               drifted={drifted[selected.id]}
               usage={usage}
               design={design}
@@ -137,10 +140,9 @@ function reviewNav(project: Project, build: Build): NavConfig {
 
 /** Three-up diff review page: baseline, current, and diff with keyboard review. */
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
-  const { project, build, snapshots, comments, selectedId, canReview, hasBaseline, drifted } = data;
+  const { project, build, snapshots, selectedId, canReview, drifted } = data;
   const selected = selectedSnapshot(snapshots, selectedId);
   const pendingGroups = reviewProgress(snapshots).pending;
-
   return (
     <DocumentLayout
       title={`Review · ${build.gitBranch}`}
@@ -162,7 +164,6 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         canReview={canReview}
       />
       <InsightSlot project={project} build={build} data={data.insight} />
-
       {snapshots.length === 0 ? (
         <EmptyState
           title="No snapshots"
@@ -170,18 +171,10 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         />
       ) : (
         <DiffReviewGrid
-          project={project}
-          build={build}
-          snapshots={snapshots}
-          comments={comments}
+          {...data}
           selected={selected}
-          canReview={canReview}
-          hasBaseline={hasBaseline}
-          drifted={drifted}
-          reference={data.reference}
           usage={data.usage ?? []}
           design={data.design ?? []}
-          publishedBaseDomain={data.publishedBaseDomain}
         />
       )}
       <ShortcutsDialog />

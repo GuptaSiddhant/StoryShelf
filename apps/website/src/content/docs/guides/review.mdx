@@ -18,6 +18,10 @@ The review page is a workspace:
 - **Comparison** (centre): _Side by side_, _Swipe_ (drag the round handle on the divider, or use the slider beneath), _Onion skin_ (blend baseline and current), _Diff_ (the overlay alone) and _Flip_ (toggle between baseline and current), with _Fit / 100% / 200% / 400%_ zoom — zoomed-in images are drawn as crisp pixels so you can inspect individual changed pixels. Panes scroll together, and your mode and zoom are remembered.
 - **Action bar** (pinned at the bottom): previous/next, **Approve** and **Reject**. Deciding a snapshot moves you straight to the next one that still needs review.
 
+Each snapshot shows the branch baseline used for its comparison when that recorded version is still available. If a reference has moved, been deleted, or comes from an older record without provenance, the page explains that its original details may be unavailable. Reference build and commit details can also be unavailable, for example when an image was inherited.
+
+When the current default-branch baseline differs, open **Compare with current default branch** for a separate side-by-side view. It does not change the primary diff or what approval updates. The view warns when capture environments differ or cannot be verified. If the default baseline changes while the page is open, reload to see the new version.
+
 Keyboard: `j`/`k` (or `→`/`←`) move between snapshots, `a` approves, `r` rejects, `1`–`5` pick a comparison mode, `f` cycles zoom, `+`/`-` zoom in and out, `t` flips baseline/current, and `?` lists them all. **Approve all** and **Reject all** in the header ask for confirmation first.
 
 ## Approve / reject

@@ -20,7 +20,7 @@ import { renderProjectsPage } from "../pages/projects.tsx";
 import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
 import { loadBaselineView } from "./baseline-guard.ts";
-import { loadBaselineReference } from "./baseline-reference.ts";
+import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
 import { loadComponentPage } from "./component.handlers.ts";
 import {
   designUrlsFor,
@@ -200,6 +200,7 @@ export function registerUiPages(app: ShelfRouter): void {
         hasBaseline,
         drifted,
         reference: selected ? await loadBaselineReference(project, build, selected) : undefined,
+        defaultComparison: selected ? await loadDefaultComparison(project, build, selected) : null,
         insight: await loadInsightPanel(project, build),
         design,
         usage: await linkedUsageFor(

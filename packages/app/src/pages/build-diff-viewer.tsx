@@ -1,10 +1,11 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { BaselineReference } from "../routers/baseline-reference.ts";
+import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
 import { Badge, Button, CompareStage, Segmented, VStack, statusTone } from "../ui/components.tsx";
 import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
 import { A11yViolationsNotice, a11yCarrierOf } from "./a11y-violations.tsx";
+import { DefaultComparisonView } from "./build-diff-default.tsx";
 import { EnvironmentChangeSnapshotNotice } from "./build-diff-environment.tsx";
 import {
   diffPercent,
@@ -28,6 +29,7 @@ export interface DiffViewerProps {
   siblings?: Snapshot[];
   hasBaseline: Record<string, boolean>;
   reference?: BaselineReference;
+  defaultComparison?: DefaultComparison | null;
   /** Set when the baseline changed after this snapshot's diff was computed. */
   drifted?: "stale" | "removed";
   /** Linked packages the story uses (provenance badges + upstream deep links). */
@@ -89,8 +91,7 @@ function ViewComponentButton(props: {
 
 /** Story heading plus the comparison stage for the selected snapshot. */
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, hasBaseline, drifted, usage, design, publishedBaseDomain } =
-    props;
+  const { project, build, selected, drifted, usage, design, publishedBaseDomain } = props;
   const siblings = props.siblings ?? [selected];
   const percent = diffPercent(selected);
   return (
@@ -122,17 +123,51 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
         <LinkedUsage usage={usage} publishedBaseDomain={publishedBaseDomain} />
       ) : null}
       {design && design.length > 0 ? <DesignStrip items={design} /> : null}
-      <CompareStage
-        baselineSrc={
-          hasBaseline[selected.id] ? snapshotImageUrl(project, build, selected, "baseline") : null
-        }
-        currentSrc={snapshotImageUrl(project, build, selected, "image")}
-        diffSrc={selected.diffPath ? snapshotImageUrl(project, build, selected, "diff") : null}
-        subject={`${selected.storyTitle} / ${selected.storyName}`}
-        diffEmpty={diffEmptyText(selected.status)}
-        diffMeta={percent ?? undefined}
-      />
+      <PrimaryComparison {...props} />
+      <SecondaryComparison {...props} />
       {design && design.length > 0 ? <DesignReferences items={design} /> : null}
     </VStack>
+  );
+}
+
+function SecondaryComparison(
+  props: DiffViewerProps,
+): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  if (!props.defaultComparison) return null;
+  return (
+    <DefaultComparisonView
+      {...props}
+      snapshot={props.selected}
+      comparison={props.defaultComparison}
+    />
+  );
+}
+
+function baselineUrl(props: DiffViewerProps): string | null {
+  const { hasBaseline, selected, reference, project, build } = props;
+  return hasBaseline[selected.id] &&
+    reference?.kind !== "none" &&
+    !(reference?.kind === "known" && !reference.imageAvailable) &&
+    !(reference?.kind === "unavailable" && selected.baselineVersion !== null)
+    ? snapshotImageUrl(project, build, selected, "baseline")
+    : null;
+}
+
+function PrimaryComparison(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, selected, reference } = props;
+  return (
+    <CompareStage
+      baselineSrc={baselineUrl(props)}
+      baselineEmpty={
+        reference?.kind === "unavailable"
+          ? "The original baseline image is unavailable."
+          : undefined
+      }
+      currentSrc={snapshotImageUrl(project, build, selected, "image")}
+      diffSrc={selected.diffPath ? snapshotImageUrl(project, build, selected, "diff") : null}
+      subject={`${selected.storyTitle} / ${selected.storyName}`}
+      diffEmpty={diffEmptyText(selected.status)}
+      diffMeta={diffPercent(selected) ?? undefined}
+    />
   );
 }
