@@ -27,6 +27,27 @@ export function createBuildReferenceLifecycle(
   };
 }
 
+/**
+ * Prepare references before enabling lifecycle-aware writes. This is deliberately not called by
+ * the adapter yet: all writers must participate in the same lifecycle before activation. Legacy
+ * baselines with unknown provenance stay unknown; invalid recorded sources block activation.
+ */
+export async function backfillBaselineReferences(path: string): Promise<number> {
+  return await inTransaction(path, async (db) => {
+    const rows = db
+      .prepare(
+        "SELECT project_id, id, source_build_id FROM baselines WHERE source_build_id IS NOT NULL",
+      )
+      .all() as unknown as [string, string, string][];
+    for (const [projectId, , buildId] of rows) checkAvailable(db, projectId, [buildId]);
+    const insert = db.prepare(
+      "INSERT OR IGNORE INTO build_references (project_id, owner_type, owner_id, build_id) VALUES (?, 'baseline', ?, ?)",
+    );
+    for (const [projectId, baselineId, buildId] of rows) insert.run(projectId, baselineId, buildId);
+    return await Promise.resolve(rows.length);
+  });
+}
+
 async function open(path: string, onContention?: () => void): Promise<DatabaseSync> {
   if (path === ":memory:") throw new Error("Reference lifecycle requires a shared SQLite file");
   const db = new DatabaseSync(path, { returnArrays: true });

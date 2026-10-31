@@ -8,7 +8,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
-import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
+import {
+  backfillBaselineReferences,
+  createBuildReferenceLifecycle,
+} from "./build-reference-lifecycle.ts";
 import { createSqliteDatabase } from "./index.ts";
 import { schema } from "./schema/index.ts";
 
@@ -46,6 +49,67 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
 }
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("backfills provable baseline sources atomically and leaves unknown sources unpinned", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const base = {
+        projectId: "p",
+        storyId: "story",
+        viewportName: "desktop",
+        branch: "main",
+        browser: "chromium",
+        screenshotPath: "shot.png",
+        snapshotId: "snapshot",
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await db.insert(schema.baselines, { ...base, id: "known", sourceBuildId: "one" });
+        await db.insert(schema.baselines, {
+          ...base,
+          id: "unknown",
+          storyId: "other",
+          sourceBuildId: null,
+        });
+        expect(await backfillBaselineReferences(path)).toBe(1);
+        expect(await backfillBaselineReferences(path)).toBe(1);
+        const lifecycle = createBuildReferenceLifecycle(path);
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
+  it("rolls back all backfill references when a recorded source is unavailable", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const base = {
+        projectId: "p",
+        storyId: "story",
+        viewportName: "desktop",
+        branch: "main",
+        browser: "chromium",
+        screenshotPath: "shot.png",
+        snapshotId: "snapshot",
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await db.insert(schema.baselines, { ...base, id: "valid", sourceBuildId: "one" });
+        await db.insert(schema.baselines, {
+          ...base,
+          id: "missing",
+          storyId: "other",
+          sourceBuildId: "missing",
+        });
+        await expect(backfillBaselineReferences(path)).rejects.toThrow("unavailable");
+        expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "one")).toBe("claimed");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
   it("protects referenced builds and leaves deletion tombstones irreversible across connections", async () => {
     await withDatabase(async (path) => {
       const first = createBuildReferenceLifecycle(path);
