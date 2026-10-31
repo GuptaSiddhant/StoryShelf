@@ -61,6 +61,13 @@ CREATE TABLE IF NOT EXISTS build_references (
   PRIMARY KEY (project_id, owner_type, owner_id, build_id)
 );
 CREATE INDEX IF NOT EXISTS build_references_build_idx ON build_references (build_id);
+CREATE TABLE IF NOT EXISTS build_reference_generations (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  owner_type TEXT NOT NULL CHECK (owner_type IN ('baseline', 'investigation')),
+  owner_id TEXT NOT NULL,
+  generation INTEGER NOT NULL CHECK (generation >= 0),
+  PRIMARY KEY (project_id, owner_type, owner_id)
+);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

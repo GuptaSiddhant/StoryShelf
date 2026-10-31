@@ -449,6 +449,7 @@ describe("createSqliteDatabase", () => {
       const raw = new DatabaseSync(path);
       raw.exec(`
         DROP TABLE build_references;
+        DROP TABLE build_reference_generations;
         ALTER TABLE builds DROP COLUMN retention_state;
         INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
         INSERT INTO builds (id, project_id, git_sha, git_branch, created_at, updated_at) VALUES ('b', 'p', 'sha', 'main', 't', 't');
@@ -458,6 +459,7 @@ describe("createSqliteDatabase", () => {
       await initDb(db);
       expect((await db.get(schema.builds, "b"))?.["retentionState"]).toBe("available");
       expect((await tableNames(db)).has("build_references")).toBe(true);
+      expect((await tableNames(db)).has("build_reference_generations")).toBe(true);
       await closeDb(db);
     } finally {
       rmSync(dir, { recursive: true, force: true });

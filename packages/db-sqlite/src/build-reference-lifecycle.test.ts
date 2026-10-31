@@ -1,6 +1,6 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BaselineModel, BaselineTransferModel } from "@storyshelf/core/models";
-import { makeStorage } from "@storyshelf/core/test-helpers";
+import { buildReferenceContractSuite, makeStorage } from "@storyshelf/core/test-helpers";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -8,7 +8,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
-import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
+import {
+  createBuildReferenceLifecycle,
+  replaceFencedReferences,
+} from "./build-reference-lifecycle.ts";
 import { createSqliteDatabase } from "./index.ts";
 import { schema } from "./schema/index.ts";
 
@@ -45,7 +48,152 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
   }
 }
 
+buildReferenceContractSuite("SQLite", async (run) => {
+  await withDatabase(async (path) => {
+    await run({
+      first: createBuildReferenceLifecycle(path),
+      second: createBuildReferenceLifecycle(path),
+      owner,
+      buildIds: ["one", "two"],
+    });
+  });
+});
+
 describe("SQLite reference lifecycle primitive", () => {
+  it("rejects invalid generations and unavailable builds without advancing the fence", async () => {
+    await withDatabase(async (path) => {
+      const lifecycle = createBuildReferenceLifecycle(path);
+      for (const invalid of [-1, 0.5, Number.MAX_SAFE_INTEGER]) {
+        // oxlint-disable-next-line no-await-in-loop -- verify each invalid boundary
+        await expect(
+          lifecycle.replaceFencedReferences(owner, invalid, [], async () => null),
+        ).rejects.toThrow("Invalid reference generation");
+      }
+      await expect(
+        lifecycle.replaceFencedReferences(owner, 0, ["missing"], async () => null),
+      ).rejects.toThrow("Referenced build is unavailable");
+      expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+      await expect(
+        lifecycle.replaceFencedReferences(owner, 0, ["one"], async () => null),
+      ).rejects.toThrow("Referenced build is unavailable");
+      expect(await lifecycle.referenceGeneration(owner)).toBe(0);
+    });
+  });
+  it("handles empty batches and rolls back both owners when domain writes fail", async () => {
+    await withDatabase(async (path) => {
+      const lifecycle = createBuildReferenceLifecycle(path);
+      const other = { ...owner, id: "other" };
+      expect(await lifecycle.replaceManyFencedReferences([], async () => "empty")).toEqual({
+        result: "empty",
+        generations: [],
+      });
+      await expect(
+        lifecycle.replaceManyFencedReferences(
+          [
+            { owner, expectedGeneration: 0, buildIds: ["one"] },
+            { owner: other, expectedGeneration: 0, buildIds: ["two"] },
+          ],
+          async () => {
+            throw new Error("rollback");
+          },
+        ),
+      ).rejects.toThrow("rollback");
+      expect(await lifecycle.referenceGeneration(owner)).toBe(0);
+      expect(await lifecycle.referenceGeneration(other)).toBe(0);
+      expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+      expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
+    });
+  });
+  it("retains the generation after release and rejects a stale observed generation", async () => {
+    await withDatabase(async (path) => {
+      const first = createBuildReferenceLifecycle(path);
+      const second = createBuildReferenceLifecycle(path);
+      expect(await first.referenceGeneration(owner)).toBe(0);
+      await first.replaceFencedReferences(owner, 0, ["one"], async () => null);
+      const observed = await second.referenceGeneration(owner);
+      expect(observed).toBe(1);
+      await first.replaceFencedReferences(owner, observed, [], async () => null);
+      expect(await second.referenceGeneration(owner)).toBe(2);
+      await expect(
+        second.replaceFencedReferences(owner, observed, ["two"], async () => null),
+      ).rejects.toThrow("Stale reference generation");
+      expect(await first.claimDeletion("p", "two")).toBe("claimed");
+    });
+  });
+  it("rejects an entire multi-owner update when one generation is stale", async () => {
+    await withDatabase(async (path) => {
+      const lifecycle = createBuildReferenceLifecycle(path);
+      const other = { ...owner, id: "other" };
+      const created = await lifecycle.replaceManyFencedReferences(
+        [
+          { owner, expectedGeneration: 0, buildIds: ["one"] },
+          { owner: other, expectedGeneration: 0, buildIds: ["two"] },
+        ],
+        async () => "created",
+      );
+      expect(created.generations).toEqual([1, 1]);
+      let wrote = false;
+      await expect(
+        lifecycle.replaceManyFencedReferences(
+          [
+            { owner, expectedGeneration: 1, buildIds: [] },
+            { owner: other, expectedGeneration: 0, buildIds: [] },
+          ],
+          async () => {
+            wrote = true;
+          },
+        ),
+      ).rejects.toThrow("Stale reference generation");
+      expect(wrote).toBe(false);
+      expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+      expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
+    });
+  });
+  it("admits only one competing update for the same owner generation", async () => {
+    await withDatabase(async (path) => {
+      const first = createBuildReferenceLifecycle(path);
+      const second = createBuildReferenceLifecycle(path);
+      const attempts = await Promise.allSettled([
+        first.replaceFencedReferences(owner, 0, ["one"], async () => "one"),
+        second.replaceFencedReferences(owner, 0, ["two"], async () => "two"),
+      ]);
+      const success = attempts.find((result) => result.status === "fulfilled");
+      expect(attempts.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(attempts.filter((result) => result.status === "rejected")).toHaveLength(1);
+      if (success?.status !== "fulfilled") throw new Error("No successful admission");
+      expect(success.value.generation).toBe(1);
+      expect(await first.claimDeletion("p", success.value.result)).toBe("protected");
+    });
+  });
+  it("invalidates a fence when an older lifecycle entry point changes the owner", async () => {
+    await withDatabase(async (path) => {
+      await replaceFencedReferences(path, owner, 0, ["one"], async () => null);
+      await createBuildReferenceLifecycle(path).replaceReferences(owner, ["two"], async () => null);
+      await expect(replaceFencedReferences(path, owner, 1, [], async () => null)).rejects.toThrow(
+        "Stale reference generation",
+      );
+      expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("protected");
+    });
+  });
+  it("fences stale releases across independent SQLite connections", async () => {
+    await withDatabase(async (path) => {
+      const first = await replaceFencedReferences(path, owner, 0, ["one"], async () => "first");
+      expect(first.generation).toBe(1);
+      const second = await replaceFencedReferences(path, owner, 1, ["two"], async () => "second");
+      expect(second.generation).toBe(2);
+      await expect(
+        replaceFencedReferences(path, owner, 1, [], async () => "stale"),
+      ).rejects.toThrow("Stale reference generation");
+      expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("protected");
+      expect(
+        (await replaceFencedReferences(path, owner, 2, [], async () => "release")).generation,
+      ).toBe(3);
+      await expect(
+        replaceFencedReferences(path, owner, 2, [], async () => "repeat"),
+      ).rejects.toThrow("Stale reference generation");
+      expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("claimed");
+    });
+  });
   it("protects referenced builds and leaves deletion tombstones irreversible across connections", async () => {
     await withDatabase(async (path) => {
       const first = createBuildReferenceLifecycle(path);
