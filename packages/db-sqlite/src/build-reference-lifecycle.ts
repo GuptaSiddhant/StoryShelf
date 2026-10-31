@@ -6,6 +6,8 @@ import type {
   FencedBuildReferenceChange,
   TxStore,
 } from "@storyshelf/core/adapter/database";
+import { resolveBaselineOrigin } from "@storyshelf/core/models";
+import type { Baseline, Build, Snapshot } from "@storyshelf/core/schema";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
@@ -41,13 +43,34 @@ export async function prepareBaselineReferences(
   return await inTransaction(path, async (db) => {
     const rows = db
       .prepare(
-        "SELECT id, project_id, source_build_id FROM baselines WHERE source_build_id IS NOT NULL",
+        "SELECT id FROM baselines WHERE source_build_id IS NOT NULL OR snapshot_id IS NOT NULL",
       )
-      .all() as unknown as [string, string, string][];
-    const protectedCount = rows.filter((row) => prepareBaselineReference(db, row)).length;
+      .all() as unknown as [string][];
+    const prepared = await Promise.all(
+      rows.map(async ([id]) => await prepareLegacyBaseline(db, id)),
+    );
+    const protectedCount = prepared.filter(Boolean).length;
     const unknown = rows.length - protectedCount;
     return await Promise.resolve({ protected: protectedCount, unknown });
   });
+}
+
+async function prepareLegacyBaseline(db: DatabaseSync, id: string): Promise<boolean> {
+  const tx = transactionStore(db);
+  const baseline = (await tx.get(schema.baselines, id)) as unknown as Baseline;
+  const source = await resolveBaselineOrigin(baseline, {
+    baseline: async (key) => (await tx.get(schema.baselines, key)) as unknown as Baseline | null,
+    snapshot: async (key) => (await tx.get(schema.snapshots, key)) as unknown as Snapshot | null,
+    build: async (key) => (await tx.get(schema.builds, key)) as unknown as Build | null,
+  });
+  if (!source) {
+    db.prepare("UPDATE baselines SET source_build_id = NULL WHERE id = ?").run(id);
+    return false;
+  }
+  const protectedSource = prepareBaselineReference(db, [id, baseline.projectId, source.id]);
+  if (protectedSource)
+    db.prepare("UPDATE baselines SET source_build_id = ? WHERE id = ?").run(source.id, id);
+  return protectedSource;
 }
 
 function prepareBaselineReference(

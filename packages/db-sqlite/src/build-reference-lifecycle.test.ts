@@ -61,6 +61,49 @@ buildReferenceContractSuite("SQLite", async (run) => {
 });
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("recovers the renderer source of an inherited baseline without pinning its containing build", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      try {
+        await db.insert(schema.snapshots, {
+          id: "inherited",
+          projectId: "p",
+          buildId: "two",
+          storyId: "story",
+          storyName: "Story",
+          storyTitle: "Story",
+          viewportName: "desktop",
+          browser: "chromium",
+          screenshotPath: "shot",
+          inherited: true,
+          sourceBuildId: "one",
+          createdAt: now,
+          updatedAt: now,
+        });
+        await db.insert(schema.baselines, {
+          id: "base",
+          projectId: "p",
+          storyId: "story",
+          viewportName: "desktop",
+          branch: "feature",
+          browser: "chromium",
+          screenshotPath: "shot",
+          snapshotId: "inherited",
+          sourceBuildId: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 0 });
+        expect((await db.get(schema.baselines, "base"))?.["sourceBuildId"]).toBe("one");
+        expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "one")).toBe(
+          "protected",
+        );
+        expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("claimed");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
   it("rolls back review on drift and atomically commits forced review with promotion", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
@@ -211,7 +254,7 @@ describe("SQLite reference lifecycle primitive", () => {
           sourceBuildId: "missing",
         });
         expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
-        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 0 });
+        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
         expect((await db.get(schema.baselines, "unknown"))?.["sourceBuildId"]).toBeNull();
         const lifecycle = createBuildReferenceLifecycle(path);
         expect(

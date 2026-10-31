@@ -37,6 +37,7 @@ async function traceInherited(
   reader: BaselineOriginReader,
   seen: Set<string>,
 ): Promise<Build | null> {
+  if (snapshot.sourceBuildId) return await verifiedBuild(snapshot.sourceBuildId, projectId, reader);
   if (!snapshot.baselineId || !snapshot.baselineVersion) return null;
   const parent = await reader.baseline(snapshot.baselineId);
   if (!parent || parent.updatedAt !== snapshot.baselineVersion || !matchesImage(parent, snapshot))
