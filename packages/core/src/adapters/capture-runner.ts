@@ -173,6 +173,8 @@ export interface CaptureRunner extends Adapter<{
    */
   readonly targets?: readonly RunnerTarget[];
 }> {
+  /** Optional diagnostic replay. Capture-only runners leave this absent and report unavailable. */
+  investigate?(input: InvestigationReplayInput): Promise<InvestigationReplayResult>;
   /**
    * Render configured viewports for the given stories of an extracted
    * Storybook and return the screenshot buffers.
@@ -274,4 +276,28 @@ export interface CaptureRunner extends Adapter<{
    * when it is absent. Runners can track their calls with {@link RenderRuns}.
    */
   cancel(buildId: string, runId?: string): Promise<void>;
+}
+
+/** Immutable inputs for one side of an investigation; callers must validate historical settings. */
+export interface InvestigationReplayInput {
+  buildId: string;
+  storybookDir: string;
+  story: StoryEntry;
+  viewport: Viewport;
+  target: CaptureTarget;
+  originalFingerprint: string;
+  executePlay: boolean;
+  /** Supplied by the caller so a cancelled or superseded run stops before result persistence. */
+  signal: AbortSignal;
+}
+
+export interface InvestigationReplayResult {
+  screenshot: Buffer;
+  /** Actual replay fingerprint, distinct from the historical request fingerprint. */
+  replayFingerprint: string;
+  dom: {
+    nodes: unknown[];
+    truncated: boolean;
+    coverage: string[];
+  };
 }
