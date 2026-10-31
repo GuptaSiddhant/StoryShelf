@@ -61,6 +61,42 @@ buildReferenceContractSuite("SQLite", async (run) => {
 });
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("does not backfill a fingerprint onto a concurrently changed baseline", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const lifecycle = createBuildReferenceLifecycle(path);
+      Object.assign(db, { buildReferenceLifecycle: lifecycle });
+      try {
+        await db.insert(schema.baselines, {
+          id: "base",
+          projectId: "p",
+          storyId: "story",
+          viewportName: "desktop",
+          branch: "main",
+          browser: "chromium",
+          screenshotPath: "old",
+          snapshotId: "snap",
+          sourceBuildId: "one",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const model = new BaselineModel(db);
+        const original = await model.getFor("p", "story", "desktop", "main");
+        if (!original) throw new Error("Missing baseline");
+        await db.update(schema.baselines, "base", {
+          screenshotPath: "new",
+          updatedAt: "2026-01-02T00:00:00.000Z",
+        });
+        await expect(model.backfillFingerprint(original, "hash", "fingerprint")).rejects.toThrow(
+          "Baseline changed during fingerprint backfill",
+        );
+        expect((await model.getFor("p", "story", "desktop", "main"))?.fingerprint).toBeNull();
+        expect(await lifecycle.referenceGeneration(owner)).toBe(0);
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
   it("prepares known baseline sources idempotently and clears missing sources", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);

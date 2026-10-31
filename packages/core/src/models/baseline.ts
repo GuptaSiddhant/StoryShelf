@@ -111,6 +111,33 @@ export class BaselineModel {
     infraHash: string,
     fingerprint: string,
   ): Promise<void> {
+    const lifecycle = this.db.buildReferenceLifecycle;
+    if (lifecycle) {
+      const owner = { type: "baseline" as const, id: baseline.id, projectId: baseline.projectId };
+      const generation = await lifecycle.referenceGeneration(owner);
+      await lifecycle.replaceFencedReferences(
+        owner,
+        generation,
+        baseline.sourceBuildId ? [baseline.sourceBuildId] : [],
+        async (tx) => {
+          const current = (await tx.get(
+            this.tables.baselines,
+            baseline.id,
+          )) as unknown as Baseline | null;
+          if (
+            !current ||
+            current.projectId !== baseline.projectId ||
+            current.updatedAt !== baseline.updatedAt ||
+            current.sourceBuildId !== baseline.sourceBuildId ||
+            current.screenshotPath !== baseline.screenshotPath ||
+            current.fingerprint !== baseline.fingerprint
+          )
+            throw new Error("Baseline changed during fingerprint backfill; retry");
+          await tx.update(this.tables.baselines, baseline.id, { infraHash, fingerprint });
+        },
+      );
+      return;
+    }
     await this.db.update(this.tables.baselines, baseline.id, { infraHash, fingerprint });
   }
 
