@@ -18,6 +18,24 @@ export function buildReferenceContractSuite(
   withFixture: BuildReferenceContractFixtureRunner,
 ): void {
   describe(`build reference lifecycle contract: ${label}`, () => {
+    it("serializes replacement against deletion of the newly referenced build", async () => {
+      await withFixture(async ({ first, second, owner, buildIds }) => {
+        await first.replaceFencedReferences(owner, 0, [buildIds[0]], async () => null);
+        const [replacement, deletion] = await Promise.allSettled([
+          first.replaceFencedReferences(owner, 1, [buildIds[1]], async () => null),
+          second.claimDeletion(owner.projectId, buildIds[1]),
+        ]);
+        expect(deletion.status).toBe("fulfilled");
+        if (deletion.status !== "fulfilled") throw new Error("deletion failed");
+        if (replacement.status === "fulfilled") {
+          expect(deletion.value).toBe("protected");
+          expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("claimed");
+        } else {
+          expect(deletion.value).toBe("claimed");
+          expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("protected");
+        }
+      });
+    });
     it("serializes an admission against deletion", async () => {
       await withFixture(async ({ first, second, owner, buildIds }) => {
         const [admission, deletion] = await Promise.allSettled([
