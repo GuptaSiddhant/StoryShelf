@@ -3,6 +3,7 @@ import type {
   BuildReferenceChange,
   BuildReferenceLifecycle,
   BuildReferenceOwner,
+  FencedBuildReferenceChange,
   TxStore,
 } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
@@ -18,6 +19,8 @@ export function createBuildReferenceLifecycle(
   onContention?: () => void,
 ): BuildReferenceLifecycle {
   return {
+    replaceManyFencedReferences: async (changes, writeDomain) =>
+      await replaceManyFencedReferences(path, changes, writeDomain),
     replaceFencedReferences: async (owner, generation, ids, writeDomain) =>
       await replaceFencedReferences(path, owner, generation, ids, writeDomain),
     replaceReferences: async (owner, buildIds, writeDomain) =>
@@ -29,6 +32,47 @@ export function createBuildReferenceLifecycle(
   };
 }
 
+/** Serialize every owner check and write with deletion claims in the SQLite write transaction. */
+export async function replaceManyFencedReferences<T>(
+  path: string,
+  changes: readonly FencedBuildReferenceChange[],
+  writeDomain: (tx: TxStore) => Promise<T>,
+): Promise<{ result: T; generations: number[] }> {
+  const keys = changes.map(({ owner }) => JSON.stringify([owner.projectId, owner.type, owner.id]));
+  if (new Set(keys).size !== keys.length) throw new Error("Duplicate reference owner");
+  for (const { expectedGeneration } of changes)
+    if (
+      !Number.isSafeInteger(expectedGeneration) ||
+      expectedGeneration < 0 ||
+      expectedGeneration >= Number.MAX_SAFE_INTEGER
+    )
+      throw new Error("Invalid reference generation");
+  // oxlint-disable-next-line eslint/max-statements -- owner validation and writes share one transaction
+  return await inTransaction(path, async (db) => {
+    const normalized = changes.map((change) => ({
+      ...change,
+      ids: [...new Set(change.buildIds)].toSorted(),
+    }));
+    const select = db.prepare(
+      "SELECT generation FROM build_reference_generations WHERE project_id = ? AND owner_type = ? AND owner_id = ?",
+    );
+    for (const change of normalized) {
+      const row = select.get(change.owner.projectId, change.owner.type, change.owner.id) as
+        | unknown[]
+        | undefined;
+      if ((row?.[0] ?? 0) !== change.expectedGeneration)
+        throw new Error("Stale reference generation");
+      checkAvailable(db, change.owner.projectId, change.ids);
+    }
+    const result = await writeDomain(transactionStore(db));
+    for (const change of normalized) {
+      saveReferences(db, change.owner, change.ids);
+      advanceGeneration(db, change.owner);
+    }
+    return { result, generations: normalized.map((change) => change.expectedGeneration + 1) };
+  });
+}
+
 /** Generation-checked owner update; the retained generation fences stale releases and retries. */
 export async function replaceFencedReferences<T>(
   path: string,
@@ -37,26 +81,12 @@ export async function replaceFencedReferences<T>(
   buildIds: readonly string[],
   writeDomain: (tx: TxStore) => Promise<T>,
 ): Promise<{ result: T; generation: number }> {
-  if (!Number.isSafeInteger(expectedGeneration) || expectedGeneration < 0)
-    throw new Error("Invalid reference generation");
-  return await inTransaction(path, async (db) => {
-    const args = [owner.projectId, owner.type, owner.id] as const;
-    const row = db
-      .prepare(
-        "SELECT generation FROM build_reference_generations WHERE project_id = ? AND owner_type = ? AND owner_id = ?",
-      )
-      .get(...args) as unknown[] | undefined;
-    if ((row?.[0] ?? 0) !== expectedGeneration) throw new Error("Stale reference generation");
-    const ids = [...new Set(buildIds)].toSorted();
-    checkAvailable(db, owner.projectId, ids);
-    const result = await writeDomain(transactionStore(db));
-    saveReferences(db, owner, ids);
-    const generation = expectedGeneration + 1;
-    db.prepare(
-      "INSERT INTO build_reference_generations (project_id, owner_type, owner_id, generation) VALUES (?, ?, ?, ?) ON CONFLICT (project_id, owner_type, owner_id) DO UPDATE SET generation = excluded.generation",
-    ).run(...args, generation);
-    return { result, generation };
-  });
+  const updated = await replaceManyFencedReferences(
+    path,
+    [{ owner, expectedGeneration, buildIds }],
+    writeDomain,
+  );
+  return { result: updated.result, generation: expectedGeneration + 1 };
 }
 
 async function open(path: string, onContention?: () => void): Promise<DatabaseSync> {

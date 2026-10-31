@@ -124,12 +124,22 @@ export interface BuildReferenceChange {
   buildIds: readonly string[];
 }
 
+/** A complete owner reference replacement guarded by its last observed generation. */
+export interface FencedBuildReferenceChange extends BuildReferenceChange {
+  expectedGeneration: number;
+}
+
 /**
  * An explicit database capability; an ordinary transaction does not establish this contract.
  * Implementations serialize admissions, reference changes, and deletion claims across processes.
  * Their tests must use independent connections, including promotion/purge and pin/purge races.
  */
 export interface BuildReferenceLifecycle {
+  /** Atomically fence and replace multiple owners, or roll back all owners and domain writes. */
+  replaceManyFencedReferences<T>(
+    changes: readonly FencedBuildReferenceChange[],
+    writeDomain: (tx: TxStore) => Promise<T>,
+  ): Promise<{ result: T; generations: number[] }>;
   /** Compare and advance an owner's durable generation with its reference and domain writes.
    * Generation zero denotes an owner with no earlier mutations. A stale generation rejects the
    * whole transaction. Generations survive release so an old worker cannot release a newer pin. */

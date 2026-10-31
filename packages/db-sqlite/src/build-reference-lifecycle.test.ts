@@ -49,6 +49,35 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
 }
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("rejects an entire multi-owner update when one generation is stale", async () => {
+    await withDatabase(async (path) => {
+      const lifecycle = createBuildReferenceLifecycle(path);
+      const other = { ...owner, id: "other" };
+      const created = await lifecycle.replaceManyFencedReferences(
+        [
+          { owner, expectedGeneration: 0, buildIds: ["one"] },
+          { owner: other, expectedGeneration: 0, buildIds: ["two"] },
+        ],
+        async () => "created",
+      );
+      expect(created.generations).toEqual([1, 1]);
+      let wrote = false;
+      await expect(
+        lifecycle.replaceManyFencedReferences(
+          [
+            { owner, expectedGeneration: 1, buildIds: [] },
+            { owner: other, expectedGeneration: 0, buildIds: [] },
+          ],
+          async () => {
+            wrote = true;
+          },
+        ),
+      ).rejects.toThrow("Stale reference generation");
+      expect(wrote).toBe(false);
+      expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+      expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
+    });
+  });
   it("admits only one competing update for the same owner generation", async () => {
     await withDatabase(async (path) => {
       const first = createBuildReferenceLifecycle(path);
