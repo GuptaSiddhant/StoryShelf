@@ -49,6 +49,22 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
 }
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("retains the generation after release and rejects a stale observed generation", async () => {
+    await withDatabase(async (path) => {
+      const first = createBuildReferenceLifecycle(path);
+      const second = createBuildReferenceLifecycle(path);
+      expect(await first.referenceGeneration(owner)).toBe(0);
+      await first.replaceFencedReferences(owner, 0, ["one"], async () => null);
+      const observed = await second.referenceGeneration(owner);
+      expect(observed).toBe(1);
+      await first.replaceFencedReferences(owner, observed, [], async () => null);
+      expect(await second.referenceGeneration(owner)).toBe(2);
+      await expect(
+        second.replaceFencedReferences(owner, observed, ["two"], async () => null),
+      ).rejects.toThrow("Stale reference generation");
+      expect(await first.claimDeletion("p", "two")).toBe("claimed");
+    });
+  });
   it("rejects an entire multi-owner update when one generation is stale", async () => {
     await withDatabase(async (path) => {
       const lifecycle = createBuildReferenceLifecycle(path);

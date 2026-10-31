@@ -19,6 +19,7 @@ export function createBuildReferenceLifecycle(
   onContention?: () => void,
 ): BuildReferenceLifecycle {
   return {
+    referenceGeneration: async (owner) => await referenceGeneration(path, owner),
     replaceManyFencedReferences: async (changes, writeDomain) =>
       await replaceManyFencedReferences(path, changes, writeDomain),
     replaceFencedReferences: async (owner, generation, ids, writeDomain) =>
@@ -30,6 +31,17 @@ export function createBuildReferenceLifecycle(
     claimDeletion: async (projectId, buildId) =>
       await claimDeletion(path, projectId, buildId, onContention),
   };
+}
+
+async function referenceGeneration(path: string, owner: BuildReferenceOwner): Promise<number> {
+  return await inTransaction(path, async (db) => {
+    const row = db
+      .prepare(
+        "SELECT generation FROM build_reference_generations WHERE project_id = ? AND owner_type = ? AND owner_id = ?",
+      )
+      .get(owner.projectId, owner.type, owner.id) as unknown[] | undefined;
+    return await Promise.resolve(Number(row?.[0] ?? 0));
+  });
 }
 
 /** Serialize every owner check and write with deletion claims in the SQLite write transaction. */

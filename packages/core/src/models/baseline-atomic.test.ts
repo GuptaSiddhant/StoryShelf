@@ -27,6 +27,7 @@ const input: AtomicBaselineInput = {
 function setup() {
   const { db } = makeDatabase();
   const lifecycle: BuildReferenceLifecycle = {
+    referenceGeneration: async () => await Promise.resolve(0),
     replaceManyFencedReferences: async (changes, writeDomain) => ({
       result: await writeDomain(db),
       generations: changes.map((change) => change.expectedGeneration + 1),

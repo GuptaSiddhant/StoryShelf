@@ -135,6 +135,9 @@ export interface FencedBuildReferenceChange extends BuildReferenceChange {
  * Their tests must use independent connections, including promotion/purge and pin/purge races.
  */
 export interface BuildReferenceLifecycle {
+  /** Return the durable generation for an owner, or zero before its first reference mutation.
+   * This is a snapshot: callers must pass it to a fenced mutation, which rechecks atomically. */
+  referenceGeneration(owner: BuildReferenceOwner): Promise<number>;
   /** Atomically fence and replace multiple owners, or roll back all owners and domain writes. */
   replaceManyFencedReferences<T>(
     changes: readonly FencedBuildReferenceChange[],
