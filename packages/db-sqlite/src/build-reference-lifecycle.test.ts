@@ -1,5 +1,5 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { BaselineModel, BaselineTransferModel } from "@storyshelf/core/models";
+import { BaselineModel, BaselineTransferModel, SnapshotModel } from "@storyshelf/core/models";
 import { buildReferenceContractSuite, makeStorage } from "@storyshelf/core/test-helpers";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -61,6 +61,61 @@ buildReferenceContractSuite("SQLite", async (run) => {
 });
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("rolls back review on drift and atomically commits forced review with promotion", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const lifecycle = createBuildReferenceLifecycle(path);
+      Object.assign(db, { buildReferenceLifecycle: lifecycle });
+      const { storage } = makeStorage();
+      const base = {
+        projectId: "p",
+        storyId: "story",
+        storyName: "Story",
+        storyTitle: "Story",
+        viewportName: "desktop",
+        browser: "chromium",
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await storage.write("old.png", Buffer.from("old"));
+        await storage.write("new.png", Buffer.from("new"));
+        await db.insert(schema.snapshots, {
+          ...base,
+          id: "old",
+          buildId: "one",
+          screenshotPath: "old.png",
+        });
+        const model = new BaselineModel(db, undefined, storage);
+        const baseline = await model.upsert("p", "story", "desktop", "main", "old", "old.png");
+        await db.insert(schema.snapshots, {
+          ...base,
+          id: "new",
+          buildId: "two",
+          screenshotPath: "new.png",
+          status: "changed",
+          baselineId: baseline.id,
+          baselineVersion: "stale",
+        });
+        const snapshot = await new SnapshotModel(db).get("new");
+        if (!snapshot) throw new Error("missing snapshot");
+        const approval = { snapshot, reviewedBy: null, force: false, branch: "main" };
+        await expect(
+          model.upsert("p", "story", "desktop", "main", "new", "new.png", undefined, { approval }),
+        ).rejects.toThrow("Baseline changed after this diff");
+        expect((await new SnapshotModel(db).get("new"))?.status).toBe("changed");
+        expect((await model.getFor("p", "story", "desktop", "main"))?.sourceBuildId).toBe("one");
+        await model.upsert("p", "story", "desktop", "main", "new", "new.png", undefined, {
+          approval: { ...approval, force: true },
+        });
+        expect((await new SnapshotModel(db).get("new"))?.status).toBe("approved");
+        expect((await model.getFor("p", "story", "desktop", "main"))?.sourceBuildId).toBe("two");
+        expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
   it("keeps a prepared source protected until both baseline owners are removed", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);

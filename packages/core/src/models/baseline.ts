@@ -12,12 +12,14 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { isContentPath } from "../utils/paths.ts";
 import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
+import { approveInTransaction, type AtomicBaselineApproval } from "./baseline-approval.ts";
 import { upsertAtomicBaseline } from "./baseline-atomic.ts";
 import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
 
 /** Extra identity/metadata for {@link BaselineModel.upsert}. */
 export interface BaselineUpsertOptions {
+  approval?: AtomicBaselineApproval;
   /** Engine the baseline belongs to (default chromium). */
   browser?: string;
   /** Resolved mode definition as JSON (display only). */
@@ -235,6 +237,7 @@ export class BaselineModel {
     const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
     const lifecycle = this.db.buildReferenceLifecycle;
     if (lifecycle) {
+      const approval = options.approval;
       const baseline = await upsertAtomicBaseline(
         lifecycle,
         { baselines: this.tables.baselines, snapshots: this.db.tables.snapshots },
@@ -254,6 +257,9 @@ export class BaselineModel {
           infraHash,
           fingerprint: options.fingerprint,
           mode: options.mode,
+          beforeWrite: approval
+            ? async (tx): Promise<void> => await approveInTransaction(tx, this.db.tables, approval)
+            : undefined,
         },
       );
       if (this.webhookTables) {

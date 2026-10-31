@@ -23,6 +23,7 @@ export interface AtomicBaselineInput {
   infraHash: string | null | undefined;
   fingerprint: string | null | undefined;
   mode: string | null | undefined;
+  beforeWrite?: (tx: TxStore) => Promise<void>;
 }
 
 /** Atomically change the baseline row and its complete build-reference set. */
@@ -37,7 +38,10 @@ export async function upsertAtomicBaseline(
     owner,
     generation,
     input.sourceBuildId ? [input.sourceBuildId] : [],
-    async (tx) => await writeBaseline(tx, tables, input),
+    async (tx) => {
+      await input.beforeWrite?.(tx);
+      return await writeBaseline(tx, tables, input);
+    },
   );
   return updated.result;
 }

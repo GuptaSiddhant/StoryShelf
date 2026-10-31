@@ -5,6 +5,7 @@
  * (`@storyshelf/core/models`); per-entity modules stay importable too.
  */
 export { BaselineModel } from "./baseline.ts";
+export { BaselineApprovalConflict } from "./baseline-approval.ts";
 export { resolveBaselineOrigin, type BaselineOriginReader } from "./baseline-origin.ts";
 export {
   BASELINE_ARCHIVE_FORMAT,
