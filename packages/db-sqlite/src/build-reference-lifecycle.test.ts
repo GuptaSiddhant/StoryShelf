@@ -10,6 +10,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 import {
   createBuildReferenceLifecycle,
+  prepareBaselineReferences,
   replaceFencedReferences,
 } from "./build-reference-lifecycle.ts";
 import { createSqliteDatabase } from "./index.ts";
@@ -60,6 +61,41 @@ buildReferenceContractSuite("SQLite", async (run) => {
 });
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("prepares known baseline sources idempotently and clears missing sources", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const baseline = {
+        projectId: "p",
+        storyId: "story",
+        viewportName: "desktop",
+        branch: "main",
+        browser: "chromium",
+        screenshotPath: "shot",
+        snapshotId: "snap",
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await db.insert(schema.baselines, { ...baseline, id: "known", sourceBuildId: "one" });
+        await db.insert(schema.baselines, {
+          ...baseline,
+          id: "unknown",
+          storyId: "other",
+          sourceBuildId: "missing",
+        });
+        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
+        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 0 });
+        expect((await db.get(schema.baselines, "unknown"))?.["sourceBuildId"]).toBeNull();
+        const lifecycle = createBuildReferenceLifecycle(path);
+        expect(
+          await lifecycle.referenceGeneration({ type: "baseline", id: "known", projectId: "p" }),
+        ).toBe(1);
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
   it("rejects invalid generations and unavailable builds without advancing the fence", async () => {
     await withDatabase(async (path) => {
       const lifecycle = createBuildReferenceLifecycle(path);

@@ -33,6 +33,46 @@ export function createBuildReferenceLifecycle(
   };
 }
 
+/** Prepare known baseline pins under the same SQLite write lock as reference admission.
+ * Do not enable lifecycle-aware deletion until all writers participate in this concurrency domain. */
+export async function prepareBaselineReferences(
+  path: string,
+): Promise<{ protected: number; unknown: number }> {
+  return await inTransaction(path, async (db) => {
+    const rows = db
+      .prepare(
+        "SELECT id, project_id, source_build_id FROM baselines WHERE source_build_id IS NOT NULL",
+      )
+      .all() as unknown as [string, string, string][];
+    const protectedCount = rows.filter((row) => prepareBaselineReference(db, row)).length;
+    const unknown = rows.length - protectedCount;
+    return await Promise.resolve({ protected: protectedCount, unknown });
+  });
+}
+
+function prepareBaselineReference(
+  db: DatabaseSync,
+  [id, projectId, buildId]: [string, string, string],
+): boolean {
+  const row = db
+    .prepare("SELECT retention_state FROM builds WHERE id = ? AND project_id = ?")
+    .get(buildId, projectId) as unknown[] | undefined;
+  if (row?.[0] !== "available") {
+    db.prepare("UPDATE baselines SET source_build_id = NULL WHERE id = ? AND project_id = ?").run(
+      id,
+      projectId,
+    );
+    return false;
+  }
+  const result = db
+    .prepare(
+      "INSERT OR IGNORE INTO build_references (project_id, owner_type, owner_id, build_id) VALUES (?, 'baseline', ?, ?)",
+    )
+    .run(projectId, id, buildId);
+  if (result.changes) advanceGeneration(db, { type: "baseline", id, projectId });
+  return true;
+}
+
 async function referenceGeneration(path: string, owner: BuildReferenceOwner): Promise<number> {
   return await inTransaction(path, async (db) => {
     const row = db
