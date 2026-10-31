@@ -115,8 +115,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("remote capture over CDP
 
   it("leaves a sibling page responsive when a run is cancelled", async () => {
     const sibling = await puppeteer.connect({ browserURL: `http://127.0.0.1:${port}` });
-    const siblingPage = await sibling.newPage();
-    await siblingPage.goto(`${served?.url}/iframe.html?id=components-button--primary`);
+    const siblingContext = await sibling.createBrowserContext();
+    const siblingPage = await siblingContext.newPage();
+    await siblingPage.goto(`${served?.url}/`);
     await siblingPage.evaluate(() => {
       (globalThis as unknown as { siblingAlive: string }).siblingAlive = "alive";
     });
@@ -143,7 +144,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("remote capture over CDP
 
       await vi.waitFor(async () => {
         const urls = (await sibling.pages()).map((page) => page.url());
-        expect(urls.some((url) => url.includes("iframe.html"))).toBe(true);
+        expect(urls.some((url) => url.includes("components-button--primary"))).toBe(true);
       });
       await runner.cancel("remote-cdp-cancel");
       const result = await rendering;
@@ -156,7 +157,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("remote capture over CDP
       ).toBe("alive");
       expect(await sibling.pages()).toHaveLength(pagesBefore);
     } finally {
-      await siblingPage.close();
+      await siblingContext.close();
       await sibling.disconnect();
     }
   }, 120_000);
