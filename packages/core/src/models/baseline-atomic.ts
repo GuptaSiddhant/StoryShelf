@@ -31,11 +31,15 @@ export async function upsertAtomicBaseline(
   tables: { baselines: Table; snapshots: Table },
   input: AtomicBaselineInput,
 ): Promise<Baseline> {
-  return await lifecycle.replaceReferences(
-    { projectId: input.projectId, type: "baseline", id: input.id },
+  const owner = { projectId: input.projectId, type: "baseline" as const, id: input.id };
+  const generation = await lifecycle.referenceGeneration(owner);
+  const updated = await lifecycle.replaceFencedReferences(
+    owner,
+    generation,
     input.sourceBuildId ? [input.sourceBuildId] : [],
     async (tx) => await writeBaseline(tx, tables, input),
   );
+  return updated.result;
 }
 
 async function writeBaseline(

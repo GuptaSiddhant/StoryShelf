@@ -370,26 +370,24 @@ export class BaselineModel {
   private async removeRecord(baseline: Baseline): Promise<void> {
     const lifecycle = this.db.buildReferenceLifecycle;
     if (lifecycle) {
-      await lifecycle.replaceReferences(
-        { type: "baseline", projectId: baseline.projectId, id: baseline.id },
-        [],
-        async (tx) => {
-          const current = (await tx.get(
-            this.tables.baselines,
-            baseline.id,
-          )) as unknown as Baseline | null;
-          if (!current) return;
-          if (
-            current.updatedAt !== baseline.updatedAt ||
-            current.snapshotId !== baseline.snapshotId ||
-            current.sourceBuildId !== baseline.sourceBuildId ||
-            current.screenshotPath !== baseline.screenshotPath
-          ) {
-            throw new Error("Baseline changed during removal; retry");
-          }
-          await tx.remove(this.tables.baselines, baseline.id);
-        },
-      );
+      const owner = { type: "baseline" as const, projectId: baseline.projectId, id: baseline.id };
+      const generation = await lifecycle.referenceGeneration(owner);
+      await lifecycle.replaceFencedReferences(owner, generation, [], async (tx) => {
+        const current = (await tx.get(
+          this.tables.baselines,
+          baseline.id,
+        )) as unknown as Baseline | null;
+        if (!current) return;
+        if (
+          current.updatedAt !== baseline.updatedAt ||
+          current.snapshotId !== baseline.snapshotId ||
+          current.sourceBuildId !== baseline.sourceBuildId ||
+          current.screenshotPath !== baseline.screenshotPath
+        ) {
+          throw new Error("Baseline changed during removal; retry");
+        }
+        await tx.remove(this.tables.baselines, baseline.id);
+      });
       await this.discardFile(baseline);
       return;
     }
