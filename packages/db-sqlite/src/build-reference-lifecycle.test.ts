@@ -1,6 +1,6 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BaselineModel, BaselineTransferModel } from "@storyshelf/core/models";
-import { makeStorage } from "@storyshelf/core/test-helpers";
+import { buildReferenceContractSuite, makeStorage } from "@storyshelf/core/test-helpers";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -47,6 +47,17 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+buildReferenceContractSuite("SQLite", async (run) => {
+  await withDatabase(async (path) => {
+    await run({
+      first: createBuildReferenceLifecycle(path),
+      second: createBuildReferenceLifecycle(path),
+      owner,
+      buildIds: ["one", "two"],
+    });
+  });
+});
 
 describe("SQLite reference lifecycle primitive", () => {
   it("retains the generation after release and rejects a stale observed generation", async () => {

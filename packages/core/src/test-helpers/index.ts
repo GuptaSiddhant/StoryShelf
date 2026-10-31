@@ -33,3 +33,9 @@ export { createManualClock, type ManualClock } from "./manual-clock.ts";
 export { runnerContractSuite } from "./runner-contract.ts";
 export { storageContractSuite } from "./storage-contract.ts";
 export { makeFakeStateNotifier, type FakeStateNotifier } from "./fake-notifier.ts";
+
+export {
+  buildReferenceContractSuite,
+  type BuildReferenceContractFixture,
+  type BuildReferenceContractFixtureRunner,
+} from "./build-reference-contract.ts";
