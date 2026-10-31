@@ -61,6 +61,42 @@ buildReferenceContractSuite("SQLite", async (run) => {
 });
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("keeps a prepared source protected until both baseline owners are removed", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const base = {
+        projectId: "p",
+        storyId: "story",
+        viewportName: "desktop",
+        branch: "main",
+        browser: "chromium",
+        screenshotPath: "shot",
+        snapshotId: "snap",
+        sourceBuildId: "one",
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await db.insert(schema.baselines, { ...base, id: "main" });
+        await db.insert(schema.baselines, { ...base, id: "feature", branch: "feature" });
+        expect(await prepareBaselineReferences(path)).toEqual({ protected: 2, unknown: 0 });
+        const lifecycle = createBuildReferenceLifecycle(path);
+        for (const id of ["main", "feature"]) {
+          const ref = { type: "baseline" as const, id, projectId: "p" };
+          // oxlint-disable-next-line no-await-in-loop -- verify protection after each owner is removed
+          await lifecycle.replaceFencedReferences(ref, 1, [], async (tx) => {
+            await tx.remove(schema.baselines, id);
+          });
+          // oxlint-disable-next-line no-await-in-loop -- the first owner must not release the second owner's pin
+          expect(await lifecycle.claimDeletion("p", "one")).toBe(
+            id === "main" ? "protected" : "claimed",
+          );
+        }
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
   it("does not backfill a fingerprint onto a concurrently changed baseline", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
