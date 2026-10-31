@@ -2,7 +2,8 @@ import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import puppeteer from "puppeteer-core";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createPuppeteerCaptureRunner } from "./capture-runner.ts";
 import { cdp } from "./remote/cdp.ts";
 import { createStaticServer, type StaticServer } from "./static-server.ts";
@@ -66,6 +67,99 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("remote capture over CDP
     chrome?.kill();
     await served?.close();
   });
+
+  it("leaves sibling pages and contexts untouched across a recycling run", async () => {
+    const sibling = await puppeteer.connect({ browserURL: `http://127.0.0.1:${port}` });
+    const siblingContext = await sibling.createBrowserContext();
+    const siblingPage = await siblingContext.newPage();
+    await siblingPage.goto(`${served?.url}/iframe.html?id=components-button--primary`);
+    await siblingPage.evaluate(() => {
+      (globalThis as unknown as { siblingAlive: string }).siblingAlive = "alive";
+    });
+    const pagesBefore = (await sibling.pages()).length;
+    try {
+      const runner = createPuppeteerCaptureRunner({
+        browsers: [
+          cdp({
+            name: "remote",
+            endpoint: `http://127.0.0.1:${port}`,
+            sessions: 2,
+            engines: ["chromium"],
+          }),
+        ],
+        recycleBrowserEvery: 1,
+        reusePages: true,
+      });
+      const result = await runner.render({
+        buildId: "remote-cdp-sibling",
+        storybookDir: join(FIXTURE_DIR, "storybook-static"),
+        storybookUrl: `${served?.url}/`,
+        stories: STORIES,
+        viewports: [{ name: "desktop", width: 1280, height: 720 }],
+      });
+
+      expect(result.failures).toEqual([]);
+      expect(result.captures).toHaveLength(2);
+      expect(
+        await siblingPage.evaluate(
+          () => (globalThis as unknown as { siblingAlive: string }).siblingAlive,
+        ),
+      ).toBe("alive");
+      expect(await sibling.pages()).toHaveLength(pagesBefore);
+      expect(await siblingContext.pages()).toHaveLength(1);
+    } finally {
+      await siblingContext.close();
+      await sibling.disconnect();
+    }
+  }, 120_000);
+
+  it("leaves a sibling page responsive when a run is cancelled", async () => {
+    const sibling = await puppeteer.connect({ browserURL: `http://127.0.0.1:${port}` });
+    const siblingPage = await sibling.newPage();
+    await siblingPage.goto(`${served?.url}/iframe.html?id=components-button--primary`);
+    await siblingPage.evaluate(() => {
+      (globalThis as unknown as { siblingAlive: string }).siblingAlive = "alive";
+    });
+    const pagesBefore = (await sibling.pages()).length;
+    try {
+      const runner = createPuppeteerCaptureRunner({
+        browsers: [
+          cdp({
+            name: "remote",
+            endpoint: `http://127.0.0.1:${port}`,
+            sessions: 2,
+            engines: ["chromium"],
+          }),
+        ],
+        concurrency: 1,
+      });
+      const rendering = runner.render({
+        buildId: "remote-cdp-cancel",
+        storybookDir: join(FIXTURE_DIR, "storybook-static"),
+        storybookUrl: `${served?.url}/`,
+        stories: [{ ...STORIES[0]!, parameters: { delay: 10_000 } }],
+        viewports: [{ name: "desktop", width: 1280, height: 720 }],
+      });
+
+      await vi.waitFor(async () => {
+        const urls = (await sibling.pages()).map((page) => page.url());
+        expect(urls.some((url) => url.includes("iframe.html"))).toBe(true);
+      });
+      await runner.cancel("remote-cdp-cancel");
+      const result = await rendering;
+
+      expect(result.failures.length).toBeGreaterThan(0);
+      expect(
+        await siblingPage.evaluate(
+          () => (globalThis as unknown as { siblingAlive: string }).siblingAlive,
+        ),
+      ).toBe("alive");
+      expect(await sibling.pages()).toHaveLength(pagesBefore);
+    } finally {
+      await siblingPage.close();
+      await sibling.disconnect();
+    }
+  }, 120_000);
 
   it("renders from the URL it is given and measures the fingerprint inside the remote browser", async () => {
     const runner = createPuppeteerCaptureRunner({

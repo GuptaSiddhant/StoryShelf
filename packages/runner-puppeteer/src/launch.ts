@@ -19,8 +19,8 @@ const DEFAULT_ARGS = [
 
 /**
  * Puppeteer closes its browser on SIGINT/SIGTERM/SIGHUP by default, which fails a render that a
- * graceful drain is still finishing. The host owns shutdown: it drains, then closes every browser
- * through `teardown`.
+ * graceful drain is still finishing. The host owns shutdown: it drains, and each render releases
+ * the browser it launched (or disconnects the one it connected to).
  */
 const HOST_OWNS_SIGNALS = {
   handleSIGINT: false,

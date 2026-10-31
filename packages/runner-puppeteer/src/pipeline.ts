@@ -24,11 +24,12 @@ import {
   type SessionGate,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
-import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import { messageOf, safeCloseServer } from "./browser.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
+import { createBrowserSession, type BrowserSession, type ReleaseOutcome } from "./session.ts";
 import { createStaticServer } from "./static-server.ts";
 import type {
   ActiveRun,
@@ -54,23 +55,56 @@ export async function renderAll(
   const { input, name, remote } = planRun(rawInput, driver, defaultTarget);
   assertReachable(name, remote, input.storybookUrl);
   // Launch first: a target that will not start must fail before a static server is bound.
-  const browser = await driver.launch(name, input.logger);
-  const server = await serve(input, browser);
+  const session = createBrowserSession(await driver.launch(name, input.logger));
+  active.session = session;
+  try {
+    return await renderWithSession(input, name, remote, session, active, driver);
+  } catch (error) {
+    await session.release("failed");
+    throw error;
+  } finally {
+    clearActive(active, session);
+  }
+}
+
+async function renderWithSession(
+  input: RunInput,
+  name: CaptureTarget,
+  remote: RemoteTarget | undefined,
+  session: BrowserSession,
+  active: ActiveRun,
+  driver: TargetDriver,
+): Promise<RenderResult> {
+  const server = await serve(input, session);
   input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
   // Measured while the browser is open: Puppeteer cannot read the version of a closed one.
-  const environment = remote
-    ? await measureRemote(browser, remote.remote, input.logger)
-    : await localEnvironment(browser);
-  const result = await runWithBrowser(
-    input,
-    active,
-    browser,
-    server,
-    async () => await driver.launch(name, input.logger),
+  const environment = await measureEnvironment(session, remote, server, input);
+  const result = await runWithBrowser(input, active, session, server, async () =>
+    createBrowserSession(await driver.launch(name, input.logger)),
   );
   // Echo the target so persisted rows are attributable without the request.
   for (const row of [...result.captures, ...result.failures]) row.browser = name;
   return { ...result, environment };
+}
+
+async function measureEnvironment(
+  session: BrowserSession,
+  remote: RemoteTarget | undefined,
+  server: Serving,
+  input: RunInput,
+): Promise<CaptureEnvironment> {
+  try {
+    return remote
+      ? await measureRemote(session, remote.remote, input.logger)
+      : await localEnvironment(session.browser);
+  } catch (error) {
+    await Promise.all([session.release("failed"), safeCloseServer(server)]);
+    throw error;
+  }
+}
+
+function clearActive(active: ActiveRun, session: BrowserSession): void {
+  if (active.session === session) active.session = null;
 }
 
 /** The input with its target resolved, and the session gate when the target is remote. */
@@ -119,7 +153,7 @@ function assertStorybookRoot(target: CaptureTarget, storybookUrl: string): void 
 /** The loopback server, or the URL given; a server that cannot start closes the browser it was for. */
 export async function serve(
   input: Pick<RunInput, "storybookDir" | "storybookUrl">,
-  browser: Browser,
+  session: BrowserSession,
 ): Promise<Serving> {
   if (input.storybookUrl !== undefined) {
     return {
@@ -130,7 +164,7 @@ export async function serve(
     };
   }
   return await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
-    await safeCloseBrowser(browser);
+    await session.release("failed");
     throw error;
   });
 }
@@ -144,32 +178,42 @@ async function localEnvironment(browser: Browser): Promise<CaptureEnvironment> {
 async function runWithBrowser(
   input: RunInput,
   active: ActiveRun,
-  browser: Browser,
+  session: BrowserSession,
   server: Serving,
-  relaunch: () => Promise<Browser>,
+  relaunch: () => Promise<BrowserSession>,
 ): Promise<RenderResult> {
-  active.browser = browser;
-  const ctx = buildContext(browser, server.url, input);
+  const ctx = buildContext(session, server.url, input);
   const captures: RenderedSnapshot[] = [];
   const failures: RenderResult["failures"] = [];
+  let outcome: ReleaseOutcome = "failed";
   try {
     await runAllCaptures(input, active, ctx, captures, failures, relaunch);
+    outcome = "finished";
     return { captures, failures };
   } finally {
-    active.browser = null;
-    await ctx.pagePool?.dispose();
-    // ctx.browser is the latest one: recycling replaces the browser mid-run.
-    await Promise.all([safeCloseBrowser(ctx.browser), safeCloseServer(server)]);
+    await releaseContext(ctx, active, outcome);
+    await safeCloseServer(server);
   }
 }
 
+async function releaseContext(
+  ctx: CaptureContext,
+  active: ActiveRun,
+  outcome: ReleaseOutcome,
+): Promise<void> {
+  await ctx.pagePool?.dispose();
+  // ctx.session is the latest one: recycling replaces the browser mid-run.
+  await ctx.session.release(active.cancelled ? "cancelled" : outcome);
+  clearActive(active, ctx.session);
+}
+
 function buildContext(
-  browser: Browser,
+  session: BrowserSession,
   baseUrl: string,
   input: PuppeteerRenderInput,
 ): CaptureContext {
   return {
-    browser,
+    session,
     adapter: input.adapter ?? new StorybookAdapter(),
     baseUrl,
     navigationTimeoutMs: input.navigationTimeoutMs,
@@ -178,7 +222,7 @@ function buildContext(
     runA11y: input.runA11y,
     ...(input.logger ? { logger: input.logger } : {}),
     runtimeParams: createRuntimeParamsState(),
-    ...(input.reusePages ? { pagePool: new PagePool(browser) } : {}),
+    ...(input.reusePages ? { pagePool: new PagePool(session) } : {}),
   };
 }
 
@@ -188,7 +232,7 @@ async function runAllCaptures(
   ctx: CaptureContext,
   captures: RenderedSnapshot[],
   failures: RenderResult["failures"],
-  relaunch: () => Promise<Browser>,
+  relaunch: () => Promise<BrowserSession>,
 ): Promise<void> {
   // Bounded: one page per story x viewport all at once exhausts memory on large Storybooks.
   const jobs = input.stories.flatMap((story) =>
@@ -218,7 +262,7 @@ async function runBatches(
   out: {
     captures: RenderedSnapshot[];
     failures: RenderResult["failures"];
-    relaunch: () => Promise<Browser>;
+    relaunch: () => Promise<BrowserSession>;
   },
 ): Promise<void> {
   for (const [index, batch] of batches.entries()) {
@@ -238,16 +282,39 @@ async function runBatches(
 async function recycleBrowser(
   active: ActiveRun,
   ctx: CaptureContext,
-  relaunch: () => Promise<Browser>,
+  relaunch: () => Promise<BrowserSession>,
   logger: PuppeteerRenderInput["logger"],
 ): Promise<void> {
-  if (active.cancelled) throw new Error("Capture cancelled");
+  assertNotCancelled(active);
   await ctx.pagePool?.dispose();
-  await safeCloseBrowser(ctx.browser);
-  ctx.browser = await relaunch();
-  if (ctx.pagePool) ctx.pagePool = new PagePool(ctx.browser);
-  active.browser = ctx.browser;
+  const previous = ctx.session;
+  await previous.release(active.cancelled ? "cancelled" : "finished");
+  assertNotCancelled(active);
+  const next = await acquireReplacement(active, relaunch);
+  activateSession(ctx, active, next);
   logger?.info({}, "browser recycled");
+}
+
+function assertNotCancelled(active: ActiveRun): void {
+  if (active.cancelled) throw new Error("Capture cancelled");
+}
+
+async function acquireReplacement(
+  active: ActiveRun,
+  relaunch: () => Promise<BrowserSession>,
+): Promise<BrowserSession> {
+  const next = await relaunch();
+  if (active.cancelled) {
+    await next.release("cancelled");
+    throw new Error("Capture cancelled");
+  }
+  return next;
+}
+
+function activateSession(ctx: CaptureContext, active: ActiveRun, next: BrowserSession): void {
+  ctx.session = next;
+  if (ctx.pagePool) ctx.pagePool = new PagePool(next);
+  active.session = next;
 }
 
 /** Capture one story x viewport; resolves to whether it timed out (failures are recorded, not thrown). */

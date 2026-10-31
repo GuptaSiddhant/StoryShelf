@@ -8,10 +8,11 @@ import {
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { createPageLimiter, isTimeoutError, type SessionGate } from "@storyshelf/core/utils";
-import type { Browser, Page } from "puppeteer-core";
-import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import type { Page } from "puppeteer-core";
+import { messageOf, safeCloseServer } from "./browser.ts";
 import { acquirePage } from "./pages.ts";
 import { assertReachable, planRun, serve } from "./pipeline.ts";
+import { createBrowserSession, type BrowserSession, type ReleaseOutcome } from "./session.ts";
 import { waitForSettled, type SettleReport } from "./settle.ts";
 import type { ActiveRun, PuppeteerTestsInput, TargetDriver } from "./types.ts";
 
@@ -31,19 +32,42 @@ export async function runTestEntries(
   if (rawInput.tests.length === 0) return [];
   const { input, name, remote } = planRun(rawInput, driver, defaultTarget);
   assertReachable(name, remote, input.storybookUrl);
-  const browser = await driver.launch(name, input.logger);
-  const server = await serve(input, browser);
-  active.browser = browser;
+  const session = createBrowserSession(await driver.launch(name, input.logger));
+  active.session = session;
+  return await runWithSession(input, active, session);
+}
+
+async function runWithSession(
+  input: PuppeteerTestsInput & { target: CaptureTarget; gate?: SessionGate | undefined },
+  active: ActiveRun,
+  session: BrowserSession,
+): Promise<TestOutcome[]> {
+  let outcome: ReleaseOutcome = "failed";
   try {
-    return await runAll(browser, server.url, input, active);
+    const outcomes = await runWithServer(session, input, active);
+    outcome = "finished";
+    return outcomes;
   } finally {
-    active.browser = null;
-    await Promise.all([safeCloseBrowser(browser), safeCloseServer(server)]);
+    await session.release(active.cancelled ? "cancelled" : outcome);
+    if (active.session === session) active.session = null;
+  }
+}
+
+async function runWithServer(
+  session: BrowserSession,
+  input: PuppeteerTestsInput & { target: CaptureTarget; gate?: SessionGate | undefined },
+  active: ActiveRun,
+): Promise<TestOutcome[]> {
+  const server = await serve(input, session);
+  try {
+    return await runAll(session, server.url, input, active);
+  } finally {
+    await safeCloseServer(server);
   }
 }
 
 async function runAll(
-  browser: Browser,
+  session: BrowserSession,
   baseUrl: string,
   input: PuppeteerTestsInput & { target: CaptureTarget; gate?: SessionGate | undefined },
   active: ActiveRun,
@@ -58,7 +82,7 @@ async function runAll(
   try {
     await pages.each(input.tests, async (test) => {
       if (active.cancelled) throw new Error("Capture cancelled");
-      const outcome = await runTestEntry(browser, baseUrl, test, input);
+      const outcome = await runTestEntry(session, baseUrl, test, input);
       outcomes.set(test.id, outcome);
       return outcome.timedOut === true;
     });
@@ -70,13 +94,13 @@ async function runAll(
 
 /** One test: open its iframe URL, let Storybook render and run it, then read the verdict. */
 async function runTestEntry(
-  browser: Browser,
+  session: BrowserSession,
   baseUrl: string,
   test: StoryEntry,
   input: PuppeteerTestsInput,
 ): Promise<TestOutcome & { timedOut?: boolean }> {
   const started = performance.now();
-  const lease = await acquirePage({ browser }, TEST_VIEWPORT);
+  const lease = await acquirePage({ session }, TEST_VIEWPORT);
   let reusable = false;
   try {
     const report = await openAndWait(lease.page, baseUrl, test, input);

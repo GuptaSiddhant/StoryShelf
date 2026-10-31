@@ -65,13 +65,13 @@ function harness(reports: Record<string, SettleReport | Error>) {
     },
   };
   const driver: TargetDriver = {
-    launch: async () => browser as never,
+    launch: async () => ({ browser: browser as never, ownership: "launched" }),
     remote: (): undefined => {},
   };
   return { driver, urls, timeouts, closed };
 }
 
-const active = (): ActiveRun => ({ cancelled: false, browser: null });
+const active = (): ActiveRun => ({ cancelled: false, session: null });
 
 describe("runTestEntries", () => {
   it("opens each test's iframe URL and reports pass or fail from what Storybook announced", async () => {
@@ -146,7 +146,7 @@ describe("runTestEntries", () => {
     };
     const browser = { newPage: async () => page, close: async (): Promise<void> => {} };
     const driver: TargetDriver = {
-      launch: async () => browser as never,
+      launch: async () => ({ browser: browser as never, ownership: "launched" }),
       remote: (): undefined => {},
     };
     const outcomes = await runTestEntries(

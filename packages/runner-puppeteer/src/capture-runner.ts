@@ -7,10 +7,11 @@ import {
 } from "@storyshelf/core/adapter/capture-runner";
 import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { verifyLocalTargets } from "./availability.ts";
-import { activeRuns, closeBrowser } from "./browser.ts";
+import { activeRuns } from "./browser.ts";
 import { connectRemote } from "./connect.ts";
 import { launchLocal } from "./launch.ts";
 import { renderAll } from "./pipeline.ts";
+import type { BrowserAcquisition } from "./session.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
 import { runTestEntries } from "./tests.ts";
 import type {
@@ -54,14 +55,17 @@ export function createPuppeteerCaptureRunner(
   // Until `lifecycle.setup` verifies them, every declared target reads as ready.
   const offers = createTargetOffers(declared);
   const driver: TargetDriver = {
-    launch: offers.guard(async (target, logger) => {
+    launch: offers.guard(async (target, logger): Promise<BrowserAcquisition> => {
       const remote = remotes.find((entry) => entry.target === target);
       return remote
-        ? await connectRemote(remote, logger)
-        : await launchLocal(
-            locals.find((entry) => entry.target === target) as LocalTarget,
-            options.args,
-          );
+        ? { browser: await connectRemote(remote, logger), ownership: "connected" }
+        : {
+            browser: await launchLocal(
+              locals.find((entry) => entry.target === target) as LocalTarget,
+              options.args,
+            ),
+            ownership: "launched",
+          };
     }),
     remote: (target) => remotes.find((entry) => entry.target === target),
   };
@@ -87,7 +91,7 @@ export function createPuppeteerCaptureRunner(
     },
     lifecycle: offers.lifecycle(async () => await Promise.resolve(verifyTargets(declared, locals))),
     async render(input: PuppeteerRenderInput) {
-      const active: ActiveRun = { cancelled: false, browser: null };
+      const active: ActiveRun = { cancelled: false, session: null };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await renderAll(
@@ -101,7 +105,7 @@ export function createPuppeteerCaptureRunner(
       }
     },
     async runTests(input: PuppeteerTestsInput) {
-      const active: ActiveRun = { cancelled: false, browser: null };
+      const active: ActiveRun = { cancelled: false, session: null };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await runTestEntries(
@@ -118,7 +122,7 @@ export function createPuppeteerCaptureRunner(
       await Promise.all(
         activeRuns.matching(buildId, runId).map(async (active) => {
           active.cancelled = true;
-          await closeBrowser(active.browser);
+          await active.session?.release("cancelled");
         }),
       );
     },

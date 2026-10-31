@@ -25,6 +25,7 @@ const puppeteer = vi.hoisted(() => {
   let extractResult: unknown;
   const launchOptions: unknown[] = [];
   let launchFailure: Error | null = null;
+  let versionFailure: Error | null = null;
   let gate: Promise<null> | null = null;
   let held = 0;
   const makePage = () => ({
@@ -76,6 +77,7 @@ const puppeteer = vi.hoisted(() => {
     closed: false,
     version: async (): Promise<string> => {
       await Promise.resolve();
+      if (versionFailure !== null) throw versionFailure;
       return "HeadlessChrome/124.0.6367.29";
     },
     createBrowserContext: async (): Promise<unknown> => {
@@ -133,6 +135,9 @@ const puppeteer = vi.hoisted(() => {
     failLaunches: (error: Error | null): void => {
       launchFailure = error;
     },
+    failVersion: (error: Error | null): void => {
+      versionFailure = error;
+    },
     stats,
     hangingPages: (): number => pendingGotos.length,
     /** Hold every `goto` until the returned function is called. */
@@ -177,6 +182,7 @@ beforeEach(async () => {
   storybookDir = join(tmp, "storybook");
   await mkdir(storybookDir, { recursive: true });
   await writeFile(join(storybookDir, "index.html"), "<html><body>fixture</body></html>");
+  puppeteer.failVersion(null);
 });
 
 afterEach(async () => {
@@ -260,6 +266,34 @@ describe("createPuppeteerCaptureRunner.render", () => {
     const result = await rendering;
     expect(result.failures).toHaveLength(0);
     expect(result.captures).toHaveLength(1);
+    expect(puppeteer.lastBrowser()?.closed).toBe(true);
+  }, 30_000);
+
+  it("closes a launched browser when the Storybook directory cannot be served", async () => {
+    puppeteer.configureHang(false);
+    const runner = createPuppeteerCaptureRunner();
+    await expect(
+      runner.render({
+        buildId: "build-missing",
+        storybookDir: join(tmp, "missing"),
+        stories: STORIES,
+        viewports: VIEWPORTS,
+      }),
+    ).rejects.toThrow();
+    expect(puppeteer.lastBrowser()?.closed).toBe(true);
+  }, 30_000);
+
+  it("closes a launched browser when measuring its environment fails", async () => {
+    puppeteer.configureHang(false);
+    puppeteer.failVersion(new Error("version probe failed"));
+    await expect(
+      createPuppeteerCaptureRunner().render({
+        buildId: "build-version",
+        storybookDir,
+        stories: STORIES,
+        viewports: VIEWPORTS,
+      }),
+    ).rejects.toThrow("version probe failed");
     expect(puppeteer.lastBrowser()?.closed).toBe(true);
   }, 30_000);
 
@@ -380,7 +414,7 @@ describe("createPuppeteerCaptureRunner.render", () => {
     const first = render("shard-a");
     const second = render("shard-b");
     await vi.waitFor(() => {
-      expect(activeRuns.matching("build-1").every((run) => run.browser !== null)).toBe(true);
+      expect(activeRuns.matching("build-1").every((run) => run.session !== null)).toBe(true);
       expect(activeRuns.matching("build-1")).toHaveLength(2);
     });
     const [a] = activeRuns.matching("build-1", "shard-a");

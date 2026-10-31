@@ -3,6 +3,7 @@ import { StorybookAdapter } from "@storyshelf/core/capture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
+import { createBrowserSession } from "./session.ts";
 import { inPagePaint, inPageWaitSettled, type SettleReport } from "./settle.ts";
 import type { CaptureContext } from "./types.ts";
 
@@ -43,8 +44,12 @@ function harness(report: SettleReport | null, overrides: Partial<CaptureContext>
     close: async (): Promise<void> => {},
   };
   const logger = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() };
+  const session = createBrowserSession({
+    browser: { newPage: async () => page } as never,
+    ownership: "launched",
+  });
   const ctx = {
-    browser: { newPage: async () => page },
+    session,
     adapter: new StorybookAdapter(),
     baseUrl: "http://sb",
     runtimeParams: createRuntimeParamsState(),
@@ -134,7 +139,7 @@ describe("waiting for the story to be ready", () => {
     const { ctx } = harness(settled, { settleTimeoutMs: 1234 });
     const seen: unknown[] = [];
     const page = await (
-      ctx.browser as unknown as {
+      ctx.session.browser as unknown as {
         newPage: () => Promise<{ evaluate: (fn: unknown, arg?: unknown) => Promise<unknown> }>;
       }
     ).newPage();

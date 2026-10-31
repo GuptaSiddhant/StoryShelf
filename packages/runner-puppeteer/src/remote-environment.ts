@@ -9,6 +9,7 @@ import {
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import { messageOf } from "./browser.ts";
+import type { BrowserSession } from "./session.ts";
 
 /**
  * The fingerprint of the browser a render drove: its version, and what a blank page in it reports
@@ -17,13 +18,13 @@ import { messageOf } from "./browser.ts";
  * change (ADR 0005), so a service outage here cannot rewrite baselines.
  */
 export async function measureRemote(
-  browser: Browser,
+  session: BrowserSession,
   remote: RemoteBrowser,
   logger?: Logger,
 ): Promise<CaptureEnvironment> {
   return remoteEnvironment({
-    browserVersion: await versionOf(browser),
-    probe: await probeBlankPage(browser, logger),
+    browserVersion: await versionOf(session.browser),
+    probe: await probeBlankPage(session, logger),
     declaredPlatform: remote.platform,
   });
 }
@@ -37,15 +38,16 @@ async function versionOf(browser: Browser): Promise<string | undefined> {
 }
 
 async function probeBlankPage(
-  browser: Browser,
+  session: BrowserSession,
   logger?: Logger,
 ): Promise<BrowserProbe | undefined> {
   try {
-    const page = await browser.newPage();
+    const page = await session.newPage();
     try {
       return await page.evaluate(inPageProbe, [...FONT_PROBE_FAMILIES]);
     } finally {
-      await page.close();
+      await page.close().catch(() => {});
+      session.forgetPage(page);
     }
   } catch (error) {
     logger?.warn({ reason: messageOf(error) }, "could not measure the remote browser");
