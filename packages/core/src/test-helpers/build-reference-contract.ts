@@ -73,6 +73,8 @@ export function buildReferenceContractSuite(
         await expect(
           second.replaceFencedReferences(owner, 1, [buildIds[1]], async () => null),
         ).rejects.toThrow();
+        expect(await second.referenceGeneration(owner)).toBe(2);
+        expect(await first.claimDeletion(owner.projectId, buildIds[1])).toBe("claimed");
         expect(await second.claimDeletion(owner.projectId, buildIds[0])).toBe("claimed");
         await expect(
           first.replaceFencedReferences(owner, 2, [buildIds[0]], async () => null),
@@ -86,6 +88,7 @@ export function buildReferenceContractSuite(
           first.replaceManyFencedReferences([change, change], async () => null),
         ).rejects.toThrow();
         expect(await first.referenceGeneration(owner)).toBe(0);
+        expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("claimed");
       });
     });
   });

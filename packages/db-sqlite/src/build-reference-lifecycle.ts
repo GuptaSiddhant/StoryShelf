@@ -50,6 +50,23 @@ export async function replaceManyFencedReferences<T>(
   changes: readonly FencedBuildReferenceChange[],
   writeDomain: (tx: TxStore) => Promise<T>,
 ): Promise<{ result: T; generations: number[] }> {
+  validateFencedChanges(changes);
+  return await inTransaction(path, async (db) => {
+    const normalized = changes.map((change) => ({
+      ...change,
+      ids: [...new Set(change.buildIds)].toSorted(),
+    }));
+    checkGenerations(db, normalized);
+    const result = await writeDomain(transactionStore(db));
+    for (const change of normalized) {
+      saveReferences(db, change.owner, change.ids);
+      advanceGeneration(db, change.owner);
+    }
+    return { result, generations: normalized.map((change) => change.expectedGeneration + 1) };
+  });
+}
+
+function validateFencedChanges(changes: readonly FencedBuildReferenceChange[]): void {
   const keys = changes.map(({ owner }) => JSON.stringify([owner.projectId, owner.type, owner.id]));
   if (new Set(keys).size !== keys.length) throw new Error("Duplicate reference owner");
   for (const { expectedGeneration } of changes)
@@ -59,30 +76,23 @@ export async function replaceManyFencedReferences<T>(
       expectedGeneration >= Number.MAX_SAFE_INTEGER
     )
       throw new Error("Invalid reference generation");
-  // oxlint-disable-next-line eslint/max-statements -- owner validation and writes share one transaction
-  return await inTransaction(path, async (db) => {
-    const normalized = changes.map((change) => ({
-      ...change,
-      ids: [...new Set(change.buildIds)].toSorted(),
-    }));
-    const select = db.prepare(
-      "SELECT generation FROM build_reference_generations WHERE project_id = ? AND owner_type = ? AND owner_id = ?",
-    );
-    for (const change of normalized) {
-      const row = select.get(change.owner.projectId, change.owner.type, change.owner.id) as
-        | unknown[]
-        | undefined;
-      if ((row?.[0] ?? 0) !== change.expectedGeneration)
-        throw new Error("Stale reference generation");
-      checkAvailable(db, change.owner.projectId, change.ids);
-    }
-    const result = await writeDomain(transactionStore(db));
-    for (const change of normalized) {
-      saveReferences(db, change.owner, change.ids);
-      advanceGeneration(db, change.owner);
-    }
-    return { result, generations: normalized.map((change) => change.expectedGeneration + 1) };
-  });
+}
+
+function checkGenerations(
+  db: DatabaseSync,
+  changes: readonly (FencedBuildReferenceChange & { ids: string[] })[],
+): void {
+  const select = db.prepare(
+    "SELECT generation FROM build_reference_generations WHERE project_id = ? AND owner_type = ? AND owner_id = ?",
+  );
+  for (const change of changes) {
+    const row = select.get(change.owner.projectId, change.owner.type, change.owner.id) as
+      | unknown[]
+      | undefined;
+    if ((row?.[0] ?? 0) !== change.expectedGeneration)
+      throw new Error("Stale reference generation");
+    checkAvailable(db, change.owner.projectId, change.ids);
+  }
 }
 
 /** Generation-checked owner update; the retained generation fences stale releases and retries. */

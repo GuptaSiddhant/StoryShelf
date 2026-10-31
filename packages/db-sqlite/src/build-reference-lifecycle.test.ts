@@ -60,6 +60,50 @@ buildReferenceContractSuite("SQLite", async (run) => {
 });
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("rejects invalid generations and unavailable builds without advancing the fence", async () => {
+    await withDatabase(async (path) => {
+      const lifecycle = createBuildReferenceLifecycle(path);
+      for (const invalid of [-1, 0.5, Number.MAX_SAFE_INTEGER]) {
+        // oxlint-disable-next-line no-await-in-loop -- verify each invalid boundary
+        await expect(
+          lifecycle.replaceFencedReferences(owner, invalid, [], async () => null),
+        ).rejects.toThrow("Invalid reference generation");
+      }
+      await expect(
+        lifecycle.replaceFencedReferences(owner, 0, ["missing"], async () => null),
+      ).rejects.toThrow("Referenced build is unavailable");
+      expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+      await expect(
+        lifecycle.replaceFencedReferences(owner, 0, ["one"], async () => null),
+      ).rejects.toThrow("Referenced build is unavailable");
+      expect(await lifecycle.referenceGeneration(owner)).toBe(0);
+    });
+  });
+  it("handles empty batches and rolls back both owners when domain writes fail", async () => {
+    await withDatabase(async (path) => {
+      const lifecycle = createBuildReferenceLifecycle(path);
+      const other = { ...owner, id: "other" };
+      expect(await lifecycle.replaceManyFencedReferences([], async () => "empty")).toEqual({
+        result: "empty",
+        generations: [],
+      });
+      await expect(
+        lifecycle.replaceManyFencedReferences(
+          [
+            { owner, expectedGeneration: 0, buildIds: ["one"] },
+            { owner: other, expectedGeneration: 0, buildIds: ["two"] },
+          ],
+          async () => {
+            throw new Error("rollback");
+          },
+        ),
+      ).rejects.toThrow("rollback");
+      expect(await lifecycle.referenceGeneration(owner)).toBe(0);
+      expect(await lifecycle.referenceGeneration(other)).toBe(0);
+      expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+      expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
+    });
+  });
   it("retains the generation after release and rejects a stale observed generation", async () => {
     await withDatabase(async (path) => {
       const first = createBuildReferenceLifecycle(path);
