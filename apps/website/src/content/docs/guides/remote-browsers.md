@@ -96,6 +96,12 @@ For a `reach: "url"` target the job mints a URL of the form `<public origin>/_s/
 
 **What the provider sees.** The remote service receives the URL, and a hosted service may record it (BrowserStack stores the URLs a session visits, for example). The token is the only secret in it and it expires, so keep the lifetime short, and treat a provider's session logs as holding a read link to that build for that long. Use a self-hosted farm with `exposeNetwork` when a Storybook must not leave your network at all.
 
+## Ownership and cleanup
+
+A remote run never owns the browser process. On completion, failure, cancellation or recycling it closes only the pages and contexts it created, disconnects its client, and releases any provider lease once with the first outcome (`finished`, `failed` or `cancelled`). It never calls `Browser.close`, closes the default context, or touches pages created by another client. Cleanup is bounded and idempotent, so a cancel/recycle race cannot double-release a lease or hide the original error.
+
+Recycling is a detach/reconnect, not a fresh browser process: `recycleBrowserEvery` still bounds a run's memory, but a long run does not promise a clean provider machine. A provider may tear down the machine only when its final legitimate lease is released; that is why the runner releases the lease instead of keeping the connection alive to hide an error.
+
 ## What is measured in the browser
 
 The capture fingerprint (see [Capture](/concepts/capture/)) of a local render comes from the host: its platform and its `fc-list` fonts. For a remote render both describe the wrong machine, and a fingerprint that cannot see the remote would let a provider-side image change through without a diff, and on the default branch rewrite the baselines as a migration. So a remote render reports its environment from the browser it drove:
@@ -114,7 +120,7 @@ A field the runner cannot determine (a page that would not open) is omitted, and
 - Connection-level failures (a refused or dropped connection, a timeout, "no capacity", 429 and 5xx answers) are retried with exponential backoff (500 ms, doubling, three retries by default; `connectRetries`, `connectBackoffMs` and `connectTimeoutMs` on `remote()`) **before** the render sees them, so a provider outage is not treated as a story crash. When the retries are spent the job fails at once with the reason (a `TargetLaunchError`), not through crash isolation.
 - A failure that no retry fixes (refused credentials, a missing endpoint, mismatched versions) also marks the target `unavailable` with the reason on **System → Capture browsers**, until the server restarts. A service that is merely down does not: it stays offered, and the next build tries again.
 - A browser that dies while rendering is a crash like a local one and goes through crash isolation as usual.
-- Browser recycling (`recycleBrowserEvery`) opens a new remote session instead of relaunching.
+- Browser recycling (`recycleBrowserEvery`) releases the old connection and opens a new remote session instead of relaunching; it never sends `Browser.close`.
 
 ## Self-hosted farm
 

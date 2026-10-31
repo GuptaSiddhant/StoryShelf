@@ -62,7 +62,13 @@ target are visible rather than silently overwritten.
 - **Remote mechanics:** Playwright uses `browserType.connect(endpoint, { headers, exposeNetwork })`
   for its own protocol, or `chromium.connectOverCDP` for Chromium-only services; Puppeteer uses
   `puppeteer.connect`. `connectOverCDP` is lower fidelity but safe because the target has its own
-  baselines and fingerprint. Browser recycling opens a new session instead of relaunching.
+  baselines and fingerprint. Browser recycling opens a new session instead of relaunching; for a
+  connected target that means release the old client and connect again, never `Browser.close`.
+- **Ownership is explicit:** a browser the run launched is closed; a browser it connected to is
+  never sent `Browser.close`. A connected run closes only the pages and contexts it created, drains
+  them, disconnects its transport and releases a provider lease once with the first outcome
+  (`finished`, `failed` or `cancelled`). Release is bounded and idempotent, so cancel/recycle races
+  cannot double-release a lease or mask the render error.
 - **Presets are plain configuration, not packages:** a function returning
   `{ name, protocol, endpoint, headers, exposeNetwork?, sessions, engines }`. A provider package is
   justified only for something a connect endpoint cannot do (real devices, real Safari).
