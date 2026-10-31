@@ -39,6 +39,7 @@ export function createBuildReferenceLifecycle(
  * Do not enable lifecycle-aware deletion until all writers participate in this concurrency domain. */
 export async function prepareBaselineReferences(
   path: string,
+  beforeCommit?: () => Promise<void>,
 ): Promise<{ protected: number; unknown: number }> {
   return await inTransaction(path, async (db) => {
     const rows = db
@@ -51,6 +52,7 @@ export async function prepareBaselineReferences(
     );
     const protectedCount = prepared.filter(Boolean).length;
     const unknown = rows.length - protectedCount;
+    await beforeCommit?.();
     return await Promise.resolve({ protected: protectedCount, unknown });
   });
 }
@@ -64,13 +66,26 @@ async function prepareLegacyBaseline(db: DatabaseSync, id: string): Promise<bool
     build: async (key) => (await tx.get(schema.builds, key)) as unknown as Build | null,
   });
   if (!source) {
-    db.prepare("UPDATE baselines SET source_build_id = NULL WHERE id = ?").run(id);
+    setPreparedSource(db, baseline, null);
     return false;
   }
   const protectedSource = prepareBaselineReference(db, [id, baseline.projectId, source.id]);
-  if (protectedSource)
-    db.prepare("UPDATE baselines SET source_build_id = ? WHERE id = ?").run(source.id, id);
+  setPreparedSource(db, baseline, protectedSource ? source.id : null);
   return protectedSource;
+}
+
+function setPreparedSource(db: DatabaseSync, baseline: Baseline, source: string | null): void {
+  const removed =
+    source === null
+      ? db
+          .prepare(
+            "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ?",
+          )
+          .run(baseline.projectId, baseline.id).changes
+      : 0;
+  if ((baseline.sourceBuildId ?? null) === source && !removed) return;
+  db.prepare("UPDATE baselines SET source_build_id = ? WHERE id = ?").run(source, baseline.id);
+  advanceGeneration(db, { type: "baseline", id: baseline.id, projectId: baseline.projectId });
 }
 
 function prepareBaselineReference(

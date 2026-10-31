@@ -60,7 +60,78 @@ buildReferenceContractSuite("SQLite", async (run) => {
   });
 });
 
+async function startContendingClaim(path: string): Promise<PromiseLike<unknown[]>[]> {
+  const script = `import('./src/build-reference-lifecycle.ts').then(async ({ createBuildReferenceLifecycle }) => {
+    const { writeFileSync } = await import('node:fs');
+    const result = await createBuildReferenceLifecycle(process.argv[1], () => writeFileSync(process.argv[1] + '.approval-blocked', 'blocked')).claimDeletion('p', 'two');
+    writeFileSync(process.argv[1] + '.approval-result', result);
+  }).catch(() => { process.exitCode = 1; });`;
+  const child = spawn(process.execPath, ["--experimental-strip-types", "-e", script, path], {
+    cwd: process.cwd(),
+    stdio: "ignore",
+  });
+  const exited = once(child, "close");
+  for (let attempt = 0; attempt < 200 && !existsSync(`${path}.approval-blocked`); attempt += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- wait for confirmed lock contention
+    await delay(10);
+  }
+  if (!existsSync(`${path}.approval-blocked`)) {
+    child.kill("SIGKILL");
+    await exited;
+    throw new Error("Deletion did not contend with approval");
+  }
+  return [exited];
+}
+
 describe("SQLite reference lifecycle primitive", () => {
+  it("rolls back a killed preparation process and resumes preparation after restart", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      try {
+        await db.insert(schema.baselines, {
+          id: "base",
+          projectId: "p",
+          storyId: "story",
+          viewportName: "desktop",
+          branch: "main",
+          browser: "chromium",
+          screenshotPath: "shot",
+          sourceBuildId: "one",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const script = `import('./src/build-reference-lifecycle.ts').then(async ({ prepareBaselineReferences }) => {
+          const { writeFileSync } = await import('node:fs');
+          await prepareBaselineReferences(process.argv[1], async () => {
+            writeFileSync(process.argv[1] + '.prepared', 'uncommitted');
+            await new Promise(() => setInterval(() => {}, 1000));
+          });
+        }).catch((error) => { process.stderr.write(String(error)); process.exitCode = 1; });`;
+        const child = spawn(process.execPath, ["--experimental-strip-types", "-e", script, path], {
+          cwd: process.cwd(),
+          stdio: "ignore",
+        });
+        const closed = once(child, "close");
+        try {
+          for (let attempt = 0; attempt < 200 && !existsSync(`${path}.prepared`); attempt += 1) {
+            // oxlint-disable-next-line no-await-in-loop -- wait until the child has written uncommitted refs
+            await delay(10);
+          }
+          expect(existsSync(`${path}.prepared`)).toBe(true);
+        } finally {
+          child.kill("SIGKILL");
+          await closed;
+        }
+        const lifecycle = createBuildReferenceLifecycle(path);
+        expect(await lifecycle.referenceGeneration(owner)).toBe(0);
+        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 0 });
+        expect(await lifecycle.referenceGeneration(owner)).toBe(1);
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  }, 15_000);
   it("recovers the renderer source of an inherited baseline without pinning its containing build", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
@@ -148,9 +219,19 @@ describe("SQLite reference lifecycle primitive", () => {
         ).rejects.toThrow("Baseline changed after this diff");
         expect((await new SnapshotModel(db).get("new"))?.status).toBe("changed");
         expect((await model.getFor("p", "story", "desktop", "main"))?.sourceBuildId).toBe("one");
+        const replace = lifecycle.replaceFencedReferences;
+        let childExit: PromiseLike<unknown[]>[] = [];
+        lifecycle.replaceFencedReferences = async (ref, generation, ids, write) =>
+          await replace(ref, generation, ids, async (tx) => {
+            const result = await write(tx);
+            childExit = await startContendingClaim(path);
+            return result;
+          });
         await model.upsert("p", "story", "desktop", "main", "new", "new.png", undefined, {
           approval: { ...approval, force: true },
         });
+        expect((await Promise.all(childExit))[0]?.[0]).toBe(0);
+        expect(readFileSync(`${path}.approval-result`, "utf8")).toBe("protected");
         expect((await new SnapshotModel(db).get("new"))?.status).toBe("approved");
         expect((await model.getFor("p", "story", "desktop", "main"))?.sourceBuildId).toBe("two");
         expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
@@ -253,10 +334,14 @@ describe("SQLite reference lifecycle primitive", () => {
           storyId: "other",
           sourceBuildId: "missing",
         });
+        const unknownOwner = { type: "baseline" as const, projectId: "p", id: "unknown" };
+        await createBuildReferenceLifecycle(path).replaceFencedReferences(unknownOwner, 0, ["two"], async () => null);
         expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
         expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
         expect((await db.get(schema.baselines, "unknown"))?.["sourceBuildId"]).toBeNull();
         const lifecycle = createBuildReferenceLifecycle(path);
+        expect(await lifecycle.referenceGeneration(unknownOwner)).toBe(2);
+        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
         expect(
           await lifecycle.referenceGeneration({ type: "baseline", id: "known", projectId: "p" }),
         ).toBe(1);
