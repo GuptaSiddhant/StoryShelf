@@ -130,6 +130,15 @@ export interface BuildReferenceChange {
  * Their tests must use independent connections, including promotion/purge and pin/purge races.
  */
 export interface BuildReferenceLifecycle {
+  /** Compare and advance an owner's durable generation with its reference and domain writes.
+   * Generation zero denotes an owner with no earlier mutations. A stale generation rejects the
+   * whole transaction. Generations survive release so an old worker cannot release a newer pin. */
+  replaceFencedReferences<T>(
+    owner: BuildReferenceOwner,
+    expectedGeneration: number,
+    buildIds: readonly string[],
+    writeDomain: (tx: TxStore) => Promise<T>,
+  ): Promise<{ result: T; generation: number }>;
   /**
    * Atomically replace one owner's complete reference set and make its domain writes. Both old and
    * new builds must be locked in stable order, checked for project ownership and availability,

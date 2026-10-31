@@ -18,6 +18,8 @@ export function createBuildReferenceLifecycle(
   onContention?: () => void,
 ): BuildReferenceLifecycle {
   return {
+    replaceFencedReferences: async (owner, generation, ids, writeDomain) =>
+      await replaceFencedReferences(path, owner, generation, ids, writeDomain),
     replaceReferences: async (owner, buildIds, writeDomain) =>
       await replaceManyReferences(path, [{ owner, buildIds }], writeDomain),
     replaceManyReferences: async (changes, writeDomain) =>

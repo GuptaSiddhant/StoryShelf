@@ -49,17 +49,29 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
 }
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("admits only one competing update for the same owner generation", async () => {
+    await withDatabase(async (path) => {
+      const first = createBuildReferenceLifecycle(path);
+      const second = createBuildReferenceLifecycle(path);
+      const attempts = await Promise.allSettled([
+        first.replaceFencedReferences(owner, 0, ["one"], async () => "one"),
+        second.replaceFencedReferences(owner, 0, ["two"], async () => "two"),
+      ]);
+      const success = attempts.find((result) => result.status === "fulfilled");
+      expect(attempts.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(attempts.filter((result) => result.status === "rejected")).toHaveLength(1);
+      if (success?.status !== "fulfilled") throw new Error("No successful admission");
+      expect(success.value.generation).toBe(1);
+      expect(await first.claimDeletion("p", success.value.result)).toBe("protected");
+    });
+  });
   it("invalidates a fence when an older lifecycle entry point changes the owner", async () => {
     await withDatabase(async (path) => {
       await replaceFencedReferences(path, owner, 0, ["one"], async () => null);
-      await createBuildReferenceLifecycle(path).replaceReferences(
-        owner,
-        ["two"],
-        async () => null,
+      await createBuildReferenceLifecycle(path).replaceReferences(owner, ["two"], async () => null);
+      await expect(replaceFencedReferences(path, owner, 1, [], async () => null)).rejects.toThrow(
+        "Stale reference generation",
       );
-      await expect(
-        replaceFencedReferences(path, owner, 1, [], async () => null),
-      ).rejects.toThrow("Stale reference generation");
       expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("protected");
     });
   });

@@ -27,6 +27,10 @@ const input: AtomicBaselineInput = {
 function setup() {
   const { db } = makeDatabase();
   const lifecycle: BuildReferenceLifecycle = {
+    replaceFencedReferences: async (_owner, generation, _ids, writeDomain) => ({
+      result: await writeDomain(db),
+      generation: generation + 1,
+    }),
     replaceReferences: async (_owner, _ids, writeDomain) => await writeDomain(db),
     replaceManyReferences: async (_changes, writeDomain) => await writeDomain(db),
     claimDeletion: async () => "missing",
