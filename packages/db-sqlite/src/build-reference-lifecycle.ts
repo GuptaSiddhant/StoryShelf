@@ -121,9 +121,19 @@ async function replaceManyReferences<T>(
     }));
     for (const change of normalized) checkAvailable(db, change.owner.projectId, change.ids);
     const result = await writeDomain(transactionStore(db));
-    for (const change of normalized) saveReferences(db, change.owner, change.ids);
+    for (const change of normalized) {
+      saveReferences(db, change.owner, change.ids);
+      advanceGeneration(db, change.owner);
+    }
     return result;
   });
+}
+
+/** Every mutation advances the fence, including legacy lifecycle entry points. */
+function advanceGeneration(db: DatabaseSync, owner: BuildReferenceOwner): void {
+  db.prepare(
+    "INSERT INTO build_reference_generations (project_id, owner_type, owner_id, generation) VALUES (?, ?, ?, 1) ON CONFLICT (project_id, owner_type, owner_id) DO UPDATE SET generation = generation + 1",
+  ).run(owner.projectId, owner.type, owner.id);
 }
 
 async function inTransaction<T>(path: string, work: (db: DatabaseSync) => Promise<T>): Promise<T> {

@@ -49,6 +49,20 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
 }
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("invalidates a fence when an older lifecycle entry point changes the owner", async () => {
+    await withDatabase(async (path) => {
+      await replaceFencedReferences(path, owner, 0, ["one"], async () => null);
+      await createBuildReferenceLifecycle(path).replaceReferences(
+        owner,
+        ["two"],
+        async () => null,
+      );
+      await expect(
+        replaceFencedReferences(path, owner, 1, [], async () => null),
+      ).rejects.toThrow("Stale reference generation");
+      expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("protected");
+    });
+  });
   it("fences stale releases across independent SQLite connections", async () => {
     await withDatabase(async (path) => {
       const first = await replaceFencedReferences(path, owner, 0, ["one"], async () => "first");
