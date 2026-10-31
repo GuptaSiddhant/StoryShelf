@@ -61,6 +61,12 @@ CREATE TABLE IF NOT EXISTS build_references (
   PRIMARY KEY (project_id, owner_type, owner_id, build_id)
 );
 CREATE INDEX IF NOT EXISTS build_references_build_idx ON build_references (build_id);
+CREATE TABLE IF NOT EXISTS build_cleanup_accounting (
+  build_id TEXT PRIMARY KEY REFERENCES builds(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  manifest_hash TEXT NOT NULL,
+  accounted_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

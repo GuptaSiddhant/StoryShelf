@@ -6,6 +6,7 @@ import type {
   TxStore,
 } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
+import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
@@ -45,6 +46,51 @@ export async function backfillBaselineReferences(path: string): Promise<number> 
     );
     for (const [projectId, baselineId, buildId] of rows) insert.run(projectId, baselineId, buildId);
     return await Promise.resolve(rows.length);
+  });
+}
+
+/**
+ * Atomically record and decrement one tombstoned build's manifest references. Call only after
+ * successfully reading its complete manifest and before deleting that manifest from storage.
+ * This primitive is not connected to purge until shared-asset admissions and recovery are safe.
+ */
+export async function accountBuildManifest(
+  path: string,
+  projectId: string,
+  buildId: string,
+  hashes: readonly string[],
+): Promise<"accounted" | "already-accounted"> {
+  if (hashes.some((hash) => !/^[a-f0-9]{64}$/u.test(hash)))
+    throw new Error("Invalid manifest hash");
+  const sorted = hashes.toSorted();
+  const digest = createHash("sha256").update(JSON.stringify(sorted)).digest("hex");
+  // oxlint-disable-next-line eslint/max-statements -- the accounting and journal must share a transaction
+  return await inTransaction(path, async (db) => {
+    const build = db
+      .prepare("SELECT retention_state FROM builds WHERE project_id = ? AND id = ?")
+      .get(projectId, buildId) as unknown[] | undefined;
+    if (build?.[0] !== "deleting") throw new Error("Build is not claimed for deletion");
+    const prior = db
+      .prepare(
+        "SELECT manifest_hash FROM build_cleanup_accounting WHERE project_id = ? AND build_id = ?",
+      )
+      .get(projectId, buildId) as unknown[] | undefined;
+    if (prior) {
+      if (prior[0] !== digest) throw new Error("Build manifest changed during cleanup");
+      return await Promise.resolve("already-accounted");
+    }
+    const update = db.prepare(
+      "UPDATE content_refs SET ref_count = ref_count - 1, last_seen_at = ? WHERE hash = ? AND ref_count > 0",
+    );
+    const now = new Date().toISOString();
+    for (const hash of sorted) {
+      if (update.run(now, hash).changes !== 1)
+        throw new Error("Manifest reference accounting is inconsistent");
+    }
+    db.prepare(
+      "INSERT INTO build_cleanup_accounting (build_id, project_id, manifest_hash, accounted_at) VALUES (?, ?, ?, ?)",
+    ).run(buildId, projectId, digest, now);
+    return await Promise.resolve("accounted");
   });
 }
 

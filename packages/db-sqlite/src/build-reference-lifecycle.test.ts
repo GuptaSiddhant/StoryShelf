@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 import {
+  accountBuildManifest,
   backfillBaselineReferences,
   createBuildReferenceLifecycle,
 } from "./build-reference-lifecycle.ts";
@@ -49,6 +50,51 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
 }
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("accounts shared manifest references once across retries", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const hash = "a".repeat(64);
+      try {
+        await db.insert(schema.contentRefs, { hash, refCount: 3, lastSeenAt: now, createdAt: now });
+        const lifecycle = createBuildReferenceLifecycle(path);
+        await expect(accountBuildManifest(path, "p", "one", [hash])).rejects.toThrow("not claimed");
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+        expect(await accountBuildManifest(path, "p", "one", [hash, hash])).toBe("accounted");
+        expect(await accountBuildManifest(path, "p", "one", [hash, hash])).toBe(
+          "already-accounted",
+        );
+        expect((await db.list(schema.contentRefs))[0]?.["refCount"]).toBe(1);
+        await expect(accountBuildManifest(path, "p", "one", [hash])).rejects.toThrow(
+          "manifest changed",
+        );
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
+  it("rolls back accounting when any manifest reference is inconsistent", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      const first = "a".repeat(64);
+      const missing = "b".repeat(64);
+      try {
+        await db.insert(schema.contentRefs, {
+          hash: first,
+          refCount: 1,
+          lastSeenAt: now,
+          createdAt: now,
+        });
+        await createBuildReferenceLifecycle(path).claimDeletion("p", "one");
+        await expect(accountBuildManifest(path, "p", "one", [first, missing])).rejects.toThrow(
+          "inconsistent",
+        );
+        expect((await db.list(schema.contentRefs))[0]?.["refCount"]).toBe(1);
+        expect(await accountBuildManifest(path, "p", "one", [first])).toBe("accounted");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
   it("backfills provable baseline sources atomically and leaves unknown sources unpinned", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
