@@ -27,6 +27,36 @@ export function createBuildReferenceLifecycle(
   };
 }
 
+/** Generation-checked owner update; the retained generation fences stale releases and retries. */
+export async function replaceFencedReferences<T>(
+  path: string,
+  owner: BuildReferenceOwner,
+  expectedGeneration: number,
+  buildIds: readonly string[],
+  writeDomain: (tx: TxStore) => Promise<T>,
+): Promise<{ result: T; generation: number }> {
+  if (!Number.isSafeInteger(expectedGeneration) || expectedGeneration < 0)
+    throw new Error("Invalid reference generation");
+  return await inTransaction(path, async (db) => {
+    const args = [owner.projectId, owner.type, owner.id] as const;
+    const row = db
+      .prepare(
+        "SELECT generation FROM build_reference_generations WHERE project_id = ? AND owner_type = ? AND owner_id = ?",
+      )
+      .get(...args) as unknown[] | undefined;
+    if ((row?.[0] ?? 0) !== expectedGeneration) throw new Error("Stale reference generation");
+    const ids = [...new Set(buildIds)].toSorted();
+    checkAvailable(db, owner.projectId, ids);
+    const result = await writeDomain(transactionStore(db));
+    saveReferences(db, owner, ids);
+    const generation = expectedGeneration + 1;
+    db.prepare(
+      "INSERT INTO build_reference_generations (project_id, owner_type, owner_id, generation) VALUES (?, ?, ?, ?) ON CONFLICT (project_id, owner_type, owner_id) DO UPDATE SET generation = excluded.generation",
+    ).run(...args, generation);
+    return { result, generation };
+  });
+}
+
 async function open(path: string, onContention?: () => void): Promise<DatabaseSync> {
   if (path === ":memory:") throw new Error("Reference lifecycle requires a shared SQLite file");
   const db = new DatabaseSync(path, { returnArrays: true });

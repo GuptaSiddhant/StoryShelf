@@ -8,7 +8,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
-import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
+import {
+  createBuildReferenceLifecycle,
+  replaceFencedReferences,
+} from "./build-reference-lifecycle.ts";
 import { createSqliteDatabase } from "./index.ts";
 import { schema } from "./schema/index.ts";
 
@@ -46,6 +49,25 @@ async function withDatabase(run: (path: string) => Promise<void>): Promise<void>
 }
 
 describe("SQLite reference lifecycle primitive", () => {
+  it("fences stale releases across independent SQLite connections", async () => {
+    await withDatabase(async (path) => {
+      const first = await replaceFencedReferences(path, owner, 0, ["one"], async () => "first");
+      expect(first.generation).toBe(1);
+      const second = await replaceFencedReferences(path, owner, 1, ["two"], async () => "second");
+      expect(second.generation).toBe(2);
+      await expect(
+        replaceFencedReferences(path, owner, 1, [], async () => "stale"),
+      ).rejects.toThrow("Stale reference generation");
+      expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("protected");
+      expect(
+        (await replaceFencedReferences(path, owner, 2, [], async () => "release")).generation,
+      ).toBe(3);
+      await expect(
+        replaceFencedReferences(path, owner, 2, [], async () => "repeat"),
+      ).rejects.toThrow("Stale reference generation");
+      expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("claimed");
+    });
+  });
   it("protects referenced builds and leaves deletion tombstones irreversible across connections", async () => {
     await withDatabase(async (path) => {
       const first = createBuildReferenceLifecycle(path);
