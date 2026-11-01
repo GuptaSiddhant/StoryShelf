@@ -12,12 +12,15 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { isContentPath } from "../utils/paths.ts";
 import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
+import { approveInTransaction, type AtomicBaselineApproval } from "./baseline-approval.ts";
 import { upsertAtomicBaseline } from "./baseline-atomic.ts";
+import { BaselineWriteConflict } from "./baseline-conflict.ts";
 import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
 
 /** Extra identity/metadata for {@link BaselineModel.upsert}. */
 export interface BaselineUpsertOptions {
+  approval?: AtomicBaselineApproval;
   /** Engine the baseline belongs to (default chromium). */
   browser?: string;
   /** Resolved mode definition as JSON (display only). */
@@ -111,6 +114,33 @@ export class BaselineModel {
     infraHash: string,
     fingerprint: string,
   ): Promise<void> {
+    const lifecycle = this.db.buildReferenceLifecycle;
+    if (lifecycle) {
+      const owner = { type: "baseline" as const, id: baseline.id, projectId: baseline.projectId };
+      const generation = await lifecycle.referenceGeneration(owner);
+      await lifecycle.replaceFencedReferences(
+        owner,
+        generation,
+        baseline.sourceBuildId ? [baseline.sourceBuildId] : [],
+        async (tx) => {
+          const current = (await tx.get(
+            this.tables.baselines,
+            baseline.id,
+          )) as unknown as Baseline | null;
+          if (
+            !current ||
+            current.projectId !== baseline.projectId ||
+            current.updatedAt !== baseline.updatedAt ||
+            current.sourceBuildId !== baseline.sourceBuildId ||
+            current.screenshotPath !== baseline.screenshotPath ||
+            current.fingerprint !== baseline.fingerprint
+          )
+            throw new BaselineWriteConflict("Baseline changed during fingerprint backfill; retry");
+          await tx.update(this.tables.baselines, baseline.id, { infraHash, fingerprint });
+        },
+      );
+      return;
+    }
     await this.db.update(this.tables.baselines, baseline.id, { infraHash, fingerprint });
   }
 
@@ -208,6 +238,7 @@ export class BaselineModel {
     const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
     const lifecycle = this.db.buildReferenceLifecycle;
     if (lifecycle) {
+      const approval = options.approval;
       const baseline = await upsertAtomicBaseline(
         lifecycle,
         { baselines: this.tables.baselines, snapshots: this.db.tables.snapshots },
@@ -227,6 +258,9 @@ export class BaselineModel {
           infraHash,
           fingerprint: options.fingerprint,
           mode: options.mode,
+          beforeWrite: approval
+            ? async (tx): Promise<void> => await approveInTransaction(tx, this.db.tables, approval)
+            : undefined,
         },
       );
       if (this.webhookTables) {
@@ -343,26 +377,24 @@ export class BaselineModel {
   private async removeRecord(baseline: Baseline): Promise<void> {
     const lifecycle = this.db.buildReferenceLifecycle;
     if (lifecycle) {
-      await lifecycle.replaceReferences(
-        { type: "baseline", projectId: baseline.projectId, id: baseline.id },
-        [],
-        async (tx) => {
-          const current = (await tx.get(
-            this.tables.baselines,
-            baseline.id,
-          )) as unknown as Baseline | null;
-          if (!current) return;
-          if (
-            current.updatedAt !== baseline.updatedAt ||
-            current.snapshotId !== baseline.snapshotId ||
-            current.sourceBuildId !== baseline.sourceBuildId ||
-            current.screenshotPath !== baseline.screenshotPath
-          ) {
-            throw new Error("Baseline changed during removal; retry");
-          }
-          await tx.remove(this.tables.baselines, baseline.id);
-        },
-      );
+      const owner = { type: "baseline" as const, projectId: baseline.projectId, id: baseline.id };
+      const generation = await lifecycle.referenceGeneration(owner);
+      await lifecycle.replaceFencedReferences(owner, generation, [], async (tx) => {
+        const current = (await tx.get(
+          this.tables.baselines,
+          baseline.id,
+        )) as unknown as Baseline | null;
+        if (!current) return;
+        if (
+          current.updatedAt !== baseline.updatedAt ||
+          current.snapshotId !== baseline.snapshotId ||
+          current.sourceBuildId !== baseline.sourceBuildId ||
+          current.screenshotPath !== baseline.screenshotPath
+        ) {
+          throw new BaselineWriteConflict("Baseline changed during removal; retry");
+        }
+        await tx.remove(this.tables.baselines, baseline.id);
+      });
       await this.discardFile(baseline);
       return;
     }

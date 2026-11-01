@@ -1,11 +1,14 @@
 /** SQLite's write-serialized admission and irreversible deletion claim primitive. */
-import type {
-  BuildReferenceChange,
-  BuildReferenceLifecycle,
-  BuildReferenceOwner,
-  FencedBuildReferenceChange,
-  TxStore,
+import {
+  ReferenceGenerationConflict,
+  type BuildReferenceChange,
+  type BuildReferenceLifecycle,
+  type BuildReferenceOwner,
+  type FencedBuildReferenceChange,
+  type TxStore,
 } from "@storyshelf/core/adapter/database";
+import { resolveBaselineOrigin } from "@storyshelf/core/models";
+import type { Baseline, Build, Snapshot } from "@storyshelf/core/schema";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
@@ -31,6 +34,87 @@ export function createBuildReferenceLifecycle(
     claimDeletion: async (projectId, buildId) =>
       await claimDeletion(path, projectId, buildId, onContention),
   };
+}
+
+/** Prepare known baseline pins under the same SQLite write lock as reference admission.
+ * Do not enable lifecycle-aware deletion until all writers participate in this concurrency domain. */
+export async function prepareBaselineReferences(
+  path: string,
+  beforeCommit?: () => Promise<void>,
+): Promise<{ protected: number; unknown: number }> {
+  return await inTransaction(path, async (db) => {
+    const rows = db
+      .prepare(
+        "SELECT id FROM baselines WHERE source_build_id IS NOT NULL OR snapshot_id IS NOT NULL",
+      )
+      .all() as unknown as [string][];
+    const prepared = await Promise.all(
+      rows.map(async ([id]) => await prepareLegacyBaseline(db, id)),
+    );
+    const protectedCount = prepared.filter(Boolean).length;
+    const unknown = rows.length - protectedCount;
+    await beforeCommit?.();
+    return await Promise.resolve({ protected: protectedCount, unknown });
+  });
+}
+
+async function prepareLegacyBaseline(db: DatabaseSync, id: string): Promise<boolean> {
+  const tx = transactionStore(db);
+  const baseline = (await tx.get(schema.baselines, id)) as unknown as Baseline;
+  const source = await resolveBaselineOrigin(baseline, {
+    baseline: async (key) => (await tx.get(schema.baselines, key)) as unknown as Baseline | null,
+    snapshot: async (key) => (await tx.get(schema.snapshots, key)) as unknown as Snapshot | null,
+    build: async (key) => (await tx.get(schema.builds, key)) as unknown as Build | null,
+  });
+  if (!source) {
+    setPreparedSource(db, baseline, null);
+    return false;
+  }
+  const protectedSource = prepareBaselineReference(db, [id, baseline.projectId, source.id]);
+  setPreparedSource(db, baseline, protectedSource ? source.id : null);
+  return protectedSource;
+}
+
+function setPreparedSource(db: DatabaseSync, baseline: Baseline, source: string | null): void {
+  const removed =
+    source === null
+      ? db
+          .prepare(
+            "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ?",
+          )
+          .run(baseline.projectId, baseline.id).changes
+      : 0;
+  if ((baseline.sourceBuildId ?? null) === source && !removed) return;
+  db.prepare("UPDATE baselines SET source_build_id = ? WHERE id = ?").run(source, baseline.id);
+  advanceGeneration(db, { type: "baseline", id: baseline.id, projectId: baseline.projectId });
+}
+
+function prepareBaselineReference(
+  db: DatabaseSync,
+  [id, projectId, buildId]: [string, string, string],
+): boolean {
+  const row = db
+    .prepare("SELECT retention_state FROM builds WHERE id = ? AND project_id = ?")
+    .get(buildId, projectId) as unknown[] | undefined;
+  if (row?.[0] !== "available") {
+    db.prepare("UPDATE baselines SET source_build_id = NULL WHERE id = ? AND project_id = ?").run(
+      id,
+      projectId,
+    );
+    return false;
+  }
+  const removed = db
+    .prepare(
+      "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ? AND build_id <> ?",
+    )
+    .run(projectId, id, buildId).changes;
+  const result = db
+    .prepare(
+      "INSERT OR IGNORE INTO build_references (project_id, owner_type, owner_id, build_id) VALUES (?, 'baseline', ?, ?)",
+    )
+    .run(projectId, id, buildId);
+  if (result.changes || removed) advanceGeneration(db, { type: "baseline", id, projectId });
+  return true;
 }
 
 async function referenceGeneration(path: string, owner: BuildReferenceOwner): Promise<number> {
@@ -90,7 +174,7 @@ function checkGenerations(
       | unknown[]
       | undefined;
     if ((row?.[0] ?? 0) !== change.expectedGeneration)
-      throw new Error("Stale reference generation");
+      throw new ReferenceGenerationConflict("Stale reference generation");
     checkAvailable(db, change.owner.projectId, change.ids);
   }
 }

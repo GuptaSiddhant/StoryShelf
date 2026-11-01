@@ -1,6 +1,8 @@
 import { PNG } from "pngjs";
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureEnvironment, RenderedSnapshot } from "../adapters/capture-runner.ts";
+import { ReferenceGenerationConflict, type BuildReferenceLifecycle } from "../adapters/database.ts";
+import { BaselineWriteConflict } from "../models/baseline-conflict.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
@@ -46,6 +48,25 @@ function png(rgb: [number, number, number], width = 4): Buffer {
 
 const RED = png([255, 0, 0]);
 const GREEN = png([0, 255, 0]);
+
+function failingLifecycle(error: Error): BuildReferenceLifecycle {
+  return {
+    referenceGeneration: async () => await Promise.resolve(0),
+    replaceManyFencedReferences: async () => {
+      throw error;
+    },
+    replaceFencedReferences: async () => {
+      throw error;
+    },
+    replaceReferences: async () => {
+      throw error;
+    },
+    replaceManyReferences: async () => {
+      throw error;
+    },
+    claimDeletion: async () => "missing",
+  };
+}
 
 function capture(
   screenshot: Buffer,
@@ -262,6 +283,25 @@ describe("capture environment migration", () => {
     // The next environment change is now detected.
     await run({ shot: GREEN, environment: ENV_A, isDefault: false });
     expect((await snapshotOf("b3"))?.envChange).toBeTruthy();
+  });
+
+  it.each([
+    ["baseline", new BaselineWriteConflict("Baseline changed during fingerprint backfill; retry")],
+    ["reference", new ReferenceGenerationConflict("Stale reference generation")],
+  ])("keeps the snapshot when fingerprint backfill loses a %s race", async (_kind, error) => {
+    const { db, run, baselines, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    const [seeded] = await baselines();
+    await db.update(db.tables.baselines, seeded?.id ?? "", {
+      infraHash: "legacy-hash",
+      fingerprint: null,
+    });
+    Object.assign(db, { buildReferenceLifecycle: failingLifecycle(error) });
+
+    await run({ shot: RED, environment: ENV_B, isDefault: true });
+
+    expect((await snapshotOf("b2"))?.status).toBe("unchanged");
+    expect((await baselines())[0]?.fingerprint).toBeNull();
   });
 
   it("is stable for runners that report no environment", async () => {

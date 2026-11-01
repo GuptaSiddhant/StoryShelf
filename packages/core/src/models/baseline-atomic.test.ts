@@ -68,11 +68,12 @@ describe("atomic baseline promotion", () => {
   it("admits the source build and writes its baseline inside the lifecycle callback", async () => {
     const { db, lifecycle, tables } = setup();
     await insertSource(db);
-    const admission = vi.spyOn(lifecycle, "replaceReferences");
+    const admission = vi.spyOn(lifecycle, "replaceFencedReferences");
     const baseline = await upsertAtomicBaseline(lifecycle, tables, input);
     expect(baseline.sourceBuildId).toBe("source");
     expect(admission).toHaveBeenCalledWith(
       { projectId: "p", type: "baseline", id: "baseline" },
+      0,
       ["source"],
       expect.any(Function),
     );

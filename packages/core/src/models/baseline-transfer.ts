@@ -10,6 +10,7 @@ import type { Baseline } from "../schema/baseline.ts";
 import { withContentClaim } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
 import { baselineIdentity } from "./baseline-archive.ts";
+import { BaselineWriteConflict } from "./baseline-conflict.ts";
 import { exportBaselineArchive, type BaselineExportOptions } from "./baseline-export.ts";
 import { planBaselineImport, writePlannedImage, type PlannedBaseline } from "./baseline-import.ts";
 import { BaselineModel, type BaselineTables } from "./baseline.ts";
@@ -113,14 +114,21 @@ export class BaselineTransferModel {
       const touched = plan
         .map((planned) => existing.get(baselineIdentity(planned.entry)))
         .filter((row): row is Baseline => row !== undefined);
-      const changes = touched.map((row) => ({
-        owner: { type: "baseline" as const, id: row.id, projectId },
-        buildIds: [],
-      }));
-      return await lifecycle.replaceManyReferences(changes, async (store) => {
+      const changes = await Promise.all(
+        touched.map(async (row) => {
+          const owner = { type: "baseline" as const, id: row.id, projectId };
+          return {
+            owner,
+            expectedGeneration: await lifecycle.referenceGeneration(owner),
+            buildIds: [],
+          };
+        }),
+      );
+      const updated = await lifecycle.replaceManyFencedReferences(changes, async (store) => {
         await this.assertUnchangedIdentities(store, touched);
         return await run(store);
       });
+      return updated.result;
     }
     return this.db.transact ? await this.db.transact(run) : await run(this.db);
   }
@@ -140,9 +148,13 @@ export class BaselineTransferModel {
         found.storyId !== row.storyId ||
         found.viewportName !== row.viewportName ||
         found.branch !== row.branch ||
+        found.updatedAt !== row.updatedAt ||
+        found.snapshotId !== row.snapshotId ||
+        found.sourceBuildId !== row.sourceBuildId ||
+        found.screenshotPath !== row.screenshotPath ||
         (found.browser ?? DEFAULT_BROWSER) !== (row.browser ?? DEFAULT_BROWSER)
       ) {
-        throw new Error("Baseline changed during import; retry");
+        throw new BaselineWriteConflict("Baseline changed during import; retry");
       }
     }
   }

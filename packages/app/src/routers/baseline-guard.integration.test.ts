@@ -1,3 +1,9 @@
+import {
+  ReferenceGenerationConflict,
+  type BuildReferenceLifecycle,
+  type DatabaseAdapter,
+  type TxStore,
+} from "@storyshelf/core/adapter/database";
 import { BaselineModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -115,6 +121,29 @@ async function moveMainBaseline(db: Awaited<ReturnType<typeof setup>>["db"]) {
   await db.update(db.tables.baselines, "bl-main", { updatedAt: T2 });
 }
 
+type LifecycleHook = (db: DatabaseAdapter) => Promise<void> | void;
+
+function testLifecycle(db: DatabaseAdapter, beforeWrite?: LifecycleHook): BuildReferenceLifecycle {
+  const run = async <T>(write: (tx: TxStore) => Promise<T>): Promise<T> => {
+    if (!db.transact) throw new Error("Test database requires transactions");
+    return await db.transact(write);
+  };
+  return {
+    referenceGeneration: async () => await Promise.resolve(0),
+    replaceManyFencedReferences: async (changes, write) => ({
+      result: await run(write),
+      generations: changes.map((change) => change.expectedGeneration + 1),
+    }),
+    replaceFencedReferences: async (_owner, generation, _ids, write) => {
+      await beforeWrite?.(db);
+      return { result: await run(write), generation: generation + 1 };
+    },
+    replaceReferences: async (_owner, _ids, write) => await run(write),
+    replaceManyReferences: async (_changes, write) => await run(write),
+    claimDeletion: async () => "missing",
+  };
+}
+
 describe("approval guard for changed baselines", () => {
   it("approves and writes the branch baseline when the baseline is unchanged", async () => {
     const { app, db } = await setup();
@@ -124,6 +153,66 @@ describe("approval guard for changed baselines", () => {
     expect(response.status).toBe(200);
     expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("approved");
     expect(await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x")).not.toBeNull();
+  });
+
+  it("approves through the lifecycle transaction", async () => {
+    const { app, db } = await setup();
+    Object.assign(db, { buildReferenceLifecycle: testLifecycle(db) });
+
+    const response = await post(app, "f1/snapshots/sf1/approve");
+
+    expect(response.status).toBe(200);
+    expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("approved");
+    expect(await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x")).not.toBeNull();
+  });
+
+  it("maps lifecycle drift to baseline_changed after the pre-check", async () => {
+    const { app, db } = await setup();
+    Object.assign(db, {
+      buildReferenceLifecycle: testLifecycle(db, async () => {
+        await moveMainBaseline(db);
+      }),
+    });
+
+    const response = await post(app, "f1/snapshots/sf1/approve");
+
+    expect(response.status).toBe(409);
+    const body = (await response.json()) as { code: string; snapshotId: string };
+    expect(body.code).toBe("baseline_changed");
+    expect(body.snapshotId).toBe("sf1");
+    expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("changed");
+    expect(await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x")).toBeNull();
+  });
+
+  it("maps a lifecycle snapshot conflict without drift to a plain 409", async () => {
+    const { app, db } = await setup();
+    Object.assign(db, {
+      buildReferenceLifecycle: testLifecycle(db, async () => {
+        await db.update(db.tables.snapshots, "sf1", { updatedAt: T2 });
+      }),
+    });
+
+    const response = await post(app, "f1/snapshots/sf1/approve");
+
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain("Snapshot changed during approval");
+    expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("changed");
+    expect(await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x")).toBeNull();
+  });
+
+  it("maps a stale reference generation to a plain 409", async () => {
+    const { app, db } = await setup();
+    Object.assign(db, {
+      buildReferenceLifecycle: testLifecycle(db, () => {
+        throw new ReferenceGenerationConflict("Stale reference generation");
+      }),
+    });
+
+    const response = await post(app, "f1/snapshots/sf1/approve");
+
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain("Stale reference generation");
+    expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("changed");
   });
 
   it("refuses with 409 on a cancelled build: nothing is promoted to a baseline", async () => {

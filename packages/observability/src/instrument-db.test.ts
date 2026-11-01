@@ -1,5 +1,10 @@
 import { SpanStatusCode } from "@opentelemetry/api";
-import type { DatabaseAdapter, Tables } from "@storyshelf/core/adapter/database";
+import type {
+  BuildReferenceLifecycle,
+  DatabaseAdapter,
+  Tables,
+  TxStore,
+} from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
 import type { SQL, Table } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
@@ -97,5 +102,25 @@ describe("createInstrumentedDatabase", () => {
     const logger = { child: () => logger } as unknown as Logger;
     db.setLogger?.(logger);
     expect(fake.setLoggerMock).toHaveBeenCalledWith(logger);
+  });
+
+  it("delegates the reference lifecycle and transactions", async () => {
+    telemetry = installTestTelemetry();
+    const fake = createFakeDb();
+    const lifecycle = {} as BuildReferenceLifecycle;
+    const transact = vi.fn(
+      async (fn: (tx: TxStore) => Promise<unknown>) => await fn({} as TxStore),
+    );
+    Object.assign(fake, { buildReferenceLifecycle: lifecycle, transact });
+    const db = createInstrumentedDatabase(fake);
+
+    expect(db.buildReferenceLifecycle).toBe(lifecycle);
+    await expect(db.transact?.(async () => "ok")).resolves.toBe("ok");
+    expect(transact).toHaveBeenCalledTimes(1);
+    expect(telemetry.exporter.getFinishedSpans().map((span) => span.name)).toEqual(["db.transact"]);
+  });
+
+  it("leaves transactions absent when the inner adapter has none", () => {
+    expect(createInstrumentedDatabase(createFakeDb()).transact).toBeUndefined();
   });
 });

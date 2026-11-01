@@ -6,7 +6,12 @@
  * host-bound logger delegate straight through, so health/setup behave
  * identically with or without observability.
  */
-import type { DatabaseAdapter, ListOptions, Tables } from "@storyshelf/core/adapter/database";
+import type {
+  DatabaseAdapter,
+  ListOptions,
+  Tables,
+  TxStore,
+} from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
 import { addTiming } from "@storyshelf/core/utils";
 import { getTableName, type SQL, type Table } from "drizzle-orm";
@@ -25,9 +30,15 @@ export function createInstrumentedDatabase(db: DatabaseAdapter): DatabaseAdapter
 
 class InstrumentedDatabase implements DatabaseAdapter {
   private readonly inner: DatabaseAdapter;
+  readonly transact: DatabaseAdapter["transact"];
 
   constructor(inner: DatabaseAdapter) {
     this.inner = inner;
+    const transact = inner.transact?.bind(inner);
+    this.transact = transact
+      ? async <Result>(fn: (tx: TxStore) => Promise<Result>): Promise<Result> =>
+          await trackQuery("db.transact", async () => await transact(fn))
+      : undefined;
   }
 
   get metadata(): DatabaseAdapter["metadata"] {
@@ -36,6 +47,10 @@ class InstrumentedDatabase implements DatabaseAdapter {
 
   get lifecycle(): DatabaseAdapter["lifecycle"] {
     return this.inner.lifecycle;
+  }
+
+  get buildReferenceLifecycle(): DatabaseAdapter["buildReferenceLifecycle"] {
+    return this.inner.buildReferenceLifecycle;
   }
 
   get tables(): Tables {

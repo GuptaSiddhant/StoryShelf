@@ -1,8 +1,15 @@
 import { z } from "@hono/zod-openapi";
-import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import {
+  ReferenceGenerationConflict,
+  type DatabaseAdapter,
+} from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
-import { BaselineModel } from "@storyshelf/core/models";
+import {
+  BaselineApprovalConflict,
+  BaselineModel,
+  BaselineWriteConflict,
+} from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
@@ -17,7 +24,7 @@ import { credentialKeys } from "../credential-keys.ts";
 import { requestBuildState } from "../git-status.ts";
 import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
-import { assertBaselineCurrent } from "./baseline-guard.ts";
+import { assertBaselineCurrent, baselineChanged } from "./baseline-guard.ts";
 import { notFound } from "./helpers.ts";
 /**
  * Create a build record with labels and the `build:created` webhook.
@@ -222,7 +229,7 @@ export async function approveSnapshot(
     throw new HTTPException(409, { message: "The build was cancelled; retry it to review it" });
   }
   await assertBaselineCurrent(project, build, snapshot, options.force ?? false);
-  await snapshots.review(snapshotId, "approved", userId);
+  if (!db.buildReferenceLifecycle) await snapshots.review(snapshotId, "approved", userId);
   const baselines = new BaselineModel(db, undefined, getStore().storage, credentialKeys(config));
   const prior = await baselines.getFor(
     project.id,
@@ -231,16 +238,31 @@ export async function approveSnapshot(
     build.gitBranch,
     snapshot.browser,
   );
-  await baselines.upsert(
-    project.id,
-    snapshot.storyId,
-    snapshot.viewportName,
-    build.gitBranch,
-    snapshot.id,
-    snapshot.screenshotPath,
-    undefined,
-    { browser: snapshot.browser, mode: snapshot.mode },
-  );
+  try {
+    await baselines.upsert(
+      project.id,
+      snapshot.storyId,
+      snapshot.viewportName,
+      build.gitBranch,
+      snapshot.id,
+      snapshot.screenshotPath,
+      undefined,
+      {
+        browser: snapshot.browser,
+        mode: snapshot.mode,
+        approval: db.buildReferenceLifecycle
+          ? { snapshot, reviewedBy: userId, force: options.force ?? false, branch: build.gitBranch }
+          : undefined,
+      },
+    );
+  } catch (error) {
+    if (error instanceof BaselineWriteConflict || error instanceof ReferenceGenerationConflict) {
+      if (error instanceof BaselineApprovalConflict && error.driftStatus)
+        throw baselineChanged(snapshot.id, error.driftStatus);
+      throw new HTTPException(409, { message: error.message });
+    }
+    throw error;
+  }
   await notifyProject(
     project,
     prior ? "baseline:updated" : "baseline:created",
