@@ -6,6 +6,7 @@
  */
 export { BaselineModel } from "./baseline.ts";
 export { BaselineApprovalConflict } from "./baseline-approval.ts";
+export { BaselineWriteConflict } from "./baseline-conflict.ts";
 export { resolveBaselineOrigin, type BaselineOriginReader } from "./baseline-origin.ts";
 export {
   BASELINE_ARCHIVE_FORMAT,

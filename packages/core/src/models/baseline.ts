@@ -14,6 +14,7 @@ import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts"
 import { ulid } from "../utils/ulid.ts";
 import { approveInTransaction, type AtomicBaselineApproval } from "./baseline-approval.ts";
 import { upsertAtomicBaseline } from "./baseline-atomic.ts";
+import { BaselineWriteConflict } from "./baseline-conflict.ts";
 import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
 
@@ -134,7 +135,7 @@ export class BaselineModel {
             current.screenshotPath !== baseline.screenshotPath ||
             current.fingerprint !== baseline.fingerprint
           )
-            throw new Error("Baseline changed during fingerprint backfill; retry");
+            throw new BaselineWriteConflict("Baseline changed during fingerprint backfill; retry");
           await tx.update(this.tables.baselines, baseline.id, { infraHash, fingerprint });
         },
       );
@@ -390,7 +391,7 @@ export class BaselineModel {
           current.sourceBuildId !== baseline.sourceBuildId ||
           current.screenshotPath !== baseline.screenshotPath
         ) {
-          throw new Error("Baseline changed during removal; retry");
+          throw new BaselineWriteConflict("Baseline changed during removal; retry");
         }
         await tx.remove(this.tables.baselines, baseline.id);
       });

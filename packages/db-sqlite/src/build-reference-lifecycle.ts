@@ -1,10 +1,11 @@
 /** SQLite's write-serialized admission and irreversible deletion claim primitive. */
-import type {
-  BuildReferenceChange,
-  BuildReferenceLifecycle,
-  BuildReferenceOwner,
-  FencedBuildReferenceChange,
-  TxStore,
+import {
+  ReferenceGenerationConflict,
+  type BuildReferenceChange,
+  type BuildReferenceLifecycle,
+  type BuildReferenceOwner,
+  type FencedBuildReferenceChange,
+  type TxStore,
 } from "@storyshelf/core/adapter/database";
 import { resolveBaselineOrigin } from "@storyshelf/core/models";
 import type { Baseline, Build, Snapshot } from "@storyshelf/core/schema";
@@ -102,12 +103,17 @@ function prepareBaselineReference(
     );
     return false;
   }
+  const removed = db
+    .prepare(
+      "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ? AND build_id <> ?",
+    )
+    .run(projectId, id, buildId).changes;
   const result = db
     .prepare(
       "INSERT OR IGNORE INTO build_references (project_id, owner_type, owner_id, build_id) VALUES (?, 'baseline', ?, ?)",
     )
     .run(projectId, id, buildId);
-  if (result.changes) advanceGeneration(db, { type: "baseline", id, projectId });
+  if (result.changes || removed) advanceGeneration(db, { type: "baseline", id, projectId });
   return true;
 }
 
@@ -168,7 +174,7 @@ function checkGenerations(
       | unknown[]
       | undefined;
     if ((row?.[0] ?? 0) !== change.expectedGeneration)
-      throw new Error("Stale reference generation");
+      throw new ReferenceGenerationConflict("Stale reference generation");
     checkAvailable(db, change.owner.projectId, change.ids);
   }
 }

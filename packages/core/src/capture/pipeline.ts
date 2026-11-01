@@ -1,7 +1,8 @@
 import type { Logger } from "pino";
 import { DEFAULT_BROWSER, type RenderedSnapshot } from "../adapters/capture-runner.ts";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import { ReferenceGenerationConflict, type DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { BaselineWriteConflict } from "../models/baseline-conflict.ts";
 import { NO_BASELINE } from "../models/baseline-status.ts";
 import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
@@ -624,11 +625,20 @@ async function refreshDefaultBaseline(
   if (!passed) {
     await upsertDefaultBaseline(ctx, snapshotId, capture, screenshot, target);
   } else if (!baseline.fingerprint || baseline.infraHash !== target.infraHash) {
-    await new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret).backfillFingerprint(
-      baseline,
-      target.infraHash,
-      target.json,
-    );
+    try {
+      await new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret).backfillFingerprint(
+        baseline,
+        target.infraHash,
+        target.json,
+      );
+    } catch (error) {
+      if (!(error instanceof BaselineWriteConflict || error instanceof ReferenceGenerationConflict))
+        throw error;
+      ctx.logger?.debug(
+        { err: error, baselineId: baseline.id },
+        "skipped baseline fingerprint backfill after concurrent write",
+      );
+    }
   }
 }
 

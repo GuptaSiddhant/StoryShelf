@@ -5,6 +5,7 @@ import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { BuildReferenceLifecycle, TxStore } from "../adapters/database.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
+import { BaselineWriteConflict } from "./baseline-conflict.ts";
 import { col } from "./columns.ts";
 
 export interface AtomicBaselineInput {
@@ -93,7 +94,7 @@ function assertBaselineUnchanged(existing: Baseline | null, input: AtomicBaselin
     (existing?.id ?? null) !== input.existingId ||
     (existing?.updatedAt ?? null) !== input.existingVersion
   )
-    throw new Error("Baseline changed during promotion; retry");
+    throw new BaselineWriteConflict("Baseline changed during promotion; retry");
 }
 
 /** Keep the version advancing even when updates share a millisecond or clocks move backwards. */
@@ -116,6 +117,6 @@ async function assertSource(tx: TxStore, table: Table, input: AtomicBaselineInpu
     row.screenshotPath !== input.originalPath ||
     origin !== input.sourceBuildId
   ) {
-    throw new Error("Source snapshot changed during promotion; retry");
+    throw new BaselineWriteConflict("Source snapshot changed during promotion; retry");
   }
 }

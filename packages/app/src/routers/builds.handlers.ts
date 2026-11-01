@@ -1,8 +1,15 @@
 import { z } from "@hono/zod-openapi";
-import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import {
+  ReferenceGenerationConflict,
+  type DatabaseAdapter,
+} from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
-import { BaselineModel, BaselineApprovalConflict } from "@storyshelf/core/models";
+import {
+  BaselineApprovalConflict,
+  BaselineModel,
+  BaselineWriteConflict,
+} from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
@@ -249,8 +256,9 @@ export async function approveSnapshot(
       },
     );
   } catch (error) {
-    if (error instanceof BaselineApprovalConflict) {
-      if (error.driftStatus) throw baselineChanged(snapshot.id, error.driftStatus);
+    if (error instanceof BaselineWriteConflict || error instanceof ReferenceGenerationConflict) {
+      if (error instanceof BaselineApprovalConflict && error.driftStatus)
+        throw baselineChanged(snapshot.id, error.driftStatus);
       throw new HTTPException(409, { message: error.message });
     }
     throw error;

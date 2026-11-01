@@ -10,6 +10,9 @@ import type { SQL } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
 
+/** A fenced reference write lost its generation race and should be retried. */
+export class ReferenceGenerationConflict extends Error {}
+
 /** Type-safe table map enforced on every DatabaseAdapter. */
 export interface Tables {
   projects: Table;

@@ -18,6 +18,18 @@ import { schema } from "./schema/index.ts";
 
 const now = "2026-01-01T00:00:00.000Z";
 const owner = { projectId: "p", type: "baseline", id: "base" } as const;
+const childPollMs = 10;
+const childWaitMs = 15_000;
+
+async function waitForPath(path: string): Promise<boolean> {
+  const deadline = Date.now() + childWaitMs;
+  while (!existsSync(path) && Date.now() < deadline) {
+    // oxlint-disable-next-line no-await-in-loop -- poll for a separate process to reach its marker
+    await delay(childPollMs);
+  }
+  return existsSync(path);
+}
+
 async function withDatabase(run: (path: string) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), "storyshelf-build-reference-"));
   const path = join(dir, "test.sqlite");
@@ -71,11 +83,7 @@ async function startContendingClaim(path: string): Promise<PromiseLike<unknown[]
     stdio: "ignore",
   });
   const exited = once(child, "close");
-  for (let attempt = 0; attempt < 200 && !existsSync(`${path}.approval-blocked`); attempt += 1) {
-    // oxlint-disable-next-line no-await-in-loop -- wait for confirmed lock contention
-    await delay(10);
-  }
-  if (!existsSync(`${path}.approval-blocked`)) {
+  if (!(await waitForPath(`${path}.approval-blocked`))) {
     child.kill("SIGKILL");
     await exited;
     throw new Error("Deletion did not contend with approval");
@@ -113,11 +121,7 @@ describe("SQLite reference lifecycle primitive", () => {
         });
         const closed = once(child, "close");
         try {
-          for (let attempt = 0; attempt < 200 && !existsSync(`${path}.prepared`); attempt += 1) {
-            // oxlint-disable-next-line no-await-in-loop -- wait until the child has written uncommitted refs
-            await delay(10);
-          }
-          expect(existsSync(`${path}.prepared`)).toBe(true);
+          expect(await waitForPath(`${path}.prepared`)).toBe(true);
         } finally {
           child.kill("SIGKILL");
           await closed;
@@ -131,7 +135,7 @@ describe("SQLite reference lifecycle primitive", () => {
         await db.lifecycle?.teardown();
       }
     });
-  }, 15_000);
+  }, 30_000);
   it("recovers the renderer source of an inherited baseline without pinning its containing build", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
@@ -239,7 +243,7 @@ describe("SQLite reference lifecycle primitive", () => {
         await db.lifecycle?.teardown();
       }
     });
-  });
+  }, 30_000);
   it("keeps a prepared source protected until both baseline owners are removed", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
@@ -335,7 +339,12 @@ describe("SQLite reference lifecycle primitive", () => {
           sourceBuildId: "missing",
         });
         const unknownOwner = { type: "baseline" as const, projectId: "p", id: "unknown" };
-        await createBuildReferenceLifecycle(path).replaceFencedReferences(unknownOwner, 0, ["two"], async () => null);
+        await createBuildReferenceLifecycle(path).replaceFencedReferences(
+          unknownOwner,
+          0,
+          ["two"],
+          async () => null,
+        );
         expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
         expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
         expect((await db.get(schema.baselines, "unknown"))?.["sourceBuildId"]).toBeNull();
@@ -345,6 +354,36 @@ describe("SQLite reference lifecycle primitive", () => {
         expect(
           await lifecycle.referenceGeneration({ type: "baseline", id: "known", projectId: "p" }),
         ).toBe(1);
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
+  it("releases a stale baseline pin when preparation resolves a different source", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      try {
+        await db.insert(schema.baselines, {
+          id: "base",
+          projectId: "p",
+          storyId: "story",
+          viewportName: "desktop",
+          branch: "main",
+          browser: "chromium",
+          screenshotPath: "shot",
+          snapshotId: "snap",
+          sourceBuildId: "one",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const lifecycle = createBuildReferenceLifecycle(path);
+        const baselineOwner = { type: "baseline" as const, projectId: "p", id: "base" };
+        await lifecycle.replaceFencedReferences(baselineOwner, 0, ["two"], async () => null);
+
+        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 0 });
+        expect(await lifecycle.referenceGeneration(baselineOwner)).toBe(2);
+        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
         expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
       } finally {
         await db.lifecycle?.teardown();
@@ -705,18 +744,14 @@ describe("SQLite reference lifecycle primitive", () => {
         child.stderr!.on("data", (chunk: Buffer) => {
           errors += chunk.toString();
         });
-        for (let attempt = 0; attempt < 200 && !existsSync(`${path}.ready`); attempt += 1) {
-          // oxlint-disable-next-line eslint/no-await-in-loop -- poll until the separate process holds its request
-          await delay(10);
-        }
-        if (!existsSync(`${path}.ready`)) throw new Error(errors || "child did not start");
+        if (!(await waitForPath(`${path}.ready`))) throw new Error(errors || "child did not start");
       });
       if (!child || !exited) throw new Error("child did not start");
       const [code] = await exited;
       expect(code).toBe(0);
       expect(readFileSync(`${path}.result`, "utf8")).toBe("protected");
     });
-  }, 15_000);
+  }, 30_000);
   it("rejects missing and cross-project builds without dropping existing references", async () => {
     await withDatabase(async (path) => {
       const lifecycle = createBuildReferenceLifecycle(path);

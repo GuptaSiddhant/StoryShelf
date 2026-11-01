@@ -10,6 +10,7 @@ import type { Baseline } from "../schema/baseline.ts";
 import { withContentClaim } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
 import { baselineIdentity } from "./baseline-archive.ts";
+import { BaselineWriteConflict } from "./baseline-conflict.ts";
 import { exportBaselineArchive, type BaselineExportOptions } from "./baseline-export.ts";
 import { planBaselineImport, writePlannedImage, type PlannedBaseline } from "./baseline-import.ts";
 import { BaselineModel, type BaselineTables } from "./baseline.ts";
@@ -153,7 +154,7 @@ export class BaselineTransferModel {
         found.screenshotPath !== row.screenshotPath ||
         (found.browser ?? DEFAULT_BROWSER) !== (row.browser ?? DEFAULT_BROWSER)
       ) {
-        throw new Error("Baseline changed during import; retry");
+        throw new BaselineWriteConflict("Baseline changed during import; retry");
       }
     }
   }

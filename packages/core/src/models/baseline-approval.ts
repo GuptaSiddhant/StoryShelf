@@ -5,6 +5,7 @@ import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
+import { BaselineWriteConflict } from "./baseline-conflict.ts";
 import { baselineStatus, isBaselineDrifted, type BaselineStatus } from "./baseline-status.ts";
 import { col } from "./columns.ts";
 
@@ -14,7 +15,7 @@ export interface AtomicBaselineApproval {
   force: boolean;
   branch: string;
 }
-export class BaselineApprovalConflict extends Error {
+export class BaselineApprovalConflict extends BaselineWriteConflict {
   readonly driftStatus?: BaselineStatus;
   constructor(message: string, driftStatus?: BaselineStatus) {
     super(message);
