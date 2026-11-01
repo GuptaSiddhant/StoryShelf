@@ -171,43 +171,51 @@ describe("BrowserSession", () => {
     expect(timeout).toHaveBeenCalledWith(expect.any(Function), RELEASE_TIMEOUT_MS);
   });
 
-  it("closes a page that arrives after release instead of leaking it", async () => {
+  it("waits for a pending page, closes it, and then disconnects", async () => {
     const pageClose = vi.fn(async (): Promise<void> => {});
+    const disconnect = vi.fn(async (): Promise<void> => {});
     let resolvePage: ((page: Page) => void) | undefined;
     const browser = {
       newPage: async () =>
         await new Promise<Page>((resolve) => {
           resolvePage = resolve;
         }),
-      disconnect: async () => {},
+      disconnect,
     } as unknown as Browser;
     const session = createBrowserSession({ browser, ownership: "connected" });
 
     const pending = session.newPage();
-    await session.release("cancelled");
+    const released = session.release("cancelled");
+    expect(disconnect).not.toHaveBeenCalled();
     resolvePage?.(pageWithClose(pageClose));
 
     await expect(pending).rejects.toThrow("browser session released");
+    await expect(released).resolves.toBeUndefined();
     expect(pageClose).toHaveBeenCalledTimes(1);
+    expect(disconnect).toHaveBeenCalledTimes(1);
   });
 
-  it("closes a context that arrives after release instead of leaking it", async () => {
+  it("waits for a pending context, closes it, and then disconnects", async () => {
     const contextClose = vi.fn(async (): Promise<void> => {});
+    const disconnect = vi.fn(async (): Promise<void> => {});
     let resolveContext: ((context: BrowserContext) => void) | undefined;
     const browser = {
       createBrowserContext: async () =>
         await new Promise<BrowserContext>((resolve) => {
           resolveContext = resolve;
         }),
-      disconnect: async () => {},
+      disconnect,
     } as unknown as Browser;
     const session = createBrowserSession({ browser, ownership: "connected" });
 
     const pending = session.createBrowserContext();
-    await session.release("cancelled");
+    const released = session.release("cancelled");
+    expect(disconnect).not.toHaveBeenCalled();
     resolveContext?.(contextWithClose(contextClose));
 
     await expect(pending).rejects.toThrow("browser session released");
+    await expect(released).resolves.toBeUndefined();
     expect(contextClose).toHaveBeenCalledTimes(1);
+    expect(disconnect).toHaveBeenCalledTimes(1);
   });
 });

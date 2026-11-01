@@ -44,6 +44,7 @@ class OwnedSession implements BrowserSession {
   readonly #lease: ReleaseLease | undefined;
   readonly #pages = new Set<Page>();
   readonly #contexts = new Set<BrowserContext>();
+  readonly #pending = new Set<Promise<unknown>>();
   #released: Promise<void> | undefined;
   #outcome: ReleaseOutcome | undefined;
 
@@ -55,6 +56,15 @@ class OwnedSession implements BrowserSession {
 
   async newPage(): Promise<Page> {
     this.#assertOpen();
+    return await this.#track(this.#openPage());
+  }
+
+  async createBrowserContext(): Promise<BrowserContext> {
+    this.#assertOpen();
+    return await this.#track(this.#openContext());
+  }
+
+  async #openPage(): Promise<Page> {
     const page = await this.browser.newPage();
     if (this.#released !== undefined) {
       await closePage(page);
@@ -64,8 +74,7 @@ class OwnedSession implements BrowserSession {
     return page;
   }
 
-  async createBrowserContext(): Promise<BrowserContext> {
-    this.#assertOpen();
+  async #openContext(): Promise<BrowserContext> {
     const context = await this.browser.createBrowserContext();
     if (this.#released !== undefined) {
       await closeContext(context);
@@ -73,6 +82,15 @@ class OwnedSession implements BrowserSession {
     }
     this.#contexts.add(context);
     return context;
+  }
+
+  async #track<T>(work: Promise<T>): Promise<T> {
+    this.#pending.add(work);
+    try {
+      return await work;
+    } finally {
+      this.#pending.delete(work);
+    }
   }
 
   forgetPage(page: Page): void {
@@ -99,6 +117,11 @@ class OwnedSession implements BrowserSession {
   }
 
   async #releaseConnected(): Promise<void> {
+    // Let creations already in flight finish so their post-release branch can close them
+    // while the transport is still connected.
+    await bounded(async () => {
+      await Promise.allSettled(this.#pending);
+    });
     await Promise.all(
       [...this.#pages].map(async (page) => {
         await this.#closePage(page);

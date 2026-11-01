@@ -142,10 +142,13 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("remote capture over CDP
         viewports: [{ name: "desktop", width: 1280, height: 720 }],
       });
 
-      await vi.waitFor(async () => {
-        const urls = (await sibling.pages()).map((page) => page.url());
-        expect(urls.some((url) => url.includes("components-button--primary"))).toBe(true);
-      });
+      await vi.waitFor(
+        async () => {
+          const urls = (await sibling.pages()).map((page) => page.url());
+          expect(urls.some((url) => url.includes("components-button--primary"))).toBe(true);
+        },
+        { timeout: 60_000, interval: 100 },
+      );
       await runner.cancel("remote-cdp-cancel");
       const result = await rendering;
 

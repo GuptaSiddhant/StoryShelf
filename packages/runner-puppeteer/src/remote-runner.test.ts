@@ -192,9 +192,7 @@ describe("a remote CDP target", () => {
       browserWSEndpoint: "wss://farm.example/?token=sekret-key",
       headers: { authorization: "Bearer sekret-token" },
     });
-    expect(fake.state.gotos[0]).toMatch(
-      new RegExp(`^${URL_BASE.replaceAll(".", String.raw`\.`)}/iframe\\.html\\?`, "u"),
-    );
+    expect(fake.state.gotos[0]?.startsWith(`${URL_BASE}/iframe.html?`)).toBe(true);
     expect(fake.state.gotos.some((url) => url.includes("127.0.0.1"))).toBe(false);
     expect(result.captures.map((capture) => capture.browser)).toEqual([
       "chromium@farm",
