@@ -95,7 +95,9 @@ branch does not carry a verdict over.
   it. A repeated publish completion, a retried hook or a second instance therefore sends nothing,
   and a reopened build sends one request for its new cycle. The event id is `<buildId>:<cycle>`
   (`data.eventId`), so its deliveries keep one identity. Testing sign-offs and builds that capture
-  owns never reach the request.
+  owns never reach the request. Delivery is at-most-once: the claim comes first,
+  and the notification and webhook fan-outs are best-effort and non-fatal like every other
+  notification, so a failed delivery after the claim is not retried for that cycle.
 - **Who may comment.** `developer`, `approver` and `admin` write build, story and snapshot comments;
   `viewer` reads only.
 - **Unresolved comments do not block.** A verdict is allowed with open threads. Resolving is a
