@@ -131,9 +131,13 @@ describe("AWS Terraform modules", () => {
       const block = compute.slice(compute.indexOf(`resource "aws_iam_role_policy" "${policy}"`));
       const statement = block.slice(0, block.indexOf("\n}\n"));
       expect(statement).toContain('Action = ["secretsmanager:GetSecretValue"]');
-      for (const secret of secrets) {
-        expect(statement).toContain(`aws_secretsmanager_secret.${secret}.arn`);
-      }
+      // The Resource list is exactly the three scaffold ARNs, in order: no extras, no wildcard.
+      const resources = /Resource = \[(?<list>[^\]]*)\]/u.exec(statement)?.groups?.["list"] ?? "";
+      const arns = resources
+        .split(",")
+        .map((arn) => arn.trim())
+        .filter(Boolean);
+      expect(arns).toEqual(secrets.map((secret) => `aws_secretsmanager_secret.${secret}.arn`));
     }
     // The task role reaches the bucket (its own policy), not just the secrets.
     const storage = compute.slice(compute.indexOf('resource "aws_iam_role_policy" "task_storage"'));

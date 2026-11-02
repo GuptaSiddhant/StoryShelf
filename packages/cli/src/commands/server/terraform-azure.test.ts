@@ -151,6 +151,15 @@ describe("Azure Terraform modules", () => {
   });
 });
 
+/** Names in a README table cell such as "Key Vault entries `A` / `B`", in order. */
+function namesIn(cell: string | undefined): string[] {
+  return (cell ?? "")
+    .replace("Key Vault entries", "")
+    .replaceAll("`", "")
+    .split("/")
+    .map((name) => name.trim());
+}
+
 describe("Azure Terraform README", () => {
   it("documents plan-before-apply, az login, and the CI profile", () => {
     const readme = generateAzureReadme("acme-shelf");
@@ -166,11 +175,13 @@ describe("Azure Terraform README", () => {
     const row = readme.split("\n").find((line) => line.startsWith("| Key Vault entries"));
     expect(row).toBeDefined();
     // Vault entry names (dashes) in the first column, env var names (underscores) in the second.
-    const [, entries, envVars] = (row ?? "").split("|").map((cell) => cell.trim());
-    expect(entries).toContain("OIDC-CLIENT-SECRET");
-    expect(entries).toContain("ADMIN-TOKEN");
-    expect(envVars).toContain("OIDC_CLIENT_SECRET");
-    expect(envVars).toContain("ADMIN_TOKEN");
+    const [, entryCell, envCell] = (row ?? "").split("|").map((cell) => cell.trim());
+    // Pairwise, in order: swapping two entries (or two env vars) must fail.
+    expect(namesIn(entryCell).map((entry, index) => [entry, namesIn(envCell)[index]])).toEqual([
+      ["SECRET", "SECRET"],
+      ["OIDC-CLIENT-SECRET", "OIDC_CLIENT_SECRET"],
+      ["ADMIN-TOKEN", "ADMIN_TOKEN"],
+    ]);
   });
 });
 
