@@ -23,7 +23,7 @@ import {
   stoppedError,
 } from "./remote-lease-error.ts";
 import { holdLease, noLease, withDeadline, type HeldConnection } from "./remote-lease-held.ts";
-import { takeSlot, type ConnectionSlot } from "./remote-limiter.ts";
+import { shutdownEpoch, takeSlot, type ConnectionSlot } from "./remote-limiter.ts";
 
 export { RemoteConnectError, type RemoteConnectErrorOptions } from "./remote-lease-error.ts";
 export type { HeldConnection } from "./remote-lease-held.ts";
@@ -115,8 +115,7 @@ async function acquire(
   attemptNo: number,
   logger: Logger | undefined,
 ): Promise<HeldConnection> {
-  // No `await` without a cap: an uncapped connection starts exactly as it did before.
-  const taking = takeSlot(entry, context.signal, logger);
+  const taking = slotFor(entry, context, logger);
   const slot = taking === undefined ? undefined : await taking;
   try {
     const held = await open(entry, context, attemptNo, logger);
@@ -125,6 +124,27 @@ async function acquire(
     slot?.release();
     throw error;
   }
+}
+
+/**
+ * The connection slot of a capped service, or undefined without a cap. Not `async`: without a cap the
+ * caller must not wait even one tick, so an uncapped connection starts exactly as it did before. A slot granted just before a shutdown
+ * resumes after the attempts were stopped, and nothing would release a connection opened then: it is
+ * given back and the connection stops.
+ */
+function slotFor(
+  entry: RemoteTarget,
+  context: ConnectLeasedContext,
+  logger: Logger | undefined,
+): Promise<ConnectionSlot> | undefined {
+  const epoch = shutdownEpoch();
+  return takeSlot(entry, context.signal, logger)?.then((slot) => {
+    if (shutdownEpoch() !== epoch) {
+      slot.release();
+      throw stoppedError();
+    }
+    return slot;
+  });
 }
 
 /** `held` that gives its slot back, once, after the lease is released. */

@@ -108,6 +108,7 @@ export class ConnectionLimiter {
 }
 
 const limiters = new Map<RemoteBrowser, ConnectionLimiter>();
+let epoch = 0;
 
 /** The limiter of a service, created on first use; undefined when it has no `maxConnections`. */
 export function limiterOf(remote: RemoteBrowser): ConnectionLimiter | undefined {
@@ -154,8 +155,18 @@ export function takeSlot(
  * took it from, which nothing uses any more.
  */
 export function resetAllLimiters(): void {
+  epoch += 1;
   for (const limiter of limiters.values()) {
     limiter.stopWaiting();
   }
   limiters.clear();
+}
+
+/**
+ * Counts shutdowns. A caller that took a slot compares it with the value from before it waited: a
+ * slot granted just before a shutdown resumes a tick later, after the attempts were stopped, and
+ * must not open a connection nobody will release.
+ */
+export function shutdownEpoch(): number {
+  return epoch;
 }

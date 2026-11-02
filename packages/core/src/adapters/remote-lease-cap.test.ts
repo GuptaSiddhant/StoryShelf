@@ -216,6 +216,27 @@ describe("maxConnections", () => {
     expect(await waiting).toMatchObject({ name: "TargetLaunchError" });
   });
 
+  it("opens no connection for a slot granted just before shutdown, and gives that slot back", async () => {
+    const connect = vi.fn(
+      async () =>
+        await Promise.resolve({ endpoint: "ws://127.0.0.1:1/secret-path", lease: { id: 1 } }),
+    );
+    const { entry, held } = service({ maxConnections: 1, connect });
+    const limiter = limiterOf(entry.remote);
+    const blocker = await limiter?.acquire();
+    const second = connectLeased(entry, CTX, opens).catch((error: unknown) => error);
+    await vi.waitFor(() => {
+      expect(limiter?.waiting).toBe(1);
+    });
+    // The grant resumes `second` a tick later: shutdown starts in that gap.
+    blocker?.release();
+    const shutting = shutdownRemote();
+    expect(await second).toMatchObject({ name: "TargetLaunchError" });
+    await shutting;
+    expect(connect).not.toHaveBeenCalled();
+    expect(held()).toBe(0);
+  });
+
   it("logs a long wait once with the target and limit, never the endpoint", async () => {
     const warn = vi.fn();
     const { entry } = service({ maxConnections: 1, timeouts: { acquireMs: 5 } });
