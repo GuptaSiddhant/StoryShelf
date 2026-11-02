@@ -9,7 +9,7 @@ import {
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { createPageLimiter, isTimeoutError, type SessionGate } from "@storyshelf/core/utils";
 import type { Page } from "puppeteer-core";
-import { finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
+import { abortIfCancelled, finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
 import { acquirePage } from "./pages.ts";
 import { assertReachable, launchContextOf, planRun, serve } from "./pipeline.ts";
 import { createBrowserSession, type BrowserSession } from "./session.ts";
@@ -48,14 +48,6 @@ export async function runTestEntries(
       await Promise.all([session.release(outcomeOf(active, failed), error), closeServer(server)]);
     },
   );
-}
-
-/** Release and throw when the run was cancelled while acquiring the browser. */
-async function abortIfCancelled(active: ActiveRun, session: BrowserSession): Promise<void> {
-  if (!active.cancelled) return;
-  await session.release("cancelled");
-  if (active.session === session) active.session = null;
-  throw new Error("Capture cancelled");
 }
 
 async function closeServer(server: { close(): Promise<void> } | undefined): Promise<void> {

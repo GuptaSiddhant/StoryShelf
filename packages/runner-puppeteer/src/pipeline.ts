@@ -24,7 +24,7 @@ import {
   type SessionGate,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
-import { finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
+import { abortIfCancelled, finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
@@ -88,14 +88,6 @@ export async function renderAll(
       await Promise.all([current.release(outcomeOf(active, failed), error), closeServer(server)]);
     },
   );
-}
-
-/** Release and throw when the run was cancelled while acquiring the browser. */
-async function abortIfCancelled(active: ActiveRun, session: BrowserSession): Promise<void> {
-  if (!active.cancelled) return;
-  await session.release("cancelled");
-  if (active.session === session) active.session = null;
-  throw new Error("Capture cancelled");
 }
 
 async function closeServer(server: Serving | undefined): Promise<void> {

@@ -2,6 +2,7 @@
 
 import { RenderRuns, type RemoteLeaseOutcome } from "@storyshelf/core/adapter/capture-runner";
 import type { ActiveRun } from "./types.ts";
+import type { BrowserSession } from "./session.ts";
 
 /** Tracks in-flight renders, each by its own handle, so `cancel` aborts exactly the runs it names. */
 export const activeRuns = new RenderRuns<ActiveRun>();
@@ -35,6 +36,17 @@ export async function safeCloseServer(server: { close(): Promise<void> }): Promi
   } catch {
     // Best-effort; teardown must never mask a render result.
   }
+}
+
+/** Release and throw when the run was cancelled while acquiring the browser. */
+export async function abortIfCancelled(
+  active: { cancelled: boolean; session: BrowserSession | null },
+  session: BrowserSession,
+): Promise<void> {
+  if (!active.cancelled) return;
+  await session.release("cancelled");
+  if (active.session === session) active.session = null;
+  throw new Error("Capture cancelled");
 }
 
 /** Normalize any thrown value to a string. */
