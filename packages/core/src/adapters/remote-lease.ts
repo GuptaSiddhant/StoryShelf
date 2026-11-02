@@ -12,6 +12,7 @@ import {
   schemesOf,
   type RemoteConnectContext,
   type RemoteConnection,
+  type RemoteLeaseOutcome,
   type RemoteLeasedConnection,
   type RemoteTarget,
 } from "./remote-browser.ts";
@@ -144,16 +145,29 @@ function stopIfShutDown(slot: ConnectionSlot | undefined, epoch: number): void {
 
 /** `held` that gives its slot back, once, after the lease is released. */
 function withSlot(held: HeldConnection, slot: ConnectionSlot): HeldConnection {
+  let ending: Promise<void> | undefined;
   return {
     connection: held.connection,
+    // Every caller gets the first call's promise: the inner `end` returns at once for a second call,
+    // which would free the slot while the first release is still running.
     end: async (outcome, error) => {
-      try {
-        await held.end(outcome, error);
-      } finally {
-        slot.release();
-      }
+      ending ??= endAndFree(held, slot, outcome, error);
+      await ending;
     },
   };
+}
+
+async function endAndFree(
+  held: HeldConnection,
+  slot: ConnectionSlot,
+  outcome: RemoteLeaseOutcome,
+  error: unknown,
+): Promise<void> {
+  try {
+    await held.end(outcome, error);
+  } finally {
+    slot.release();
+  }
 }
 
 async function open(

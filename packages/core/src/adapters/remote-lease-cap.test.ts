@@ -151,6 +151,38 @@ describe("maxConnections", () => {
     await again.lease.end("finished");
   });
 
+  it("keeps the slot until the first release finishes, however many callers end the lease", async () => {
+    let openRelease!: () => void;
+    const releasing = new Promise<void>((resolve) => {
+      openRelease = resolve;
+    });
+    const outcomes: string[] = [];
+    const { entry, held } = service({
+      maxConnections: 1,
+      release: async (_lease, info) => {
+        outcomes.push(info.outcome);
+        await releasing;
+      },
+    });
+    const { lease } = await connectLeased(entry, CTX, opens);
+    const first = lease.end("finished");
+    const second = lease.end("failed", new Error("late"));
+    await vi.waitFor(() => {
+      expect(outcomes).toEqual(["finished"]);
+    });
+    // The release hook is still running: no caller may free the slot, so a new connection must wait.
+    const waiting = connectLeased(entry, CTX, opens);
+    await vi.waitFor(() => {
+      expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    });
+    expect(held()).toBe(1);
+    openRelease();
+    await Promise.all([first, second]);
+    await (await waiting).lease.end("finished");
+    expect(outcomes).toEqual(["finished", "finished"]);
+    expect(held()).toBe(0);
+  });
+
   it("frees the slot of a handshake that failed before it connects again: never two held for one connection", async () => {
     let tries = 0;
     const { entry, released, held } = service({
