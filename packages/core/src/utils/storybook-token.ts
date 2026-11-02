@@ -2,8 +2,9 @@
  * Signed Storybook tokens (ADR 0007, decision 5): the single owner of everything about the path
  * prefix of the URL a remote browser opens to read one build's published Storybook, `/_s/<token>/`:
  * the prefix, the token shape, the derived signing key, signing, verification and the lifetime
- * rules. Stateless: `base64url("<projectId>:<buildId>:<exp>")`, a dot, and the base64url
- * HMAC-SHA-256 of that first part. Imported through `@storyshelf/core/utils`.
+ * rules. Stateless: `base64url("<projectId>:<buildId>:<exp>[:<purpose>]")`, a dot, and the base64url
+ * HMAC-SHA-256 of that first part. The optional purpose is covered by the signature; a token
+ * without one is a legacy or interactive-preview grant. Imported through `@storyshelf/core/utils`.
  */
 import { createHmac } from "node:crypto";
 import type { SecretInput } from "./encrypt.ts";
@@ -38,7 +39,14 @@ export const MIN_STORYBOOK_URL_TTL_OVERRIDE =
 /** Domain separation: the signing key is derived from the secret with this context, nothing else uses it. */
 const KEY_CONTEXT = "storyshelf/storybook-url/v1";
 const TOKEN_SHAPE = new RegExp(`^${STORYBOOK_TOKEN_SOURCE}$`, "u");
-const CLAIMS_SHAPE = /^([A-Za-z0-9_-]{1,64}):([A-Za-z0-9_-]{1,64}):(\d{1,12})$/u;
+const CLAIMS_SHAPE = /^([A-Za-z0-9_-]{1,64}):([A-Za-z0-9_-]{1,64}):(\d{1,12})(?::(capture))?$/u;
+
+/**
+ * What a token was minted for. `capture` marks the tokens the server mints for a render pass or
+ * slice (`storybookUrlSource`); it is the only claim that may opt into browser-private caching of
+ * the build's assets. Interactive preview grants and legacy tokens carry none.
+ */
+export type StorybookTokenPurpose = "capture";
 
 /** What a valid token grants: read-only access to one build's static files until `expiresAt`. */
 export interface StorybookTokenClaims {
@@ -46,6 +54,8 @@ export interface StorybookTokenClaims {
   buildId: string;
   /** Unix seconds. */
   expiresAt: number;
+  /** Set only on tokens minted for a render pass; absent on previews and legacy tokens. */
+  purpose?: StorybookTokenPurpose;
 }
 
 /** Inputs for {@link signStorybookToken}. */
@@ -56,6 +66,8 @@ export interface SignStorybookTokenInput {
   buildId: string;
   /** Lifetime in seconds; defaults to {@link DEFAULT_STORYBOOK_URL_TTL}. See {@link storybookUrlTtl}. */
   ttlSeconds?: number | undefined;
+  /** What the token is for; omit for an interactive preview. Signed into the token. */
+  purpose?: StorybookTokenPurpose | undefined;
   /** Clock override for tests (ms). */
   now?: number | undefined;
 }
@@ -74,7 +86,9 @@ export function signStorybookToken(input: SignStorybookTokenInput): string {
   assertStorybookUrlTtl(ttl);
   const secret = currentSecret(input.secret);
   const expiresAt = Math.floor((input.now ?? Date.now()) / 1000) + ttl;
-  const claims = `${input.projectId}:${input.buildId}:${expiresAt}`;
+  const claims = `${input.projectId}:${input.buildId}:${expiresAt}${
+    input.purpose === undefined ? "" : `:${input.purpose}`
+  }`;
   if (!CLAIMS_SHAPE.test(claims)) {
     throw new Error("Cannot sign a Storybook URL: unexpected project or build id");
   }
@@ -157,7 +171,7 @@ function claimsOf(payload: string, nowSeconds: number): StorybookTokenResult {
   if (!match) {
     return { ok: false, reason: "malformed" };
   }
-  const [, projectId = "", buildId = "", exp = ""] = match;
+  const [, projectId = "", buildId = "", exp = "", purpose] = match;
   const expiresAt = Number(exp);
   if (expiresAt <= nowSeconds) {
     return { ok: false, reason: "expired" };
@@ -165,7 +179,10 @@ function claimsOf(payload: string, nowSeconds: number): StorybookTokenResult {
   if (expiresAt > nowSeconds + MAX_STORYBOOK_URL_TTL) {
     return { ok: false, reason: "scope" };
   }
-  return { ok: true, claims: { projectId, buildId, expiresAt } };
+  return {
+    ok: true,
+    claims: { projectId, buildId, expiresAt, ...(purpose === "capture" ? { purpose } : {}) },
+  };
 }
 
 /** The key tokens are signed with; throws when none is configured. */

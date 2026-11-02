@@ -16,6 +16,22 @@ describe("validateConfig", () => {
     expect(() => validateConfig({ publishedCompression: "true" })).toThrow("Invalid ShelfConfig");
   });
 
+  it("validates the capture asset cache opt-in: unset, 0 and 1 to 3600 whole seconds", () => {
+    expect(validateConfig({}).captureAssets).toBeUndefined();
+    expect(validateConfig({ captureAssets: {} }).captureAssets).toEqual({});
+    for (const cacheMaxAgeSeconds of [0, 1, 600, 3600]) {
+      expect(validateConfig({ captureAssets: { cacheMaxAgeSeconds } }).captureAssets).toEqual({
+        cacheMaxAgeSeconds,
+      });
+    }
+    for (const bad of [-1, 3601, 1.5, "60", Number.NaN]) {
+      expect(() => validateConfig({ captureAssets: { cacheMaxAgeSeconds: bad } })).toThrow(
+        "Invalid ShelfConfig",
+      );
+    }
+    expect(() => validateConfig({ captureAssets: { headers: {} } })).toThrow("Invalid ShelfConfig");
+  });
+
   it("rejects non-boolean serverTiming", () => {
     expect(() => validateConfig({ serverTiming: "yes" })).toThrow("Invalid ShelfConfig");
   });

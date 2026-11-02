@@ -34,8 +34,20 @@ describe("storybookUrlSource", () => {
     expect(url).toMatch(/^https:\/\/shelf\.test\/_s\/[\w-]+\.[\w-]+\/$/u);
     expect(verifyStorybookToken(tokenOf(url), "k")).toMatchObject({
       ok: true,
-      claims: { projectId: "01PROJECT", buildId: "01BUILD" },
+      claims: { projectId: "01PROJECT", buildId: "01BUILD", purpose: "capture" },
     });
+  });
+
+  it("signs the capture purpose into every token it mints, a fresh one per call", async () => {
+    const source = storybookUrlSource({ runner, secret: "k", publicOrigin: origin }, subject);
+    const first = tokenOf(await source("chromium@farm", { budgetMs: 60_000 }));
+    const second = tokenOf(await source("chromium@farm", { budgetMs: 60_000 }));
+    for (const token of [first, second]) {
+      expect(verifyStorybookToken(token, "k")).toMatchObject({
+        ok: true,
+        claims: { purpose: "capture" },
+      });
+    }
   });
 
   it("signs with the current key of a rotation pair", async () => {

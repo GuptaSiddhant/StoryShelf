@@ -6,15 +6,20 @@
  * granted.
  */
 import { readPublishedFileInfo } from "@storyshelf/core/capture";
-import { isSafeSegment, mimeFor } from "@storyshelf/core/utils";
+import { isSafeSegment, mimeFor, type StorybookTokenClaims } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { getStore } from "../store.ts";
+import { signedCacheControl, SIGNED_NO_STORE } from "./capture-cache.ts";
 import { publishedCorsHeaders, type PublishedAccess } from "./published-access.ts";
 import { acceptsGzip, publishedGzip } from "./published-compression.ts";
 
-/** Headers of every signed URL answer: a token URL must not be cached, indexed or leaked by `Referer`. */
+/**
+ * Headers of every signed URL answer: a token URL must not be indexed or leaked by `Referer`, and
+ * is `no-store` here. Only a successful answer for a capture grant may replace `cache-control`
+ * (`signedCacheControl`); an error always sends these as they are.
+ */
 export const SIGNED_URL_HEADERS = {
-  "cache-control": "private, no-store",
+  "cache-control": SIGNED_NO_STORE,
   "referrer-policy": "no-referrer",
   "x-robots-tag": "noindex, nofollow",
   "x-content-type-options": "nosniff",
@@ -52,8 +57,10 @@ export interface PublishedFileRequest {
   /** A path accepted by {@link publishedRelativePath}, not the root. */
   rel: string;
   access: PublishedAccess;
-  /** `Cache-Control` of a normal answer; a signed URL always answers `private, no-store`. */
+  /** `Cache-Control` of a normal answer; a signed URL answers `signedCacheControl` instead. */
   cacheControl: string;
+  /** The verified claims of a signed URL's token; decides whether its answer may be fresh. */
+  grant?: StorybookTokenClaims | undefined;
 }
 
 /** The file as a response, or `null` when the build has no such file. */
@@ -68,7 +75,16 @@ export async function servePublishedFile(
     return null;
   }
   const headers =
-    access === "token" ? SIGNED_URL_HEADERS : { "cache-control": request.cacheControl };
+    access === "token"
+      ? {
+          ...SIGNED_URL_HEADERS,
+          "cache-control": signedCacheControl({
+            cacheMaxAgeSeconds: config.captureAssets?.cacheMaxAgeSeconds,
+            grant: request.grant,
+            immutable: file.contentHash !== undefined,
+          }),
+        }
+      : { "cache-control": request.cacheControl };
   const mime = mimeFor(rel);
   const compressed =
     config.publishedCompression && acceptsGzip(c.req.header("accept-encoding"))

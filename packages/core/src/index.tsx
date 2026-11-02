@@ -11,6 +11,7 @@
 export type {
   AdapterSnapshot,
   BrandTheme,
+  CaptureAssetsConfig,
   ShelfConfig,
   ShelfOptions,
   ShelfViewport,
@@ -18,6 +19,7 @@ export type {
 } from "./config.ts";
 export {
   DEFAULT_MAX_UPLOAD_BYTES,
+  MAX_CAPTURE_ASSET_CACHE_SECONDS,
   shelfConfigSchema,
   uiConfigSchema,
   validateConfig,

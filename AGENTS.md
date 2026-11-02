@@ -116,13 +116,18 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   (`packages/app/src/routers/signed-storybook.ts`, class `testing`).
   `packages/core/src/utils/storybook-token.ts` is the single owner of the prefix
   `STORYBOOK_TOKEN_PREFIX`, token shape, derived key, sign/verify and lifetime: never type `/_s/` or
-  derive a key elsewhere. Mint only through `storybookUrlSource` (renders) and
+  derive a key elsewhere. Mint only through `storybookUrlSource` (renders; it alone signs the
+  `capture` purpose claim) and
   `packages/app/src/routers/preview-base.ts` (private previews); `renderInSlices` re-mints for long
   passes. Every published-file route goes through `publishedAccess` +
   `servePublishedFile`/`publishedRelativePath`; CORS only from `publishedCorsHeaders`. The signed
   route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
   `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
-  `/_s/` or widen what a token grants.
+  `/_s/` or widen what a token grants. Only `signedCacheControl` (`packages/app/src/routers/
+  capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
+  manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
+  by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
+  never let a runner set response headers.
 - **Review.** `projects.review_enabled` (default true) and `review_approvals` (default 1) are the only
   switches; there is no `ShelfOptions` field. Verdicts live in `build_reviews` (`BuildReviewModel`;
   newest row counts) and are attributed by `resolveReviewer` (session user or bearer-token owner;

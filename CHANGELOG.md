@@ -5,6 +5,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Added: opt-in browser caching of capture-scoped signed Storybook assets (#385).** `config.captureAssets.cacheMaxAgeSeconds` (a whole number from 0 to 3600, default 0) lets a remote capture browser reuse a render's assets across stories instead of fetching them for every story. It is off by default and signed answers stay `Cache-Control: private, no-store`. When set, a successful answer for a token the server minted for a render pass (a new signed `capture` purpose claim; tokens minted before it, and interactive preview links, are unchanged and verify as before) for a file of a content-addressed build is `private, max-age=N`, N being the least of the cap, one hour and the token's remaining lifetime, so it never outlives the grant. Errors, refusals, previews and legacy files stay `no-store`; the server sets the header and runners get a URL only. Authorization is still checked on every request that reaches the server, but bytes a browser already holds fresh cannot be recalled until their freshness ends, and a fresh browser context starts cold. See the remote browsers guide.
+
 **Changed: accessibility checks warn when story configuration contains values that cannot cross from the preview (#242).** The warning includes the story ID and omitted-value count; axe uses the remaining configuration.
 
 **Changed: invalid inline Storybook ZIP uploads return 422 (#253).** Malformed, unsafe or over-limit archives are rejected immediately without queuing capture; a corrected archive can be uploaded to the same build. Background publishing remains asynchronous.

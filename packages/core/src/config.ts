@@ -90,6 +90,19 @@ export interface NotificationsConfig {
   footerText?: string;
   slackUsername?: string;
 }
+/** Longest browser-private freshness a signed capture asset may be given, in seconds (1 hour). */
+export const MAX_CAPTURE_ASSET_CACHE_SECONDS = 3600;
+
+/** Signed Storybook asset serving for remote capture browsers (ADR 0007, decision 5). */
+export interface CaptureAssetsConfig {
+  /**
+   * Opt-in browser-private freshness of capture-scoped signed assets, in whole seconds from 0 to
+   * {@link MAX_CAPTURE_ASSET_CACHE_SECONDS}. 0 (default) keeps every signed answer `no-store`. A
+   * positive value is a cap: the answer's `max-age` never exceeds the grant's remaining lifetime.
+   */
+  cacheMaxAgeSeconds?: number;
+}
+
 /** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
 export interface ShelfConfig {
   secret?: string;
@@ -136,6 +149,8 @@ export interface ShelfConfig {
   serverTiming?: boolean;
   /** Persist gzip variants for published Storybook files (default off). */
   publishedCompression?: boolean;
+  /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
+  captureAssets?: CaptureAssetsConfig;
   /**
    * Largest zip (bytes) extracted inline in the upload request; a larger zip is published by a
    * `publish` job (or refused with 413 on a host that runs no consumer). The count is taken
@@ -232,6 +247,12 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
     publishedCompression: z.boolean().optional(),
+    captureAssets: z
+      .object({
+        cacheMaxAgeSeconds: z.number().int().min(0).max(MAX_CAPTURE_ASSET_CACHE_SECONDS).optional(),
+      })
+      .strict()
+      .optional(),
     maxInlineUnzipSize: z.number().int().min(0).optional(),
     maxZipEntries: z.number().int().positive().optional(),
     maxUnzippedBytes: z.number().int().positive().optional(),
