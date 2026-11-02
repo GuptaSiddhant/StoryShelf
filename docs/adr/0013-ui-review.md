@@ -179,9 +179,10 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
   the existing webhook and notifier paths (ADR 0014); there is no new transport. Every comment raises
   exactly one `comment:created`, whose payload names its `scope` (`build`, `story` or `snapshot`) and
   carries `eventId`, the comment id, so a retried delivery repeats the same id and a receiver can
-  de-duplicate. `review:comment` is a subscription alias, never emitted: a notification channel or
+  de-duplicate. `review:comment` is a filter alias, never emitted: a webhook, notification channel or
   subscription listing it receives a `comment:created` of scope `build` or `story`, and one listing
-  both names receives it once.
+  both names receives it once. One predicate (`matchesEvent` in core) applies the rule to every
+  filter, so the alias has a single definition.
 - **Auth.** Review never widens who can view a project (ADR 0011 Authentication and Access).
 
 ## Consequences

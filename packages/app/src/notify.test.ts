@@ -7,7 +7,7 @@ import {
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import { eventMatches, notifyProject, notifySystem } from "./notify.ts";
+import { notifyProject, notifySystem } from "./notify.ts";
 import { runWithStore, type Store } from "./store.ts";
 
 const SECRET = "test-server-secret-32-chars-long!!";
@@ -345,8 +345,6 @@ describe("notifySystem", () => {
   });
 });
 
-const scoped = (scope: string): Record<string, unknown> => ({ scope, buildId: "b1" });
-
 async function sentFor(
   events: string[],
   scope: string,
@@ -379,26 +377,6 @@ async function sentFor(
 }
 
 describe("comment:created and the review:comment alias", () => {
-  it("matches the alias for build and story comments, never snapshot comments", () => {
-    const alias = ["review:comment"];
-    expect(eventMatches(alias, "comment:created", scoped("build"))).toBe(true);
-    expect(eventMatches(alias, "comment:created", scoped("story"))).toBe(true);
-    expect(eventMatches(alias, "comment:created", scoped("snapshot"))).toBe(false);
-    expect(eventMatches(alias, "comment:created", {})).toBe(false);
-  });
-
-  it("matches the canonical name for every scope, and an empty list matches everything", () => {
-    for (const scope of ["build", "story", "snapshot"]) {
-      expect(eventMatches(["comment:created"], "comment:created", scoped(scope))).toBe(true);
-      expect(eventMatches([], "comment:created", scoped(scope))).toBe(true);
-    }
-    expect(eventMatches(["build:created"], "comment:created", scoped("build"))).toBe(false);
-  });
-
-  it("does not make the alias match other events", () => {
-    expect(eventMatches(["review:comment"], "review:verdict", scoped("build"))).toBe(false);
-  });
-
   it("delivers to a channel filtered on the alias for build and story comments only", async () => {
     expect(await sentFor(["review:comment"], "build")).toBe(1);
     expect(await sentFor(["review:comment"], "story")).toBe(1);
