@@ -138,6 +138,9 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
     },
   );
 
+  // Destructive: drops the four auth columns from `users` on the configured database (the other
+  // upgrade test drops project and snapshot columns the same way). It is gated on
+  // MYSQL_SCHEMA_MUTATION_TEST=1, so point MYSQL_DATABASE_URL at a disposable database.
   it.skipIf(process.env["MYSQL_SCHEMA_MUTATION_TEST"] !== "1")(
     "adds the users auth columns to an existing table and keeps its rows",
     async () => {

@@ -147,6 +147,38 @@ describe("runMigrations: users auth columns", () => {
     expect(queries.some((sql) => sql.startsWith("ALTER TABLE users ADD COLUMN "))).toBe(false);
   });
 
+  it("adds only the auth columns that a partly upgraded table is still missing", async () => {
+    const present = new Set(["password_hash", "display_name_override"]);
+    const queries: string[] = [];
+    const { run: base } = recordingRunner();
+    await runMigrations(async (sql) => {
+      queries.push(sql);
+      const column = /table_name = 'users' AND column_name = '(?<column>\w+)'/u.exec(sql)?.groups?.[
+        "column"
+      ];
+      if (column !== undefined) {
+        return present.has(column) ? [{ 1: 1 }] : [];
+      }
+      return await base(sql);
+    });
+    const added = queries
+      .filter((sql) => sql.startsWith("ALTER TABLE users ADD COLUMN "))
+      .map((sql) => sql.split(" ")[5]);
+    expect(added).toEqual(["auth_provider", "disabled"]);
+  });
+
+  it("fails the boot when the disabled column cannot be added", async () => {
+    const { run: base } = recordingRunner();
+    await expect(
+      runMigrations(async (sql) => {
+        if (sql.startsWith("ALTER TABLE users ADD COLUMN disabled")) {
+          throw new Error("ALTER command denied to user for table 'users'");
+        }
+        return await base(sql);
+      }),
+    ).rejects.toThrow("ALTER command denied");
+  });
+
   it("keeps the new-install DDL and the upgrade ALTER definitions identical", async () => {
     const { queries, run } = recordingRunner();
     await runMigrations(run);
