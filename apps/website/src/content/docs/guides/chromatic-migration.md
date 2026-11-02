@@ -116,7 +116,7 @@ Dynamic content (a timestamp, an avatar, an ad) can be hidden before the screens
 export const Clock = { parameters: { storyshelf: { ignoreSelectors: [".clock", "[data-testid=avatar]"] } } };
 ```
 
-Both browser engines inject the same stylesheet, which sets `visibility: hidden` so the layout stays put. An invalid selector is skipped with a warning in the build log and never fails the build; at most 50 selectors count per story. Baseline keys and the diff itself are unchanged, so **adding a mask produces a one-time expected diff** on the first build after it lands: approve it to refresh the baseline.
+Both browser engines inject the same stylesheet, which sets `visibility: hidden` and `opacity: 0` on the element, so its whole subtree disappears while the layout stays put. An invalid selector is skipped with a warning in the build log and never fails the build; at most 50 selectors count per story. Baseline keys and the diff itself are unchanged, so **adding a mask produces a one-time expected diff** on the first build after it lands: approve it to refresh the baseline.
 
 ## 6. Baseline model differences
 

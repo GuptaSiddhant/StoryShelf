@@ -76,7 +76,7 @@ Convert a Lost Pixel ratio directly to `max_diff_ratio`. There is no absolute pi
 
 ## 6. Masks and ignore regions
 
-Lost Pixel's `mask` selectors map to StoryShelf's ignore regions: list the selectors in `parameters.storyshelf.ignoreSelectors`, or put `data-storyshelf-ignore` on the element. The element is hidden (`visibility: hidden`, layout kept) before the screenshot. See [Ignore regions](/guides/chromatic-migration/#ignore-regions). Adding a mask produces a one-time expected diff.
+Lost Pixel's `mask` selectors map to StoryShelf's ignore regions: list the selectors in `parameters.storyshelf.ignoreSelectors`, or put `data-storyshelf-ignore` on the element. The element and everything inside it is hidden (`visibility: hidden` and `opacity: 0`, layout kept) before the screenshot. See [Ignore regions](/guides/chromatic-migration/#ignore-regions). Adding a mask produces a one-time expected diff.
 
 For content you cannot select, fall back to:
 

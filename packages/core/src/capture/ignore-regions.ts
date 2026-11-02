@@ -14,15 +14,27 @@ export const DEFAULT_IGNORE_SELECTORS: readonly string[] = [
   '[data-chromatic="ignore"]',
 ];
 
-/** The declarations applied to a masked element: hidden, but still taking up its space. */
-const MASK_DECLARATION = "visibility: hidden !important;";
+/**
+ * The declarations applied to a masked element: hidden but still taking up its space. `opacity: 0`
+ * hides the whole subtree whatever its children declare (even an inline `visibility: visible
+ * !important`, which beats any stylesheet rule), because a child cannot be more opaque than its parent.
+ */
+const MASK_DECLARATION = "visibility: hidden !important; opacity: 0 !important;";
+
+/** CSS whitespace only. `String.trim()` would also strip U+00A0, which is part of a CSS identifier. */
+const CSS_EDGE_SPACE = /^[ \t\n\f\r]+|[ \t\n\f\r]+$/gu;
+
+/** `value` without leading and trailing CSS whitespace. */
+const trimCss = (value: string): string => value.replaceAll(CSS_EDGE_SPACE, "");
 
 /** Characters that could close the rule and open another one; such a selector is refused. */
 const UNSAFE_SELECTOR = /[{}]|\/\*|<\/?style/iu;
 
 /** Whether `selector` is non-empty text that cannot break out of a single CSS rule. */
 export function isSafeIgnoreSelector(selector: unknown): selector is string {
-  return typeof selector === "string" && selector.trim() !== "" && !UNSAFE_SELECTOR.test(selector);
+  return (
+    typeof selector === "string" && trimCss(selector) !== "" && !UNSAFE_SELECTOR.test(selector)
+  );
 }
 
 /** The result of reading a story's `ignoreSelectors`. */
@@ -42,8 +54,8 @@ export function cleanIgnoreSelectors(value: unknown): IgnoreSelectorList {
       result.skipped.push(typeof entry === "string" ? entry : String(entry));
     } else if (result.selectors.length >= MAX_IGNORE_SELECTORS) {
       result.skipped.push(entry);
-    } else if (!result.selectors.includes(entry.trim())) {
-      result.selectors.push(entry.trim());
+    } else if (!result.selectors.includes(trimCss(entry))) {
+      result.selectors.push(trimCss(entry));
     }
   }
   return result;
@@ -62,19 +74,13 @@ export function declaredIgnoreSelectors(value: unknown): string[] | undefined {
 }
 
 /**
- * The stylesheet that masks `selectors` plus {@link DEFAULT_IGNORE_SELECTORS}. Each selector gets
- * its own pair of rules, so a selector the browser rejects cannot take the others down with it:
- * the element itself, and (`:is()` forgives an invalid selector) every descendant, so a child that
- * sets `visibility: visible` is hidden too. Unsafe selectors are dropped here as well.
+ * The stylesheet that masks `selectors` plus {@link DEFAULT_IGNORE_SELECTORS}. One rule per
+ * selector, so a selector the browser rejects cannot take the others down with it. Unsafe selectors
+ * are dropped here as well.
  */
 export function ignoreStylesheet(selectors: readonly string[] = []): string {
   const all = [...new Set([...DEFAULT_IGNORE_SELECTORS, ...selectors])].filter((selector) =>
     isSafeIgnoreSelector(selector),
   );
-  return all
-    .map(
-      (selector) =>
-        `${selector} { ${MASK_DECLARATION} }\n:is(${selector}) * { ${MASK_DECLARATION} }`,
-    )
-    .join("\n");
+  return all.map((selector) => `${selector} { ${MASK_DECLARATION} }`).join("\n");
 }

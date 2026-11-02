@@ -44,6 +44,18 @@ describe("cleanIgnoreSelectors", () => {
   });
 });
 
+describe("selector trimming", () => {
+  it("trims CSS whitespace but keeps a non-breaking space, which is part of an identifier", () => {
+    const result = cleanIgnoreSelectors(["  .a\t\n", ".clock\u00A0", "\u00A0.b"]);
+    expect(result.selectors).toEqual([".a", ".clock\u00A0", "\u00A0.b"]);
+  });
+
+  it("does not treat a lone non-breaking space as an empty selector, but does a blank one", () => {
+    expect(isSafeIgnoreSelector("\u00A0")).toBe(true);
+    expect(isSafeIgnoreSelector(" \t\n")).toBe(false);
+  });
+});
+
 describe("isSafeIgnoreSelector", () => {
   it("accepts attribute and combinator selectors", () => {
     expect(isSafeIgnoreSelector('[data-x="1"] > .y:not(.z)')).toBe(true);
@@ -55,14 +67,16 @@ describe("ignoreStylesheet", () => {
   it("always masks the default markers, one rule each, hiding without collapsing layout", () => {
     const css = ignoreStylesheet();
     for (const selector of DEFAULT_IGNORE_SELECTORS)
-      expect(css).toContain(`${selector} { visibility: hidden !important; }`);
+      expect(css).toContain(
+        `${selector} { visibility: hidden !important; opacity: 0 !important; }`,
+      );
     expect(css).not.toContain("display");
   });
 
-  it("hides descendants too, so a child that sets visibility: visible cannot show through", () => {
-    const css = ignoreStylesheet([".clock"]);
-    expect(css).toContain(".clock { visibility: hidden !important; }");
-    expect(css).toContain(":is(.clock) * { visibility: hidden !important; }");
+  it("also zeroes opacity, so no child can show through (opacity applies to the whole subtree)", () => {
+    expect(ignoreStylesheet([".clock"])).toContain(
+      ".clock { visibility: hidden !important; opacity: 0 !important; }",
+    );
   });
 
   it("never emits an unsafe selector, even if one reaches it", () => {

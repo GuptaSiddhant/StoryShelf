@@ -168,7 +168,7 @@ describe("ignore regions", () => {
     const { ctx, styles } = harness(settled);
     await captureScreenshot(ctx, withIgnore([".clock"]), viewport);
     expect(styles).toHaveLength(1);
-    expect(styles[0]).toContain(".clock { visibility: hidden !important; }");
+    expect(styles[0]).toContain(".clock { visibility: hidden !important; opacity: 0 !important; }");
     expect(styles[0]).toContain("[data-storyshelf-ignore]");
   });
 
