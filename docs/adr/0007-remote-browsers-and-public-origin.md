@@ -161,7 +161,7 @@ verified statelessly; it grants read-only access to one build's static files and
   assumes a published build's manifest is not rewritten while a pass runs: the upload API does not
   forbid that, and a rewrite changes what the same URL serves (a new pass mints a new URL).
 - **Hygiene:** the token is redacted from logs, attempt records, errors, span attributes and
-  `Referer`; every refusal and error is one identical `404` with `Cache-Control: private, no-store`.
+  `Referer`; refusals are one identical `404` with `Cache-Control: private, no-store`.
 
 Published Storybooks on `publishedBaseDomain` subdomains are not used for signed URLs: the app
 builds those links but does not serve those hosts, so reachability depends on an external proxy.
