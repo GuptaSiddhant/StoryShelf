@@ -166,9 +166,21 @@ async function reportExhausted(rt: QueueRuntime, job: CaptureJobRow): Promise<vo
   if (rt.onExhausted === undefined) {
     return;
   }
-  try {
-    await rt.onExhausted(toDatabaseJob(job, job.attempt, rt.leaseMs), LEASE_EXHAUSTED_ERROR);
-  } catch (error) {
-    rt.logger?.error({ err: error, jobId: job.jobId }, "exhausted-job hook failed");
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await rt.onExhausted(toDatabaseJob(job, job.attempt, rt.leaseMs), LEASE_EXHAUSTED_ERROR);
+      return;
+    } catch (error) {
+      rt.logger?.error(
+        { err: error, jobId: job.jobId, attempt, attempts },
+        "exhausted-job hook failed",
+      );
+      if (attempt < attempts) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 100 * attempt);
+        });
+      }
+    }
   }
 }
