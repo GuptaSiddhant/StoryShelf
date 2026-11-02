@@ -38,7 +38,7 @@ describe("defineRemote", () => {
       protocol: "playwright",
       reach: "loopback",
       retry: { attempts: 3, backoffMs: 500 },
-      timeouts: { acquireMs: 30_000, connectMs: 30_000, releaseMs: 30_000 },
+      timeouts: { acquireMs: 30_000, connectMs: 30_000, releaseMs: 30_000, probeMs: 15_000 },
       platform: undefined,
     });
     expect(isRemoteBrowser("chromium")).toBe(false);
@@ -51,7 +51,18 @@ describe("defineRemote", () => {
       all,
     );
     expect(remote.retry).toEqual({ attempts: 0, backoffMs: 1 });
-    expect(remote.timeouts).toEqual({ acquireMs: 5, connectMs: 30_000, releaseMs: 7 });
+    expect(remote.timeouts).toEqual({
+      acquireMs: 5,
+      connectMs: 30_000,
+      releaseMs: 7,
+      probeMs: 15_000,
+    });
+    expect(defineRemote(options({ timeouts: { probeMs: 2500 } }), all).timeouts.probeMs).toBe(2500);
+    for (const probeMs of [0, -1, 1.5]) {
+      expect(() => defineRemote(options({ timeouts: { probeMs } }), all)).toThrow(
+        /timeouts.probeMs must be an integer of at least 1/u,
+      );
+    }
     expect(() => defineRemote(options({ timeouts: { connectMs: 0 } }), all)).toThrow(
       /timeouts.connectMs must be an integer of at least 1/u,
     );

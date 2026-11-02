@@ -18,6 +18,8 @@ const fake = vi.hoisted(() => {
     failure: null as Error | null,
     probe: undefined as unknown,
     probeError: null as Error | null,
+    probeHang: false,
+    probeStarted: 0,
     active: 0,
     peak: 0,
     closes: 0,
@@ -54,6 +56,10 @@ const fake = vi.hoisted(() => {
         if (page.closed) throw new Error("page closed by cancel");
         if (typeof fn === "function" && fn.name === "inPageWaitSettled") {
           return { settled: true, hooked: true, phase: "completed", elapsedMs: 0 };
+        }
+        if (state.probeHang && typeof fn === "function" && fn.name === "inPageProbe") {
+          state.probeStarted += 1;
+          await new Promise<never>(() => {});
         }
         if (state.probeError !== null) throw state.probeError;
         return typeof fn === "function" && fn.name === "inPageProbe" ? state.probe : {};
@@ -144,6 +150,8 @@ beforeEach(async () => {
     failure: null,
     probe: { platform: "Linux x86_64", deviceScaleFactor: 1, fonts: ["Arial"] },
     probeError: null,
+    probeHang: false,
+    probeStarted: 0,
     active: 0,
     peak: 0,
     closes: 0,
@@ -423,6 +431,46 @@ const leased = (overrides: Partial<CdpLeasedOptions<{ id: string }>> = {}) => {
   const service = cdp<{ id: string }>(options);
   return { service, seen, released };
 };
+
+describe("measuring a remote CDP browser", () => {
+  it("stops waiting for a probe that hangs, warns, renders, and leaves the environment unknown", async () => {
+    fake.state.probeHang = true;
+    const warn = vi.fn();
+    const { service, released } = leased({ timeouts: { probeMs: 20 } });
+    const result = await createPuppeteerCaptureRunner({ browsers: [service] }).render(
+      input({
+        storybookUrl: URL_ROOT,
+        logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() },
+      }),
+    );
+    expect(fake.state.probeStarted).toBe(1);
+    expect(result.captures).toHaveLength(2);
+    expect(result.environment).toEqual({ browserVersion: "HeadlessChrome/131.0.1" });
+    expect(warn).toHaveBeenCalledWith(
+      { timeoutMs: 20 },
+      "measuring the remote browser timed out; its environment is unknown",
+    );
+    expect(released.map((entry) => entry.outcome)).toEqual(["finished"]);
+  });
+
+  it("stops the run when cancelled during the probe, and releases as cancelled", async () => {
+    fake.state.probeHang = true;
+    const { service, released } = leased();
+    const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+    const rendering = runner.render(input({ storybookUrl: URL_ROOT }));
+    const outcome = rendering.then(
+      () => "rendered",
+      (error: unknown) => (error as Error).message,
+    );
+    await vi.waitFor(() => {
+      expect(fake.state.probeStarted).toBe(1);
+    });
+    await runner.cancel("b1");
+    expect(await outcome).toBe("Capture cancelled");
+    expect(fake.state.gotos).toEqual([]);
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+});
 
 describe("a remote CDP target with a function connect and release", () => {
   it("connects per shard with its identity and releases as finished", async () => {

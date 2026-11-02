@@ -91,6 +91,11 @@ host:
 A field the runner cannot determine is omitted; an unknown fingerprint component is not a change
 (ADR 0005), so omission cannot read as a migration.
 
+The measurement is bounded by `timeouts.probeMs` (default 15 000). An overrun or a failure leaves
+the environment unknown with a warning and the render goes on; a cancel interrupts the probe and
+stops the run (`Capture cancelled`), never stored as an unknown environment. Its page is closed on
+every path, and its lease is released as `cancelled`, not `failed`.
+
 ### 3. Remote captures are their own engine, and a target's name is data
 
 A remote target is `<engine>@<name>`, where `<name>` is the preset's `name` or fixed default

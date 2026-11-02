@@ -179,7 +179,10 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   host. `protocol`/`reach` are declared, not inferred. Use `connectLeased`/`shutdownRemote` so a lease
   is released exactly once; scrub endpoints, headers and leases (`scrubConnection`) and never log
   them. A `reach: "url"` target needs a server secret and a confirmed origin; its URL is always
-  `<origin>/_s/<token>/` (`storybookBase`).
+  `<origin>/_s/<token>/` (`storybookBase`). Measure the environment through `boundedProbe`
+  (`timeouts.probeMs`): an overrun or failure is unknown plus a warning, a cancel throws
+  `Capture cancelled` and never becomes an unknown-environment capture; close the probe page on
+  every path and release the lease as `cancelled` when the run was cancelled.
 - **Boot replay.** `runBootTasks` re-requests open build states after startup only when notifiers are
   wired and an origin is resolved. Chat, email and alerts are never replayed.
 - **Retention lifecycle.** Every baseline mutation goes through the fenced
