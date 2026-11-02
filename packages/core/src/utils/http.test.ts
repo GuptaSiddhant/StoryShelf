@@ -126,6 +126,21 @@ describe("spans and logs of a request with a secret URL", () => {
     expectNoSecrets(recorder.spans, []);
   });
 
+  it("records an unparseable URL, which fetch echoes as given, as an invalid URL", async () => {
+    const relative = "/SECRET/path?token=abc";
+    const failure = new TypeError(`Failed to parse URL from ${relative}`);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => await Promise.reject(failure)),
+    );
+    const caught = await httpText(relative, { retries: 1 }).catch((error: unknown) => error);
+    expect(caught).toBe(failure);
+    const [span] = recorder.spans;
+    expect(span?.exceptions[0]?.message).toBe("Failed to parse URL from [invalid url]");
+    expect(span?.attributes["url.full"]).toBe("[invalid url]");
+    expectNoSecrets(recorder.spans, []);
+  });
+
   it("still requests the real URL", async () => {
     const fetchMock = vi.fn(async () => {
       await Promise.resolve();

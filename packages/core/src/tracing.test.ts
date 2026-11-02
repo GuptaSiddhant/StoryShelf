@@ -43,15 +43,15 @@ describe("core tracing helpers", () => {
 });
 
 /** Fail a span with `error` and return whatever `withSpan` rethrew. */
-async function failWith(error: unknown): Promise<unknown> {
+async function failWith(failure: unknown): Promise<unknown> {
   try {
     await withSpan("test.failing", async () => {
       await Promise.resolve();
-      throw error;
+      throw failure;
     });
     return undefined;
-  } catch (caught) {
-    return caught;
+  } catch (error) {
+    return error;
   }
 }
 
