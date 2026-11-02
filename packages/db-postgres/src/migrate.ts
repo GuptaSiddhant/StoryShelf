@@ -69,6 +69,10 @@ const BUILD_AFFECTED_PATHS_ALTER =
 const BUILD_INHERITED_COUNT_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS inherited_count INTEGER NOT NULL DEFAULT 0";
 const BUILD_TEST_RESULTS_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS test_results TEXT";
+const BUILD_REVIEW_CYCLE_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS review_cycle INTEGER NOT NULL DEFAULT 0";
+const BUILD_REVIEW_REQUESTED_CYCLE_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS review_requested_cycle INTEGER";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
@@ -184,6 +188,8 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, BUILD_AFFECTED_PATHS_ALTER);
   await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
   await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
+  await execIgnore(run, BUILD_REVIEW_CYCLE_ALTER);
+  await execIgnore(run, BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
 }
 
 /** Run the full migration set through any row-query runner. */

@@ -102,6 +102,31 @@ describe("runMigrations: builds and projects gain later columns", () => {
   }, 60_000);
 });
 
+describe("runMigrations: builds gain the review cycle columns", () => {
+  it("adds review_cycle (default 0) and review_requested_cycle (null) to older builds", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, created_at, updated_at)
+        VALUES ('b', 'p', 'abc', 'main', now(), now());
+      ALTER TABLE builds DROP COLUMN review_cycle;
+      ALTER TABLE builds DROP COLUMN review_requested_cycle;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const build = await client.query<{
+      review_cycle: number;
+      review_requested_cycle: number | null;
+    }>("SELECT review_cycle, review_requested_cycle FROM builds WHERE id = 'b'");
+    expect(build.rows).toEqual([{ review_cycle: 0, review_requested_cycle: null }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: review, a11y, comment and notification columns", () => {
   it("back-fills every later column on older tables with the current defaults", async () => {
     const client = new PGlite();

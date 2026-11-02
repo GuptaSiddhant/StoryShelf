@@ -51,9 +51,14 @@ export async function announceReview(
   await announceReviewWith(getStore(), project, event, data, buildId);
 }
 
-/** What `review:requested` carries: the build to look at. */
+/**
+ * What `review:requested` carries: the build to look at. `eventId` is `<buildId>:<cycle>`, so every
+ * delivery of one cycle's request, retries included, has the same identity, and a reopened build
+ * (a new cycle) a new one.
+ */
 export function reviewRequestedData(build: Build): Record<string, unknown> {
   return {
+    eventId: `${build.id}:${String(build.reviewCycle ?? 0)}`,
     buildId: build.id,
     gitSha: build.gitSha,
     gitBranch: build.gitBranch,

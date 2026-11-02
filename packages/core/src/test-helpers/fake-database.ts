@@ -13,6 +13,7 @@ function withoutUndefined(values: unknown): Record<string, unknown> {
 
 /** Column defaults real drivers apply on insert (the fake has no DDL). */
 const INSERT_DEFAULTS: Record<string, Record<string, unknown>> = {
+  builds: { reviewCycle: 0 },
   snapshots: { browser: "chromium" },
   baselines: { browser: "chromium" },
 };

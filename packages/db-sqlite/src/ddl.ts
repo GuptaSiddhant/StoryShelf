@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_files TEXT,
   affected_import_paths TEXT,
   test_results TEXT,
+  review_cycle INTEGER NOT NULL DEFAULT 0,
+  review_requested_cycle INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

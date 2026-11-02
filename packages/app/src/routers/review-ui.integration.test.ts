@@ -602,6 +602,19 @@ async function withChannel(booted: Booted): Promise<void> {
 
 const events = (booted: Booted): string => booted.sent.join("\n");
 
+const reviewRequests = (booted: Booted): number =>
+  booted.sent.filter((subject) => subject.includes("review:requested")).length;
+
+/** Complete a publish of the build again (a repeated upload, or a retried hook). */
+async function republishBuild(booted: Booted, id: string): Promise<void> {
+  const upload = await booted.app.request(`/api/v1/projects/gate/builds/${id}/zip`, {
+    method: "PUT",
+    headers: { cookie: "storyshelf_session=dev", "content-type": "application/zip" },
+    body: new Uint8Array(storybookZip(BUTTON)),
+  });
+  expect(upload.status).toBe(202);
+}
+
 describe("review events", () => {
   it("raises review:requested for a published build that waits, not for the default branch", async () => {
     const booted = await boot();
@@ -614,6 +627,38 @@ describe("review events", () => {
     expect(id).toBeTruthy();
     expect(events(booted)).toContain("review:requested on feature/x");
     await booted.stop();
+  });
+
+  describe("review:requested, once per review cycle", () => {
+    it("sends one request after publish and none for a repeated publish completion", async () => {
+      const booted = await boot();
+      await withChannel(booted);
+      const id = await publish(booted, "feature/x");
+      await vi.waitFor(() => expect(reviewRequests(booted)).toBe(1));
+      await republishBuild(booted, id);
+      await republishBuild(booted, id);
+      await vi.waitFor(() => expect(booted.sent.length).toBeGreaterThan(1));
+      expect(reviewRequests(booted)).toBe(1);
+      await booted.stop();
+    });
+
+    it("sends a new request after a genuine reopening, and none for a build that is not pending", async () => {
+      const booted = await boot();
+      await withChannel(booted);
+      const id = await publish(booted, "feature/x");
+      await vi.waitFor(() => expect(reviewRequests(booted)).toBe(1));
+      const builds = new BuildModel(booted.db);
+      await builds.setStatus(id, "approved");
+      await republishBuild(booted, id);
+      expect(reviewRequests(booted)).toBe(1);
+      await builds.setStatus(id, "pending");
+      await republishBuild(booted, id);
+      await vi.waitFor(() => expect(reviewRequests(booted)).toBe(2));
+      await republishBuild(booted, id);
+      expect(reviewRequests(booted)).toBe(2);
+      expect(await builds.get(id)).toMatchObject({ reviewCycle: 1, reviewRequestedCycle: 1 });
+      await booted.stop();
+    });
   });
 
   it("raises build:pending when a rewritten verdict sends the build back to pending", async () => {

@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_files TEXT,
   affected_import_paths TEXT,
   test_results TEXT,
+  review_cycle INT NOT NULL DEFAULT 0,
+  review_requested_cycle INT,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_builds_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

@@ -87,6 +87,15 @@ branch does not carry a verdict over.
   the project's approvers and admins through the notification channels and their per-user
   subscriptions (ADR 0014). Unlike other topics, which are opt-in, this one is on by default for
   those roles and can be turned off per user.
+- **One request per review cycle.** A build has a review cycle, `builds.review_cycle`, that starts
+  at 0 and is incremented, in the same write that sets the status, when a build goes back to
+  `pending` from `approved` or `rejected`. Before a request is sent it is claimed with one
+  conditional write that sets `builds.review_requested_cycle` to the cycle, only while the build is
+  `pending` and the cycle was not yet requested; only the caller whose write took effect sends
+  it. A repeated publish completion, a retried hook or a second instance therefore sends nothing,
+  and a reopened build sends one request for its new cycle. The event id is `<buildId>:<cycle>`
+  (`data.eventId`), so its deliveries keep one identity. Testing sign-offs and builds that capture
+  owns never reach the request.
 - **Who may comment.** `developer`, `approver` and `admin` write build, story and snapshot comments;
   `viewer` reads only.
 - **Unresolved comments do not block.** A verdict is allowed with open threads. Resolving is a
