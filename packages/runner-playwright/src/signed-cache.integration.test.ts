@@ -41,8 +41,11 @@ async function freePort(): Promise<number> {
 
 interface Shelf {
   origin: string;
-  /** A signed root URL for the build; `capture` marks a render-pass grant, else a preview grant. */
-  rootUrl: (options?: { capture?: boolean }) => string;
+  /**
+   * A signed root URL for the build; `capture` marks a render-pass grant, else a preview grant. A
+   * different `ttlSeconds` gives a different token and so a different URL, with no waiting.
+   */
+  rootUrl: (options?: { capture?: boolean; ttlSeconds?: number }) => string;
   /** How many requests the server has answered for the asset. */
   assetRequests: () => number;
   close: () => Promise<void>;
@@ -83,12 +86,12 @@ async function startShelf(cacheMaxAgeSeconds?: number): Promise<Shelf> {
   const origin = `http://127.0.0.1:${String(port)}`;
   return {
     origin,
-    rootUrl: ({ capture = false } = {}) =>
+    rootUrl: ({ capture = false, ttlSeconds = 3600 } = {}) =>
       `${origin}/_s/${signStorybookToken({
         secret: SECRET,
         projectId: project.id,
         buildId: build.id,
-        ttlSeconds: 3600,
+        ttlSeconds,
         ...(capture ? { purpose: "capture" as const } : {}),
       })}/`,
     assetRequests: () => hits,
@@ -182,8 +185,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
       const context = await browser.newContext();
       await visitTwice(context, opted.rootUrl({ capture: true }));
       expect(opted.assetRequests()).toBe(1);
-      await new Promise((resolve) => setTimeout(resolve, 1100));
-      await visitTwice(context, opted.rootUrl({ capture: true }));
+      await visitTwice(context, opted.rootUrl({ capture: true, ttlSeconds: 3500 }));
       expect(opted.assetRequests()).toBe(2);
       await context.close();
     });

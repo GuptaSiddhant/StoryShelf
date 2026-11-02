@@ -157,7 +157,9 @@ verified statelessly; it grants read-only access to one build's static files and
   URL only. Authorization is checked on every request that reaches the server (before storage, a
   gzip variant or the answer); a browser's fresh copy needs none, so revocation, a purge or a key
   rotation cannot retract bytes already cached until their freshness ends. No `public`, no
-  `s-maxage`, no service worker. A fresh browser context or a recycled browser starts cold.
+  `s-maxage`, no service worker. A fresh browser context or a recycled browser starts cold. It
+  assumes a published build's manifest is not rewritten while a pass runs: the upload API does not
+  forbid that, and a rewrite changes what the same URL serves (a new pass mints a new URL).
 - **Hygiene:** the token is redacted from logs, attempt records, errors, span attributes and
   `Referer`; every refusal and error is one identical `404` with `Cache-Control: private, no-store`.
 
