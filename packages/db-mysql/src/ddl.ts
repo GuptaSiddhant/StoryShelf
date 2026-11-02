@@ -217,7 +217,11 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url TEXT,
   role VARCHAR(32) NOT NULL DEFAULT 'member',
   last_login_at DATETIME(3),
-  created_at DATETIME(3) NOT NULL
+  created_at DATETIME(3) NOT NULL,
+  password_hash TEXT,
+  display_name_override TEXT,
+  auth_provider VARCHAR(32) NOT NULL DEFAULT 'oidc',
+  disabled TINYINT(1) NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS user_connections (
   id VARCHAR(64) PRIMARY KEY,

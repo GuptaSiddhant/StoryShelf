@@ -109,3 +109,102 @@ describe("runMigrations: MySQL 8 compatibility", () => {
     expect(queries).toContain("ALTER TABLE comments MODIFY COLUMN user_id VARCHAR(64) NULL");
   });
 });
+
+/** The `users` table block of the DDL. */
+function usersDdl(): string {
+  const start = DDL.indexOf("CREATE TABLE IF NOT EXISTS users (");
+  return DDL.slice(start, DDL.indexOf("\n);", start));
+}
+
+describe("runMigrations: users auth columns", () => {
+  const AUTH_COLUMNS = ["password_hash", "display_name_override", "auth_provider", "disabled"];
+
+  it("adds the four auth columns to an existing users table", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+
+    const added = queries.filter((sql) => sql.startsWith("ALTER TABLE users ADD COLUMN "));
+    expect(added.map((sql) => sql.split(" ")[5])).toEqual(AUTH_COLUMNS);
+    expect(queries).toContain(
+      "ALTER TABLE users ADD COLUMN auth_provider VARCHAR(32) NOT NULL DEFAULT 'oidc'",
+    );
+    expect(queries).toContain(
+      "ALTER TABLE users ADD COLUMN disabled TINYINT(1) NOT NULL DEFAULT 0",
+    );
+  });
+
+  it("leaves a users table that already has them alone", async () => {
+    const queries: string[] = [];
+    await runMigrations(async (sql) => {
+      queries.push(sql);
+      if (sql.includes("information_schema.columns") && sql.includes("table_name = 'users'")) {
+        return [{ 1: 1 }];
+      }
+      return sql.includes("column_name = 'user_id'") && sql.includes("is_nullable")
+        ? [{ is_nullable: "NO" }]
+        : [];
+    });
+    expect(queries.some((sql) => sql.startsWith("ALTER TABLE users ADD COLUMN "))).toBe(false);
+  });
+
+  it("adds only the auth columns that a partly upgraded table is still missing", async () => {
+    const present = new Set(["password_hash", "display_name_override"]);
+    const queries: string[] = [];
+    const { run: base } = recordingRunner();
+    await runMigrations(async (sql) => {
+      queries.push(sql);
+      const column = /table_name = 'users' AND column_name = '(?<column>\w+)'/u.exec(sql)?.groups?.[
+        "column"
+      ];
+      if (column !== undefined) {
+        return present.has(column) ? [{ 1: 1 }] : [];
+      }
+      return await base(sql);
+    });
+    const added = queries
+      .filter((sql) => sql.startsWith("ALTER TABLE users ADD COLUMN "))
+      .map((sql) => sql.split(" ")[5]);
+    expect(added).toEqual(["auth_provider", "disabled"]);
+  });
+
+  it("fails the boot when the disabled column cannot be added", async () => {
+    const { run: base } = recordingRunner();
+    await expect(
+      runMigrations(async (sql) => {
+        if (sql.startsWith("ALTER TABLE users ADD COLUMN disabled")) {
+          throw new Error("ALTER command denied to user for table 'users'");
+        }
+        return await base(sql);
+      }),
+    ).rejects.toThrow("ALTER command denied");
+  });
+
+  it("tolerates a concurrent boot that already added the column", async () => {
+    const { run: base } = recordingRunner();
+    await expect(
+      runMigrations(async (sql) => {
+        if (sql.startsWith("ALTER TABLE users ADD COLUMN disabled")) {
+          throw Object.assign(new Error("Duplicate column name 'disabled'"), {
+            code: "ER_DUP_FIELDNAME",
+            errno: 1060,
+          });
+        }
+        return await base(sql);
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("keeps the new-install DDL and the upgrade ALTER definitions identical", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+    const ddl = usersDdl();
+    for (const column of AUTH_COLUMNS) {
+      const alter = queries.find((sql) =>
+        sql.startsWith(`ALTER TABLE users ADD COLUMN ${column} `),
+      );
+      expect(alter, `ALTER for ${column}`).toBeDefined();
+      const definition = (alter ?? "").slice(`ALTER TABLE users ADD COLUMN `.length);
+      expect(ddl, `DDL for ${column}`).toContain(`  ${definition}`);
+    }
+  });
+});

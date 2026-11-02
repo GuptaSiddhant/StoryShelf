@@ -97,6 +97,15 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'manual'",
   },
   { table: "comments", column: "story_id", definition: "TEXT" },
+  // Auth columns the SQLite `users` table always had (access control: `disabled`).
+  { table: "users", column: "password_hash", definition: "TEXT" },
+  { table: "users", column: "display_name_override", definition: "TEXT" },
+  {
+    table: "users",
+    column: "auth_provider",
+    definition: "VARCHAR(32) NOT NULL DEFAULT 'oidc'",
+  },
+  { table: "users", column: "disabled", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
 ];
@@ -237,9 +246,22 @@ async function ensureColumn(run: MigrationRunner, migration: ColumnMigration): P
   if (await hasColumn(run, migration.table, migration.column)) {
     return;
   }
-  await run(
-    `ALTER TABLE ${migration.table} ADD COLUMN ${migration.column} ${migration.definition}`,
-  );
+  try {
+    await run(
+      `ALTER TABLE ${migration.table} ADD COLUMN ${migration.column} ${migration.definition}`,
+    );
+  } catch (error) {
+    // Another instance booting at the same time may have added it between the check and the ALTER.
+    if (!isDuplicateColumnError(error)) {
+      throw error;
+    }
+  }
+}
+
+function isDuplicateColumnError(error: unknown): boolean {
+  const code = (error as { code?: string }).code;
+  const errno = (error as { errno?: number }).errno;
+  return code === "ER_DUP_FIELDNAME" || errno === 1060;
 }
 
 async function hasColumn(run: MigrationRunner, table: string, column: string): Promise<boolean> {

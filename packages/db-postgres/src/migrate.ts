@@ -78,6 +78,16 @@ const TOKEN_USER_ALTER =
   "ALTER TABLE tokens ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE";
 const MEMBER_SOURCE_ALTER =
   "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'";
+/**
+ * Auth columns the SQLite `users` table always had. Without them the Drizzle model cannot store
+ * `disabled` (an admin disabling a user fails) or the auth provider and display-name override.
+ */
+const USER_AUTH_ALTERS = [
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT",
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name_override TEXT",
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'oidc'",
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false",
+];
 const COMMENT_STORY_ID_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS story_id TEXT";
 const NOTIFICATION_LAST_ERROR_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error TEXT";
@@ -180,10 +190,24 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
 export async function runMigrations(run: MigrationRunner): Promise<void> {
   await run(DDL);
   await migrateCoreColumns(run);
+  await migrateUserAuthColumns(run);
   await migrateProjectExtras(run);
   await applyIdentityStatements(run);
   await migrateCommentsTable(run);
   await migrateNotificationColumns(run);
+}
+
+/**
+ * Unlike the other follow-up ALTERs this one is not swallowed: if the columns cannot be added the
+ * boot must fail loudly, because a missing `disabled` column means access control silently does
+ * not work. `ADD COLUMN IF NOT EXISTS` is already idempotent, so there is no "already done" error
+ * to ignore.
+ */
+async function migrateUserAuthColumns(run: MigrationRunner): Promise<void> {
+  for (const statement of USER_AUTH_ALTERS) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered, and a failure must stop the boot
+    await run(statement);
+  }
 }
 
 async function migrateRunA11yDefault(run: MigrationRunner): Promise<void> {
