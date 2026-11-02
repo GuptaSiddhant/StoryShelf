@@ -74,7 +74,7 @@ export async function renderAll(
       server = await serve(input, session);
       input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
       // Measured while the browser is open: Puppeteer cannot read the version of a closed one.
-      const environment = await measureEnvironment(session, remote, input);
+      const environment = await measureEnvironment(session, remote, input, active.abort?.signal);
       ctx = buildContext(session, server.url, input);
       const { captures, failures } = await runCaptures(input, active, ctx, relaunch);
       // Echo the target so persisted rows are attributable without the request.
@@ -185,8 +185,9 @@ async function measureEnvironment(
   session: BrowserSession,
   remote: RemoteTarget | undefined,
   input: RunInput,
+  signal: AbortSignal | undefined,
 ): Promise<CaptureEnvironment> {
-  if (remote) return await measureRemote(session, remote.remote, input.logger);
+  if (remote) return await measureRemote(session, remote.remote, { logger: input.logger, signal });
   const browser: Browser = session.browser;
   const version = typeof browser.version === "function" ? await browser.version() : undefined;
   return await detectCaptureEnvironment(version);

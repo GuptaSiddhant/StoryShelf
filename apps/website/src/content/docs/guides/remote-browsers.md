@@ -129,7 +129,7 @@ The capture fingerprint (see [Capture](/concepts/capture/)) of a local render co
 - `deviceScaleFactor`: `window.devicePixelRatio` of the page.
 - `fontsHash`: a digest over a fixed list of 44 common font families, each tested in a blank page by measuring text against the generic family it would fall back to. `fc-list` is not used. Changing that list would re-baseline every remote target, so it is part of the fingerprint's contract.
 
-A field the runner cannot determine (a page that would not open) is omitted, and an unknown fingerprint component is not read as a change. Provider browser builds move: pin the browser version in the preset where it has one (`browserVersion` on BrowserStack), because every move is a baseline migration on the default branch.
+A field the runner cannot determine (a page that would not open) is omitted, and an unknown fingerprint component is not read as a change. The measurement is bounded: `timeouts: { probeMs }` on `remote()` and on the leased form of `cdp()` (default 15 000 ms; the other presets use the default) caps how long a render waits for it. If it overruns or fails, the render goes on with those fields unknown and a warning in the log, and the page it used is closed. If the build is cancelled while it runs, the render stops at once and its lease is released as `cancelled`; a cancel is never recorded as an unknown environment. Provider browser builds move: pin the browser version in the preset where it has one (`browserVersion` on BrowserStack), because every move is a baseline migration on the default branch.
 
 ## Sessions and failures
 
