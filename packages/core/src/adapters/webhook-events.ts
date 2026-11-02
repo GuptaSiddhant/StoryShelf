@@ -3,7 +3,7 @@ import { WebhookModel, type WebhookTables } from "../models/webhook.ts";
 import type { Webhook } from "../schema/webhook.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import { hmacSha256 } from "../utils/hash.ts";
-import { httpText } from "../utils/http.ts";
+import { httpStatus } from "../utils/http.ts";
 import type { DatabaseAdapter } from "./database.ts";
 
 /**
@@ -92,7 +92,7 @@ function hostOf(url: string): string {
 }
 
 /**
- * POST one event through `httpText` (default timeout and retry policy). The signature covers the
+ * POST one event through `httpStatus` (default timeout and retry policy). The signature covers the
  * exact body string, and `json` serializes the event with the same `JSON.stringify`.
  */
 async function sendWebhook(
@@ -101,7 +101,7 @@ async function sendWebhook(
   event: WebhookEvent,
   logger: Logger | undefined,
 ): Promise<void> {
-  await httpText(url, {
+  await httpStatus(url, {
     method: "POST",
     json: event,
     headers: {
