@@ -78,7 +78,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("ignore regions (Playwri
   }, 120_000);
 
   it("skips an invalid selector instead of failing the build", async () => {
-    const result = await shotOf(story("ignore--selector", ["[", ".clock"]), "ignore-bad-1");
-    expect(result).not.toEqual("");
+    const first = await shotOf(story("ignore--selector", ["[", ".clock"]), "ignore-bad-1");
+    const second = await shotOf(story("ignore--selector", ["[", ".clock"]), "ignore-bad-2");
+    expect(first).not.toEqual("");
+    expect(second).toEqual(first);
   }, 120_000);
 });
