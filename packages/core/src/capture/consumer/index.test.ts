@@ -359,6 +359,29 @@ describe("lease and cancel", () => {
     await started;
   });
 
+  it("does not fall back to ack when the final nack fails on a counted queue", async () => {
+    const r = rig({
+      retries: 0,
+      handlers: {
+        capture: async () => {
+          throw new Error("always");
+        },
+      },
+    });
+    vi.spyOn(r.queue, "nack").mockRejectedValueOnce(new Error("db down"));
+    const consumer = r.consume();
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.clock.advance(5000);
+
+    expect(r.log.calls.some((call) => call.message === "failed to settle job")).toBe(true);
+    // The job is not acknowledged; it stays for lease expiry / redelivery.
+    const job = await stateOf(r, id);
+    expect(job?.status).not.toBe("completed");
+    await consumer.stop();
+    await started;
+  });
+
   it("cancels a running job: runner stops, the job ends cancelled", async () => {
     const hold = gate();
     const cancel = vi.fn(async () => {
