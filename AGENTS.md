@@ -241,10 +241,18 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   the issue's "Files to Modify".
 - Work in a branch or git worktree; run `nub ci` once per worktree. `nub.lock` is per worktree — never
   run installs concurrently in the same tree.
-- Verify before pushing (`nubx turbo verify --filter='<pkg>' --force`, or full). Merges into `main`
-  are **squash merges**, one task = one commit, titled `<type>(<scope>): <short description> (#<task-id>)`
+- Verify before pushing (`nubx turbo verify --filter='<pkg>' --force`, or full). A task PR is a
+  **squash merge**, one task = one commit, titled `<type>(<scope>): <short description> (#<task-id>)`
   where the scope is the package or area (e.g. `fix(cli): make the AWS stack boot (#423)`). PR titles
   use the same form. Reference the issue with `Closes #<n>` (or `Part of #<n>` for a partial slice).
+- **Epic branches.** Work that belongs to an epic with an epic branch (listed in issue #370) targets
+  `epic/<epic-issue>-<slug>`, not `main`; `main` only receives the epic branch as a whole, through a
+  PR merged with a **merge commit** (never squash, so each task commit survives), titled
+  `<type>(<scope>): <epic summary> (#<epic-issue>)`. Every push to an epic branch, and every epic
+  PR into `main`, runs the full `verify`. Keep the branch current by merging `main` into it (never
+  rebase or force-push a shared branch); land an epic, or a coherent finished part of it, within
+  about two weeks. P0/security fixes, standalone issues and docs/config changes still target `main`
+  directly.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

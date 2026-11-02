@@ -16,7 +16,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   push:
-    branches: ["main"]
+    # Epic branches collect the task PRs of one epic (AGENTS.md); each push to one runs the
+    # full verify like main, without main's deploy and preview workflows.
+    branches: ["main", "epic/**"]
   workflow_dispatch:
 
 permissions:
@@ -51,6 +53,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          HEAD_REF: ${{ github.head_ref }}
           # Paths that cannot change the Fly image or the capture tests: the docs site, docs,
           # markdown, and the fixtures the PR run does not use.
           IGNORABLE: '^(apps/website/|docs/|fixtures/storybook-(8|10)/|\.github/ISSUE_TEMPLATE/)|\.md$'
@@ -67,7 +70,7 @@ jobs:
               git diff --name-only HEAD^1 HEAD > changed.txt || rm -f changed.txt
               ;;
             push)
-              # A push to main always validates the whole workspace.
+              # A push to main or an epic branch always validates the whole workspace.
               git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null \
                 && git diff --name-only "$BEFORE" HEAD > changed.txt || rm -f changed.txt
               ;;
@@ -78,7 +81,10 @@ jobs:
             if grep -qE '^apps/website/' changed.txt; then website=true; else website=false; fi
             if grep -vqE "$IGNORABLE" changed.txt; then heavy=true; else heavy=false; fi
             if [ "$EVENT" = "pull_request" ]; then
-              if grep -qE "$FULL" changed.txt || printf '%s' "$LABELS" | grep -qE '(^|,)ci:full(,|$)'; then
+              # An epic branch merging into main carries many tasks: always verify everything.
+              if grep -qE "$FULL" changed.txt \
+                || printf '%s' "$LABELS" | grep -qE '(^|,)ci:full(,|$)' \
+                || case "$HEAD_REF" in epic/*) true ;; *) false ;; esac; then
                 full=true
               else
                 full=false
