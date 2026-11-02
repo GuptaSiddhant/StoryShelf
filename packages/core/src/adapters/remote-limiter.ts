@@ -148,9 +148,14 @@ export function takeSlot(
   );
 }
 
-/** Stop every caller still waiting for a slot (shutdown). */
-export function stopAllWaiting(): void {
+/**
+ * Shutdown: reject every caller still waiting for a slot and forget every limiter, so a service used
+ * again starts with none held. A lease that is released later gives its slot back to the limiter it
+ * took it from, which nothing uses any more.
+ */
+export function resetAllLimiters(): void {
   for (const limiter of limiters.values()) {
     limiter.stopWaiting();
   }
+  limiters.clear();
 }

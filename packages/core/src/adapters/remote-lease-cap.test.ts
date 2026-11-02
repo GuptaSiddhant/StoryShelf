@@ -85,8 +85,9 @@ describe("maxConnections", () => {
     const first = await connectLeased(entry, CTX, opens);
     expect(held()).toBe(1);
     const second = connectLeased(entry, CTX, opens);
-    await Promise.resolve();
-    expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    await vi.waitFor(() => {
+      expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    });
     await first.lease.end("finished");
     const granted = await second;
     expect(held()).toBe(1);
@@ -100,8 +101,9 @@ describe("maxConnections", () => {
     // Many pages on the one connection take nothing more from the cap.
     expect(held()).toBe(1);
     const next = connectLeased(entry, CTX, opens);
-    await Promise.resolve();
-    expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    await vi.waitFor(() => {
+      expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    });
     await shared.lease.end("finished");
     await (await next).lease.end("finished");
     expect(held()).toBe(0);
@@ -120,8 +122,9 @@ describe("maxConnections", () => {
     expect(open).toHaveBeenCalledTimes(1);
     expect(held()).toBe(2);
     const c = connectLeased(entry, CTX, opens);
-    await Promise.resolve();
-    expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    await vi.waitFor(() => {
+      expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    });
     await a.lease.end("finished");
     await Promise.all([b.lease.end("finished"), (await c).lease.end("finished")]);
     expect(held()).toBe(0);
@@ -183,8 +186,9 @@ describe("maxConnections", () => {
     const waiting = connectLeased(entry, { ...CTX, signal: controller.signal }, opens).catch(
       (error: unknown) => error,
     );
-    await Promise.resolve();
-    expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    await vi.waitFor(() => {
+      expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    });
     controller.abort();
     expect(await waiting).toMatchObject({ name: "TargetLaunchError" });
     expect(limiterOf(entry.remote)?.waiting).toBe(0);
@@ -199,7 +203,9 @@ describe("maxConnections", () => {
     const { entry } = service({ maxConnections: 1 });
     await connectLeased(entry, CTX, opens);
     const waiting = connectLeased(entry, CTX, opens).catch((error: unknown) => error);
-    await Promise.resolve();
+    await vi.waitFor(() => {
+      expect(limiterOf(entry.remote)?.waiting).toBe(1);
+    });
     await shutdownRemote();
     expect(await waiting).toMatchObject({ name: "TargetLaunchError" });
   });
@@ -209,15 +215,26 @@ describe("maxConnections", () => {
     const { entry } = service({ maxConnections: 1, timeouts: { acquireMs: 5 } });
     const first = await connectLeased(entry, CTX, opens);
     const waiting = connectLeased(entry, CTX, { ...opens, logger: { warn } as never });
-    await new Promise((resolve) => {
-      setTimeout(resolve, 40);
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledTimes(1);
     });
-    expect(warn).toHaveBeenCalledTimes(1);
     const [fields, message] = warn.mock.calls[0] as [Record<string, unknown>, string];
     expect(fields).toMatchObject({ target: "chromium@farm", limit: 1, waiting: 1 });
     expect(JSON.stringify([fields, message])).not.toContain("secret-path");
     await first.lease.end("finished");
     await (await waiting).lease.end("finished");
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds no slot after shutdown, so a service used again does not wait on a stale lease", async () => {
+    const { entry, held } = service({ maxConnections: 1 });
+    await connectLeased(entry, CTX, opens);
+    expect(held()).toBe(1);
+    await shutdownRemote();
+    expect(held()).toBe(0);
+    const again = await connectLeased(entry, CTX, opens);
+    expect(held()).toBe(1);
+    await again.lease.end("finished");
   });
 
   it("changes nothing without a cap", async () => {

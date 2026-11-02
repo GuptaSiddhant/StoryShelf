@@ -106,26 +106,38 @@ describe("ConnectionLimiter", () => {
     slot.release();
   });
 
-  it("reports a long wait once, and not for a wait that ends in time", async () => {
-    vi.useRealTimers();
+  it("reports a long wait once the wait outlasts its threshold", async () => {
     const limiter = new ConnectionLimiter(1);
     const slot = await limiter.acquire();
     const onLongWait = vi.fn();
     const waiting = limiter.acquire(undefined, onLongWait, 5);
-    await new Promise((resolve) => {
-      setTimeout(resolve, 40);
+    await vi.waitFor(() => {
+      expect(onLongWait).toHaveBeenCalledTimes(1);
     });
-    expect(onLongWait).toHaveBeenCalledTimes(1);
     slot.release();
     (await waiting).release();
-    const quick = vi.fn();
-    const held = await limiter.acquire();
-    const second = limiter.acquire(undefined, quick, 50);
-    held.release();
-    (await second).release();
-    await new Promise((resolve) => {
-      setTimeout(resolve, 80);
-    });
-    expect(quick).not.toHaveBeenCalled();
+    expect(onLongWait).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels the long-wait timer of a wait that ends in time, so it never reports", async () => {
+    const THRESHOLD = 987_654;
+    const setSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearSpy = vi.spyOn(globalThis, "clearTimeout");
+    try {
+      const limiter = new ConnectionLimiter(1);
+      const held = await limiter.acquire();
+      const onLongWait = vi.fn();
+      const waiting = limiter.acquire(undefined, onLongWait, THRESHOLD);
+      const index = setSpy.mock.calls.findIndex((call) => call[1] === THRESHOLD);
+      expect(index).toBeGreaterThanOrEqual(0);
+      const timer = setSpy.mock.results[index]?.value;
+      held.release();
+      (await waiting).release();
+      expect(clearSpy).toHaveBeenCalledWith(timer);
+      expect(onLongWait).not.toHaveBeenCalled();
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
   });
 });

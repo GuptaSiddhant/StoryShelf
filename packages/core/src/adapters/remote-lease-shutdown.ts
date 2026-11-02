@@ -1,7 +1,7 @@
 import { stopAllAttempts } from "./remote-lease-attempt.ts";
 /** Stopping everything remote the process holds, for a runner shutting down (ADR 0007, decision 4). */
 import { releaseAllHeld } from "./remote-lease-held.ts";
-import { stopAllWaiting } from "./remote-limiter.ts";
+import { resetAllLimiters } from "./remote-limiter.ts";
 
 const shutdownHooks = new Set<() => Promise<void>>();
 
@@ -12,7 +12,7 @@ const shutdownHooks = new Set<() => Promise<void>>();
  */
 export async function shutdownRemote(): Promise<void> {
   stopAllAttempts();
-  stopAllWaiting();
+  resetAllLimiters();
   await releaseAllHeld();
   await Promise.all(
     [...shutdownHooks].map(async (hook) => {

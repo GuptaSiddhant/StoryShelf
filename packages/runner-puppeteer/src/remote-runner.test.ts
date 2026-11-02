@@ -405,6 +405,21 @@ function holdRenders(): { open: () => void } {
   return { open: () => resolve(true) };
 }
 
+/** A logger whose `warn` records the one-time "waiting for a connection slot" line. */
+const queuedLogger = () => {
+  const warn = vi.fn();
+  return { warn, logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } };
+};
+/** Resolves once a shard has been logged as queued for a slot: the barrier before "has not connected". */
+const untilQueued = async (warn: ReturnType<typeof vi.fn>) => {
+  await vi.waitFor(() => {
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 1 }),
+      "waiting for a remote browser connection slot",
+    );
+  });
+};
+
 const leased = (overrides: Partial<CdpLeasedOptions<{ id: string }>> = {}) => {
   const seen: RemoteConnectContext[] = [];
   const released: { lease: unknown; outcome: string; error?: unknown }[] = [];
@@ -555,15 +570,21 @@ describe("a remote CDP target with a function connect and release", () => {
 
   describe("with maxConnections", () => {
     it("connects the second shard only after the first connection is released", async () => {
-      const { service, seen, released } = leased({ maxConnections: 1 });
+      const { service, seen, released } = leased({
+        maxConnections: 1,
+        timeouts: { acquireMs: 50 },
+      });
       const runner = createPuppeteerCaptureRunner({ browsers: [service] });
       const hold = holdRenders();
       const first = runner.render(input({ shardIndex: 1, runId: "s1", storybookUrl: URL_ROOT }));
       await vi.waitFor(() => {
         expect(fake.state.gotos.length).toBeGreaterThan(0);
       });
-      const second = runner.render(input({ shardIndex: 2, runId: "s2", storybookUrl: URL_ROOT }));
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      const queued = queuedLogger();
+      const second = runner.render(
+        input({ shardIndex: 2, runId: "s2", storybookUrl: URL_ROOT, logger: queued.logger }),
+      );
+      await untilQueued(queued.warn);
       expect(seen.map((context) => context.shardIndex)).toEqual([1]);
       hold.open();
       await Promise.all([first, second]);
@@ -572,20 +593,29 @@ describe("a remote CDP target with a function connect and release", () => {
     });
 
     it("ends a shard that is cancelled while waiting, without connecting for it or freeing the first one's slot", async () => {
-      const { service, seen, released } = leased({ maxConnections: 1 });
+      const { service, seen, released } = leased({
+        maxConnections: 1,
+        timeouts: { acquireMs: 50 },
+      });
       const runner = createPuppeteerCaptureRunner({ browsers: [service] });
       const hold = holdRenders();
       const first = runner.render(input({ shardIndex: 1, runId: "s1", storybookUrl: URL_ROOT }));
       await vi.waitFor(() => {
         expect(fake.state.gotos.length).toBeGreaterThan(0);
       });
-      const waiting = runner.render(input({ shardIndex: 2, runId: "s2", storybookUrl: URL_ROOT }));
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      const queuedSecond = queuedLogger();
+      const waiting = runner.render(
+        input({ shardIndex: 2, runId: "s2", storybookUrl: URL_ROOT, logger: queuedSecond.logger }),
+      );
+      await untilQueued(queuedSecond.warn);
       await runner.cancel("b1", "s2");
       await expect(waiting).rejects.toBeInstanceOf(TargetLaunchError);
       expect(seen.map((context) => context.shardIndex)).toEqual([1]);
-      const third = runner.render(input({ shardIndex: 3, runId: "s3", storybookUrl: URL_ROOT }));
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      const queuedThird = queuedLogger();
+      const third = runner.render(
+        input({ shardIndex: 3, runId: "s3", storybookUrl: URL_ROOT, logger: queuedThird.logger }),
+      );
+      await untilQueued(queuedThird.warn);
       expect(seen.map((context) => context.shardIndex)).toEqual([1]);
       hold.open();
       await Promise.all([first, third]);
