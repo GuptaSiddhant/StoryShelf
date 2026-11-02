@@ -234,7 +234,7 @@ sequenceDiagram
     Handler-->>Client: JSON (/api/v1) or HTML (hono/jsx + HTMX) + HX-Redirect
 ```
 
-Conventions: IDs are ULIDs, timestamps ISO-8601 (`architecture.md:30`); `linkRoute()` for type-safe URLs; outbound HTTP via `httpJson`/`HttpError` (`core/utils`), never hand-rolled fetch (ADR 0001); structured logs `logger.info({ buildId }, "msg")` with `err` child (ADR 0015).
+Conventions: IDs are ULIDs, timestamps ISO-8601 (`architecture.md:30`); `createUrlBuilder` for type-safe URLs; outbound HTTP via `httpJson`/`HttpError` (`core/utils`), never hand-rolled fetch (ADR 0001); structured logs `logger.info({ buildId }, "msg")` with `err` child (ADR 0015).
 
 ---
 
@@ -634,7 +634,7 @@ flowchart LR
 - HTML and published routes use `slug`; JSON uses ULID (`architecture.md:507`).
 - `/storybook` and `/storybook/:key/:value` are resolvers (302) — assets served only under `/storybook/build/:buildId/...` to avoid `key/value` vs `assets/foo.js` collision (`architecture.md:477`).
 - `public` = `builds.public` OR `branch` matches `projects.public_branch_regex`; otherwise auth + `viewer` membership required (ADR 0011).
-- `linkRoute()` switches between path and subdomain forms based on `publishedBaseDomain`.
+- `createUrlBuilder` switches between path and subdomain forms based on `publishedBaseDomain`.
 
 ---
 
@@ -684,7 +684,7 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    startP(["Trigger<br/>--purge-interval (hourly) + branchGcIntervalMs (daily)<br/>or POST /api/v1/admin/purge<br/>or storyshelf purge CLI"])
+    startP(["Trigger<br/>branchGcIntervalMs (daily, branch GC only)<br/>or POST /api/v1/admin/purge<br/>or storyshelf purge CLI"])
     loadProjects["For each project"]
     cutoff["cutoff = now - purgeTtlDays (30)"]
     candidates["candidates = builds<br/>where status IN (approved,rejected)<br/>AND updated_at < cutoff"]

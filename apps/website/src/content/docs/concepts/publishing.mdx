@@ -98,7 +98,7 @@ createShelfApp({
 });
 ```
 
-The `linkRoute()` helper switches between path and subdomain forms based on config.
+The URL builder switches between path and subdomain forms based on config. It only produces the links: the app does not route requests by host, so a reverse proxy must deliver the wildcard hostnames to it (native routing is tracked in [#358](https://github.com/GuptaSiddhant/StoryShelf/issues/358)).
 
 ## Related
 

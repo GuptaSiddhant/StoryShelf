@@ -6,7 +6,7 @@ The public site lives in `apps/website/` and is built with **Astro Starlight** �
 
 - **Homepage:** the "self-hosted Chromatic alternative" pitch.
 - **Guides:** Getting started; CI (GitHub Actions, GitLab CI); Deployment (Docker/docker-compose, reverse proxy, subdomains + wildcard TLS); Auth (local, social, SSO/SAML, passkeys, none); Monorepo (one project per Storybook); Retention & labels; Migrating from Chromatic.
-- **API reference:** generated from the Hono `OpenAPIHono` spec — the `openapi` script runs `packages/core/scripts/generate-openapi.ts` → `apps/website/public/openapi.json` (prebuild). The site serves the static spec at `/openapi.json` and a client-side Swagger UI at `/openapi/` (CDN, read-only, no try-it) loading that spec.
+- **API reference:** generated from the Hono `OpenAPIHono` spec — the `openapi` script runs `packages/app/scripts/generate-openapi.ts` → `apps/website/public/openapi.json` (prebuild). The site serves the static spec at `/openapi.json` and a client-side Swagger UI at `/openapi/` (CDN, read-only, no try-it) loading that spec.
 - The internal `docs/` (architecture + ADRs) remains engineering-facing; the site is curated user guides.
 
 ## Examples & Fixtures
