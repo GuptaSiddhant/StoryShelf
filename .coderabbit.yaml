@@ -5,7 +5,6 @@ tone_instructions: "Be direct, technical, actionable. State defect, failure mode
 
 reviews:
   profile: "assertive"
-  request_changes_workflow: false
   auto_approvals:
     enabled: true
     allow_author_approval: true
