@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Logger } from "../logger.ts";
 import { recordSpans, type RecordedSpan } from "../test-helpers/span-recorder.ts";
-import { HttpError, httpBytes, httpJson, httpText, redactUrlForLog } from "./http.ts";
+import { HttpError, httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });
@@ -275,6 +275,70 @@ describe("httpText", () => {
     const caught = await httpText("https://hooks.example.com/x").catch((error: unknown) => error);
     expect(caught).toBeInstanceOf(HttpError);
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
+
+/** A response whose endless body records whether anything pulled from it or cancelled it. */
+function endlessResponse(status: number): { response: Response; state: StreamState } {
+  const state: StreamState = { pulls: 0, cancelled: false };
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      state.pulls += 1;
+      controller.enqueue(new Uint8Array(1024));
+    },
+    cancel() {
+      state.cancelled = true;
+    },
+  });
+  return { response: new Response(body, { status }), state };
+}
+
+interface StreamState {
+  pulls: number;
+  cancelled: boolean;
+}
+
+describe("httpStatus", () => {
+  it("resolves with the status and cancels the body unread on a 2xx", async () => {
+    const { response, state } = endlessResponse(201);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => await Promise.resolve(response)),
+    );
+    expect(await httpStatus("https://hooks.example.com/x", { method: "POST" })).toBe(201);
+    expect(state.cancelled).toBe(true);
+    expect(state.pulls).toBeLessThanOrEqual(1);
+  });
+
+  it("throws an HttpError with no body and cancels it unread on an error", async () => {
+    const { response, state } = endlessResponse(403);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => await Promise.resolve(response)),
+    );
+    const caught = await httpStatus("https://hooks.example.com/x").catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(HttpError);
+    expect((caught as HttpError).status).toBe(403);
+    expect((caught as HttpError).body).toBe("");
+    expect(state.cancelled).toBe(true);
+    expect(state.pulls).toBeLessThanOrEqual(1);
+  });
+
+  it("retries a 503 and cancels every body it does not read", async () => {
+    const first = endlessResponse(503);
+    const second = endlessResponse(200);
+    const queue = [first.response, second.response];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => await Promise.resolve(queue.shift())),
+    );
+    vi.stubGlobal("setTimeout", (callback: () => void) => {
+      callback();
+      return 0;
+    });
+    expect(await httpStatus("https://hooks.example.com/x")).toBe(200);
+    expect(first.state.cancelled).toBe(true);
+    expect(second.state.cancelled).toBe(true);
   });
 });
 
