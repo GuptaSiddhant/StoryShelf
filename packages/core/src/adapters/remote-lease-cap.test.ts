@@ -221,7 +221,7 @@ describe("maxConnections", () => {
       async () =>
         await Promise.resolve({ endpoint: "ws://127.0.0.1:1/secret-path", lease: { id: 1 } }),
     );
-    const { entry, held } = service({ maxConnections: 1, connect });
+    const { entry } = service({ maxConnections: 1, connect });
     const limiter = limiterOf(entry.remote);
     const blocker = await limiter?.acquire();
     const second = connectLeased(entry, CTX, opens).catch((error: unknown) => error);
@@ -234,7 +234,8 @@ describe("maxConnections", () => {
     expect(await second).toMatchObject({ name: "TargetLaunchError" });
     await shutting;
     expect(connect).not.toHaveBeenCalled();
-    expect(held()).toBe(0);
+    // The limiter the slot came from, not the fresh one a later connection would get.
+    expect(limiter?.held).toBe(0);
   });
 
   it("logs a long wait once with the target and limit, never the endpoint", async () => {

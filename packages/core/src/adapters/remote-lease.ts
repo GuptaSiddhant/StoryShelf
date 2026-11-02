@@ -115,8 +115,11 @@ async function acquire(
   attemptNo: number,
   logger: Logger | undefined,
 ): Promise<HeldConnection> {
-  const taking = slotFor(entry, context, logger);
+  // No `await` without a cap: an uncapped connection starts exactly as it did before.
+  const epoch = shutdownEpoch();
+  const taking = takeSlot(entry, context.signal, logger);
   const slot = taking === undefined ? undefined : await taking;
+  stopIfShutDown(slot, epoch);
   try {
     const held = await open(entry, context, attemptNo, logger);
     return slot === undefined ? held : withSlot(held, slot);
@@ -127,24 +130,16 @@ async function acquire(
 }
 
 /**
- * The connection slot of a capped service, or undefined without a cap. Not `async`: without a cap the
- * caller must not wait even one tick, so an uncapped connection starts exactly as it did before. A slot granted just before a shutdown
- * resumes after the attempts were stopped, and nothing would release a connection opened then: it is
- * given back and the connection stops.
+ * A slot granted across a shutdown must not open a connection: the shutdown has already stopped the
+ * attempts and collected the leases, so nothing would release it. The slot is given back and the
+ * connection stops. Called right before `open`, with nothing awaited in between, so a shutdown cannot
+ * slip into the gap (`open` registers its attempt synchronously).
  */
-function slotFor(
-  entry: RemoteTarget,
-  context: ConnectLeasedContext,
-  logger: Logger | undefined,
-): Promise<ConnectionSlot> | undefined {
-  const epoch = shutdownEpoch();
-  return takeSlot(entry, context.signal, logger)?.then((slot) => {
-    if (shutdownEpoch() !== epoch) {
-      slot.release();
-      throw stoppedError();
-    }
-    return slot;
-  });
+function stopIfShutDown(slot: ConnectionSlot | undefined, epoch: number): void {
+  if (slot !== undefined && shutdownEpoch() !== epoch) {
+    slot.release();
+    throw stoppedError();
+  }
 }
 
 /** `held` that gives its slot back, once, after the lease is released. */
