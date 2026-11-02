@@ -242,8 +242,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - Work in a branch or git worktree; run `nub ci` once per worktree. `nub.lock` is per worktree — never
   run installs concurrently in the same tree.
 - Verify before pushing (`nubx turbo verify --filter='<pkg>' --force`, or full). Merges into `main`
-  are **squash merges**, one task = one commit: `feat(<task-id>): <short description>`. Reference the
-  issue with `Closes #<n>`.
+  are **squash merges**, one task = one commit, titled `<type>(<scope>): <short description> (#<task-id>)`
+  where the scope is the package or area (e.g. `fix(cli): make the AWS stack boot (#423)`). PR titles
+  use the same form. Reference the issue with `Closes #<n>` (or `Part of #<n>` for a partial slice).
 
 <!-- BEGIN:turborepo-agent-rules -->
 
