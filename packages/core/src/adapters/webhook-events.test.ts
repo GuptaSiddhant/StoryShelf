@@ -145,6 +145,43 @@ describe("emitWebhookEvent", () => {
     expect(signatures.every((signature) => signature.length === 64)).toBe(true);
   });
 
+  it("never reads the receiver's response body, on 2xx or on an error", async () => {
+    const { db } = makeDatabase();
+    await new WebhookModel(db, webhookTables(db), TEST_SECRET).create("p1", {
+      url: "https://example.com/hook",
+      secret: "whsec-plain",
+      events: [],
+    });
+    const statuses = [200, 500];
+    const cancelled: boolean[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        await Promise.resolve();
+        const index = cancelled.push(false) - 1;
+        const body = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.enqueue(new Uint8Array(1024));
+          },
+          cancel() {
+            cancelled[index] = true;
+          },
+        });
+        return new Response(body, { status: statuses.shift() ?? 200 });
+      }),
+    );
+    vi.stubGlobal("setTimeout", (callback: () => void) => {
+      callback();
+      return 0;
+    });
+
+    await emitWebhookEvent(db, webhookTables(db), "p1", "build:created", {}, TEST_SECRET);
+    await emitWebhookEvent(db, webhookTables(db), "p1", "build:created", {}, TEST_SECRET);
+
+    expect(cancelled.length).toBeGreaterThanOrEqual(2);
+    expect(cancelled.every(Boolean)).toBe(true);
+  });
+
   describe("delivery outcome", () => {
     const URL_WITH_SECRET = "https://hooks.example.com/in/SECRETPATH?token=abc";
 

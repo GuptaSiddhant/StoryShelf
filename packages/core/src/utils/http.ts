@@ -59,6 +59,27 @@ export async function httpText(url: string, options: HttpTextOptions = {}): Prom
   );
 }
 
+/**
+ * Send a request and resolve with the response status, without ever reading the response body (it
+ * is cancelled on every response). Use it when the answer is only "did it succeed", such as webhook
+ * delivery, so a receiver cannot make the process buffer an arbitrarily large body. Retries,
+ * timeouts, redaction and tracing are those of {@link httpText}. A non-2xx response throws
+ * {@link HttpError} with an empty `body`.
+ *
+ * @param url - Absolute request URL.
+ * @param options - Method, headers, JSON body, timeout, retries, logger.
+ * @returns The 2xx response status.
+ */
+export async function httpStatus(url: string, options: HttpTextOptions = {}): Promise<number> {
+  return await requestWithRetry<number>(
+    url,
+    options,
+    options.retries ?? DEFAULT_RETRIES,
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    doFetchStatus,
+  );
+}
+
 /** Failed HTTP response: status code plus a snippet of the response body. */
 export class HttpError extends Error {
   readonly status: number;
@@ -275,6 +296,16 @@ async function doFetchText(
   return await response.text();
 }
 
+async function doFetchStatus(
+  url: string,
+  options: HttpRequestOptions,
+  timeoutMs: number,
+): Promise<number> {
+  const response = await doFetchResponse(url, options, timeoutMs, false);
+  await response.body?.cancel();
+  return response.status;
+}
+
 async function doFetchBytes(
   url: string,
   options: HttpRequestOptions,
@@ -288,6 +319,7 @@ async function doFetchResponse(
   url: string,
   options: HttpRequestOptions,
   timeoutMs: number,
+  readErrorBody = true,
 ): Promise<Response> {
   const request = buildRequest(options);
   injectTraceContext(request.headers);
@@ -301,8 +333,17 @@ async function doFetchResponse(
       : AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) {
-    const text = await response.text();
-    throw new HttpError(response.status, text.slice(0, MAX_BODY_SNIPPET), response.headers);
+    throw await failureOf(response, readErrorBody);
   }
   return response;
+}
+
+/** The {@link HttpError} for a non-2xx response; the body is read (and capped) only on request. */
+async function failureOf(response: Response, readBody: boolean): Promise<HttpError> {
+  if (!readBody) {
+    await response.body?.cancel();
+    return new HttpError(response.status, "", response.headers);
+  }
+  const text = await response.text();
+  return new HttpError(response.status, text.slice(0, MAX_BODY_SNIPPET), response.headers);
 }
