@@ -4,6 +4,7 @@
 
 Accepted. Amended with the `capture_jobs` table, claim algorithm, poll/cancel details and the
 `notify` job kind (decisions 4, 5 and 11), recorded while implementing #212, #217 and #222.
+Amended by ADR 0040 (queues, per-queue retry limits and the rule for new job kinds).
 
 Supersedes (archived): ADR 0034.
 

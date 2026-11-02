@@ -1,3 +1,4 @@
+# Schedule deferred; see #410.
 name: Live Cloud GCP
 
 # Phase 3 live tests: GCS against strictly real GCP (no fakes, no
@@ -12,8 +13,6 @@ name: Live Cloud GCP
 # - LIVE_GCS_BUCKET (terraform output: gcs_bucket)
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "45 3 * * *"
 
 permissions:
   contents: read

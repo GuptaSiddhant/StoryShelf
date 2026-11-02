@@ -1,3 +1,4 @@
+# Schedule deferred; see #410.
 name: Live Cloud AWS
 
 # Phase 1 live tests: S3 against strictly real AWS (no fakes, no emulators).
@@ -13,8 +14,6 @@ name: Live Cloud AWS
 # - LIVE_S3_BUCKET (terraform output: s3_bucket)
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 3 * * *"
 
 permissions:
   contents: read

@@ -95,6 +95,7 @@ export interface QueueRuntime {
   maxAttempts: number;
   owner: string;
   now: () => number;
+  timers?: QueueTimers;
   wake: WakeSignal;
   /** Wake version read when the latest poll began. */
   pollVersion: number;

@@ -3,6 +3,8 @@ import type { Logger } from "../logger.ts";
 import { HttpError, httpBytes, httpJson, httpText, redactUrlForLog } from "./http.ts";
 
 const spanAttributes = vi.hoisted(() => [] as Record<string, unknown>[]);
+/** Every `recordException` call on an `http.client` span, as message + stack text, in order. */
+const recordedExceptions = vi.hoisted(() => [] as string[]);
 
 vi.mock("../tracing.ts", async (importOriginal) => {
   const original = await importOriginal<typeof import("../tracing.ts")>();
@@ -10,7 +12,19 @@ vi.mock("../tracing.ts", async (importOriginal) => {
     ...original,
     withSpan: ((name, fn, attributes, parent) => {
       spanAttributes.push({ ...attributes });
-      return original.withSpan(name, fn, attributes, parent);
+      return original.withSpan(
+        name,
+        async (span) => {
+          vi.spyOn(span, "recordException").mockImplementation((exception) => {
+            const { message = "", stack = "" } =
+              typeof exception === "string" ? { message: exception } : exception;
+            recordedExceptions.push(`${message}\n${stack}`);
+          });
+          return await fn(span);
+        },
+        attributes,
+        parent,
+      );
     }) as typeof original.withSpan,
   };
 });
@@ -22,6 +36,7 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
 afterEach(() => {
   vi.unstubAllGlobals();
   spanAttributes.length = 0;
+  recordedExceptions.length = 0;
 });
 
 /** A logger that records every call as one JSON line, so a test can search all of it. */
@@ -82,6 +97,72 @@ describe("secret-bearing URLs in logs and spans", () => {
       expect(everything).not.toContain(secret);
     }
     expect(spanAttributes[0]?.["url.full"]).toBe(row.expected);
+  });
+
+  it("redacts userinfo and path secrets from the exception it records, and still rethrows the original", async () => {
+    const url = "https://user:pass@example.com/a/SECRETxyz";
+    const failure = new TypeError(
+      `Request cannot be constructed from a URL that includes credentials: ${url}`,
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        await Promise.resolve();
+        throw failure;
+      }),
+    );
+    const caught = await httpText(url, { retries: 1 }).catch((error: unknown) => error);
+    expect(caught).toBe(failure);
+    expect(caught).toHaveProperty("message", expect.stringContaining("user:pass"));
+    // The first record is this module's; any later one comes from `withSpan` in tracing.ts.
+    expect(recordedExceptions[0]).toBeDefined();
+    // Not the bare words: the stack's file paths may contain "user" (e.g. `/home/user/`).
+    expect(recordedExceptions[0]).not.toContain("user:pass");
+    expect(recordedExceptions[0]).not.toContain("pass@");
+    // `redactSecrets` alone would keep the path, where webhook secrets live.
+    expect(recordedExceptions[0]).not.toContain("SECRETxyz");
+    expect(recordedExceptions[0]).toContain("https://example.com/a/…");
+  });
+
+  it("keeps a path echoed in a retried error body off the recorded exception", async () => {
+    const url = "https://hooks.slack.com/services/T000/B000/SECRETxyz?token=abc";
+    const echoed =
+      "no route for /services/T000/B000/SECRETxyz?token=abc and /services/T000/B000/SECRETxyz";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce(
+          new Response(echoed, { status: 503, headers: { "retry-after": "0" } }),
+        )
+        .mockResolvedValueOnce(new Response("ok", { status: 200 })),
+    );
+    await httpText(url);
+    expect(recordedExceptions).toHaveLength(1);
+    for (const secret of ["SECRETxyz", "T000", "B000", "token=abc"]) {
+      expect(recordedExceptions[0]).not.toContain(secret);
+    }
+    expect(recordedExceptions[0]).toContain("no route for");
+  });
+
+  it("keeps an HTML-escaped query echoed in an error page off the recorded exception", async () => {
+    const url =
+      "https://prod.example.com/workflows/W1/triggers/manual/paths/invoke?api-version=1&sig=SECRETsig";
+    const echoed =
+      "<pre>Cannot POST /workflows/W1/triggers/manual/paths/invoke?api-version=1&amp;sig=SECRETsig</pre>";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce(
+          new Response(echoed, { status: 502, headers: { "retry-after": "0" } }),
+        )
+        .mockResolvedValueOnce(new Response("ok", { status: 200 })),
+    );
+    await httpText(url);
+    expect(recordedExceptions).toHaveLength(1);
+    expect(recordedExceptions[0]).not.toContain("SECRETsig");
+    expect(recordedExceptions[0]).toContain("Cannot POST");
   });
 
   it("still requests the real URL", async () => {

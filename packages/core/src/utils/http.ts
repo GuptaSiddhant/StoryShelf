@@ -172,7 +172,7 @@ async function requestWithRetry<T>(
         try {
           return await perform(url, options, timeoutMs);
         } catch (error) {
-          span.recordException(error instanceof Error ? error : String(error));
+          span.recordException(redactedException(error, url));
           if (options.signal?.aborted || !shouldRetry(error, attempt, maxAttempts)) {
             throw error;
           }
@@ -204,6 +204,52 @@ export function redactUrlForLog(url: string): string {
   const origin = `${parsed.protocol}//${parsed.host}`;
   const path = first !== undefined && rest.length > 0 ? `/${first}/…` : "";
   return redactSecrets(`${origin}${path}`);
+}
+
+/**
+ * A copy of a failure that is safe to record on a span. Native `fetch` rejects a URL with userinfo
+ * with a message and stack that repeat the whole URL (`https://user:pass@host/path`), so the URL
+ * is replaced by its {@link redactUrlForLog} form first (`redactSecrets` alone leaves a secret in
+ * the path), then both text fields go through `redactSecrets`. The original error is what gets
+ * rethrown; only the recorded copy changes.
+ */
+function redactedException(error: unknown, url: string): Error | string {
+  if (!(error instanceof Error)) {
+    return scrubText(String(error), url);
+  }
+  const copy = new Error(scrubText(error.message, url));
+  copy.name = error.name;
+  if (error.stack) {
+    copy.stack = scrubText(error.stack, url);
+  }
+  return copy;
+}
+
+/**
+ * `text` with the request URL (as given and as normalized) and its bare request target (path and
+ * query, which a server's error page often echoes back) redacted.
+ */
+function scrubText(text: string, url: string): string {
+  const safe = redactUrlForLog(url);
+  const normalized = URL.canParse(url) ? new URL(url).href : url;
+  let scrubbed = text;
+  for (const secret of [url, normalized, ...requestTargets(url)]) {
+    scrubbed = scrubbed.replaceAll(secret, safe);
+  }
+  return redactSecrets(scrubbed);
+}
+
+/**
+ * The path-and-query forms of a URL that an error body may repeat (as written and with `&`
+ * HTML-escaped, as an HTML error page does); the bare root is not one.
+ */
+function requestTargets(url: string): string[] {
+  if (!URL.canParse(url)) {
+    return [];
+  }
+  const { pathname, search } = new URL(url);
+  const target = `${pathname}${search}`;
+  return [target, target.replaceAll("&", "&amp;"), pathname].filter((value) => value.length > 1);
 }
 
 async function backoff(

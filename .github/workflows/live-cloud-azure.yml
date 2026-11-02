@@ -1,3 +1,4 @@
+# Schedule deferred; see #410.
 name: Live Cloud Azure
 
 # Phase 2 live tests: Blob against strictly real Azure (no fakes, no
@@ -11,8 +12,6 @@ name: Live Cloud Azure
 # - LIVE_AZURE_CONTAINER (existing blob container name)
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "30 3 * * *"
 
 permissions:
   contents: read
