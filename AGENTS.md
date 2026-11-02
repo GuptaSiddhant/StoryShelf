@@ -124,7 +124,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
   `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
   `/_s/` or widen what a token grants. Only `signedCacheControl` (`packages/app/src/routers/
-  capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
+capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
   manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
   by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
   never let a runner set response headers.
@@ -186,7 +186,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `<origin>/_s/<token>/` (`storybookBase`). Measure the environment through `boundedProbe`
   (`timeouts.probeMs`): an overrun or failure is unknown plus a warning, a cancel throws
   `Capture cancelled` and never becomes an unknown-environment capture; close the probe page on
-  every path and release the lease as `cancelled` when the run was cancelled.
+  every path and release the lease as `cancelled` when the run was cancelled. The optional
+  `maxConnections` is a separate per-process limiter (`remote-limiter.ts`), never the page gate: its
+  slot is taken before `connect` and freed with the lease, exactly once.
 - **Boot replay.** `runBootTasks` re-requests open build states after startup only when notifiers are
   wired and an origin is resolved. Chat, email and alerts are never replayed.
 - **Retention lifecycle.** Every baseline mutation goes through the fenced

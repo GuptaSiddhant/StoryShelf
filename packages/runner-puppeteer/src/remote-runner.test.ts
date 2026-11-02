@@ -553,6 +553,47 @@ describe("a remote CDP target with a function connect and release", () => {
     expect(runner.metadata.targets?.[0]?.status).toBe("ready");
   });
 
+  describe("with maxConnections", () => {
+    it("connects the second shard only after the first connection is released", async () => {
+      const { service, seen, released } = leased({ maxConnections: 1 });
+      const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+      const hold = holdRenders();
+      const first = runner.render(input({ shardIndex: 1, runId: "s1", storybookUrl: URL_ROOT }));
+      await vi.waitFor(() => {
+        expect(fake.state.gotos.length).toBeGreaterThan(0);
+      });
+      const second = runner.render(input({ shardIndex: 2, runId: "s2", storybookUrl: URL_ROOT }));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      hold.open();
+      await Promise.all([first, second]);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1, 2]);
+      expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+    });
+
+    it("ends a shard that is cancelled while waiting, without connecting for it or freeing the first one's slot", async () => {
+      const { service, seen, released } = leased({ maxConnections: 1 });
+      const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+      const hold = holdRenders();
+      const first = runner.render(input({ shardIndex: 1, runId: "s1", storybookUrl: URL_ROOT }));
+      await vi.waitFor(() => {
+        expect(fake.state.gotos.length).toBeGreaterThan(0);
+      });
+      const waiting = runner.render(input({ shardIndex: 2, runId: "s2", storybookUrl: URL_ROOT }));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      await runner.cancel("b1", "s2");
+      await expect(waiting).rejects.toBeInstanceOf(TargetLaunchError);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      const third = runner.render(input({ shardIndex: 3, runId: "s3", storybookUrl: URL_ROOT }));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      hold.open();
+      await Promise.all([first, third]);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1, 3]);
+      expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+    });
+  });
+
   it("releases leases still held when the runner shuts down", async () => {
     const { service, released } = leased();
     const runner = createPuppeteerCaptureRunner({ browsers: [service] });

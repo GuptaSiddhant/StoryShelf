@@ -74,6 +74,13 @@ export interface RemoteOptions<TLease = unknown> {
   sessions: number | (() => number);
   /** Maximum concurrent pages on each browser connection; independent of the shared session gate. */
   maxPagesPerConnection?: number | undefined;
+  /**
+   * Maximum connections this process holds to the service at once (default: no cap). A separate
+   * limit from `sessions` (pages) and `maxPagesPerConnection`: a connection counts from the moment
+   * it is requested until its render has ended, a shared one once. Renders over the cap wait, and a
+   * cancel or shutdown ends the wait. Per process; the deployment-wide cap is another issue.
+   */
+  maxConnections?: number | undefined;
   /** Declared, never inferred: how the runner talks to the service. */
   protocol: RemoteProtocol;
   /**
@@ -126,6 +133,7 @@ export interface RemoteBrowser {
   readonly engines: readonly BrowserName[];
   readonly sessions: number | (() => number);
   readonly maxPagesPerConnection?: number | undefined;
+  readonly maxConnections?: number | undefined;
   readonly protocol: RemoteProtocol;
   readonly reach: TargetReach;
   readonly connect: RemoteOptions["connect"];
@@ -181,6 +189,7 @@ const KNOWN = new Set([
   "engines",
   "sessions",
   "maxPagesPerConnection",
+  "maxConnections",
   "protocol",
   "reach",
   "connect",
@@ -209,6 +218,7 @@ export function defineRemote<TLease = unknown>(
     engines: [...options.engines],
     sessions: options.sessions,
     maxPagesPerConnection: options.maxPagesPerConnection,
+    maxConnections: options.maxConnections,
     protocol: options.protocol,
     reach: options.reach,
     connect: options.connect,
@@ -327,15 +337,18 @@ function checkOptions(options: RemoteOptions, { label }: RemoteSupport): void {
     );
   }
   checkSessions(options.sessions, where);
-  if (
-    options.maxPagesPerConnection !== undefined &&
-    (!Number.isInteger(options.maxPagesPerConnection) || options.maxPagesPerConnection < 1)
-  ) {
-    throw new Error(`${where}: maxPagesPerConnection must be a positive integer`);
-  }
+  checkPositiveInteger("maxPagesPerConnection", options.maxPagesPerConnection, where);
+  checkPositiveInteger("maxConnections", options.maxConnections, where);
   checkNumbers(options, where);
   if (options.release !== undefined && typeof options.connect !== "function") {
     throw new Error(`${where}: release needs a function connect (a fixed connection has no lease)`);
+  }
+}
+
+/** An optional limit: absent, or a whole number of at least 1. */
+function checkPositiveInteger(name: string, value: number | undefined, where: string): void {
+  if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
+    throw new Error(`${where}: ${name} must be a positive integer`);
   }
 }
 

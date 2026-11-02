@@ -44,13 +44,13 @@ createShelfApp({ database, storage, testing: { runner } });
 
 Credentials are operator-level: they are passed in the server's code, from the environment or a secret manager. They are never stored per project, and never logged: the endpoint (it can carry a key) and every header value are removed from the messages the runner surfaces.
 
-| Preset                     | Package                                | Protocol   | Reaches the Storybook through |
-| -------------------------- | -------------------------------------- | ---------- | ----------------------------- |
-| `playwrightServer(...)`    | `@storyshelf/runner-playwright/remote` | Playwright | `exposeNetwork` (default)     |
-| `azurePlaywright(...)`     | `@storyshelf/runner-playwright/remote` | Playwright | `exposeNetwork`               |
-| `browserstack(...)`        | `@storyshelf/runner-playwright/remote` | Playwright | a Storybook URL               |
+| Preset                                      | Package                                | Protocol                       | Reaches the Storybook through                       |
+| ------------------------------------------- | -------------------------------------- | ------------------------------ | --------------------------------------------------- |
+| `playwrightServer(...)`                     | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork` (default)                           |
+| `azurePlaywright(...)`                      | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
+| `browserstack(...)`                         | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
 | `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
-| `cdp(...)`                 | `@storyshelf/runner-puppeteer/remote`  | CDP        | a Storybook URL               |
+| `cdp(...)`                                  | `@storyshelf/runner-puppeteer/remote`  | CDP                            | a Storybook URL                                     |
 
 `remote()` is the generic constructor every preset is sugar over, so a provider without a preset needs no new release. A fixed service declares how it is reached and where:
 
@@ -192,14 +192,14 @@ remote<{ id: string }>({
 
 **The context `connect` receives**
 
-| Field        | Meaning                                                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `engine`     | The engine being connected.                                                                                                              |
-| `buildId`    | The StoryShelf build; the same for every shard.                                                                                          |
-| `runId`      | The shard's id; the build id when the render is not sharded.                                                                             |
-| `shardIndex` | The shard's **1-based** position in the plan, and **`undefined` (never `0`) when the build is not sharded**. Stable if a shard is retried. |
-| `purpose`    | `render` (a build or shard), `extract` (the parameter pre-pass) or `tests` (`.test()` entries). The pre-passes connect too.               |
-| `attempt`    | This connection's attempt, from 1; every retry connects anew.                                                                            |
+| Field        | Meaning                                                                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `engine`     | The engine being connected.                                                                                                                    |
+| `buildId`    | The StoryShelf build; the same for every shard.                                                                                                |
+| `runId`      | The shard's id; the build id when the render is not sharded.                                                                                   |
+| `shardIndex` | The shard's **1-based** position in the plan, and **`undefined` (never `0`) when the build is not sharded**. Stable if a shard is retried.     |
+| `purpose`    | `render` (a build or shard), `extract` (the parameter pre-pass) or `tests` (`.test()` entries). The pre-passes connect too.                    |
+| `attempt`    | This connection's attempt, from 1; every retry connects anew.                                                                                  |
 | `signal`     | Aborts while `connect` is pending: on `timeouts.acquireMs`, a cancel (user, build, render budget) and shutdown. Spent once `connect` resolves. |
 
 **Lifecycle**
@@ -211,6 +211,7 @@ remote<{ id: string }>({
 - The connection `connect` returns must be `endpoint`, `headers` and `lease` only: `protocol` and `reach` are declared on `remote()`, and a wrong scheme or an extra field fails the job.
 - `sessions` can be a function, read each time a render pass starts and a page waits for a slot, for a provider whose cap follows the servers it has woken. A value that is not a finite number keeps the last good one (and logs once); below 1 counts as 1.
 - Playwright's `remote()` and `playwrightServer()` accept `maxPagesPerConnection`, a positive integer that limits the pages on each connection independently of the target-wide `sessions` budget. Two pages per connection worked as a starting point on one 2 GB browser host; measure and tune it for your workload. The local loopback Storybook server allows successful files to be cached for one hour within a capture run. Signed Storybook URLs retain their own cache and access policies.
+- `maxConnections` (on `remote()`, `playwrightServer()`, `cdp()` and `defineRemote`) caps how many connections this process holds to the service at once. It is separate from `sessions` (pages) and `maxPagesPerConnection`: a connection counts from the moment it is requested until its render has ended, and one connection shared by several pages counts once. Renders over the cap wait; a cancelled build ends its wait without taking a slot. A wait longer than `timeouts.acquireMs` is logged once with the target and the limit. Unset means no cap, as before. The cap is per process: it does not coordinate several StoryShelf instances.
 - `createPlaywrightCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
 - Playwright remote captures retry one navigation timeout, screenshot timeout or observed page crash on a fresh page and context, within the same page limits. A disconnected browser is reported as a failure instead of being replaced while sibling captures may be active. Play/assertion failures, cancellation and capture-delivery failures are not retried; retry attempts and outcomes are logged.
 
@@ -261,13 +262,13 @@ cdp({
 
 0.8 is a breaking release for `remote()`; a 0.7 call fails at runner creation with a message naming the replacement. The presets (`playwrightServer`, `azurePlaywright`, `browserstack`, `cdp`) keep their options.
 
-| 0.7                                                      | 0.8                                                                                |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `connect: (engine) => ({ protocol, endpoint, … })`       | `protocol` and `reach` on `remote()`; `connect: { endpoint, headers }`, or a function receiving a context object |
-| `exposeNetwork: "<loopback>"` on the connection          | `reach: "loopback"` (`"url"` for none)                                             |
-| `connectRetries`, `connectBackoffMs`                     | `retry: { attempts, backoffMs }`                                                   |
-| `connectTimeoutMs`                                       | `timeouts: { connectMs }`                                                          |
-| `acquire` (0.7.1 only)                                   | merged into `connect`                                                              |
+| 0.7                                                | 0.8                                                                                                              |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `connect: (engine) => ({ protocol, endpoint, … })` | `protocol` and `reach` on `remote()`; `connect: { endpoint, headers }`, or a function receiving a context object |
+| `exposeNetwork: "<loopback>"` on the connection    | `reach: "loopback"` (`"url"` for none)                                                                           |
+| `connectRetries`, `connectBackoffMs`               | `retry: { attempts, backoffMs }`                                                                                 |
+| `connectTimeoutMs`                                 | `timeouts: { connectMs }`                                                                                        |
+| `acquire` (0.7.1 only)                             | merged into `connect`                                                                                            |
 
 ## Other services
 
