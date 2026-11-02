@@ -3,7 +3,6 @@ import { CommentModel, type CommentCreateInput } from "@storyshelf/core/models";
 import type { Comment, Project } from "@storyshelf/core/schema";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
-import { notifyProject } from "../notify.ts";
 import { REVIEW_EVENTS, announceReview } from "../review-events.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
@@ -112,23 +111,30 @@ function assertOneAnchor(body: {
   }
 }
 
+/** Where a comment is anchored: its snapshot, else its story, else the build. */
+export function commentScope(comment: Comment): "build" | "story" | "snapshot" {
+  if (comment.snapshotId !== null) {
+    return "snapshot";
+  }
+  return comment.storyId === null ? "build" : "story";
+}
+
 /**
- * Snapshot comments keep `comment:created`; build and story comments, the review ones, raise
- * `review:comment` (webhook and notifications, ADR 0013, decision 10). One event per comment.
+ * Every comment raises one `comment:created` (ADR 0013, decision 10), anchored by `scope`.
+ * `review:comment` is a subscription alias for the build and story scopes, not a second event.
+ * `eventId` is the comment id, so a retried delivery carries the same id.
  */
 async function announceComment(project: Project, buildId: string, comment: Comment): Promise<void> {
   const data = {
+    eventId: comment.id,
+    scope: commentScope(comment),
     buildId,
     commentId: comment.id,
     snapshotId: comment.snapshotId,
     storyId: comment.storyId,
     body: comment.body.slice(0, 500),
   };
-  if (comment.snapshotId === null) {
-    await announceReview(project, REVIEW_EVENTS.comment, data, buildId);
-    return;
-  }
-  await notifyProject(project, "comment:created", data, `/builds/${buildId}`);
+  await announceReview(project, REVIEW_EVENTS.commentCreated, data, buildId);
 }
 
 export async function createComment(
