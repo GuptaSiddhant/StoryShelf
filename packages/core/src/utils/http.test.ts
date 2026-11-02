@@ -124,6 +124,27 @@ describe("secret-bearing URLs in logs and spans", () => {
     expect(recordedExceptions[0]).toContain("https://example.com/a/…");
   });
 
+  it("keeps a path echoed in a retried error body off the recorded exception", async () => {
+    const url = "https://hooks.slack.com/services/T000/B000/SECRETxyz?token=abc";
+    const echoed =
+      "no route for /services/T000/B000/SECRETxyz?token=abc and /services/T000/B000/SECRETxyz";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce(
+          new Response(echoed, { status: 503, headers: { "retry-after": "0" } }),
+        )
+        .mockResolvedValueOnce(new Response("ok", { status: 200 })),
+    );
+    await httpText(url);
+    expect(recordedExceptions).toHaveLength(1);
+    for (const secret of ["SECRETxyz", "T000", "B000", "token=abc"]) {
+      expect(recordedExceptions[0]).not.toContain(secret);
+    }
+    expect(recordedExceptions[0]).toContain("no route for");
+  });
+
   it("still requests the real URL", async () => {
     const fetchMock = vi.fn(async () => {
       await Promise.resolve();

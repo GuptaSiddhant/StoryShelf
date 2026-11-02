@@ -225,11 +225,27 @@ function redactedException(error: unknown, url: string): Error | string {
   return copy;
 }
 
-/** `text` with every occurrence of the request URL (as given and as normalized) redacted. */
+/**
+ * `text` with the request URL (as given and as normalized) and its bare request target (path and
+ * query, which a server's error page often echoes back) redacted.
+ */
 function scrubText(text: string, url: string): string {
   const safe = redactUrlForLog(url);
   const normalized = URL.canParse(url) ? new URL(url).href : url;
-  return redactSecrets(text.replaceAll(url, safe).replaceAll(normalized, safe));
+  let scrubbed = text;
+  for (const secret of [url, normalized, ...requestTargets(url)]) {
+    scrubbed = scrubbed.replaceAll(secret, safe);
+  }
+  return redactSecrets(scrubbed);
+}
+
+/** The path-and-query forms of a URL that an error body may repeat; the bare root is not one. */
+function requestTargets(url: string): string[] {
+  if (!URL.canParse(url)) {
+    return [];
+  }
+  const { pathname, search } = new URL(url);
+  return [`${pathname}${search}`, pathname].filter((target) => target.length > 1);
 }
 
 async function backoff(
