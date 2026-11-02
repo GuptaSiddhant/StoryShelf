@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { dirname } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   generateAwsCompute,
@@ -21,7 +23,6 @@ import {
 const options: AwsTerraformOptions = {
   project: "acme-shelf",
   region: "us-east-1",
-  dbEngine: "rds",
 };
 
 function outputNames(outputsTf: string): string[] {
@@ -40,6 +41,8 @@ describe("AWS Terraform modules", () => {
     const versions = generateAwsVersions();
     expect(versions).toContain(TERRAFORM_REQUIRED_VERSION);
     expect(versions).toContain("hashicorp/aws");
+    // random_password generates the SECRET and ADMIN_TOKEN values.
+    expect(versions).toContain("hashicorp/random");
   });
 
   it("declares only live variables", () => {
@@ -49,8 +52,7 @@ describe("AWS Terraform modules", () => {
     expect(variables).toContain('variable "vpc_id"');
     expect(variables).toContain('variable "domain_name"');
     expect(variables).toContain('variable "saml_metadata_url"');
-    // db_engine is baked at scaffold time, like storage; a
-    // variable here would be dead config that terraform validate flags.
+    // The Postgres engine is not configurable (RDS only), so there is no variable for it.
     expect(variables).not.toContain("db_engine");
   });
 
@@ -61,11 +63,34 @@ describe("AWS Terraform modules", () => {
     expect(storage).toContain("expire-transient-builds");
   });
 
-  it("uses RDS by default and DSQL on request", () => {
-    expect(generateAwsDatabase("rds")).toContain('resource "aws_db_instance" "main"');
-    expect(generateAwsDatabase("rds")).not.toContain("aws_dsql_cluster");
-    expect(generateAwsDatabase("dsql")).toContain('resource "aws_dsql_cluster" "main"');
-    expect(generateAwsDatabase("dsql")).not.toContain("aws_db_instance");
+  it("provisions RDS Postgres with an RDS-managed master password, behind a dedicated db SG", () => {
+    const database = generateAwsDatabase();
+    expect(database).toContain('resource "aws_db_instance" "main"');
+    expect(database).toContain("manage_master_user_password = true");
+    expect(database).toContain("vpc_security_group_ids      = [aws_security_group.db.id]");
+    // The database is no longer attached to the task security group.
+    expect(database).not.toContain("aws_security_group.ecs");
+  });
+
+  it("lets only the task security group reach Postgres, on 5432", () => {
+    const security = generateAwsSecurity();
+    const start = security.indexOf('resource "aws_security_group" "db"');
+    expect(start).toBeGreaterThan(-1);
+    const db = security.slice(start);
+    const ingress = [...db.matchAll(/ingress \{(?<body>[^}]*)\}/gu)];
+    expect(ingress).toHaveLength(1);
+    const body = ingress[0]?.groups?.["body"] ?? "";
+    expect(body).toContain("from_port       = 5432");
+    expect(body).toContain("to_port         = 5432");
+    expect(body).toContain("security_groups = [aws_security_group.ecs.id]");
+    expect(body).not.toContain("cidr_blocks");
+  });
+
+  it("puts no plaintext database password in any generated file", () => {
+    const all = Object.values(generateAwsTerraformFiles(options)).join("\n");
+    expect(all).not.toMatch(/\bpassword\s*=\s*"/u);
+    expect(all).not.toContain("master_password");
+    expect(all).not.toMatch(/random_password"\s+"(?:db|database|master)/u);
   });
 
   it("keeps data-plane traffic private and compute on Fargate", () => {
@@ -106,8 +131,8 @@ describe("AWS Terraform modules", () => {
     expect(vpc).toContain("public_subnet_ids");
     expect(vpc).toContain("private_subnet_ids");
     expect(generateAwsCompute()).not.toContain("data.aws_subnets");
-    expect(generateAwsDatabase("rds")).not.toContain("data.aws_subnets");
-    expect(generateAwsDatabase("rds")).toContain("local.private_subnet_ids");
+    expect(generateAwsDatabase()).not.toContain("data.aws_subnets");
+    expect(generateAwsDatabase()).toContain("local.private_subnet_ids");
   });
 
   it("runs the service and the ALB in public subnets with a public IP, tasks reachable only via the ALB", () => {
@@ -121,23 +146,29 @@ describe("AWS Terraform modules", () => {
     expect(security).toContain("security_groups = [aws_security_group.alb.id]");
   });
 
-  it("grants least-privilege roles: both read exactly the three secrets, task also the bucket", () => {
+  it("grants least-privilege roles: exact secret lists, and the task role also the bucket", () => {
     const compute = generateAwsCompute();
-    const secrets = ["shelf_secret", "oidc_client_secret", "admin_token"];
+    const appSecrets = ["shelf_secret", "oidc_client_secret", "admin_token"].map(
+      (secret) => `aws_secretsmanager_secret.${secret}.arn`,
+    );
+    // The execution role also reads the RDS-managed master secret (injected into the task).
+    const expected = {
+      execution_secrets: [...appSecrets, "local.db_secret_arn"],
+      task_secrets: appSecrets,
+    };
     expect(compute).toContain('resource "aws_iam_role" "execution"');
     expect(compute).toContain('resource "aws_iam_role" "task"');
-    // Each role's secrets policy lists exactly the three scaffold ARNs and nothing broader.
-    for (const policy of ["execution_secrets", "task_secrets"]) {
+    // Each role's secrets policy lists exactly its ARNs, in order: no extras, no wildcard.
+    for (const policy of ["execution_secrets", "task_secrets"] as const) {
       const block = compute.slice(compute.indexOf(`resource "aws_iam_role_policy" "${policy}"`));
       const statement = block.slice(0, block.indexOf("\n}\n"));
       expect(statement).toContain('Action = ["secretsmanager:GetSecretValue"]');
-      // The Resource list is exactly the three scaffold ARNs, in order: no extras, no wildcard.
       const resources = /Resource = \[(?<list>[^\]]*)\]/u.exec(statement)?.groups?.["list"] ?? "";
       const arns = resources
         .split(",")
         .map((arn) => arn.trim())
         .filter(Boolean);
-      expect(arns).toEqual(secrets.map((secret) => `aws_secretsmanager_secret.${secret}.arn`));
+      expect(arns).toEqual(expected[policy]);
     }
     // The task role reaches the bucket (its own policy), not just the secrets.
     const storage = compute.slice(compute.indexOf('resource "aws_iam_role_policy" "task_storage"'));
@@ -193,24 +224,22 @@ describe("AWS Terraform modules", () => {
       "user_pool_id",
       "app_client_id",
     ]) {
-      expect(generateAwsOutputs("rds")).toContain(`output "${name}"`);
-      expect(generateAwsOutputs("dsql")).toContain(`output "${name}"`);
+      expect(generateAwsOutputs()).toContain(`output "${name}"`);
     }
   });
 
-  it("emits a frozen output contract for both engines", () => {
+  it("emits a frozen output contract", () => {
     const frozen = ["alb_dns_name", "app_client_id", "db_endpoint", "s3_bucket", "user_pool_id"];
-    for (const engine of ["rds", "dsql"] as const) {
-      expect(outputNames(generateAwsOutputs(engine))).toEqual(frozen);
-    }
+    expect(outputNames(generateAwsOutputs())).toEqual(frozen);
   });
 
-  it("derives the DSQL endpoint from the documented format", () => {
-    const dsql = generateAwsOutputs("dsql");
-    expect(dsql).toContain(".dsql.");
-    expect(dsql).toContain(".on.aws");
-    expect(dsql).toContain("aws_dsql_cluster.main.identifier");
-    expect(generateAwsOutputs("rds")).toContain("aws_db_instance.main.endpoint");
+  it("reports the RDS endpoint as db_endpoint", () => {
+    expect(generateAwsOutputs()).toContain("aws_db_instance.main.endpoint");
+  });
+
+  it("no longer offers DSQL anywhere (no database preset or IAM-token flow exists for it)", () => {
+    const all = Object.values(generateAwsTerraformFiles(options)).join("\n");
+    expect(all.toLowerCase()).not.toContain("dsql");
   });
 
   it("references no non-AWS provider", () => {
@@ -269,5 +298,164 @@ describe("AWS Terraform README", () => {
     expect(readme).toContain("IAM");
     expect(readme).toContain("CI test profile");
     expect(readme).toContain("shelf-ci-");
+  });
+});
+
+/** The `sh -c` script the container runs, as the container sees it (HCL escapes undone). */
+function containerScript(): string {
+  const match = /app_command = \[\s*"sh",\s*"-c",\s*"(?<script>(?:[^"\\]|\\.)*)",\s*\]/u.exec(
+    generateAwsCompute(),
+  );
+  return (match?.groups?.["script"] ?? "").replaceAll('\\"', '"');
+}
+
+describe("AWS stack applies and boots: database credentials, environment, secrets", () => {
+  it("builds a valid, percent-encoded DATABASE_URL from the RDS credentials", () => {
+    const script = containerScript();
+    expect(script.endsWith("exec node src/index.ts")).toBe(true);
+    // Run it for real, but print the URL instead of starting the server.
+    const probe = script.replace("exec node src/index.ts", 'printf %s "$DATABASE_URL"');
+    const password = "p@ss:w/rd#?%&=+ \"'$x`y";
+    const result = spawnSync("sh", ["-c", probe], {
+      encoding: "utf8",
+      env: {
+        PATH: `${dirname(process.execPath)}:${process.env["PATH"] ?? ""}`,
+        DB_USERNAME: "shelf",
+        DB_PASSWORD: password,
+        DB_HOST: "db.example.internal",
+      },
+    });
+    expect(result.status).toBe(0);
+    const url = new URL(result.stdout);
+    expect(url.username).toBe("shelf");
+    expect(decodeURIComponent(url.password)).toBe(password);
+    expect(url.hostname).toBe("db.example.internal");
+    expect(url.port).toBe("5432");
+    expect(url.pathname).toBe("/shelf");
+    expect(url.search).toBe("?sslmode=require");
+  });
+
+  it("gives the task the database parts, the public URL and the app secrets", () => {
+    const compute = generateAwsCompute();
+    expect(compute).toContain("command      = local.app_command");
+    expect(compute).toContain('{ name = "PUBLIC_BASE_URL", value = local.public_base_url }');
+    expect(compute).toContain('{ name = "DB_HOST", value = aws_db_instance.main.address }');
+    expect(compute).toContain(
+      '{ name = "DB_USERNAME", valueFrom = "${local.db_secret_arn}:username::" }',
+    );
+    expect(compute).toContain(
+      '{ name = "DB_PASSWORD", valueFrom = "${local.db_secret_arn}:password::" }',
+    );
+    for (const name of ["SECRET", "ADMIN_TOKEN"]) {
+      expect(compute).toMatch(
+        new RegExp(
+          `\\{ name = "${name}", valueFrom = aws_secretsmanager_secret\\.\\w+\\.arn \\}`,
+          "u",
+        ),
+      );
+    }
+    expect(compute).toContain(
+      "db_secret_arn   = aws_db_instance.main.master_user_secret[0].secret_arn",
+    );
+  });
+
+  it("derives PUBLIC_BASE_URL from the domain, else from the ALB DNS name", () => {
+    expect(generateAwsCompute()).toContain(
+      'public_base_url = var.domain_name == "" ? "http://${aws_lb.main.dns_name}" : "https://${var.domain_name}"',
+    );
+  });
+
+  it("sets COGNITO_DOMAIN only if the identity file creates a user pool domain", () => {
+    const createsDomain = generateAwsIdentity().includes("aws_cognito_user_pool_domain");
+    expect(generateAwsCompute().includes("COGNITO_DOMAIN")).toBe(createsDomain);
+  });
+
+  it("generates SECRET and ADMIN_TOKEN, and leaves a never-overwritten OIDC placeholder", () => {
+    const secrets = generateAwsSecrets();
+    for (const name of ["shelf_secret", "admin_token"]) {
+      expect(secrets).toContain(`resource "random_password" "${name}"`);
+      expect(secrets).toContain(`resource "aws_secretsmanager_secret_version" "${name}"`);
+      expect(secrets).toContain(`secret_string = random_password.${name}.result`);
+    }
+    // OIDC_CLIENT_SECRET is the operator's: a placeholder, and Terraform never reverts the real value.
+    expect(secrets).not.toContain('resource "random_password" "oidc_client_secret"');
+    const oidc = secrets.slice(
+      secrets.indexOf('resource "aws_secretsmanager_secret_version" "oidc_client_secret"'),
+    );
+    expect(oidc).toContain('secret_string = "change-me"');
+    expect(oidc).toContain("ignore_changes = [secret_string]");
+  });
+
+  it("starts the service only after the secrets have values and a listener has the target group", () => {
+    const compute = generateAwsCompute();
+    const service = compute.slice(compute.indexOf('resource "aws_ecs_service" "app"'));
+    const dependsOn = /depends_on = \[(?<list>[^\]]*)\]/u.exec(service)?.groups?.["list"] ?? "";
+    for (const dependency of [
+      "aws_lb_listener.http",
+      "aws_lb_listener.https",
+      "aws_secretsmanager_secret_version.shelf_secret",
+      "aws_secretsmanager_secret_version.oidc_client_secret",
+      "aws_secretsmanager_secret_version.admin_token",
+    ]) {
+      expect(dependsOn).toContain(dependency);
+    }
+  });
+});
+
+describe("AWS stack TLS when domain_name is set", () => {
+  it("validates the ACM certificate with DNS records in the zone", () => {
+    const dns = generateAwsDns();
+    expect(dns).toContain('resource "aws_route53_record" "cert_validation"');
+    expect(dns).toContain("aws_acm_certificate.main[0].domain_validation_options");
+    expect(dns).toContain("zone_id         = aws_route53_zone.main[0].zone_id");
+    expect(dns).toContain('resource "aws_acm_certificate_validation" "main"');
+    expect(dns).toContain("validation_record_fqdns");
+    expect(dns).toContain('count                   = var.domain_name == "" ? 0 : 1');
+  });
+
+  it("serves HTTPS with the validated certificate and creates no HTTPS listener without a domain", () => {
+    const compute = generateAwsCompute();
+    const https = compute.slice(compute.indexOf('resource "aws_lb_listener" "https"'));
+    expect(https).toContain('count             = var.domain_name == "" ? 0 : 1');
+    expect(https).toContain(
+      "certificate_arn   = aws_acm_certificate_validation.main[0].certificate_arn",
+    );
+    // Never the raw (possibly still pending) certificate.
+    expect(compute).not.toContain("certificate_arn   = aws_acm_certificate.main[0].arn");
+  });
+
+  it("redirects port 80 to HTTPS with a 301 when a domain is set, and forwards otherwise", () => {
+    const compute = generateAwsCompute();
+    const start = compute.indexOf('resource "aws_lb_listener" "http"');
+    const http = compute.slice(start, compute.indexOf('resource "aws_lb_listener" "https"'));
+    // Two default_action blocks, each gated on the domain: forward without one, redirect with one.
+    const [, forward = "", redirect = ""] = http.split('dynamic "default_action"');
+    expect(forward).toContain('for_each = var.domain_name == "" ? [1] : []');
+    expect(forward).toContain('type             = "forward"');
+    expect(redirect).toContain('for_each = var.domain_name == "" ? [] : [1]');
+    expect(redirect).toContain('type = "redirect"');
+    expect(redirect).toContain('status_code = "HTTP_301"');
+    expect(redirect).toContain('protocol    = "HTTPS"');
+    expect(redirect).toContain('port        = "443"');
+    expect(redirect).not.toContain("target_group_arn");
+  });
+});
+
+describe("AWS README operator steps", () => {
+  const readme = generateAwsReadme("acme-shelf");
+
+  it("explains how to delegate the domain to the new Route 53 zone", () => {
+    expect(readme).toContain("terraform apply -target='aws_route53_zone.main'");
+    expect(readme).toContain("terraform state show 'aws_route53_zone.main[0]'");
+    expect(readme).toContain("name_servers");
+    expect(readme).toContain("NS records");
+  });
+
+  it("explains how to set OIDC_CLIENT_SECRET and where the generated secrets live", () => {
+    expect(readme).toContain("aws secretsmanager put-secret-value");
+    expect(readme).toContain("<project>/OIDC_CLIENT_SECRET");
+    expect(readme).toContain("--force-new-deployment");
+    expect(readme).toContain("Terraform state");
+    expect(readme.toLowerCase()).not.toContain("dsql");
   });
 });

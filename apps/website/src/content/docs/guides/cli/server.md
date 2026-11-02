@@ -37,7 +37,7 @@ Notifications and OpenTelemetry wiring are opt-in: the generated server only imp
 
 - `local` — bare Node
 - `docker` — compose file + `docker:*` npm scripts
-- `aws` — ECS Fargate app, S3, Postgres (RDS/Aurora DSQL), Cognito — see [AWS deployment](/guides/deployment/aws/)
+- `aws` — ECS Fargate app, S3, Postgres (RDS), Cognito — see [AWS deployment](/guides/deployment/aws/)
 - `azure` — Container Apps + Blob + Postgres + Entra — see [Azure](/guides/deployment/azure/)
 - `gcp` — Cloud Run + GCS + Postgres + Identity Platform — see [GCP](/guides/deployment/gcp/)
 

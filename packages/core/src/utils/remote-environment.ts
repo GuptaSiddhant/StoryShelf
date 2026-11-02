@@ -107,6 +107,91 @@ export function inPageProbe(families: string[]): BrowserProbe {
   return probe;
 }
 
+/** How a {@link boundedProbe} ended. */
+export type ProbeOutcome<T> =
+  | { status: "done"; value: T }
+  /** Still running after `timeoutMs`: the environment is unknown, the run goes on. */
+  | { status: "timeout" }
+  /** The run was cancelled: the run stops, it is never read as "unknown environment". */
+  | { status: "cancelled" }
+  /** The probe threw (a service outage, a page that would not open): unknown, with a warning. */
+  | { status: "failed"; error: unknown };
+
+/** What a probe's work can ask about its own fate. */
+export interface ProbeControl {
+  /**
+   * True once the probe timed out or was cancelled. Work that opens a page must check it after
+   * every await and release what it opened, because nothing waits for it any more.
+   */
+  stopped: () => boolean;
+}
+
+/**
+ * Run probe work under a time limit and a cancel signal (ADR 0007, decision 2). A probe that hangs
+ * on an unresponsive service must not hold a render, and a cancel must interrupt it instead of
+ * waiting for the service. The work is never awaited past the limit and never leaves an unhandled
+ * rejection; releasing the page it opened is the caller's job (`ProbeControl.stopped`, or closing
+ * what it holds once this returns). A failure after the signal fired reads as cancelled, since
+ * closing the browser is how a cancel interrupts it.
+ */
+export async function boundedProbe<T>(options: {
+  run: (control: ProbeControl) => Promise<T>;
+  timeoutMs: number;
+  signal?: AbortSignal | undefined;
+}): Promise<ProbeOutcome<T>> {
+  const { signal, timeoutMs } = options;
+  if (signal?.aborted) {
+    return { status: "cancelled" };
+  }
+  const halt = { halted: false };
+  const work = options.run({ stopped: () => halt.halted }).then(
+    (value): ProbeOutcome<T> => ({ status: "done", value }),
+    (error: unknown): ProbeOutcome<T> => ({ status: "failed", error }),
+  );
+  return await settle(work, limitOf<T>(timeoutMs, signal), signal, halt);
+}
+
+/** Wait for the work or the limit, mark the work stopped if it lost, and drop the timer and listener. */
+async function settle<T>(
+  work: Promise<ProbeOutcome<T>>,
+  limit: { reached: Promise<ProbeOutcome<T>>; clear: () => void },
+  signal: AbortSignal | undefined,
+  halt: { halted: boolean },
+): Promise<ProbeOutcome<T>> {
+  try {
+    const outcome = await Promise.race([work, limit.reached]);
+    halt.halted = outcome.status === "timeout" || outcome.status === "cancelled";
+    return outcome.status === "failed" && signal?.aborted ? { status: "cancelled" } : outcome;
+  } finally {
+    limit.clear();
+  }
+}
+
+/** A promise that settles on the timeout or the abort, and a way to drop both. */
+function limitOf<T>(
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): { reached: Promise<ProbeOutcome<T>>; clear: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const reached = new Promise<ProbeOutcome<T>>((resolve) => {
+    timer = setTimeout(() => {
+      resolve({ status: "timeout" });
+    }, timeoutMs);
+    onAbort = (): void => {
+      resolve({ status: "cancelled" });
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+  return {
+    reached,
+    clear: (): void => {
+      clearTimeout(timer);
+      if (onAbort) signal?.removeEventListener("abort", onAbort);
+    },
+  };
+}
+
 /**
  * The environment of a remote render: the driver's browser version and what the page reported. A
  * field the page could not give is left out, except the OS, which falls back to what the service

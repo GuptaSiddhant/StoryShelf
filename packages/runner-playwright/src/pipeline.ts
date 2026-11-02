@@ -66,8 +66,15 @@ export async function renderAll(
   const server = await serve(input, browser);
   input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
   const measured = remote
-    ? await measureRemote(browser, remote.remote, input.logger).catch(async (error: unknown) => {
-        await Promise.all([safeCloseBrowser(browser, "failed", error), safeCloseServer(server)]);
+    ? await measureRemote(browser, remote.remote, {
+        logger: input.logger,
+        signal: active.abort?.signal,
+      }).catch(async (error: unknown) => {
+        // A cancel that interrupted the probe releases the lease as cancelled, not failed.
+        await Promise.all([
+          safeCloseBrowser(browser, outcomeOf(active, true), error),
+          safeCloseServer(server),
+        ]);
         throw error;
       })
     : undefined;

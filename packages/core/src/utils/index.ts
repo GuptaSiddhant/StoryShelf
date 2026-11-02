@@ -45,9 +45,12 @@ export {
 } from "./connect-retry.ts";
 export {
   FONT_PROBE_FAMILIES,
+  boundedProbe,
   inPageProbe,
   remoteEnvironment,
   type BrowserProbe,
+  type ProbeControl,
+  type ProbeOutcome,
 } from "./remote-environment.ts";
 export { storybookBase } from "./storybook-url.ts";
 export {

@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { FONT_PROBE_FAMILIES, inPageProbe, remoteEnvironment } from "./remote-environment.ts";
+import { describe, expect, it, vi } from "vitest";
+import {
+  FONT_PROBE_FAMILIES,
+  boundedProbe,
+  inPageProbe,
+  remoteEnvironment,
+} from "./remote-environment.ts";
 
 const hash = (fonts: string[]) => remoteEnvironment({ probe: { fonts } }).fontsHash;
 
@@ -97,5 +102,131 @@ describe("inPageProbe", () => {
 
   it("probes a fixed, duplicate-free list", () => {
     expect(new Set(FONT_PROBE_FAMILIES).size).toBe(FONT_PROBE_FAMILIES.length);
+  });
+});
+
+/** A promise settled from the outside, so a test decides the order of events. */
+function gate<T = void>(): {
+  promise: Promise<T>;
+  open: (value: T) => void;
+  fail: (e: Error) => void;
+} {
+  let open!: (value: T) => void;
+  let fail!: (e: Error) => void;
+  const promise = new Promise<T>((resolve, reject) => {
+    open = resolve;
+    fail = reject;
+  });
+  return { promise, open, fail };
+}
+
+describe("boundedProbe", () => {
+  it("returns what the work returned", async () => {
+    const outcome = await boundedProbe({
+      run: async () => await Promise.resolve(42),
+      timeoutMs: 1000,
+    });
+    expect(outcome).toEqual({ status: "done", value: 42 });
+  });
+
+  it("reports an ordinary failure as failed, with the error", async () => {
+    const error = new Error("service said no");
+    const outcome = await boundedProbe({
+      run: async () => await Promise.reject(error),
+      timeoutMs: 1000,
+    });
+    expect(outcome).toEqual({ status: "failed", error });
+  });
+
+  it("stops waiting at the limit and tells the work it is stopped", async () => {
+    const never = gate<number>();
+    let control: { stopped: () => boolean } | undefined;
+    const outcome = await boundedProbe({
+      run: async (c) => {
+        control = c;
+        return await never.promise;
+      },
+      timeoutMs: 20,
+    });
+    expect(outcome).toEqual({ status: "timeout" });
+    expect(control?.stopped()).toBe(true);
+    never.open(1);
+  });
+
+  it("lets work that finishes after the limit release what it opened", async () => {
+    const opened = gate();
+    const closed = vi.fn();
+    const outcome = await boundedProbe({
+      run: async ({ stopped }) => {
+        await opened.promise;
+        if (stopped()) {
+          closed();
+        }
+      },
+      timeoutMs: 20,
+    });
+    expect(outcome.status).toBe("timeout");
+    expect(closed).not.toHaveBeenCalled();
+    opened.open();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it("never leaves an unhandled rejection when the work fails after the limit", async () => {
+    const late = gate();
+    const outcome = await boundedProbe({
+      run: async () => await late.promise,
+      timeoutMs: 20,
+    });
+    expect(outcome.status).toBe("timeout");
+    late.fail(new Error("too late to matter"));
+    await new Promise((resolve) => setImmediate(resolve));
+  });
+
+  it("is cancelled at once by the signal, without waiting for the limit or the work", async () => {
+    const controller = new AbortController();
+    const never = gate();
+    const pending = boundedProbe({
+      run: async () => await never.promise,
+      timeoutMs: 60_000,
+      signal: controller.signal,
+    });
+    controller.abort();
+    expect(await pending).toEqual({ status: "cancelled" });
+    never.open();
+  });
+
+  it("does not start the work for a signal that has already fired", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const run = vi.fn(async () => await Promise.resolve(1));
+    expect(await boundedProbe({ run, timeoutMs: 1000, signal: controller.signal })).toEqual({
+      status: "cancelled",
+    });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("reads a failure after the signal fired as cancelled, not as an unknown environment", async () => {
+    const controller = new AbortController();
+    const outcome = await boundedProbe({
+      run: async () => {
+        controller.abort();
+        return await Promise.reject(new Error("Target closed"));
+      },
+      timeoutMs: 1000,
+      signal: controller.signal,
+    });
+    expect(outcome).toEqual({ status: "cancelled" });
+  });
+
+  it("does not mistake a signal that never fires for a cancel", async () => {
+    const controller = new AbortController();
+    const outcome = await boundedProbe({
+      run: async () => await Promise.resolve("ok"),
+      timeoutMs: 1000,
+      signal: controller.signal,
+    });
+    expect(outcome).toEqual({ status: "done", value: "ok" });
   });
 });

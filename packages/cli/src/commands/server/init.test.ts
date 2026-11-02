@@ -201,7 +201,6 @@ describe("runServerInit", () => {
       })
       .mockResolvedValueOnce({
         awsRegion: "eu-west-1",
-        dbEngine: "dsql",
         domainName: "",
         samlMetadataUrl: "",
       });
@@ -223,7 +222,8 @@ describe("runServerInit", () => {
     expect(existsSync(join(dir, "Dockerfile.worker"))).toBe(false);
     expect(existsSync(join(dir, "terraform", "database.tf"))).toBe(true);
     const databaseTf = readFileSync(join(dir, "terraform", "database.tf"), "utf8");
-    expect(databaseTf).toContain("aws_dsql_cluster");
+    expect(databaseTf).toContain("aws_db_instance");
+    expect(databaseTf).not.toContain("dsql");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
       scripts: Record<string, string>;
