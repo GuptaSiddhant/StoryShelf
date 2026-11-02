@@ -179,6 +179,21 @@ describe("runMigrations: users auth columns", () => {
     ).rejects.toThrow("ALTER command denied");
   });
 
+  it("tolerates a concurrent boot that already added the column", async () => {
+    const { run: base } = recordingRunner();
+    await expect(
+      runMigrations(async (sql) => {
+        if (sql.startsWith("ALTER TABLE users ADD COLUMN disabled")) {
+          throw Object.assign(new Error("Duplicate column name 'disabled'"), {
+            code: "ER_DUP_FIELDNAME",
+            errno: 1060,
+          });
+        }
+        return await base(sql);
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it("keeps the new-install DDL and the upgrade ALTER definitions identical", async () => {
     const { queries, run } = recordingRunner();
     await runMigrations(run);
