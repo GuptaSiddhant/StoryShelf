@@ -9,7 +9,7 @@ import {
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
 import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { verifyLocalTargets } from "./availability.ts";
-import { activeRuns, closeBrowser } from "./browser.ts";
+import { activeRuns } from "./browser.ts";
 import { connectRemote } from "./connect.ts";
 import { launchLocal } from "./launch.ts";
 import { renderAll } from "./pipeline.ts";
@@ -60,10 +60,13 @@ export function createPuppeteerCaptureRunner(
       const remote = remotes.find((entry) => entry.target === target);
       return remote
         ? await connectRemote(remote, context, logger)
-        : await launchLocal(
-            locals.find((entry) => entry.target === target) as LocalTarget,
-            options.args,
-          );
+        : {
+            browser: await launchLocal(
+              locals.find((entry) => entry.target === target) as LocalTarget,
+              options.args,
+            ),
+            ownership: "launched",
+          };
     }),
     remote: (target) => remotes.find((entry) => entry.target === target),
   };
@@ -91,7 +94,7 @@ export function createPuppeteerCaptureRunner(
       offers.lifecycle(async () => await Promise.resolve(verifyTargets(declared, locals))),
     ),
     async render(input: PuppeteerRenderInput) {
-      const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
+      const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await renderAll(
@@ -105,7 +108,7 @@ export function createPuppeteerCaptureRunner(
       }
     },
     async runTests(input: PuppeteerTestsInput) {
-      const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
+      const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
       const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await runTestEntries(
@@ -123,7 +126,7 @@ export function createPuppeteerCaptureRunner(
         activeRuns.matching(buildId, runId).map(async (active) => {
           active.cancelled = true;
           active.abort?.abort();
-          await closeBrowser(active.browser);
+          await active.session?.release("cancelled");
         }),
       );
     },
