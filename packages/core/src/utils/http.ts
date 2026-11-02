@@ -172,7 +172,7 @@ async function requestWithRetry<T>(
         try {
           return await perform(url, options, timeoutMs);
         } catch (error) {
-          span.recordException(error instanceof Error ? error : String(error));
+          span.recordException(redactedException(error));
           if (options.signal?.aborted || !shouldRetry(error, attempt, maxAttempts)) {
             throw error;
           }
@@ -204,6 +204,23 @@ export function redactUrlForLog(url: string): string {
   const origin = `${parsed.protocol}//${parsed.host}`;
   const path = first !== undefined && rest.length > 0 ? `/${first}/…` : "";
   return redactSecrets(`${origin}${path}`);
+}
+
+/**
+ * A copy of a failure that is safe to record on a span. Native `fetch` rejects a URL with userinfo
+ * with a message and stack that repeat it (`https://user:pass@host/`), so both are redacted. The
+ * original error is what gets rethrown; only the recorded copy changes.
+ */
+function redactedException(error: unknown): Error | string {
+  if (!(error instanceof Error)) {
+    return redactSecrets(String(error));
+  }
+  const copy = new Error(redactSecrets(error.message));
+  copy.name = error.name;
+  if (error.stack) {
+    copy.stack = redactSecrets(error.stack);
+  }
+  return copy;
 }
 
 async function backoff(

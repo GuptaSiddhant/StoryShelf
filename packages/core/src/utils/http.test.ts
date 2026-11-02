@@ -3,6 +3,8 @@ import type { Logger } from "../logger.ts";
 import { HttpError, httpBytes, httpJson, httpText, redactUrlForLog } from "./http.ts";
 
 const spanAttributes = vi.hoisted(() => [] as Record<string, unknown>[]);
+/** Every `recordException` call on an `http.client` span, as message + stack text, in order. */
+const recordedExceptions = vi.hoisted(() => [] as string[]);
 
 vi.mock("../tracing.ts", async (importOriginal) => {
   const original = await importOriginal<typeof import("../tracing.ts")>();
@@ -10,7 +12,19 @@ vi.mock("../tracing.ts", async (importOriginal) => {
     ...original,
     withSpan: ((name, fn, attributes, parent) => {
       spanAttributes.push({ ...attributes });
-      return original.withSpan(name, fn, attributes, parent);
+      return original.withSpan(
+        name,
+        async (span) => {
+          vi.spyOn(span, "recordException").mockImplementation((exception) => {
+            const { message = "", stack = "" } =
+              typeof exception === "string" ? { message: exception } : exception;
+            recordedExceptions.push(`${message}\n${stack}`);
+          });
+          return await fn(span);
+        },
+        attributes,
+        parent,
+      );
     }) as typeof original.withSpan,
   };
 });
@@ -22,6 +36,7 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
 afterEach(() => {
   vi.unstubAllGlobals();
   spanAttributes.length = 0;
+  recordedExceptions.length = 0;
 });
 
 /** A logger that records every call as one JSON line, so a test can search all of it. */
@@ -82,6 +97,29 @@ describe("secret-bearing URLs in logs and spans", () => {
       expect(everything).not.toContain(secret);
     }
     expect(spanAttributes[0]?.["url.full"]).toBe(row.expected);
+  });
+
+  it("redacts userinfo from the exception it records, and still rethrows the original", async () => {
+    const url = "https://user:pass@example.com/a/b";
+    const failure = new TypeError(
+      `Request cannot be constructed from a URL that includes credentials: ${url}`,
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        await Promise.resolve();
+        throw failure;
+      }),
+    );
+    const caught = await httpText(url, { retries: 1 }).catch((error: unknown) => error);
+    expect(caught).toBe(failure);
+    expect(caught).toHaveProperty("message", expect.stringContaining("user:pass"));
+    // The first record is this module's; any later one comes from `withSpan` in tracing.ts.
+    expect(recordedExceptions[0]).toBeDefined();
+    // Not the bare words: the stack's file paths may contain "user" (e.g. `/home/user/`).
+    expect(recordedExceptions[0]).not.toContain("user:pass");
+    expect(recordedExceptions[0]).not.toContain("pass@");
+    expect(recordedExceptions[0]).toContain("[redacted]");
   });
 
   it("still requests the real URL", async () => {
