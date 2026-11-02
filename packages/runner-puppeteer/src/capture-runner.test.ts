@@ -25,6 +25,7 @@ const puppeteer = vi.hoisted(() => {
   let extractResult: unknown;
   const launchOptions: unknown[] = [];
   let launchFailure: Error | null = null;
+  let launchGate: Promise<unknown> | null = null;
   let gate: Promise<null> | null = null;
   let held = 0;
   const makePage = () => ({
@@ -117,6 +118,9 @@ const puppeteer = vi.hoisted(() => {
     browser,
     launch: async (options?: unknown): Promise<typeof browser> => {
       launchOptions.push(options);
+      if (launchGate !== null) {
+        await launchGate;
+      }
       if (launchFailure !== null) {
         throw launchFailure;
       }
@@ -132,6 +136,17 @@ const puppeteer = vi.hoisted(() => {
     launchOptions,
     failLaunches: (error: Error | null): void => {
       launchFailure = error;
+    },
+    holdLaunches: (): (() => void) => {
+      const { promise, resolve } = Promise.withResolvers<unknown>();
+      launchGate = promise;
+      return () => {
+        launchGate = null;
+        resolve(null);
+      };
+    },
+    resetLaunchGate: (): void => {
+      launchGate = null;
     },
     stats,
     hangingPages: (): number => pendingGotos.length,
@@ -206,6 +221,21 @@ describe("createPuppeteerCaptureRunner.render", () => {
     expect(result.failures[0]?.storyId).toBe("components-button--primary");
     const browser = puppeteer.lastBrowser();
     expect(browser?.closed).toBe(true);
+  }, 30_000);
+
+  it("releases a session cancelled while its launch is still pending", async () => {
+    puppeteer.configureHang(false);
+    const openLaunch = puppeteer.holdLaunches();
+    const runner = createPuppeteerCaptureRunner();
+    const renderPromise = runner.render({
+      buildId: "build-hold",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+    });
+    await runner.cancel("build-hold");
+    openLaunch();
+    await expect(renderPromise).rejects.toThrow("Capture cancelled");
   }, 30_000);
 
   it("caps concurrently open pages at the configured concurrency", async () => {
@@ -597,6 +627,7 @@ describe("createPuppeteerCaptureRunner targets (ADR 0007)", () => {
       );
     } finally {
       puppeteer.failLaunches(null);
+  puppeteer.resetLaunchGate();
     }
     expect(runner.metadata.targets?.[0]?.status).toEqual({
       unavailable: "Failed to launch the browser process!",
