@@ -92,6 +92,7 @@ function resolveRuntime(db: DatabaseAdapter, options: DatabaseCaptureQueueOption
     maxAttempts: retries + 1,
     owner: options.owner ?? `${hostname()}:${String(process.pid)}:${ulid().slice(-6)}`,
     now: options.now ?? Date.now,
+    timers: options.timers,
     wake: createWakeSignal(options.timers),
     pollVersion: 0,
   };

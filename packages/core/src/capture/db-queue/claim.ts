@@ -161,14 +161,39 @@ async function exhaust(
   await reportExhausted(rt, job);
 }
 
+/** Sleep for `ms`, using injected timers when available. */
+async function sleep(rt: QueueRuntime, ms: number): Promise<void> {
+  if (rt.timers === undefined) {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, ms);
+    });
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    rt.timers?.setTimeout(resolve, ms);
+  });
+}
+
 /** Tell the host a job ended without any holder to record it; its failure never blocks the poll. */
 async function reportExhausted(rt: QueueRuntime, job: CaptureJobRow): Promise<void> {
   if (rt.onExhausted === undefined) {
     return;
   }
-  try {
-    await rt.onExhausted(toDatabaseJob(job, job.attempt, rt.leaseMs), LEASE_EXHAUSTED_ERROR);
-  } catch (error) {
-    rt.logger?.error({ err: error, jobId: job.jobId }, "exhausted-job hook failed");
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential retries
+      await rt.onExhausted(toDatabaseJob(job, job.attempt, rt.leaseMs), LEASE_EXHAUSTED_ERROR);
+      return;
+    } catch (error) {
+      rt.logger?.error(
+        { err: error, jobId: job.jobId, attempt, attempts },
+        "exhausted-job hook failed",
+      );
+      if (attempt < attempts) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- sequential retries
+        await sleep(rt, 100 * attempt);
+      }
+    }
   }
 }
