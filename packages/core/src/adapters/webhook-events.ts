@@ -3,10 +3,8 @@ import { WebhookModel, type WebhookTables } from "../models/webhook.ts";
 import type { Webhook } from "../schema/webhook.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import { hmacSha256 } from "../utils/hash.ts";
+import { httpText } from "../utils/http.ts";
 import type { DatabaseAdapter } from "./database.ts";
-
-/** Per-delivery budget: single attempt, no retries (events already fan out). */
-const WEBHOOK_TIMEOUT_MS = 10_000;
 
 /**
  * Deliver an event to every subscribed webhook of a project.
@@ -64,7 +62,8 @@ async function deliverToWebhook(
     return;
   }
   try {
-    await sendWebhook(webhook.url, plaintext, eventPayload);
+    // A non-2xx answer throws HttpError, so only a delivery the subscriber accepted is "delivered".
+    await sendWebhook(webhook.url, plaintext, eventPayload, logger);
     logger?.info({ webhookId: webhook.id, host: hostOf(webhook.url) }, "webhook delivered");
   } catch (error) {
     // Webhook delivery failures are non-fatal
@@ -92,17 +91,23 @@ function hostOf(url: string): string {
   }
 }
 
-async function sendWebhook(url: string, secret: string, event: WebhookEvent): Promise<void> {
-  const body = JSON.stringify(event);
-  const signature = hmacSha256(secret, body);
-  await fetch(url, {
+/**
+ * POST one event through `httpText` (default timeout and retry policy). The signature covers the
+ * exact body string, and `json` serializes the event with the same `JSON.stringify`.
+ */
+async function sendWebhook(
+  url: string,
+  secret: string,
+  event: WebhookEvent,
+  logger: Logger | undefined,
+): Promise<void> {
+  await httpText(url, {
     method: "POST",
+    json: event,
     headers: {
-      "Content-Type": "application/json",
       "X-StoryShelf-Event": event.event,
-      "X-StoryShelf-Signature": signature,
+      "X-StoryShelf-Signature": hmacSha256(secret, JSON.stringify(event)),
     },
-    body,
-    signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+    ...(logger ? { logger } : {}),
   });
 }
