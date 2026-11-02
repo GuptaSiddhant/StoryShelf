@@ -160,6 +160,18 @@ describe("Azure Terraform README", () => {
     expect(readme).toContain("CI test profile");
     expect(readme).toContain("shelf-ci-");
   });
+
+  it("maps the dashed Key Vault entry names to the underscored env vars", () => {
+    const readme = generateAzureReadme("acme-shelf");
+    const row = readme.split("\n").find((line) => line.startsWith("| Key Vault entries"));
+    expect(row).toBeDefined();
+    // Vault entry names (dashes) in the first column, env var names (underscores) in the second.
+    const [, entries, envVars] = (row ?? "").split("|").map((cell) => cell.trim());
+    expect(entries).toContain("OIDC-CLIENT-SECRET");
+    expect(entries).toContain("ADMIN-TOKEN");
+    expect(envVars).toContain("OIDC_CLIENT_SECRET");
+    expect(envVars).toContain("ADMIN_TOKEN");
+  });
 });
 
 describe("Azure Terraform tfvars example", () => {

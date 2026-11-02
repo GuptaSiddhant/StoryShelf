@@ -121,15 +121,25 @@ describe("AWS Terraform modules", () => {
     expect(security).toContain("security_groups = [aws_security_group.alb.id]");
   });
 
-  it("grants least-privilege roles: execution reads the three secrets, task reads only the bucket", () => {
+  it("grants least-privilege roles: both read exactly the three secrets, task also the bucket", () => {
     const compute = generateAwsCompute();
-    for (const secret of ["shelf_secret", "oidc_client_secret", "admin_token"]) {
-      expect(compute).toContain(`aws_secretsmanager_secret.${secret}.arn`);
-    }
+    const secrets = ["shelf_secret", "oidc_client_secret", "admin_token"];
     expect(compute).toContain('resource "aws_iam_role" "execution"');
     expect(compute).toContain('resource "aws_iam_role" "task"');
-    expect(compute).toContain("aws_s3_bucket.storybook.arn");
+    // Each role's secrets policy lists exactly the three scaffold ARNs and nothing broader.
+    for (const policy of ["execution_secrets", "task_secrets"]) {
+      const block = compute.slice(compute.indexOf(`resource "aws_iam_role_policy" "${policy}"`));
+      const statement = block.slice(0, block.indexOf("\n}\n"));
+      expect(statement).toContain('Action = ["secretsmanager:GetSecretValue"]');
+      for (const secret of secrets) {
+        expect(statement).toContain(`aws_secretsmanager_secret.${secret}.arn`);
+      }
+    }
+    // The task role reaches the bucket (its own policy), not just the secrets.
+    const storage = compute.slice(compute.indexOf('resource "aws_iam_role_policy" "task_storage"'));
+    expect(storage.slice(0, storage.indexOf("\n}\n"))).toContain("aws_s3_bucket.storybook.arn");
     expect(compute).not.toContain('Resource = "*"');
+    expect(compute).not.toContain("secretsmanager:*");
   });
 
   it("runs the app as one ECS service behind the ALB, with no worker", () => {

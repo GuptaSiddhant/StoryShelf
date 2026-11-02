@@ -360,7 +360,7 @@ function generateAzureEnvTable(): string {
 | \`storage_connection_string\` | \`AZURE_STORAGE_CONNECTION\` | \`storage-azure\` (Blob container) |
 | \`database_url\` | \`DATABASE_URL\` | \`db-postgres\` |
 | \`entra_application_id\` / \`entra_tenant_id\` | \`OIDC_CLIENT_ID\` / \`OIDC_ISSUER\` (\`https://login.microsoftonline.com/{tenant}/v2.0\`) | \`auth\` (keycloak recipe) |
-| Key Vault | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
+| Key Vault entries \`SECRET\` / \`OIDC-CLIENT-SECRET\` / \`ADMIN-TOKEN\` | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
 `;
 }
 

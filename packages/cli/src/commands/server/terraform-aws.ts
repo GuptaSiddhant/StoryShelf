@@ -517,6 +517,24 @@ resource "aws_iam_role_policy" "task_storage" {
     }]
   })
 }
+
+resource "aws_iam_role_policy" "task_secrets" {
+  name = "read-app-secrets"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue"]
+      Resource = [
+        aws_secretsmanager_secret.shelf_secret.arn,
+        aws_secretsmanager_secret.oidc_client_secret.arn,
+        aws_secretsmanager_secret.admin_token.arn,
+      ]
+    }]
+  })
+}
 `;
 }
 
