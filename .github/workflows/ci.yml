@@ -24,7 +24,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Only PRs cancel superseded runs: every commit on main gets the full verify and saves the turbo cache.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Cheap first job: decides what the rest of the run needs. Anything it cannot work out
