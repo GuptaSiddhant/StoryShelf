@@ -97,6 +97,15 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'manual'",
   },
   { table: "comments", column: "story_id", definition: "TEXT" },
+  // Auth columns the SQLite `users` table always had (access control: `disabled`).
+  { table: "users", column: "password_hash", definition: "TEXT" },
+  { table: "users", column: "display_name_override", definition: "TEXT" },
+  {
+    table: "users",
+    column: "auth_provider",
+    definition: "VARCHAR(32) NOT NULL DEFAULT 'oidc'",
+  },
+  { table: "users", column: "disabled", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
 ];

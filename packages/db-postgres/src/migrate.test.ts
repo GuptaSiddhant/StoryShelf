@@ -159,3 +159,105 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
     await client.close();
   }, 60_000);
 });
+
+/** Put `users` back to its pre-fix shape (no auth columns) and keep one existing account in it. */
+async function downgradeUsers(client: PGlite): Promise<void> {
+  await client.exec(`
+    ALTER TABLE users DROP COLUMN password_hash;
+    ALTER TABLE users DROP COLUMN display_name_override;
+    ALTER TABLE users DROP COLUMN auth_provider;
+    ALTER TABLE users DROP COLUMN disabled;
+    INSERT INTO users (id, email, name, role, created_at)
+      VALUES ('u1', 'old@example.com', 'Old', 'admin', now());
+  `);
+}
+
+/** Column name, type, default and nullability of `users`, ordered by column name. */
+async function usersShape(client: PGlite): Promise<unknown[]> {
+  const result = await client.query(`
+    SELECT column_name, data_type, column_default, is_nullable FROM information_schema.columns
+    WHERE table_name = 'users' ORDER BY column_name
+  `);
+  return result.rows;
+}
+
+describe("runMigrations: users auth columns", () => {
+  const AUTH_COLUMNS = "password_hash, display_name_override, auth_provider, disabled";
+
+  it("creates the columns with their defaults on a fresh database", async () => {
+    const client = new PGlite();
+    await runMigrations(runnerFor(client));
+    await client.exec(
+      "INSERT INTO users (id, email, name, created_at) VALUES ('u', 'u@example.com', 'U', now())",
+    );
+    const rows = await client.query<Record<string, unknown>>(`SELECT ${AUTH_COLUMNS} FROM users`);
+    expect(rows.rows).toEqual([
+      {
+        password_hash: null,
+        display_name_override: null,
+        auth_provider: "oidc",
+        disabled: false,
+      },
+    ]);
+    await client.close();
+  }, 60_000);
+
+  it("adds the columns to an existing users table and leaves its rows unchanged", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await downgradeUsers(client);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const rows = await client.query<Record<string, unknown>>(
+      `SELECT id, email, name, role, ${AUTH_COLUMNS} FROM users`,
+    );
+    expect(rows.rows).toEqual([
+      {
+        id: "u1",
+        email: "old@example.com",
+        name: "Old",
+        role: "admin",
+        password_hash: null,
+        display_name_override: null,
+        auth_provider: "oidc",
+        disabled: false,
+      },
+    ]);
+    // The upgraded table can now store the flag (this is the update that used to fail).
+    await client.exec("UPDATE users SET disabled = true WHERE id = 'u1'");
+    const flag = await client.query<{ disabled: boolean }>("SELECT disabled FROM users");
+    expect(flag.rows).toEqual([{ disabled: true }]);
+    await client.close();
+  }, 60_000);
+
+  it("gives an upgraded users table the same columns as a fresh one", async () => {
+    const fresh = new PGlite();
+    await runMigrations(runnerFor(fresh));
+    const upgraded = new PGlite();
+    const run = runnerFor(upgraded);
+    await runMigrations(run);
+    await downgradeUsers(upgraded);
+    await runMigrations(run);
+
+    // Guards the two copies of each definition (new-install DDL and upgrade ALTER) against drift.
+    expect(await usersShape(upgraded)).toEqual(await usersShape(fresh));
+    await fresh.close();
+    await upgraded.close();
+  }, 60_000);
+
+  it("fails the boot instead of silently skipping when the columns cannot be added", async () => {
+    const client = new PGlite();
+    const inner = runnerFor(client);
+    const failing = async (sql: string): Promise<unknown[]> => {
+      if (sql.startsWith("ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled")) {
+        throw new Error("permission denied for table users");
+      }
+      return await inner(sql);
+    };
+    await expect(runMigrations(failing)).rejects.toThrow("permission denied for table users");
+    await client.close();
+  }, 60_000);
+});

@@ -138,6 +138,54 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
     },
   );
 
+  it.skipIf(process.env["MYSQL_SCHEMA_MUTATION_TEST"] !== "1")(
+    "adds the users auth columns to an existing table and keeps its rows",
+    async () => {
+      const userId = `upgrade-user-${randomUUID()}`;
+      await liveDb().insert(schema.users, {
+        id: userId,
+        email: `${userId}@example.com`,
+        name: "Upgrade",
+        role: "admin",
+        createdAt: new Date().toISOString(),
+      });
+      await liveDb().all(
+        sql.raw(
+          `ALTER TABLE users
+            DROP COLUMN password_hash,
+            DROP COLUMN display_name_override,
+            DROP COLUMN auth_provider,
+            DROP COLUMN disabled`,
+        ),
+      );
+
+      await liveDb().lifecycle?.setup({ config: {}, logger: silentLogger });
+
+      type AuthUser = {
+        email: string;
+        role: string;
+        passwordHash: string | null;
+        displayNameOverride: string | null;
+        authProvider: string;
+        disabled: boolean;
+      };
+      const upgraded = (await liveDb().get(schema.users, userId)) as AuthUser | null;
+      expect(upgraded).toMatchObject({
+        email: `${userId}@example.com`,
+        role: "admin",
+        passwordHash: null,
+        displayNameOverride: null,
+        authProvider: "oidc",
+        disabled: false,
+      });
+      // The flag can now be stored (disabling a user used to fail on this table).
+      await liveDb().update(schema.users, userId, { disabled: true });
+      const disabled = (await liveDb().get(schema.users, userId)) as AuthUser | null;
+      expect(disabled?.disabled).toBe(true);
+      await liveDb().remove(schema.users, userId);
+    },
+  );
+
   it("migrates and round-trips a project", async () => {
     const now = new Date().toISOString();
     await liveDb().insert(schema.projects, {

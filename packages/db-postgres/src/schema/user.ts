@@ -1,5 +1,5 @@
 import type { SiteRole } from "@storyshelf/core/types";
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 /** Narrow `users` table definition. */
 export const users = pgTable("users", {
@@ -10,6 +10,13 @@ export const users = pgTable("users", {
   role: text("role").$type<SiteRole>().notNull().default("member"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "string" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
+  passwordHash: text("password_hash"),
+  displayNameOverride: text("display_name_override"),
+  authProvider: text("auth_provider")
+    .$type<"local" | "oidc" | "shared">()
+    .notNull()
+    .default("oidc"),
+  disabled: boolean("disabled").notNull().default(false),
 });
 
 /** A user row. */
@@ -21,4 +28,8 @@ export interface User {
   role: SiteRole;
   lastLoginAt: string | null;
   createdAt: string;
+  passwordHash: string | null;
+  displayNameOverride: string | null;
+  authProvider: "local" | "oidc" | "shared";
+  disabled: boolean;
 }
