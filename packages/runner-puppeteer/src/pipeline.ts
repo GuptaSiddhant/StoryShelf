@@ -66,11 +66,7 @@ export async function renderAll(
   // Launch first: a target that will not start must fail before a static server is bound.
   const session = await relaunch();
   active.session = session;
-  if (active.cancelled) {
-    await session.release("cancelled");
-    if (active.session === session) active.session = null;
-    throw new Error("Capture cancelled");
-  }
+  await abortIfCancelled(active, session);
   let server: Serving | undefined;
   let ctx: CaptureContext | undefined;
   return await finishing(
@@ -92,6 +88,14 @@ export async function renderAll(
       await Promise.all([current.release(outcomeOf(active, failed), error), closeServer(server)]);
     },
   );
+}
+
+/** Release and throw when the run was cancelled while acquiring the browser. */
+async function abortIfCancelled(active: ActiveRun, session: BrowserSession): Promise<void> {
+  if (!active.cancelled) return;
+  await session.release("cancelled");
+  if (active.session === session) active.session = null;
+  throw new Error("Capture cancelled");
 }
 
 async function closeServer(server: Serving | undefined): Promise<void> {

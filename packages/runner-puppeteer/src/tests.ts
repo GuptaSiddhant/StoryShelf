@@ -36,11 +36,7 @@ export async function runTestEntries(
     await driver.launch(name, input.logger, launchContextOf(input, "tests", active.abort?.signal)),
   );
   active.session = session;
-  if (active.cancelled) {
-    await session.release("cancelled");
-    if (active.session === session) active.session = null;
-    throw new Error("Capture cancelled");
-  }
+  await abortIfCancelled(active, session);
   let server: { url: string; close(): Promise<void> } | undefined;
   return await finishing(
     async () => {
@@ -52,6 +48,14 @@ export async function runTestEntries(
       await Promise.all([session.release(outcomeOf(active, failed), error), closeServer(server)]);
     },
   );
+}
+
+/** Release and throw when the run was cancelled while acquiring the browser. */
+async function abortIfCancelled(active: ActiveRun, session: BrowserSession): Promise<void> {
+  if (!active.cancelled) return;
+  await session.release("cancelled");
+  if (active.session === session) active.session = null;
+  throw new Error("Capture cancelled");
 }
 
 async function closeServer(server: { close(): Promise<void> } | undefined): Promise<void> {
