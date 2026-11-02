@@ -36,6 +36,11 @@ export async function runTestEntries(
     await driver.launch(name, input.logger, launchContextOf(input, "tests", active.abort?.signal)),
   );
   active.session = session;
+  if (active.cancelled) {
+    await session.release("cancelled");
+    if (active.session === session) active.session = null;
+    throw new Error("Capture cancelled");
+  }
   let server: { url: string; close(): Promise<void> } | undefined;
   return await finishing(
     async () => {

@@ -66,6 +66,11 @@ export async function renderAll(
   // Launch first: a target that will not start must fail before a static server is bound.
   const session = await relaunch();
   active.session = session;
+  if (active.cancelled) {
+    await session.release("cancelled");
+    if (active.session === session) active.session = null;
+    throw new Error("Capture cancelled");
+  }
   let server: Serving | undefined;
   let ctx: CaptureContext | undefined;
   return await finishing(
