@@ -17,6 +17,8 @@ const fake = vi.hoisted(() => {
     failure: null as Error | null,
     probe: undefined as unknown,
     probeFails: false,
+    probeHang: false,
+    probeStarted: 0,
     active: 0,
     peak: 0,
     closed: 0,
@@ -51,6 +53,10 @@ const fake = vi.hoisted(() => {
     evaluate: async (fn: unknown): Promise<unknown> => {
       await Promise.resolve();
       if (typeof fn === "function" && fn.name === "inPageProbe") {
+        if (state.probeHang) {
+          state.probeStarted += 1;
+          await new Promise<never>(() => {});
+        }
         if (state.probeFails) throw new Error("page crashed");
         return state.probe;
       }
@@ -120,6 +126,8 @@ beforeEach(async () => {
     failure: null,
     probe: { platform: "Linux x86_64", deviceScaleFactor: 2, fonts: ["Arial", "Roboto"] },
     probeFails: false,
+    probeHang: false,
+    probeStarted: 0,
     active: 0,
     peak: 0,
     closed: 0,
@@ -513,6 +521,39 @@ describe("a remote target with a function connect and release", () => {
     await runner.cancel("b1", "s1");
     hold.open();
     await rendering.catch(() => {});
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+
+  it("stops waiting for a probe that hangs, warns, renders, and leaves the environment unknown", async () => {
+    fake.state.probeHang = true;
+    const warn = vi.fn();
+    const result = await createPlaywrightCaptureRunner({
+      browsers: [farm({ timeouts: { probeMs: 20 } })],
+    }).render(input({ logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } }));
+    expect(fake.state.probeStarted).toBe(1);
+    expect(result.environment).toEqual({ browserVersion: "131.0.1", platform: "windows" });
+    expect(warn).toHaveBeenCalledWith(
+      { timeoutMs: 20 },
+      "measuring the remote browser timed out; its environment is unknown",
+    );
+    expect(fake.state.gotos.length).toBeGreaterThan(0);
+  });
+
+  it("stops the run when the build is cancelled during the probe, and releases as cancelled", async () => {
+    const { service, released } = leased();
+    fake.state.probeHang = true;
+    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
+    const outcome = rendering.then(
+      () => "rendered",
+      (error: unknown) => (error as Error).message,
+    );
+    await vi.waitFor(() => {
+      expect(fake.state.probeStarted).toBe(1);
+    });
+    await runner.cancel("b1", "s1");
+    expect(await outcome).toBe("Capture cancelled");
+    expect(fake.state.gotos).toEqual([]);
     expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
   });
 

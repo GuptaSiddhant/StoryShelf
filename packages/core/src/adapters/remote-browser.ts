@@ -11,6 +11,9 @@ import {
   type TargetReach,
 } from "./capture-target.ts";
 
+/** Default bound on measuring a connected remote browser's environment (`timeouts.probeMs`). */
+export const DEFAULT_PROBE_MS = 15_000;
+
 /** How a runner talks to the service: Playwright's own protocol, or the Chrome DevTools Protocol. */
 export type RemoteProtocol = "playwright" | "cdp";
 
@@ -102,13 +105,16 @@ export interface RemoteOptions<TLease = unknown> {
   /**
    * `acquireMs` bounds the `connect` function, `connectMs` the handshake after it (a farm with a
    * client cap queues extra connections, so a busy farm shows up as this timeout), `releaseMs`
-   * the `release` hook. All default to 30 000.
+   * the `release` hook. All default to 30 000. `probeMs` bounds measuring the browser's
+   * environment once connected (default 15 000): a probe that overruns leaves the environment
+   * unknown with a warning, and a cancel stops it at once.
    */
   timeouts?:
     | {
         acquireMs?: number | undefined;
         connectMs?: number | undefined;
         releaseMs?: number | undefined;
+        probeMs?: number | undefined;
       }
     | undefined;
 }
@@ -130,6 +136,7 @@ export interface RemoteBrowser {
     readonly acquireMs: number;
     readonly connectMs: number;
     readonly releaseMs: number;
+    readonly probeMs: number;
   };
 }
 
@@ -212,6 +219,7 @@ export function defineRemote<TLease = unknown>(
       acquireMs: options.timeouts?.acquireMs ?? 30_000,
       connectMs: options.timeouts?.connectMs ?? 30_000,
       releaseMs: options.timeouts?.releaseMs ?? 30_000,
+      probeMs: options.timeouts?.probeMs ?? DEFAULT_PROBE_MS,
     },
   };
 }
@@ -344,6 +352,7 @@ function checkNumbers(options: RemoteOptions, where: string): void {
     ["timeouts.acquireMs", options.timeouts?.acquireMs],
     ["timeouts.connectMs", options.timeouts?.connectMs],
     ["timeouts.releaseMs", options.timeouts?.releaseMs],
+    ["timeouts.probeMs", options.timeouts?.probeMs],
     ["retry.backoffMs", options.retry?.backoffMs],
   ];
   for (const [name, value] of entries) {

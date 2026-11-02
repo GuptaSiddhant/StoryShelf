@@ -46,7 +46,8 @@ Turning a project's review off accepts its pending builds that no capture worked
 
 ## Triggers
 
-- **Scheduled:** in-server timers (hourly build purge + daily branch GC).
+- **Scheduled:** one in-server timer, the daily branch GC. Build purge is not scheduled.
+- **With testing enabled**, branch GC is skipped and admin purge answers `503` (builds are retained) until lifecycle-aware retention lands; hosting-only deployments are unaffected.
 - **Manual:** `storyshelf purge --url $SHELF_URL --token $STORYSHELF_ADMIN_TOKEN` or `POST /api/v1/admin/purge` (admin) — runs both sweeps and returns `{ removedBuilds, removedBranches, removedBaselines }`.
 
 Configure via `ShelfConfig` or env:
@@ -57,7 +58,6 @@ createShelfApp({
     purgeTtlDays: 30,
     branchTtlDays: 30, // null to disable branch GC
     branchGcIntervalMs: 86_400_000,
-    purgeIntervalMinutes: 60,
   },
 });
 ```
