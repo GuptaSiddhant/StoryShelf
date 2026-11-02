@@ -7,6 +7,22 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 **Added: an optional per-process cap on remote browser connections, `maxConnections` (#467, #273).** A remote service can now limit how many connections the process holds to it at once, separately from the page limits (`sessions`, `maxPagesPerConnection`). A slot is taken before `connect` runs and returned with the lease, once, on finish, failure, cancel and shutdown; a connection shared by several pages counts once. Renders over the cap wait, a cancel or shutdown ends the wait, and a wait longer than `timeouts.acquireMs` is logged once with the target and the limit. Available on `defineRemote`, `remote()`, `playwrightServer()` and `cdp()`; unset behaves as before. It is per process, not deployment-wide.
 
+## 0.8.0 — Remote browser leases, redaction and retention safety (2026-11-02)
+
+**Changed: with `testing` on, automatic build purge and branch cleanup stop unless the database proves it can do them safely (#354, ADR 0039).** Purging a build could race a baseline promotion and delete a build a baseline had just started to reference. Until the database adapter offers the build-reference lifecycle capability (SQLite first, then Postgres and MySQL), deployments with `testing` skip automatic build deletion and branch cleanup, and `POST /api/v1/admin/purge` answers 503 with an explanation. Storage therefore grows on those deployments until the capability ships; hosting-only deployments purge as before. Comparisons keep a frozen copy of the reference image, so older diffs stay reviewable.
+
+**Fixed: disabling a user is saved on Postgres and MySQL (#418).** The `users` table on those backends lacked `disabled`, `auth_provider`, `password_hash` and `display_name_override`, so a disabled user stayed active there. The columns are added on start-up to existing databases.
+
+**Fixed: outbound HTTP logs and spans no longer contain secret-bearing URLs (#408), and webhook delivery reports HTTP failures (#409).** A webhook receiver answering with an error status is now recorded as a failed delivery instead of a success.
+
+**Fixed: the generated AWS deployment runs (#407, #423).** The generated AWS Terraform stack now includes the ECS service and network it needs, applies cleanly and boots.
+
+**Changed: a build fails clearly when Storybook tests are enabled but the runner cannot run them (#308).**
+
+**Fixed: Puppeteer runner cleanup (#388, #405).** Shared CDP browsers are disconnected without closing the remote Chrome, and a cancelled first launch is released before the server does more work.
+
+**Fixed: Storybook titles with slashes resolve correctly in the app (#326), and vulnerable dependencies are updated (#334).**
+
 **Fixed: the `observability` and `ai` span wrappers no longer record raw errors (#466).** A database, storage or AI-provider error whose message held a connection string with a password, a token or a provider response was recorded as is on exported spans. Both wrappers now record a copy with the same name and a redacted message and stack, and only `HTTP <status>` for an `HttpError`, and still rethrow the original error. Together with #429, no span records a raw error.
 
 **Fixed: webhook delivery no longer buffers the receiver's response body (#430).** A new `httpStatus` helper in `@storyshelf/core/utils` shares the retries, timeouts, redaction and tracing of the other HTTP helpers but never reads the body: it cancels it on every response. Webhook delivery uses it, so a receiver that answers with a huge body cannot grow the server's memory. An `HttpError` from `httpStatus` has an empty `body`; the signature and the delivered/failed outcomes are unchanged.
