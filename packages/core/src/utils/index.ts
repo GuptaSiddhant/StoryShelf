@@ -69,6 +69,7 @@ export {
   type SignStorybookTokenInput,
   type StorybookTokenClaims,
   type StorybookTokenFailure,
+  type StorybookTokenPurpose,
   type StorybookTokenResult,
 } from "./storybook-token.ts";
 export { createSessionGate, sessionGateFor, type SessionGate } from "./session-gate.ts";

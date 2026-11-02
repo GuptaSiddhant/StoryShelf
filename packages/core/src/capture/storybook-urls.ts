@@ -3,6 +3,8 @@
  * only for a target whose browser cannot reach this host (`reach: "url"`). The URL is the build's
  * Storybook root, `<publicOrigin>/_s/<token>/`; it carries the token and is never logged. Its
  * lifetime comes from the pass's render budget unless the project sets one (`storybookUrlTtl`).
+ * Every token minted here carries the signed `capture` purpose, the only claim that lets the
+ * server opt a response into browser-private caching.
  */
 import type { CaptureRunner, CaptureTarget } from "../adapters/capture-runner.ts";
 import type { Build } from "../schema/build.ts";
@@ -76,7 +78,9 @@ function mint(
     budgetMs: pass.budgetMs ?? 0,
   });
   const { id: buildId, projectId } = subject.build;
-  return storybookTokenPath(signStorybookToken({ secret, projectId, buildId, ttlSeconds }));
+  return storybookTokenPath(
+    signStorybookToken({ secret, projectId, buildId, ttlSeconds, purpose: "capture" }),
+  );
 }
 
 function needsUrl(runner: Pick<CaptureRunner, "metadata">, target: CaptureTarget): boolean {

@@ -4,6 +4,8 @@
  * names one project and one build and expires. The file itself is served by the same handler and
  * access policy as the other published routes (`published-files.ts`, `published-access.ts`).
  * Nothing else lives under `/_s/`: no wrapper page, no API, no other build, no listing.
+ * Answers are `private, no-store`, except a success for a capture-purpose grant when the server
+ * opted in (`captureAssets.cacheMaxAgeSeconds`, see `capture-cache.ts`).
  */
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import {
@@ -52,7 +54,14 @@ async function serveGranted(c: Context, token: string, rel: string): Promise<Res
   if (access !== "token") {
     return refuse(c, "unknown build");
   }
-  return await servePublishedFile(c, { projectId, buildId, rel, access, cacheControl: "" });
+  return await servePublishedFile(c, {
+    projectId,
+    buildId,
+    rel,
+    access,
+    cacheControl: "",
+    grant: verified.claims,
+  });
 }
 
 /** The one answer for every refusal, so a caller cannot tell a bad signature from an expired token. */

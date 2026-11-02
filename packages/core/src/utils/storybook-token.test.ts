@@ -118,6 +118,59 @@ describe("signStorybookToken / verifyStorybookToken", () => {
   });
 });
 
+describe("capture purpose claim", () => {
+  it("round-trips a signed capture purpose, and a token without one has none", () => {
+    const capture = verifyStorybookToken(
+      signStorybookToken({ ...base, purpose: "capture" }),
+      "s3cret",
+      NOW + 1000,
+    );
+    expect(capture).toMatchObject({ ok: true, claims: { purpose: "capture" } });
+    const plain = verifyStorybookToken(signStorybookToken(base), "s3cret", NOW + 1000);
+    expect(plain.ok && "purpose" in plain.claims).toBe(false);
+  });
+
+  it("keeps the legacy three-part token format for a token without a purpose", () => {
+    // Tokens minted before the purpose claim existed are exactly this shape and must keep working.
+    const token = signStorybookToken(base);
+    const payload = Buffer.from(token.split(".")[0] ?? "", "base64url").toString("utf8");
+    expect(payload.split(":")).toHaveLength(3);
+    const result = verifyStorybookToken(token, "s3cret", NOW + 1000);
+    expect(result).toMatchObject({ ok: true, claims: { projectId: "01PROJECT" } });
+    expect(result.ok && result.claims.purpose).toBeUndefined();
+  });
+
+  it("cannot be added or removed by editing the payload: the purpose is signed", () => {
+    const withPurpose = signStorybookToken({ ...base, purpose: "capture" });
+    const without = signStorybookToken(base);
+    const [capturePayload = "", captureSig = ""] = withPurpose.split(".");
+    const [plainPayload = "", plainSig = ""] = without.split(".");
+    expect(verifyStorybookToken(`${plainPayload}.${captureSig}`, "s3cret", NOW).ok).toBe(false);
+    expect(verifyStorybookToken(`${capturePayload}.${plainSig}`, "s3cret", NOW).ok).toBe(false);
+  });
+
+  it("refuses a signed token whose purpose is not a known one", () => {
+    const expiresAt = Math.floor(NOW / 1000) + 600;
+    const claims = `01PROJECT:01BUILD:${String(expiresAt)}:admin`;
+    const payload = Buffer.from(claims).toString("base64url");
+    expect(verifyStorybookToken(`${payload}.${"A".repeat(43)}`, "s3cret", NOW)).toEqual({
+      ok: false,
+      reason: "signature",
+    });
+  });
+
+  it("keeps the capture token within the token shape for ULID ids", () => {
+    const token = signStorybookToken({
+      ...base,
+      projectId: "01JABCDEFGHJKMNPQRSTVWXYZ0",
+      buildId: "01JABCDEFGHJKMNPQRSTVWXYZ1",
+      purpose: "capture",
+    });
+    expect(token).toMatch(/^[A-Za-z0-9_-]{8,200}\.[A-Za-z0-9_-]{43}$/u);
+    expect(verifyStorybookToken(token, "s3cret", NOW + 1000).ok).toBe(true);
+  });
+});
+
 describe("redaction", () => {
   it("scrubs a token in a path or URL", () => {
     const token = signStorybookToken(base);

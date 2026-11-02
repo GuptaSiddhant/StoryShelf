@@ -134,8 +134,8 @@ The runner opens `iframe.html` under that root. The app strips `/_s/<token>`, ch
 serves the build's static files through the same handler and access rule as published Storybook
 routes, with the token as the grant. It never serves the wrapper page for an empty path.
 
-**Token:** `base64url(projectId, buildId, expiresAt) + "." + HMAC-SHA256(key, same)`, verified
-statelessly; it grants read-only access to one build's static files and nothing else.
+**Token:** `base64url(projectId, buildId, expiresAt[, purpose]) + "." + HMAC-SHA256(key, same)`,
+verified statelessly; it grants read-only access to one build's static files and nothing else.
 
 - **Key:** derived from `config.secret` with the fixed context `storyshelf/storybook-url/v1`, so it
   cannot be confused with a session or another signature. Without a secret every `reach: "url"`
@@ -146,8 +146,20 @@ statelessly; it grants read-only access to one build's static files and nothing 
   no instance option. A pass that would outlast its token is rendered in slices, each minting a
   fresh URL.
 - **Where:** `render` and `extractParameters` inputs both carry `storybookUrl`.
+- **Purpose:** the signed optional claim `capture` marks a token minted for a render pass or slice
+  (`storybookUrlSource`, both runners). Interactive preview grants and tokens minted before the
+  claim carry none and keep their behaviour. A caller cannot add it: it is inside the signature.
+- **Caching (opt-in):** answers are `private, no-store`. With
+  `config.captureAssets.cacheMaxAgeSeconds` (0 to 3600, default 0) a successful answer for a
+  `capture` grant, for a file read through the build's content-addressed manifest, is
+  `private, max-age=N`, N the whole seconds of the least of the cap, one hour and the grant's
+  remaining lifetime, so never past token expiry. The server owns the header; a runner receives a
+  URL only. Authorization is checked on every request that reaches the server (before storage, a
+  gzip variant or the answer); a browser's fresh copy needs none, so revocation, a purge or a key
+  rotation cannot retract bytes already cached until their freshness ends. No `public`, no
+  `s-maxage`, no service worker. A fresh browser context or a recycled browser starts cold.
 - **Hygiene:** the token is redacted from logs, attempt records, errors, span attributes and
-  `Referer`; refusals are one identical `404` with `Cache-Control: private, no-store`.
+  `Referer`; every refusal and error is one identical `404` with `Cache-Control: private, no-store`.
 
 Published Storybooks on `publishedBaseDomain` subdomains are not used for signed URLs: the app
 builds those links but does not serve those hosts, so reachability depends on an external proxy.
