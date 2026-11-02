@@ -466,6 +466,45 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("adds the single-flight key and its unique index to a volume created before them", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-jobkey-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        DROP INDEX capture_jobs_active_key_idx;
+        ALTER TABLE capture_jobs DROP COLUMN active_key;
+        ALTER TABLE capture_jobs DROP COLUMN rerun_requested_at;
+        INSERT INTO capture_jobs (id, entry, job_id, kind, status, created_at, updated_at)
+          VALUES ('j1', 'job', 'j1', 'notify', 'queued', 't', 't'),
+                 ('j2', 'job', 'j2', 'notify', 'queued', 't', 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      await closeDb(db);
+      const check = new DatabaseSync(path);
+      const rows = check
+        .prepare("SELECT id, active_key, rerun_requested_at FROM capture_jobs ORDER BY id")
+        .all();
+      expect(rows.map((row) => Object.assign({}, row))).toEqual([
+        { id: "j1", active_key: null, rerun_requested_at: null },
+        { id: "j2", active_key: null, rerun_requested_at: null },
+      ]);
+      // Rows without a key coexist; two rows with the same key do not.
+      check.exec("UPDATE capture_jobs SET active_key = 'notify:c:b' WHERE id = 'j1'");
+      expect(() =>
+        check.exec("UPDATE capture_jobs SET active_key = 'notify:c:b' WHERE id = 'j2'"),
+      ).toThrow(/UNIQUE/u);
+      check.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("adds the fingerprint columns to a volume created before them, keeping existing rows", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-fingerprint-"));
     const path = join(dir, "legacy.db");

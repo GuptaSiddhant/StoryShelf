@@ -150,10 +150,15 @@ Details of the job kind:
   (`status`, `active`, `recent`, `cancel`) leave them out so they do not bury a build's capture and
   publish jobs.
 - **Enqueue.** Every build transition and the end of publishing request the build's state. A
-  request queues one job per enabled git channel unless a job for the same `(channel, build)` is
-  still waiting: that one reads the state when it runs. A running job may have read an older state,
-  so a new one queues behind it. A forked capture child queues its jobs on the database queue; the
-  parent's consumer runs them.
+  request inserts one job per enabled git channel, holding the key `notify:<channel>:<build>` in
+  the unique `capture_jobs.active_key` column while the job is not terminal; the database, not a
+  check before the insert, decides. If a queued job holds the key the request is covered (it reads
+  the state when it runs). If a running job holds it, `rerun_requested_at` is set on it, and when it
+  ends a successor job takes the key for one more pass. A forked capture child queues its jobs on
+  the database queue; the parent's consumer runs them.
+- **Guarantee.** Delivery converges on the build's current state per `(channel, build)`, with at
+  most one delivery in flight per key while leases hold. It is not exactly-once: after a lost
+  lease a stale holder's HTTP call can still finish, and the next pass rewrites the current state.
 - **Retries.** A job allows five attempts and the retry delay doubles from 10 s to at most five
   minutes (a job states its own attempts and its handler its own backoff; the capture defaults are
   untouched). The consumer retries, the handler only fails.

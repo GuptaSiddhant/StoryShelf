@@ -261,3 +261,80 @@ describe("runMigrations: users auth columns", () => {
     await client.close();
   }, 60_000);
 });
+
+async function downgradeCaptureJobs(client: PGlite): Promise<void> {
+  await client.exec(`
+    DROP INDEX capture_jobs_active_key_idx;
+    ALTER TABLE capture_jobs DROP COLUMN active_key;
+    ALTER TABLE capture_jobs DROP COLUMN rerun_requested_at;
+    INSERT INTO capture_jobs (id, entry, job_id, kind, status, created_at, updated_at)
+      VALUES ('j1', 'job', 'j1', 'notify', 'queued', now(), now()),
+             ('j2', 'job', 'j2', 'notify', 'queued', now(), now());
+  `);
+}
+
+async function captureJobsShape(client: PGlite): Promise<unknown[]> {
+  const columns = await client.query(`
+    SELECT column_name, data_type, column_default, is_nullable FROM information_schema.columns
+    WHERE table_name = 'capture_jobs' ORDER BY column_name
+  `);
+  const indexes = await client.query(`
+    SELECT indexdef FROM pg_indexes WHERE tablename = 'capture_jobs' ORDER BY indexname
+  `);
+  return [...columns.rows, ...indexes.rows];
+}
+
+describe("runMigrations: capture_jobs single-flight key", () => {
+  it("adds the key columns and its unique index to an existing table, keeping its rows", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await downgradeCaptureJobs(client);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const rows = await client.query<Record<string, unknown>>(
+      "SELECT id, active_key, rerun_requested_at FROM capture_jobs ORDER BY id",
+    );
+    expect(rows.rows).toEqual([
+      { id: "j1", active_key: null, rerun_requested_at: null },
+      { id: "j2", active_key: null, rerun_requested_at: null },
+    ]);
+    // Many rows without a key coexist; two with the same key do not.
+    await client.exec("UPDATE capture_jobs SET active_key = 'notify:c:b' WHERE id = 'j1'");
+    await expect(
+      client.exec("UPDATE capture_jobs SET active_key = 'notify:c:b' WHERE id = 'j2'"),
+    ).rejects.toThrow(/duplicate key|unique/iu);
+    await client.close();
+  }, 60_000);
+
+  it("gives an upgraded table the same columns and indexes as a fresh one", async () => {
+    const fresh = new PGlite();
+    await runMigrations(runnerFor(fresh));
+    const upgraded = new PGlite();
+    const run = runnerFor(upgraded);
+    await runMigrations(run);
+    await downgradeCaptureJobs(upgraded);
+    await runMigrations(run);
+
+    expect(await captureJobsShape(upgraded)).toEqual(await captureJobsShape(fresh));
+    await fresh.close();
+    await upgraded.close();
+  }, 60_000);
+
+  it("fails the boot when the unique index cannot be created", async () => {
+    const client = new PGlite();
+    const inner = runnerFor(client);
+    const failing = async (sql: string): Promise<unknown[]> => {
+      if (sql.startsWith("CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx")) {
+        throw new Error("permission denied for table capture_jobs");
+      }
+      return await inner(sql);
+    };
+    await expect(runMigrations(failing)).rejects.toThrow(
+      "permission denied for table capture_jobs",
+    );
+    await client.close();
+  }, 60_000);
+});

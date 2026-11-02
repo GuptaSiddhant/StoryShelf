@@ -249,3 +249,86 @@ describe("attempt row ids", () => {
     }
   });
 });
+
+describe("CaptureJobModel: single-flight keys", () => {
+  const KEY = "notify:c1:b1";
+
+  async function keyed(jobs: CaptureJobModel, id: string, activeKey = KEY) {
+    return await jobs.createKeyed(
+      { id, kind: "notify", buildId: "b1", maxAttempts: 5, activeKey },
+      T0,
+    );
+  }
+
+  it("inserts the first job for a key and reports it as the holder to the second", async () => {
+    const { jobs } = model();
+    const first = await keyed(jobs, "j1");
+    expect(first).toMatchObject({ created: { id: "j1", activeKey: KEY, rerunRequestedAt: null } });
+    const second = await keyed(jobs, "j2");
+    expect(second).toMatchObject({ holder: { id: "j1" } });
+    expect(await jobs.get("j2")).toBeNull();
+  });
+
+  it("lets different keys, and jobs without one, coexist", async () => {
+    const { jobs } = model();
+    await keyed(jobs, "j1");
+    await keyed(jobs, "j2", "notify:c2:b1");
+    await queued(jobs, "j3");
+    await queued(jobs, "j4");
+    expect((await jobs.holderOf(KEY))?.id).toBe("j1");
+    expect(await jobs.holderOf("notify:none")).toBeNull();
+  });
+
+  it("frees the key in the write that ends the job, whatever the status", async () => {
+    const { jobs } = model();
+    for (const status of ["done", "failed", "cancelled"] as const) {
+      const id = `j-${status}`;
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one status at a time
+      await keyed(jobs, id);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- see above
+      await jobs.finishJob(id, status, T1);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- see above
+      expect(await jobs.holderOf(KEY)).toBeNull();
+    }
+  });
+
+  it("keeps the key while a job is requeued for a retry", async () => {
+    const { jobs } = model();
+    await keyed(jobs, "j1");
+    await jobs.requeue("j1", T2, "boom", T1);
+    expect((await jobs.holderOf(KEY))?.id).toBe("j1");
+  });
+
+  it("does not copy the key onto an attempt row", async () => {
+    const { jobs } = model();
+    const created = await keyed(jobs, "j1");
+    if (!("created" in created)) throw new Error("not created");
+    await jobs.claim({ job: created.created, attempt: 1, owner: "me", leaseUntil: T2 }, T1);
+    expect((await jobs.get(attemptRowId("j1", 1)))?.activeKey).toBeNull();
+  });
+
+  it("surfaces an insert failure that no holder explains instead of swallowing it", async () => {
+    const { jobs } = model();
+    await queued(jobs, "dup");
+    // Same primary key, free active key: a real failure, not a conflict with a holder.
+    await expect(keyed(jobs, "dup")).rejects.toThrow(/UNIQUE|duplicate/iu);
+  });
+
+  it("asks a running job for a rerun once, and not at all when it is not running", async () => {
+    const { jobs } = model();
+    const created = await keyed(jobs, "j1");
+    if (!("created" in created)) throw new Error("not created");
+    // Queued: the write does not apply.
+    expect((await jobs.requestRerun("j1", T1))?.rerunRequestedAt).toBeNull();
+    await jobs.claim({ job: created.created, attempt: 1, owner: "me", leaseUntil: T2 }, T1);
+    await jobs.markRunning("j1", 1, T1);
+    expect((await jobs.requestRerun("j1", T1))?.rerunRequestedAt).toBe(T1);
+    // The first marker stays: a second request does not move it.
+    expect((await jobs.requestRerun("j1", T2))?.rerunRequestedAt).toBe(T1);
+    // A new attempt reads the current state, so it clears the marker.
+    await jobs.requeue("j1", T2, "retry", T2);
+    await jobs.markRunning("j1", 2, T2);
+    expect((await jobs.get("j1"))?.rerunRequestedAt).toBeNull();
+    expect(await jobs.requestRerun("missing", T2)).toBeNull();
+  });
+});

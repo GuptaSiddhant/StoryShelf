@@ -102,6 +102,8 @@ CREATE TABLE IF NOT EXISTS capture_jobs (
   owner TEXT,
   payload TEXT,
   cancel_requested_at TIMESTAMPTZ,
+  active_key TEXT,
+  rerun_requested_at TIMESTAMPTZ,
   error TEXT,
   started_at TIMESTAMPTZ,
   finished_at TIMESTAMPTZ,

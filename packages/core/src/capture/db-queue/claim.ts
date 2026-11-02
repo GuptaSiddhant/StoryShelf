@@ -8,6 +8,7 @@ import { attemptRowId, isTerminalJob } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { isoAt } from "./clock.ts";
 import { toDatabaseJob } from "./codec.ts";
+import { finishJob } from "./single-flight.ts";
 import type { DatabaseJob, QueueRuntime } from "./types.ts";
 
 /** Candidates tried per poll when other instances win the race for them. */
@@ -150,13 +151,12 @@ async function exhaust(
   job: CaptureJobRow,
   stale: CaptureJobRow | null,
 ): Promise<void> {
-  const now = isoAt(rt);
   if (stale !== null && (await rt.model.get(stale.id))?.status === "done") {
-    await rt.model.finishJob(job.jobId, "done", now);
+    await finishJob(rt, job, "done");
     return;
   }
   await retire(rt, stale);
-  await rt.model.finishJob(job.jobId, "failed", now, LEASE_EXHAUSTED_ERROR);
+  await finishJob(rt, job, "failed", LEASE_EXHAUSTED_ERROR);
   rt.logger?.warn({ jobId: job.jobId, attempts: job.attempt }, "job failed: lease exhausted");
   await reportExhausted(rt, job);
 }

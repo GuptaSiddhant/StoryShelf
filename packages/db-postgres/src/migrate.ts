@@ -82,6 +82,17 @@ const MEMBER_SOURCE_ALTER =
  * Auth columns the SQLite `users` table always had. Without them the Drizzle model cannot store
  * `disabled` (an admin disabling a user fails) or the auth provider and display-name override.
  */
+/**
+ * Single-flight jobs (ADR 0040): `capture_jobs.active_key` is unique while a job is non-terminal.
+ * Not swallowed like the other follow-ups: without the index two notify jobs for one key could run
+ * at once, so a failure must stop the boot. Every statement is idempotent.
+ */
+const CAPTURE_JOB_SINGLE_FLIGHT = [
+  "ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS active_key TEXT",
+  "ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS rerun_requested_at TIMESTAMPTZ",
+  "CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx ON capture_jobs (active_key)",
+];
+
 const USER_AUTH_ALTERS = [
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT",
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name_override TEXT",
@@ -191,6 +202,7 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
   await run(DDL);
   await migrateCoreColumns(run);
   await migrateUserAuthColumns(run);
+  await migrateCaptureJobSingleFlight(run);
   await migrateProjectExtras(run);
   await applyIdentityStatements(run);
   await migrateCommentsTable(run);
@@ -206,6 +218,13 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
 async function migrateUserAuthColumns(run: MigrationRunner): Promise<void> {
   for (const statement of USER_AUTH_ALTERS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered, and a failure must stop the boot
+    await run(statement);
+  }
+}
+
+async function migrateCaptureJobSingleFlight(run: MigrationRunner): Promise<void> {
+  for (const statement of CAPTURE_JOB_SINGLE_FLIGHT) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered (columns, then the index), and a failure must stop the boot
     await run(statement);
   }
 }
