@@ -99,8 +99,8 @@ describe("secret-bearing URLs in logs and spans", () => {
     expect(spanAttributes[0]?.["url.full"]).toBe(row.expected);
   });
 
-  it("redacts userinfo from the exception it records, and still rethrows the original", async () => {
-    const url = "https://user:pass@example.com/a/b";
+  it("redacts userinfo and path secrets from the exception it records, and still rethrows the original", async () => {
+    const url = "https://user:pass@example.com/a/SECRETxyz";
     const failure = new TypeError(
       `Request cannot be constructed from a URL that includes credentials: ${url}`,
     );
@@ -119,7 +119,9 @@ describe("secret-bearing URLs in logs and spans", () => {
     // Not the bare words: the stack's file paths may contain "user" (e.g. `/home/user/`).
     expect(recordedExceptions[0]).not.toContain("user:pass");
     expect(recordedExceptions[0]).not.toContain("pass@");
-    expect(recordedExceptions[0]).toContain("[redacted]");
+    // `redactSecrets` alone would keep the path, where webhook secrets live.
+    expect(recordedExceptions[0]).not.toContain("SECRETxyz");
+    expect(recordedExceptions[0]).toContain("https://example.com/a/…");
   });
 
   it("still requests the real URL", async () => {

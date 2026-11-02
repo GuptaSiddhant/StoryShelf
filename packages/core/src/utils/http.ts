@@ -172,7 +172,7 @@ async function requestWithRetry<T>(
         try {
           return await perform(url, options, timeoutMs);
         } catch (error) {
-          span.recordException(redactedException(error));
+          span.recordException(redactedException(error, url));
           if (options.signal?.aborted || !shouldRetry(error, attempt, maxAttempts)) {
             throw error;
           }
@@ -208,19 +208,28 @@ export function redactUrlForLog(url: string): string {
 
 /**
  * A copy of a failure that is safe to record on a span. Native `fetch` rejects a URL with userinfo
- * with a message and stack that repeat it (`https://user:pass@host/`), so both are redacted. The
- * original error is what gets rethrown; only the recorded copy changes.
+ * with a message and stack that repeat the whole URL (`https://user:pass@host/path`), so the URL
+ * is replaced by its {@link redactUrlForLog} form first (`redactSecrets` alone leaves a secret in
+ * the path), then both text fields go through `redactSecrets`. The original error is what gets
+ * rethrown; only the recorded copy changes.
  */
-function redactedException(error: unknown): Error | string {
+function redactedException(error: unknown, url: string): Error | string {
   if (!(error instanceof Error)) {
-    return redactSecrets(String(error));
+    return scrubText(String(error), url);
   }
-  const copy = new Error(redactSecrets(error.message));
+  const copy = new Error(scrubText(error.message, url));
   copy.name = error.name;
   if (error.stack) {
-    copy.stack = redactSecrets(error.stack);
+    copy.stack = scrubText(error.stack, url);
   }
   return copy;
+}
+
+/** `text` with every occurrence of the request URL (as given and as normalized) redacted. */
+function scrubText(text: string, url: string): string {
+  const safe = redactUrlForLog(url);
+  const normalized = URL.canParse(url) ? new URL(url).href : url;
+  return redactSecrets(text.replaceAll(url, safe).replaceAll(normalized, safe));
 }
 
 async function backoff(
