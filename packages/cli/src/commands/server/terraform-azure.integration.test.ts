@@ -9,13 +9,12 @@ function terraformAvailable(): boolean {
   return res.status === 0;
 }
 
-const hasTerraform = terraformAvailable();
-
 // `terraform init` downloads providers, so the suite runs only when RUN_TERRAFORM=1 (CI's verify
-// job sets it); `nub run test` stays hermetic even where a terraform binary is installed. With the
+// job sets it); `nub run test` stays hermetic even where a terraform binary is installed. Without
+// the gate the binary is not even probed (`terraform version` can reach the network). With the
 // gate set, a missing binary must fail rather than silently skip the suite below.
 const runTerraform = process.env["RUN_TERRAFORM"] === "1";
-const enabled = runTerraform && hasTerraform;
+const hasTerraform = runTerraform && terraformAvailable();
 
 it.runIf(runTerraform)("has a terraform binary (RUN_TERRAFORM=1 requires one)", () => {
   expect(hasTerraform).toBe(true);
@@ -36,7 +35,7 @@ function materialize(options: AzureTerraformOptions): string {
   return dir;
 }
 
-describe.skipIf(!enabled)("generated Azure terraform (gated on RUN_TERRAFORM=1)", () => {
+describe.skipIf(!hasTerraform)("generated Azure terraform (gated on RUN_TERRAFORM=1)", () => {
   let fullDir: string;
   let minimalDir: string;
 
