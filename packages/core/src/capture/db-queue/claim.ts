@@ -186,7 +186,10 @@ async function reportExhausted(rt: QueueRuntime, job: CaptureJobRow): Promise<vo
       await rt.onExhausted(toDatabaseJob(job, job.attempt, rt.leaseMs), LEASE_EXHAUSTED_ERROR);
       return;
     } catch (error) {
-      rt.logger?.error({ err: error, jobId: job.jobId, attempt, attempts }, "exhausted-job hook failed");
+      rt.logger?.error(
+        { err: error, jobId: job.jobId, attempt, attempts },
+        "exhausted-job hook failed",
+      );
       if (attempt < attempts) {
         // oxlint-disable-next-line eslint/no-await-in-loop -- sequential retries
         await sleep(rt, 100 * attempt);
