@@ -72,6 +72,12 @@ describe("GCP Terraform modules", () => {
     expect(compute).not.toContain("cloudfunctions");
   });
 
+  it("aligns the attribute equals signs terraform fmt expects", () => {
+    expect(generateGcpStorage()).toContain("age            = 30");
+    expect(generateGcpIdentity()).toContain("allow_password_signup = false");
+    expect(generateGcpIdentity()).toContain("count                 = ");
+  });
+
   it("provisions a private GCS bucket with transient expiry", () => {
     const storage = generateGcpStorage();
     expect(storage).toContain('resource "google_storage_bucket" "storybook"');
@@ -85,6 +91,9 @@ describe("GCP Terraform modules", () => {
     expect(database).toContain('resource "google_sql_database_instance" "main"');
     expect(database).toContain("db-f1-micro");
     expect(database).toContain('resource "google_sql_database" "shelf"');
+    // TLS is required (`require_ssl` no longer exists in the google provider).
+    expect(database).toContain('ssl_mode     = "ENCRYPTED_ONLY"');
+    expect(database).not.toContain("require_ssl");
   });
 
   it("gates Identity Platform on identity_tenant", () => {

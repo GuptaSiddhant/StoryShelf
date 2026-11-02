@@ -11,6 +11,15 @@ function terraformAvailable(): boolean {
 
 const hasTerraform = terraformAvailable();
 
+// CI installs Terraform (ci.yml "Setup Terraform"). A missing binary there must fail rather than
+// silently skip the suite below; locally the suite still skips, so `nub run test` stays hermetic.
+it.runIf(process.env["CI"] === "true" && !hasTerraform)(
+  "has a terraform binary in CI (the suite must not be skipped there)",
+  () => {
+    expect(hasTerraform).toBe(true);
+  },
+);
+
 /** Repo-local scratch root (`.tmp` is gitignored and absent on a fresh checkout, e.g. CI). */
 function scratchRoot(): string {
   mkdirSync(".tmp", { recursive: true });
@@ -60,13 +69,13 @@ describe.skipIf(!hasTerraform)("generated Azure terraform (gated on terraform bi
     for (const dir of [fullDir, minimalDir]) {
       expect(() =>
         execFileSync("terraform", ["init", "-backend=false", "-input=false", "-no-color"], {
-          cwd: dir,
+          cwd: join(dir, "terraform"),
           stdio: "ignore",
         }),
       ).not.toThrow();
       expect(() =>
         execFileSync("terraform", ["validate", "-no-color"], {
-          cwd: dir,
+          cwd: join(dir, "terraform"),
           stdio: "ignore",
         }),
       ).not.toThrow();

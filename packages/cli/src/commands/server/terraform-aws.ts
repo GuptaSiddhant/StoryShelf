@@ -84,7 +84,12 @@ variable "saml_metadata_url" {
 }
 
 export function generateAwsVpc(): string {
-  return `${header()}# VPC: created unless var.vpc_id points at an existing one.
+  return `${header()}${vpcResource()}${createdSubnets()}${publicRouting()}${subnetLookups()}${subnetLocals()}`;
+}
+
+/** The VPC, created unless var.vpc_id points at an existing one. */
+function vpcResource(): string {
+  return `# VPC: created unless var.vpc_id points at an existing one.
 resource "aws_vpc" "main" {
   count                = var.vpc_id == "" ? 1 : 0
   cidr_block           = "10.0.0.0/16"
@@ -93,9 +98,113 @@ resource "aws_vpc" "main" {
 
   tags = { Name = "\${var.project}-vpc" }
 }
+`;
+}
 
+/**
+ * The network created with the VPC: 2 public + 2 private subnets across 2 AZs. There is no NAT
+ * gateway (about $32/month per AZ): ECS tasks run in the public subnets with a public IP, and
+ * only the ALB can reach them; the database sits in the private subnets (no egress needed).
+ */
+function createdSubnets(): string {
+  return `
+data "aws_availability_zones" "available" {
+  count = var.vpc_id == "" ? 1 : 0
+  state = "available"
+}
+
+resource "aws_subnet" "public" {
+  count                   = var.vpc_id == "" ? 2 : 0
+  vpc_id                  = aws_vpc.main[0].id
+  availability_zone       = data.aws_availability_zones.available[0].names[count.index]
+  cidr_block              = cidrsubnet(aws_vpc.main[0].cidr_block, 8, count.index)
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "\${var.project}-public-\${count.index}"
+    Tier = "public"
+  }
+}
+
+resource "aws_subnet" "private" {
+  count             = var.vpc_id == "" ? 2 : 0
+  vpc_id            = aws_vpc.main[0].id
+  availability_zone = data.aws_availability_zones.available[0].names[count.index]
+  cidr_block        = cidrsubnet(aws_vpc.main[0].cidr_block, 8, count.index + 10)
+
+  tags = {
+    Name = "\${var.project}-private-\${count.index}"
+    Tier = "private"
+  }
+}
+`;
+}
+
+/** Internet gateway and the public route table for the created network. */
+function publicRouting(): string {
+  return `
+resource "aws_internet_gateway" "main" {
+  count  = var.vpc_id == "" ? 1 : 0
+  vpc_id = aws_vpc.main[0].id
+
+  tags = { Name = "\${var.project}-igw" }
+}
+
+resource "aws_route_table" "public" {
+  count  = var.vpc_id == "" ? 1 : 0
+  vpc_id = aws_vpc.main[0].id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main[0].id
+  }
+
+  tags = { Name = "\${var.project}-public" }
+}
+
+resource "aws_route_table_association" "public" {
+  count          = var.vpc_id == "" ? 2 : 0
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public[0].id
+}
+`;
+}
+
+/** Existing VPC: subnets are looked up by their Tier tag (needs 2 public subnets in 2 AZs). */
+function subnetLookups(): string {
+  return `
+# Existing VPC (var.vpc_id set): subnets are looked up by their Tier tag.
+data "aws_subnets" "public" {
+  count = var.vpc_id == "" ? 0 : 1
+
+  filter {
+    name   = "vpc-id"
+    values = [var.vpc_id]
+  }
+
+  tags = { Tier = "public" }
+}
+
+data "aws_subnets" "private" {
+  count = var.vpc_id == "" ? 0 : 1
+
+  filter {
+    name   = "vpc-id"
+    values = [var.vpc_id]
+  }
+
+  tags = { Tier = "private" }
+}
+`;
+}
+
+/** One place for created-or-looked-up ids: compute.tf and database.tf reference only these. */
+function subnetLocals(): string {
+  return `
 locals {
-  vpc_id = var.vpc_id != "" ? var.vpc_id : aws_vpc.main[0].id
+  vpc_id             = var.vpc_id != "" ? var.vpc_id : aws_vpc.main[0].id
+  public_subnet_ids  = var.vpc_id == "" ? aws_subnet.public[*].id : flatten(data.aws_subnets.public[*].ids)
+  private_subnet_ids = var.vpc_id == "" ? aws_subnet.private[*].id : flatten(data.aws_subnets.private[*].ids)
 }
 `;
 }
@@ -227,7 +336,7 @@ resource "aws_dsql_cluster" "main" {
 # createPostgresDatabase({ url: <DATABASE_URL with sslmode=require> }).
 resource "aws_db_subnet_group" "main" {
   name       = "\${var.project}-db"
-  subnet_ids = data.aws_subnets.private.ids
+  subnet_ids = local.private_subnet_ids
 }
 
 resource "aws_db_instance" "main" {
@@ -255,10 +364,10 @@ resource "aws_cognito_user_pool_client" "shelf" {
   user_pool_id    = aws_cognito_user_pool.main.id
   generate_secret = true
 
-  allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["openid", "email", "profile"]
-  callback_urls                        = ["https://\${var.domain_name == "" ? aws_lb.main.dns_name : var.domain_name}/auth/callback"]
-  supported_identity_providers         = ["COGNITO"]
+  allowed_oauth_flows          = ["code"]
+  allowed_oauth_scopes         = ["openid", "email", "profile"]
+  callback_urls                = ["https://\${var.domain_name == "" ? aws_lb.main.dns_name : var.domain_name}/auth/callback"]
+  supported_identity_providers = ["COGNITO"]
 }
 
 resource "aws_cognito_user_group" "admins" {
@@ -282,11 +391,12 @@ resource "aws_cognito_identity_provider" "saml" {
 export function generateAwsCompute(): string {
   return `${header()}# ECS Fargate: one long-lived app service; it also consumes capture jobs from the
 # database. Playwright/Chromium renders on Fargate — Lambda's 15-minute limit and /tmp caps rule it out.
+# Tasks run in the public subnets with a public IP (no NAT gateway); only the ALB can reach them.
 resource "aws_lb" "main" {
   name               = "\${var.project}-alb"
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = data.aws_subnets.public.ids
+  subnets            = local.public_subnet_ids
 }
 
 resource "aws_ecs_cluster" "main" {
@@ -297,7 +407,202 @@ resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/\${var.project}-app"
   retention_in_days = 30
 }
+${generateAwsLoadBalancing()}${generateAwsExecutionRole()}${generateAwsTaskRole()}${generateAwsTaskDefinition()}${generateAwsAppService()}`;
+}
 
+/** ALB target group and listeners: HTTP always, HTTPS when var.domain_name is set. */
+function generateAwsLoadBalancing(): string {
+  return `
+resource "aws_lb_target_group" "app" {
+  name        = "\${var.project}-app"
+  port        = 3000
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = local.vpc_id
+
+  health_check {
+    path    = "/api/v1/health"
+    matcher = "200"
+  }
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  count             = var.domain_name == "" ? 0 : 1
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = aws_acm_certificate.main[0].arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+`;
+}
+
+/** Execution role: pulls the image, writes logs, reads exactly the three secrets. */
+function generateAwsExecutionRole(): string {
+  return `
+data "aws_iam_policy_document" "ecs_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "execution" {
+  name               = "\${var.project}-ecs-execution"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "execution" {
+  role       = aws_iam_role.execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy" "execution_secrets" {
+  name = "read-app-secrets"
+  role = aws_iam_role.execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue"]
+      Resource = [
+        aws_secretsmanager_secret.shelf_secret.arn,
+        aws_secretsmanager_secret.oidc_client_secret.arn,
+        aws_secretsmanager_secret.admin_token.arn,
+      ]
+    }]
+  })
+}
+`;
+}
+
+/** Task role: the app's own access to the Storybook bucket. */
+function generateAwsTaskRole(): string {
+  return `
+resource "aws_iam_role" "task" {
+  name               = "\${var.project}-ecs-task"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+resource "aws_iam_role_policy" "task_storage" {
+  name = "storybook-bucket"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+      Resource = [aws_s3_bucket.storybook.arn, "\${aws_s3_bucket.storybook.arn}/*"]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "task_secrets" {
+  name = "read-app-secrets"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue"]
+      Resource = [
+        aws_secretsmanager_secret.shelf_secret.arn,
+        aws_secretsmanager_secret.oidc_client_secret.arn,
+        aws_secretsmanager_secret.admin_token.arn,
+      ]
+    }]
+  })
+}
+`;
+}
+
+/**
+ * The app task definition. The image is a placeholder, like GCP/Azure: push the
+ * scaffolded Dockerfile to ECR and update it before apply.
+ */
+function generateAwsTaskDefinition(): string {
+  return `
+resource "aws_ecs_task_definition" "app" {
+  family                   = "\${var.project}-app"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 2048
+  memory                   = 4096
+  execution_role_arn       = aws_iam_role.execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  container_definitions = jsonencode([{
+    name         = "app"
+    image        = "storyshelf:latest"
+    essential    = true
+    portMappings = [{ containerPort = 3000, protocol = "tcp" }]
+    environment = [
+      { name = "S3_BUCKET", value = aws_s3_bucket.storybook.id },
+      { name = "AWS_REGION", value = var.region },
+    ]
+    secrets = [
+      { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
+      { name = "OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret.arn },
+      { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.app.name
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "app"
+      }
+    }
+  }])
+}
+`;
+}
+
+/** The single app service behind the ALB (no worker: it also consumes capture jobs). */
+function generateAwsAppService(): string {
+  return `
+resource "aws_ecs_service" "app" {
+  name            = "\${var.project}-app"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = local.public_subnet_ids
+    security_groups  = [aws_security_group.ecs.id]
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "app"
+    container_port   = 3000
+  }
+
+  depends_on = [aws_lb_listener.http]
 }
 `;
 }
@@ -416,6 +721,19 @@ terraform init
 terraform plan -out=tfplan   # review before applying
 terraform apply tfplan
 \`\`\`
+
+## Networking
+
+With \`vpc_id = ""\` the scaffold creates the network: 2 public and 2 private subnets across 2
+availability zones (tagged \`Tier = public\` / \`Tier = private\`), an internet gateway and a public
+route table. There is **no NAT gateway** (about $32/month per availability zone): the ALB and the
+ECS tasks run in the public subnets, the tasks get a public IP (to pull the image and reach AWS
+APIs) and their security group admits only the ALB; the database sits in the private subnets.
+
+With an existing \`vpc_id\` the subnets are looked up by their \`Tier\` tag, so tag at least two public
+subnets in different availability zones \`Tier = public\` (ALB and tasks) and at least two in
+different availability zones \`Tier = private\` (the RDS subnet group needs two); the public subnets
+need a route to an internet gateway, since tasks reach AWS APIs through their public IP.
 
 ## Wire outputs into env
 

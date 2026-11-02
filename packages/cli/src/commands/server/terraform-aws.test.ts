@@ -78,6 +78,93 @@ describe("AWS Terraform modules", () => {
     expect(compute).not.toContain("lambda");
   });
 
+  it("creates a usable network with the VPC: subnets, IGW and public route table, no NAT", () => {
+    const vpc = generateAwsVpc();
+    expect(vpc).toContain('resource "aws_subnet" "public"');
+    expect(vpc).toContain('resource "aws_subnet" "private"');
+    expect(vpc).toContain('Tier = "public"');
+    expect(vpc).toContain('Tier = "private"');
+    expect(vpc).toContain("data.aws_availability_zones.available[0].names[count.index]");
+    expect(vpc).toContain('resource "aws_internet_gateway" "main"');
+    expect(vpc).toContain('resource "aws_route_table" "public"');
+    expect(vpc).toContain('resource "aws_route_table_association" "public"');
+    expect(vpc).not.toContain("aws_nat_gateway");
+    expect(vpc).not.toContain("aws_eip");
+  });
+
+  it("looks up Tier-tagged subnets when an existing vpc_id is supplied", () => {
+    const vpc = generateAwsVpc();
+    expect(vpc).toContain('data "aws_subnets" "public"');
+    expect(vpc).toContain('data "aws_subnets" "private"');
+    expect(vpc).toContain('tags = { Tier = "public" }');
+    expect(vpc).toContain('tags = { Tier = "private" }');
+    expect(vpc).toContain('count = var.vpc_id == "" ? 0 : 1');
+  });
+
+  it("exposes created-or-looked-up subnet ids in one place for compute and database", () => {
+    const vpc = generateAwsVpc();
+    expect(vpc).toContain("public_subnet_ids");
+    expect(vpc).toContain("private_subnet_ids");
+    expect(generateAwsCompute()).not.toContain("data.aws_subnets");
+    expect(generateAwsDatabase("rds")).not.toContain("data.aws_subnets");
+    expect(generateAwsDatabase("rds")).toContain("local.private_subnet_ids");
+  });
+
+  it("runs the service and the ALB in public subnets with a public IP, tasks reachable only via the ALB", () => {
+    const compute = generateAwsCompute();
+    expect(compute).toContain("subnets            = local.public_subnet_ids");
+    expect(compute).toContain("subnets          = local.public_subnet_ids");
+    expect(compute).toContain("assign_public_ip = true");
+    expect(compute).not.toContain("assign_public_ip = false");
+    // The task security group admits only the ALB security group.
+    const security = generateAwsSecurity();
+    expect(security).toContain("security_groups = [aws_security_group.alb.id]");
+  });
+
+  it("grants least-privilege roles: both read exactly the three secrets, task also the bucket", () => {
+    const compute = generateAwsCompute();
+    const secrets = ["shelf_secret", "oidc_client_secret", "admin_token"];
+    expect(compute).toContain('resource "aws_iam_role" "execution"');
+    expect(compute).toContain('resource "aws_iam_role" "task"');
+    // Each role's secrets policy lists exactly the three scaffold ARNs and nothing broader.
+    for (const policy of ["execution_secrets", "task_secrets"]) {
+      const block = compute.slice(compute.indexOf(`resource "aws_iam_role_policy" "${policy}"`));
+      const statement = block.slice(0, block.indexOf("\n}\n"));
+      expect(statement).toContain('Action = ["secretsmanager:GetSecretValue"]');
+      // The Resource list is exactly the three scaffold ARNs, in order: no extras, no wildcard.
+      const resources = /Resource = \[(?<list>[^\]]*)\]/u.exec(statement)?.groups?.["list"] ?? "";
+      const arns = resources
+        .split(",")
+        .map((arn) => arn.trim())
+        .filter(Boolean);
+      expect(arns).toEqual(secrets.map((secret) => `aws_secretsmanager_secret.${secret}.arn`));
+    }
+    // The task role reaches the bucket (its own policy), not just the secrets.
+    const storage = compute.slice(compute.indexOf('resource "aws_iam_role_policy" "task_storage"'));
+    expect(storage.slice(0, storage.indexOf("\n}\n"))).toContain("aws_s3_bucket.storybook.arn");
+    expect(compute).not.toContain('Resource = "*"');
+    expect(compute).not.toContain("secretsmanager:*");
+  });
+
+  it("runs the app as one ECS service behind the ALB, with no worker", () => {
+    const compute = generateAwsCompute();
+    expect(compute).toContain('resource "aws_ecs_task_definition" "app"');
+    expect(compute).toContain('resource "aws_ecs_service" "app"');
+    expect(compute).toContain('resource "aws_lb_target_group" "app"');
+    expect(compute).toContain('resource "aws_lb_listener" "http"');
+    expect(compute).not.toContain('resource "aws_ecs_service" "worker"');
+    expect(compute).not.toContain('resource "aws_ecs_task_definition" "worker"');
+    expect(compute).not.toContain("aws_appautoscaling");
+  });
+
+  it("wires the service to the existing secrets and log group", () => {
+    const compute = generateAwsCompute();
+    for (const secret of ["shelf_secret", "oidc_client_secret", "admin_token"]) {
+      expect(compute).toContain(`aws_secretsmanager_secret.${secret}.arn`);
+    }
+    expect(compute).toContain("aws_cloudwatch_log_group.app.name");
+  });
+
   it("provisions Cognito with an admin group and optional SAML", () => {
     const identity = generateAwsIdentity();
     expect(identity).toContain('resource "aws_cognito_user_pool" "main"');
@@ -158,6 +245,20 @@ describe("AWS Terraform modules", () => {
     expect(files["terraform/README.md"]).toContain("S3_BUCKET");
     expect(files["terraform/README.md"]).toContain("terraform destroy");
     expect(files["terraform/terraform.tfvars.example"]).toContain("saml_metadata_url");
+  });
+});
+
+describe("AWS Terraform README networking notes", () => {
+  it("documents the Tier tags, the no-NAT choice and the two-AZ subnet requirements", () => {
+    const readme = generateAwsReadme("acme");
+    expect(readme).toContain("Tier = public");
+    expect(readme).toContain("Tier = private");
+    expect(readme).toContain("no NAT gateway");
+    // Each tier gets its own clause: two subnets in different AZs, bound to that tier's tag.
+    expect(readme).toMatch(
+      /at least two public\s+subnets in different availability zones\s+`Tier = public`/u,
+    );
+    expect(readme).toMatch(/at least two in\s+different availability zones\s+`Tier = private`/u);
   });
 });
 

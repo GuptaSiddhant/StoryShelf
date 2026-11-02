@@ -187,7 +187,7 @@ resource "google_sql_database_instance" "main" {
 
     ip_configuration {
       ipv4_enabled = true
-      require_ssl  = true
+      ssl_mode     = "ENCRYPTED_ONLY"
     }
   }
 }
@@ -226,7 +226,7 @@ resource "google_storage_bucket" "storybook" {
     }
 
     condition {
-      age           = 30
+      age            = 30
       matches_prefix = ["builds/"]
     }
   }
@@ -238,9 +238,9 @@ export function generateGcpIdentity(): string {
   return `${header()}# Identity Platform tenant for OIDC sign-in. Skipped entirely
 # when var.identity_tenant is empty (use any OIDC provider instead).
 resource "google_identity_platform_tenant" "main" {
-  count               = var.identity_tenant == "" ? 0 : 1
-  display_name        = var.identity_tenant
-  project             = var.gcp_project_id
+  count                 = var.identity_tenant == "" ? 0 : 1
+  display_name          = var.identity_tenant
+  project               = var.gcp_project_id
   allow_password_signup = false
 }
 `;

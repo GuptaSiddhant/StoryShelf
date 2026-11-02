@@ -58,7 +58,7 @@ export function generateAzureVersions(): string {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 4.0"
+      version = "~> 4.0"
     }
     azuread = {
       source  = "hashicorp/azuread"
@@ -159,8 +159,8 @@ resource "azurerm_container_app" "app" {
   }
 
   ingress {
-    external    = true
-    target_port = 3000
+    external_enabled = true
+    target_port      = 3000
 
     traffic_weight {
       latest_revision = true
@@ -263,19 +263,19 @@ resource "azurerm_key_vault_secret" "shelf_secret" {
 }
 
 resource "azurerm_key_vault_secret" "oidc_client_secret" {
-  name         = "OIDC_CLIENT_SECRET"
+  name         = "OIDC-CLIENT-SECRET"
   value        = "change-me"
   key_vault_id = azurerm_key_vault.main.id
 }
 
 resource "azurerm_key_vault_secret" "admin_token" {
-  name         = "ADMIN_TOKEN"
+  name         = "ADMIN-TOKEN"
   value        = "change-me"
   key_vault_id = azurerm_key_vault.main.id
 }
 
 resource "azurerm_key_vault_secret" "db_password" {
-  name         = "DB_PASSWORD"
+  name         = "DB-PASSWORD"
   value        = random_password.db.result
   key_vault_id = azurerm_key_vault.main.id
 }
@@ -360,7 +360,7 @@ function generateAzureEnvTable(): string {
 | \`storage_connection_string\` | \`AZURE_STORAGE_CONNECTION\` | \`storage-azure\` (Blob container) |
 | \`database_url\` | \`DATABASE_URL\` | \`db-postgres\` |
 | \`entra_application_id\` / \`entra_tenant_id\` | \`OIDC_CLIENT_ID\` / \`OIDC_ISSUER\` (\`https://login.microsoftonline.com/{tenant}/v2.0\`) | \`auth\` (keycloak recipe) |
-| Key Vault | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
+| Key Vault entries \`SECRET\` / \`OIDC-CLIENT-SECRET\` / \`ADMIN-TOKEN\` | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
 `;
 }
 

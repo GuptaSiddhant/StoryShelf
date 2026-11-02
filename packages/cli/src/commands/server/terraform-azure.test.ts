@@ -47,6 +47,8 @@ describe("Azure Terraform modules", () => {
     const versions = generateAzureVersions();
     expect(versions).toContain(">= 1.9");
     expect(versions).toContain("hashicorp/azurerm");
+    // azurerm 5.x renamed enable_rbac_authorization; the generated Key Vault uses the 4.x name.
+    expect(versions).toContain('version = "~> 4.0"');
     expect(versions).toContain("hashicorp/azuread");
   });
 
@@ -65,6 +67,10 @@ describe("Azure Terraform modules", () => {
     // One app: it also consumes capture jobs from the database queue.
     expect(compute).not.toContain('resource "azurerm_container_app" "worker"');
     expect(compute).toContain("min_replicas = 1");
+    // External ingress on the app port (azurerm names the flag `external_enabled`, not `external`).
+    expect(compute).toContain("external_enabled = true");
+    expect(compute).toContain("target_port      = 3000");
+    expect(compute).not.toMatch(/^\s+external\s+=/mu);
     expect(compute).not.toContain("linux_virtual_machine");
     expect(compute).not.toContain("linux_function_app");
   });
@@ -93,8 +99,10 @@ describe("Azure Terraform modules", () => {
   it("stores secrets in Key Vault, never in env", () => {
     const secrets = generateAzureSecrets();
     expect(secrets).toContain('resource "azurerm_key_vault" "main"');
-    expect(secrets).toContain("ADMIN_TOKEN");
-    expect(secrets).toContain("DB_PASSWORD");
+    // Key Vault secret names reject underscores, so they use dashes.
+    expect(secrets).toContain("OIDC-CLIENT-SECRET");
+    expect(secrets).toContain("ADMIN-TOKEN");
+    expect(secrets).toContain("DB-PASSWORD");
   });
 
   it("gates DNS on domain_name", () => {
@@ -143,6 +151,15 @@ describe("Azure Terraform modules", () => {
   });
 });
 
+/** Names in a README table cell such as "Key Vault entries `A` / `B`", in order. */
+function namesIn(cell: string | undefined): string[] {
+  return (cell ?? "")
+    .replace("Key Vault entries", "")
+    .replaceAll("`", "")
+    .split("/")
+    .map((name) => name.trim());
+}
+
 describe("Azure Terraform README", () => {
   it("documents plan-before-apply, az login, and the CI profile", () => {
     const readme = generateAzureReadme("acme-shelf");
@@ -151,6 +168,20 @@ describe("Azure Terraform README", () => {
     expect(readme).toContain("AZURE_STORAGE_CONNECTION");
     expect(readme).toContain("CI test profile");
     expect(readme).toContain("shelf-ci-");
+  });
+
+  it("maps the dashed Key Vault entry names to the underscored env vars", () => {
+    const readme = generateAzureReadme("acme-shelf");
+    const row = readme.split("\n").find((line) => line.startsWith("| Key Vault entries"));
+    expect(row).toBeDefined();
+    // Vault entry names (dashes) in the first column, env var names (underscores) in the second.
+    const [, entryCell, envCell] = (row ?? "").split("|").map((cell) => cell.trim());
+    // Pairwise, in order: swapping two entries (or two env vars) must fail.
+    expect(namesIn(entryCell).map((entry, index) => [entry, namesIn(envCell)[index]])).toEqual([
+      ["SECRET", "SECRET"],
+      ["OIDC-CLIENT-SECRET", "OIDC_CLIENT_SECRET"],
+      ["ADMIN-TOKEN", "ADMIN_TOKEN"],
+    ]);
   });
 });
 

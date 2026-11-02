@@ -104,6 +104,15 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
+      - name: Setup Terraform
+        # The cli's terraform-*.integration.test.ts skip without a terraform binary, so install one
+        # here: `fmt -check` and `validate` of the generated AWS/GCP/Azure output run on every PR.
+        # 1.9.x matches TERRAFORM_REQUIRED_VERSION (">= 1.9") in packages/cli.
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+          terraform_wrapper: false
+
       - name: Check ADR references and size
         run: nub run docs:check
 
