@@ -490,7 +490,13 @@ describe("createSqliteDatabase", () => {
       const rows = check
         .prepare("SELECT id, active_key, rerun_requested_at FROM capture_jobs ORDER BY id")
         .all();
-      expect(rows.map((row) => Object.assign({}, row))).toEqual([
+      expect(
+        rows.map((row) => ({
+          id: row["id"],
+          active_key: row["active_key"],
+          rerun_requested_at: row["rerun_requested_at"],
+        })),
+      ).toEqual([
         { id: "j1", active_key: null, rerun_requested_at: null },
         { id: "j2", active_key: null, rerun_requested_at: null },
       ]);
