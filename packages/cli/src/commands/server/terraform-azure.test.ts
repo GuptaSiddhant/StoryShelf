@@ -47,6 +47,8 @@ describe("Azure Terraform modules", () => {
     const versions = generateAzureVersions();
     expect(versions).toContain(">= 1.9");
     expect(versions).toContain("hashicorp/azurerm");
+    // azurerm 5.x renamed enable_rbac_authorization; the generated Key Vault uses the 4.x name.
+    expect(versions).toContain('version = "~> 4.0"');
     expect(versions).toContain("hashicorp/azuread");
   });
 
