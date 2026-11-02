@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanIgnoreSelectors,
+  declaredIgnoreSelectors,
   DEFAULT_IGNORE_SELECTORS,
   ignoreStylesheet,
   isSafeIgnoreSelector,
@@ -58,14 +59,46 @@ describe("ignoreStylesheet", () => {
     expect(css).not.toContain("display");
   });
 
+  it("hides descendants too, so a child that sets visibility: visible cannot show through", () => {
+    const css = ignoreStylesheet([".clock"]);
+    expect(css).toContain(".clock { visibility: hidden !important; }");
+    expect(css).toContain(":is(.clock) * { visibility: hidden !important; }");
+  });
+
+  it("never emits an unsafe selector, even if one reaches it", () => {
+    const css = ignoreStylesheet([".ok", "a{}", "x } body { display:none"]);
+    expect(css).toContain(".ok {");
+    expect(css).not.toContain("display");
+    expect(css).not.toContain("a{}");
+  });
+
   it("adds declared selectors once", () => {
     const css = ignoreStylesheet([".clock", ".clock", "[data-storyshelf-ignore]"]);
-    expect(css.match(/\.clock \{/gu)).toHaveLength(1);
+    expect(css.match(/^\.clock \{/gmu)).toHaveLength(1);
     expect(css.match(/\[data-storyshelf-ignore\] \{/gu)).toHaveLength(1);
   });
 });
 
+describe("declaredIgnoreSelectors", () => {
+  it("keeps string entries untouched, leaving safety and the cap to the runner", () => {
+    expect(declaredIgnoreSelectors([".a", 1, "b{}", null])).toEqual([".a", "b{}"]);
+  });
+
+  it("is undefined when nothing usable was declared", () => {
+    expect(declaredIgnoreSelectors("nope")).toBeUndefined();
+    expect(declaredIgnoreSelectors([1, 2])).toBeUndefined();
+    expect(declaredIgnoreSelectors([])).toBeUndefined();
+  });
+});
+
 describe("mergeParameters ignoreSelectors", () => {
+  it("passes a refused selector through so the runner can report it", () => {
+    const merged = mergeParameters({
+      parameters: { storyshelf: { ignoreSelectors: [".a", "b{}"] } },
+    });
+    expect(merged?.ignoreSelectors).toEqual([".a", "b{}"]);
+  });
+
   it("reads the chromatic key alone", () => {
     const merged = mergeParameters({ parameters: { chromatic: { ignoreSelectors: [".a"] } } });
     expect(merged?.ignoreSelectors).toEqual([".a"]);

@@ -24,6 +24,7 @@ export {
 export { storybookUrlSource, type StorybookUrlSource } from "./storybook-urls.ts";
 export {
   cleanIgnoreSelectors,
+  declaredIgnoreSelectors,
   DEFAULT_IGNORE_SELECTORS,
   ignoreStylesheet,
   isSafeIgnoreSelector,

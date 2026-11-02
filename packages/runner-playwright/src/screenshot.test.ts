@@ -204,6 +204,17 @@ describe("ignore regions", () => {
     );
   });
 
+  it("reports a selector refused as unsafe, and keeps it out of the stylesheet", async () => {
+    const { ctx, styles, logger } = harness(settled);
+    await captureScreenshot(ctx, withIgnore([".ok", "a{}"]), viewport);
+    expect(styles[0]).toContain(".ok {");
+    expect(styles[0]).not.toContain("a{}");
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ storyId: "a--b", selectors: ["a{}"] }),
+      expect.stringContaining("invalid ignore selectors"),
+    );
+  });
+
   it("never fails the capture when the stylesheet cannot be injected", async () => {
     const { ctx, page, logger } = harness(settled);
     page.addStyleTag = async () => {

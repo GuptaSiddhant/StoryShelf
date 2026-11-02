@@ -1,7 +1,11 @@
 /** Screenshot pipeline for a single story + viewport (Puppeteer). */
 
 import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runner";
-import { getScreenshotPlan, ignoreStylesheet } from "@storyshelf/core/capture";
+import {
+  cleanIgnoreSelectors,
+  getScreenshotPlan,
+  ignoreStylesheet,
+} from "@storyshelf/core/capture";
 import type { Page } from "puppeteer-core";
 import { checkA11y } from "./a11y.ts";
 import { acquirePage } from "./pages.ts";
@@ -139,9 +143,9 @@ async function maskIgnoredRegions(
   page: Page,
   story: StoryEntry,
 ): Promise<void> {
-  const declared = story.parameters?.ignoreSelectors ?? [];
+  const { selectors: declared, skipped } = cleanIgnoreSelectors(story.parameters?.ignoreSelectors);
   try {
-    const rejected = await page.evaluate((list: string[]) => {
+    const refused = await page.evaluate((list: string[]) => {
       const doc = (globalThis as unknown as { document: { querySelector(s: string): unknown } })
         .document;
       return list.filter((selector) => {
@@ -153,6 +157,7 @@ async function maskIgnoredRegions(
         }
       });
     }, declared);
+    const rejected = [...skipped, ...refused];
     if (rejected.length > 0)
       ctx.logger?.warn(
         { storyId: story.id, selectors: rejected },

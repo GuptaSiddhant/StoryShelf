@@ -12,7 +12,7 @@ import type {
 } from "./adapter.ts";
 import type { DiscoverOptions } from "./adapter.ts";
 import { extractDesignUrl, type DesignUrlParser } from "./design.ts";
-import { cleanIgnoreSelectors } from "./ignore-regions.ts";
+import { declaredIgnoreSelectors } from "./ignore-regions.ts";
 import { applyModes, buildGlobalsParam } from "./modes.ts";
 
 interface StorybookIndex {
@@ -52,8 +52,8 @@ export function mergeParameters(entry: {
   if (modes) merged.modes = modes;
   if (entry.parameters?.viewport) merged.viewport = entry.parameters.viewport;
   if ("ignoreSelectors" in merged) {
-    const { selectors } = cleanIgnoreSelectors(merged.ignoreSelectors);
-    if (selectors.length > 0) merged.ignoreSelectors = selectors;
+    const declared = declaredIgnoreSelectors(merged.ignoreSelectors);
+    if (declared) merged.ignoreSelectors = declared;
     else delete merged.ignoreSelectors;
   }
   return Object.keys(merged).length > 0 ? merged : undefined;

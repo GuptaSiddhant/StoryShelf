@@ -50,10 +50,31 @@ export function cleanIgnoreSelectors(value: unknown): IgnoreSelectorList {
 }
 
 /**
- * The stylesheet that masks `selectors` plus {@link DEFAULT_IGNORE_SELECTORS}. One rule per
- * selector, so a selector the browser rejects cannot take the others down with it.
+ * The string entries of a declared `ignoreSelectors` value, untouched, or `undefined` when there
+ * are none. Safety and the cap are applied later by {@link cleanIgnoreSelectors}, in the runner,
+ * so a refused selector can still be reported on the snapshot log.
+ */
+export function declaredIgnoreSelectors(value: unknown): string[] | undefined {
+  const strings = Array.isArray(value)
+    ? (value as unknown[]).filter((entry): entry is string => typeof entry === "string")
+    : [];
+  return strings.length > 0 ? strings : undefined;
+}
+
+/**
+ * The stylesheet that masks `selectors` plus {@link DEFAULT_IGNORE_SELECTORS}. Each selector gets
+ * its own pair of rules, so a selector the browser rejects cannot take the others down with it:
+ * the element itself, and (`:is()` forgives an invalid selector) every descendant, so a child that
+ * sets `visibility: visible` is hidden too. Unsafe selectors are dropped here as well.
  */
 export function ignoreStylesheet(selectors: readonly string[] = []): string {
-  const all = [...new Set([...DEFAULT_IGNORE_SELECTORS, ...selectors])];
-  return all.map((selector) => `${selector} { ${MASK_DECLARATION} }`).join("\n");
+  const all = [...new Set([...DEFAULT_IGNORE_SELECTORS, ...selectors])].filter((selector) =>
+    isSafeIgnoreSelector(selector),
+  );
+  return all
+    .map(
+      (selector) =>
+        `${selector} { ${MASK_DECLARATION} }\n:is(${selector}) * { ${MASK_DECLARATION} }`,
+    )
+    .join("\n");
 }

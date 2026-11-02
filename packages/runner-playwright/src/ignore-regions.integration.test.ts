@@ -32,6 +32,15 @@ const PAGE = `<!doctype html><html><body style="margin:0;font:24px monospace">
   box.textContent = digits;
   if (id === "ignore--attribute") box.setAttribute("data-storyshelf-ignore", "");
   if (id === "ignore--selector") box.className = "clock";
+  if (id === "ignore--descendant") {
+    // The mask is on the parent; the child overrides it, as a popover or portal might.
+    box.setAttribute("data-storyshelf-ignore", "");
+    box.textContent = "";
+    const child = document.createElement("span");
+    child.style.visibility = "visible";
+    child.textContent = digits;
+    box.append(child);
+  }
   root.append(box);
 </script></body></html>`;
 
@@ -74,6 +83,12 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("ignore regions (Playwri
   it("masks elements matched by parameters.storyshelf.ignoreSelectors", async () => {
     const first = await shotOf(story("ignore--selector", [".clock"]), "ignore-sel-1");
     const second = await shotOf(story("ignore--selector", [".clock"]), "ignore-sel-2");
+    expect(second).toEqual(first);
+  }, 120_000);
+
+  it("hides a descendant that sets visibility: visible inside an ignored element", async () => {
+    const first = await shotOf(story("ignore--descendant"), "ignore-desc-1");
+    const second = await shotOf(story("ignore--descendant"), "ignore-desc-2");
     expect(second).toEqual(first);
   }, 120_000);
 
