@@ -160,9 +160,10 @@ describe("waiting for the story to be ready", () => {
   });
 });
 
+const withIgnore = (selectors: string[]): StoryEntry =>
+  ({ ...story(), parameters: { ignoreSelectors: selectors } }) as StoryEntry;
+
 describe("ignore regions", () => {
-  const withIgnore = (selectors: string[]): StoryEntry =>
-    ({ ...story(), parameters: { ignoreSelectors: selectors } }) as StoryEntry;
 
   it("injects one mask stylesheet before the screenshot, defaults included", async () => {
     const { ctx, styles } = harness(settled);
