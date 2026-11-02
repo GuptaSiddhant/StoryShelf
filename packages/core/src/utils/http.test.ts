@@ -145,6 +145,26 @@ describe("secret-bearing URLs in logs and spans", () => {
     expect(recordedExceptions[0]).toContain("no route for");
   });
 
+  it("keeps an HTML-escaped query echoed in an error page off the recorded exception", async () => {
+    const url =
+      "https://prod.example.com/workflows/W1/triggers/manual/paths/invoke?api-version=1&sig=SECRETsig";
+    const echoed =
+      "<pre>Cannot POST /workflows/W1/triggers/manual/paths/invoke?api-version=1&amp;sig=SECRETsig</pre>";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce(
+          new Response(echoed, { status: 502, headers: { "retry-after": "0" } }),
+        )
+        .mockResolvedValueOnce(new Response("ok", { status: 200 })),
+    );
+    await httpText(url);
+    expect(recordedExceptions).toHaveLength(1);
+    expect(recordedExceptions[0]).not.toContain("SECRETsig");
+    expect(recordedExceptions[0]).toContain("Cannot POST");
+  });
+
   it("still requests the real URL", async () => {
     const fetchMock = vi.fn(async () => {
       await Promise.resolve();

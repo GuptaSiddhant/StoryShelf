@@ -239,13 +239,17 @@ function scrubText(text: string, url: string): string {
   return redactSecrets(scrubbed);
 }
 
-/** The path-and-query forms of a URL that an error body may repeat; the bare root is not one. */
+/**
+ * The path-and-query forms of a URL that an error body may repeat (as written and with `&`
+ * HTML-escaped, as an HTML error page does); the bare root is not one.
+ */
 function requestTargets(url: string): string[] {
   if (!URL.canParse(url)) {
     return [];
   }
   const { pathname, search } = new URL(url);
-  return [`${pathname}${search}`, pathname].filter((target) => target.length > 1);
+  const target = `${pathname}${search}`;
+  return [target, target.replaceAll("&", "&amp;"), pathname].filter((value) => value.length > 1);
 }
 
 async function backoff(
