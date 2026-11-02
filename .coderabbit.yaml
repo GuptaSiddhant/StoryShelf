@@ -6,7 +6,7 @@ tone_instructions: "Be direct, technical, actionable. State defect, failure mode
 reviews:
   profile: "assertive"
   auto_approvals:
-    enabled: true
+    enabled: false
     allow_author_approval: true
   high_level_summary: true
   high_level_summary_in_walkthrough: true
@@ -30,8 +30,8 @@ reviews:
   enable_prompt_for_ai_agents: true
   abort_on_close: true
   auto_review:
-    enabled: false
-    auto_incremental_review: false
+    enabled: true
+    auto_incremental_review: true
     drafts: false
     ignore_title_keywords:
       - "WIP"
