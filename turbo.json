@@ -38,7 +38,8 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc.json"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "env": ["RUN_TERRAFORM"]
     },
     "test:integration": {
       "dependsOn": ["^build"],
