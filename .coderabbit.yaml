@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: "en-US"
 early_access: false
-tone_instructions: "Be direct, highly technical, and strictly actionable. State the defect, failure mode, and concrete fix with file:line. No praise, filler, generic advice, or restating the diff. Only raise blocking defects and concrete risks; skip nitpicks, style, and observations. Flag uncertainty explicitly; never assert an unverified issue. Keep each comment to 3 sentences max."
+tone_instructions: "Be direct, technical, actionable. State defect, failure mode, concrete fix with file:line. No praise, filler, or restating diff. Only blocking defects and concrete risks; skip nitpicks. Flag uncertainty; never assert unverified. Max 3 sentences."
 
 reviews:
   profile: "assertive"
