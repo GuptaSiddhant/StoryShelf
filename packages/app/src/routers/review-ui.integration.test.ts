@@ -1,5 +1,5 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
-import { BuildModel, CommentModel, MemberModel } from "@storyshelf/core/models";
+import { BuildModel, CommentModel, MemberModel, WebhookModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import AdmZip from "adm-zip";
@@ -602,6 +602,15 @@ async function withChannel(booted: Booted): Promise<void> {
 
 const events = (booted: Booted): string => booted.sent.join("\n");
 
+async function postComment(booted: Booted, id: string, extra: Record<string, unknown>) {
+  const response = await booted.api("dev", `/builds/${id}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ body: "hello", ...extra }),
+  });
+  expect(response.status).toBe(201);
+  return (await response.json()) as { id: string };
+}
+
 describe("review events", () => {
   it("raises review:requested for a published build that waits, not for the default branch", async () => {
     const booted = await boot();
@@ -633,7 +642,7 @@ describe("review events", () => {
     await booted.stop();
   });
 
-  it("raises review:verdict for each verdict, and review:comment for build and story comments", async () => {
+  it("raises review:verdict for each verdict, and one comment:created for build and story comments", async () => {
     const booted = await boot();
     await withChannel(booted);
     const id = await publish(booted, "feature/x");
@@ -651,9 +660,87 @@ describe("review events", () => {
     });
     await vi.waitFor(() => {
       expect(booted.sent.filter((subject) => subject.includes("review:verdict"))).toHaveLength(1);
-      expect(booted.sent.filter((subject) => subject.includes("review:comment"))).toHaveLength(2);
+      expect(booted.sent.filter((subject) => subject.includes("comment:created"))).toHaveLength(2);
     });
-    expect(events(booted)).not.toContain("comment:created");
+    expect(events(booted)).not.toContain("review:comment");
     await booted.stop();
+  });
+
+  describe("comment:created", () => {
+    type Delivery = { event: string; header: string; data: Record<string, unknown> };
+
+    /** Webhook deliveries to one subscriber, read from the stubbed `fetch`. */
+    async function deliveries(
+      booted: Booted,
+      subscribed: string[],
+      respond: () => number = () => 200,
+    ): Promise<Delivery[]> {
+      await new WebhookModel(booted.db, { webhooks: booted.db.tables.webhooks }, "s").create("p1", {
+        url: "https://hooks.example/in",
+        secret: "whsec",
+        events: subscribed,
+      });
+      const seen: Delivery[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_url: string, init: { headers: Record<string, string>; body: string }) => {
+          await Promise.resolve();
+          const body = JSON.parse(init.body) as { event: string; data: Record<string, unknown> };
+          seen.push({
+            event: body.event,
+            header: init.headers["X-StoryShelf-Event"] ?? "",
+            data: body.data,
+          });
+          return new Response("{}", { status: respond() });
+        }),
+      );
+      return seen;
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("emits one comment:created per comment, anchored by scope, with the event header", async () => {
+      const booted = await boot();
+      await withChannel(booted);
+      const id = await publish(booted, "feature/x");
+      const seen = await deliveries(booted, []);
+      const build = await postComment(booted, id, {});
+      const story = await postComment(booted, id, { storyId: "card--basic" });
+      const snap = await postComment(booted, id, { snapshotId: "snap1" });
+      await vi.waitFor(() => expect(seen).toHaveLength(3));
+      expect(seen.map((item) => [item.event, item.header])).toEqual([
+        ["comment:created", "comment:created"],
+        ["comment:created", "comment:created"],
+        ["comment:created", "comment:created"],
+      ]);
+      expect(seen.map((item) => item.data["scope"])).toEqual(["build", "story", "snapshot"]);
+      expect(seen.map((item) => item.data["commentId"])).toEqual([build.id, story.id, snap.id]);
+      expect(seen[1]?.data).toMatchObject({ buildId: id, storyId: "card--basic" });
+      expect(seen[2]?.data).toMatchObject({ buildId: id, snapshotId: "snap1" });
+      await vi.waitFor(() =>
+        expect(booted.sent.filter((subject) => subject.includes("comment:created"))).toHaveLength(
+          3,
+        ),
+      );
+      expect(events(booted)).not.toContain("review:comment");
+      await booted.stop();
+    });
+
+    it("keeps the same event id (the comment id) when a delivery is retried", async () => {
+      const booted = await boot();
+      const id = await publish(booted, "feature/x");
+      const statuses = [503, 200];
+      const seen = await deliveries(booted, ["comment:created"], () => statuses.shift() ?? 200);
+      vi.stubGlobal("setTimeout", (callback: () => void) => {
+        callback();
+        return 0;
+      });
+      const created = await postComment(booted, id, {});
+      await vi.waitFor(() => expect(seen).toHaveLength(2));
+      expect(seen.map((item) => item.data["eventId"])).toEqual([created.id, created.id]);
+      await booted.stop();
+    });
   });
 });
