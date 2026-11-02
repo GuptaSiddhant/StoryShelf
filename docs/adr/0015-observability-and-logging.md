@@ -104,7 +104,9 @@ exports and no behavioural change, and the hermetic vitest suite stays network-f
   is intentionally internal: no new `core` exports subpath. Core's `withSpan` records a
   redacted copy of a thrown error (`spanException`: same name, `redactSecrets` message) and
   rethrows the original. The HTTP retry loop records a failed attempt it retries through the same
-  `spanException`; no core code passes a raw error to `recordException`.
+  `spanException`; no core code passes a raw error to `recordException`. The `observability` and
+  `ai` span wrappers do the same with their own copy of the helper (the no-cycle rule keeps them
+  separate), so no span records a raw error.
 - `@storyshelf/observability` owns the SDK lifecycle (`node.ts`: OTLP/HTTP exporters, a resource with
   service name, version and environment), the `createInstrumentedDatabase` and
   `createInstrumentedStorage` wrappers (`db.*` and `storage.*` spans plus duration histograms), the pino
