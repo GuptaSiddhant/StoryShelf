@@ -31,14 +31,20 @@ describe("ConnectionLimiter", () => {
     const limiter = new ConnectionLimiter(3);
     let inFlight = 0;
     let peak = 0;
+    // Every slot is held until the cap is full, so reaching it is certain, not a matter of timing.
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
     await Promise.all(
       Array.from({ length: 20 }, async () => {
         const slot = await limiter.acquire();
         inFlight += 1;
         peak = Math.max(peak, inFlight);
-        await new Promise((resolve) => {
-          setTimeout(resolve, 1);
-        });
+        if (inFlight === 3) {
+          openGate();
+        }
+        await gate;
         inFlight -= 1;
         slot.release();
       }),

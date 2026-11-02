@@ -57,15 +57,21 @@ describe("maxConnections", () => {
     const { entry, released, held } = service({ maxConnections: 2 });
     let inFlight = 0;
     let peak = 0;
+    // Every lease is held until the cap is full, so reaching it is certain, not a matter of timing.
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
     await Promise.all(
       Array.from({ length: 8 }, async () => {
         const { lease } = await connectLeased(entry, CTX, opens);
         inFlight += 1;
         peak = Math.max(peak, inFlight);
         expect(held()).toBeLessThanOrEqual(2);
-        await new Promise((resolve) => {
-          setTimeout(resolve, 2);
-        });
+        if (inFlight === 2) {
+          openGate();
+        }
+        await gate;
         inFlight -= 1;
         await lease.end("finished");
       }),
