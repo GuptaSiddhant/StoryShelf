@@ -124,7 +124,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
   `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
   `/_s/` or widen what a token grants. Only `signedCacheControl` (`packages/app/src/routers/
-  capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
+capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
   manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
   by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
   never let a runner set response headers.
@@ -173,9 +173,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - **Logging and HTTP.** Use pino from core (`createShelfLogger()`): structured objects, never string
   interpolation (`logger.info({ buildId }, "msg")`), errors as an `err` child. Adapters receive scoped
   loggers via `Adapter.setLogger` and never create their own. Outbound HTTP only through
-  `@storyshelf/core/utils` (`httpJson`/`HttpError`); never add `ky`/`ofetch`. In core, record an exception
-  on a span only through `spanException` (core's `withSpan` does it): a redacted copy, rethrowing
-  the original.
+  `@storyshelf/core/utils` (`httpJson`/`HttpError`); never add `ky`/`ofetch`. On every span (core,
+  `observability`, `ai`), record an exception only as a redacted copy (core's `spanException`, or
+  the wrappers' own copy of it), rethrowing the original.
   An `HttpError` is recorded as `HTTP <status>`, never its body; log and trace a request URL only as
   `redactUrlForLog(url)` (origin only).
 - **Remote browsers.** `defineRemote` expands to `<engine>@<name>` targets; presets are plain
