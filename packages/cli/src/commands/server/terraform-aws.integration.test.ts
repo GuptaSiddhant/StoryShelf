@@ -41,23 +41,23 @@ function materialize(options: AwsTerraformOptions): string {
 }
 
 describe.skipIf(!hasTerraform)("generated AWS terraform (gated on terraform binary)", () => {
-  let rdsDir: string;
-  let dsqlDir: string;
+  let domainDir: string;
+  let noDomainDir: string;
   let existingVpcDir: string;
 
   beforeAll(() => {
-    rdsDir = materialize({
+    // With a domain: Route 53 zone, ACM certificate validation, HTTPS listener, 301 on port 80.
+    domainDir = materialize({
       project: "acme-shelf",
       region: "us-east-1",
-      dbEngine: "rds",
       domainName: "shelf.example.com",
       samlMetadataUrl: "https://idp.example.com/metadata/saml",
     });
-    dsqlDir = materialize({ project: "acme-shelf", region: "us-east-1", dbEngine: "dsql" });
+    // Without a domain: HTTP only, no HTTPS listener.
+    noDomainDir = materialize({ project: "acme-shelf", region: "us-east-1" });
     existingVpcDir = materialize({
       project: "acme-shelf",
       region: "us-east-1",
-      dbEngine: "rds",
       vpcId: "vpc-0123456789abcdef0",
     });
   });
@@ -69,8 +69,8 @@ describe.skipIf(!hasTerraform)("generated AWS terraform (gated on terraform bina
     }
   });
 
-  it("passes terraform fmt -check for the RDS, DSQL and existing-VPC variants", () => {
-    for (const dir of [rdsDir, dsqlDir, existingVpcDir]) {
+  it("passes terraform fmt -check with and without a domain and with an existing VPC", () => {
+    for (const dir of [domainDir, noDomainDir, existingVpcDir]) {
       expect(() =>
         execFileSync("terraform", ["fmt", "-check", "-recursive", "."], { cwd: dir }),
       ).not.toThrow();
@@ -78,7 +78,7 @@ describe.skipIf(!hasTerraform)("generated AWS terraform (gated on terraform bina
   });
 
   it("initializes and validates the generated terraform directory", () => {
-    for (const dir of [rdsDir, dsqlDir, existingVpcDir]) {
+    for (const dir of [domainDir, noDomainDir, existingVpcDir]) {
       const cwd = join(dir, "terraform");
       expect(() =>
         execFileSync("terraform", ["init", "-backend=false", "-input=false", "-no-color"], {

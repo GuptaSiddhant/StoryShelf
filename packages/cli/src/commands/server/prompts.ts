@@ -331,15 +331,6 @@ export const AWS_INFRA_PROMPTS: Prompt[] = [
     initial: "us-east-1",
   },
   {
-    type: "select",
-    name: "dbEngine",
-    message: "Postgres engine?",
-    choices: [
-      { title: "RDS (VPC-isolated, battle-tested)", value: "rds" },
-      { title: "Aurora DSQL (serverless)", value: "dsql" },
-    ],
-  },
-  {
     type: "text",
     name: "domainName",
     message: "Public domain for the ALB? (empty leaves it HTTP-only)",

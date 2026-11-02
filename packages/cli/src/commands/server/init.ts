@@ -92,7 +92,6 @@ interface Answers {
   advancedAdapters?: boolean;
   /** AWS-only follow-ups (asked when deployTarget is `aws`). */
   awsRegion?: string;
-  dbEngine?: "rds" | "dsql";
   domainName?: string;
   samlMetadataUrl?: string;
   /** Azure-only follow-ups (asked when deployTarget is `azure`). */
@@ -631,7 +630,6 @@ async function writeTerraformFiles(outDir: string, answers: Answers): Promise<vo
   const files = generateAwsTerraformFiles({
     project: answers.name,
     region: answers.awsRegion ?? "us-east-1",
-    dbEngine: answers.dbEngine ?? "rds",
     ...(answers.domainName ? { domainName: answers.domainName } : {}),
     ...(answers.samlMetadataUrl ? { samlMetadataUrl: answers.samlMetadataUrl } : {}),
   });
@@ -790,7 +788,6 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.docker = true;
     const awsAnswers = ((await prompts(AWS_INFRA_PROMPTS)) as Record<string, unknown>) ?? {};
     answers.awsRegion = (awsAnswers["awsRegion"] as string | undefined) ?? "us-east-1";
-    answers.dbEngine = (awsAnswers["dbEngine"] as "rds" | "dsql" | undefined) ?? "rds";
     answers.domainName = (awsAnswers["domainName"] as string | undefined) ?? undefined;
     answers.samlMetadataUrl = (awsAnswers["samlMetadataUrl"] as string | undefined) ?? undefined;
   }
