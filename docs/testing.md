@@ -112,7 +112,8 @@ Strictly real providers — no injected fake clients, no emulators. Hermetic
 `turbo test` never touches the network: live files `skipIf(LIVE_CLOUD !== "1")`
 and construct adapters inside `beforeAll`, so skipped runs don't even read
 cloud env vars. Live results must never come from the turbo cache — always
-run with `--force`. Nightly + manual dispatch per provider:
+run with `--force`. Manual dispatch only, per provider (the nightly schedules
+are deferred until secrets exist and the AWS scaffold is fixed; see #410):
 
 - `.github/workflows/live-cloud-aws.yml` — S3
 - `.github/workflows/live-cloud-azure.yml` — Blob

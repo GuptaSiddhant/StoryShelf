@@ -1,3 +1,4 @@
+# Schedule deferred; see #410.
 name: Live Cloud Ancillary
 
 # Phase 4 live tests: Turso + Postgres + MySQL + OAuth + GitHub + GitLab
@@ -15,8 +16,6 @@ name: Live Cloud Ancillary
 #   (+ optional LIVE_GL_HOST for self-managed GitLab)
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "15 4 * * *"
 
 permissions:
   contents: read
@@ -92,7 +91,7 @@ jobs:
 
       - name: Run auth suite (hermetic + live)
         if: matrix.suite == 'auth'
-        run: nubx turbo test --filter='@storyshelf/auth-oauth' --force
+        run: nubx turbo test --filter='@storyshelf/auth' --force
 
       - name: Run git suites (hermetic + live)
         if: matrix.suite == 'git'
