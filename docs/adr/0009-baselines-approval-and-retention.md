@@ -104,7 +104,7 @@ Projects, Published Storybook and Labels). Feature-branch baselines go through b
 
 **Purged:**
 
-- Builds in a terminal status (`approved`, `rejected`, `failed`, `cancelled`) older than `purge_ttl` (default 30
+- Builds in a terminal status (`approved`, `rejected`, `failed`, `cancelled`) older than `purgeTtlDays` (default 30
   days).
 - Old builds of a branch: the most recent build per branch is retained (it backs the PR status
   link); older ones are purged past the TTL.
@@ -150,8 +150,10 @@ removed mode or target leaves stale baselines, which are not pruned yet.
 
 ### 5. Triggers
 
-- **Scheduled** in-server timers: build purge (`--purge-interval`, default hourly) and branch GC
-  (`branchTtlDays` plus `branchGcIntervalMs`, a daily clock staggered one hour).
+- **Scheduled:** one in-server timer, branch GC (`branchTtlDays` plus `branchGcIntervalMs`, a daily
+  clock staggered one hour). Build purge is not scheduled; run it manually.
+- **Current limitation:** with `testing` enabled, branch GC is skipped and `POST /api/v1/admin/purge`
+  answers `503` until lifecycle-aware retention lands (#374). Hosting-only deployments are unaffected.
 - **Manual:** `storyshelf purge` or `POST /api/v1/admin/purge`, which runs build purge and branch GC
   and returns `{ removedBuilds, removedBranches, removedBaselines }`.
 - **Switching `review` off** accepts, in one pass at save time, the project's `pending` builds that
