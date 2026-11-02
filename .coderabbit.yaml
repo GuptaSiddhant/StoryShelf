@@ -33,6 +33,9 @@ reviews:
     enabled: true
     auto_incremental_review: true
     drafts: false
+    # Review PRs into epic branches too (AGENTS.md "Epic branches"); the default branch is always included.
+    base_branches:
+      - "epic/.*"
     ignore_title_keywords:
       - "WIP"
       - "DO NOT MERGE"

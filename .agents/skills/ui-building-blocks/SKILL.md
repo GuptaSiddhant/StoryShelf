@@ -38,9 +38,9 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 - **No raw classes in pages:** `class="btn…"`, `class="tabs…"`,
   `tabs__link`, hand-rolled `page-header`/`card`/`empty` markup are banned —
   use the facade component with `variant`/`size`/`tone` props instead.
-- **No `style="…"` in pages.** If a layout recurs, add a block component
-  (`Stack`, `Row`, `TableActions`, `SectionTitle`) to the facade; one-off
-  spacing is a design smell, not an exception.
+- **No `style="…"` in pages.** If a layout recurs, compose `HStack` / `VStack`
+  or add a block component to the facade; one-off spacing is a design smell,
+  not an exception.
 - **Stack layout uses `HStack` / `VStack`, never utility divs or inline
   flex.** `HStack` (gap sm/md/lg, align center/start/end/baseline,
   justify start/center/end/between, wrap) and `VStack` (gap, align)

@@ -234,7 +234,7 @@ sequenceDiagram
     Handler-->>Client: JSON (/api/v1) or HTML (hono/jsx + HTMX) + HX-Redirect
 ```
 
-Conventions: IDs are ULIDs, timestamps ISO-8601 (`architecture.md:30`); `linkRoute()` for type-safe URLs; outbound HTTP via `httpJson`/`HttpError` (`core/utils`), never hand-rolled fetch (ADR 0001); structured logs `logger.info({ buildId }, "msg")` with `err` child (ADR 0015).
+Conventions: IDs are ULIDs, timestamps ISO-8601 (`architecture.md:30`); `createUrlBuilder` for type-safe URLs; outbound HTTP via `httpJson`/`HttpError` (`core/utils`), never hand-rolled fetch (ADR 0001); structured logs `logger.info({ buildId }, "msg")` with `err` child (ADR 0015).
 
 ---
 
@@ -634,7 +634,7 @@ flowchart LR
 - HTML and published routes use `slug`; JSON uses ULID (`architecture.md:507`).
 - `/storybook` and `/storybook/:key/:value` are resolvers (302) — assets served only under `/storybook/build/:buildId/...` to avoid `key/value` vs `assets/foo.js` collision (`architecture.md:477`).
 - `public` = `builds.public` OR `branch` matches `projects.public_branch_regex`; otherwise auth + `viewer` membership required (ADR 0011).
-- `linkRoute()` switches between path and subdomain forms based on `publishedBaseDomain`.
+- `createUrlBuilder` switches between path and subdomain forms based on `publishedBaseDomain`.
 
 ---
 
@@ -684,7 +684,8 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    startP(["Trigger<br/>--purge-interval (hourly) + branchGcIntervalMs (daily)<br/>or POST /api/v1/admin/purge<br/>or storyshelf purge CLI"])
+    dailyP(["Trigger<br/>branchGcIntervalMs (daily timer, branch GC only)"])
+    startP(["Trigger<br/>POST /api/v1/admin/purge<br/>or storyshelf purge CLI"])
     loadProjects["For each project"]
     cutoff["cutoff = now - purgeTtlDays (30)"]
     candidates["candidates = builds<br/>where status IN (approved,rejected)<br/>AND updated_at < cutoff"]
@@ -699,6 +700,7 @@ flowchart TB
     branchGC["Branch GC<br/>purgeStaleBranches(project, branchTtlDays=30)<br/>branches with no build since cutoff<br/>default branch exempt"]
     done(["Done<br/>return { removedBuilds, removedBranches, removedBaselines }"])
 
+    dailyP --> branchGC
     startP --> loadProjects --> cutoff --> candidates --> keepLatest
     keepLatest -- yes --> latest --> checkPersistent
     keepLatest -- no --> checkPersistent
@@ -711,7 +713,7 @@ flowchart TB
     classDef decision fill:#fff4ce,stroke:#e6a800;
     classDef action fill:#fef7e0,stroke:#fbbc04;
     classDef done2 fill:#e6f4ea,stroke:#34a853;
-    class startP trigger;
+    class dailyP,startP trigger;
     class keepLatest,checkPersistent decision;
     class loadProjects,cutoff,candidates,latest,toPurge,delFiles,delRows,orphanGC,branchGC action;
     class done done2;
