@@ -44,14 +44,18 @@ initialization preamble and log correlation — you only add the endpoint.
 **Spans:** `http.server` per request, `capture.job` per capture with
 `extract` / `persist-statics` / `render` / `persist` phases, `db.*` and
 `storage.*` per adapter operation, `http.client` for outbound calls (git
-hosts, webhooks, OIDC). Span names never contain IDs or paths.
+hosts, webhooks, OIDC). Span names never contain IDs or paths. A span records a redacted
+copy of an error, not the error itself: secrets are replaced by `[redacted]`, and a failed
+outbound HTTP request is recorded as its status (`HTTP 503`), never the response body, which
+can echo the request URL. `url.full` is the origin only (`https://api.example.com`), with no
+path, query or credentials, because the path of a webhook or bot URL can be the secret.
 
 **Metrics:** `capture.job.duration`, `capture.jobs.completed/failed`,
 `db.operation.duration`, `storage.operation.duration`,
 `http.server.request.duration` — all low-cardinality by rule.
 
 **Logs:** stdout JSON unchanged, plus `trace_id`/`span_id` on every line
-inside a span, so logs join with traces in your backend. A [signed Storybook URL](/guides/remote-browsers/#signed-storybook-urls) token in a request path is replaced by `[redacted]` in request logs and in the span's `url.full` attribute.
+inside a span, so logs join with traces in your backend. A [signed Storybook URL](/guides/remote-browsers/#signed-storybook-urls) token in a request path is replaced by `[redacted]` in request logs. The URL of an outbound request is logged as its origin only.
 
 ## Server-Timing response headers
 

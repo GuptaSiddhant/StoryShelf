@@ -1,7 +1,7 @@
+import type { Span } from "@opentelemetry/api";
 import { Buffer } from "node:buffer";
 import type { Logger } from "../logger.ts";
-import { injectTraceContext, withSpan } from "../tracing.ts";
-import { redactSecrets } from "./redact.ts";
+import { injectTraceContext, setSpanMessage, spanException, withSpan } from "../tracing.ts";
 
 /**
  * Fetch JSON with timeout, retries, and structured errors.
@@ -172,10 +172,12 @@ async function requestWithRetry<T>(
         try {
           return await perform(url, options, timeoutMs);
         } catch (error) {
-          span.recordException(redactedException(error, url));
+          describeFailure(span, error, url);
           if (options.signal?.aborted || !shouldRetry(error, attempt, maxAttempts)) {
+            // The final failure is recorded once, by `withSpan`, in the same redacted form.
             throw error;
           }
+          span.recordException(spanException(error));
           span.setAttribute("http.retry.count", attempt);
           await backoff(error, attempt, url, options.logger);
         }
@@ -187,69 +189,41 @@ async function requestWithRetry<T>(
 /* oxlint-enable eslint/no-await-in-loop */
 
 /**
- * The form of a request URL that may appear in logs and span attributes. The path of an incoming
- * webhook (Slack, Teams) is the secret, and other URLs carry credentials in the userinfo or the
- * query, so only the origin and the first path segment survive: `https://hooks.slack.com/services/…`.
- * A path of one segment (or none) is dropped to the origin, since that segment may be the secret.
- * Never userinfo, never the query string or fragment, never the full path. There is no opt-out.
+ * The form of a request URL that may appear in logs and span attributes: its origin
+ * (`protocol//host`) and nothing else. The path of an incoming webhook (Slack, Teams) is the secret,
+ * a bot token can be the first segment (Telegram), and other URLs carry credentials in the userinfo
+ * or the query, so the path, query, fragment and userinfo are dropped by construction. There is no
+ * opt-out.
  */
 export function redactUrlForLog(url: string): string {
-  let parsed: URL;
   try {
-    parsed = new URL(url);
+    const { protocol, host } = new URL(url);
+    return `${protocol}//${host}`;
   } catch {
     return "[invalid url]";
   }
-  const [first, ...rest] = parsed.pathname.split("/").filter((segment) => segment !== "");
-  const origin = `${parsed.protocol}//${parsed.host}`;
-  const path = first !== undefined && rest.length > 0 ? `/${first}/…` : "";
-  return redactSecrets(`${origin}${path}`);
 }
 
 /**
- * A copy of a failure that is safe to record on a span. Native `fetch` rejects a URL with userinfo
- * with a message and stack that repeat the whole URL (`https://user:pass@host/path`), so the URL
- * is replaced by its {@link redactUrlForLog} form first (`redactSecrets` alone leaves a secret in
- * the path), then both text fields go through `redactSecrets`. The original error is what gets
- * rethrown; only the recorded copy changes.
+ * What a span may say about a failed request. An HTTP failure carries its status and never the
+ * response body, which can echo the request URL in any encoding. Any other failure keeps its
+ * message with the request URL replaced by its origin, because native `fetch` repeats the whole
+ * URL, userinfo included, when it refuses one. The error a caller catches is not changed.
  */
-function redactedException(error: unknown, url: string): Error | string {
-  if (!(error instanceof Error)) {
-    return scrubText(String(error), url);
+function describeFailure(span: Span, error: unknown, url: string): void {
+  if (error instanceof HttpError) {
+    span.setAttribute("http.response.status_code", error.status);
+    setSpanMessage(error, `HTTP ${String(error.status)}`);
+  } else if (error instanceof Error) {
+    setSpanMessage(error, scrubUrl(error.message, url));
   }
-  const copy = new Error(scrubText(error.message, url));
-  copy.name = error.name;
-  if (error.stack) {
-    copy.stack = scrubText(error.stack, url);
-  }
-  return copy;
 }
 
-/**
- * `text` with the request URL (as given and as normalized) and its bare request target (path and
- * query, which a server's error page often echoes back) redacted.
- */
-function scrubText(text: string, url: string): string {
-  const safe = redactUrlForLog(url);
+/** `text` with the request URL, as given and as normalized, replaced by its origin. */
+function scrubUrl(text: string, url: string): string {
+  const origin = redactUrlForLog(url);
   const normalized = URL.canParse(url) ? new URL(url).href : url;
-  let scrubbed = text;
-  for (const secret of [url, normalized, ...requestTargets(url)]) {
-    scrubbed = scrubbed.replaceAll(secret, safe);
-  }
-  return redactSecrets(scrubbed);
-}
-
-/**
- * The path-and-query forms of a URL that an error body may repeat (as written and with `&`
- * HTML-escaped, as an HTML error page does); the bare root is not one.
- */
-function requestTargets(url: string): string[] {
-  if (!URL.canParse(url)) {
-    return [];
-  }
-  const { pathname, search } = new URL(url);
-  const target = `${pathname}${search}`;
-  return [target, target.replaceAll("&", "&amp;"), pathname].filter((value) => value.length > 1);
+  return text.replaceAll(url, origin).replaceAll(normalized, origin);
 }
 
 async function backoff(

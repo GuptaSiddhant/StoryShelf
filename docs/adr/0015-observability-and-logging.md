@@ -97,10 +97,13 @@ exports and no behavioural change, and the hermetic vitest suite stays network-f
 
 - `core` depends only on `@opentelemetry/api` (a zero-dependency shim, Deno-bridged). It uses it
   directly through an internal `src/tracing.ts` (`withSpan`, `parentContext`, `injectTraceContext`,
-  `currentTraceparent`), an `http.client` span with retry attributes in `httpJson` (query string
-  redacted), and a `capture.job` root span with four phase children (`capture.extract`,
+  `currentTraceparent`), an `http.client` span with retry attributes in `httpJson` (`url.full` is
+  the origin only; an HTTP failure is recorded as its status, never its response body), and a
+  `capture.job` root span with four phase children (`capture.extract`,
   `capture.persist-statics`, `capture.render`, `capture.persist`) in the orchestrator. `tracing.ts`
-  is intentionally internal: no new `core` exports subpath.
+  is intentionally internal: no new `core` exports subpath. `withSpan` records a redacted copy of a
+  thrown error (`spanException`: same name, `redactSecrets` message) and rethrows the original;
+  nothing else records an exception on a span.
 - `@storyshelf/observability` owns the SDK lifecycle (`node.ts`: OTLP/HTTP exporters, a resource with
   service name, version and environment), the `createInstrumentedDatabase` and
   `createInstrumentedStorage` wrappers (`db.*` and `storage.*` spans plus duration histograms), the pino

@@ -66,7 +66,7 @@ persist), with every log line carrying the same `trace_id`.
 | `storage.read/write/…`                                                               | Instrumented storage adapter                                         | `storage.path`                                                               |
 | `ai.summarize`                                                                       | One per AI call (`@storyshelf/ai`)                                   | `ai.task`, `ai.profile`, `ai.model`                                          |
 | `invoke_agent {model}` / `chat {model}`                                              | The AI SDK's `@ai-sdk/otel` GenAI spans, nested under `ai.summarize` | `gen_ai.*` usage attributes (prompts, images and outputs are never recorded) |
-| `http.client`                                                                        | Outbound `httpJson` (git hosts, webhooks, OIDC)                      | `http.request.method`, `url.full` (query redacted), `http.retry.count`       |
+| `http.client`                                                                        | Outbound `httpJson` (git hosts, webhooks, OIDC)                      | `http.request.method`, `url.full` (origin only), `http.response.status_code`, `http.retry.count` |
 
 Span names never contain IDs, paths, or branch names. The consumer
 continues the enqueueing request's trace via the `traceparent` job field, so

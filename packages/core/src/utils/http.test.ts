@@ -1,42 +1,21 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Logger } from "../logger.ts";
+import { recordSpans, type RecordedSpan } from "../test-helpers/span-recorder.ts";
 import { HttpError, httpBytes, httpJson, httpText, redactUrlForLog } from "./http.ts";
-
-const spanAttributes = vi.hoisted(() => [] as Record<string, unknown>[]);
-/** Every `recordException` call on an `http.client` span, as message + stack text, in order. */
-const recordedExceptions = vi.hoisted(() => [] as string[]);
-
-vi.mock("../tracing.ts", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../tracing.ts")>();
-  return {
-    ...original,
-    withSpan: ((name, fn, attributes, parent) => {
-      spanAttributes.push({ ...attributes });
-      return original.withSpan(
-        name,
-        async (span) => {
-          vi.spyOn(span, "recordException").mockImplementation((exception) => {
-            const { message = "", stack = "" } =
-              typeof exception === "string" ? { message: exception } : exception;
-            recordedExceptions.push(`${message}\n${stack}`);
-          });
-          return await fn(span);
-        },
-        attributes,
-        parent,
-      );
-    }) as typeof original.withSpan,
-  };
-});
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });
 }
 
+let recorder: ReturnType<typeof recordSpans>;
+
+beforeEach(() => {
+  recorder = recordSpans();
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
-  spanAttributes.length = 0;
-  recordedExceptions.length = 0;
+  recorder.stop();
 });
 
 /** A logger that records every call as one JSON line, so a test can search all of it. */
@@ -51,118 +30,100 @@ function recordingLogger(): { logger: Logger; lines: string[] } {
   return { logger: logger as unknown as Logger, lines };
 }
 
-const SECRET_URLS: { url: string; secrets: string[]; expected: string }[] = [
-  {
-    url: "https://hooks.slack.com/services/T000/B000/SECRETxyz?token=abc",
-    secrets: ["SECRETxyz", "T000", "B000", "abc", "token="],
-    expected: "https://hooks.slack.com/services/…",
-  },
-  {
-    url: "https://user:pass@example.com/a/b",
-    secrets: ["user", "pass", "@"],
-    expected: "https://example.com/a/…",
-  },
-];
-
 describe("redactUrlForLog", () => {
-  it.each(SECRET_URLS)("keeps only the origin and first segment of $url", (row) => {
-    expect(redactUrlForLog(row.url)).toBe(row.expected);
+  it.each([
+    ["https://hooks.slack.com/services/T000/B000/SECRETxyz?token=abc", "https://hooks.slack.com"],
+    ["https://user:pass@example.com/a/b", "https://example.com"],
+    ["https://api.telegram.org/bot123:ABC/sendMessage", "https://api.telegram.org"],
+    ["http://localhost:3000/api/v1/x?token=1#frag", "http://localhost:3000"],
+    ["https://example.com/", "https://example.com"],
+  ])("keeps only the origin of %s", (url, origin) => {
+    expect(redactUrlForLog(url)).toBe(origin);
   });
 
-  it("drops a single-segment path, which may itself be the secret", () => {
-    expect(redactUrlForLog("https://example.com/SECRETONLY?x=1#frag")).toBe("https://example.com");
-    expect(redactUrlForLog("https://example.com/")).toBe("https://example.com");
-  });
-
-  it("keeps a non-default port and never throws on an invalid URL", () => {
-    expect(redactUrlForLog("http://localhost:3000/api/v1/x")).toBe("http://localhost:3000/api/…");
+  it("never throws on an invalid URL", () => {
     expect(redactUrlForLog("not a url with SECRET")).toBe("[invalid url]");
   });
 });
 
-describe("secret-bearing URLs in logs and spans", () => {
-  it.each(SECRET_URLS)("never logs or traces secrets of $url across a retry", async (row) => {
-    const fetchMock = vi
-      .fn<() => Promise<Response>>()
-      .mockResolvedValueOnce(jsonResponse({}, 503, { "retry-after": "0" }))
-      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+/** The request URL, and a response body that echoes it raw, URL-encoded and HTML-escaped. */
+const SECRET_URL = "https://u:p@h.example/SECRET/path?token=abc";
+const ECHO = [SECRET_URL, encodeURIComponent(SECRET_URL), `${SECRET_URL}&amp;x=1`].join(" | ");
+const FORBIDDEN = ["SECRET", "token=abc", "abc", "u:p", "u%3Ap", "p@h"];
+
+function expectNoSecrets(spans: RecordedSpan[], lines: string[]): void {
+  const everything = JSON.stringify({ spans, lines });
+  for (const secret of FORBIDDEN) {
+    expect(everything).not.toContain(secret);
+  }
+}
+
+describe("spans and logs of a request with a secret URL", () => {
+  it("records only the status of a non-retried 4xx, and still throws the response body to the caller", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => await Promise.resolve(new Response(ECHO, { status: 404 }))),
+    );
+    const { logger, lines } = recordingLogger();
+    const caught = await httpText(SECRET_URL, { logger }).catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(HttpError);
+    expect((caught as HttpError).status).toBe(404);
+    expect((caught as HttpError).body).toContain("SECRET");
+    expect((caught as HttpError).message).toContain("HTTP 404: ");
+    const [span] = recorder.spans;
+    expect(span?.name).toBe("http.client");
+    expect(span?.exceptions).toEqual([
+      {
+        name: "HttpError",
+        message: "HTTP 404",
+        stack: expect.stringMatching(/^HttpError: HTTP 404/u),
+      },
+    ]);
+    expect(span?.attributes["http.response.status_code"]).toBe(404);
+    expect(span?.attributes["url.full"]).toBe("https://h.example");
+    expect(span?.status?.code).toBe(2);
+    expectNoSecrets(recorder.spans, lines);
+  });
+
+  it("records only the status of a failure on the final retry, and of the retried ones", async () => {
+    const fetchMock = vi.fn(async () => {
+      await Promise.resolve();
+      return new Response(ECHO, { status: 503, headers: { "retry-after": "0" } });
+    });
     vi.stubGlobal("fetch", fetchMock);
     const { logger, lines } = recordingLogger();
-    await httpText(row.url, { method: "POST", json: {}, logger });
-    const warned = lines.filter((line) => line.includes("http request failed, retrying"));
-    expect(warned).toHaveLength(1);
-    expect(lines.some((line) => line.includes(row.expected))).toBe(true);
-    const everything = JSON.stringify({ lines, spans: spanAttributes });
-    for (const secret of row.secrets) {
-      expect(everything).not.toContain(secret);
-    }
-    expect(spanAttributes[0]?.["url.full"]).toBe(row.expected);
+    const caught = await httpText(SECRET_URL, { retries: 2, logger }).catch(
+      (error: unknown) => error,
+    );
+    expect(caught).toBeInstanceOf(HttpError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [span] = recorder.spans;
+    expect(span?.exceptions.map((exception) => exception.message)).toEqual([
+      "HTTP 503",
+      "HTTP 503",
+    ]);
+    expect(span?.attributes["http.retry.count"]).toBe(1);
+    expect(lines.some((line) => line.includes("https://h.example"))).toBe(true);
+    expectNoSecrets(recorder.spans, lines);
   });
 
-  it("redacts userinfo and path secrets from the exception it records, and still rethrows the original", async () => {
-    const url = "https://user:pass@example.com/a/SECRETxyz";
+  it("records a refused userinfo URL with the URL replaced by its origin, and rethrows the original", async () => {
     const failure = new TypeError(
-      `Request cannot be constructed from a URL that includes credentials: ${url}`,
+      `Request cannot be constructed from a URL that includes credentials: ${SECRET_URL}`,
     );
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => {
-        await Promise.resolve();
-        throw failure;
-      }),
+      vi.fn(async () => await Promise.reject(failure)),
     );
-    const caught = await httpText(url, { retries: 1 }).catch((error: unknown) => error);
+    const caught = await httpText(SECRET_URL, { retries: 1 }).catch((error: unknown) => error);
     expect(caught).toBe(failure);
-    expect(caught).toHaveProperty("message", expect.stringContaining("user:pass"));
-    // The first record is this module's; any later one comes from `withSpan` in tracing.ts.
-    expect(recordedExceptions[0]).toBeDefined();
-    // Not the bare words: the stack's file paths may contain "user" (e.g. `/home/user/`).
-    expect(recordedExceptions[0]).not.toContain("user:pass");
-    expect(recordedExceptions[0]).not.toContain("pass@");
-    // `redactSecrets` alone would keep the path, where webhook secrets live.
-    expect(recordedExceptions[0]).not.toContain("SECRETxyz");
-    expect(recordedExceptions[0]).toContain("https://example.com/a/…");
-  });
-
-  it("keeps a path echoed in a retried error body off the recorded exception", async () => {
-    const url = "https://hooks.slack.com/services/T000/B000/SECRETxyz?token=abc";
-    const echoed =
-      "no route for /services/T000/B000/SECRETxyz?token=abc and /services/T000/B000/SECRETxyz";
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn<() => Promise<Response>>()
-        .mockResolvedValueOnce(
-          new Response(echoed, { status: 503, headers: { "retry-after": "0" } }),
-        )
-        .mockResolvedValueOnce(new Response("ok", { status: 200 })),
+    expect(failure.message).toContain(SECRET_URL);
+    const [span] = recorder.spans;
+    expect(span?.exceptions).toHaveLength(1);
+    expect(span?.exceptions[0]?.message).toBe(
+      "Request cannot be constructed from a URL that includes credentials: https://h.example",
     );
-    await httpText(url);
-    expect(recordedExceptions).toHaveLength(1);
-    for (const secret of ["SECRETxyz", "T000", "B000", "token=abc"]) {
-      expect(recordedExceptions[0]).not.toContain(secret);
-    }
-    expect(recordedExceptions[0]).toContain("no route for");
-  });
-
-  it("keeps an HTML-escaped query echoed in an error page off the recorded exception", async () => {
-    const url =
-      "https://prod.example.com/workflows/W1/triggers/manual/paths/invoke?api-version=1&sig=SECRETsig";
-    const echoed =
-      "<pre>Cannot POST /workflows/W1/triggers/manual/paths/invoke?api-version=1&amp;sig=SECRETsig</pre>";
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn<() => Promise<Response>>()
-        .mockResolvedValueOnce(
-          new Response(echoed, { status: 502, headers: { "retry-after": "0" } }),
-        )
-        .mockResolvedValueOnce(new Response("ok", { status: 200 })),
-    );
-    await httpText(url);
-    expect(recordedExceptions).toHaveLength(1);
-    expect(recordedExceptions[0]).not.toContain("SECRETsig");
-    expect(recordedExceptions[0]).toContain("Cannot POST");
+    expectNoSecrets(recorder.spans, []);
   });
 
   it("still requests the real URL", async () => {
@@ -171,8 +132,8 @@ describe("secret-bearing URLs in logs and spans", () => {
       return jsonResponse({});
     });
     vi.stubGlobal("fetch", fetchMock);
-    await httpJson(SECRET_URLS[0]!.url);
-    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(SECRET_URLS[0]!.url);
+    await httpJson(SECRET_URL);
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(SECRET_URL);
   });
 });
 

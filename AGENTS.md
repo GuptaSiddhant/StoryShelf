@@ -173,7 +173,10 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - **Logging and HTTP.** Use pino from core (`createShelfLogger()`): structured objects, never string
   interpolation (`logger.info({ buildId }, "msg")`), errors as an `err` child. Adapters receive scoped
   loggers via `Adapter.setLogger` and never create their own. Outbound HTTP only through
-  `@storyshelf/core/utils` (`httpJson`/`HttpError`); never add `ky`/`ofetch`.
+  `@storyshelf/core/utils` (`httpJson`/`HttpError`); never add `ky`/`ofetch`. Record an exception on a
+  span only through `spanException` (`withSpan` does it): a redacted copy, rethrowing the original.
+  An `HttpError` is recorded as `HTTP <status>`, never its body; log and trace a request URL only as
+  `redactUrlForLog(url)` (origin only).
 - **Remote browsers.** `defineRemote` expands to `<engine>@<name>` targets; presets are plain
   configuration, no vendor SDKs. Measure the environment in-browser (`inPageProbe`), never from the
   host. `protocol`/`reach` are declared, not inferred. Use `connectLeased`/`shutdownRemote` so a lease
