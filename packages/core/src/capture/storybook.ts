@@ -11,6 +11,7 @@ import type {
   Viewport,
 } from "./adapter.ts";
 import type { DiscoverOptions } from "./adapter.ts";
+import { cleanIgnoreSelectors } from "./ignore-regions.ts";
 import { extractDesignUrl, type DesignUrlParser } from "./design.ts";
 import { applyModes, buildGlobalsParam } from "./modes.ts";
 
@@ -50,6 +51,11 @@ export function mergeParameters(entry: {
   const modes = mergeModes(entry.parameters?.chromatic?.modes, entry.parameters?.storyshelf?.modes);
   if (modes) merged.modes = modes;
   if (entry.parameters?.viewport) merged.viewport = entry.parameters.viewport;
+  if ("ignoreSelectors" in merged) {
+    const { selectors } = cleanIgnoreSelectors(merged.ignoreSelectors);
+    if (selectors.length > 0) merged.ignoreSelectors = selectors;
+    else delete merged.ignoreSelectors;
+  }
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 

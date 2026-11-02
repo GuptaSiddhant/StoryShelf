@@ -29,14 +29,20 @@ afterEach(() => vi.restoreAllMocks());
 /** A page that answers the settle wait with `report` and records every fixed wait. */
 function harness(report: SettleReport | null, overrides: Partial<CaptureContext> = {}) {
   const evaluated: unknown[] = [];
+  const styles: string[] = [];
   const page = {
     goto: async (): Promise<void> => {},
     setDefaultTimeout: (): void => {},
     evaluateOnNewDocument: async (): Promise<void> => {},
     setViewport: async (): Promise<void> => {},
     waitForSelector: async (): Promise<null> => null,
-    evaluate: async (fn: unknown): Promise<unknown> => {
+    addStyleTag: async ({ content }: { content: string }): Promise<void> => {
+      styles.push(content);
+    },
+    evaluate: async (fn: unknown, arg?: unknown): Promise<unknown> => {
       evaluated.push(fn);
+      // The ignore-selector check: "!!bad" stands for a selector the browser rejects.
+      if (Array.isArray(arg)) return (arg as string[]).filter((s) => s === "!!bad");
       return fn === inPageWaitSettled ? report : undefined;
     },
     $: async () => ({ boundingBox: async (): Promise<null> => null }),
@@ -57,7 +63,7 @@ function harness(report: SettleReport | null, overrides: Partial<CaptureContext>
     logger,
     ...overrides,
   } as unknown as CaptureContext;
-  return { ctx, page, evaluated, logger };
+  return { ctx, page, evaluated, styles, logger };
 }
 
 function story(delay?: number): StoryEntry {
@@ -151,5 +157,42 @@ describe("waiting for the story to be ready", () => {
     };
     await captureScreenshot(ctx, story(), viewport);
     expect(seen).toEqual([{ timeoutMs: 1234 }]);
+  });
+});
+
+describe("ignore regions", () => {
+  const withIgnore = (selectors: string[]): StoryEntry =>
+    ({ ...story(), parameters: { ignoreSelectors: selectors } }) as StoryEntry;
+
+  it("injects one mask stylesheet before the screenshot, defaults included", async () => {
+    const { ctx, styles } = harness(settled);
+    await captureScreenshot(ctx, withIgnore([".clock"]), viewport);
+    expect(styles).toHaveLength(1);
+    expect(styles[0]).toContain(".clock { visibility: hidden !important; }");
+    expect(styles[0]).toContain("[data-storyshelf-ignore]");
+  });
+
+  it("skips a selector the browser rejects, with a warning, and still captures", async () => {
+    const { ctx, styles, logger } = harness(settled);
+    const result = await captureScreenshot(ctx, withIgnore([".ok", "!!bad"]), viewport);
+    expect(result.screenshot).toEqual(Buffer.from([1]));
+    expect(styles[0]).toContain(".ok {");
+    expect(styles[0]).not.toContain("!!bad");
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ storyId: "a--b", selectors: ["!!bad"] }),
+      expect.stringContaining("invalid ignore selectors"),
+    );
+  });
+
+  it("never fails the capture when the stylesheet cannot be injected", async () => {
+    const { ctx, page, logger } = harness(settled);
+    page.addStyleTag = async () => {
+      throw new Error("csp");
+    };
+    await expect(captureScreenshot(ctx, story(), viewport)).resolves.toBeDefined();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ storyId: "a--b" }),
+      expect.stringContaining("could not mask"),
+    );
   });
 });

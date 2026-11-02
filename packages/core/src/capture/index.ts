@@ -23,6 +23,14 @@ export {
 } from "./targets.ts";
 export { storybookUrlSource, type StorybookUrlSource } from "./storybook-urls.ts";
 export {
+  cleanIgnoreSelectors,
+  DEFAULT_IGNORE_SELECTORS,
+  ignoreStylesheet,
+  isSafeIgnoreSelector,
+  MAX_IGNORE_SELECTORS,
+  type IgnoreSelectorList,
+} from "./ignore-regions.ts";
+export {
   buildGlobalsParam,
   filterModes,
   MAX_MODES_PER_STORY,

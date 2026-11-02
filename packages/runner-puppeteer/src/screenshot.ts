@@ -1,7 +1,7 @@
 /** Screenshot pipeline for a single story + viewport (Puppeteer). */
 
 import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runner";
-import { getScreenshotPlan } from "@storyshelf/core/capture";
+import { getScreenshotPlan, ignoreStylesheet } from "@storyshelf/core/capture";
 import type { Page } from "puppeteer-core";
 import { checkA11y } from "./a11y.ts";
 import { acquirePage } from "./pages.ts";
@@ -39,6 +39,7 @@ async function runCapture(
   if (ctx.executePlay) await runPlay(page, story.id, ctx.playTimeoutMs ?? 10_000);
   const a11yViolations = await getA11y(ctx, page, story);
   await settlePage(page, story);
+  await maskIgnoredRegions(ctx, page, story);
   const plan = await resolvePlan(page, viewport, story);
   if (plan.viewport.width !== viewport.width || plan.viewport.height !== viewport.height)
     await page.setViewport({ width: plan.viewport.width, height: plan.viewport.height });
@@ -126,6 +127,39 @@ async function settlePage(page: Page, story: StoryEntry): Promise<void> {
     });
   } catch {
     // best-effort
+  }
+}
+/**
+ * Hide the story's ignore regions (`ignoreSelectors` plus the attribute markers) so a changing
+ * timestamp or avatar cannot cause a diff. A selector the browser rejects is skipped with a
+ * warning on the snapshot log; it never fails the build.
+ */
+async function maskIgnoredRegions(
+  ctx: CaptureContext,
+  page: Page,
+  story: StoryEntry,
+): Promise<void> {
+  const declared = story.parameters?.ignoreSelectors ?? [];
+  try {
+    const rejected = await page.evaluate((list: string[]) => {
+      const doc = (globalThis as unknown as { document: { querySelector(s: string): unknown } })
+        .document;
+      return list.filter((selector) => {
+        try {
+          doc.querySelector(selector);
+          return false;
+        } catch {
+          return true;
+        }
+      });
+    }, declared);
+    if (rejected.length > 0)
+      ctx.logger?.warn({ storyId: story.id, selectors: rejected }, "skipped invalid ignore selectors");
+    await page.addStyleTag({
+      content: ignoreStylesheet(declared.filter((selector) => !rejected.includes(selector))),
+    });
+  } catch (err) {
+    ctx.logger?.warn({ storyId: story.id, err }, "could not mask ignore regions");
   }
 }
 async function resolvePlan(
