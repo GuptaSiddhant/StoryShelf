@@ -1,6 +1,7 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { describe, expect, it } from "vitest";
 import {
+  designSources,
   diffPercent,
   groupOf,
   groupSnapshots,
@@ -10,6 +11,7 @@ import {
   snapshotImageUrl,
   snapshotPageUrl,
 } from "./build-diff-model.ts";
+import type { DesignItem } from "./design-links.tsx";
 
 const snap = (
   id: string,
@@ -144,5 +146,35 @@ describe("formatting and urls", () => {
     expect(snapshotImageUrl(project, build, snap("s1", "new"), "diff")).toBe(
       "/api/v1/projects/demo/builds/b1/snapshots/s1/diff",
     );
+  });
+});
+
+const designItem = (renderUrl: string | null, name: string | null = "Button"): DesignItem => ({
+  url: `https://figma.test/${renderUrl ?? "none"}`,
+  providerName: "Figma",
+  name,
+  state: "ok",
+  renderUrl,
+  stale: false,
+});
+
+describe("designSources", () => {
+  it("offers nothing without a cached render", () => {
+    expect(designSources([])).toEqual([]);
+    expect(designSources([designItem(null)])).toEqual([]);
+  });
+
+  it("offers a lone render as `Design`", () => {
+    expect(designSources([designItem("/r/1")])).toEqual([
+      { value: "design", label: "Design", src: "/r/1", name: "Button", providerName: "Figma" },
+    ]);
+  });
+
+  it("numbers several renders and skips links that have none", () => {
+    const sources = designSources([designItem("/r/1"), designItem(null), designItem("/r/2", null)]);
+    expect(sources.map((source) => [source.value, source.label, source.src])).toEqual([
+      ["design-1", "Figma 1", "/r/1"],
+      ["design-2", "Figma 2", "/r/2"],
+    ]);
   });
 });
