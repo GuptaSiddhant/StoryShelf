@@ -1,7 +1,8 @@
 /** Page leasing for captures: a fresh page each time, or a small reusable pool (opt-in). */
 
 import type { Viewport } from "@storyshelf/core/adapter/capture-runner";
-import type { Browser, BrowserContext, Page } from "puppeteer-core";
+import type { BrowserContext, Page } from "puppeteer-core";
+import type { BrowserSession } from "./session.ts";
 import { installSettleRecorder } from "./settle.ts";
 
 /** A page on loan for one capture; `release(false)` discards it instead of reusing it. */
@@ -12,17 +13,18 @@ export interface PageLease {
 
 /** Lease a page for `viewport`: pooled when the context has a pool, otherwise a throwaway. */
 export async function acquirePage(
-  ctx: { browser: Browser; pagePool?: PagePool },
+  ctx: { session: BrowserSession; pagePool?: PagePool },
   viewport: Viewport,
 ): Promise<PageLease> {
   if (ctx.pagePool) return await ctx.pagePool.acquire(viewport);
-  const page = await ctx.browser.newPage();
+  const page = await ctx.session.newPage();
   await page.setViewport({ width: viewport.width, height: viewport.height });
   await installSettleRecorder(page);
   return {
     page,
     release: async () => {
-      await page.close();
+      await page.close().catch(() => {});
+      ctx.session.forgetPage(page);
     },
   };
 }
@@ -41,10 +43,10 @@ interface Entry {
 export class PagePool {
   private readonly free: Entry[] = [];
 
-  private readonly browser: Browser;
+  private readonly session: BrowserSession;
 
-  constructor(browser: Browser) {
-    this.browser = browser;
+  constructor(session: BrowserSession) {
+    this.session = session;
   }
 
   async acquire(viewport: Viewport): Promise<PageLease> {
@@ -54,7 +56,7 @@ export class PagePool {
       page: entry.page,
       release: async (reusable) => {
         if (reusable && (await reset(entry))) this.free.push(entry);
-        else await closeEntry(entry);
+        else await this.close(entry);
       },
     };
   }
@@ -63,16 +65,21 @@ export class PagePool {
   async dispose(): Promise<void> {
     await Promise.all(
       this.free.splice(0).map(async (entry) => {
-        await closeEntry(entry);
+        await this.close(entry);
       }),
     );
   }
 
   private async open(): Promise<Entry> {
-    const context = await this.browser.createBrowserContext();
+    const context = await this.session.createBrowserContext();
     const page = await context.newPage();
     await installSettleRecorder(page);
     return { context, page };
+  }
+
+  private async close(entry: Entry): Promise<void> {
+    await entry.context.close().catch(() => {});
+    this.session.forgetContext(entry.context);
   }
 }
 
@@ -86,10 +93,6 @@ async function reset(entry: Entry): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-async function closeEntry(entry: Entry): Promise<void> {
-  await entry.context.close().catch(() => {});
 }
 
 /** Runs in the page: clears web storage and IndexedDB for the current origin. */

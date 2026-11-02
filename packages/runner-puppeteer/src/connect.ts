@@ -9,28 +9,33 @@ import {
 import type { Logger } from "@storyshelf/core/logger";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
-import { holdLease } from "./browser.ts";
+import type { BrowserAcquisition } from "./session.ts";
 
 /**
- * Connect to `entry`'s service and return its browser, holding the service's lease (a function
- * `connect`'s `lease`) until the browser is closed through `closeBrowser`/`safeCloseBrowser`.
- * Connection-level failures are retried with backoff, so a provider outage or a full plan costs
- * time and not a story crash; what is left is a `TargetLaunchError`, which fails the job at once
- * (a refused credential also marks the target unavailable, a service that is merely down does
- * not). No message carries the endpoint, its credentials or the lease.
+ * Connect to `entry`'s service and return the browser with its ownership: the run must disconnect
+ * it, never close it, and releases the service's lease (a function `connect`'s `lease`) exactly
+ * once when the session ends. Connection-level failures are retried with backoff, so a provider
+ * outage or a full plan costs time and not a story crash; what is left is a `TargetLaunchError`,
+ * which fails the job at once (a refused credential also marks the target unavailable, a service
+ * that is merely down does not). No message carries the endpoint, its credentials or the lease.
  */
 export async function connectRemote(
   entry: RemoteTarget,
   context: ConnectLeasedContext,
   logger?: Logger,
-): Promise<Browser> {
+): Promise<BrowserAcquisition> {
   const { value, lease } = await connectLeased(entry, context, {
     logger,
     open: async (connection) => await connectOnce(connection, entry.remote.timeouts.connectMs),
     reasonOf,
   });
-  holdLease(value, lease);
-  return value;
+  return {
+    browser: value,
+    ownership: "connected",
+    releaseLease: async (outcome, error) => {
+      await lease.end(outcome, error);
+    },
+  };
 }
 
 async function connectOnce(connection: RemoteConnection, timeoutMs: number): Promise<Browser> {

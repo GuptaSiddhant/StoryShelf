@@ -380,7 +380,7 @@ describe("createPuppeteerCaptureRunner.render", () => {
     const first = render("shard-a");
     const second = render("shard-b");
     await vi.waitFor(() => {
-      expect(activeRuns.matching("build-1").every((run) => run.browser !== null)).toBe(true);
+      expect(activeRuns.matching("build-1").every((run) => run.session !== null)).toBe(true);
       expect(activeRuns.matching("build-1")).toHaveLength(2);
     });
     const [a] = activeRuns.matching("build-1", "shard-a");

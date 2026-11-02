@@ -13,8 +13,8 @@ import type {
 import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import type { SessionGate } from "@storyshelf/core/utils";
-import type { Browser } from "puppeteer-core";
 import type { PagePool } from "./pages.ts";
+import type { BrowserAcquisition, BrowserSession } from "./session.ts";
 
 /** Input for a Puppeteer capture run over a built Storybook directory. */
 export interface PuppeteerRenderInput {
@@ -76,7 +76,7 @@ export type LaunchTarget = (
   target: CaptureTarget,
   logger: Logger | undefined,
   context: LaunchContext,
-) => Promise<Browser>;
+) => Promise<BrowserAcquisition>;
 
 /** Which run a browser is for, so a remote service can route and lease per shard. */
 export interface LaunchContext {
@@ -101,7 +101,7 @@ export type RunInput = PuppeteerRenderInput & { gate?: SessionGate | undefined }
 
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {
-  browser: Browser;
+  session: BrowserSession;
   /** Present when page reuse is on; replaced together with the browser. */
   pagePool?: PagePool;
   adapter: StorySourceAdapter;
@@ -139,7 +139,7 @@ export interface ExtractedEntry {
 /** A render that may currently be in flight, so that `cancel` can abort it. */
 export interface ActiveRun {
   cancelled: boolean;
-  browser: Browser | null;
+  session: BrowserSession | null;
   /** Aborted by `cancel`, so a `connect` still pending stops too. */
   abort?: AbortController | undefined;
 }
