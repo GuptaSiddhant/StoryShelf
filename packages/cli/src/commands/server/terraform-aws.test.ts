@@ -240,7 +240,11 @@ describe("AWS Terraform README networking notes", () => {
     expect(readme).toContain("Tier = public");
     expect(readme).toContain("Tier = private");
     expect(readme).toContain("no NAT gateway");
-    expect(readme).toMatch(/at least two[^.]*different availability zones/u);
+    // Each tier gets its own clause: two subnets in different AZs, bound to that tier's tag.
+    expect(readme).toMatch(
+      /at least two public\s+subnets in different availability zones\s+`Tier = public`/u,
+    );
+    expect(readme).toMatch(/at least two in\s+different availability zones\s+`Tier = private`/u);
   });
 });
 
