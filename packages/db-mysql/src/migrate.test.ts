@@ -101,6 +101,8 @@ describe("runMigrations: MySQL 8 compatibility", () => {
       "ALTER TABLE projects ADD COLUMN review_enabled TINYINT(1) NOT NULL DEFAULT 1",
     );
     expect(queries).toContain("ALTER TABLE projects ADD COLUMN storybook_url_ttl_seconds INT");
+    expect(queries).toContain("ALTER TABLE builds ADD COLUMN review_cycle INT NOT NULL DEFAULT 0");
+    expect(queries).toContain("ALTER TABLE builds ADD COLUMN review_requested_cycle INT NULL");
     expect(queries).toContain("ALTER TABLE snapshots ADD COLUMN a11y_violations TEXT");
     expect(queries).toContain("ALTER TABLE comments ADD COLUMN story_id TEXT");
     expect(queries).toContain(

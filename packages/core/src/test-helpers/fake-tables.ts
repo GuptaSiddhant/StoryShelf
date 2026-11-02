@@ -148,6 +148,8 @@ const builds = defineTable("builds", {
   changedFiles: "changed_files",
   affectedImportPaths: "affected_import_paths",
   testResults: "test_results",
+  reviewCycle: "review_cycle",
+  reviewRequestedCycle: "review_requested_cycle",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

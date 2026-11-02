@@ -31,6 +31,10 @@ export interface Build {
    * the project does not run tests or the Storybook has none.
    */
   testResults?: string | null;
+  /** Times the build went back to `pending` from a verdict; each starts a new review cycle (ADR 0013). */
+  reviewCycle?: number;
+  /** The review cycle whose `review:requested` was already announced; null until the first. */
+  reviewRequestedCycle?: number | null;
   createdAt: string;
   updatedAt: string;
 }
