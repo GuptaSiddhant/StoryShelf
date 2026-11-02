@@ -684,7 +684,8 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    startP(["Trigger<br/>branchGcIntervalMs (daily, branch GC only)<br/>or POST /api/v1/admin/purge<br/>or storyshelf purge CLI"])
+    dailyP(["Trigger<br/>branchGcIntervalMs (daily timer, branch GC only)"])
+    startP(["Trigger<br/>POST /api/v1/admin/purge<br/>or storyshelf purge CLI"])
     loadProjects["For each project"]
     cutoff["cutoff = now - purgeTtlDays (30)"]
     candidates["candidates = builds<br/>where status IN (approved,rejected)<br/>AND updated_at < cutoff"]
@@ -699,6 +700,7 @@ flowchart TB
     branchGC["Branch GC<br/>purgeStaleBranches(project, branchTtlDays=30)<br/>branches with no build since cutoff<br/>default branch exempt"]
     done(["Done<br/>return { removedBuilds, removedBranches, removedBaselines }"])
 
+    dailyP --> branchGC
     startP --> loadProjects --> cutoff --> candidates --> keepLatest
     keepLatest -- yes --> latest --> checkPersistent
     keepLatest -- no --> checkPersistent
@@ -711,7 +713,7 @@ flowchart TB
     classDef decision fill:#fff4ce,stroke:#e6a800;
     classDef action fill:#fef7e0,stroke:#fbbc04;
     classDef done2 fill:#e6f4ea,stroke:#34a853;
-    class startP trigger;
+    class dailyP,startP trigger;
     class keepLatest,checkPersistent decision;
     class loadProjects,cutoff,candidates,latest,toPurge,delFiles,delRows,orphanGC,branchGC action;
     class done done2;
