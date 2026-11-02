@@ -1,3 +1,4 @@
+import type { Logger } from "@storyshelf/core/logger";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { slackWebhookNotifier } from "./slack.ts";
 
@@ -56,5 +57,36 @@ describe("slackWebhookNotifier", () => {
 
   it("rejects invalid config", () => {
     expect(() => slackWebhookNotifier.create({ config: { style: "huge" } })).toThrow();
+  });
+
+  it("never logs the webhook path when a send is retried", async () => {
+    const url = "https://hooks.slack.com/services/T000/B000/SECRETxyz?token=abc";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce(
+          new Response("busy", { status: 503, headers: { "retry-after": "0" } }),
+        )
+        .mockResolvedValueOnce(new Response("ok", { status: 200 })),
+    );
+    const lines: string[] = [];
+    const record =
+      (level: string) =>
+      (...args: unknown[]): void => {
+        lines.push(JSON.stringify({ level, args }));
+      };
+    const logger = { debug: record("debug"), warn: record("warn"), info: record("info") };
+    const child = { ...logger, child: () => child };
+    const sender = slackWebhookNotifier.create({
+      config: {},
+      secret: url,
+      logger: child as unknown as Logger,
+    });
+    await sender.send({ channel: CHANNEL, formatted: FORMATTED });
+    expect(lines.some((line) => line.includes("http request failed, retrying"))).toBe(true);
+    for (const secret of ["SECRETxyz", "T000", "B000", "abc"]) {
+      expect(lines.join("\n")).not.toContain(secret);
+    }
   });
 });
