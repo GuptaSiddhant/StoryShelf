@@ -17,8 +17,12 @@ function scratchRoot(): string {
   return ".tmp";
 }
 
+/** Every fixture directory created so far, so teardown removes them even if a later one failed. */
+const created: string[] = [];
+
 function materialize(options: AwsTerraformOptions): string {
   const dir = mkdtempSync(join(scratchRoot(), "terraform-aws-check-"));
+  created.push(dir);
   // The generator writes `terraform/*.tf`; the GCP and Azure tests create this folder too.
   mkdirSync(join(dir, "terraform"), { recursive: true });
   for (const [rel, contents] of Object.entries(generateAwsTerraformFiles(options))) {
@@ -50,7 +54,8 @@ describe.skipIf(!hasTerraform)("generated AWS terraform (gated on terraform bina
   });
 
   afterAll(() => {
-    for (const dir of [rdsDir, dsqlDir, existingVpcDir]) {
+    // Remove whatever was created, including fixtures from a `beforeAll` that threw part-way.
+    for (const dir of created.splice(0)) {
       rmSync(dir, { recursive: true, force: true });
     }
   });

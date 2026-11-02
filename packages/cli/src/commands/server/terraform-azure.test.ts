@@ -67,6 +67,10 @@ describe("Azure Terraform modules", () => {
     // One app: it also consumes capture jobs from the database queue.
     expect(compute).not.toContain('resource "azurerm_container_app" "worker"');
     expect(compute).toContain("min_replicas = 1");
+    // External ingress on the app port (azurerm names the flag `external_enabled`, not `external`).
+    expect(compute).toContain("external_enabled = true");
+    expect(compute).toContain("target_port      = 3000");
+    expect(compute).not.toMatch(/^\s+external\s+=/mu);
     expect(compute).not.toContain("linux_virtual_machine");
     expect(compute).not.toContain("linux_function_app");
   });
@@ -95,6 +99,8 @@ describe("Azure Terraform modules", () => {
   it("stores secrets in Key Vault, never in env", () => {
     const secrets = generateAzureSecrets();
     expect(secrets).toContain('resource "azurerm_key_vault" "main"');
+    // Key Vault secret names reject underscores, so they use dashes.
+    expect(secrets).toContain("OIDC-CLIENT-SECRET");
     expect(secrets).toContain("ADMIN-TOKEN");
     expect(secrets).toContain("DB-PASSWORD");
   });

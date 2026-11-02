@@ -91,6 +91,9 @@ describe("GCP Terraform modules", () => {
     expect(database).toContain('resource "google_sql_database_instance" "main"');
     expect(database).toContain("db-f1-micro");
     expect(database).toContain('resource "google_sql_database" "shelf"');
+    // TLS is required (`require_ssl` no longer exists in the google provider).
+    expect(database).toContain('ssl_mode     = "ENCRYPTED_ONLY"');
+    expect(database).not.toContain("require_ssl");
   });
 
   it("gates Identity Platform on identity_tenant", () => {

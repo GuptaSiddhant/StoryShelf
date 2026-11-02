@@ -713,8 +713,9 @@ ECS tasks run in the public subnets, the tasks get a public IP (to pull the imag
 APIs) and their security group admits only the ALB; the database sits in the private subnets.
 
 With an existing \`vpc_id\` the subnets are looked up by their \`Tier\` tag, so tag at least two public
-subnets in different availability zones \`Tier = public\` (ALB and tasks) and the database subnets
-\`Tier = private\`; tasks need a route to the internet from the public subnets.
+subnets in different availability zones \`Tier = public\` (ALB and tasks) and at least two in
+different availability zones \`Tier = private\` (the RDS subnet group needs two); the public subnets
+need a route to an internet gateway, since tasks reach AWS APIs through their public IP.
 
 ## Wire outputs into env
 

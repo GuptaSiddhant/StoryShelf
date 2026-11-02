@@ -234,6 +234,16 @@ describe("AWS Terraform modules", () => {
   });
 });
 
+describe("AWS Terraform README networking notes", () => {
+  it("documents the Tier tags, the no-NAT choice and the two-AZ subnet requirements", () => {
+    const readme = generateAwsReadme("acme");
+    expect(readme).toContain("Tier = public");
+    expect(readme).toContain("Tier = private");
+    expect(readme).toContain("no NAT gateway");
+    expect(readme).toMatch(/at least two[^.]*different availability zones/u);
+  });
+});
+
 describe("AWS Terraform README", () => {
   it("documents plan-before-apply and IAM credentials", () => {
     const readme = generateAwsReadme("acme-shelf");

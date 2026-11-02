@@ -33,7 +33,7 @@ With no existing VPC (the default), the scaffold creates the network: a VPC with
 
 - **No NAT gateway.** It costs about $32/month per availability zone, so the scaffold leaves it out. The ALB and the ECS tasks run in the public subnets and the tasks get a public IP, which is how they pull the image and reach S3, Secrets Manager and CloudWatch. Their security group admits traffic only from the ALB.
 - **Private database.** RDS sits in the private subnets, which need no internet egress.
-- **Existing VPC.** Supply `vpc_id` and the scaffold looks subnets up by their `Tier` tag instead of creating any. Tag at least two public subnets in different availability zones `Tier = public` (the ALB and the tasks) and the database subnets `Tier = private`; the public subnets need a route to an internet gateway.
+- **Existing VPC.** Supply `vpc_id` and the scaffold looks subnets up by their `Tier` tag instead of creating any. Tag at least two public subnets in different availability zones `Tier = public` (the ALB and the tasks) and at least two subnets in different availability zones `Tier = private` (an RDS subnet group needs two); the public subnets need a route to an internet gateway.
 
 The IAM roles are least-privilege: the task execution role pulls the image, writes logs and reads exactly the three Secrets Manager secrets; the task role reads and writes only the Storybook bucket.
 
