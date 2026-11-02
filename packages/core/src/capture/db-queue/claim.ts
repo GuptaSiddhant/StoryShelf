@@ -169,6 +169,7 @@ async function reportExhausted(rt: QueueRuntime, job: CaptureJobRow): Promise<vo
   const attempts = 3;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential retries
       await rt.onExhausted(toDatabaseJob(job, job.attempt, rt.leaseMs), LEASE_EXHAUSTED_ERROR);
       return;
     } catch (error) {
@@ -177,9 +178,18 @@ async function reportExhausted(rt: QueueRuntime, job: CaptureJobRow): Promise<vo
         "exhausted-job hook failed",
       );
       if (attempt < attempts) {
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 100 * attempt);
-        });
+        const waitMs = 100 * attempt;
+        if (rt.timers !== undefined) {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- sequential retries
+          await new Promise<void>((resolve) => {
+            rt.timers?.setTimeout(resolve, waitMs);
+          });
+        } else {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- sequential retries
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, waitMs);
+          });
+        }
       }
     }
   }
