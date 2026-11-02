@@ -17,7 +17,15 @@ describe("cleanIgnoreSelectors", () => {
   });
 
   it("skips non-strings, blanks and selectors that could close the rule", () => {
-    const result = cleanIgnoreSelectors([1, "", "  ", ".ok", "a{}", ".x } body { display:none", "/*"]);
+    const result = cleanIgnoreSelectors([
+      1,
+      "",
+      "  ",
+      ".ok",
+      "a{}",
+      ".x } body { display:none",
+      "/*",
+    ]);
     expect(result.selectors).toEqual([".ok"]);
     expect(result.skipped).toHaveLength(6);
   });

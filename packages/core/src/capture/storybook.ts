@@ -11,8 +11,8 @@ import type {
   Viewport,
 } from "./adapter.ts";
 import type { DiscoverOptions } from "./adapter.ts";
-import { cleanIgnoreSelectors } from "./ignore-regions.ts";
 import { extractDesignUrl, type DesignUrlParser } from "./design.ts";
+import { cleanIgnoreSelectors } from "./ignore-regions.ts";
 import { applyModes, buildGlobalsParam } from "./modes.ts";
 
 interface StorybookIndex {

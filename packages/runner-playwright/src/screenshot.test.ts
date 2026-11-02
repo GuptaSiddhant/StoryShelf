@@ -184,7 +184,6 @@ const withIgnore = (selectors: string[]): StoryEntry =>
   ({ ...story(), parameters: { ignoreSelectors: selectors } }) as StoryEntry;
 
 describe("ignore regions", () => {
-
   it("injects one mask stylesheet before the screenshot, defaults included", async () => {
     const { ctx, styles } = harness(settled);
     await captureScreenshot(ctx, withIgnore([".clock"]), viewport);

@@ -187,7 +187,10 @@ async function maskIgnoredRegions(
       });
     }, declared);
     if (rejected.length > 0)
-      ctx.logger?.warn({ storyId: story.id, selectors: rejected }, "skipped invalid ignore selectors");
+      ctx.logger?.warn(
+        { storyId: story.id, selectors: rejected },
+        "skipped invalid ignore selectors",
+      );
     await page.addStyleTag({
       content: ignoreStylesheet(declared.filter((selector) => !rejected.includes(selector))),
     });
