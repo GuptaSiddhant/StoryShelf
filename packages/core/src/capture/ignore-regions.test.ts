@@ -24,7 +24,7 @@ describe("cleanIgnoreSelectors", () => {
 
   it("yields nothing for a value that is not an array", () => {
     expect(cleanIgnoreSelectors(".a")).toEqual({ selectors: [], skipped: [] });
-    expect(cleanIgnoreSelectors(undefined)).toEqual({ selectors: [], skipped: [] });
+    expect(cleanIgnoreSelectors(null)).toEqual({ selectors: [], skipped: [] });
   });
 
   it("caps the list and reports the overflow", () => {
