@@ -5,8 +5,8 @@
  * `storyshelf server init` when the deploy target is `aws`, alongside the
  * standard `src/index.ts` / `package.json` files.
  *
- * Reference stack: S3 (storage) + Postgres (RDS default, Aurora DSQL
- * option; the database also holds the capture queue) + ECS Fargate app + ALB +
+ * Reference stack: S3 (storage) + Postgres (RDS; the database also holds the
+ * capture queue) + ECS Fargate app + ALB +
  * Cognito (auth) + Secrets Manager + CloudWatch. VPC is created unless
  * `vpcId` is supplied; Route 53 + ACM apply only when `domainName` is set.
  */
@@ -17,8 +17,6 @@ export interface AwsTerraformOptions {
   project: string;
   /** AWS region, e.g. `us-east-1`. */
   region: string;
-  /** Postgres engine: battle-tested RDS by default, serverless DSQL option. */
-  dbEngine: "rds" | "dsql";
   /** Existing VPC id. Empty creates a new VPC. */
   vpcId?: string;
   /** Public domain for the ALB. Empty leaves the ALB HTTP-only. */
@@ -45,6 +43,10 @@ export function generateAwsVersions(): string {
     aws = {
       source  = "hashicorp/aws"
       version = ">= 5.60"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
     }
   }
 }
@@ -257,6 +259,24 @@ resource "aws_security_group" "ecs" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+${generateAwsDbSecurityGroup()}`;
+}
+
+/** Postgres is reachable from the ECS task security group only, on 5432. */
+function generateAwsDbSecurityGroup(): string {
+  return `
+resource "aws_security_group" "db" {
+  name        = "\${var.project}-db"
+  description = "Postgres: ECS task ingress only"
+  vpc_id      = local.vpc_id
+
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs.id]
+  }
+}
 `;
 }
 
@@ -321,33 +341,27 @@ resource "aws_s3_bucket_lifecycle_configuration" "storybook" {
 `;
 }
 
-export function generateAwsDatabase(dbEngine: "rds" | "dsql"): string {
-  if (dbEngine === "dsql") {
-    return `${header()}# Serverless Postgres. The server connects with
-# createPostgresDatabase({ url: <cluster endpoint> }).
-resource "aws_dsql_cluster" "main" {
-  deletion_protection_enabled = true
-
-  tags = { Name = "\${var.project}-db" }
-}
-`;
-  }
-  return `${header()}# VPC-isolated Postgres for regulated estates. The server connects with
-# createPostgresDatabase({ url: <DATABASE_URL with sslmode=require> }).
+export function generateAwsDatabase(): string {
+  return `${header()}# VPC-isolated Postgres for regulated estates. RDS creates and rotates the master password
+# itself (manage_master_user_password), so it is never in Terraform state: the task reads it from the
+# RDS-managed secret and builds DATABASE_URL (sslmode=require) at start-up (see compute.tf).
 resource "aws_db_subnet_group" "main" {
   name       = "\${var.project}-db"
   subnet_ids = local.private_subnet_ids
 }
 
 resource "aws_db_instance" "main" {
-  identifier             = "\${var.project}-db"
-  engine                 = "postgres"
-  engine_version         = "16"
-  instance_class         = "db.t4g.micro"
-  allocated_storage      = 20
-  db_subnet_group_name   = aws_db_subnet_group.main.name
-  vpc_security_group_ids = [aws_security_group.ecs.id]
-  skip_final_snapshot    = true
+  identifier                  = "\${var.project}-db"
+  engine                      = "postgres"
+  engine_version              = "16"
+  instance_class              = "db.t4g.micro"
+  allocated_storage           = 20
+  db_name                     = "shelf"
+  username                    = "shelf"
+  manage_master_user_password = true
+  db_subnet_group_name        = aws_db_subnet_group.main.name
+  vpc_security_group_ids      = [aws_security_group.db.id]
+  skip_final_snapshot         = true
 }
 `;
 }
@@ -407,10 +421,13 @@ resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/\${var.project}-app"
   retention_in_days = 30
 }
-${generateAwsLoadBalancing()}${generateAwsExecutionRole()}${generateAwsTaskRole()}${generateAwsTaskDefinition()}${generateAwsAppService()}`;
+${generateAwsLoadBalancing()}${generateAwsExecutionRole()}${generateAwsTaskRole()}${generateAwsAppLocals()}${generateAwsTaskDefinition()}${generateAwsAppService()}`;
 }
 
-/** ALB target group and listeners: HTTP always, HTTPS when var.domain_name is set. */
+/**
+ * ALB target group and listeners. Without a domain only HTTP exists and it forwards. With a
+ * domain, HTTPS forwards (using the validated certificate) and port 80 redirects to it.
+ */
 function generateAwsLoadBalancing(): string {
   return `
 resource "aws_lb_target_group" "app" {
@@ -431,9 +448,27 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
 
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app.arn
+  dynamic "default_action" {
+    for_each = var.domain_name == "" ? [1] : []
+
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.app.arn
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = var.domain_name == "" ? [] : [1]
+
+    content {
+      type = "redirect"
+
+      redirect {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
   }
 }
 
@@ -442,7 +477,7 @@ resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.main.arn
   port              = 443
   protocol          = "HTTPS"
-  certificate_arn   = aws_acm_certificate.main[0].arn
+  certificate_arn   = aws_acm_certificate_validation.main[0].certificate_arn
 
   default_action {
     type             = "forward"
@@ -452,7 +487,7 @@ resource "aws_lb_listener" "https" {
 `;
 }
 
-/** Execution role: pulls the image, writes logs, reads exactly the three secrets. */
+/** Execution role: pulls the image, writes logs, reads the three app secrets and the RDS-managed one. */
 function generateAwsExecutionRole(): string {
   return `
 data "aws_iam_policy_document" "ecs_assume" {
@@ -489,6 +524,7 @@ resource "aws_iam_role_policy" "execution_secrets" {
         aws_secretsmanager_secret.shelf_secret.arn,
         aws_secretsmanager_secret.oidc_client_secret.arn,
         aws_secretsmanager_secret.admin_token.arn,
+        local.db_secret_arn,
       ]
     }]
   })
@@ -539,6 +575,28 @@ resource "aws_iam_role_policy" "task_secrets" {
 }
 
 /**
+ * Values the task definition needs. The server reads one DATABASE_URL, but RDS keeps the master
+ * credentials in its own secret, so the task gets the host, user and password as separate
+ * variables and builds the URL when it starts. The password is percent-encoded because generated
+ * passwords can contain URL-special characters. The command mirrors the Dockerfile CMD
+ * (\`node src/index.ts\`).
+ */
+function generateAwsAppLocals(): string {
+  return `
+locals {
+  public_base_url = var.domain_name == "" ? "http://\${aws_lb.main.dns_name}" : "https://\${var.domain_name}"
+  db_secret_arn   = aws_db_instance.main.master_user_secret[0].secret_arn
+
+  app_command = [
+    "sh",
+    "-c",
+    "export DATABASE_URL=\\"postgres://$(node -p 'encodeURIComponent(process.env.DB_USERNAME)'):$(node -p 'encodeURIComponent(process.env.DB_PASSWORD)')@$DB_HOST:5432/shelf?sslmode=require\\" && exec node src/index.ts",
+  ]
+}
+`;
+}
+
+/**
  * The app task definition. The image is a placeholder, like GCP/Azure: push the
  * scaffolded Dockerfile to ECR and update it before apply.
  */
@@ -558,14 +616,19 @@ resource "aws_ecs_task_definition" "app" {
     image        = "storyshelf:latest"
     essential    = true
     portMappings = [{ containerPort = 3000, protocol = "tcp" }]
+    command      = local.app_command
     environment = [
       { name = "S3_BUCKET", value = aws_s3_bucket.storybook.id },
       { name = "AWS_REGION", value = var.region },
+      { name = "PUBLIC_BASE_URL", value = local.public_base_url },
+      { name = "DB_HOST", value = aws_db_instance.main.address },
     ]
     secrets = [
       { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
       { name = "OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret.arn },
       { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
+      { name = "DB_USERNAME", valueFrom = "\${local.db_secret_arn}:username::" },
+      { name = "DB_PASSWORD", valueFrom = "\${local.db_secret_arn}:password::" },
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -602,14 +665,22 @@ resource "aws_ecs_service" "app" {
     container_port   = 3000
   }
 
-  depends_on = [aws_lb_listener.http]
+  # The target group must be attached to a listener, and the secrets must have values, before
+  # the first task starts (a task cannot fetch a secret that has no version).
+  depends_on = [
+    aws_lb_listener.http,
+    aws_lb_listener.https,
+    aws_secretsmanager_secret_version.shelf_secret,
+    aws_secretsmanager_secret_version.oidc_client_secret,
+    aws_secretsmanager_secret_version.admin_token,
+  ]
 }
 `;
 }
 
 export function generateAwsSecrets(): string {
-  return `${header()}# Secrets Manager: session secret, OIDC secret, break-glass admin
-# token. Task roles below may read exactly these ARNs.
+  return `${header()}# Secrets Manager: session secret, OIDC secret, break-glass admin token. The execution role may
+# read exactly these ARNs (plus the RDS-managed database secret).
 resource "aws_secretsmanager_secret" "shelf_secret" {
   name = "\${var.project}/SECRET"
 }
@@ -621,12 +692,50 @@ resource "aws_secretsmanager_secret" "oidc_client_secret" {
 resource "aws_secretsmanager_secret" "admin_token" {
   name = "\${var.project}/ADMIN_TOKEN"
 }
+${generateAwsSecretValues()}`;
+}
+
+/**
+ * Values, so the first task can start. SECRET and ADMIN_TOKEN are generated (the values also live
+ * in Terraform state: protect it). OIDC_CLIENT_SECRET is operator-provided: a placeholder is
+ * written once and then left alone, so the operator can replace it without Terraform undoing it.
+ */
+function generateAwsSecretValues(): string {
+  return `
+resource "random_password" "shelf_secret" {
+  length  = 48
+  special = false
+}
+
+resource "random_password" "admin_token" {
+  length  = 48
+  special = false
+}
+
+resource "aws_secretsmanager_secret_version" "shelf_secret" {
+  secret_id     = aws_secretsmanager_secret.shelf_secret.id
+  secret_string = random_password.shelf_secret.result
+}
+
+resource "aws_secretsmanager_secret_version" "admin_token" {
+  secret_id     = aws_secretsmanager_secret.admin_token.id
+  secret_string = random_password.admin_token.result
+}
+
+resource "aws_secretsmanager_secret_version" "oidc_client_secret" {
+  secret_id     = aws_secretsmanager_secret.oidc_client_secret.id
+  secret_string = "change-me"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
 `;
 }
 
 export function generateAwsDns(): string {
   return `${header()}# Route 53 + ACM. Skipped entirely when var.domain_name is empty
-# (the ALB stays HTTP-only for dev).
+# (the ALB stays HTTP-only for dev; with a domain, port 80 redirects to HTTPS).
 resource "aws_acm_certificate" "main" {
   count             = var.domain_name == "" ? 0 : 1
   domain_name       = var.domain_name
@@ -636,6 +745,31 @@ resource "aws_acm_certificate" "main" {
 resource "aws_route53_zone" "main" {
   count = var.domain_name == "" ? 0 : 1
   name  = var.domain_name
+}
+
+# Certificate validation: the records live in the zone above, so ACM only validates once the
+# domain is delegated to this zone's name servers (see the README). The HTTPS listener waits for it.
+resource "aws_route53_record" "cert_validation" {
+  for_each = var.domain_name == "" ? {} : {
+    for option in aws_acm_certificate.main[0].domain_validation_options : option.domain_name => {
+      name   = option.resource_record_name
+      type   = option.resource_record_type
+      record = option.resource_record_value
+    }
+  }
+
+  zone_id         = aws_route53_zone.main[0].zone_id
+  name            = each.value.name
+  type            = each.value.type
+  records         = [each.value.record]
+  ttl             = 60
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "main" {
+  count                   = var.domain_name == "" ? 0 : 1
+  certificate_arn         = aws_acm_certificate.main[0].arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
 resource "aws_route53_record" "app" {
@@ -653,7 +787,7 @@ resource "aws_route53_record" "app" {
 `;
 }
 
-export function generateAwsOutputs(dbEngine: "rds" | "dsql"): string {
+export function generateAwsOutputs(): string {
   return `${header()}# Outputs feed directly into the scaffolded server's env.
 # Keys are a stable contract parsed by CI — do not rename.
 output "alb_dns_name" {
@@ -665,7 +799,7 @@ output "s3_bucket" {
 }
 
 output "db_endpoint" {
-  value = ${generateAwsDbEndpoint(dbEngine)}
+  value = aws_db_instance.main.endpoint
 }
 
 output "user_pool_id" {
@@ -678,19 +812,10 @@ output "app_client_id" {
 `;
 }
 
-/** Connection endpoint per Postgres engine (DSQL has no endpoint attribute). */
-function generateAwsDbEndpoint(dbEngine: "rds" | "dsql"): string {
-  if (dbEngine === "dsql") {
-    return `"\${aws_dsql_cluster.main.identifier}.dsql.\${var.region}.on.aws"`;
-  }
-  return "aws_db_instance.main.endpoint";
-}
-
 function generateAwsCiProfile(): string {
   return `## CI test profile
 
-Smallest footprint, unique resources per run, documented destroy.
-Prefer the serverless engine for CI (no instance to pay for idle):
+Smallest footprint, unique resources per run, documented destroy:
 
 \`\`\`sh
 export PROJECT="shelf-ci-$GITHUB_RUN_ID"   # unique prefix per run (all names derive from it)
@@ -702,13 +827,17 @@ terraform output -json   # or: npm run infra:outputs
 terraform destroy -var "project=$PROJECT" -auto-approve
 \`\`\`
 
-Re-scaffold with the DSQL engine for the cheapest CI runs
-(\`dbEngine: "dsql"\`); RDS uses the smallest burstable class
-(\`db.t4g.micro\`) when you need a classic instance.
+RDS uses the smallest burstable class (\`db.t4g.micro\`).
 `;
 }
 
 export function generateAwsReadme(project: string): string {
+  return `${generateAwsReadmeIntro(project)}${generateAwsReadmeNetworking()}${generateAwsReadmeSecrets()}${generateAwsReadmeTls()}${generateAwsReadmeOutputs()}
+${generateAwsCiProfile()}`;
+}
+
+/** Title and the plan-before-apply steps. */
+function generateAwsReadmeIntro(project: string): string {
   return `# ${project} on AWS
 
 Scaffolded by \`storyshelf server init --target aws\`.
@@ -721,7 +850,12 @@ terraform init
 terraform plan -out=tfplan   # review before applying
 terraform apply tfplan
 \`\`\`
+`;
+}
 
+/** Subnets, NAT and the existing-VPC tag requirements. */
+function generateAwsReadmeNetworking(): string {
+  return `
 ## Networking
 
 With \`vpc_id = ""\` the scaffold creates the network: 2 public and 2 private subnets across 2
@@ -734,8 +868,60 @@ With an existing \`vpc_id\` the subnets are looked up by their \`Tier\` tag, so 
 subnets in different availability zones \`Tier = public\` (ALB and tasks) and at least two in
 different availability zones \`Tier = private\` (the RDS subnet group needs two); the public subnets
 need a route to an internet gateway, since tasks reach AWS APIs through their public IP.
+`;
+}
 
+/** Database credentials, generated secrets and the OIDC_CLIENT_SECRET operator step. */
+function generateAwsReadmeSecrets(): string {
+  return `
+## Secrets and credentials
+
+- **Database.** RDS creates and manages the master password itself, in its own Secrets Manager
+  secret, so it is never in Terraform state. The ECS task reads the username and password from that
+  secret and builds \`DATABASE_URL\` (password percent-encoded, \`?sslmode=require\`) when it starts.
+  Only the task security group can reach Postgres, on port 5432.
+- **\`SECRET\` and \`ADMIN_TOKEN\`** are generated by Terraform (\`random_password\`) and stored in
+  Secrets Manager. Their values are also in the Terraform state, so keep the state in an encrypted
+  backend with restricted access.
+- **\`OIDC_CLIENT_SECRET\` is an operator step.** Terraform writes the placeholder \`change-me\` once
+  (so the first task can start) and never overwrites it. Put the real client secret in, then restart
+  the service so the task picks it up:
+
+\`\`\`sh
+aws secretsmanager put-secret-value --secret-id "<project>/OIDC_CLIENT_SECRET" --secret-string "<client secret>"
+aws ecs update-service --cluster <project>-cluster --service <project>-app --force-new-deployment
+\`\`\`
+`;
+}
+
+/** Domain, ACM validation and the NS-delegation operator step. */
+function generateAwsReadmeTls(): string {
+  return `
+## Domain and TLS
+
+Without \`domain_name\` the ALB serves plain HTTP only. With one, Terraform creates a Route 53 zone
+for it, an ACM certificate validated through DNS records in that zone, an HTTPS listener, and a 301
+redirect from port 80 to HTTPS. The task's \`PUBLIC_BASE_URL\` is \`https://<domain_name>\` (or
+\`http://<alb_dns_name>\` without a domain).
+
+**Operator step: delegate the domain to the new zone.** ACM can only validate the certificate once
+the domain's name servers point at the zone Terraform created, so apply in two steps:
+
+\`\`\`sh
+terraform apply -target='aws_route53_zone.main'
+terraform state show 'aws_route53_zone.main[0]'   # copy the name_servers
+# At your registrar (or the parent zone), create NS records for the domain with those servers.
+terraform apply                                   # now the certificate validates
+\`\`\`
+`;
+}
+
+/** Mapping of outputs to the server's environment. */
+function generateAwsReadmeOutputs(): string {
+  return `
 ## Wire outputs into env
+
+On ECS the task receives all of these automatically; this table is for running the server elsewhere.
 
 \`\`\`sh
 terraform output -json   # or: npm run infra:outputs
@@ -744,7 +930,7 @@ terraform output -json   # or: npm run infra:outputs
 | Output | Env var | Adapter |
 |---|---|---|
 | \`s3_bucket\` | \`S3_BUCKET\` (+ \`AWS_REGION\`) | \`storage-s3\` |
-| \`db_endpoint\` | \`DATABASE_URL\` (\`?sslmode=require\`) | \`db-postgres\` |
+| \`db_endpoint\` + the RDS-managed secret | \`DATABASE_URL\` (\`?sslmode=require\`, percent-encoded password) | \`db-postgres\` |
 | \`user_pool_id\` / \`app_client_id\` | \`COGNITO_DOMAIN\` / \`COGNITO_REGION\` / \`COGNITO_USER_POOL_ID\` / \`OIDC_CLIENT_ID\` | \`auth\` (cognito social) |
 | Secrets Manager | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
 
@@ -754,15 +940,13 @@ npm start
 \`\`\`
 
 Credentials come from IAM (ECS task roles) — never check access keys into env files.
-
-${generateAwsCiProfile()}`;
+`;
 }
 
 export function generateAwsTfvarsExample(): string {
   return `# Copy to terraform.tfvars and fill in per environment.
 # CI test profile: pass a unique project per run instead —
 #   terraform plan -var "project=shelf-ci-$GITHUB_RUN_ID"
-# db_engine is baked at scaffold time (rds | dsql); prefer dsql for CI.
 project           = "my-storyshelf"
 region            = "us-east-1"
 vpc_id            = ""
@@ -783,7 +967,7 @@ const AWS_FILES: ReadonlyArray<readonly [string, (options: AwsTerraformOptions) 
   ["terraform/compute.tf", () => generateAwsCompute()],
   ["terraform/secrets.tf", () => generateAwsSecrets()],
   ["terraform/dns.tf", () => generateAwsDns()],
-  ["terraform/outputs.tf", (options) => generateAwsOutputs(options.dbEngine)],
+  ["terraform/outputs.tf", () => generateAwsOutputs()],
   ["terraform/terraform.tfvars.example", () => generateAwsTfvarsExample()],
 ];
 
@@ -793,7 +977,7 @@ export function generateAwsTerraformFiles(options: AwsTerraformOptions): Terrafo
   for (const [path, generate] of AWS_FILES) {
     files[path] = generate(options);
   }
-  files["terraform/database.tf"] = generateAwsDatabase(options.dbEngine);
+  files["terraform/database.tf"] = generateAwsDatabase();
   files["terraform/README.md"] = generateAwsReadme(options.project);
   return files;
 }

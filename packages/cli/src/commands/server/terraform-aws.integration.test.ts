@@ -41,54 +41,43 @@ function materialize(options: AwsTerraformOptions): string {
 }
 
 describe.skipIf(!hasTerraform)("generated AWS terraform (gated on terraform binary)", () => {
-  let rdsDir: string;
-  let dsqlDir: string;
-  let existingVpcDir: string;
+  let dir: string;
 
   beforeAll(() => {
-    rdsDir = materialize({
+    // The generated HCL is driven by variables (`domain_name`, `vpc_id`), not by generator options,
+    // so every option set produces the same files. `terraform validate` type-checks both arms of
+    // each conditional (`count`, `dynamic`), but it does not evaluate them with values.
+    dir = materialize({
       project: "acme-shelf",
       region: "us-east-1",
-      dbEngine: "rds",
       domainName: "shelf.example.com",
       samlMetadataUrl: "https://idp.example.com/metadata/saml",
-    });
-    dsqlDir = materialize({ project: "acme-shelf", region: "us-east-1", dbEngine: "dsql" });
-    existingVpcDir = materialize({
-      project: "acme-shelf",
-      region: "us-east-1",
-      dbEngine: "rds",
-      vpcId: "vpc-0123456789abcdef0",
     });
   });
 
   afterAll(() => {
     // Remove whatever was created, including fixtures from a `beforeAll` that threw part-way.
-    for (const dir of created.splice(0)) {
-      rmSync(dir, { recursive: true, force: true });
+    for (const fixture of created.splice(0)) {
+      rmSync(fixture, { recursive: true, force: true });
     }
   });
 
-  it("passes terraform fmt -check for the RDS, DSQL and existing-VPC variants", () => {
-    for (const dir of [rdsDir, dsqlDir, existingVpcDir]) {
-      expect(() =>
-        execFileSync("terraform", ["fmt", "-check", "-recursive", "."], { cwd: dir }),
-      ).not.toThrow();
-    }
+  it("passes terraform fmt -check", () => {
+    expect(() =>
+      execFileSync("terraform", ["fmt", "-check", "-recursive", "."], { cwd: dir }),
+    ).not.toThrow();
   });
 
   it("initializes and validates the generated terraform directory", () => {
-    for (const dir of [rdsDir, dsqlDir, existingVpcDir]) {
-      const cwd = join(dir, "terraform");
-      expect(() =>
-        execFileSync("terraform", ["init", "-backend=false", "-input=false", "-no-color"], {
-          cwd,
-          stdio: "ignore",
-        }),
-      ).not.toThrow();
-      expect(() =>
-        execFileSync("terraform", ["validate", "-no-color"], { cwd, stdio: "ignore" }),
-      ).not.toThrow();
-    }
+    const cwd = join(dir, "terraform");
+    expect(() =>
+      execFileSync("terraform", ["init", "-backend=false", "-input=false", "-no-color"], {
+        cwd,
+        stdio: "ignore",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      execFileSync("terraform", ["validate", "-no-color"], { cwd, stdio: "ignore" }),
+    ).not.toThrow();
   }, 300_000);
 });
