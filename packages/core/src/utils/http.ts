@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import type { Logger } from "../logger.ts";
 import { injectTraceContext, withSpan } from "../tracing.ts";
+import { redactSecrets } from "./redact.ts";
 
 /**
  * Fetch JSON with timeout, retries, and structured errors.
@@ -180,15 +181,29 @@ async function requestWithRetry<T>(
         }
       }
     },
-    { "http.request.method": options.method ?? "GET", "url.full": redactUrl(url) },
+    { "http.request.method": options.method ?? "GET", "url.full": redactUrlForLog(url) },
   );
 }
 /* oxlint-enable eslint/no-await-in-loop */
 
-/** Strip the query string (tokens, signatures) from a URL for span attributes. */
-function redactUrl(url: string): string {
-  const query = url.indexOf("?");
-  return query === -1 ? url : url.slice(0, query);
+/**
+ * The form of a request URL that may appear in logs and span attributes. The path of an incoming
+ * webhook (Slack, Teams) is the secret, and other URLs carry credentials in the userinfo or the
+ * query, so only the origin and the first path segment survive: `https://hooks.slack.com/services/…`.
+ * A path of one segment (or none) is dropped to the origin, since that segment may be the secret.
+ * Never userinfo, never the query string or fragment, never the full path. There is no opt-out.
+ */
+export function redactUrlForLog(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return "[invalid url]";
+  }
+  const [first, ...rest] = parsed.pathname.split("/").filter((segment) => segment !== "");
+  const origin = `${parsed.protocol}//${parsed.host}`;
+  const path = first !== undefined && rest.length > 0 ? `/${first}/…` : "";
+  return redactSecrets(`${origin}${path}`);
 }
 
 async function backoff(
@@ -198,7 +213,10 @@ async function backoff(
   logger?: Logger,
 ): Promise<void> {
   const delay = retryDelayMs(error, attempt);
-  logger?.warn({ url, attempt, delayMs: delay }, "http request failed, retrying");
+  logger?.warn(
+    { url: redactUrlForLog(url), attempt, delayMs: delay },
+    "http request failed, retrying",
+  );
   await sleep(delay);
 }
 
@@ -253,7 +271,7 @@ async function doFetchResponse(
 ): Promise<Response> {
   const request = buildRequest(options);
   injectTraceContext(request.headers);
-  options.logger?.debug({ url, method: request.method }, "http request");
+  options.logger?.debug({ url: redactUrlForLog(url), method: request.method }, "http request");
   const response = await fetch(url, {
     method: request.method,
     headers: request.headers,

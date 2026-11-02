@@ -1,5 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HttpError, httpBytes, httpJson, httpText } from "./http.ts";
+import type { Logger } from "../logger.ts";
+import { HttpError, httpBytes, httpJson, httpText, redactUrlForLog } from "./http.ts";
+
+const spanAttributes = vi.hoisted(() => [] as Record<string, unknown>[]);
+
+vi.mock("../tracing.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../tracing.ts")>();
+  return {
+    ...original,
+    withSpan: ((name, fn, attributes, parent) => {
+      spanAttributes.push({ ...attributes });
+      return original.withSpan(name, fn, attributes, parent);
+    }) as typeof original.withSpan,
+  };
+});
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });
@@ -7,6 +21,78 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  spanAttributes.length = 0;
+});
+
+/** A logger that records every call as one JSON line, so a test can search all of it. */
+function recordingLogger(): { logger: Logger; lines: string[] } {
+  const lines: string[] = [];
+  const record =
+    (level: string) =>
+    (...args: unknown[]): void => {
+      lines.push(JSON.stringify({ level, args }));
+    };
+  const logger = { debug: record("debug"), warn: record("warn"), info: record("info") };
+  return { logger: logger as unknown as Logger, lines };
+}
+
+const SECRET_URLS: { url: string; secrets: string[]; expected: string }[] = [
+  {
+    url: "https://hooks.slack.com/services/T000/B000/SECRETxyz?token=abc",
+    secrets: ["SECRETxyz", "T000", "B000", "abc", "token="],
+    expected: "https://hooks.slack.com/services/…",
+  },
+  {
+    url: "https://user:pass@example.com/a/b",
+    secrets: ["user", "pass", "@"],
+    expected: "https://example.com/a/…",
+  },
+];
+
+describe("redactUrlForLog", () => {
+  it.each(SECRET_URLS)("keeps only the origin and first segment of $url", (row) => {
+    expect(redactUrlForLog(row.url)).toBe(row.expected);
+  });
+
+  it("drops a single-segment path, which may itself be the secret", () => {
+    expect(redactUrlForLog("https://example.com/SECRETONLY?x=1#frag")).toBe("https://example.com");
+    expect(redactUrlForLog("https://example.com/")).toBe("https://example.com");
+  });
+
+  it("keeps a non-default port and never throws on an invalid URL", () => {
+    expect(redactUrlForLog("http://localhost:3000/api/v1/x")).toBe("http://localhost:3000/api/…");
+    expect(redactUrlForLog("not a url with SECRET")).toBe("[invalid url]");
+  });
+});
+
+describe("secret-bearing URLs in logs and spans", () => {
+  it.each(SECRET_URLS)("never logs or traces secrets of $url across a retry", async (row) => {
+    const fetchMock = vi
+      .fn<() => Promise<Response>>()
+      .mockResolvedValueOnce(jsonResponse({}, 503, { "retry-after": "0" }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { logger, lines } = recordingLogger();
+    await httpText(row.url, { method: "POST", json: {}, logger });
+    const warned = lines.filter((line) => line.includes("http request failed, retrying"));
+    expect(warned).toHaveLength(1);
+    expect(lines.some((line) => line.includes(row.expected))).toBe(true);
+    const everything = JSON.stringify({ lines, spans: spanAttributes });
+    for (const secret of row.secrets) {
+      expect(everything).not.toContain(secret);
+    }
+    expect(spanAttributes[0]?.["url.full"]).toBe(row.expected);
+  });
+
+  it("still requests the real URL", async () => {
+    const fetchMock = vi.fn(async () => {
+      await Promise.resolve();
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await httpJson(SECRET_URLS[0]!.url);
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(SECRET_URLS[0]!.url);
+  });
 });
 
 describe("httpJson", () => {

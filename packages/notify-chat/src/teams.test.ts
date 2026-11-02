@@ -1,3 +1,4 @@
+import type { Logger } from "@storyshelf/core/logger";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { teamsWorkflowNotifier } from "./teams.ts";
 
@@ -51,5 +52,37 @@ describe("teamsWorkflowNotifier", () => {
     await expect(sender.send({ channel: CHANNEL, formatted: FORMATTED })).rejects.toThrow(
       "workflow URL",
     );
+  });
+
+  it("never logs the webhook path when a send is retried", async () => {
+    const url =
+      "https://prod-00.westus.logic.azure.com/workflows/SECRETflow/triggers/manual/paths/invoke?sig=SECRETsig";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce(
+          new Response("busy", { status: 503, headers: { "retry-after": "0" } }),
+        )
+        .mockResolvedValueOnce(new Response("ok", { status: 200 })),
+    );
+    const lines: string[] = [];
+    const record =
+      (level: string) =>
+      (...args: unknown[]): void => {
+        lines.push(JSON.stringify({ level, args }));
+      };
+    const logger = { debug: record("debug"), warn: record("warn"), info: record("info") };
+    const child = { ...logger, child: () => child };
+    const sender = teamsWorkflowNotifier.create({
+      config: {},
+      secret: url,
+      logger: child as unknown as Logger,
+    });
+    await sender.send({ channel: CHANNEL, formatted: FORMATTED });
+    expect(lines.some((line) => line.includes("http request failed, retrying"))).toBe(true);
+    for (const secret of ["SECRETflow", "SECRETsig", "triggers", "invoke"]) {
+      expect(lines.join("\n")).not.toContain(secret);
+    }
   });
 });
