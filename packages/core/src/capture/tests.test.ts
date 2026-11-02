@@ -198,12 +198,12 @@ describe("runProjectTests", () => {
     expect(stored[1]?.error).not.toContain("abcDEF123456789");
   });
 
-  it("warns and skips when the runner cannot run tests", async () => {
+  it("fails when the runner cannot run tests", async () => {
     await writeIndex([entry("b--primary"), testEntry("b--primary", "works")]);
     const { input, builds, buildId, logger } = await setup({ runTests: true }, undefined);
     const sets = await runProjectTests(await input());
-    expect(sets.blocking.size).toBe(0);
-    expect(logger.warn).toHaveBeenCalledWith({ tests: 1 }, expect.stringContaining("cannot run"));
+    expect([...sets.blocking]).toEqual(["b--primary:works"]);
+    expect(logger.error).toHaveBeenCalledWith({ tests: 1 }, expect.stringContaining("cannot run"));
     expect((await builds.get(buildId))?.testResults).toBeFalsy();
   });
 

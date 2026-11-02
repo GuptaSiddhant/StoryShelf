@@ -71,7 +71,8 @@ export interface RunTestsInput {
 export async function runProjectTests(input: RunTestsInput): Promise<TestRunSets> {
   const tests = input.project.runTests ? await testsToRun(input) : [];
   const run = input.runner.runTests?.bind(input.runner);
-  if (tests.length === 0 || !run) return await skipTests(input, tests.length);
+  if (tests.length === 0) return await skipTests(input, tests.length);
+  if (!run) return await unsupportedTests(input, tests);
   const results = resultsOf(tests, await execute(input, run, tests));
   await keepResults(input, results);
   return await reportFailures(input, results, tests);
@@ -87,6 +88,22 @@ async function skipTests(input: RunTestsInput, wanted: number): Promise<TestRunS
   }
   await keepResults(input, null);
   return { blocking: new Set(), flaky: new Set() };
+}
+
+/** Tests were wanted and exist, but the runner cannot run them: fail loudly rather than silently. */
+async function unsupportedTests(
+  input: RunTestsInput,
+  tests: readonly StoryEntry[],
+): Promise<TestRunSets> {
+  input.logger?.error(
+    { tests: tests.length },
+    "project runs tests but the capture runner cannot run them; unsupported capability",
+  );
+  await emitAttemptLog(input.recordLog, input.logger, "error", "storybook tests unsupported", {
+    tests: tests.length,
+  });
+  await keepResults(input, null);
+  return { blocking: new Set(tests.map((test) => test.id)), flaky: new Set() };
 }
 
 /** The test entries to run: those of stories that are not skipped. */
