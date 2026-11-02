@@ -103,7 +103,8 @@ exports and no behavioural change, and the hermetic vitest suite stays network-f
   `capture.persist-statics`, `capture.render`, `capture.persist`) in the orchestrator. `tracing.ts`
   is intentionally internal: no new `core` exports subpath. Core's `withSpan` records a
   redacted copy of a thrown error (`spanException`: same name, `redactSecrets` message) and
-  rethrows the original; nothing else in core records an exception on a span.
+  rethrows the original. The HTTP retry loop records a failed attempt it retries through the same
+  `spanException`; no core code passes a raw error to `recordException`.
 - `@storyshelf/observability` owns the SDK lifecycle (`node.ts`: OTLP/HTTP exporters, a resource with
   service name, version and environment), the `createInstrumentedDatabase` and
   `createInstrumentedStorage` wrappers (`db.*` and `storage.*` spans plus duration histograms), the pino
