@@ -1,20 +1,14 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { generateGcpTerraformFiles, type GcpTerraformOptions } from "./terraform-gcp.ts";
+import { terraformGate } from "./test-helpers/terraform-gate.ts";
 
-function terraformAvailable(): boolean {
-  const res = spawnSync("terraform", ["version"], { stdio: "ignore" });
-  return res.status === 0;
-}
-
-// `terraform init` downloads providers, so the suite runs only when RUN_TERRAFORM=1 (CI's verify
-// job sets it); `nub run test` stays hermetic even where a terraform binary is installed. Without
-// the gate the binary is not even probed (`terraform version` can reach the network). With the
-// gate set, a missing binary must fail rather than silently skip the suite below.
-const runTerraform = process.env["RUN_TERRAFORM"] === "1";
-const hasTerraform = runTerraform && terraformAvailable();
+// `terraform init` downloads providers, so the suite runs only when RUN_TERRAFORM=1 (see
+// test-helpers/terraform-gate.ts). With the gate set, a missing binary must fail rather than
+// silently skip the suite below.
+const { runTerraform, hasTerraform } = terraformGate();
 
 it.runIf(runTerraform)("has a terraform binary (RUN_TERRAFORM=1 requires one)", () => {
   expect(hasTerraform).toBe(true);
