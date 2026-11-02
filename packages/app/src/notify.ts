@@ -109,18 +109,51 @@ function recordOutcomes(
   };
 }
 
-/** Subscriptions matching an event (enabled + allowlist). */
+/** The one event raised for every comment; its `data.scope` is `build`, `story` or `snapshot`. */
+export const COMMENT_CREATED = "comment:created";
+
+/**
+ * `review:comment` is a filter alias, never an emitted event (ADR 0013, decision 10): a filter that
+ * lists it matches a {@link COMMENT_CREATED} whose scope is `build` or `story`.
+ */
+export const REVIEW_COMMENT_ALIAS = "review:comment";
+
+/**
+ * Whether an allowlist admits an event (empty admits all). Matches the event name, or the
+ * `review:comment` alias for a build or story comment; a list holding both names admits it once.
+ */
+export function eventMatches(
+  allowed: readonly string[],
+  event: string,
+  data: Record<string, unknown>,
+): boolean {
+  if (allowed.length === 0 || allowed.includes(event)) {
+    return true;
+  }
+  const reviewScope = data["scope"] === "build" || data["scope"] === "story";
+  return event === COMMENT_CREATED && reviewScope && allowed.includes(REVIEW_COMMENT_ALIAS);
+}
+
+/** Subscriptions matching an event (enabled + allowlist, alias included). */
 function matchingSubs(
   rows: NotificationSubscriptionRow[],
   event: string,
+  data: Record<string, unknown>,
 ): NotificationSubscriptionRow[] {
-  return rows.filter((row) => {
-    if (!row.enabled) {
-      return false;
-    }
-    const events = NotificationSubscriptionModel.eventsOf(row);
-    return events.length === 0 || events.includes(event);
-  });
+  return rows.filter(
+    (row) => row.enabled && eventMatches(NotificationSubscriptionModel.eventsOf(row), event, data),
+  );
+}
+
+/** Stored channels that admit the event; the core fan-out then needs no filter of its own. */
+function admittedChannels(
+  channels: NotificationChannel[],
+  event: string,
+  data: Record<string, unknown>,
+): NotificationChannel[] {
+  return channels
+    .filter((channel) => eventMatches(channel.events, event, data))
+    .map((channel) => Object.assign({}, channel, { events: [] }));
 }
 
 /** Per-subscriber targets for one subscription (wired kinds only). */
@@ -196,11 +229,12 @@ async function subscriberTargets(
   db: DatabaseAdapter,
   projectId: string,
   event: string,
+  data: Record<string, unknown>,
   wired: ReadonlySet<string>,
 ): Promise<NotificationChannel[]> {
   const rows = await new NotificationSubscriptionModel(db).list(projectId);
   const nested = await Promise.all(
-    matchingSubs(rows, event).map(async (sub) => await targetsForSub(db, sub, wired)),
+    matchingSubs(rows, event, data).map(async (sub) => await targetsForSub(db, sub, wired)),
   );
   const defaults = DEFAULT_ON_EVENTS.has(event)
     ? await defaultTargets(db, projectId, rows, wired)
@@ -228,8 +262,8 @@ export async function notifyProjectWith(
   }
   const reviewUrl = reviewSuffix ? reviewUrlFor(origin, project.slug, reviewSuffix) : undefined;
   const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
-  const channels = await loadChannels(deps, project.id);
-  const targets = await subscriberTargets(deps.db, project.id, event, wired);
+  const channels = admittedChannels(await loadChannels(deps, project.id), event, data);
+  const targets = await subscriberTargets(deps.db, project.id, event, data, wired);
   await emitNotifications(
     { event, projectId: project.id, projectSlug: project.slug, data, timestamp: now() },
     {

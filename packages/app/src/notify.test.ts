@@ -7,7 +7,7 @@ import {
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import { notifyProject, notifySystem } from "./notify.ts";
+import { eventMatches, notifyProject, notifySystem } from "./notify.ts";
 import { runWithStore, type Store } from "./store.ts";
 
 const SECRET = "test-server-secret-32-chars-long!!";
@@ -342,5 +342,77 @@ describe("notifySystem", () => {
       await notifySystem("sys:purge-completed", { removedBuilds: 3 });
     });
     expect(sent).toHaveLength(1);
+  });
+});
+
+const scoped = (scope: string): Record<string, unknown> => ({ scope, buildId: "b1" });
+
+async function sentFor(
+  events: string[],
+  scope: string,
+  via: "channel" | "subscription" = "channel",
+): Promise<number> {
+  const { db } = makeDatabase();
+  const sent: unknown[] = [];
+  const wired = [recordingProvider("log", sent), recordingProvider("email", sent)];
+  if (via === "channel") {
+    await seedProject(db);
+    await new NotificationChannelModel(db, undefined, SECRET).create({
+      projectId: "p1",
+      provider: "log",
+      config: {},
+      events,
+    });
+  } else {
+    await seedUsers(db);
+    await new NotificationSubscriptionModel(db).upsert("p1", "dev1", { via: ["email"], events });
+  }
+  await runWithStore(storeFor(db, wired), async () => {
+    await notifyProject(
+      { id: "p1", slug: "test-project" },
+      "comment:created",
+      { scope, buildId: "b1", commentId: "c1" },
+      "/builds/b1",
+    );
+  });
+  return sent.length;
+}
+
+describe("comment:created and the review:comment alias", () => {
+  it("matches the alias for build and story comments, never snapshot comments", () => {
+    const alias = ["review:comment"];
+    expect(eventMatches(alias, "comment:created", scoped("build"))).toBe(true);
+    expect(eventMatches(alias, "comment:created", scoped("story"))).toBe(true);
+    expect(eventMatches(alias, "comment:created", scoped("snapshot"))).toBe(false);
+    expect(eventMatches(alias, "comment:created", {})).toBe(false);
+  });
+
+  it("matches the canonical name for every scope, and an empty list matches everything", () => {
+    for (const scope of ["build", "story", "snapshot"]) {
+      expect(eventMatches(["comment:created"], "comment:created", scoped(scope))).toBe(true);
+      expect(eventMatches([], "comment:created", scoped(scope))).toBe(true);
+    }
+    expect(eventMatches(["build:created"], "comment:created", scoped("build"))).toBe(false);
+  });
+
+  it("does not make the alias match other events", () => {
+    expect(eventMatches(["review:comment"], "review:verdict", scoped("build"))).toBe(false);
+  });
+
+  it("delivers to a channel filtered on the alias for build and story comments only", async () => {
+    expect(await sentFor(["review:comment"], "build")).toBe(1);
+    expect(await sentFor(["review:comment"], "story")).toBe(1);
+    expect(await sentFor(["review:comment"], "snapshot")).toBe(0);
+  });
+
+  it("sends one message to a channel subscribed to both names", async () => {
+    expect(await sentFor(["review:comment", "comment:created"], "story")).toBe(1);
+    expect(await sentFor(["review:comment", "comment:created"], "snapshot")).toBe(1);
+  });
+
+  it("applies the alias to per-user subscriptions as well", async () => {
+    expect(await sentFor(["review:comment"], "build", "subscription")).toBe(1);
+    expect(await sentFor(["review:comment"], "snapshot", "subscription")).toBe(0);
+    expect(await sentFor(["review:comment", "comment:created"], "build", "subscription")).toBe(1);
   });
 });
