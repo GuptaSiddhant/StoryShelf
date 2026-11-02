@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: "en-US"
 early_access: false
-tone_instructions: "Be direct, highly technical, and strictly actionable. State the defect, failure mode, and concrete fix with file:line. No praise, filler, or generic advice. Flag uncertainty explicitly; never assert an unverified issue."
+tone_instructions: "Be direct, highly technical, and strictly actionable. State the defect, failure mode, and concrete fix with file:line. No praise, filler, generic advice, or restating the diff. Only raise blocking defects and concrete risks; skip nitpicks, style, and observations. Flag uncertainty explicitly; never assert an unverified issue. Keep each comment to 3 sentences max."
 
 reviews:
   profile: "assertive"
@@ -12,19 +12,19 @@ reviews:
   high_level_summary: true
   high_level_summary_in_walkthrough: true
   high_level_summary_instructions: |
-    Summarize only verifiable changes: affected packages, behavior, schema/migration impact, and test coverage. Do not claim a fix works unless the diff or tests prove it. List unresolved risks under "Risks".
+    Summarize only verifiable changes: affected packages, behavior, schema/migration impact, and test coverage. Do not claim a fix works unless the diff or tests prove it. List unresolved risks under "Risks". Keep the summary to at most 5 bullets.
   review_status: true
-  review_details: true
-  collapse_walkthrough: false
-  changed_files_summary: true
-  sequence_diagrams: true
-  estimate_code_review_effort: true
-  assess_linked_issues: true
-  related_issues: true
-  related_prs: true
-  suggested_labels: true
+  review_details: false
+  collapse_walkthrough: true
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
   auto_apply_labels: false
-  suggested_reviewers: true
+  suggested_reviewers: false
   auto_assign_reviewers: false
   poem: false
   in_progress_fortune: false
