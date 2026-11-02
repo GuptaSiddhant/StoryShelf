@@ -77,13 +77,15 @@ describe("measureRemote", () => {
   it("does not leave a page that only opens after the limit", async () => {
     const opening = Promise.withResolvers<unknown>();
     const page = fakePage(async () => await Promise.resolve(PROBE));
-    const { session } = fakeSession(async () => await opening.promise);
+    const { session, forgetPage } = fakeSession(async () => await opening.promise);
     const environment = await measureRemote(session, remote(20));
     expect(environment.fontsHash).toBeUndefined();
     expect(page.close).not.toHaveBeenCalled();
     opening.resolve(page);
     await new Promise((resolve) => setImmediate(resolve));
     expect(page.evaluate).not.toHaveBeenCalled();
+    expect(page.close).toHaveBeenCalledOnce();
+    expect(forgetPage).toHaveBeenCalledWith(page);
   });
 
   it("stops the run when cancelled mid-probe and closes the page, with no warning", async () => {

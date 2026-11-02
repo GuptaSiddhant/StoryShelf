@@ -42,6 +42,7 @@ export async function measureRemote(
       const opened = await session.newPage();
       page = opened;
       if (stopped()) {
+        await closePage(session, opened);
         throw new Error("the measurement stopped before its page opened");
       }
       seen.probe = await opened.evaluate(inPageProbe, [...FONT_PROBE_FAMILIES]);
