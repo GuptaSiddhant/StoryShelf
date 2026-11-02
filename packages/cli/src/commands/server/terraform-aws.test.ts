@@ -78,6 +78,36 @@ describe("AWS Terraform modules", () => {
     expect(compute).not.toContain("lambda");
   });
 
+  it("looks up the public and private subnets the ALB and tasks use", () => {
+    const vpc = generateAwsVpc();
+    expect(vpc).toContain('data "aws_subnets" "public"');
+    expect(vpc).toContain('data "aws_subnets" "private"');
+  });
+
+  it("runs the app as one ECS service behind the ALB, with no worker", () => {
+    const compute = generateAwsCompute();
+    expect(compute).toContain('resource "aws_ecs_task_definition" "app"');
+    expect(compute).toContain('resource "aws_ecs_service" "app"');
+    expect(compute).toContain('resource "aws_lb_target_group" "app"');
+    expect(compute).toContain('resource "aws_lb_listener" "http"');
+    expect(compute).not.toContain('resource "aws_ecs_service" "worker"');
+    expect(compute).not.toContain('resource "aws_ecs_task_definition" "worker"');
+    expect(compute).not.toContain("aws_appautoscaling");
+  });
+
+  it("wires the service to the existing secrets and log group", () => {
+    const compute = generateAwsCompute();
+    for (const secret of ["shelf_secret", "oidc_client_secret", "admin_token"]) {
+      expect(compute).toContain(`aws_secretsmanager_secret.${secret}.arn`);
+    }
+    expect(compute).toContain("aws_cloudwatch_log_group.app.name");
+  });
+
+  it("is brace-balanced so terraform can parse it", () => {
+    const compute = generateAwsCompute();
+    expect(compute.split("{").length).toBe(compute.split("}").length);
+  });
+
   it("provisions Cognito with an admin group and optional SAML", () => {
     const identity = generateAwsIdentity();
     expect(identity).toContain('resource "aws_cognito_user_pool" "main"');

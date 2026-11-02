@@ -97,6 +97,25 @@ resource "aws_vpc" "main" {
 locals {
   vpc_id = var.vpc_id != "" ? var.vpc_id : aws_vpc.main[0].id
 }
+
+# Subnets are looked up by a Tier tag (public: ALB; private: ECS tasks and the database).
+data "aws_subnets" "public" {
+  filter {
+    name   = "vpc-id"
+    values = [local.vpc_id]
+  }
+
+  tags = { Tier = "public" }
+}
+
+data "aws_subnets" "private" {
+  filter {
+    name   = "vpc-id"
+    values = [local.vpc_id]
+  }
+
+  tags = { Tier = "private" }
+}
 `;
 }
 
@@ -255,10 +274,10 @@ resource "aws_cognito_user_pool_client" "shelf" {
   user_pool_id    = aws_cognito_user_pool.main.id
   generate_secret = true
 
-  allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["openid", "email", "profile"]
-  callback_urls                        = ["https://\${var.domain_name == "" ? aws_lb.main.dns_name : var.domain_name}/auth/callback"]
-  supported_identity_providers         = ["COGNITO"]
+  allowed_oauth_flows          = ["code"]
+  allowed_oauth_scopes         = ["openid", "email", "profile"]
+  callback_urls                = ["https://\${var.domain_name == "" ? aws_lb.main.dns_name : var.domain_name}/auth/callback"]
+  supported_identity_providers = ["COGNITO"]
 }
 
 resource "aws_cognito_user_group" "admins" {
@@ -297,7 +316,184 @@ resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/\${var.project}-app"
   retention_in_days = 30
 }
+${generateAwsLoadBalancing()}${generateAwsExecutionRole()}${generateAwsTaskRole()}${generateAwsTaskDefinition()}${generateAwsAppService()}`;
+}
 
+/** ALB target group and listeners: HTTP always, HTTPS when var.domain_name is set. */
+function generateAwsLoadBalancing(): string {
+  return `
+resource "aws_lb_target_group" "app" {
+  name        = "\${var.project}-app"
+  port        = 3000
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = local.vpc_id
+
+  health_check {
+    path    = "/api/v1/health"
+    matcher = "200"
+  }
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  count             = var.domain_name == "" ? 0 : 1
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = aws_acm_certificate.main[0].arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+`;
+}
+
+/** Execution role: pulls the image, writes logs, reads exactly the three secrets. */
+function generateAwsExecutionRole(): string {
+  return `
+data "aws_iam_policy_document" "ecs_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "execution" {
+  name               = "\${var.project}-ecs-execution"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "execution" {
+  role       = aws_iam_role.execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy" "execution_secrets" {
+  name = "read-app-secrets"
+  role = aws_iam_role.execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue"]
+      Resource = [
+        aws_secretsmanager_secret.shelf_secret.arn,
+        aws_secretsmanager_secret.oidc_client_secret.arn,
+        aws_secretsmanager_secret.admin_token.arn,
+      ]
+    }]
+  })
+}
+`;
+}
+
+/** Task role: the app's own access to the Storybook bucket. */
+function generateAwsTaskRole(): string {
+  return `
+resource "aws_iam_role" "task" {
+  name               = "\${var.project}-ecs-task"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+resource "aws_iam_role_policy" "task_storage" {
+  name = "storybook-bucket"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+      Resource = [aws_s3_bucket.storybook.arn, "\${aws_s3_bucket.storybook.arn}/*"]
+    }]
+  })
+}
+`;
+}
+
+/**
+ * The app task definition. The image is a placeholder, like GCP/Azure: push the
+ * scaffolded Dockerfile to ECR and update it before apply.
+ */
+function generateAwsTaskDefinition(): string {
+  return `
+resource "aws_ecs_task_definition" "app" {
+  family                   = "\${var.project}-app"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 2048
+  memory                   = 4096
+  execution_role_arn       = aws_iam_role.execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  container_definitions = jsonencode([{
+    name         = "app"
+    image        = "storyshelf:latest"
+    essential    = true
+    portMappings = [{ containerPort = 3000, protocol = "tcp" }]
+    environment = [
+      { name = "S3_BUCKET", value = aws_s3_bucket.storybook.id },
+      { name = "AWS_REGION", value = var.region },
+    ]
+    secrets = [
+      { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
+      { name = "OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret.arn },
+      { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.app.name
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "app"
+      }
+    }
+  }])
+}
+`;
+}
+
+/** The single app service behind the ALB (no worker: it also consumes capture jobs). */
+function generateAwsAppService(): string {
+  return `
+resource "aws_ecs_service" "app" {
+  name            = "\${var.project}-app"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = data.aws_subnets.private.ids
+    security_groups  = [aws_security_group.ecs.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "app"
+    container_port   = 3000
+  }
+
+  depends_on = [aws_lb_listener.http]
 }
 `;
 }

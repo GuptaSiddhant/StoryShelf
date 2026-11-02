@@ -72,6 +72,12 @@ describe("GCP Terraform modules", () => {
     expect(compute).not.toContain("cloudfunctions");
   });
 
+  it("aligns the attribute equals signs terraform fmt expects", () => {
+    expect(generateGcpStorage()).toContain("age            = 30");
+    expect(generateGcpIdentity()).toContain("allow_password_signup = false");
+    expect(generateGcpIdentity()).toContain("count                 = ");
+  });
+
   it("provisions a private GCS bucket with transient expiry", () => {
     const storage = generateGcpStorage();
     expect(storage).toContain('resource "google_storage_bucket" "storybook"');
