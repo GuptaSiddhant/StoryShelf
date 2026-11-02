@@ -19,7 +19,7 @@ The product grew out of a hosting-and-comparison tool (StoryBooker). That tool's
 CLI were built around uploading a zip and showing builds side by side, with models coupled to
 `AsyncLocalStorage` and a user-defined shell-job compute system. Visual testing needs a different
 data model, UI shape and capture pipeline, so StoryShelf is a from-scratch codebase that keeps only
-the architectural patterns worth keeping: adapter composition, a type-safe URL builder (`linkRoute()`)
+the architectural patterns worth keeping: adapter composition, a type-safe URL builder (`createUrlBuilder`)
 and an HTMX page shell.
 
 ## Decision
@@ -90,7 +90,7 @@ and are not scheduled.
 - **IDs** are ULIDs everywhere: sortable, collision-resistant, URL-safe.
 - **Timestamps** are ISO-8601 strings in the database.
 - **API prefix:** every JSON endpoint lives under `/api/v1`; HTML pages live at `/`.
-- **URLs** are built with a type-safe `linkRoute()` builder.
+- **URLs** are built with a type-safe builder (`createUrlBuilder`, `packages/core/src/urls.ts`).
 - **Outbound HTTP** goes through one shared helper in core (decision 6); client libraries such as
   `ky` or `ofetch` are not added.
 - **Single production owner per third-party dependency:** a runtime dependency is listed in exactly

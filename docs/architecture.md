@@ -776,10 +776,10 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 
 ### What is purged
 
-- **Builds in a terminal state** (`approved`/`rejected`/`failed`/`cancelled`) older than `purge_ttl` (default 30 days).
+- **Builds in a terminal state** (`approved`/`rejected`/`failed`/`cancelled`) older than `purgeTtlDays` (default 30 days).
 - **Old builds of a branch**: retain the most recent build per branch (it is the branch's "current" state and powers the PR status link); purge older ones past TTL.
 - Builds stuck in `capturing`/`comparing`/`reviewing` are **not** purged (a `reviewing` build must not vanish before review).
-- **`pending` builds** (waiting for a review verdict, ADR 0013 decision 9; `core/src/retention/pending.ts`): purged once their last activity (the build's `updated_at`, its newest comment, its newest `build_reviews` row) is older than `purge_ttl`. A pending build replaced by a newer one on its branch with no attempts, comments or verdicts is "superseded" and leaves at the same window; the latest-per-branch rule does not shield pending builds, and persistent ones are kept. No new status.
+- **`pending` builds** (waiting for a review verdict, ADR 0013 decision 9; `core/src/retention/pending.ts`): purged once their last activity (the build's `updated_at`, its newest comment, its newest `build_reviews` row) is older than `purgeTtlDays`. A pending build replaced by a newer one on its branch with no attempts, comments or verdicts is "superseded" and leaves at the same window; the latest-per-branch rule does not shield pending builds, and persistent ones are kept. No new status.
 - **Stale branch baselines:** branches whose latest build is older than `branchTtlDays` (default 30, `null` = disabled) are GC'd — deletes `baselines/{branch}/**` files and `baselines` rows for that branch (default branch never GC'd).
 
 Purge removes **both** storage files (`builds/{buildId}/` or `baselines/{branch}/**`) and database rows (`builds`, `snapshots`, or `baselines`) in one transaction.
@@ -790,7 +790,8 @@ When a story is renamed or removed from Storybook, its baseline is never touched
 
 ### Trigger
 
-- **Scheduled**: in-server timers — build purge (`--purge-interval`, default hourly) and branch GC (`branchTtlDays` 30 + `branchGcIntervalMs` 24h daily interval clock via `retention-timer.ts`, staggered 1h).
+- **Scheduled**: one in-server timer, branch GC (`branchTtlDays` 30 + `branchGcIntervalMs` 24h daily interval clock via `retention-timer.ts`, staggered 1h). Build purge is not scheduled; run it manually.
+- **With `testing` enabled** (until #374 activates lifecycle-aware retention), branch GC is skipped (`retention-timer.ts`) and `POST /api/v1/admin/purge` answers `503` (`routers/admin.ts`); builds are retained. Hosting-only deployments are unaffected.
 - **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin; now runs both build purge and branch GC and returns `{removedBuilds,removedBranches,removedBaselines}`).
 
 ## Published Storybook
@@ -825,7 +826,7 @@ For sharing, a published Storybook can also be served on a **per-project subdoma
 - `:slug.stories.example.com` → latest published Storybook on the default branch
 - `:buildId.:slug.stories.example.com` → a specific build
 
-Subdomains serve the Storybook at the domain **root**, so no asset-path rewriting is needed (Storybook's static build expects root serving). They serve **published Storybooks only** — the review UI stays on the main domain at `/projects/:slug/...`. Label values are not exposed as subdomains (DNS labels cannot contain `/`); labels remain on the path-based URLs above. Without `publishedBaseDomain`, the path-based URLs are the only published surface (and stay the default for `localhost` and hosts without a wildcard record). The `linkRoute()` builder switches between path and subdomain forms based on config.
+Subdomains serve the Storybook at the domain **root**, so no asset-path rewriting is needed (Storybook's static build expects root serving). They serve **published Storybooks only** — the review UI stays on the main domain at `/projects/:slug/...`. Label values are not exposed as subdomains (DNS labels cannot contain `/`); labels remain on the path-based URLs above. Without `publishedBaseDomain`, the path-based URLs are the only published surface (and stay the default for `localhost` and hosts without a wildcard record). The URL builder (`createUrlBuilder`) switches between path and subdomain forms based on config, but it only builds links: the app does no host-based routing, so a reverse proxy in front of it must deliver the wildcard hosts (native routing is #358; ADR 0010).
 
 ## Component Page
 
@@ -994,11 +995,10 @@ StoryShelf/
         logger.ts         # pino factory (`core/logger`)
         urls.ts           # type-safe URL builder
         types.ts          # status/role enums
-        ddl.ts            # raw SQL DDL
         utils/            # hash/encrypt/ulid/paths (`core/utils`)
         test-helpers/     # in-memory fakes (`core/test-helpers`)
         index.tsx         # domain-only barrel (config/logger/types surface)
-      package.json        # subpaths: adapter/*, capture, config, ddl, diff,
+      package.json        # subpaths: adapter/*, capture, config, diff,
                           # logger, models, paths, retention, schema, types,
                           # urls, utils, test-helpers
     app/                  # HTTP app over core (see ADR 0001)
