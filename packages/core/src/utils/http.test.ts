@@ -278,6 +278,15 @@ describe("httpText", () => {
   });
 });
 
+/** A response whose body rejects when cancelled. */
+function rejectingResponse(status: number): Response {
+  const response = new Response("x", { status });
+  Object.defineProperty(response, "body", {
+    value: { cancel: async () => await Promise.reject(new Error("cancel failed")) },
+  });
+  return response;
+}
+
 /** A response whose endless body records whether anything pulled from it or cancelled it. */
 function endlessResponse(status: number): { response: Response; state: StreamState } {
   const state: StreamState = { pulls: 0, cancelled: false };
@@ -322,6 +331,17 @@ describe("httpStatus", () => {
     expect((caught as HttpError).body).toBe("");
     expect(state.cancelled).toBe(true);
     expect(state.pulls).toBeLessThanOrEqual(1);
+  });
+
+  it("keeps the outcome when cancelling the body rejects (no resend of a delivered request)", async () => {
+    const fetchMock = vi.fn(async () => await Promise.resolve(rejectingResponse(200)));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await httpStatus("https://hooks.example.com/x", { method: "POST" })).toBe(200);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    fetchMock.mockImplementation(async () => await Promise.resolve(rejectingResponse(403)));
+    const caught = await httpStatus("https://hooks.example.com/x").catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(HttpError);
+    expect((caught as HttpError).status).toBe(403);
   });
 
   it("retries a 503 and cancels every body it does not read", async () => {

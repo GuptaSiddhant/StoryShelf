@@ -302,7 +302,7 @@ async function doFetchStatus(
   timeoutMs: number,
 ): Promise<number> {
   const response = await doFetchResponse(url, options, timeoutMs, false);
-  await response.body?.cancel();
+  await discardBody(response);
   return response.status;
 }
 
@@ -338,10 +338,22 @@ async function doFetchResponse(
   return response;
 }
 
+/**
+ * Cancel an unread body. Cleanup only: a rejected cancel must never replace the request's outcome,
+ * or a delivered request would look failed and be retried.
+ */
+async function discardBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // The status is already known; there is nothing left to do with the body.
+  }
+}
+
 /** The {@link HttpError} for a non-2xx response; the body is read (and capped) only on request. */
 async function failureOf(response: Response, readBody: boolean): Promise<HttpError> {
   if (!readBody) {
-    await response.body?.cancel();
+    await discardBody(response);
     return new HttpError(response.status, "", response.headers);
   }
   const text = await response.text();
