@@ -144,12 +144,14 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   render a test entry as a story or add a test table.
 - **Publishing and the queue.** Publishing is independent of capture. Small zips extract inline;
   larger ones are `publish` jobs. Every publish route ends in `PublishCompleter.complete`
-  (`publishVerdict` is the one acceptance rule). There is one database job queue and ONE
-  `createCaptureConsumer` wired in `packages/app/src/jobs-setup.ts` (capture + publish handlers); no
-  in-memory queue. `testing.retries` is the only retry limit; `testing.leaseSeconds` is the lease,
-  renewed by `keepJobLease`; lease expiry/redelivery recovers work. A new job kind needs a handler
-  and, if it can lose a lease, an `exhausted` hook. Cancel all kinds with `cancel(buildId)`. Forked
-  capture's parent consumes; the child never reads the queue.
+  (`publishVerdict` is the one acceptance rule). Every job is a row in the one database table
+  (`capture_jobs`); `packages/app/src/jobs-setup.ts` wires one consumer per queue: the main queue
+  (capture + publish, retry limit `testing.retries`) and, on a long-running host, the `notify` queue
+  (`NOTIFY_MAX_ATTEMPTS`). No in-memory queue. `testing.leaseSeconds` is the lease, renewed by
+  `keepJobLease`; lease expiry/redelivery recovers work. A new job kind follows ADR 0040: a handler,
+  an `exhausted` hook if it can lose a lease, its retry limit declared with its queue, and its own
+  consumer (not a priority) if it must not wait behind capture. Cancel all kinds with
+  `cancel(buildId)`. Forked capture's parent consumes; the child never reads the queue.
 - **Catalog and UI.** Library/component/build pages render from `catalogOf()`
   (`packages/app/src/store.ts`), never `index.json` directly. The component preview is click-to-load in
   a sandbox without `allow-same-origin`. UI is server-rendered hono/jsx + HTMX + hono/css; no client
@@ -175,19 +177,27 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `<origin>/_s/<token>/` (`storybookBase`).
 - **Boot replay.** `runBootTasks` re-requests open build states after startup only when notifiers are
   wired and an origin is resolved. Chat, email and alerts are never replayed.
+- **Retention lifecycle.** Every baseline mutation goes through the fenced
+  `buildReferenceLifecycle` capability when the adapter has it; never check references and then
+  write or delete separately. Builds move `available` → `deleting` (irreversible); storage is
+  deleted only after the tombstone commits. Never guess a baseline's source build. Without the
+  capability, testing deployments fail closed for purge and branch GC. See ADR 0039.
 - **MCP follows route classes.** A tool that calls `testing` routes sets `routeClass: "testing"`; the
   server hides it unless `GET /api/v1/health` reports `testing: true`.
 - **Architecture direction.** Protect the self-hosted, vendor-independent workflow: assess recovery,
-  portability and whether a result accurately reports what was compared. ADRs 0037 (portability) and
-  0038 (environment migration/review) are proposed direction, not implemented behavior; ADRs 0003 and
-  0009 describe current behavior until that work lands.
+  portability and whether a result accurately reports what was compared. ADR 0037 (portability) is
+  proposed direction; ADR 0038 (environment migration/review) is accepted as the target but not yet
+  implemented. ADRs 0003 and 0009 describe current behavior until that work lands. ADR 0041 (schema
+  source of truth) is proposed; until it is accepted, change a table in every dialect's DDL, Drizzle
+  schema and migration, plus the core row type.
 
 ## Conventions
 
 - **IDs** are ULIDs; **timestamps** are ISO-8601 strings in the database.
 - **Commits** are conventional (`feat:`, `fix:`); pre-commit rejects unformatted or unlinted files.
   Fix with `nub run fmt` and re-stage; do not bypass hooks.
-- **URLs** use the type-safe `linkRoute()` builder. **Forms** use HTMX `hx-post` + `HX-Redirect`.
+- **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
+  the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
   JSON endpoints live under `/api/v1`; HTML pages at `/`.
 - **Module layout.** Put the primary export first (purpose obvious within the first screen). Split a
   module at ~150 lines or 3+ concerns. Adapters follow per-kind layouts (storage:
@@ -202,7 +212,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - **Tests.** Every model, router and adapter needs tests (target 100% coverage). `nub run test` must
   stay hermetic; real-browser is gated by `RUN_INTEGRATION=1`; live cloud by `LIVE_CLOUD=1`. See
   `docs/testing.md` for the adapter matrix and determinism rules. Do not paper over flaky timing
-  tests with `skip`; each package's `test:flake` script is the nightly canary.
+  tests with `skip`; packages with timing-sensitive tests carry a `test:flake` script, the nightly
+  canary (`docs/testing.md`).
 - **ADRs.** Current ADRs are 0001-0018 plus 0037+; archived ADRs are 0001-0036 under `archive/`.
   A bare `ADR NNNN` means a current ADR. Do not edit `archive/`; new ADRs start at 0037. ADRs are
   decision records (target 250 lines, hard cap 320); `docs/architecture.md` owns entities/interfaces.
