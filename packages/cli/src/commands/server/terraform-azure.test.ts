@@ -93,8 +93,8 @@ describe("Azure Terraform modules", () => {
   it("stores secrets in Key Vault, never in env", () => {
     const secrets = generateAzureSecrets();
     expect(secrets).toContain('resource "azurerm_key_vault" "main"');
-    expect(secrets).toContain("ADMIN_TOKEN");
-    expect(secrets).toContain("DB_PASSWORD");
+    expect(secrets).toContain("ADMIN-TOKEN");
+    expect(secrets).toContain("DB-PASSWORD");
   });
 
   it("gates DNS on domain_name", () => {

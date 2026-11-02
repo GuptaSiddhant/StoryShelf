@@ -84,7 +84,12 @@ variable "saml_metadata_url" {
 }
 
 export function generateAwsVpc(): string {
-  return `${header()}# VPC: created unless var.vpc_id points at an existing one.
+  return `${header()}${vpcResource()}${createdSubnets()}${publicRouting()}${subnetLookups()}${subnetLocals()}`;
+}
+
+/** The VPC, created unless var.vpc_id points at an existing one. */
+function vpcResource(): string {
+  return `# VPC: created unless var.vpc_id points at an existing one.
 resource "aws_vpc" "main" {
   count                = var.vpc_id == "" ? 1 : 0
   cidr_block           = "10.0.0.0/16"
@@ -93,28 +98,113 @@ resource "aws_vpc" "main" {
 
   tags = { Name = "\${var.project}-vpc" }
 }
-
-locals {
-  vpc_id = var.vpc_id != "" ? var.vpc_id : aws_vpc.main[0].id
+`;
 }
 
-# Subnets are looked up by a Tier tag (public: ALB; private: ECS tasks and the database).
+/**
+ * The network created with the VPC: 2 public + 2 private subnets across 2 AZs. There is no NAT
+ * gateway (about $32/month per AZ): ECS tasks run in the public subnets with a public IP, and
+ * only the ALB can reach them; the database sits in the private subnets (no egress needed).
+ */
+function createdSubnets(): string {
+  return `
+data "aws_availability_zones" "available" {
+  count = var.vpc_id == "" ? 1 : 0
+  state = "available"
+}
+
+resource "aws_subnet" "public" {
+  count                   = var.vpc_id == "" ? 2 : 0
+  vpc_id                  = aws_vpc.main[0].id
+  availability_zone       = data.aws_availability_zones.available[0].names[count.index]
+  cidr_block              = cidrsubnet(aws_vpc.main[0].cidr_block, 8, count.index)
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "\${var.project}-public-\${count.index}"
+    Tier = "public"
+  }
+}
+
+resource "aws_subnet" "private" {
+  count             = var.vpc_id == "" ? 2 : 0
+  vpc_id            = aws_vpc.main[0].id
+  availability_zone = data.aws_availability_zones.available[0].names[count.index]
+  cidr_block        = cidrsubnet(aws_vpc.main[0].cidr_block, 8, count.index + 10)
+
+  tags = {
+    Name = "\${var.project}-private-\${count.index}"
+    Tier = "private"
+  }
+}
+`;
+}
+
+/** Internet gateway and the public route table for the created network. */
+function publicRouting(): string {
+  return `
+resource "aws_internet_gateway" "main" {
+  count  = var.vpc_id == "" ? 1 : 0
+  vpc_id = aws_vpc.main[0].id
+
+  tags = { Name = "\${var.project}-igw" }
+}
+
+resource "aws_route_table" "public" {
+  count  = var.vpc_id == "" ? 1 : 0
+  vpc_id = aws_vpc.main[0].id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main[0].id
+  }
+
+  tags = { Name = "\${var.project}-public" }
+}
+
+resource "aws_route_table_association" "public" {
+  count          = var.vpc_id == "" ? 2 : 0
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public[0].id
+}
+`;
+}
+
+/** Existing VPC: subnets are looked up by their Tier tag (needs 2 public subnets in 2 AZs). */
+function subnetLookups(): string {
+  return `
+# Existing VPC (var.vpc_id set): subnets are looked up by their Tier tag.
 data "aws_subnets" "public" {
+  count = var.vpc_id == "" ? 0 : 1
+
   filter {
     name   = "vpc-id"
-    values = [local.vpc_id]
+    values = [var.vpc_id]
   }
 
   tags = { Tier = "public" }
 }
 
 data "aws_subnets" "private" {
+  count = var.vpc_id == "" ? 0 : 1
+
   filter {
     name   = "vpc-id"
-    values = [local.vpc_id]
+    values = [var.vpc_id]
   }
 
   tags = { Tier = "private" }
+}
+`;
+}
+
+/** One place for created-or-looked-up ids: compute.tf and database.tf reference only these. */
+function subnetLocals(): string {
+  return `
+locals {
+  vpc_id             = var.vpc_id != "" ? var.vpc_id : aws_vpc.main[0].id
+  public_subnet_ids  = var.vpc_id == "" ? aws_subnet.public[*].id : flatten(data.aws_subnets.public[*].ids)
+  private_subnet_ids = var.vpc_id == "" ? aws_subnet.private[*].id : flatten(data.aws_subnets.private[*].ids)
 }
 `;
 }
@@ -246,7 +336,7 @@ resource "aws_dsql_cluster" "main" {
 # createPostgresDatabase({ url: <DATABASE_URL with sslmode=require> }).
 resource "aws_db_subnet_group" "main" {
   name       = "\${var.project}-db"
-  subnet_ids = data.aws_subnets.private.ids
+  subnet_ids = local.private_subnet_ids
 }
 
 resource "aws_db_instance" "main" {
@@ -301,11 +391,12 @@ resource "aws_cognito_identity_provider" "saml" {
 export function generateAwsCompute(): string {
   return `${header()}# ECS Fargate: one long-lived app service; it also consumes capture jobs from the
 # database. Playwright/Chromium renders on Fargate — Lambda's 15-minute limit and /tmp caps rule it out.
+# Tasks run in the public subnets with a public IP (no NAT gateway); only the ALB can reach them.
 resource "aws_lb" "main" {
   name               = "\${var.project}-alb"
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = data.aws_subnets.public.ids
+  subnets            = local.public_subnet_ids
 }
 
 resource "aws_ecs_cluster" "main" {
@@ -482,9 +573,9 @@ resource "aws_ecs_service" "app" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = data.aws_subnets.private.ids
+    subnets          = local.public_subnet_ids
     security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   load_balancer {
@@ -612,6 +703,18 @@ terraform init
 terraform plan -out=tfplan   # review before applying
 terraform apply tfplan
 \`\`\`
+
+## Networking
+
+With \`vpc_id = ""\` the scaffold creates the network: 2 public and 2 private subnets across 2
+availability zones (tagged \`Tier = public\` / \`Tier = private\`), an internet gateway and a public
+route table. There is **no NAT gateway** (about $32/month per availability zone): the ALB and the
+ECS tasks run in the public subnets, the tasks get a public IP (to pull the image and reach AWS
+APIs) and their security group admits only the ALB; the database sits in the private subnets.
+
+With an existing \`vpc_id\` the subnets are looked up by their \`Tier\` tag, so tag at least two public
+subnets in different availability zones \`Tier = public\` (ALB and tasks) and the database subnets
+\`Tier = private\`; tasks need a route to the internet from the public subnets.
 
 ## Wire outputs into env
 

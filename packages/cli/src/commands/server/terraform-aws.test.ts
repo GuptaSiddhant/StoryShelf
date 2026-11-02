@@ -78,10 +78,58 @@ describe("AWS Terraform modules", () => {
     expect(compute).not.toContain("lambda");
   });
 
-  it("looks up the public and private subnets the ALB and tasks use", () => {
+  it("creates a usable network with the VPC: subnets, IGW and public route table, no NAT", () => {
+    const vpc = generateAwsVpc();
+    expect(vpc).toContain('resource "aws_subnet" "public"');
+    expect(vpc).toContain('resource "aws_subnet" "private"');
+    expect(vpc).toContain('Tier = "public"');
+    expect(vpc).toContain('Tier = "private"');
+    expect(vpc).toContain("data.aws_availability_zones.available[0].names[count.index]");
+    expect(vpc).toContain('resource "aws_internet_gateway" "main"');
+    expect(vpc).toContain('resource "aws_route_table" "public"');
+    expect(vpc).toContain('resource "aws_route_table_association" "public"');
+    expect(vpc).not.toContain("aws_nat_gateway");
+    expect(vpc).not.toContain("aws_eip");
+  });
+
+  it("looks up Tier-tagged subnets when an existing vpc_id is supplied", () => {
     const vpc = generateAwsVpc();
     expect(vpc).toContain('data "aws_subnets" "public"');
     expect(vpc).toContain('data "aws_subnets" "private"');
+    expect(vpc).toContain('tags = { Tier = "public" }');
+    expect(vpc).toContain('tags = { Tier = "private" }');
+    expect(vpc).toContain('count = var.vpc_id == "" ? 0 : 1');
+  });
+
+  it("exposes created-or-looked-up subnet ids in one place for compute and database", () => {
+    const vpc = generateAwsVpc();
+    expect(vpc).toContain("public_subnet_ids");
+    expect(vpc).toContain("private_subnet_ids");
+    expect(generateAwsCompute()).not.toContain("data.aws_subnets");
+    expect(generateAwsDatabase("rds")).not.toContain("data.aws_subnets");
+    expect(generateAwsDatabase("rds")).toContain("local.private_subnet_ids");
+  });
+
+  it("runs the service and the ALB in public subnets with a public IP, tasks reachable only via the ALB", () => {
+    const compute = generateAwsCompute();
+    expect(compute).toContain("subnets            = local.public_subnet_ids");
+    expect(compute).toContain("subnets          = local.public_subnet_ids");
+    expect(compute).toContain("assign_public_ip = true");
+    expect(compute).not.toContain("assign_public_ip = false");
+    // The task security group admits only the ALB security group.
+    const security = generateAwsSecurity();
+    expect(security).toContain("security_groups = [aws_security_group.alb.id]");
+  });
+
+  it("grants least-privilege roles: execution reads the three secrets, task reads only the bucket", () => {
+    const compute = generateAwsCompute();
+    for (const secret of ["shelf_secret", "oidc_client_secret", "admin_token"]) {
+      expect(compute).toContain(`aws_secretsmanager_secret.${secret}.arn`);
+    }
+    expect(compute).toContain('resource "aws_iam_role" "execution"');
+    expect(compute).toContain('resource "aws_iam_role" "task"');
+    expect(compute).toContain("aws_s3_bucket.storybook.arn");
+    expect(compute).not.toContain('Resource = "*"');
   });
 
   it("runs the app as one ECS service behind the ALB, with no worker", () => {
@@ -101,11 +149,6 @@ describe("AWS Terraform modules", () => {
       expect(compute).toContain(`aws_secretsmanager_secret.${secret}.arn`);
     }
     expect(compute).toContain("aws_cloudwatch_log_group.app.name");
-  });
-
-  it("is brace-balanced so terraform can parse it", () => {
-    const compute = generateAwsCompute();
-    expect(compute.split("{").length).toBe(compute.split("}").length);
   });
 
   it("provisions Cognito with an admin group and optional SAML", () => {

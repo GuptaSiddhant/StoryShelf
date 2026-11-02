@@ -60,13 +60,13 @@ describe.skipIf(!hasTerraform)("generated Azure terraform (gated on terraform bi
     for (const dir of [fullDir, minimalDir]) {
       expect(() =>
         execFileSync("terraform", ["init", "-backend=false", "-input=false", "-no-color"], {
-          cwd: dir,
+          cwd: join(dir, "terraform"),
           stdio: "ignore",
         }),
       ).not.toThrow();
       expect(() =>
         execFileSync("terraform", ["validate", "-no-color"], {
-          cwd: dir,
+          cwd: join(dir, "terraform"),
           stdio: "ignore",
         }),
       ).not.toThrow();

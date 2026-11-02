@@ -27,6 +27,16 @@ terraform -chdir=terraform plan -out=tfplan   # review before applying
 terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
 ```
 
+## Networking
+
+With no existing VPC (the default), the scaffold creates the network: a VPC with 2 public and 2 private subnets across 2 availability zones (tagged `Tier = public` / `Tier = private`), an internet gateway and a public route table.
+
+- **No NAT gateway.** It costs about $32/month per availability zone, so the scaffold leaves it out. The ALB and the ECS tasks run in the public subnets and the tasks get a public IP, which is how they pull the image and reach S3, Secrets Manager and CloudWatch. Their security group admits traffic only from the ALB.
+- **Private database.** RDS sits in the private subnets, which need no internet egress.
+- **Existing VPC.** Supply `vpc_id` and the scaffold looks subnets up by their `Tier` tag instead of creating any. Tag at least two public subnets in different availability zones `Tier = public` (the ALB and the tasks) and the database subnets `Tier = private`; the public subnets need a route to an internet gateway.
+
+The IAM roles are least-privilege: the task execution role pulls the image, writes logs and reads exactly the three Secrets Manager secrets; the task role reads and writes only the Storybook bucket.
+
 ## Wiring outputs
 
 Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): `S3_BUCKET` + `AWS_REGION`, `DATABASE_URL` (`?sslmode=require`), `COGNITO_REGION` / `COGNITO_USER_POOL_ID` / `OIDC_*`, `SECRET`. Output keys (`alb_dns_name`, `s3_bucket`, `db_endpoint`, `user_pool_id`, `app_client_id`) are a stable contract parsed by CI — they never change.

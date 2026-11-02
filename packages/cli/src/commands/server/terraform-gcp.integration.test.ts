@@ -62,13 +62,13 @@ describe.skipIf(!hasTerraform)("generated GCP terraform (gated on terraform bina
     for (const dir of [fullDir, minimalDir]) {
       expect(() =>
         execFileSync("terraform", ["init", "-backend=false", "-input=false", "-no-color"], {
-          cwd: dir,
+          cwd: join(dir, "terraform"),
           stdio: "ignore",
         }),
       ).not.toThrow();
       expect(() =>
         execFileSync("terraform", ["validate", "-no-color"], {
-          cwd: dir,
+          cwd: join(dir, "terraform"),
           stdio: "ignore",
         }),
       ).not.toThrow();
