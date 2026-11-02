@@ -9,7 +9,7 @@ import {
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { createPageLimiter, isTimeoutError, type SessionGate } from "@storyshelf/core/utils";
 import type { Page } from "puppeteer-core";
-import { finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
+import { abortIfCancelled, finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
 import { acquirePage } from "./pages.ts";
 import { assertReachable, launchContextOf, planRun, serve } from "./pipeline.ts";
 import { createBrowserSession, type BrowserSession } from "./session.ts";
@@ -36,6 +36,7 @@ export async function runTestEntries(
     await driver.launch(name, input.logger, launchContextOf(input, "tests", active.abort?.signal)),
   );
   active.session = session;
+  await abortIfCancelled(active, session);
   let server: { url: string; close(): Promise<void> } | undefined;
   return await finishing(
     async () => {

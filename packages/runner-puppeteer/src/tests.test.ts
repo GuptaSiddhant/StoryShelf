@@ -188,6 +188,31 @@ describe("runTestEntries", () => {
     expect(closed.browser).toBe(1);
   });
 
+  it("releases a session cancelled while its launch is still pending", async () => {
+    const gate = Promise.withResolvers<null>();
+    const close = vi.fn(async (): Promise<void> => {});
+    const browser = { newPage: async () => ({}) as never, close };
+    const driver: TargetDriver = {
+      launch: async () => {
+        await gate.promise;
+        return { browser: browser as never, ownership: "launched" };
+      },
+      remote: (): undefined => {},
+    };
+    const run = active();
+    const promise = runTestEntries(
+      { buildId: "b", storybookDir: dir, tests: [entry("ok")], concurrency: 1 },
+      run,
+      driver,
+      "chromium",
+    );
+    run.cancelled = true;
+    run.abort?.abort();
+    gate.resolve(null);
+    await expect(promise).rejects.toThrow("Capture cancelled");
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it("answers an empty list with no outcomes", async () => {
     const { driver } = harness({});
     const launch = vi.spyOn(driver, "launch");

@@ -24,7 +24,7 @@ import {
   type SessionGate,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
-import { finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
+import { abortIfCancelled, finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
@@ -66,6 +66,7 @@ export async function renderAll(
   // Launch first: a target that will not start must fail before a static server is bound.
   const session = await relaunch();
   active.session = session;
+  await abortIfCancelled(active, session);
   let server: Serving | undefined;
   let ctx: CaptureContext | undefined;
   return await finishing(
