@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted. Decision 4 is amended by ADR 0039 for deployments with `testing` (build references,
+irreversible tombstones and fail-closed purge).
 
 Supersedes (archived): ADR 0009
 
