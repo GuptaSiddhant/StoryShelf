@@ -137,16 +137,29 @@ async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
 async function readJson(url: string, res: Response): Promise<unknown> {
   const contentType = res.headers?.get("content-type") ?? "";
   if (!res.ok) {
-    throw new RequestError(
-      res.status,
-      /html/iu.test(contentType) ? notJsonMessage(url, contentType) : await res.text(),
-    );
+    throw await failedRequest(url, res, contentType);
   }
   try {
     return (await res.json()) as unknown;
-  } catch {
-    throw new Error(notJsonMessage(url, contentType));
+  } catch (error) {
+    // Only a body that is not JSON gets the url hint; a dropped connection keeps its own error.
+    throw error instanceof SyntaxError
+      ? new Error(notJsonMessage(url, contentType), { cause: error })
+      : error;
   }
+}
+
+/** The error for a failed status: an HTML page is described, not read, and its body released. */
+async function failedRequest(
+  url: string,
+  res: Response,
+  contentType: string,
+): Promise<RequestError> {
+  if (!/html/iu.test(contentType)) {
+    return new RequestError(res.status, await res.text());
+  }
+  await res.body?.cancel().catch(() => {});
+  return new RequestError(res.status, notJsonMessage(url, contentType));
 }
 
 /** What to tell the user when a JSON endpoint answered with something else (origin only, no path). */

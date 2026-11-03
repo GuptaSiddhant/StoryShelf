@@ -155,4 +155,29 @@ describe("server url forms", () => {
       /^The server at https:\/\/shelf\.test answered with an HTML page/u,
     );
   });
+
+  it("keeps a transport error while reading the body instead of blaming the url", async () => {
+    const dropped = new Error("terminated");
+    const res = {
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: () => Promise.reject(dropped),
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(res));
+    await expect(createClient("https://shelf.test").projects.get("demo")).rejects.toBe(dropped);
+  });
+
+  it("releases the body of an HTML error page it does not read", async () => {
+    const page = new Response("<html></html>", {
+      status: 502,
+      headers: { "content-type": "text/html" },
+    });
+    const cancel = vi.spyOn(page.body as ReadableStream, "cancel");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(page));
+    await expect(createClient("https://shelf.test").projects.get("demo")).rejects.toMatchObject({
+      status: 502,
+    });
+    expect(cancel).toHaveBeenCalled();
+  });
 });
