@@ -156,7 +156,7 @@ export const Tones = jsxStory(() => (
   ids, times via `hoursAgo()`), never `Date.now()` or randomness.
 - A page that cannot render in the browser needs a story-only stand-in in `.storybook/shims/` and
   an alias in `.storybook/main.ts`, never an `if` in production code.
-- `nub run storybook` (from `packages/app`) to look at it; `nub run build-storybook` must pass.
+- `nub run storybook` (from the repo root) to look at it; `nub run build-storybook` (from `packages/app`) must pass.
 
 ## Gotchas this repo already hit
 

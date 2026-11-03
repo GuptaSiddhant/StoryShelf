@@ -37,8 +37,9 @@ nubx vitest run src/path/to/file.test.ts
 nubx vitest run src/path/to/file.test.ts -t "test name"
 nubx tsc --noEmit -p tsconfig.json
 
-# The app's own Storybook (UI components + key pages), from packages/app:
-#   nub run storybook (dev, :6006) | nub run build-storybook (-> storybook-static/, gitignored)
+# The app's own Storybook (UI components + key pages):
+#   nub run storybook (from the root; dev, :6006)
+#   nub run build-storybook (from packages/app; -> storybook-static/, gitignored)
 
 # Website, from apps/website: nub run dev | build | start   (start needs a prior build)
 # Or from the root: nub run web:dev | web:build | docs
