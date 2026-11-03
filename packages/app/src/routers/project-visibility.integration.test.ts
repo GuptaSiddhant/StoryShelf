@@ -1,4 +1,4 @@
-import { MemberModel } from "@storyshelf/core/models";
+import { BuildModel, MemberModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -33,6 +33,10 @@ const auth = stubAuth(null, {
 });
 
 let scratchDir = "";
+let privateBuildId = "";
+let openBuildId = "";
+/** A well-formed build id that no build has. */
+const UNKNOWN_BUILD_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 let booted: { lifecycle: { teardown: () => Promise<void> } } | undefined;
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-visibility-"));
@@ -71,6 +75,33 @@ async function boot() {
     }),
   );
   await new MemberModel(db).set("p1", "viewer", "viewer");
+  const builds = new BuildModel(db);
+  const build = await builds.create("p1", {
+    gitSha: "a".repeat(40),
+    gitBranch: "main",
+    isDefault: true,
+  });
+  await builds.update(build.id, { status: "approved" });
+  privateBuildId = build.id;
+  await db.insert(db.tables.projects, {
+    id: "p2",
+    name: "Open",
+    slug: "open",
+    gitRepository: "acme/open",
+    gitDefaultBranch: "main",
+    publicBranchRegex: "^main$",
+    reviewEnabled: true,
+    reviewApprovals: 1,
+    createdAt: NOW,
+    updatedAt: NOW,
+  });
+  const open = await builds.create("p2", {
+    gitSha: "b".repeat(40),
+    gitBranch: "main",
+    isDefault: true,
+  });
+  await builds.update(open.id, { status: "approved" });
+  openBuildId = open.id;
   const app = createShelfApp({
     database: db,
     storage,
@@ -90,12 +121,14 @@ type Booted = Awaited<ReturnType<typeof boot>>;
 async function observed(response: Response): Promise<Record<string, unknown>> {
   return {
     status: response.status,
-    body: await response.text(),
+    body: (await response.text()).replaceAll(/\b(?:hidden|ghost)\b/gu, ":slug"),
     cacheControl: response.headers.get("cache-control"),
     contentType: response.headers.get("content-type"),
     location: response.headers
       .get("location")
-      ?.replaceAll(/\/projects\/(?:hidden|ghost)\//gu, "/projects/:slug/"),
+      ?.replaceAll(/\/projects\/(?:hidden|ghost)\//gu, "/projects/:slug/")
+      .replaceAll(privateBuildId, ":id")
+      .replaceAll(UNKNOWN_BUILD_ID, ":id"),
   };
 }
 
@@ -185,5 +218,68 @@ describe("a project the caller cannot see", () => {
       headers: { cookie: "storyshelf_session=admin" },
     });
     expect(response.status).toBe(200);
+  });
+});
+
+/** Every way to reach a build's published Storybook, for a project slug and a build id. */
+const storybookPaths = [
+  (slug: string, id: string) => `/projects/${slug}/storybook`,
+  (slug: string, id: string) => `/projects/${slug}/storybook/build/${id}/`,
+  (slug: string, id: string) => `/projects/${slug}/storybook/build/${id}/index.html`,
+  (slug: string, id: string) => `/projects/${slug}/storybook/branch/main`,
+  (slug: string, id: string) => `/_/${id}/`,
+  (slug: string, id: string) => `/_/${id}/index.html`,
+  (slug: string) => `/_/${slug}/`,
+];
+
+async function getAs(app: Booted, path: string, cookie?: string): Promise<Record<string, unknown>> {
+  requests += 1;
+  return await observed(
+    await app.request(path, {
+      headers: {
+        ...(cookie ? { cookie } : {}),
+        "x-forwarded-for": `10.2.${Math.floor(requests / 250)}.${requests % 250}`,
+      },
+    }),
+  );
+}
+
+describe("a private project's published Storybook", () => {
+  it.each([
+    ["an anonymous caller", undefined],
+    ["a signed-in caller with no role", "storyshelf_session=outsider"],
+  ])("answers %s exactly as for a project that does not exist", async (_name, cookie) => {
+    const app = await boot();
+    for (const path of storybookPaths) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one route at a time keeps failures readable
+      const hidden = await getAs(app, path("hidden", privateBuildId), cookie);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      const unknown = await getAs(app, path("ghost", UNKNOWN_BUILD_ID), cookie);
+      const where = path("hidden", privateBuildId);
+      expect(hidden, where).toEqual(unknown);
+      // The auth gate answers an anonymous short link, for any id, before the route runs.
+      const byGate = cookie === undefined && where.startsWith("/_/");
+      expect(hidden["status"], where).toBe(byGate ? 302 : 404);
+      expect(hidden["location"] === undefined, where).toBe(!byGate);
+    }
+  });
+
+  it("still opens a public build to an anonymous caller", async () => {
+    const app = await boot();
+    const resolver = await app.request("/projects/open/storybook");
+    expect(resolver.status).toBe(302);
+    expect(resolver.headers.get("location")).toBe(`/projects/open/storybook/build/${openBuildId}/`);
+    expect((await app.request(`/_/${openBuildId}/`)).status).not.toBe(404);
+  });
+
+  it("shows a signed-in viewer the Storybook", async () => {
+    const app = await boot();
+    const response = await app.request("/projects/hidden/storybook", {
+      headers: { cookie: "storyshelf_session=viewer" },
+    });
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      `/projects/hidden/storybook/build/${privateBuildId}/`,
+    );
   });
 });

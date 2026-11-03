@@ -120,7 +120,7 @@ describe("storybook routes", () => {
     },
   );
 
-  it("redirects an unauthenticated visitor from a private label", async () => {
+  it("answers an unauthenticated visitor to a private label as for a project that does not exist", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     await db.insert(db.tables.projects, mockProject());
@@ -134,8 +134,8 @@ describe("storybook routes", () => {
     });
     const url = createUrlBuilder("").storybookLabel("test-project", "branch", "feature/login");
     const response = await app.request(url);
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/auth/login");
+    expect(response.status).toBe(404);
+    expect(response.headers.get("location")).toBeNull();
   });
 
   it("returns 404 when no approved default-branch build exists", async () => {

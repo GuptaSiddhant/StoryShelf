@@ -84,7 +84,10 @@ export function registerStorybook(app: ShelfRouter): void {
       if (!build) return c.notFound();
     }
     const access = await publishedAccess(build, project);
-    if (!access) return c.redirect("/auth/login", 302);
+    if (!access) {
+      // A caller with no role gets what a build that does not exist gets (#497).
+      return (await hiddenFrom(project)) ? c.notFound() : c.redirect("/auth/login", 302);
+    }
     if (rest === "" && !(await staticsReady(project.id, build.id))) {
       return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
     }
