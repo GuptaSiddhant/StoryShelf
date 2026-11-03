@@ -42,8 +42,9 @@ app origin. It reads the project slug and build id from its own `location.pathna
 injected into the uploaded files and a published build stays byte-for-byte what was uploaded.
 The project URLs without a build id, `/projects/:slug/storybook` and the label resolver
 `/projects/:slug/storybook/:key/:value`, 302-redirect to `/projects/:slug/storybook/build/:buildId/`,
-and Storybook's files are served only under that path. The addon reads the post-redirect pathname, so
-it always runs on a path that carries the build id. It supports no other shape.
+and a signed-in viewer's Storybook files are served only under that path (the signed `/_s/<token>/`
+route is a separate, token-only read that the addon never uses). The addon reads the post-redirect
+pathname, so it always runs on a path that carries the build id. It supports no other shape.
 
 Everywhere else the addon is inert: it registers no panel and makes no request. That covers a
 developer's local `storybook dev`, a Storybook hosted elsewhere, and a project subdomain
