@@ -263,6 +263,30 @@ cdp({
 });
 ```
 
+### Example: a hibernating Fly Sprite
+
+The demo app (`apps/fly-app`) renders on a [Fly Sprite](https://sprites.dev) that wakes for a build and sleeps afterwards. The Sprite runs `playwright run-server` behind a small proxy that refuses requests without a shared secret. The target is plain configuration: `refCounted` wakes the Sprite by polling its `/healthz`, and the Sprite pauses by itself once the connections close, so `close` has nothing to do.
+
+```ts
+import { refCounted, remote } from "@storyshelf/runner-playwright/remote";
+
+const pool = refCounted<string>({ idleMs: 60_000, open: wakeSprite, close: () => {} });
+remote({
+  name: "sprite",
+  engines: ["chromium"],
+  protocol: "playwright",
+  reach: "loopback",
+  timeouts: { acquireMs: 65_000 },
+  connect: pool.connect((url) => ({
+    endpoint: url.replace("https:", "wss:"),
+    headers: { "x-storyshelf-secret": process.env.SPRITE_BROWSER_SECRET },
+  })),
+  release: pool.release,
+});
+```
+
+Keep the proxy's secret and the platform token in the host's secrets; both are scrubbed from logs like any other connection header.
+
 ## Upgrading from 0.7
 
 0.8 is a breaking release for `remote()`; a 0.7 call fails at runner creation with a message naming the replacement. The presets (`playwrightServer`, `azurePlaywright`, `browserstack`, `cdp`) keep their options.

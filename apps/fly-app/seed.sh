@@ -51,8 +51,10 @@ esac
 
 # Create the project with fixed metadata. Uploads use the admin token itself: a project token
 # minted through it has no owner, which makes it a viewer that cannot upload.
-curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
-  -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main"}'
+# DEMO_BROWSER (e.g. chromium@sprite) renders the demo on that target; unset keeps the VM's Chromium.
+PROJECT_JSON="$(jq -nc --arg b "${DEMO_BROWSER:-}" \
+  '{name:"Demo Design System",gitRepository:"acme/design-system",gitDefaultBranch:"main"} + (if $b == "" then {} else {browsers:[$b]} end)')"
+curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null -d "$PROJECT_JSON"
 
 upload() { # <dir> <branch> <sha> <message>
   (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$STORYSHELF_ADMIN_TOKEN" \

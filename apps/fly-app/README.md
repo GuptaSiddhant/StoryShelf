@@ -57,3 +57,11 @@ cd packages/storage-s3
 LIVE_CLOUD=1 S3_BUCKET=<scratch-bucket> AWS_ENDPOINT_URL_S3=https://t3.storage.dev AWS_REGION=auto \
   AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… nubx vitest run src/s3.live.test.ts
 ```
+
+## Browser on a Fly Sprite (scale to zero)
+
+The VM can render the demo on its own Chromium, or on `chromium@sprite`: a Playwright server on a hibernating [Fly Sprite](https://sprites.dev) that wakes for a build and sleeps afterwards, so the demo VM can stay small. Files: `sprite.ts` (the target, config only), `sprite/` (the Sprite's proxy, start script and `setup.sh`; see `sprite/README.md`).
+
+**Configuration** is Fly secrets only: `fly secrets set FLY_SPRITES_TOKEN=… SPRITE_BROWSER_SECRET=… -a storyshelf` (the secret is at least 16 characters and is also written into the Sprite by `setup.sh`). Optional `SPRITE_BROWSER_NAME` (default `storyshelf-browser`) and `SPRITE_BROWSER_URL` skip the API lookup. With either secret unset the target does not exist and nothing changes; removing them is the rollback. The server logs only whether it is configured, never the token, the secret or the URL.
+
+**Using it.** Select `chromium@sprite` in the demo project's capture settings, or re-seed with `DEMO_BROWSER=chromium@sprite` (seeding recreates the project, so do that deliberately).
