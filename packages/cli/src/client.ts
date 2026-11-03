@@ -126,14 +126,26 @@ function buildRequestHeaders(
 }
 
 async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
-  const res = await fetch(url, options);
+  return await readJson(url, await fetch(url, options));
+}
+
+/**
+ * The JSON body of a response. A failed status throws a `RequestError` that keeps the status; an
+ * HTML page there (a proxy or login page) or in place of the JSON is described by `notJsonMessage`
+ * instead of its markup or a parse error.
+ */
+async function readJson(url: string, res: Response): Promise<unknown> {
+  const contentType = res.headers?.get("content-type") ?? "";
   if (!res.ok) {
-    throw new RequestError(res.status, await res.text());
+    throw new RequestError(
+      res.status,
+      /html/iu.test(contentType) ? notJsonMessage(url, contentType) : await res.text(),
+    );
   }
   try {
     return (await res.json()) as unknown;
   } catch {
-    throw new Error(notJsonMessage(url, res.headers?.get("content-type") ?? ""));
+    throw new Error(notJsonMessage(url, contentType));
   }
 }
 
@@ -222,11 +234,8 @@ function createBuildsApi(
         body: body as unknown as BodyInit,
         duplex: "half",
       } as RequestInit;
-      const res = await fetch(`${baseUrl}${uploadUrl}`, init);
-      if (!res.ok) {
-        throw new RequestError(res.status, await res.text());
-      }
-      return res.json() as unknown;
+      const url = `${baseUrl}${uploadUrl}`;
+      return await readJson(url, await fetch(url, init));
     },
     retry: async (slug: string, buildId: string) =>
       await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/retry`, {

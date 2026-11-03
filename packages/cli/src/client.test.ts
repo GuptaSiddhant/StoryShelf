@@ -1,3 +1,4 @@
+import { Readable as NodeReadable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createClient, normalizeBaseUrl, postFormWithProgress, RequestError } from "./client.ts";
 
@@ -121,6 +122,37 @@ describe("server url forms", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(plain));
     await expect(createClient("https://shelf.test").projects.get("demo")).rejects.toThrow(
       /answered with a response that is not JSON \(text\/plain\)/u,
+    );
+  });
+
+  it("describes an HTML page behind a failed status, keeping the status", async () => {
+    const page = new Response("<html>502 Bad Gateway</html>", {
+      status: 502,
+      headers: { "content-type": "text/html" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(page));
+    const failure = createClient("https://shelf.test", "t").projects.get("demo");
+    await expect(failure).rejects.toMatchObject({ name: "RequestError", status: 502 });
+    await expect(failure).rejects.toThrow(/answered with an HTML page, not JSON/u);
+    await expect(failure).rejects.not.toThrow(/Bad Gateway/u);
+  });
+
+  it("keeps the raw body of a failed non-HTML answer", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 400 })));
+    await expect(createClient("https://shelf.test").projects.get("demo")).rejects.toThrow(
+      /Request failed \(400\): boom/u,
+    );
+  });
+
+  it("describes an HTML page where the zip upload expects JSON", async () => {
+    const page = new Response("<html></html>", { headers: { "content-type": "text/html" } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(page));
+    const upload = createClient("https://shelf.test/shelf/", "t").projects.builds.uploadZip(
+      "/api/v1/projects/demo/builds/b1/zip",
+      NodeReadable.from([]),
+    );
+    await expect(upload).rejects.toThrow(
+      /^The server at https:\/\/shelf\.test answered with an HTML page/u,
     );
   });
 });
