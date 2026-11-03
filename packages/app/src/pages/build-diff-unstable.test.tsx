@@ -27,9 +27,13 @@ describe("unstable render flag", () => {
   });
 
   it("shows nothing for a stable, unchecked or unflagged snapshot", async () => {
-    for (const unstable of [false, null, undefined]) {
-      expect(await html(<UnstableBadge snapshot={{ unstable }} />)).toBe("");
-      expect(await html(<UnstableNotice snapshot={{ unstable }} />)).toBe("");
-    }
+    const values = [false, null, undefined];
+    const pages = await Promise.all(
+      values.flatMap((unstable) => [
+        html(<UnstableBadge snapshot={{ unstable }} />),
+        html(<UnstableNotice snapshot={{ unstable }} />),
+      ]),
+    );
+    expect(pages).toEqual(values.flatMap(() => ["", ""]));
   });
 });

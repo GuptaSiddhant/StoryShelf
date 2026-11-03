@@ -53,9 +53,10 @@ describe("review stage: unstable render", () => {
     const flagged = await render(undefined, { ...selected, unstable: true });
     expect(flagged).toContain("Unstable render: likely flaky");
     expect(flagged).toContain("This change may be noise");
-    for (const unstable of [false, null]) {
-      expect(await render(undefined, { ...selected, unstable })).not.toContain("Unstable render");
-    }
+    const unflagged = await Promise.all(
+      [false, null].map(async (unstable) => await render(undefined, { ...selected, unstable })),
+    );
+    for (const page of unflagged) expect(page).not.toContain("Unstable render");
     expect(await render()).not.toContain("Unstable render");
   });
 });
