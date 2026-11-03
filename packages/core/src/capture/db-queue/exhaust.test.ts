@@ -312,6 +312,28 @@ describe("exhausted-job recovery races", () => {
     expect(await rt.model.get("j1:3")).toMatchObject({ status: "done" });
   });
 
+  it("lets a superseded run neither record itself nor call the hook", async () => {
+    const { rt, clock } = runtime();
+    const hook = vi.fn<Hook>(failing);
+    const other: QueueRuntime = { ...rt, owner: "other", onExhausted: hook };
+    rt.onExhausted = hook;
+    await spendAttempts(rt, clock);
+    // Run 3 is claimed, then pauses before it records itself; run 4 takes over and records itself.
+    afterNextRead(
+      rt,
+      "j1",
+      async () => {
+        clock.now += 1001;
+        await claimNext(other);
+      },
+      1,
+    );
+    expect(await claimNext(rt)).toBeNull();
+    expect(hook).toHaveBeenCalledTimes(1);
+    expect(await rt.model.get("j1")).toMatchObject({ status: "exhausting", attempt: 4 });
+    expect(await rt.model.get("j1:3")).toMatchObject({ status: "expired" });
+  });
+
   it("cancels a job that is exhausting instead of running the hook again", async () => {
     const { rt, clock } = runtime();
     const hook = vi.fn<Hook>(failing);

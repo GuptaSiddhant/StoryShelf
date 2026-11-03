@@ -173,7 +173,9 @@ describe("CaptureJobModel", () => {
     const { jobs } = model();
     await jobs.create({ id: "x", kind: "capture", buildId: "b1", maxAttempts: 2 }, T0);
     await jobs.markRunning("x", 2, T1);
-    await jobs.markExhausting("x", 3, "lease expired", T2);
+    expect(await jobs.markExhausting("x", 3, "lease expired", T2)).toBe(true);
+    // A superseded run records nothing and does not move the count back.
+    expect(await jobs.markExhausting("x", 2, "older", T2)).toBe(false);
     expect(await jobs.get("x")).toMatchObject({
       status: "exhausting",
       attempt: 3,
