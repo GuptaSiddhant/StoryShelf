@@ -16,6 +16,7 @@ import {
 } from "./build-diff-model.ts";
 import { BaselineReferenceNotice, ComparisonSources } from "./build-diff-reference.tsx";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
+import { UnstableBadge, UnstableNotice } from "./build-diff-unstable.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
 
@@ -105,6 +106,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
           <Badge tone={statusTone(selected.status)} icon>
             {selected.status}
           </Badge>
+          <UnstableBadge snapshot={selected} />
           <span>
             {snapshotVariant(selected)} · {selected.viewportWidth}×{selected.viewportHeight}
           </span>
@@ -119,6 +121,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
       <BrowserTabs project={project} build={build} selected={selected} siblings={siblings} />
       {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
       <EnvironmentChangeSnapshotNotice snapshot={selected} migrated={build.isDefault} />
+      <UnstableNotice snapshot={selected} />
       <A11yViolationsNotice snapshot={a11yCarrierOf(selected, siblings)} />
       {usage && usage.length > 0 ? (
         <LinkedUsage usage={usage} publishedBaseDomain={publishedBaseDomain} />

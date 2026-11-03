@@ -71,6 +71,9 @@ const BUILD_AFFECTED_PATHS_ALTER =
 const BUILD_INHERITED_COUNT_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS inherited_count INTEGER NOT NULL DEFAULT 0";
 const BUILD_TEST_RESULTS_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS test_results TEXT";
+const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
+const DETECT_UNSTABLE_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
@@ -172,6 +175,12 @@ async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await migrateBuildColumns(run);
   await execIgnore(run, RUN_TESTS_ALTER);
   await migrateDesignColumns(run);
+  await migrateUnstableColumns(run);
+}
+
+async function migrateUnstableColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, SNAPSHOT_UNSTABLE_ALTER);
+  await execIgnore(run, DETECT_UNSTABLE_ALTER);
 }
 
 async function migrateDesignColumns(run: MigrationRunner): Promise<void> {

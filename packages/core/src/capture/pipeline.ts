@@ -48,12 +48,15 @@ export const PERSIST_CONCURRENCY = 4;
  * (blocking failures). They force the build to `failed`.
  * @param flakyFailedStoryIds - Story ids that failed but are marked flaky
  * (non-blocking). They are logged as warnings and do not block the build.
+ * @param beforeFinalize - Runs after every snapshot row exists and before the build is finalized
+ * (the stability pass), so what it records is there when the build is announced.
  */
 export async function persistCapture(
   input: CaptureContext,
   renderFailedStoryIds: ReadonlySet<string> = new Set(),
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
   a11yFailedStoryIds: ReadonlySet<string> = new Set(),
+  beforeFinalize?: () => Promise<void>,
 ): Promise<void> {
   const sets = await persistRendered(
     input,
@@ -64,6 +67,7 @@ export async function persistCapture(
   for (const id of await persistInherited(input)) {
     sets.failed.add(id);
   }
+  await beforeFinalize?.();
   await finalizeBuild(input, allStoryIds(input), sets.failed, sets.flaky, sets.a11y);
 }
 

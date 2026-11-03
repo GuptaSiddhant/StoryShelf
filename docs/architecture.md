@@ -42,6 +42,7 @@ projects (
   public_branch_regex text,                    -- branches whose builds are publicly viewable (ADR 0010)
   run_a11y            boolean NOT NULL DEFAULT true,   -- axe accessibility checks during capture; results are shown in review and never block (ADR 0004, decision 6)
   run_tests           boolean NOT NULL DEFAULT false,  -- run Storybook 10 `.test()` entries as interaction tests during capture (ADR 0004, decision 10)
+  detect_unstable     boolean NOT NULL DEFAULT true,   -- re-render a changed snapshot once and flag it when the two renders differ (advisory; `capture/stability.ts`)
   review_enabled      boolean NOT NULL DEFAULT true,   -- review on: non-default builds wait for a verdict (ADR 0013, decision 1)
   review_approvals    integer NOT NULL DEFAULT 1,      -- approvals a build needs with `testing` off (ADR 0013, decision 3)
   storybook_url_ttl_seconds integer,           -- lifetime of the signed Storybook URLs of a render; NULL derives it from the build (ADR 0007, decision 5)
@@ -93,6 +94,7 @@ snapshots (
   reviewed_by         text,
   reviewed_at         text,
   a11y_violations     text,                    -- JSON array of the axe violation lines found on this capture (non-blocking); NULL when none or not checked (axe runs on the primary target only; `browser` names the target)
+  unstable            boolean,                 -- true: a second render of this changed snapshot differed from the first (likely flaky); false: it matched; NULL: not re-rendered. Never changes `status`
   created_at          text NOT NULL,
   updated_at          text NOT NULL,
   baseline_id         text,                    -- baseline row the diff was computed against (NULL: none, or legacy row)

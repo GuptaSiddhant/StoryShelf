@@ -63,6 +63,7 @@ const projects = defineTable("projects", {
   playTimeoutMs: "play_timeout_ms",
   runA11y: "run_a11y",
   runTests: "run_tests",
+  detectUnstable: "detect_unstable",
   browser: "browser",
   viewports: "viewports",
   browsers: "browsers",
@@ -251,6 +252,7 @@ const captureLogs = defineTable("capture_logs", {
 const snapshots = defineTable("snapshots", {
   durationMs: "duration_ms",
   a11yViolations: "a11y_violations",
+  unstable: "unstable",
   id: "id",
   projectId: "project_id",
   buildId: "build_id",
