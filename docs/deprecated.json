@@ -17,10 +17,6 @@
           "0.3.2"
         ],
         "message": "Deprecated: Turso moved into @storyshelf/db-sqlite as the /turso subpath with the same createTursoDatabase API. Use @storyshelf/db-sqlite/turso instead. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:34:55.968Z"
       }
     },
     {
@@ -39,10 +35,6 @@
           "0.3.2"
         ],
         "message": "Deprecated: The Better Auth engine replaces the bespoke password adapter; local password hashes are incompatible, so users must be re-invited. Use @storyshelf/auth instead. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:03.870Z"
       }
     },
     {
@@ -61,10 +53,6 @@
           "0.3.2"
         ],
         "message": "Deprecated: The Better Auth engine replaces the bespoke OAuth adapter; existing issuer URLs keep working through presets. Use @storyshelf/auth instead. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:05.201Z"
       }
     },
     {
@@ -89,10 +77,6 @@
           "0.6.2"
         ],
         "message": "Deprecated: Git hosts merged into the notifier family; register the github state notifier instead. Use @storyshelf/notify-git instead. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:06.350Z"
       }
     },
     {
@@ -117,10 +101,6 @@
           "0.6.2"
         ],
         "message": "Deprecated: Git hosts merged into the notifier family; register the gitlab state notifier instead. Use @storyshelf/notify-git instead. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:08.359Z"
       }
     },
     {
@@ -144,10 +124,6 @@
           "0.6.2"
         ],
         "message": "Deprecated: The database-backed capture queue is built in; remove the external queue transport and its service. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:09.586Z"
       }
     },
     {
@@ -166,10 +142,6 @@
           "0.6.2"
         ],
         "message": "Deprecated: The database-backed capture queue is built in; remove the external queue transport and its service. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:10.905Z"
       }
     },
     {
@@ -189,10 +161,6 @@
           "0.6.2"
         ],
         "message": "Deprecated: The database-backed capture queue is built in; remove the external queue transport and its service. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:12.272Z"
       }
     },
     {
@@ -211,10 +179,6 @@
           "0.6.2"
         ],
         "message": "Deprecated: The database-backed capture queue is built in; remove the external queue transport and its service. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:13.693Z"
       }
     },
     {
@@ -234,10 +198,6 @@
           "0.6.2"
         ],
         "message": "Deprecated: Capture and publish jobs run in the app's in-app consumer; remove the separate worker service. See docs/deprecated.json."
-      },
-      "jsr": {
-        "state": "archived",
-        "confirmedAt": "2026-10-24T21:35:17.816Z"
       }
     }
   ]

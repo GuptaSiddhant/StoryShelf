@@ -43,6 +43,7 @@ export const snapshots = mysqlTable(
     browser: text("browser").notNull().default("chromium"),
     durationMs: int("duration_ms"),
     a11yViolations: text("a11y_violations"),
+    unstable: boolean("unstable"),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
@@ -91,6 +92,7 @@ export interface Snapshot {
   browser?: string;
   durationMs: number | null;
   a11yViolations: string | null;
+  unstable: boolean | null;
   createdAt: string;
   updatedAt: string;
 }

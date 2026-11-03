@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  MEASUREMENT_VERSION,
   buildFingerprint,
   changedFields,
   fingerprintHash,
+  measurementVersionOf,
   mergeFingerprint,
   parseFingerprint,
+  remeasuredFields,
+  unknownFields,
 } from "./fingerprint.ts";
 
 const viewport = { name: "desktop", width: 1280, height: 720 };
@@ -98,5 +102,94 @@ describe("fingerprint", () => {
     expect(parseFingerprint("")).toBeNull();
     expect(parseFingerprint("not json")).toBeNull();
     expect(parseFingerprint('{"foo":1}')).toBeNull();
+  });
+});
+
+/** Pretend version 2 changed how the fonts and the platform are measured. */
+const history = { 2: ["fontsHash", "platform"] } as const;
+const v1 = () => ({ ...buildFingerprint("chromium", viewport, env), measurementVersion: 1 });
+const v2 = (extra: Partial<ReturnType<typeof v1>> = {}) => ({
+  ...buildFingerprint("chromium", viewport, env),
+  measurementVersion: 2,
+  ...extra,
+});
+
+describe("measurement version", () => {
+  it("writes the current version, and reads a fingerprint without one as version 1", () => {
+    expect(buildFingerprint("chromium", viewport, env).measurementVersion).toBe(
+      MEASUREMENT_VERSION,
+    );
+    const { measurementVersion: _dropped, ...legacy } = v1();
+    expect(measurementVersionOf(legacy)).toBe(1);
+    expect(parseFingerprint(JSON.stringify(legacy))).toEqual(legacy);
+  });
+
+  it("hashes a version-1 fingerprint identically with or without the field, and any version alike", () => {
+    const { measurementVersion: _dropped, ...legacy } = v1();
+    expect(fingerprintHash(v1())).toBe(fingerprintHash(legacy));
+    expect(fingerprintHash(v2())).toBe(fingerprintHash(v1()));
+  });
+
+  it("keeps a same-version comparison unchanged", () => {
+    expect(changedFields(v1(), v1(), history)).toEqual([]);
+    expect(changedFields(v2(), v2({ fontsHash: "other" }), history)).toEqual(["fontsHash"]);
+    expect(unknownFields(v2(), v2(), history)).toEqual([]);
+    expect(remeasuredFields(v1(), v1(), history)).toEqual([]);
+  });
+
+  it("compares a component measured differently across versions as unknown, not changed", () => {
+    const earlier = v1();
+    const now = v2({ fontsHash: "measured-another-way", platform: "darwin-arm64" });
+    expect(changedFields(earlier, now, history)).toEqual([]);
+    expect(unknownFields(earlier, now, history)).toHaveLength(["fontsHash", "platform"].length);
+    expect(unknownFields(earlier, now, history)).toEqual(
+      expect.arrayContaining(["fontsHash", "platform"]),
+    );
+    // Components measured the same way in both versions still compare.
+    expect(changedFields(earlier, { ...now, browserVersion: "125.0.0" }, history)).toEqual([
+      "browserVersion",
+    ]);
+    // The hash differs (values differ), but the comparison never calls it a migration.
+    expect(fingerprintHash(earlier)).not.toBe(fingerprintHash(now));
+  });
+
+  it("compares in either direction, and across several versions", () => {
+    const now = v2({ fontsHash: "other" });
+    expect(changedFields(now, v1(), history)).toEqual([]);
+    expect(unknownFields(now, v1(), history)).toHaveLength(["fontsHash", "platform"].length);
+    expect(unknownFields(now, v1(), history)).toEqual(
+      expect.arrayContaining(["fontsHash", "platform"]),
+    );
+    const v3 = { ...v2(), measurementVersion: 3 };
+    expect(unknownFields(v1(), v3, { ...history, 3: ["engine"] })).toHaveLength(
+      ["engine", "fontsHash", "platform"].length,
+    );
+    expect(unknownFields(v1(), v3, { ...history, 3: ["engine"] })).toEqual(
+      expect.arrayContaining(["engine", "fontsHash", "platform"]),
+    );
+    expect(unknownFields(v2(), v3, { ...history, 3: ["engine"] })).toEqual(["engine"]);
+  });
+
+  it("treats a remeasured sizing as unknown too", () => {
+    const now = { ...v2(), sizing: { ...v2().sizing, deviceScaleFactor: 9 } as never };
+    expect(changedFields(v1(), now, { 2: ["sizing"] })).toEqual([]);
+    expect(changedFields(v1(), now, {})).toEqual(["sizing"]);
+  });
+
+  it("reports nothing unknown without an earlier fingerprint", () => {
+    expect(unknownFields(null, v2(), history)).toEqual([]);
+  });
+
+  it("does not carry an earlier value over a remeasured component when the capture lacks it", () => {
+    const earlier = v1();
+    const now = { ...v2({ fontsHash: null, browserVersion: "125.0.0" }) };
+    const merged = mergeFingerprint(earlier, now, history);
+    expect(merged.fontsHash).toBeNull();
+    expect(merged.platform).toBe(earlier.platform);
+    expect(merged.measurementVersion).toBe(2);
+    // Within one version the earlier value is kept, as before.
+    expect(mergeFingerprint(earlier, { ...v1(), fontsHash: null }, history).fontsHash).toBe(
+      earlier.fontsHash,
+    );
   });
 });

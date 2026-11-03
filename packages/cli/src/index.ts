@@ -142,49 +142,65 @@ function buildPurgeCommand(): Command {
 }
 
 function buildUploadCommand(): Command {
-  return new Command("upload")
-    .description("Create a build record for a StoryShelf project")
-    .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
-    .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
-    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
-    .option("--sha <sha>", "revision SHA (flag, CI env, local git HEAD, or synthesized local-*)")
-    .option("--branch <branch>", "baseline namespace (flag, CI env, local git branch, or local)")
-    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
-    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
-    .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
-    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
-    .option("--force-build", "force rebuild even if buildDir exists")
-    .option("--dry-run", "validate and build without sending any requests")
-    .option("--skip <glob>", "skip upload for matching branch (glob)")
-    .option("--message <message>", "build message")
-    .option("--author-email <email>", "author email")
-    .option("--author-name <name>", "author name")
-    .option("--full", "disable affected capture (render every story)")
-    .option(
-      "--untraced <glob>",
-      "exclude matching files from affected tracing (repeatable)",
-      (value: string, previous: string[]) => [...previous, value],
-      [] as string[],
-    )
-    .option("--stats-file <path>", "bundler stats file (default <buildDir>/preview-stats.json)")
-    .option(
-      "--label <key=value>",
-      "build label (repeatable: --label pr=123)",
-      (value: string, previous: string[]) => [...previous, value],
-      [] as string[],
-    )
-    .action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload));
+  return (
+    new Command("upload")
+      .description("Create a build record for a StoryShelf project")
+      .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
+      .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
+      .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+      .option("--sha <sha>", "revision SHA (flag, CI env, local git HEAD, or synthesized local-*)")
+      .option("--branch <branch>", "baseline namespace (flag, CI env, local git branch, or local)")
+      .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+      .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+      .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
+      .option(
+        "--build-script-name <name>",
+        "npm script to build Storybook (default build-storybook)",
+      )
+      .option("--force-build", "force rebuild even if buildDir exists")
+      .option("--dry-run", "validate and build without sending any requests")
+      .option("--skip <glob>", "skip upload for matching branch (glob)")
+      .option("--message <message>", "build message")
+      .option("--author-email <email>", "author email")
+      .option("--author-name <name>", "author name")
+      .option("--full", "disable affected capture (render every story)")
+      // Declared first so the negated flag has no implied default: absent means "use the config file".
+      .option("--build-stats", "add --stats-json to the build script (default when affected)")
+      .option("--no-build-stats", "do not add --stats-json to the build script")
+      .option(
+        "--untraced <glob>",
+        "exclude matching files from affected tracing (repeatable)",
+        (value: string, previous: string[]) => [...previous, value],
+        [] as string[],
+      )
+      .option("--stats-file <path>", "bundler stats file (default <buildDir>/preview-stats.json)")
+      .option(
+        "--label <key=value>",
+        "build label (repeatable: --label pr=123)",
+        (value: string, previous: string[]) => [...previous, value],
+        [] as string[],
+      )
+      .action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload))
+  );
 }
 
 function buildBuildCommand(): Command {
-  return new Command("build")
-    .description("Build Storybook for upload (no server contact)")
-    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
-    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
-    .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
-    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
-    .option("--force-build", "force rebuild even if buildDir exists")
-    .action(run<BuildOptions>(async () => (await import("./commands/build.ts")).runBuild));
+  return (
+    new Command("build")
+      .description("Build Storybook for upload (no server contact)")
+      .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+      .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+      .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
+      .option(
+        "--build-script-name <name>",
+        "npm script to build Storybook (default build-storybook)",
+      )
+      .option("--force-build", "force rebuild even if buildDir exists")
+      // Declared first so the negated flag has no implied default: absent means "use the config file".
+      .option("--build-stats", "add --stats-json to the build script (default when affected)")
+      .option("--no-build-stats", "do not add --stats-json to the build script")
+      .action(run<BuildOptions>(async () => (await import("./commands/build.ts")).runBuild))
+  );
 }
 
 function buildDoctorCommand(): Command {

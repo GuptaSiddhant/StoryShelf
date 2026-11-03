@@ -15,6 +15,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 | **TurboSnap**             | Yes (dependency graph)                         | Yes — affected capture (dependency graph, on by default)                                     |
 | **Modes / Globals**       | Yes                                            | Yes — `parameters.chromatic.modes` / `parameters.storyshelf.modes` ([Modes](/guides/modes/)) |
 | **Accessibility testing** | Yes (aXe)                                      | axe-core checks (on by default), shown in review and non-blocking                               |
+| **Ignore regions**        | `.chromatic-ignore`, `data-chromatic="ignore"`, `ignoreSelectors` | Yes — same markers, `data-storyshelf-ignore` and `ignoreSelectors` ([Ignore regions](/guides/chromatic-migration/#ignore-regions)) |
 | **Interaction tests**     | Yes (`play` functions)                         | Yes (`play` functions)                                                                       |
 | **SSO / Enterprise**      | Enterprise plan                                | Better Auth engine (OIDC/SAML via any IdP)                                                   |
 | **Vendor lock-in**        | Yes (proprietary)                              | No (MIT, open source)                                                                        |
@@ -78,7 +79,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 - **Full data control** — Your database, your storage, your network.
 - **No vendor lock-in** — MIT licensed, open source, standard APIs.
 - **Flexible SSO** — Any OIDC provider (Keycloak, Okta, Entra ID, Auth0, Cognito).
-- **Self-hosted on any platform** — Node, Bun, Deno, Fly.io, Railway, Render, Vercel, Cloudflare Workers, AWS Lambda, etc.
+- **Self-hosted on any platform** — Node, Bun, Fly.io, Railway, Render, Vercel, Cloudflare Workers, AWS Lambda, etc.
 - **Per-branch baselines with fallback** — Cleaner model for long-lived feature branches.
 
 ## Migration considerations

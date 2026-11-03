@@ -1,5 +1,5 @@
 /** Codec of the database queue: job payload JSON and the row → job / queue-entry mappings. */
-import type { JobStatus, QueueEntry } from "../../adapters/capture-queue.ts";
+import type { QueueEntry, QueueEntryStatus } from "../../adapters/capture-queue.ts";
 import { attemptRowId } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import type { DatabaseJob, QueueJobInput } from "./types.ts";
@@ -91,12 +91,15 @@ function withOptional(job: DatabaseJob, row: CaptureJobRow, payload: StoredPaylo
   return job;
 }
 
-function entryStatus(status: CaptureJobRow["status"]): JobStatus {
+function entryStatus(status: CaptureJobRow["status"]): QueueEntryStatus {
   if (status === "done") {
     return "completed";
   }
   if (status === "expired") {
     return "failed";
+  }
+  if (status === "exhausting") {
+    return "recovering";
   }
   return status;
 }

@@ -40,9 +40,10 @@ describe("AWS Terraform modules", () => {
   it("pins terraform and provider versions", () => {
     const versions = generateAwsVersions();
     expect(versions).toContain(TERRAFORM_REQUIRED_VERSION);
-    expect(versions).toContain("hashicorp/aws");
+    // Each provider is bounded to the major version CI validates, so a new major cannot break it.
+    expect(versions).toMatch(/source\s*=\s*"hashicorp\/aws"\s*version\s*=\s*"~> 6\.0"/u);
     // random_password generates the SECRET and ADMIN_TOKEN values.
-    expect(versions).toContain("hashicorp/random");
+    expect(versions).toMatch(/source\s*=\s*"hashicorp\/random"\s*version\s*=\s*"~> 3\.0"/u);
   });
 
   it("declares only live variables", () => {

@@ -76,7 +76,9 @@ Convert a Lost Pixel ratio directly to `max_diff_ratio`. There is no absolute pi
 
 ## 6. Masks and ignore regions
 
-**StoryShelf does not support masks or ignore regions.** There is no equivalent of Lost Pixel's `mask` selectors. For dynamic content (dates, avatars, random data):
+Lost Pixel's `mask` selectors map to StoryShelf's ignore regions: list the selectors in `parameters.storyshelf.ignoreSelectors`, or put `data-storyshelf-ignore` on the element. The element and everything inside it is hidden (`visibility: hidden` and `opacity: 0`, layout kept) before the screenshot. See [Ignore regions](/guides/chromatic-migration/#ignore-regions). Adding a mask produces a one-time expected diff.
+
+For content you cannot select, fall back to:
 
 - make the story deterministic — fixed dates and seeds in `args` or decorators;
 - freeze animations via story `delay` and rely on StoryShelf's animation-disabled screenshots;

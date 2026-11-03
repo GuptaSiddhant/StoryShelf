@@ -2,7 +2,7 @@
 // oxlint-disable max-statements curly no-console
 /**
  * Rewrite `workspace:*` and `catalog:` version requirements to concrete
- * semver before publish. Neither npm nor JSR can record the workspace
+ * semver before publish. npm cannot record the workspace
  * protocol or pnpm-style catalog references in a published manifest.
  *
  * - `workspace:*` (for `@storyshelf/*` deps) → the package's own version.

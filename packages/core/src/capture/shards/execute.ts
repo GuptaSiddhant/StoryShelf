@@ -9,6 +9,7 @@ import { persistRendered } from "../pipeline.ts";
 import type { CaptureProgress } from "../progress.ts";
 import { removeShardScratch } from "../scratch.ts";
 import type { ShardPayload, ShardResult } from "../shard-plan.ts";
+import { detectUnstableRenders, stabilityKey } from "../stability.ts";
 import { extractStorybookToScratch } from "../statics.ts";
 import { loadTarget } from "../target.ts";
 import { contextOf, matrixInputOf, type ShardTarget } from "./context.ts";
@@ -210,19 +211,17 @@ async function renderAndPersist(
 ): Promise<Omit<ShardResult, "durationMs">> {
   const stories = payload.browsers.flatMap((engine) => engine.stories);
   const browsers = payload.browsers.map((engine) => engine.browser);
-  const rendered = await renderWork(
-    matrixInputOf(target, {
-      stories,
-      viewports: payload.viewports,
-      browsers,
-      storybookDir: run.storybookDir,
-      affectedPaths: null,
-      progress: run.progress,
-      runId: run.runId,
-      shardIndex: run.shardIndex,
-    }),
-    payload.browsers,
-  );
+  const matrix = matrixInputOf(target, {
+    stories,
+    viewports: payload.viewports,
+    browsers,
+    storybookDir: run.storybookDir,
+    affectedPaths: null,
+    progress: run.progress,
+    runId: run.runId,
+    shardIndex: run.shardIndex,
+  });
+  const rendered = await renderWork(matrix, payload.browsers);
   const failures = classifyFailures(stories, rendered.failures);
   await clearEarlierRun(target, payload);
   const persisted = await persistRendered(
@@ -237,12 +236,22 @@ async function renderAndPersist(
     failures.flaky,
     failures.a11y,
   );
+  await detectUnstableRenders(matrix, shardScope(payload));
   return {
     failedStoryIds: [...persisted.failed],
     flakyStoryIds: [...persisted.flaky],
     a11yStoryIds: [...persisted.a11y],
     captured: rendered.captures.length,
   };
+}
+
+/** The (engine, story) pairs of this shard: sibling shards judge their own. */
+function shardScope(payload: ShardPayload): ReadonlySet<string> {
+  return new Set(
+    payload.browsers.flatMap((engine) =>
+      engine.stories.map((story) => stabilityKey(engine.browser, story.id)),
+    ),
+  );
 }
 
 /**

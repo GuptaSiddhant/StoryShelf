@@ -27,3 +27,9 @@ runs:
         key: turbo-${{ runner.os }}-${{ github.sha }}
         restore-keys: |
           turbo-${{ runner.os }}-
+
+    # Marks the start of this job's own turbo work: save-turbo-cache keeps only cache
+    # entries written after this point, so the saved cache never accumulates old runs.
+    - name: Mark turbo cache start
+      shell: bash
+      run: mkdir -p .turbo/cache && touch .turbo/run-start

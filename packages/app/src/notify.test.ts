@@ -267,6 +267,18 @@ describe("notifyProject", () => {
     });
   });
 
+  describe("design:changed (opt-in, never default-on)", () => {
+    it("reaches only subscribers of the topic, not reviewers by role", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      expect(await recipients(db, "design:changed")).toEqual([]);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "dev1", { events: ["design:changed"], via: ["email"] });
+      await subscriptions.upsert("p1", "appr1", { events: ["build:approved"], via: ["email"] });
+      expect(await recipients(db, "design:changed")).toEqual(["dev1@example.com"]);
+    });
+  });
+
   it("links to the resolved public origin", async () => {
     const { db } = makeDatabase();
     await seedProject(db);

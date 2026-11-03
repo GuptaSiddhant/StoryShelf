@@ -26,6 +26,7 @@ const CONFIG_KEYS = [
   "buildScriptName",
   "skip",
   "affectedOnly",
+  "buildStats",
   "untraced",
 ] as const;
 
@@ -63,6 +64,7 @@ describe("storyshelf-config.json parity", () => {
     expect(schema.properties["slug"]?.type).toBe("string");
     expect(schema.properties["url"]?.type).toBe("string");
     expect(schema.properties["affectedOnly"]?.type).toBe("boolean");
+    expect(schema.properties["buildStats"]?.type).toBe("boolean");
     expect(schema.properties["untraced"]?.type).toBe("array");
   });
 

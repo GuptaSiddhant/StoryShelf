@@ -13,7 +13,6 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 | **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Workers entry           |
 | **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (Azure Blob) | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Azure Functions handler |
 | **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (S3)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Lambda handler          |
-| **Deno Deploy**        | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2/S3)      | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Deno entry              |
 | **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `storage-local` or `storage-s3`       | `testing` (long-running host) | `@storyshelf/auth` | Hono + Bun.serve               |
 
 ## Serverless: Storybook hosting only

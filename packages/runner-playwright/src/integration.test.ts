@@ -11,7 +11,13 @@ import { join } from "node:path";
 import { inflateSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
-import { ensureFixtureBuilt, readJson, uploadBuild, waitForBuild } from "./integration-harness.ts";
+import {
+  ensureFixtureBuilt,
+  readJson,
+  uploadBuild,
+  waitForAttemptFinished,
+  waitForBuild,
+} from "./integration-harness.ts";
 
 let harness: {
   app: ReturnType<typeof createShelfApp>;
@@ -202,10 +208,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
         .map((l) => (JSON.parse(l.fields ?? "{}") as { storyId?: string }).storyId)
         .filter((id): id is string => id !== undefined);
     // Exactly one blocking failure (BlockingFailure); flaky play failures are warnings only
-    const attemptRes = await app.request(
-      `/api/v1/projects/${project.slug}/builds/${final.id}/attempts/1`,
-    );
-    const attempt = await readJson<{ failedCount: number }>(attemptRes);
+    const attempt = await waitForAttemptFinished(app, project.slug, final.id, 1);
     expect(attempt.failedCount).toBe(1);
     // The attempt log records the blocking render failure as the only error line;
     // flaky failures are downgraded to warnings.

@@ -42,6 +42,7 @@ export const snapshots = sqliteTable(
     browser: text("browser").notNull().default("chromium"),
     durationMs: integer("duration_ms"),
     a11yViolations: text("a11y_violations"),
+    unstable: integer("unstable", { mode: "boolean" }),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -90,6 +91,7 @@ export interface Snapshot {
   browser: string;
   durationMs: number | null;
   a11yViolations: string | null;
+  unstable: boolean | null;
   createdAt: string;
   updatedAt: string;
 }

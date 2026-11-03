@@ -58,6 +58,7 @@ export const designNodes = sqliteTable(
     state: text("state").notNull().default("ok"),
     renderPath: text("render_path"),
     renderVersion: text("render_version"),
+    notifiedVersion: text("notified_version"),
     fetchedAt: text("fetched_at").notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -120,6 +121,7 @@ export interface DesignNode {
   renderPath: string | null;
   /** File `version` the cached render was taken at. */
   renderVersion: string | null;
+  notifiedVersion: string | null;
   fetchedAt: string;
   createdAt: string;
   updatedAt: string;

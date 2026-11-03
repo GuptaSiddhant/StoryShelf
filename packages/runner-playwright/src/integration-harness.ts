@@ -58,7 +58,7 @@ async function runBuilders(
 
 async function buildFixture(): Promise<void> {
   const runners: readonly (readonly [string, readonly string[]])[] = [
-    ["npx", ["storybook", "build", "-o", "storybook-static"]],
+    ["npx", ["storybook", "build", "-o", "storybook-static", "--stats-json"]],
     ["npm", ["run", "build-storybook"]],
     ["nub", ["run", "build-storybook"]],
   ];
@@ -70,8 +70,23 @@ async function buildFixture(): Promise<void> {
   }
 }
 
+/** Whether the build carries `preview-stats.json`, the dependency graph affected capture reads. */
+async function fixtureHasStats(): Promise<boolean> {
+  try {
+    await access(join(FIXTURE_STATIC_DIR, "preview-stats.json"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The built fixture, building it when missing or when an older build left no stats file (the
+ * fixtures build with `--stats-json` since #499). A build that still has none is returned as is:
+ * the suites that need stats report that themselves.
+ */
 export async function ensureFixtureBuilt(): Promise<string> {
-  if (!(await fixtureBuilt())) {
+  if (!(await fixtureBuilt()) || !(await fixtureHasStats())) {
     await buildFixture();
   }
   return FIXTURE_STATIC_DIR;
@@ -137,6 +152,44 @@ export async function waitForBuild(
     }
     await new Promise<void>((done) => {
       setTimeout(done, 2000);
+    });
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
+}
+
+/** The attempt fields the integration tests read. */
+export interface FinishedAttempt {
+  status: string;
+  failedCount: number;
+}
+
+/**
+ * Poll an attempt until it has left `queued`/`running`. `finalizeBuild` writes
+ * the build before `finishAttempt` writes the attempt's counts, so a build
+ * that reads terminal can still show the attempt's default counts. Throws on
+ * timeout.
+ */
+export async function waitForAttemptFinished(
+  app: ReturnType<typeof createShelfApp>,
+  slug: string,
+  buildId: string,
+  attemptNo: number,
+  timeoutMs = 150_000,
+): Promise<FinishedAttempt> {
+  const started = Date.now();
+  /* oxlint-disable eslint/no-await-in-loop -- poll loop must be sequential */
+  for (;;) {
+    const attempt = await readJson<FinishedAttempt>(
+      await app.request(`/api/v1/projects/${slug}/builds/${buildId}/attempts/${attemptNo}`),
+    );
+    if (attempt.status !== "queued" && attempt.status !== "running") {
+      return attempt;
+    }
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(`timed out waiting for attempt ${attemptNo} of build ${buildId} to finish`);
+    }
+    await new Promise<void>((done) => {
+      setTimeout(done, 250);
     });
   }
   /* oxlint-enable eslint/no-await-in-loop */
