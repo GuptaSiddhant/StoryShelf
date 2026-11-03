@@ -85,3 +85,42 @@ describe("file-by-file upload calls", () => {
     await expect(attempt).rejects.toMatchObject({ status: 413 });
   });
 });
+
+const okFetch = (): ReturnType<typeof vi.fn> =>
+  vi.fn().mockResolvedValue(Response.json({ slug: "demo" }));
+
+describe("server url forms", () => {
+  it.each([
+    ["https://shelf.test", "https://shelf.test/api/v1/projects/demo"],
+    ["https://shelf.test/", "https://shelf.test/api/v1/projects/demo"],
+    ["https://shelf.test///", "https://shelf.test/api/v1/projects/demo"],
+    ["https://shelf.test/shelf/", "https://shelf.test/shelf/api/v1/projects/demo"],
+  ])("reaches /api/v1 with one slash from %s", async (serverUrl, expected) => {
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    await createClient(serverUrl, "t").projects.get("demo");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(expected);
+  });
+
+  it("says plainly when the server answers with an HTML page, naming only the origin", async () => {
+    const page = new Response("<!DOCTYPE html><html></html>", {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(page));
+    const failure = createClient("https://user:pw@shelf.test/secret/path", "t").projects.get(
+      "demo",
+    );
+    await expect(failure).rejects.toThrow(
+      /^The server at https:\/\/shelf\.test answered with an HTML page, not JSON\. Check the url/u,
+    );
+    await expect(failure).rejects.not.toThrow(/secret|pw|Unexpected token/u);
+  });
+
+  it("names the content type of any other non-JSON answer", async () => {
+    const plain = new Response("nope", { headers: { "content-type": "text/plain" } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(plain));
+    await expect(createClient("https://shelf.test").projects.get("demo")).rejects.toThrow(
+      /answered with a response that is not JSON \(text\/plain\)/u,
+    );
+  });
+});

@@ -87,6 +87,41 @@ describe("resolveConnection", () => {
   });
 });
 
+describe("resolveConnection url", () => {
+  const withSlash = "https://shelf.example.com/";
+  const clean = "https://shelf.example.com";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("drops a trailing slash from the flag", async () => {
+    const resolved = await resolveConnection({
+      url: withSlash,
+      slug: "demo",
+      token: "t",
+      cwd: dir,
+    });
+    expect(resolved.url).toBe(clean);
+  });
+
+  it("drops a trailing slash from the environment", async () => {
+    vi.stubEnv("STORYSHELF_URL", `${withSlash}//`);
+    const resolved = await resolveConnection({ slug: "demo", token: "t", cwd: dir });
+    expect(resolved.url).toBe(clean);
+  });
+
+  it("drops a trailing slash from the config file and keeps a path prefix", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", url: "https://shelf.example.com/shelf/" }),
+    );
+    const resolved = await resolveConnection({ token: "t", cwd: dir });
+    expect(resolved.url).toBe("https://shelf.example.com/shelf");
+  });
+});
+
 describe("runDoctor", () => {
   it("passes everything when setup, server, and output are ready", async () => {
     setupStorybook();

@@ -4,11 +4,13 @@
  * Wraps `fetch` with bearer auth and JSON helpers so commands can call
  * `client.projects.builds.createJson(...)` without hand-rolling URLs or headers.
  *
- * @param baseUrl - Server origin, e.g. `https://shelf.example.com`
+ * @param serverUrl - Server URL, e.g. `https://shelf.example.com`; trailing slashes are dropped and
+ *   a path prefix (`https://host/shelf`) is kept
  * @param token - Optional bearer token (CI or admin token); sent as `Authorization: Bearer <token>`
  * @returns Namespaced client with `projects`, `builds`, `tokens`, and `admin` helpers
  */
-export function createClient(baseUrl: string, token?: string): Client {
+export function createClient(serverUrl: string, token?: string): Client {
+  const baseUrl = normalizeBaseUrl(serverUrl);
   const authHeaders = buildAuthHeaders(token);
   const requestHeaders = (contentType?: string): Record<string, string> =>
     buildRequestHeaders(authHeaders, contentType);
@@ -128,7 +130,20 @@ async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
   if (!res.ok) {
     throw new RequestError(res.status, await res.text());
   }
-  return res.json() as unknown;
+  try {
+    return (await res.json()) as unknown;
+  } catch {
+    throw new Error(notJsonMessage(url, res.headers?.get("content-type") ?? ""));
+  }
+}
+
+/** What to tell the user when a JSON endpoint answered with something else (origin only, no path). */
+function notJsonMessage(url: string, contentType: string): string {
+  const origin = URL.canParse(url) ? new URL(url).origin : "[invalid url]";
+  const answered = /html/iu.test(contentType)
+    ? "an HTML page, not JSON"
+    : `a response that is not JSON${contentType ? ` (${contentType})` : ""}`;
+  return `The server at ${origin} answered with ${answered}. Check the url (a wrong path, or a reverse proxy or login page in front of StoryShelf?)`;
 }
 
 function createTokensApi(
@@ -285,8 +300,7 @@ function createProjectsApi(
   };
 }
 
-// Re-export old helpers for backward compatibility with tests
-/** Strip trailing slashes from a URL so `base + path` never doubles them. */
+/** Strip trailing slashes from a URL so `base + path` never doubles them; a path prefix stays. */
 export function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/u, "");
 }

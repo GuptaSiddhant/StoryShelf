@@ -130,6 +130,42 @@ describe("runUpload success", () => {
     ).toEqual(["iframe.html", "index.json"]);
   });
 
+  it.each(["flag", "env", "config"])(
+    "sends one slash before /api/v1 for a trailing-slash url from the %s",
+    async (source) => {
+      writeFixture(dir);
+      const urls: string[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init?: RequestInit) => {
+          await Promise.resolve();
+          urls.push(url);
+          if ((init?.method ?? "") === "PUT") {
+            await collectBody(init?.body);
+            return okJson({ id: "b1" });
+          }
+          return okJson({ build: { id: "b1" }, uploadUrl: "/api/v1/projects/demo/builds/b1/zip" });
+        }),
+      );
+      const options: Record<string, string | undefined> = {
+        ...baseOptions(),
+        buildDir: "storybook-static",
+        url: source === "flag" ? "https://shelf.example.com//" : undefined,
+      };
+      if (source === "env") vi.stubEnv("STORYSHELF_URL", "https://shelf.example.com/");
+      if (source === "config") {
+        mkdirSync(join(dir, ".storybook"), { recursive: true });
+        writeFileSync(
+          join(dir, ".storybook", "storyshelf.json"),
+          JSON.stringify({ slug: "demo", url: "https://shelf.example.com/" }),
+        );
+      }
+      await runUpload(options);
+      expect(urls[0]).toBe("https://shelf.example.com/api/v1/projects/demo/builds");
+      expect(urls.every((url) => !url.includes("//api"))).toBe(true);
+    },
+  );
+
   it("throws on invalid --label flags", async () => {
     writeFixture(dir);
     vi.stubGlobal(
