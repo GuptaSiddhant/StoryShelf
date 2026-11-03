@@ -44,6 +44,7 @@ import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { TestsCard } from "./build-tests.tsx";
 import { DesignButtons } from "./design-links.tsx";
+import { ChangeRequestsCard } from "./review-change-requests.tsx";
 import { ChangesetCard } from "./review-changeset.tsx";
 import { CommentsCard } from "./review-comments.tsx";
 import { VerdictCard } from "./review-verdict.tsx";
@@ -325,6 +326,7 @@ export async function renderBuildDetailPage(
         <div class="mb-1">
           <VStack>
             {testing || cancelled ? null : <VerdictCard data={review} />}
+            <ChangeRequestsCard data={review} />
             <ChangesetCard data={review} />
           </VStack>
         </div>
