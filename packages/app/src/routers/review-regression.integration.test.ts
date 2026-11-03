@@ -40,10 +40,13 @@ const auth = stubAuth(null, {
 });
 
 let scratchDir = "";
+/** Every app a test booted, torn down after it even when an assertion failed. */
+const apps: { lifecycle: { teardown(): Promise<void> } }[] = [];
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-review-regression-"));
 });
 afterEach(async () => {
+  await Promise.all(apps.splice(0).map(async (app) => await app.lifecycle.teardown()));
   await rm(scratchDir, { recursive: true, force: true });
 });
 
@@ -93,6 +96,7 @@ async function boot(
     logger: pino({ level: "silent" }),
   });
   await app.lifecycle.setup();
+  apps.push(app);
   return { app, db, storage };
 }
 
@@ -177,7 +181,6 @@ describe("reviewer identity", () => {
     expect(await statusOf(booted, id)).toBe("pending");
     await give(booted, "api", id, { user: "bob" });
     expect(await statusOf(booted, id)).toBe("approved");
-    await booted.app.lifecycle.teardown();
   });
 
   it("refuses ownerless, deleted-owner and admin tokens with 403", async () => {
@@ -194,7 +197,6 @@ describe("reviewer identity", () => {
       "A verdict needs a user",
     );
     expect(await statusOf(booted, id)).toBe("pending");
-    await booted.app.lifecycle.teardown();
   });
 
   it("does not take a token on the form route: the browser form needs a session", async () => {
@@ -207,7 +209,6 @@ describe("reviewer identity", () => {
     });
     expect((await give(booted, "form", id, { token: "alice-token" })).status).toBe(403);
     expect(await statusOf(booted, id)).toBe("pending");
-    await booted.app.lifecycle.teardown();
   });
 });
 
@@ -220,7 +221,6 @@ describe.each(CHANNELS)("a session user through the %s", (channel) => {
     expect(await statusOf(booted, id)).toBe("pending");
     await give(booted, channel, id, { user: "bob" });
     expect(await statusOf(booted, id)).toBe("approved");
-    await booted.app.lifecycle.teardown();
   });
 
   it("refuses a caller who is no member (403) and an unknown build (404)", async () => {
@@ -229,7 +229,6 @@ describe.each(CHANNELS)("a session user through the %s", (channel) => {
     expect((await give(booted, channel, id, { user: "outsider" })).status).toBe(403);
     expect((await give(booted, channel, "ghost", { user: "alice" })).status).toBe(404);
     expect(await statusOf(booted, id)).toBe("pending");
-    await booted.app.lifecycle.teardown();
   });
 });
 
@@ -240,7 +239,6 @@ describe.each(CHANNELS)("anonymous review through the %s (authentication off)", 
     const given = await give(booted, channel, id, { user: "nobody" });
     expect(given.status).toBeLessThan(400);
     expect(await statusOf(booted, id)).toBe("approved");
-    await booted.app.lifecycle.teardown();
   });
 
   it("answers 409 with two required, and repeated verdicts never count twice", async () => {
@@ -254,7 +252,6 @@ describe.each(CHANNELS)("anonymous review through the %s (authentication off)", 
     }
     expect(await statusOf(booted, id)).toBe("pending");
     expect(await booted.db.list(booted.db.tables.buildReviews)).toHaveLength(0);
-    await booted.app.lifecycle.teardown();
   });
 });
 
@@ -269,7 +266,6 @@ describe.each(CHANNELS)("the publish guard through the %s", (channel) => {
     await booted.storage.write(`${storybookDir("p1", id)}/manifest.json`, Buffer.from("{}"));
     expect((await give(booted, channel, id, { user: "alice" })).status).toBeLessThan(400);
     expect(await statusOf(booted, id)).toBe("approved");
-    await booted.app.lifecycle.teardown();
   });
 
   it("answers 409 after a failed publish, and the page offers no form", async () => {
@@ -280,7 +276,6 @@ describe.each(CHANNELS)("the publish guard through the %s", (channel) => {
     expect(refused.status).toBe(409);
     expect(refused.text).toContain("failed");
     expect(await page(booted, "alice", `/builds/${id}`)).not.toContain("Approve build");
-    await booted.app.lifecycle.teardown();
   });
 });
 
@@ -295,7 +290,6 @@ describe("the verdict form while publishing", () => {
     const ready = await page(booted, "alice", `/builds/${id}`);
     expect(ready).not.toContain("Waiting for the Storybook to publish");
     expect(ready).not.toMatch(/<button[^>]*disabled[^>]*value="approved"/u);
-    await booted.app.lifecycle.teardown();
   });
 });
 
@@ -304,13 +298,25 @@ describe.each(CHANNELS)("sign-offs through the %s (testing on)", (channel) => {
     const booted = await boot({ testing: true });
     const id = await createBuild(booted);
     await new BuildModel(booted.db).setStatus(id, "capturing");
+    await booted.db.insert(booted.db.tables.baselines, {
+      id: "bl1",
+      projectId: "p1",
+      storyId: "a--x",
+      viewportName: "default",
+      browser: "chromium",
+      branch: "main",
+      snapshotId: "s0",
+      screenshotPath: "baselines/bl1.png",
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
     const baselines = await booted.db.list(booted.db.tables.baselines);
+    expect(baselines).toHaveLength(1);
     const given = await give(booted, channel, id, { user: "alice" });
     expect(given.status).toBeLessThan(400);
     expect(await statusOf(booted, id)).toBe("capturing");
     expect(await booted.db.list(booted.db.tables.baselines)).toEqual(baselines);
     expect(await page(booted, "alice", `/builds/${id}`)).toContain("sign-off");
-    await booted.app.lifecycle.teardown();
   });
 
   it.each(["failed", "cancelled"] as const)("keeps a %s build non-reviewable", async (status) => {
@@ -320,6 +326,5 @@ describe.each(CHANNELS)("sign-offs through the %s (testing on)", (channel) => {
     expect((await give(booted, channel, id, { user: "alice" })).status).toBe(409);
     expect(await statusOf(booted, id)).toBe(status);
     expect(await booted.db.list(booted.db.tables.buildReviews)).toHaveLength(0);
-    await booted.app.lifecycle.teardown();
   });
 });
