@@ -333,6 +333,8 @@ function focusPart(): string {
       if(box&&box.tagName==='TEXTAREA'&&box.hasAttribute('autofocus')&&box.setSelectionRange){
         var end=box.value.length;
         box.setSelectionRange(end,end);
+        // Once: later swaps (the next suggestions) must not move the caret while they edit.
+        box.removeAttribute('autofocus');
       }
     });`;
 }

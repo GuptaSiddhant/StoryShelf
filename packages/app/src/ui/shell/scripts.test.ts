@@ -48,6 +48,8 @@ describe("shell scripts", () => {
     expect(source).toContain("htmx:afterSettle");
     expect(source).toContain("box.hasAttribute('autofocus')");
     expect(source).toContain("setSelectionRange(end,end)");
+    // Only once: the attribute goes, so the next settle (new suggestions) leaves the caret alone.
+    expect(source).toContain("box.removeAttribute('autofocus')");
     // A document-level listener, bound once with the rest of the shell, not per render.
     expect(source.match(/htmx:afterSettle/gu)?.length).toBe(1);
   });
