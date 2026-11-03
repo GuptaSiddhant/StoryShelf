@@ -669,6 +669,29 @@ baseline that applies _now_ (own branch, else default):
 - Re-diff skips approved/rejected snapshots (decisions), inherited snapshots (never rendered), and
   default-branch builds (authoritative); the build roll-up is refreshed afterwards.
 
+### Capture environment fingerprint
+
+Each baseline and snapshot stores a `Fingerprint` (JSON, `packages/core/src/capture/fingerprint.ts`) next
+to its `infraHash`: engine, browser version, platform, device scale factor, fonts digest, viewport and
+sizing. The hash covers exactly those components; a difference on the default branch is an environment
+migration (ADR 0009), on a feature branch it rides along as `envChange`.
+
+**Measurement version.** `measurementVersion` says how the browser-measured components were read. It is
+**not part of `infraHash`**, so changing it never changes a baseline's identity or causes a mass
+migration; a fingerprint stored without it is version 1.
+
+- Between two different versions, a component whose measurement changed (listed per version in
+  `REMEASURED_IN`) is compared as **unknown**, never as a mismatch: it cannot cause a migration, an
+  earlier value of it is not carried over a capture that lacks it, and the review says "Environment
+  partly unknown (measurement updated)". Components measured the same way still compare; with equal
+  versions nothing differs from before.
+- Bump `MEASUREMENT_VERSION` only together with a probe change, and add the components that probe change
+  re-measures to `REMEASURED_IN` in the same commit.
+
+| Version | What it measures                                                                               |
+| ------- | ---------------------------------------------------------------------------------------------- |
+| 1       | The in-browser probe of the first fingerprint release: browser version, platform, scale, fonts |
+
 ### Baseline Portability (export/import)
 
 Baselines are portable between instances (backup/restore, migration, staging → prod promotion):

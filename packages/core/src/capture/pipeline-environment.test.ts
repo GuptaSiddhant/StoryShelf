@@ -304,6 +304,29 @@ describe("capture environment migration", () => {
     expect((await baselines())[0]?.fingerprint).toBeNull();
   });
 
+  it("keeps the identity of a baseline stored before measurement versions: same environment, no change", async () => {
+    const { db, run, baselines, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    const [seeded] = await baselines();
+    // The fingerprint as an older version stored it: no `measurementVersion` field.
+    const { measurementVersion, ...legacy } = JSON.parse(seeded?.fingerprint ?? "{}") as Record<
+      string,
+      unknown
+    >;
+    expect(measurementVersion).toBe(1);
+    await db.update(db.tables.baselines, seeded?.id ?? "", { fingerprint: JSON.stringify(legacy) });
+
+    for (const isDefault of [true, false]) {
+      // eslint-disable-next-line no-await-in-loop -- sequential builds share one world
+      const ctx = await run({ shot: RED, environment: ENV_A, isDefault });
+      // eslint-disable-next-line no-await-in-loop -- sequential builds share one world
+      const snapshot = await snapshotOf(ctx.build.id);
+      expect(snapshot?.envChange).toBeNull();
+      expect(snapshot?.status).toBe("unchanged");
+      expect(snapshot?.infraHash).toBe(seeded?.infraHash);
+    }
+  });
+
   it("is stable for runners that report no environment", async () => {
     const { run, snapshotOf } = world();
     await run({ shot: RED, isDefault: true });

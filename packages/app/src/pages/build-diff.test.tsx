@@ -220,7 +220,19 @@ const change = JSON.stringify({
   to: { engine: "chromium", browserVersion: "126.0.0" },
 });
 
-async function seedMigrated(db: Db, migrated: boolean, branch = "main"): Promise<string> {
+const unknownChange = JSON.stringify({
+  changed: [],
+  unknown: ["fontsHash"],
+  from: { engine: "chromium", browserVersion: "124.0.1" },
+  to: { engine: "chromium", browserVersion: "124.0.1" },
+});
+
+async function seedMigrated(
+  db: Db,
+  migrated: boolean,
+  branch = "main",
+  envChange = change,
+): Promise<string> {
   const project = await new ProjectModel(db).create({ name: "Env" });
   const build = await new BuildModel(db).create(project.id, {
     gitSha: "abc1234def",
@@ -236,16 +248,20 @@ async function seedMigrated(db: Db, migrated: boolean, branch = "main"): Promise
     viewportWidth: 1280,
     viewportHeight: 720,
     screenshotPath: "shots/Primary.png",
-    ...(migrated ? { envChange: change } : {}),
+    ...(migrated ? { envChange } : {}),
   });
   await snapshots.update(snap.id, { status: "unchanged" });
   return `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`;
 }
 
-async function pageWithMigration(migrated: boolean, branch?: string): Promise<string> {
+async function pageWithMigration(
+  migrated: boolean,
+  branch?: string,
+  envChange?: string,
+): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const url = await seedMigrated(db, migrated, branch);
+  const url = await seedMigrated(db, migrated, branch, envChange);
   const app = createShelfApp({
     testing: { runner: stubRunner() },
     database: db,
@@ -273,6 +289,18 @@ describe("review page: capture environment migration", () => {
     expect(html).toContain("may come from the environment");
     expect(html).not.toContain("accepted without a pixel diff");
     expect(html).not.toContain("No diff:");
+  });
+
+  it("says the environment is partly unknown when only the measurement changed, and migrates nothing", async () => {
+    for (const branch of ["main", "feature/x"]) {
+      // eslint-disable-next-line no-await-in-loop -- two pages
+      const html = await pageWithMigration(true, branch, unknownChange);
+      expect(html, branch).toContain("Environment partly unknown (measurement updated)");
+      expect(html, branch).toContain("installed fonts");
+      expect(html, branch).not.toContain("Capture environment changed");
+      expect(html, branch).not.toContain("No diff:");
+      expect(html, branch).not.toContain("accepted without a pixel diff");
+    }
   });
 
   it("shows nothing about the environment for an ordinary build", async () => {

@@ -26,6 +26,7 @@ import {
   fingerprintHash,
   mergeFingerprint,
   parseFingerprint,
+  unknownFields,
   type EnvironmentChange,
   type Fingerprint,
 } from "./fingerprint.ts";
@@ -474,7 +475,16 @@ function environmentChange(baseline: Baseline, now: CaptureFingerprint): Environ
     return null;
   }
   const changed = changedFields(from, now.fingerprint);
-  return changed.length > 0 ? { changed, from, to: now.fingerprint } : null;
+  const unknown = unknownFields(from, now.fingerprint);
+  if (changed.length === 0 && unknown.length === 0) {
+    return null;
+  }
+  return {
+    changed,
+    ...(unknown.length > 0 ? { unknown } : {}),
+    from,
+    to: now.fingerprint,
+  };
 }
 
 /**
@@ -501,7 +511,8 @@ async function createWithBaseline(
     sourceSnapshotId: await sourceSnapshotId(ctx.db, baseline),
   });
   const input = { ctx, capture, viewport, screenshot, baseline, now, change, comparison };
-  if (change && ctx.build.isDefault) {
+  // Components measured differently across versions are only recorded as unknown, never migrated.
+  if (change && change.changed.length > 0 && ctx.build.isDefault) {
     await persistMigration(input, change);
   } else {
     await persistDiff(input);
