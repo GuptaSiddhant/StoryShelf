@@ -416,17 +416,21 @@ describe("worker messages that answer no job", () => {
     const stray = `parentPort.postMessage({ type: "error", message: "boom" });`;
     const burst = stray.repeat(3);
     const fallbacks: string[] = [];
+    const events: string[] = [];
     const pool = new DiffPool({
       size: 1,
       workerUrl: misbehavingWorker(idleThen(stray), burst),
       onFallback: (reason) => fallbacks.push(reason),
-      onWorkerEvent: () => {},
+      onWorkerEvent: (reason) => events.push(reason),
     });
     pools.push(pool);
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
     await until(() => pool.workerCount === 0);
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
     expect(fallbacks).toEqual([]);
+    // One event for worker 1's idle fault and exactly one for worker 2's burst: it did fault, and
+    // its other two queued messages were not heard (without the guard there are four events).
+    expect(events).toHaveLength(2);
   });
 
   it("still cleans up when the event reporter throws", async () => {
