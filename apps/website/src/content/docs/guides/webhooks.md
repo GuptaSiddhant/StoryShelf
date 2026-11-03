@@ -17,7 +17,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/webhooks \
 ```
 
 - `url` — HTTPS endpoint (must be reachable from the server).
-- `events` — JSON array filter or `null` for all events. Build events are `build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `build:pending` (a verdict sent a build back to pending, for example when a rejecting reviewer rewrites to an approval and too few approvals remain) and `build:cancelled` (a user cancelled the build, see [Builds](/concepts/builds/); the payload is `{ buildId, status: "cancelled" }`). Review adds `review:requested`, `review:comment` and `review:verdict` (see [Review](/guides/review/#events)). `design:changed` reports a linked design that changed after its baseline was approved (see [`design:changed`](#design-changed)).
+- `events` — JSON array filter or `null` for all events. Build events are `build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `build:pending` (a verdict sent a build back to pending, for example when a rejecting reviewer rewrites to an approval and too few approvals remain) and `build:cancelled` (a user cancelled the build, see [Builds](/concepts/builds/); the payload is `{ buildId, status: "cancelled" }`). Review adds `review:requested`, `review:comment` and `review:verdict` (see [Review](/guides/review/#events)). `design:changed` reports a linked design that changed after its baseline was approved (see [`design:changed`](#design-changes)).
 - `secret` — HMAC secret; stored AES-256-GCM encrypted with server `SECRET`.
 
 Manage via `GET /api/v1/projects/:slug/webhooks` and `DELETE`. See `POST /api/v1/projects/:slug/webhooks` in the OpenAPI.
@@ -28,7 +28,7 @@ Manage via `GET /api/v1/projects/:slug/webhooks` and `DELETE`. See `POST /api/v1
 - Header `X-StoryShelf-Signature: sha256=<hmac>` — verify with the shared `secret` (HMAC-SHA256 of the raw body).
 - Retries: transient 5xx / network errors are retried with backoff; 4xx is not retried. Delivery logs are not yet exposed beyond capture logs — track separately if you need audit.
 
-## `design:changed`
+## Design changes
 
 Sent when a linked design (Figma node) was modified after the baseline it is compared with was approved, or no longer exists. It is a normal subscribable topic, off unless you opt in through a webhook's `events` filter, a notification channel or your subscription. Without a public URL set or confirmed, nothing is sent (see [Notifications](/guides/notifications/)).
 
