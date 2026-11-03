@@ -252,6 +252,27 @@ describe("failCrashedCapture", () => {
     expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("skipped");
   });
 
+  it("leaves open an attempt a newer run began after this run failed the build", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.failIfOwnedBy(w.build.id, "J1");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const attempts = new CaptureAttemptModel(w.db, tables(w.db));
+    const newer = await attempts.startAttempt(w.project.id, w.build.id);
+    await attempts.markRunning(newer.id);
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("skipped");
+    const [open] = await attempts.listByBuild(w.build.id);
+    expect(open?.status).toBe("running");
+  });
+
   it("finishes the cleanup when the first run failed the build but not its attempts", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");

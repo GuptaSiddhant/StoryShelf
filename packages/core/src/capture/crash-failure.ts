@@ -87,12 +87,22 @@ async function failOwnedBuild(
     );
     return "skipped";
   }
-  const closed = await closeOpenAttempts(deps, buildId, error);
+  const closed = await closeRunAttempts(deps, buildId, build, error);
   if (retry && closed === 0) {
     return "skipped"; // nothing was left to do: the first pass finished
   }
   await deps.buildState.request(buildId);
   return "failed";
+}
+
+/** Close the attempts that began before the build was failed: a newer run's are left open. */
+async function closeRunAttempts(
+  deps: DispatchDeps,
+  buildId: string,
+  failed: Build | null,
+  error: string,
+): Promise<number> {
+  return await closeOpenAttempts(deps, buildId, error, Date.parse(failed?.updatedAt ?? ""));
 }
 
 async function failShard(
@@ -145,10 +155,13 @@ async function closeOpenAttempts(
   deps: DispatchDeps,
   buildId: string,
   error: string,
+  startedBefore = Number.POSITIVE_INFINITY,
 ): Promise<number> {
   const attempts = new CaptureAttemptModel(deps.db, deps.tables);
   const open = (await attempts.listByBuild(buildId)).filter(
-    (attempt) => attempt.status === "queued" || attempt.status === "running",
+    (attempt) =>
+      (attempt.status === "queued" || attempt.status === "running") &&
+      Date.parse(attempt.createdAt) <= startedBefore,
   );
   await Promise.all(
     open.map(async (attempt) => await attempts.markFinished(attempt.id, "failed", error)),

@@ -558,7 +558,7 @@ export const IDENTITY_STATEMENTS: string[] = [
  * a failure leaves in-flight builds unowned, so setup must stop.
  */
 export const CAPTURE_JOB_BACKFILL =
-  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.build_id = builds.id AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') ORDER BY j.created_at DESC LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')";
+  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.build_id = builds.id AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') ORDER BY j.created_at DESC, j.job_id DESC LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')";
 
 const CONSTRAINT_PREFIX = /^(?:PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\s/iu;
 const TABLE_BLOCK = /CREATE TABLE IF NOT EXISTS\s+(?<table>\w+)\s*\((?<body>[\s\S]*?)\n\);/gu;

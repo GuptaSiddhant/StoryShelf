@@ -113,7 +113,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
 
 /** A run in flight when `builds.capture_job_id` was added owns the build it was started for. */
 const BUILD_CAPTURE_JOB_BACKFILL =
-  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.build_id = builds.id AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') ORDER BY j.created_at DESC LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')";
+  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.build_id = builds.id AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') ORDER BY j.created_at DESC, j.job_id DESC LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')";
 
 const IDENTITY_INDEXES = [
   {
