@@ -53,6 +53,23 @@ async function nextRun(queue: QueueRuntime, clock: { now: number }): Promise<voi
   await claimNext(queue);
 }
 
+/** Run `inject` right after the next read of row `id`, so the caller acts on a row that just went stale. */
+function afterNextRead(rt: QueueRuntime, id: string, inject: () => Promise<void>, skip = 0): void {
+  const read = rt.model.get.bind(rt.model);
+  let left = skip;
+  let armed = true;
+  rt.model.get = async (target) => {
+    const row = await read(target);
+    if (target === id && left > 0) {
+      left -= 1;
+    } else if (target === id && armed) {
+      armed = false;
+      await inject();
+    }
+    return row;
+  };
+}
+
 describe("exhausted-job recovery", () => {
   it("runs the hook as a leased attempt, then fails the job", async () => {
     const { rt, clock } = runtime();
@@ -259,6 +276,40 @@ describe("exhausted-job recovery races", () => {
     await spendAttempts(rt, clock);
     await claimNext(rt);
     expect((await rt.model.get("j1"))?.status).toBe("done");
+  });
+
+  it("does not overwrite a late finish that lands between the check and the exhausting write", async () => {
+    const { rt, clock } = runtime();
+    const hook = vi.fn<Hook>(async () => {});
+    rt.onExhausted = hook;
+    await spendAttempts(rt, clock);
+    // The first read of the job is the probe's; the second is the claim's re-read just before the write.
+    afterNextRead(
+      rt,
+      "j1",
+      async () => {
+        await ackJob(rt, { buildId: "b1", receipt: "j1:2" });
+      },
+      1,
+    );
+    expect(await claimNext(rt)).toBeNull();
+    expect(hook).not.toHaveBeenCalled();
+    expect(await rt.model.get("j1")).toMatchObject({ status: "done" });
+    expect(await rt.model.get("j1:3")).toMatchObject({ status: "expired" });
+  });
+
+  it("does not overwrite a late finish that lands between the settle read and its write", async () => {
+    const { rt, clock } = runtime();
+    rt.onExhausted = async () => {
+      // The next read of the job row is settle's: the finish lands right after it.
+      afterNextRead(rt, "j1", async () => {
+        await ackJob(rt, { buildId: "b1", receipt: "j1:2" });
+      });
+    };
+    await spendAttempts(rt, clock);
+    await claimNext(rt);
+    expect(await rt.model.get("j1")).toMatchObject({ status: "done" });
+    expect(await rt.model.get("j1:3")).toMatchObject({ status: "done" });
   });
 
   it("cancels a job that is exhausting instead of running the hook again", async () => {

@@ -103,11 +103,13 @@ async function runHook(rt: QueueRuntime, job: CaptureJobRow, run: number): Promi
     await settle(rt, job.jobId, run, "cancelled");
   } else if (run - job.maxAttempts > MAX_HOOK_RUNS) {
     await abandon(rt, job, run);
-  } else {
-    await rt.model.markExhausting(job.jobId, run, LEASE_EXHAUSTED_ERROR, isoAt(rt));
+  } else if (await rt.model.markExhausting(job.jobId, run, LEASE_EXHAUSTED_ERROR, isoAt(rt))) {
     if (await callHook(rt, job, run - job.maxAttempts)) {
       await settle(rt, job.jobId, run, "failed");
     }
+  } else {
+    // A late holder finished the job after the check: leave its outcome and skip the hook.
+    await rt.model.finishAttempt(attemptRowId(job.jobId, run), "expired", isoAt(rt));
   }
 }
 
@@ -156,7 +158,8 @@ async function settle(
   const current = await rt.model.get(jobId);
   if (current !== null && !isTerminalJob(current)) {
     const outcome = current.cancelRequestedAt === null ? status : "cancelled";
-    await rt.model.finishJob(jobId, outcome, isoAt(rt), LEASE_EXHAUSTED_ERROR);
+    // Conditional: a `done` that lands after the read above is not overwritten.
+    await rt.model.finishOpenJob(jobId, outcome, isoAt(rt), LEASE_EXHAUSTED_ERROR);
   }
   await rt.model.finishAttempt(own, "done", isoAt(rt));
 }

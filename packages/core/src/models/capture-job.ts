@@ -171,16 +171,39 @@ export class CaptureJobModel {
   /**
    * The last attempt lost its lease: the job row records that the exhausted-job hook runs as
    * `attempt` (numbered after the allowed attempts, so it also counts the runs) and leaves the
-   * poll's range; the hook run's own attempt row carries the lease.
+   * poll's range; the hook run's own attempt row carries the lease. Conditional on the job being
+   * unfinished, so a late `done` is never overwritten: false when it did not apply.
    */
-  async markExhausting(jobId: string, attempt: number, error: string, now: string): Promise<void> {
-    await this.#db.update(this.#table, jobId, {
-      status: "exhausting",
-      attempt,
-      visibleAt: null,
-      error,
-      updatedAt: now,
-    });
+  async markExhausting(
+    jobId: string,
+    attempt: number,
+    error: string,
+    now: string,
+  ): Promise<boolean> {
+    const row = (await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      { status: "exhausting", attempt, visibleAt: null, error, updatedAt: now },
+      inArray(this.#c.status, ACTIVE_STATUSES),
+    )) as unknown as CaptureJobRow | null;
+    // `updateWhere` returns the row either way; only our write leaves it exhausting at our run.
+    return row?.status === "exhausting" && row.attempt === attempt;
+  }
+
+  /** End a job row for good unless it already ended (a late `done` or a cancel keeps its outcome). */
+  async finishOpenJob(
+    jobId: string,
+    status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">,
+    now: string,
+    error: string | null = null,
+  ): Promise<void> {
+    const patch = { status, visibleAt: null, finishedAt: now, updatedAt: now };
+    await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      error === null ? patch : { ...patch, error },
+      inArray(this.#c.status, ACTIVE_STATUSES),
+    );
   }
 
   /** End a job row for good. */
