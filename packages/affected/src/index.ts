@@ -8,7 +8,7 @@ import {
 } from "./paths.ts";
 import { loadDepGraph, loadStoryImportPaths, statsPathFor } from "./stats.ts";
 import { matchesAnyGlob, traceAffected } from "./trace.ts";
-import type { AffectedInput, AffectedResult } from "./types.ts";
+import type { AffectedInput, AffectedResult, DepGraph } from "./types.ts";
 
 /**
  * Compute the affected story set for an upload. Never throws: every failure
@@ -66,6 +66,21 @@ function isUntraced(file: string, base: PathBase, globs: readonly string[]): boo
   return matchesAnyGlob(file, globs) || matchesAnyGlob(projectRelative(base, file), globs);
 }
 
+/** What tracing reads: the dependency graph, and each story's absolute key with its project-relative path. */
+async function loadTraceInputs(
+  input: AffectedInput,
+  base: PathBase,
+): Promise<{ graph: DepGraph; storyOf: Map<string, string> }> {
+  const stories = await loadStoryImportPaths(input.cwd, input.buildDir).catch(() => {
+    throw new Error("story-index-unreadable");
+  });
+  const graph = await loadDepGraph(statsPathFor(input.cwd, input.buildDir, input.statsFile), base);
+  if (!graph) {
+    throw new Error("dependency-graph-unavailable");
+  }
+  return { graph, storyOf: new Map(stories.map((path) => [keyOfStoryFile(base, path), path])) };
+}
+
 /** Trace the affected set once inputs are validated. Throws reason strings. */
 async function traceSelective(
   input: AffectedInput,
@@ -75,26 +90,19 @@ async function traceSelective(
   if (changed.length === 0) {
     return selectiveResult(changed, input.baseSha, []);
   }
-  const stories = await loadStoryImportPaths(input.cwd, input.buildDir).catch(() => {
-    throw new Error("story-index-unreadable");
-  });
-  const graph = await loadDepGraph(statsPathFor(input.cwd, input.buildDir, input.statsFile), base);
-  if (!graph) {
-    throw new Error("dependency-graph-unavailable");
-  }
   // Both sides meet as absolute paths; the result keeps the project-relative story paths.
-  const storyOf = new Map(stories.map((path) => [keyOfStoryFile(base, path), path] as const));
+  const { graph, storyOf } = await loadTraceInputs(input, base);
   const traced = changed.filter((file) => !isUntraced(file, base, input.untraced ?? []));
-  const affected = traceAffected(
-    graph,
-    traced.map((file) => keyOfChangedFile(base, file)),
-    [...storyOf.keys()],
-  );
+  const keys = traced.map((file) => keyOfChangedFile(base, file));
+  const affected = traceAffected(graph, keys, [...storyOf.keys()]);
   if (affected === null) {
     throw new Error("global-file-changed");
   }
-  const paths = affected.map((key) => storyOf.get(key) ?? key).toSorted();
-  return selectiveResult(changed, input.baseSha, paths);
+  return selectiveResult(
+    changed,
+    input.baseSha,
+    affected.map((key) => storyOf.get(key) ?? key).toSorted(),
+  );
 }
 
 /** Selective computation with reason-string failures mapped to full renders. */

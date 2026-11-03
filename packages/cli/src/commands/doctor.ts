@@ -144,8 +144,8 @@ export async function runDoctor(options: DoctorOptions): Promise<void> {
   reportChecks(checks);
 }
 
-/** Warn when affected capture would silently fall back to a full render. */
-async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
+/** The git history problem that makes affected capture render everything, if there is one. */
+function historyProblem(cwd: string): Check | null {
   const repo = gitRepoStatus(cwd);
   if (repo === "no-git") {
     return {
@@ -154,11 +154,20 @@ async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
         "No git repository — upload uses a synthetic local identity and affected capture renders all stories",
     };
   }
-  if (repo === "shallow") {
-    return {
-      status: "warn",
-      message: "Shallow clone detected — affected capture renders all stories (use fetch-depth: 0)",
-    };
+  return repo === "shallow"
+    ? {
+        status: "warn",
+        message:
+          "Shallow clone detected — affected capture renders all stories (use fetch-depth: 0)",
+      }
+    : null;
+}
+
+/** Warn when affected capture would silently fall back to a full render. */
+async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
+  const problem = historyProblem(cwd);
+  if (problem) {
+    return problem;
   }
   const base = pathBase(gitRepoRoot(cwd), cwd);
   if (!base) {
