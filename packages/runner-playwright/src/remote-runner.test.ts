@@ -426,6 +426,21 @@ describe("a remote target", () => {
   });
 });
 
+/** A logger whose `warn` records the one-time "waiting for a connection slot" line. */
+const queuedLogger = () => {
+  const warn = vi.fn();
+  return { warn, logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } };
+};
+/** Resolves once a shard has been logged as queued for a slot: the barrier before "has not connected". */
+const untilQueued = async (warn: ReturnType<typeof vi.fn>) => {
+  await vi.waitFor(() => {
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 1 }),
+      "waiting for a remote browser connection slot",
+    );
+  });
+};
+
 const leased = (overrides: Partial<Parameters<typeof remote<{ id: string }>>[0]> = {}) => {
   const seen: RemoteConnectContext[] = [];
   const released: { lease: unknown; outcome: string; error?: unknown }[] = [];
@@ -596,6 +611,94 @@ describe("a remote target with a function connect and release", () => {
     expect(error.transient).toBe(true);
     expect(fake.state.connects).toEqual([]);
     expect(released).toEqual([]);
+  });
+
+  describe("with maxConnections", () => {
+    it("connects the second shard only after the first connection is released", async () => {
+      const { service, seen, released } = leased({
+        maxConnections: 1,
+        timeouts: { acquireMs: 50 },
+      });
+      const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+      const hold = holdRenders();
+      const first = runner.render(input({ shardIndex: 1, runId: "s1", target: "chromium@grid" }));
+      await vi.waitFor(() => {
+        expect(fake.state.gotos.length).toBeGreaterThan(0);
+      });
+      const queued = queuedLogger();
+      const second = runner.render(
+        input({ shardIndex: 2, runId: "s2", target: "chromium@grid", logger: queued.logger }),
+      );
+      await untilQueued(queued.warn);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      hold.open();
+      await Promise.all([first, second]);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1, 2]);
+      expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+      expect(fake.state.connects).toHaveLength(2);
+    });
+
+    it("ends a shard that is cancelled while waiting, without connecting for it or freeing the first one's slot", async () => {
+      const { service, seen, released } = leased({
+        maxConnections: 1,
+        timeouts: { acquireMs: 50 },
+      });
+      const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+      const hold = holdRenders();
+      const first = runner.render(input({ shardIndex: 1, runId: "s1", target: "chromium@grid" }));
+      await vi.waitFor(() => {
+        expect(fake.state.gotos.length).toBeGreaterThan(0);
+      });
+      const queuedSecond = queuedLogger();
+      const waiting = runner.render(
+        input({ shardIndex: 2, runId: "s2", target: "chromium@grid", logger: queuedSecond.logger }),
+      );
+      await untilQueued(queuedSecond.warn);
+      await runner.cancel("b1", "s2");
+      await expect(waiting).rejects.toBeInstanceOf(TargetLaunchError);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      // The cancelled shard took no slot, so the first still holds the only one.
+      const queuedThird = queuedLogger();
+      const third = runner.render(
+        input({ shardIndex: 3, runId: "s3", target: "chromium@grid", logger: queuedThird.logger }),
+      );
+      await untilQueued(queuedThird.warn);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      hold.open();
+      await Promise.all([first, third]);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1, 3]);
+      expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+    });
+
+    it("recycles the browser under a cap of one without deadlocking, one connection at a time", async () => {
+      let open = 0;
+      let peak = 0;
+      const { service } = leased({
+        maxConnections: 1,
+        connect: async () => {
+          open += 1;
+          peak = Math.max(peak, open);
+          await Promise.resolve();
+          return { endpoint: `wss://farm-${open}.example/`, lease: { id: String(open) } };
+        },
+        release: () => {
+          open -= 1;
+        },
+      });
+      const stories = Array.from({ length: 6 }, (_, index) => ({
+        ...STORIES[0]!,
+        id: `s-${index}`,
+      }));
+      const result = await createPlaywrightCaptureRunner({
+        browsers: [service],
+        recycleBrowserEvery: 2,
+        concurrency: 1,
+      }).render(input({ stories, target: "chromium@grid", runId: "s1" }));
+      expect(result.failures).toEqual([]);
+      expect(fake.state.connects.length).toBeGreaterThanOrEqual(3);
+      expect(peak).toBe(1);
+      expect(open).toBe(0);
+    });
   });
 
   it("releases leases still held when the runner shuts down", async () => {

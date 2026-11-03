@@ -5,6 +5,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Added: an optional per-process cap on remote browser connections, `maxConnections` (#467, #273).** A remote service can now limit how many connections the process holds to it at once, separately from the page limits (`sessions`, `maxPagesPerConnection`). A slot is taken before `connect` runs and returned with the lease, once, on finish, failure, cancel and shutdown; a connection shared by several pages counts once. Renders over the cap wait, a cancel or shutdown ends the wait, and a wait longer than `timeouts.acquireMs` is logged once with the target and the limit. Available on `defineRemote`, `remote()`, `playwrightServer()` and `cdp()`; unset behaves as before. It is per process, not deployment-wide.
+
 ## 0.8.0 — Remote browser leases, redaction and retention safety (2026-11-02)
 
 **Changed: with `testing` on, automatic build purge and branch cleanup stop unless the database proves it can do them safely (#354, ADR 0039).** Purging a build could race a baseline promotion and delete a build a baseline had just started to reference. Until the database adapter offers the build-reference lifecycle capability (SQLite first, then Postgres and MySQL), deployments with `testing` skip automatic build deletion and branch cleanup, and `POST /api/v1/admin/purge` answers 503 with an explanation. Storage therefore grows on those deployments until the capability ships; hosting-only deployments purge as before. Comparisons keep a frozen copy of the reference image, so older diffs stay reviewable.

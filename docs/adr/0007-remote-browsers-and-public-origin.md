@@ -116,6 +116,16 @@ fixed default, never from the OS, browser version or endpoint. Renaming starts f
 - A remote target's page limiter uses the preset's fixed `sessions` cap instead of CPU/memory
   sizing. One render call may hold several sessions; shards map onto sessions naturally.
 - **The limit is per target and per process**, so concurrent shards do not multiply the cap.
+- **Connections have their own optional cap, `maxConnections`** (per process, unset means no cap),
+  separate from the page limits: `sessions` counts pages and `maxPagesPerConnection` pages on one
+  connection, and neither is a provider connection count. A separate limiter takes a slot before
+  `connect` is called and gives it back with the lease, exactly once (finish, failure, cancel,
+  shutdown), so a connection counts from the request until its render has ended, and a connection
+  that several renders share counts once. Renders over the cap wait: the wait ends on the run's
+  cancel and at shutdown without having taken a slot, and one longer than `timeouts.acquireMs` is
+  logged once with the target and the limit, never the endpoint. The page gate and the connection
+  limiter are never held for each other, so they cannot deadlock. A provider's refusal is a connect
+  failure to retry, not capacity enforcement; a deployment-wide cap is another decision.
 - Connection-level failures (dropped WebSocket, no capacity, a session that never starts) are
   retried with backoff before the render pass sees them. Crash isolation only sees a browser that
   died while rendering, so a provider outage is not a story crash.
