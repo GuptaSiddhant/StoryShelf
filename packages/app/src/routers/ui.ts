@@ -240,7 +240,14 @@ export function registerUiPages(app: ShelfRouter): void {
     const slug = c.req.param("slug");
     const base = `/projects/${slug}/components/`;
     const path = c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "";
-    const data = await loadComponentPage(c, slug, path, c.req.query("tab"), c.req.query("story"));
+    const data = await loadComponentPage(
+      c,
+      slug,
+      path,
+      c.req.query("tab"),
+      c.req.query("story"),
+      c.req.query("build"),
+    );
     return data ? c.html(renderComponentPage(data)) : c.notFound();
   });
 
