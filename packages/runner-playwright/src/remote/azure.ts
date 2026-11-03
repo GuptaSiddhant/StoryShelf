@@ -20,7 +20,10 @@ export interface AzurePlaywrightOptions {
   engines?: readonly BrowserName[];
 }
 
-/** Targets on a workspace: `chromium@azure`, `firefox@azure`, `webkit@azure`. */
+/**
+ * Targets on a workspace: `chromium@azure`, `firefox@azure`, `webkit@azure`. Experimental: not
+ * verified against live infrastructure.
+ */
 export function azurePlaywright(options: AzurePlaywrightOptions): RemoteBrowser {
   const os = options.os ?? "linux";
   return remote({
@@ -38,6 +41,7 @@ export function azurePlaywright(options: AzurePlaywrightOptions): RemoteBrowser 
     },
     sessions: options.sessions ?? 1,
     platform: os,
+    experimental: true,
   });
 }
 

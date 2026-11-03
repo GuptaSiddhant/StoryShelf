@@ -125,7 +125,7 @@ fixed default, never from the OS, browser version or endpoint. Renaming starts f
   cancel and at shutdown without having taken a slot, and one longer than `timeouts.acquireMs` is
   logged once with the target and the limit, never the endpoint. The page gate and the connection
   limiter are never held for each other, so they cannot deadlock. A provider's refusal is a connect
-  failure to retry, not capacity enforcement; a deployment-wide cap is another decision.
+  failure to retry, not capacity enforcement; a deployment-wide cap is another decision. Runs log the limits; vendor presets are experimental.
 - Connection-level failures (dropped WebSocket, no capacity, a session that never starts) are
   retried with backoff before the render pass sees them. Crash isolation only sees a browser that
   died while rendering, so a provider outage is not a story crash.
