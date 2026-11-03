@@ -64,5 +64,6 @@ describe("runDoctor path base", () => {
       process.stdout.write = write;
     }
     expect(lines.some((line) => line.includes("path-base-unknown"))).toBe(true);
+    expect(process.exitCode).toBeUndefined();
   });
 });
