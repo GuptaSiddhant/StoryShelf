@@ -133,16 +133,19 @@ but it belongs with the local-comparison work, not here.
 
 ## Open questions for owner
 
-1. **Subdomain-published Storybooks.** Recommended: ship without badges there. If wanted, the shape
-   is a separate short-lived read grant for this endpoint only (not the `/_s/` token, whose scope
-   must not widen), delivered without editing the uploaded files. Is that worth building?
-2. **Anonymous viewers of public builds.** Recommended: no badges (decision 2). Should a public
-   build show its review state to anyone?
-3. **Local `storybook dev`.** Which option in decision 6 do you prefer, or should it wait for the
-   local-comparison decision?
-4. **Design stale.** It shows only for stories with a linked design (ADR 0018). Keep it in the first
-   release, or ship the three review states first?
+The architect's recommendation (2026-11-03) is given for each, so the owner only has to confirm.
+
+1. **Subdomain-published Storybooks.** Ship without badges first. A separate short-lived read grant
+   for this endpoint would widen what a token grants, which AGENTS.md forbids without a decision, so
+   it is not built unless the owner asks for it (it would be a read grant for this endpoint only, not
+   the `/_s/` token, delivered without editing the uploaded files).
+2. **Anonymous viewers of public builds.** No badges (decision 2). A public build shares its Storybook
+   files, not its review state.
+3. **Local `storybook dev`.** Wait for the local-comparison decision (#346, deferred). Choose no
+   credential option from decision 6 yet.
+4. **Design stale.** Keep it in the first release. The data already exists (`designDrift`), so it
+   costs nothing extra, and it shows only for stories with a linked design (ADR 0018).
 5. **Build envelope.** #461 asked for per-story state only. The ADR adds the build's status and a
    `reviewPath` so the addon links to the review without building URLs itself, which keeps URL
-   construction in the server's `UrlBuilder`. Accept the envelope, or return per-story state only and
-   let the addon derive the link from its own pathname?
+   construction in the server's `UrlBuilder`. Recommended: accept the envelope. The alternative is
+   per-story state only, with the addon deriving the link from its own pathname.
