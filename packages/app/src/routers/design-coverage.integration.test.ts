@@ -11,7 +11,10 @@ import { stubRunner } from "../test-runner.ts";
 
 const SECRET = "coverage-test-secret";
 const NOW = "2026-01-01T00:00:00.000Z";
+/** When the current baselines were approved. */
 const BASELINE = "2026-01-01T00:00:00.000Z";
+/** The older baseline the snapshots were diffed against, before promotion replaced it. */
+const DIFFED_AGAINST = "2025-06-01T00:00:00.000Z";
 const URL_PATH = "/projects/app/design/coverage";
 const figma = createFigmaDesign();
 
@@ -46,6 +49,26 @@ interface Options {
   build?: "approved" | "pending" | "none";
   auth?: boolean;
   testing?: boolean;
+}
+
+/** The approved default-branch baseline of each story, promoted after the snapshots were diffed. */
+async function seedBaselines(db: ReturnType<typeof makeDatabase>["db"]): Promise<void> {
+  await Promise.all(
+    FILES.map(
+      async (file) =>
+        await db.insert(db.tables.baselines, {
+          id: `base-${file.name}`,
+          projectId: "p1",
+          storyId: entry(file.name).id,
+          viewportName: "default",
+          branch: "main",
+          browser: "chromium",
+          screenshotPath: `p1/${file.name}.png`,
+          createdAt: BASELINE,
+          updatedAt: BASELINE,
+        } as never),
+    ),
+  );
 }
 
 async function seedNodes(db: ReturnType<typeof makeDatabase>["db"]): Promise<void> {
@@ -126,7 +149,7 @@ async function seed(options: Options = {}) {
             storyImportPath: `./src/${file.name}.stories.tsx`,
             screenshotPath: `p1/${file.name}.png`,
             status: "unchanged",
-            baselineVersion: BASELINE,
+            baselineVersion: DIFFED_AGAINST,
             designUrl: file.url ?? null,
             createdAt: NOW,
             updatedAt: NOW,
@@ -134,6 +157,7 @@ async function seed(options: Options = {}) {
       ),
     );
   }
+  await seedBaselines(db);
   await seedNodes(db);
   const admin = { id: "u-admin", email: "a@x.io", name: "Ada", role: "admin" as const };
   const viewer = { id: "u-viewer", email: "v@x.io", name: "Vee", role: "member" as const };
@@ -213,6 +237,19 @@ describe("design coverage page", () => {
     expect(section).toContain(
       "1 more has a link but nothing stored says whether the design changed",
     );
+  });
+
+  it("compares with the current baseline, not the one the snapshot was diffed against", async () => {
+    // Input changed (2025-12) after the baseline the snapshots were diffed against (2025-06) but
+    // before the baseline promoted since (2026-01), so the approved screenshot already shows it.
+    const { app } = await seed();
+    const page = await text(app.request(URL_PATH));
+    const changed = page.slice(
+      page.indexOf("Design changed or deleted"),
+      page.indexOf("Up to date"),
+    );
+    expect(changed).not.toContain("Kit/Input");
+    expect(page.slice(page.indexOf("Up to date"))).toContain("Up to date (1)");
   });
 
   it("counts a hand-mapped component as linked, not as missing a design", async () => {

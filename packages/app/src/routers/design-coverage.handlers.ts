@@ -1,6 +1,7 @@
 import { parseDesignUrl } from "@storyshelf/core/adapter/design";
 import type { CatalogEntry } from "@storyshelf/core/capture";
 import {
+  BaselineModel,
   DesignCredentialModel,
   DesignModel,
   designDrift,
@@ -41,7 +42,7 @@ export async function coverageOf(
       .catch(() => new Map<string, DesignNode>()),
     providersWithToken(project, urls),
   ]);
-  const baselines = latestBaselineVersions(snapshots);
+  const baselines = await approvedVersions(project, entries);
   const rows = components.map((group) => {
     const key = normalizeImportPath(group.importPath);
     const baseline = baselines.get(key) ?? null;
@@ -70,17 +71,26 @@ function linkOf(
 }
 
 /**
- * When each component's baselines were last approved: the newest real `baselineVersion` among its
- * snapshots, by normalized story file. A snapshot with no baseline (`none`) has no approval time.
+ * When each component's baselines were last approved: the newest `updatedAt` among the current
+ * default-branch baselines of its stories, by normalized story file. A snapshot's own
+ * `baselineVersion` is the baseline it was diffed against, which promotion has since replaced.
  */
-function latestBaselineVersions(snapshots: readonly Snapshot[]): Map<string, string> {
+async function approvedVersions(
+  project: Project,
+  entries: readonly CatalogEntry[],
+): Promise<Map<string, string>> {
+  const fileOf = new Map(
+    entries.map((entry) => [entry.id, normalizeImportPath(entry.importPath)] as const),
+  );
+  const baselines = await new BaselineModel(getStore().db).list(project.id);
   const latest = new Map<string, string>();
-  for (const snap of snapshots) {
-    const version = snap.baselineVersion;
-    if (!snap.storyImportPath || !version || !Number.isFinite(Date.parse(version))) continue;
-    const key = normalizeImportPath(snap.storyImportPath);
+  for (const baseline of baselines) {
+    const key = fileOf.get(baseline.storyId);
+    if (!key || baseline.branch !== project.gitDefaultBranch) continue;
     const known = latest.get(key);
-    if (known === undefined || Date.parse(version) > Date.parse(known)) latest.set(key, version);
+    if (known === undefined || Date.parse(baseline.updatedAt) > Date.parse(known)) {
+      latest.set(key, baseline.updatedAt);
+    }
   }
   return latest;
 }

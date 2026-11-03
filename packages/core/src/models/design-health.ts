@@ -20,8 +20,8 @@ export type DesignDrift = "deleted" | "stale" | "current" | "unknown";
 
 /**
  * Classify a cached design node: `deleted` (the node no longer exists), `stale` (changed after the
- * baseline was approved), `current`, or `unknown` (nothing cached, the provider refused, or there is no baseline
- * to compare with, so the state cannot be told). Reads only what was stored; never calls a provider.
+ * baseline was approved), `current`, or `unknown` (nothing cached, the provider refused, there is no baseline
+ * or no readable modification time to compare, so the state cannot be told). Reads only what was stored; never calls a provider.
  */
 export function designDrift(
   node: Pick<DesignNode, "state" | "lastModified"> | null | undefined,
@@ -29,7 +29,10 @@ export function designDrift(
 ): DesignDrift {
   if (node?.state === "deleted") return "deleted";
   if (isDesignStale(node, baselineVersion)) return "stale";
-  return node?.state === "ok" && baselineVersion ? "current" : "unknown";
+  const modified = node?.lastModified ? Date.parse(node.lastModified) : Number.NaN;
+  return node?.state === "ok" && baselineVersion && Number.isFinite(modified)
+    ? "current"
+    : "unknown";
 }
 
 /**

@@ -49,6 +49,11 @@ describe("designDrift", () => {
     );
   });
 
+  it("is unknown when the design has no readable modification time", () => {
+    expect(designDrift({ state: "ok", lastModified: null }, approved)).toBe("unknown");
+    expect(designDrift({ state: "ok", lastModified: "not a date" }, approved)).toBe("unknown");
+  });
+
   it("is unknown when nothing is cached or the provider refused", () => {
     expect(designDrift(null, approved)).toBe("unknown");
     expect(designDrift(undefined, approved)).toBe("unknown");
