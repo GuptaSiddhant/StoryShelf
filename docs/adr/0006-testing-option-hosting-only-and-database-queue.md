@@ -108,9 +108,11 @@ implementations, which is accepted.
   completion, lost lease and cancel.
 - **Enqueue** inserts and wakes the local consumer; other instances find the job on their next
   poll. **Retry/failure:** past `testing.retries` the job fails and the build takes the standard
-  terminal path. A final attempt that loses its lease calls `onExhausted(job, error)` (idempotent,
-  any instance): capture fails the build (`failCrashedCapture` + alert), publish completes as
-  failed.
+  terminal path. A final attempt that loses its lease moves the job to `exhausting` and calls
+  `onExhausted(job, error)` (idempotent, any instance): capture fails the build
+  (`failCrashedCapture` + alert), publish completes as failed. Each hook run is a leased attempt
+  row after the last allowed attempt, so a run that throws or dies is re-run by any instance once
+  its lease ends, at most five times; then the job fails and `onAbandoned` alerts.
 - **Cancel** flags the job; the running instance reads it and calls `runner.cancel`. It works
   across instances and for a hung capture; a not-started job is immediate.
   `CaptureQueue.cancel(jobId | buildId)` cancels unfinished jobs of every kind and flags the running
