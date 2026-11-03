@@ -295,6 +295,14 @@ function misbehavingWorker(firstWorker: string): URL {
     import { parentPort } from "node:worker_threads";
     const first = !existsSync(${JSON.stringify(marker)});
     if (first) writeFileSync(${JSON.stringify(marker)}, "1");
+    // afterResult(fn): run fn right after the first job's result has been posted (a barrier on the
+    // job, not on the clock).
+    const post = parentPort.postMessage.bind(parentPort);
+    let afterResult = () => {};
+    parentPort.postMessage = (message, transfer) => {
+      post(message, transfer);
+      if (message?.type === "result") setImmediate(() => { const run = afterResult; afterResult = () => {}; run(); });
+    };
     const realWorker = ${JSON.stringify(WORKER_URL.href)};
     if (!first) { await import(realWorker); }
     else { ${firstWorker} }`;
@@ -315,7 +323,7 @@ function poolWithEvents(workerUrl: URL): { pool: DiffPool; events: string[] } {
 
 // The first worker answers diffs properly (it is the real worker), then misbehaves while idle.
 const idleThen = (action: string): string =>
-  `await import(realWorker); setTimeout(() => { ${action} }, 80);`;
+  `afterResult = () => { ${action} }; await import(realWorker);`;
 const expected = async (): Promise<unknown> => await diffImages(base(), changed(), failOnResize);
 
 describe("worker messages that answer no job", () => {
@@ -335,7 +343,9 @@ describe("worker messages that answer no job", () => {
     const stray = `parentPort.on("message", () => parentPort.postMessage({ type: "error", message: "boom" }));
       parentPort.postMessage({ type: "ready" });`;
     const { pool, events } = poolWithEvents(misbehavingWorker(stray));
-    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(/without a job id/u);
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(
+      /answer the pool cannot use/u,
+    );
     expect(events).toHaveLength(1);
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
   });
@@ -359,14 +369,43 @@ describe("worker messages that answer no job", () => {
     expect(events).toEqual([]);
   });
 
+  it("rejects the job and replaces the worker for an answer it cannot settle", async () => {
+    const broken = `parentPort.on("message", (request) => parentPort.postMessage({ type: "result", id: request.id }));
+      parentPort.postMessage({ type: "ready" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(broken));
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(
+      /answer the pool cannot use/u,
+    );
+    expect(events).toEqual(["diff worker sent a malformed answer; replacing the worker"]);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("still cleans up when the event reporter throws", async () => {
+    const stray = `parentPort.on("message", () => parentPort.postMessage({ type: "error", message: "boom" }));
+      parentPort.postMessage({ type: "ready" });`;
+    const pool = new DiffPool({
+      size: 1,
+      workerUrl: misbehavingWorker(stray),
+      onFallback: () => {},
+      onWorkerEvent: () => {
+        throw new Error("reporter broke");
+      },
+    });
+    pools.push(pool);
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(
+      /answer the pool cannot use/u,
+    );
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
   it("ignores messages that are not this pool's protocol, like node --watch's", async () => {
     const foreign = `parentPort.postMessage("garbage");
       parentPort.postMessage({ "watch:require": ["/some/preload.cjs"] });`;
     const { pool, events } = poolWithEvents(misbehavingWorker(idleThen(foreign)));
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // The second job completes after the worker's earlier messages were delivered, in order.
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
     expect(events).toEqual([]);
     expect(pool.workerCount).toBe(1);
-    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
   });
 });

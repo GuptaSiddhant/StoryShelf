@@ -225,15 +225,36 @@ export class DiffPool {
     if (!isAnswer(message)) {
       return;
     }
-    if (jobIdOf(message) !== undefined) {
-      this.onWorkerEvent("diff worker answered a job that is not in flight; ignored");
+    const id = jobIdOf(message);
+    if (id !== undefined && id !== slot.task?.id) {
+      this.report("diff worker answered a job that is not in flight; ignored");
       return;
     }
-    this.onWorkerEvent("diff worker sent a message without a job id; replacing the worker");
+    // No job id, or the job's own id with an answer that cannot be settled: the worker is at fault.
+    this.failWorker(
+      slot,
+      id === undefined
+        ? "diff worker sent a message without a job id; replacing the worker"
+        : "diff worker sent a malformed answer; replacing the worker",
+    );
+  }
+
+  /** Report a faulty worker, fail the job it held (once) and replace it. */
+  private failWorker(slot: Slot, reason: string): void {
+    this.report(reason);
     const { task } = slot;
     slot.task = null;
     this.retire(slot);
-    task?.reject(new Error("diff worker failed: it sent a message without a job id"));
+    task?.reject(new Error("diff worker failed: it sent an answer the pool cannot use"));
+  }
+
+  /** Tell `onWorkerEvent`; a reporter that throws must not break the pool's cleanup. */
+  private report(reason: string): void {
+    try {
+      this.onWorkerEvent(reason);
+    } catch {
+      // Reporting is best effort.
+    }
   }
 
   private markReady(slot: Slot): void {
@@ -322,13 +343,21 @@ function ignore(): void {}
 function answerJob(slot: Slot, message: DiffResponse): boolean {
   const { task } = slot;
   const id = jobIdOf(message);
-  if (!task || id !== task.id || message.type === "ready") {
+  if (!task || id !== task.id || message.type === "ready" || !isWellFormed(message)) {
     return false;
   }
   slot.task = null;
   slot.worker.unref();
   settle(task, message);
   return true;
+}
+
+/** An answer `settle` can use: a `result` carrying its result, an `error` carrying its message. */
+function isWellFormed(message: DiffResponse): boolean {
+  if (message.type === "result") {
+    return typeof message.result === "object" && message.result !== null;
+  }
+  return message.type === "error" && typeof message.message === "string";
 }
 
 /** A `result` or `error` message: this pool's answer to a job, whatever its job id. */
