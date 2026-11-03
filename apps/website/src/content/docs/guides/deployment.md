@@ -93,6 +93,22 @@ Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js
 
 One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
 
+### Object storage on Tigris (Fly.io)
+
+Tigris is an S3-compatible object store that Fly provisions with `fly storage create`, so it needs no new package or preset: it is `@storyshelf/storage-s3` pointed at its endpoint. Keep the database on the machine's volume (SQLite) and move the objects (published Storybooks, screenshots, baselines, diffs) off it, so the volume stops filling up and storage no longer depends on one machine.
+
+```ts
+import { createS3Storage } from "@storyshelf/storage-s3";
+
+const storage = createS3Storage({
+  bucket: process.env.AWS_BUCKET!,
+  endpoint: process.env.AWS_ENDPOINT_URL_S3, // https://t3.storage.dev
+  region: process.env.AWS_REGION ?? "auto",
+});
+```
+
+Credentials come from the SDK's default chain, so `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` stay Fly secrets and are never passed in code. See `apps/fly-app` in the repository for the demo's wiring, including how it falls back to the volume when no bucket is set and a one-time copy of existing objects.
+
 ## Remote browsers
 
 Rendering scales on the browser side, not by adding processes: every instance runs the same `testing` configuration, so every instance offers the same targets. To take browsers off the app host, list remote services in the runner's `browsers` (a self-hosted Playwright server, Azure Playwright Workspaces, a CDP service) and the host needs no installed browsers. `sessions` per service is the page cap per instance; divide a provider's parallel-session limit among instances. See [Remote browsers](/guides/remote-browsers/).

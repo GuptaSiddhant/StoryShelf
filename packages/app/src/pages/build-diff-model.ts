@@ -1,4 +1,5 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
+import type { DesignItem } from "./design-links.tsx";
 
 /** How far a build's review has progressed, counted per story/mode (not per browser). */
 export interface ReviewProgress {
@@ -139,4 +140,34 @@ export function snapshotImageUrl(
 export function snapshotVariant(snap: Pick<Snapshot, "viewportName" | "browser">): string {
   const browser = snap.browser ?? "chromium";
   return browser === "chromium" ? snap.viewportName : `${snap.viewportName} · ${browser}`;
+}
+
+/** A cached design render the review stage can compare the screenshot with. */
+export interface DesignSource {
+  /** Stage key: `design` for a lone render, `design-<n>` when the component links several. */
+  value: string;
+  /** Source switch label. */
+  label: string;
+  /** API URL of the cached render. */
+  src: string;
+  name: string | null;
+  providerName: string;
+}
+
+/**
+ * The design links of a component that have a cached render, as comparison sources.
+ * A link without a render is not offered (the design strip still lists it).
+ */
+export function designSources(items: readonly DesignItem[]): DesignSource[] {
+  const rendered = items.flatMap((item) =>
+    item.renderUrl === null ? [] : [{ item, src: item.renderUrl }],
+  );
+  const several = rendered.length > 1;
+  return rendered.map(({ item, src }, index) => ({
+    value: several ? `design-${index + 1}` : "design",
+    label: several ? `${item.providerName} ${index + 1}` : "Design",
+    src,
+    name: item.name,
+    providerName: item.providerName,
+  }));
 }

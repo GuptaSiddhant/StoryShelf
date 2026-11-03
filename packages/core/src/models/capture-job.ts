@@ -42,6 +42,9 @@ export const TERMINAL_JOB_STATUSES: readonly CaptureJobStatus[] = ["done", "fail
 /** Statuses of rows the poll may claim: a queued job, or a running attempt whose lease ran out. */
 const CANDIDATE_STATUSES = ["queued", "running"];
 
+/** Statuses of unfinished jobs the queue views list: candidates plus a job running its exhausted-job hook. */
+const ACTIVE_STATUSES = [...CANDIDATE_STATUSES, "exhausting"];
+
 /**
  * Data operations of the database queue. Every write is an unconditional update by id or an
  * insert; the only atomic primitive is the unique-key insert of an attempt row ({@link claim}),
@@ -165,10 +168,50 @@ export class CaptureJobModel {
     });
   }
 
+  /**
+   * The last attempt lost its lease: the job row records that the exhausted-job hook runs as
+   * `attempt` (numbered after the allowed attempts, so it also counts the runs) and leaves the
+   * poll's range; the hook run's own attempt row carries the lease. Conditional on the job being
+   * unfinished (a late `done` is never overwritten) and on no later run having been recorded: false
+   * when it did not apply.
+   */
+  async markExhausting(
+    jobId: string,
+    attempt: number,
+    error: string,
+    now: string,
+  ): Promise<boolean> {
+    const row = (await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      { status: "exhausting", attempt, visibleAt: null, error, updatedAt: now },
+      // A superseded run (a lower number) writes nothing.
+      both(inArray(this.#c.status, ACTIVE_STATUSES), lt(this.#c.attempt, attempt)),
+    )) as unknown as CaptureJobRow | null;
+    // `updateWhere` returns the row either way; only our write leaves it exhausting at our run.
+    return row?.status === "exhausting" && row.attempt === attempt;
+  }
+
+  /** End a job row for good unless it already ended (a late `done` or a cancel keeps its outcome). */
+  async finishOpenJob(
+    jobId: string,
+    status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">,
+    now: string,
+    error: string | null = null,
+  ): Promise<void> {
+    const patch = { status, visibleAt: null, finishedAt: now, updatedAt: now };
+    await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      error === null ? patch : { ...patch, error },
+      inArray(this.#c.status, ACTIVE_STATUSES),
+    );
+  }
+
   /** End a job row for good. */
   async finishJob(
     jobId: string,
-    status: Exclude<CaptureJobStatus, "queued" | "running">,
+    status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">,
     now: string,
     error: string | null = null,
   ): Promise<void> {
@@ -223,13 +266,13 @@ export class CaptureJobModel {
     return rows.toSorted((a, b) => a.attempt - b.attempt);
   }
 
-  /** Job rows of `kinds` that are queued or running, oldest first. */
+  /** Job rows of `kinds` that are unfinished (queued, running or exhausting), oldest first. */
   async listActive(kinds: readonly CaptureJobKind[]): Promise<CaptureJobRow[]> {
     const rows = (await this.#db.list(this.#table, {
       where: and(
         jobEntries(this.#c),
         kindFilter(this.#c, kinds),
-        inArray(this.#c.status, CANDIDATE_STATUSES),
+        inArray(this.#c.status, ACTIVE_STATUSES),
       ),
     })) as unknown as CaptureJobRow[];
     return rows.toSorted(byCreation);
@@ -321,6 +364,7 @@ interface JobColumns {
   kind: Column;
   buildId: Column;
   status: Column;
+  attempt: Column;
   visibleAt: Column;
   createdAt: Column;
 }
@@ -333,9 +377,15 @@ function jobColumns(table: Table): JobColumns {
     kind: col(table, "kind"),
     buildId: col(table, "buildId"),
     status: col(table, "status"),
+    attempt: col(table, "attempt"),
     visibleAt: col(table, "visibleAt"),
     createdAt: col(table, "createdAt"),
   };
+}
+
+/** `first AND second`; drizzle's `and` is only undefined for an empty list, so `first` is a formality. */
+function both(first: SQL, second: SQL): SQL {
+  return and(first, second) ?? first;
 }
 
 function kindFilter(c: JobColumns, kinds: readonly CaptureJobKind[]): SQL {

@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storage-s3",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "description": "S3-compatible storage adapter for StoryShelf (AWS SDK v3).",
   "keywords": [
     "r2",
@@ -68,14 +68,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "browser": false,
-      "workerd": false,
-      "bun": true
-    }
   }
 }

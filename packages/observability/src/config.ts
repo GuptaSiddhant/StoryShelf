@@ -3,9 +3,7 @@
  *
  * Standard `OTEL_*` variables win; `STORYSHELF_OTEL_*` covers StoryShelf
  * specifics. When `OTEL_EXPORTER_OTLP_ENDPOINT` is unset the SDK stays a
- * noop (zero overhead, hermetic tests). Deno runtimes are always noop here —
- * Deno's built-in OTEL (`OTEL_DENO=true`) bridges `npm:@opentelemetry/api`
- * natively, so a NodeSDK must never start under Deno.
+ * noop (zero overhead, hermetic tests).
  */
 
 /** Resolved observability configuration for the Node SDK entrypoint. */
@@ -26,14 +24,6 @@ export interface ObservabilityConfig {
 
 const DEFAULT_SERVICE_NAME = "storyshelf";
 const DEFAULT_METRICS_INTERVAL_MS = 60_000;
-
-/** Whether the current runtime is Deno (native OTEL owns the SDK there). */
-function isDenoRuntime(env: NodeJS.ProcessEnv): boolean {
-  if (env["OTEL_DENO"] === "true") {
-    return true;
-  }
-  return (globalThis as { Deno?: unknown }).Deno !== undefined;
-}
 
 /** Parse one `k=v` pair into the headers record. */
 function parseHeaderPair(pair: string, headers: Record<string, string>): void {
@@ -83,8 +73,7 @@ export function resolveObservabilityConfig(
   const endpoint = env["OTEL_EXPORTER_OTLP_ENDPOINT"];
   const sdkDisabled = env["OTEL_SDK_DISABLED"] === "true";
   const explicit = env["STORYSHELF_OTEL_ENABLED"];
-  const enabled =
-    !sdkDisabled && !isDenoRuntime(env) && (explicit ? explicit === "true" : Boolean(endpoint));
+  const enabled = !sdkDisabled && (explicit ? explicit === "true" : Boolean(endpoint));
   return {
     enabled,
     endpoint,

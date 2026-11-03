@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/observability",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "description": "StoryShelf observability: OpenTelemetry tracing, metrics, and log correlation over @storyshelf/core adapters.",
   "keywords": [
     "metrics",
@@ -86,14 +86,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "bun": true,
-      "workerd": false,
-      "browser": false
-    }
   }
 }

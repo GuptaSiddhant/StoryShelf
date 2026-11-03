@@ -70,6 +70,8 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   { table: "snapshots", column: "duration_ms", definition: "INT" },
   { table: "snapshots", column: "a11y_violations", definition: "TEXT" },
+  { table: "snapshots", column: "unstable", definition: "TINYINT(1)" },
+  { table: "projects", column: "detect_unstable", definition: "TINYINT(1) NOT NULL DEFAULT 1" },
   { table: "baselines", column: "infra_hash", definition: "TEXT" },
   { table: "baselines", column: "fingerprint", definition: "TEXT" },
   { table: "baselines", column: "source_build_id", definition: "TEXT" },
@@ -91,6 +93,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "test_results", definition: "TEXT" },
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
+  { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
   {
@@ -111,9 +114,14 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'oidc'",
   },
   { table: "users", column: "disabled", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  { table: "design_nodes", column: "notified_version", definition: "TEXT" },
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
 ];
+
+/** A run in flight when `builds.capture_job_id` was added owns the build it was started for. */
+const BUILD_CAPTURE_JOB_BACKFILL =
+  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
 
 const IDENTITY_INDEXES = [
   {
@@ -132,6 +140,7 @@ const IDENTITY_INDEXES = [
 export async function runMigrations(run: MigrationRunner): Promise<void> {
   await runDdl(run);
   await ensureColumns(run);
+  await run(BUILD_CAPTURE_JOB_BACKFILL);
   await migrateIndexes(run);
   await migrateLegacyColumns(run);
   await ensureForeignKeys(run);

@@ -1,5 +1,5 @@
 import type { BuildStatus } from "@storyshelf/core/types";
-import { boolean, index, int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { boolean, index, int, mysqlTable, text, varchar } from "drizzle-orm/mysql-core";
 import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
@@ -32,6 +32,7 @@ export const builds = mysqlTable(
     testResults: text("test_results"),
     reviewCycle: int("review_cycle").notNull().default(0),
     reviewRequestedCycle: int("review_requested_cycle"),
+    captureJobId: varchar("capture_job_id", { length: 26 }),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
@@ -65,6 +66,7 @@ export interface Build {
   testResults: string | null;
   reviewCycle: number;
   reviewRequestedCycle: number | null;
+  captureJobId: string | null;
   createdAt: string;
   updatedAt: string;
 }

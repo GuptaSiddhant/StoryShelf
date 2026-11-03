@@ -36,10 +36,15 @@ jobs:
           persist-credentials: false
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
+      # The contract suite gets its own database: the live suite's upgrade test drops columns, and
+      # vitest runs the two files in parallel.
+      - name: Create a database for the contract suite
+        run: mysql -h 127.0.0.1 -uroot -ptest-password -e "CREATE DATABASE storyshelf_contract"
       - name: Run MySQL suite against disposable database
         env:
           LIVE_CLOUD: "1"
           MYSQL_DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/storyshelf_test
+          MYSQL_URL: mysql://root:test-password@127.0.0.1:3306/storyshelf_contract
           MYSQL_SCHEMA_MUTATION_TEST: "1"
         run: nubx turbo test --filter='@storyshelf/db-mysql' --force --env-mode=loose
 

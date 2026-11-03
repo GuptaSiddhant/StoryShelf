@@ -23,6 +23,7 @@ import { loadBaselineView } from "./baseline-guard.ts";
 import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
 import { isBuildAuthor } from "./comment-triage.ts";
 import { loadComponentPage } from "./component.handlers.ts";
+import { registerDesignCoverage } from "./design-coverage.ts";
 import {
   designUrlsFor,
   loadDesignResolutions,
@@ -264,6 +265,7 @@ export function registerUiPages(app: ShelfRouter): void {
     return c.html(html);
   });
 
+  registerDesignCoverage(app);
   registerSettingsPages(app);
 }
 

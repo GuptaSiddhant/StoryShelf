@@ -37,6 +37,10 @@ nubx vitest run src/path/to/file.test.ts
 nubx vitest run src/path/to/file.test.ts -t "test name"
 nubx tsc --noEmit -p tsconfig.json
 
+# The app's own Storybook (UI components + key pages):
+#   nub run storybook (from the root; dev, :6006)
+#   nub run build-storybook (from packages/app; -> storybook-static/, gitignored)
+
 # Website, from apps/website: nub run dev | build | start   (start needs a prior build)
 # Or from the root: nub run web:dev | web:build | docs
 ```
@@ -124,7 +128,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
   `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
   `/_s/` or widen what a token grants. Only `signedCacheControl` (`packages/app/src/routers/
-  capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
+capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
   manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
   by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
   never let a runner set response headers.
@@ -165,7 +169,13 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   never raw `btn`/`tabs`/`card` classes, `style="..."`, or direct family imports. Styles are colocated
   via `packages/app/src/ui/css.ts`: one labeled `css` template per variant composed with `${base}`
   (not `cx`), static values only. `packages/app/src/ui/consistency.test.ts` is a zero-tolerance
-  ratchet. Load the `ui-building-blocks` skill before touching UI.
+  ratchet. **A new component or variant ships with a story** (`*.stories.tsx` beside it, titled
+  `UI/<Component>`; pages are `Pages/<Area>/<Page>`, one story per state): `packages/app/.storybook/`
+  renders the real hono/jsx with the app's own styles, tokens and theme, and `turbo verify` builds it,
+  so a broken story fails the PR. Story-only fixtures live in `src/stories-fixtures/` (typed with the
+  real row types, fixed ids, clock frozen at `STORY_NOW`); story-only stand-ins for server modules
+  (`store.ts`, `middleware/csrf.ts`, the icon sprite, Node built-ins) live in `.storybook/shims/`,
+  never as a production branch. Load the `ui-building-blocks` skill before touching UI.
 - **Turbo cache inputs.** CI restores `.turbo/cache`, so a task hash must cover everything it reads.
   Shared files belong in `globalDependencies`; a test reading outside its package needs that file in
   the package's `turbo.json` (`extends: ["//"]`, `inputs: ["$TURBO_DEFAULT$", "$TURBO_ROOT$/<path>"]`).
@@ -173,9 +183,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - **Logging and HTTP.** Use pino from core (`createShelfLogger()`): structured objects, never string
   interpolation (`logger.info({ buildId }, "msg")`), errors as an `err` child. Adapters receive scoped
   loggers via `Adapter.setLogger` and never create their own. Outbound HTTP only through
-  `@storyshelf/core/utils` (`httpJson`/`HttpError`); never add `ky`/`ofetch`. In core, record an exception
-  on a span only through `spanException` (core's `withSpan` does it): a redacted copy, rethrowing
-  the original.
+  `@storyshelf/core/utils` (`httpJson`/`HttpError`); never add `ky`/`ofetch`. On every span (core,
+  `observability`, `ai`), record an exception only as a redacted copy (core's `spanException`, or
+  the wrappers' own copy of it), rethrowing the original.
   An `HttpError` is recorded as `HTTP <status>`, never its body; log and trace a request URL only as
   `redactUrlForLog(url)` (origin only).
 - **Remote browsers.** `defineRemote` expands to `<engine>@<name>` targets; presets are plain
@@ -186,7 +196,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `<origin>/_s/<token>/` (`storybookBase`). Measure the environment through `boundedProbe`
   (`timeouts.probeMs`): an overrun or failure is unknown plus a warning, a cancel throws
   `Capture cancelled` and never becomes an unknown-environment capture; close the probe page on
-  every path and release the lease as `cancelled` when the run was cancelled.
+  every path and release the lease as `cancelled` when the run was cancelled. The optional
+  `maxConnections` is a separate per-process limiter (`remote-limiter.ts`), never the page gate: its
+  slot is taken before `connect` and freed with the lease, exactly once.
 - **Boot replay.** `runBootTasks` re-requests open build states after startup only when notifiers are
   wired and an origin is resolved. Chat, email and alerts are never replayed.
 - **Retention lifecycle.** Every baseline mutation goes through the fenced
@@ -208,6 +220,11 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - **IDs** are ULIDs; **timestamps** are ISO-8601 strings in the database.
 - **Commits** are conventional (`feat:`, `fix:`); pre-commit rejects unformatted or unlinted files.
   Fix with `nub run fmt` and re-stage; do not bypass hooks.
+- **Changesets.** A pull request that changes shipped behavior (the source of `packages/*`, or a
+  published `package.json`) adds a changeset: `nub run changeset <patch|minor|major>`, one Markdown file in `.changeset/`
+  written like a `CHANGELOG.md` entry. Never edit `CHANGELOG.md` by hand and never bump versions;
+  `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
+  tells the CI check so. Task PRs on an epic branch add theirs there.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
   JSON endpoints live under `/api/v1`; HTML pages at `/`.

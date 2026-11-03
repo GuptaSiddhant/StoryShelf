@@ -69,12 +69,17 @@ function workingTreeChanges(cwd: string): string[] {
  * Repo-relative files changed between `base` and `head`, including staged
  * and untracked working-tree files. Throws when git cannot diff.
  *
- * @param cwd - Repository root.
+ * Every path is relative to the repository root, whichever directory `cwd`
+ * is: git reports untracked files relative to the directory it runs in, and
+ * only below it, so the whole listing runs at the root.
+ *
+ * @param cwd - A directory inside the repository (its root, or a package of it).
  * @param base - Ancestor commit (baseline).
  * @param head - Current commit.
  */
 export function changedFiles(cwd: string, base: string, head: string): string[] {
-  const files = new Set([...committedChanges(cwd, base, head), ...workingTreeChanges(cwd)]);
+  const root = gitRepoRoot(cwd) ?? cwd;
+  const files = new Set([...committedChanges(root, base, head), ...workingTreeChanges(root)]);
   return [...files].toSorted();
 }
 
@@ -86,6 +91,14 @@ function tryGit(cwd: string, args: string[]): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * The repository root containing `cwd` (`git rev-parse --show-toplevel`), or `null` when git is
+ * missing or `cwd` is not inside a repository.
+ */
+export function gitRepoRoot(cwd: string): string | null {
+  return tryGit(cwd, ["rev-parse", "--show-toplevel"]);
 }
 
 /**

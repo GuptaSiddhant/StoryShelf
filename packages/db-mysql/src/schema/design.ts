@@ -59,6 +59,7 @@ export const designNodes = mysqlTable(
     state: text("state").notNull().default("ok"),
     renderPath: text("render_path"),
     renderVersion: text("render_version"),
+    notifiedVersion: text("notified_version"),
     fetchedAt: datetime("fetched_at", { mode: "string", fsp: 3 }).notNull(),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
@@ -121,6 +122,7 @@ export interface DesignNode {
   renderPath: string | null;
   /** File `version` the cached render was taken at. */
   renderVersion: string | null;
+  notifiedVersion: string | null;
   fetchedAt: string;
   createdAt: string;
   updatedAt: string;

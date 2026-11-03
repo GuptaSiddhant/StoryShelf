@@ -69,6 +69,10 @@ const stageRoot = css`
     font-size: var(--text-sm);
     text-align: center;
   }
+  .stage__note {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+  }
   .stage__divider,
   .stage__controls {
     display: none;
@@ -101,6 +105,10 @@ const stageRoot = css`
   &[data-zoom="200"] .stage__img,
   &[data-zoom="400"] .stage__img {
     image-rendering: pixelated;
+  }
+  /* Design variant: screenshot against a render, two panes and no diff. */
+  &[data-variant="design"][data-view="split"] .stage__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   &[data-view="diff"] .stage__grid,
   &[data-view="flip"] .stage__grid,
@@ -193,6 +201,9 @@ const ZOOMS = [
   { label: "400%", value: "400" },
 ];
 
+/** Modes and zoom a design comparison offers: no pixel diff, and the render always fits the stage. */
+const DESIGN_MODES = ["split", "swipe", "onion"];
+
 function withActive(
   items: { label: string; value: string }[],
   active: string,
@@ -226,16 +237,16 @@ const Pane: FC<PaneProps> = ({ kind, label, src, alt, empty, meta }) => {
 };
 
 /** Swipe and onion-skin sliders; each is shown only in its own mode (CSS). */
-const RangeControls: FC = () => {
+const RangeControls: FC<{ baselineLabel: string }> = ({ baselineLabel }) => {
   return (
     <>
       <label class="stage__controls" data-for="swipe">
-        <span>Baseline</span>
+        <span>{baselineLabel}</span>
         <input type="range" min="0" max="100" value="50" data-compare-swipe aria-label="Swipe" />
         <span>Current</span>
       </label>
       <label class="stage__controls" data-for="onion">
-        <span>Baseline</span>
+        <span>{baselineLabel}</span>
         <input type="range" min="0" max="100" value="50" data-compare-onion aria-label="Opacity" />
         <span>Current</span>
       </label>
@@ -255,10 +266,32 @@ export interface CompareStageProps {
   baselineEmpty?: unknown;
   diffEmpty?: unknown;
   diffMeta?: string;
+  /**
+   * `design` compares the screenshot with a design render instead of a baseline: side by side,
+   * swipe and onion only (no diff, no flip), fit zoom only.
+   */
+  variant?: "baseline" | "design";
+  /** Name of the left-hand image in labels and sliders (default "Baseline"). */
+  baselineLabel?: string;
+  /** A line under the controls, e.g. what the left-hand image is. */
+  note?: string;
 }
 
-/** Baseline / current / diff comparison with swipe, onion-skin, flip, and zoom. */
-export const CompareStage: FC<CompareStageProps> = ({
+/** Mode switch, plus the zoom switch (a design comparison always fits, so it has none). */
+const StageBar: FC<{ design: boolean }> = ({ design }) => {
+  const modes = design ? MODES.filter((mode) => DESIGN_MODES.includes(mode.value)) : MODES;
+  return (
+    <div class="stage__bar">
+      <Segmented label="Comparison mode" data-compare-mode items={withActive(modes, "split")} />
+      {design ? null : (
+        <Segmented label="Zoom" data-compare-zoom items={withActive(ZOOMS, "fit")} />
+      )}
+    </div>
+  );
+};
+
+/** The panes (baseline or design, current, diff) and the swipe divider. */
+const StageGrid: FC<CompareStageProps & { design: boolean; baselineLabel: string }> = ({
   baselineSrc,
   currentSrc,
   diffSrc,
@@ -266,43 +299,65 @@ export const CompareStage: FC<CompareStageProps> = ({
   baselineEmpty = "New story — no baseline yet. Approve to set the baseline.",
   diffEmpty = "No diff",
   diffMeta,
+  design,
+  baselineLabel,
+}) => (
+  <div class="stage__grid">
+    <Pane
+      kind="baseline"
+      label={baselineLabel}
+      src={baselineSrc}
+      alt={`${baselineLabel} for ${subject}`}
+      empty={baselineEmpty}
+    />
+    <Pane
+      kind="current"
+      label="Current"
+      src={currentSrc}
+      alt={`Current for ${subject}`}
+      empty="No screenshot"
+    />
+    {design ? null : (
+      <Pane
+        kind="diff"
+        label="Diff"
+        src={diffSrc}
+        alt={`Diff for ${subject}`}
+        empty={diffEmpty}
+        meta={diffMeta}
+      />
+    )}
+    <span class="stage__divider" aria-hidden="true">
+      <span class="stage__knob" data-compare-knob>
+        ↔
+      </span>
+    </span>
+  </div>
+);
+
+/** Baseline / current / diff comparison with swipe, onion-skin, flip, and zoom. */
+export const CompareStage: FC<CompareStageProps> = ({
+  variant = "baseline",
+  baselineLabel = "Baseline",
+  note,
+  ...images
 }) => {
+  const design = variant === "design";
   return (
-    <div class={stageRoot} data-compare data-view="split" data-zoom="fit" data-flip="current">
-      <div class="stage__bar">
-        <Segmented label="Comparison mode" data-compare-mode items={withActive(MODES, "split")} />
-        <Segmented label="Zoom" data-compare-zoom items={withActive(ZOOMS, "fit")} />
-      </div>
-      <div class="stage__grid">
-        <Pane
-          kind="baseline"
-          label="Baseline"
-          src={baselineSrc}
-          alt={`Baseline for ${subject}`}
-          empty={baselineEmpty}
-        />
-        <Pane
-          kind="current"
-          label="Current"
-          src={currentSrc}
-          alt={`Current for ${subject}`}
-          empty="No screenshot"
-        />
-        <Pane
-          kind="diff"
-          label="Diff"
-          src={diffSrc}
-          alt={`Diff for ${subject}`}
-          empty={diffEmpty}
-          meta={diffMeta}
-        />
-        <span class="stage__divider" aria-hidden="true">
-          <span class="stage__knob" data-compare-knob>
-            ↔
-          </span>
-        </span>
-      </div>
-      <RangeControls />
+    <div
+      class={stageRoot}
+      data-compare
+      data-view="split"
+      data-zoom="fit"
+      data-flip="current"
+      data-variant={variant}
+      data-modes={design ? DESIGN_MODES.join(",") : undefined}
+      data-zooms={design ? "fit" : undefined}
+    >
+      <StageBar design={design} />
+      {note ? <p class="stage__note">{note}</p> : null}
+      <StageGrid {...images} design={design} baselineLabel={baselineLabel} />
+      <RangeControls baselineLabel={baselineLabel} />
     </div>
   );
 };

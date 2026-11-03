@@ -156,7 +156,10 @@ async function targetsForSub(
     }));
 }
 
-/** Topics that reach a project's approvers and admins unless they opted out (ADR 0013, decision 4). */
+/**
+ * Topics that reach a project's approvers and admins unless they opted out (ADR 0013, decision 4).
+ * Every other topic (`design:changed` included) reaches only people who subscribed to it.
+ */
 const DEFAULT_ON_EVENTS: ReadonlySet<string> = new Set(["review:requested"]);
 
 /** Roles that review builds: the default recipients of {@link DEFAULT_ON_EVENTS}. */

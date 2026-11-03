@@ -55,8 +55,8 @@
     "docs:check": "node ./scripts/check-adr-refs.mjs",
     "deprecate": "nub ./scripts/deprecate-packages.mjs",
     "deprecate:dry": "nub ./scripts/deprecate-packages.mjs --dry-run",
-    "jsr": "nub ./scripts/jsr.mjs",
     "serve": "nub run --filter dev-server serve",
+    "storybook": "nub run --filter @storyshelf/app storybook",
     "fmt": "turbo fmt",
     "hook:install": "git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/commit-msg",
     "lint": "turbo lint",
@@ -70,8 +70,10 @@
     "screenshots": "nub ./scripts/screenshots.mjs",
     "screenshots:app": "nub ./scripts/screenshots.mjs app",
     "screenshots:og": "nub ./scripts/screenshots.mjs og",
-    "release": "nub ./scripts/release.mjs",
-    "release:dry": "nub ./scripts/release.mjs --dry-run",
+    "release:prepare": "node scripts/release.mjs",
+    "release:dry": "node scripts/release.mjs --dry-run",
+    "changeset": "node scripts/changeset-add.mjs",
+    "version-packages": "node ./scripts/version-packages.mjs",
     "trust": "node ./scripts/npm-trust-all.mjs"
   },
   "devDependencies": {
