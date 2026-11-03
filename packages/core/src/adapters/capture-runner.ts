@@ -52,6 +52,8 @@ export type {
   HeldConnection,
   RemoteConnectErrorOptions,
 } from "./remote-lease.ts";
+export { UNVERIFIED_NOTE, logRemoteSizing, remoteSizingOf } from "./remote-sizing.ts";
+export type { RemoteSizing } from "./remote-sizing.ts";
 export { refCounted } from "./remote-pool.ts";
 export type { PoolLease, RefCounted, RefCountedOptions } from "./remote-pool.ts";
 export type {

@@ -448,6 +448,21 @@ const leased = (overrides: Partial<CdpLeasedOptions<{ id: string }>> = {}) => {
 };
 
 describe("measuring a remote CDP browser", () => {
+  it("logs the remote's limits once at run start, without its lease or endpoint", async () => {
+    const info = vi.fn();
+    const { service } = leased({ maxConnections: 2 });
+    await createPuppeteerCaptureRunner({ browsers: [service] }).render(
+      input({
+        storybookUrl: URL_ROOT,
+        logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+      }),
+    );
+    const sizing = info.mock.calls.filter(([, message]) => message === "remote sizing");
+    expect(sizing).toHaveLength(1);
+    expect(sizing[0]?.[0]).toMatchObject({ maxConnections: 2, experimental: false });
+    expect(JSON.stringify(sizing)).not.toMatch(/endpoint|lease|authorization/iu);
+  });
+
   it("stops waiting for a probe that hangs, warns, renders, and leaves the environment unknown", async () => {
     fake.state.probeHang = true;
     const warn = vi.fn();
