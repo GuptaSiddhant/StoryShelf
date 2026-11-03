@@ -108,9 +108,9 @@ jobs:
         run: |
           # The Storybook imports the workspace packages through their built dist, so the module
           # graph cannot match a changed packages/*/src file to a story. When one of them changed,
-          # render everything; a change confined to packages/app is traced.
+          # render everything, also when the diff cannot be computed; a change confined to packages/app is traced.
           mode=""
-          if [ -z "$DIFF_BASE" ] || git diff --name-only "$DIFF_BASE" "$UPLOAD_SHA" -- ':(top)packages/core' ':(top)packages/image' ':(top)packages/affected' | grep -q .; then
+          if [ -z "$DIFF_BASE" ] || ! changed=$(git diff --name-only "$DIFF_BASE" "$UPLOAD_SHA" -- ':(top)packages/core' ':(top)packages/image' ':(top)packages/affected') || [ -n "$changed" ]; then
             mode="--full"
           fi
           # shellcheck disable=SC2086
