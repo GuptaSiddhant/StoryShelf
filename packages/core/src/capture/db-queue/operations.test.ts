@@ -9,6 +9,15 @@ function queue() {
   return { db, queue: createDatabaseCaptureQueue(db, { kinds: ["capture"] }) };
 }
 
+/** A promise the test settles by hand. */
+function gate(): { promise: Promise<boolean>; resolve: (open: boolean) => void } {
+  const holder: { resolve: (open: boolean) => void } = { resolve: () => {} };
+  const promise = new Promise<boolean>((done) => {
+    holder.resolve = done;
+  });
+  return { promise, resolve: (open) => holder.resolve(open) };
+}
+
 describe("database queue operations", () => {
   it("stamps the build with the job of its own run, not with a shard job", async () => {
     const { db, queue: q } = queue();
@@ -25,6 +34,43 @@ describe("database queue operations", () => {
     expect((await builds.get(build.id))?.captureJobId).toBe(
       job?.shard === undefined ? job?.jobId : (await q.poll())?.jobId,
     );
+  });
+
+  it("keeps the newer run as owner when a slow enqueue is overtaken by a retry", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
+    const builds = new BuildModel(db);
+    const build = await builds.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    // Hold the first enqueue between inserting its job row and stamping the build.
+    const reached = gate();
+    const release = gate();
+    let held = false;
+    const slow = Object.create(db) as typeof db;
+    slow.insert = async (table, values) => {
+      const row = await db.insert(table, values);
+      if (table === db.tables.captureJobs && !held) {
+        held = true;
+        reached.resolve(true);
+        await release.promise;
+      }
+      return row;
+    };
+    const q = createDatabaseCaptureQueue(slow, { kinds: ["capture"] });
+    const first = q.enqueue({ buildId: build.id });
+    await reached.promise;
+    // A whole retry runs meanwhile: reset, then a new enqueue that stamps its job.
+    await builds.resetStatus(build.id, "pending");
+    await q.enqueue({ buildId: build.id });
+    const newer = (await builds.get(build.id))?.captureJobId;
+    expect(newer).toBeTruthy();
+
+    release.resolve(true);
+    await first;
+
+    expect((await builds.get(build.id))?.captureJobId).toBe(newer);
+    const entries = await q.recent(10);
+    expect(entries.filter((entry) => entry.status === "cancelled")).toHaveLength(1);
+    expect(entries.filter((entry) => entry.status === "queued")).toHaveLength(1);
   });
 
   it("stores request id, trace and shard on the job row", async () => {

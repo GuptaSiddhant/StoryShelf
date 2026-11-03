@@ -517,6 +517,33 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("adds builds.capture_generation at 0 to a database created without it", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-generation-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at)
+          VALUES ('b', 'p', 'a', 'main', 'pending', 't', 't');
+        ALTER TABLE builds DROP COLUMN capture_generation;
+      `);
+      raw.close();
+
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+
+      const rows = (await db.list(schema.builds)) as { id: string; captureGeneration: number }[];
+      expect(rows.map((row) => row.captureGeneration)).toEqual([0]);
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("leaves a cancel-requested job out of the backfill, and stops setup when the backfill fails", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-capture-job-fail-"));
     const path = join(dir, "legacy.db");

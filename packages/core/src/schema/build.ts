@@ -37,6 +37,12 @@ export interface Build {
    * means no run owns the build.
    */
   captureJobId?: string | null;
+  /**
+   * Orders the writers of {@link Build.captureJobId}: a retry reset advances it, and an enqueue
+   * stamps its job only while the generation it read is still current, so a stale enqueue never
+   * overwrites a newer run's ownership. Starts at 0.
+   */
+  captureGeneration?: number;
   createdAt: string;
   updatedAt: string;
 }

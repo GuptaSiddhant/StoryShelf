@@ -150,6 +150,7 @@ const builds = defineTable("builds", {
   changedFiles: "changed_files",
   affectedImportPaths: "affected_import_paths",
   testResults: "test_results",
+  captureGeneration: "capture_generation",
   captureJobId: "capture_job_id",
   createdAt: "created_at",
   updatedAt: "updated_at",

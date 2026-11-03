@@ -92,6 +92,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "inherited_count", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "test_results", definition: "TEXT" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
+  { table: "builds", column: "capture_generation", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
   {

@@ -270,10 +270,29 @@ describe("BuildModel: a cancelled build is terminal", () => {
     });
     const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
 
-    await model.stampCaptureJob(id, "J1");
+    await model.stampCaptureJob(id, "J1", 0);
     expect((await model.get(id))?.captureJobId).toBe("J1");
     await model.resetStatus(id, "pending");
     expect((await model.get(id))?.captureJobId).toBeNull();
+  });
+
+  it("advances the run generation on reset and refuses a stamp from an older one", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    expect((await model.get(id))?.captureGeneration).toBe(0);
+
+    await model.resetStatus(id, "pending");
+    expect((await model.get(id))?.captureGeneration).toBe(1);
+    expect(await model.stampCaptureJob(id, "OLD", 0)).toBe("stale");
+    expect((await model.get(id))?.captureJobId ?? null).toBeNull();
+    expect(await model.stampCaptureJob(id, "NEW", 1)).toBe("stamped");
+    expect((await model.get(id))?.captureJobId).toBe("NEW");
+    expect(await model.stampCaptureJob("missing", "J", 0)).toBe("ignored");
   });
 
   it("does not stamp a cancelled build", async () => {
@@ -286,7 +305,7 @@ describe("BuildModel: a cancelled build is terminal", () => {
     const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
     await model.setStatus(id, "cancelled");
 
-    await model.stampCaptureJob(id, "J1");
+    await model.stampCaptureJob(id, "J1", 0);
 
     expect((await model.get(id))?.captureJobId ?? null).toBeNull();
   });
@@ -299,7 +318,7 @@ describe("BuildModel: a cancelled build is terminal", () => {
       gitRepository: "owner/repo",
     });
     const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
-    await model.stampCaptureJob(id, "J2");
+    await model.stampCaptureJob(id, "J2", 0);
 
     const stale = await model.failIfOwnedBy(id, "J1");
     expect(stale.applied).toBe(false);
@@ -319,7 +338,7 @@ describe("BuildModel: a cancelled build is terminal", () => {
     });
     const plain = new BuildModel(db, buildTables(db));
     const { id } = await plain.create(project.id, { gitSha: "abc", gitBranch: "main" });
-    await plain.stampCaptureJob(id, "J2");
+    await plain.stampCaptureJob(id, "J2", 0);
     // J2 failed the build in the same millisecond J1 stamped its write: the refused update of
     // J1 returns J2's row, whose updatedAt equals J1's stamp.
     const sameInstant: DatabaseAdapter = {

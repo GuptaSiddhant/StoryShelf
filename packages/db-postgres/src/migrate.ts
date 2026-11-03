@@ -75,6 +75,8 @@ const BUILD_CAPTURE_JOB_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS cap
 /** A run in flight when the column was added owns the build it was started for (idempotent). */
 const BUILD_CAPTURE_JOB_BACKFILL =
   "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
+const BUILD_CAPTURE_GENERATION_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS capture_generation INTEGER NOT NULL DEFAULT 0";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
@@ -210,6 +212,7 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
   await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
   await execIgnore(run, BUILD_CAPTURE_JOB_ALTER);
+  await execIgnore(run, BUILD_CAPTURE_GENERATION_ALTER);
 }
 
 /** Run the full migration set through any row-query runner. */

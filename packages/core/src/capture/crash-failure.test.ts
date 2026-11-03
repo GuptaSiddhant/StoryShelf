@@ -195,7 +195,7 @@ describe("failCrashedCapture", () => {
   it("fails the build its job still owns", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
 
     const outcome = await failCrashedCapture(
       w.deps,
@@ -210,10 +210,10 @@ describe("failCrashedCapture", () => {
   it("leaves a rerun alone when the hook of the run that ended arrives late", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     // J1 exhausted; the build is retried and queued again as J2 before J1's hook runs.
     await w.builds.resetStatus(w.build.id, "pending");
-    await w.builds.stampCaptureJob(w.build.id, "J2");
+    await w.builds.stampCaptureJob(w.build.id, "J2", 1);
     await w.builds.setStatus(w.build.id, "capturing");
 
     const outcome = await failCrashedCapture(
@@ -245,7 +245,7 @@ describe("failCrashedCapture", () => {
   it("reports one failure when the hook runs twice with nothing left to clean up", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     const job = { buildId: w.build.id, jobId: "J1" };
 
     expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("failed");
@@ -255,7 +255,7 @@ describe("failCrashedCapture", () => {
   it("leaves open an attempt a newer run began after this run failed the build", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     const { build: failed } = await w.builds.failIfOwnedBy(w.build.id, "J1");
     const attempts = new CaptureAttemptModel(w.db, tables(w.db));
     const newer = await attempts.startAttempt(w.project.id, w.build.id);
@@ -279,7 +279,7 @@ describe("failCrashedCapture", () => {
   it("finishes the cleanup when the first run failed the build but not its attempts", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     const attempts = new CaptureAttemptModel(w.db, tables(w.db));
     const attempt = await attempts.startAttempt(w.project.id, w.build.id);
     await attempts.markRunning(attempt.id);
