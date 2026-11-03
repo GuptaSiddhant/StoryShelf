@@ -7,6 +7,12 @@
 export const COMMENT_CREATED = "comment:created";
 
 /**
+ * Raised once per member a comment mentions (#463), to that member only: a directed notification,
+ * never a webhook, and never delivered to a channel that others read.
+ */
+export const COMMENT_MENTIONED = "comment:mentioned";
+
+/**
  * `review:comment` is a filter alias, never an emitted event: a filter that lists it matches a
  * {@link COMMENT_CREATED} whose scope is `build` or `story`.
  */

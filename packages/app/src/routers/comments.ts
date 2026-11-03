@@ -1,9 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { CommentModel, type CommentCreateInput } from "@storyshelf/core/models";
 import type { Comment, Project } from "@storyshelf/core/schema";
+import { resolveMentions, type FoundMention } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
-import { REVIEW_EVENTS, announceReview } from "../review-events.ts";
+import { displayNameOf, mentionCandidates, mentionData } from "../mentions.ts";
+import { REVIEW_EVENTS, announceMention, announceReview } from "../review-events.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 import { flashHx } from "./flash.ts";
@@ -122,9 +124,15 @@ export function commentScope(comment: Comment): "build" | "story" | "snapshot" {
 /**
  * Every comment raises one `comment:created` (ADR 0013, decision 10), anchored by `scope`.
  * `review:comment` is a subscription alias for the build and story scopes, not a second event.
- * `eventId` is the comment id, so a retried delivery carries the same id.
+ * `eventId` is the comment id, so a retried delivery carries the same id. Members who get the
+ * comment as a mention (`skipUsers`) are left out of its subscriber notifications: one message.
  */
-async function announceComment(project: Project, buildId: string, comment: Comment): Promise<void> {
+async function announceComment(
+  project: Project,
+  buildId: string,
+  comment: Comment,
+  skipUsers: ReadonlySet<string>,
+): Promise<void> {
   const data = {
     eventId: comment.id,
     scope: commentScope(comment),
@@ -134,7 +142,45 @@ async function announceComment(project: Project, buildId: string, comment: Comme
     storyId: comment.storyId,
     body: comment.body.slice(0, 500),
   };
-  await announceReview(project, REVIEW_EVENTS.commentCreated, data, buildId);
+  await announceReview(project, REVIEW_EVENTS.commentCreated, data, buildId, { skipUsers });
+}
+
+/**
+ * The project members `text` mentions (#463), by `@email-local-part` or `@display name`. Only this
+ * project's members can resolve, so a mention never reveals who is in another project. Skips the
+ * member lookup entirely for the common comment with no `@`.
+ */
+async function mentionsIn(project: Project, text: string): Promise<FoundMention[]> {
+  if (!text.includes("@")) {
+    return [];
+  }
+  const people = await mentionCandidates(getStore().db, project.id);
+  return resolveMentions(
+    text,
+    people.map((person) => person.candidate),
+  );
+}
+
+/** One `comment:mentioned` per mentioned member; a failure to notify never fails the comment. */
+async function announceMentions(
+  project: Project,
+  comment: Comment,
+  mentions: readonly FoundMention[],
+): Promise<void> {
+  const user = getStore().user;
+  const data = mentionData(comment, commentScope(comment), user ? displayNameOf(user) : "Someone");
+  await Promise.all(
+    mentions.map(async (mention) => {
+      await announceMention(project, mention.userId, data, comment.buildId).catch(
+        (error: unknown) => {
+          getStore().logger.warn(
+            { err: error, commentId: comment.id },
+            "mention notification failed",
+          );
+        },
+      );
+    }),
+  );
 }
 
 export async function createComment(
@@ -144,7 +190,20 @@ export async function createComment(
 ): Promise<Comment> {
   assertOneAnchor(body);
   const userId = getStore().user?.id ?? null;
-  const comment = await new CommentModel(getStore().db).create(project.id, buildId, userId, body);
-  await announceComment(project, buildId, comment);
+  // Resolved here, never taken from the request: a client cannot name who gets notified.
+  const mentions = await mentionsIn(project, body.body);
+  const comment = await new CommentModel(getStore().db).create(project.id, buildId, userId, {
+    ...body,
+    mentions,
+  });
+  // Mentioning yourself is highlighted but never notifies you.
+  const notify = mentions.filter((mention) => mention.userId !== userId);
+  await announceComment(
+    project,
+    buildId,
+    comment,
+    new Set(notify.map((mention) => mention.userId)),
+  );
+  await announceMentions(project, comment, notify);
   return comment;
 }

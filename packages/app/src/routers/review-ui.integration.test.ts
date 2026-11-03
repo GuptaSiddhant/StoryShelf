@@ -1,5 +1,11 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
-import { BuildModel, CommentModel, MemberModel, WebhookModel } from "@storyshelf/core/models";
+import {
+  BuildModel,
+  CommentModel,
+  MemberModel,
+  NotificationSubscriptionModel,
+  WebhookModel,
+} from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import AdmZip from "adm-zip";
@@ -625,6 +631,13 @@ async function postComment(booted: Booted, id: string, extra: Record<string, unk
   return (await response.json()) as { id: string };
 }
 
+const mentionsOf = async (booted: Booted, id: string) =>
+  (await new CommentModel(booted.db).listByBuild(id)).map((comment) =>
+    CommentModel.mentionsOf(comment).map((mention) => mention.userId),
+  );
+const mentionMessages = (booted: Booted): number =>
+  booted.sent.filter((subject) => subject.includes("comment:mentioned")).length;
+
 describe("review events", () => {
   it("raises review:requested for a published build that waits, not for the default branch", async () => {
     const booted = await boot();
@@ -802,6 +815,66 @@ describe("review events", () => {
       await vi.waitFor(() => expect(seen).toHaveLength(2));
       expect(seen.map((item) => item.data["eventId"])).toEqual([created.id, created.id]);
       await booted.stop();
+    });
+    describe("mentions (#463)", () => {
+      it("resolves @handles against this project's members only, and stores ids", async () => {
+        const booted = await boot();
+        const id = await publish(booted, "feature/x");
+        const created = await postComment(booted, id, {
+          body: "cc @alice and @Alice Reviewer, @view, @outsider and @admin, mail dev@example.com",
+        });
+        expect(await mentionsOf(booted, id)).toEqual([["alice", "view"]]);
+        // Plain text stays plain and nothing about the non-members is echoed back.
+        const stored = await new CommentModel(booted.db).listByBuild(id);
+        expect(stored[0]?.id).toBe(created.id);
+        expect(JSON.stringify(stored[0]?.mentions)).not.toMatch(/outsider|admin/u);
+        await booted.stop();
+      });
+
+      it("never takes who is mentioned from the request", async () => {
+        const booted = await boot();
+        const id = await publish(booted, "feature/x");
+        await postComment(booted, id, {
+          body: "no mentions here",
+          mentions: [{ userId: "alice", handle: "alice" }],
+        });
+        expect(await mentionsOf(booted, id)).toEqual([[]]);
+        await booted.stop();
+      });
+
+      it("tells the mentioned member once, with no webhook and no message to the room", async () => {
+        const booted = await boot();
+        const id = await publish(booted, "feature/x");
+        await withChannel(booted);
+        await new NotificationSubscriptionModel(booted.db).upsert("p1", "alice", {
+          via: ["log"],
+          events: ["comment:created"],
+        });
+        const seen = await deliveries(booted, []);
+        await postComment(booted, id, { body: "please look, @alice" });
+        await vi.waitFor(() => expect(mentionMessages(booted)).toBe(1));
+        await vi.waitFor(() => expect(seen).toHaveLength(1));
+        // The room (the stored channel) gets the comment; alice, who is subscribed to comments
+        // and mentioned, gets the mention instead of a second message.
+        const created = booted.sent.filter((subject) => subject.includes("comment:created"));
+        expect(created).toHaveLength(1);
+        expect(seen.map((item) => item.event)).toEqual(["comment:created"]);
+        // The payload carries the comment text as typed, but no resolved mention (no id mapping).
+        expect(seen[0]?.data).not.toHaveProperty("mentions");
+        expect(seen[0]?.data).not.toHaveProperty("mentionedUserId");
+        await booted.stop();
+      });
+
+      it("highlights a self-mention but does not notify the author", async () => {
+        const booted = await boot();
+        const id = await publish(booted, "feature/x");
+        await new NotificationSubscriptionModel(booted.db).upsert("p1", "dev", { via: ["log"] });
+        await postComment(booted, id, { body: "note to self @dev" });
+        expect(await mentionsOf(booted, id)).toEqual([["dev"]]);
+        await vi.waitFor(() => expect(events(booted)).toContain("comment:created"));
+        expect(mentionMessages(booted)).toBe(0);
+        await booted.stop();
+      });
     });
   });
 });
