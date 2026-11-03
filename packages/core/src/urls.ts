@@ -10,6 +10,8 @@ export interface UrlBuilder {
   /** Review page of one snapshot: the build's diff page with that snapshot selected. */
   snapshot(slug: string, buildId: string, snapshotId: string): string;
   library(slug: string): string;
+  /** Design coverage page: stories vs design links vs drift. */
+  designCoverage(slug: string): string;
   jobs(slug: string): string;
   labels(slug: string): string;
   label(slug: string, key: string, value: string): string;
@@ -43,6 +45,7 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     snapshot: (slug, buildId, snapshotId) =>
       `${root}/projects/${slug}/builds/${buildId}/diff?snapshot=${encodeURIComponent(snapshotId)}`,
     library: (slug) => `${root}/projects/${slug}/library`,
+    designCoverage: (slug) => `${root}/projects/${slug}/design/coverage`,
     jobs: (slug) => `${root}/projects/${slug}/jobs`,
     labels: (slug) => `${root}/projects/${slug}/labels`,
     label: (slug, key, value) =>

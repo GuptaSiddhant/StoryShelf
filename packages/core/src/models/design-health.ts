@@ -15,6 +15,23 @@ export function isDesignStale(
   return Number.isFinite(modified) && Number.isFinite(approved) && modified > approved;
 }
 
+/** Where a linked design stands against its component's approved baseline. */
+export type DesignDrift = "deleted" | "stale" | "current" | "unknown";
+
+/**
+ * Classify a cached design node: `deleted` (the node no longer exists), `stale` (changed after the
+ * baseline was approved), `current`, or `unknown` (nothing cached, or the provider refused, so the
+ * state cannot be told). Reads only what was stored; never calls a provider.
+ */
+export function designDrift(
+  node: Pick<DesignNode, "state" | "lastModified"> | null | undefined,
+  baselineVersion: string | null | undefined,
+): DesignDrift {
+  if (node?.state === "deleted") return "deleted";
+  if (isDesignStale(node, baselineVersion)) return "stale";
+  return node?.state === "ok" ? "current" : "unknown";
+}
+
 /**
  * Days until a credential passes its provider's maximum lifetime (negative once
  * past). `issuedAt` is when the credential was set or replaced — never a status write.

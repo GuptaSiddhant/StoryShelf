@@ -101,7 +101,13 @@ export {
   type DesignResolution,
   type DesignSource,
 } from "./design-resolve.ts";
-export { credentialDaysLeft, DESIGN_TTL_MS, isDesignStale } from "./design-health.ts";
+export {
+  credentialDaysLeft,
+  DESIGN_TTL_MS,
+  designDrift,
+  isDesignStale,
+  type DesignDrift,
+} from "./design-health.ts";
 export { LabelModel } from "./label.ts";
 export { matchUpstreamStory, PackageUsageModel } from "./usage.ts";
 export type { PackageUsageInput, PackageUsageTables, UpstreamStory } from "./usage.ts";

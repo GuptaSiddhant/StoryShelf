@@ -70,3 +70,12 @@ describe("label and branch encoding", () => {
     }
   });
 });
+
+describe("design coverage url", () => {
+  it("sits under the project's design path, with the base and a trailing slash trimmed", () => {
+    expect(createUrlBuilder("https://shelf.example.com/").designCoverage("app")).toBe(
+      "https://shelf.example.com/projects/app/design/coverage",
+    );
+    expect(createUrlBuilder("").designCoverage("app")).toBe("/projects/app/design/coverage");
+  });
+});

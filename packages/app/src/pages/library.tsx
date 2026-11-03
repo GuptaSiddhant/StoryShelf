@@ -190,6 +190,11 @@ function LibraryHeader(props: {
           <Button variant="ghost" size="sm" icon="external-link" href={urls.short(build.id)}>
             View Storybook
           </Button>
+          {getStore().design.length > 0 ? (
+            <Button variant="ghost" size="sm" href={urls.designCoverage(project.slug)}>
+              Design coverage
+            </Button>
+          ) : null}
           <BranchPicker project={project} build={build} branches={props.branches} />
         </HStack>
       }
