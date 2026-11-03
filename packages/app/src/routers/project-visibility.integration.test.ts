@@ -287,7 +287,10 @@ describe("a private project's published Storybook", () => {
     const resolver = await app.request("/projects/open/storybook");
     expect(resolver.status).toBe(302);
     expect(resolver.headers.get("location")).toBe(`/projects/open/storybook/build/${openBuildId}/`);
-    expect((await app.request(`/_/${openBuildId}/`)).status).not.toBe(404);
+    // The canonical build route opens for an anonymous caller: no 404, no redirect to sign-in.
+    const opened = await app.request(`/projects/open/storybook/build/${openBuildId}/`);
+    expect(opened.status).toBe(200);
+    expect(opened.headers.get("location")).toBeNull();
   });
 
   it("shows a signed-in viewer the Storybook", async () => {
