@@ -35,27 +35,6 @@ describe("resolveObservabilityConfig", () => {
     ).toBe(false);
   });
 
-  it("stays noop under Deno", () => {
-    const deno = (globalThis as { Deno?: unknown }).Deno;
-    (globalThis as { Deno?: unknown }).Deno = {};
-    try {
-      const config = resolveObservabilityConfig({ OTEL_EXPORTER_OTLP_ENDPOINT: "http://x:4318" });
-      expect(config.enabled).toBe(false);
-    } finally {
-      if (deno === undefined) {
-        delete (globalThis as { Deno?: unknown }).Deno;
-      } else {
-        (globalThis as { Deno?: unknown }).Deno = deno;
-      }
-    }
-    expect(
-      resolveObservabilityConfig({
-        OTEL_EXPORTER_OTLP_ENDPOINT: "http://x:4318",
-        OTEL_DENO: "true",
-      }).enabled,
-    ).toBe(false);
-  });
-
   it("parses headers, service name, and interval", () => {
     const config = resolveObservabilityConfig(
       {

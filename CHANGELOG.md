@@ -5,6 +5,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Removed (breaking for Deno users): JSR publishing and Deno runtime support (#482).** Install from npm (`@storyshelf/*`); JSR keeps 0.7.0 and earlier. `OTEL_DENO` is no longer read, and `@storyshelf/observability` no longer detects a Deno runtime. The CLI no longer detects Deno as a Storybook project's package runner (`packageManager: "deno@…"` and `deno.lock` fall back to the default runner); set `buildCommand` instead. Affected-file detection no longer treats `deno.lock` as a lockfile.
+
 ## 0.8.0 — Remote browser leases, ignore regions, redaction and retention safety (2026-11-03)
 
 **Added: ignore regions (#456).** Elements matched by `parameters.storyshelf.ignoreSelectors` (or `parameters.chromatic.ignoreSelectors`), `[data-storyshelf-ignore]`, `.chromatic-ignore` or `[data-chromatic="ignore"]` are hidden before the screenshot, keeping the layout, so dynamic content such as timestamps no longer produces a diff. Both runners apply the same mask; a selector the browser rejects is skipped with a warning and never fails the capture. Adding a mask to a story produces one expected diff the first time.

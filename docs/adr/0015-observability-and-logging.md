@@ -136,6 +136,10 @@ The package root imports `@opentelemetry/api` only and is cross-runtime. The SDK
 or `OTEL_DENO`) and returns the noop handle; Deno users set `OTEL_DENO=true` and the `withSpan` and
 middleware calls light up through the native bridge with no SDK init.
 
+> **Amendment (2026-11-03, #482):** Deno and JSR support was removed. `initObservabilityFromEnv` no
+> longer detects Deno and `OTEL_DENO` is no longer read; the JSR mentions in this ADR no longer apply.
+> The split entrypoint stays: the root remains `@opentelemetry/api` only, for non-Node bundlers.
+
 ### 12. Metrics catalog (bounded cardinality)
 
 `capture.job.duration` (histogram, ms), `capture.jobs.completed` and `capture.jobs.failed` (counters),

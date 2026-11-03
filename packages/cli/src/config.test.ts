@@ -293,11 +293,16 @@ describe("detectPackageRunner", () => {
     ["yarn@4.5.0", "yarn"],
     ["bun@1.1.0", "bun"],
     ["npm@10.0.0", "npm"],
-    ["deno@2.0.0", "deno"],
     ["nub@0.7.5", "nub"],
   ])("reads the packageManager field %s as %s", async (field, expected) => {
     writeFileSync(join(dir, "package.json"), JSON.stringify({ packageManager: field }));
     await expect(detectPackageRunner(dir)).resolves.toBe(expected);
+  });
+
+  it("no longer detects Deno: its packageManager field and lockfile fall back to npm", async () => {
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ packageManager: "deno@2.0.0" }));
+    writeFileSync(join(dir, "deno.lock"), "");
+    await expect(detectPackageRunner(dir)).resolves.toBe("npm");
   });
 
   it("prefers the packageManager field over lockfiles", async () => {
@@ -313,7 +318,6 @@ describe("detectPackageRunner", () => {
     ["pnpm-lock.yaml", "pnpm"],
     ["yarn.lock", "yarn"],
     ["package-lock.json", "npm"],
-    ["deno.lock", "deno"],
   ])("reads lockfile %s as %s", async (file, expected) => {
     writeFileSync(join(dir, file), "");
     await expect(detectPackageRunner(dir)).resolves.toBe(expected);
@@ -326,7 +330,6 @@ describe("installCommand and startCommand", () => {
     ["pnpm", "pnpm install", "pnpm start"],
     ["yarn", "yarn install", "yarn start"],
     ["bun", "bun install", "bun run start"],
-    ["deno", "deno install", "deno task start"],
     ["nub", "nub install", "nub run start"],
   ] as const)("maps %s to install/start commands", (runner, install, start) => {
     expect(installCommand(runner)).toBe(install);
