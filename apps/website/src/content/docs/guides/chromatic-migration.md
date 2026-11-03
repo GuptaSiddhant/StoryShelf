@@ -99,9 +99,24 @@ StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshe
 | `diffThreshold`       | `diffThreshold`       | Works unchanged                |
 | `pauseAnimationAtEnd` | `pauseAnimationAtEnd` | Works unchanged                |
 | `viewports`           | Server config         | Set in `ShelfConfig.viewports` |
+| `ignoreSelectors`     | `ignoreSelectors`     | Works unchanged; see below     |
 | `modes` / `globals`   | Not supported         | **Gap** — no equivalent        |
 
 **No code changes needed** for existing `chromatic:` parameters. They work as-is.
+
+### Ignore regions
+
+Dynamic content (a timestamp, an avatar, an ad) can be hidden before the screenshot so it never causes a diff. StoryShelf hides these elements, whichever of these marks them:
+
+- `parameters.storyshelf.ignoreSelectors: string[]` (or `parameters.chromatic.ignoreSelectors`; `storyshelf:` replaces `chromatic:` when both are set);
+- an element with the attribute `data-storyshelf-ignore`;
+- for migration, `.chromatic-ignore` and `[data-chromatic="ignore"]`, which need no change.
+
+```ts
+export const Clock = { parameters: { storyshelf: { ignoreSelectors: [".clock", "[data-testid=avatar]"] } } };
+```
+
+Both browser engines inject the same stylesheet, which sets `visibility: hidden` and `opacity: 0` on the element, so its whole subtree disappears while the layout stays put. An invalid selector is skipped with a warning in the build log and never fails the build; at most 50 selectors count per story. Baseline keys and the diff itself are unchanged, so **adding a mask produces a one-time expected diff** on the first build after it lands: approve it to refresh the baseline.
 
 ## 6. Baseline model differences
 

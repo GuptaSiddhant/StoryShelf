@@ -15,6 +15,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 | **TurboSnap**             | Yes (dependency graph)                         | Yes — affected capture (dependency graph, on by default)                                     |
 | **Modes / Globals**       | Yes                                            | Yes — `parameters.chromatic.modes` / `parameters.storyshelf.modes` ([Modes](/guides/modes/)) |
 | **Accessibility testing** | Yes (aXe)                                      | axe-core checks (on by default), shown in review and non-blocking                               |
+| **Ignore regions**        | `.chromatic-ignore`, `data-chromatic="ignore"`, `ignoreSelectors` | Yes — same markers, `data-storyshelf-ignore` and `ignoreSelectors` ([Ignore regions](/guides/chromatic-migration/#ignore-regions)) |
 | **Interaction tests**     | Yes (`play` functions)                         | Yes (`play` functions)                                                                       |
 | **SSO / Enterprise**      | Enterprise plan                                | Better Auth engine (OIDC/SAML via any IdP)                                                   |
 | **Vendor lock-in**        | Yes (proprietary)                              | No (MIT, open source)                                                                        |
