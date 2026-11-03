@@ -1,0 +1,36 @@
+/**
+ * The shared database contract suite against a real MySQL, like the SQLite and Postgres adapters.
+ *
+ * Gated on `MYSQL_URL` (`mysql://user:pass@host:3306/db`), so hermetic `nub run test` never touches
+ * MySQL: without it the whole suite is skipped. Point it at a disposable database; the nightly
+ * `nightly-db.yml` MySQL job does, with its own database so it cannot collide with the live suite.
+ *
+ *   docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
+ *   MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts
+ */
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { databaseContractSuite } from "@storyshelf/core/test-helpers";
+import { afterAll, describe } from "vitest";
+import { createMysqlDatabase } from "./index.ts";
+
+const url = process.env["MYSQL_URL"];
+
+describe.skipIf(url === undefined || url === "")(
+  "mysql contract (real MySQL, gated on MYSQL_URL)",
+  () => {
+    const created: DatabaseAdapter[] = [];
+
+    // The suite builds one adapter per case and some cases never tear theirs down.
+    afterAll(async () => {
+      await Promise.all(
+        created.map(async (adapter) => await adapter.lifecycle?.teardown().catch(() => {})),
+      );
+    });
+
+    databaseContractSuite("mysql", () => {
+      const adapter = createMysqlDatabase({ url: url ?? "" });
+      created.push(adapter);
+      return adapter;
+    });
+  },
+);

@@ -204,3 +204,12 @@ Database compatibility runs nightly and on demand in
 upgrade test drops columns before rerunning migrations; it is skipped unless
 `MYSQL_SCHEMA_MUTATION_TEST=1` is set. Set that flag only for a disposable database, never a
 shared cloud database. The regular live suite still tests setup, CRUD and queue behavior.
+
+The MySQL job also runs the shared `databaseContractSuite` (`packages/db-mysql/src/contract.test.ts`),
+as SQLite and Postgres do, in its own database. That file is skipped unless `MYSQL_URL` is set, so
+`nub run test` stays hermetic. To run it yourself, against a disposable database:
+
+```sh
+docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
+MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts   # from packages/db-mysql
+```
