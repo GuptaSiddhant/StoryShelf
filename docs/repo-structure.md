@@ -81,12 +81,12 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 
 ## Config ownership
 
-| File                        | Owns                                                                                                |
-| --------------------------- | --------------------------------------------------------------------------------------------------- |
-| `package.json` (root)       | Workspaces list, `catalog` pins (dev tools: TS, tsdown, vitest, oxlint/oxfmt, pino, yaml)           |
-| `nub.jsonc`                 | `source` condition, isolated linker, public hoists                                                  |
-| `turbo.json`                | `build → ^build`; `lint/test/test:integration` need `^build`; `verify = build+lint+test`            |
-| `config/tsconfig.base.json` | Strict TS, `hono/jsx`, `customConditions: ["source"]`                                               |
-| `config/tsdown.ts`          | `libConfig` / `cliConfig`                                                                           |
-| `.oxlintrc.json`            | Rule-based lint (no per-file path exemptions)                                                       |
-| `scripts/`                  | Release/publish tooling only (`release.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`) |
+| File                        | Owns                                                                                                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `package.json` (root)       | Workspaces list, `catalog` pins (dev tools: TS, tsdown, vitest, oxlint/oxfmt, pino, yaml)                                                                          |
+| `nub.jsonc`                 | `source` condition, isolated linker, public hoists                                                                                                                 |
+| `turbo.json`                | `build → ^build`; `lint/test/test:integration` need `^build`; `verify = build+lint+test`                                                                           |
+| `config/tsconfig.base.json` | Strict TS, `hono/jsx`, `customConditions: ["source"]`                                                                                                              |
+| `config/tsdown.ts`          | `libConfig` / `cliConfig`                                                                                                                                          |
+| `.oxlintrc.json`            | Rule-based lint (no per-file path exemptions)                                                                                                                      |
+| `scripts/`                  | Repository automation and tooling (`release.mjs`, `release-detect.mjs`, `version-packages.mjs`, `changeset-check.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`) |
