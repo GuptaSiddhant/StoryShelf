@@ -33,13 +33,13 @@ const design = (extra: Partial<DesignItem> = {}): DesignItem => ({
   ...extra,
 });
 
-async function render(items?: DesignItem[]): Promise<string> {
+async function render(items?: DesignItem[], snapshot: Snapshot = selected): Promise<string> {
   const app = new Hono().get("/", (c): Response | Promise<Response> =>
     c.html(
       <DiffViewer
         project={project}
         build={build}
-        selected={selected}
+        selected={snapshot}
         hasBaseline={{ s1: true }}
         design={items}
       />,
@@ -47,6 +47,19 @@ async function render(items?: DesignItem[]): Promise<string> {
   );
   return await (await app.request("/")).text();
 }
+
+describe("review stage: unstable render", () => {
+  it("flags a snapshot whose second render differed, and nothing else", async () => {
+    const flagged = await render(undefined, { ...selected, unstable: true });
+    expect(flagged).toContain("Unstable render: likely flaky");
+    expect(flagged).toContain("This change may be noise");
+    const unflagged = await Promise.all(
+      [false, null].map(async (unstable) => await render(undefined, { ...selected, unstable })),
+    );
+    for (const page of unflagged) expect(page).not.toContain("Unstable render");
+    expect(await render()).not.toContain("Unstable render");
+  });
+});
 
 describe("review stage: compare to design", () => {
   it("offers the Design source only when the component has a cached render", async () => {
