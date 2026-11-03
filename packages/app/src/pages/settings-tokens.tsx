@@ -1,6 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
@@ -11,7 +12,6 @@ import {
   SectionTitle,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
 export function renderSettingsTokens(

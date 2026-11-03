@@ -8,6 +8,7 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ComponentCatalogView } from "../routers/component-catalog.handlers.ts";
 import type { ComponentReview } from "../routers/review-section.handlers.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Alert,
   Badge,
@@ -25,7 +26,6 @@ import {
   VStack,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import {
   snapshotCardBody,
   snapshotCardHead,

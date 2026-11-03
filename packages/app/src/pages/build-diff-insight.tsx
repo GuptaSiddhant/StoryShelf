@@ -1,6 +1,7 @@
 import type { Build, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Badge,
@@ -11,7 +12,6 @@ import {
   SectionTitle,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 

@@ -3,6 +3,7 @@ import type { DesignDrift } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
   Alert,
@@ -20,7 +21,6 @@ import {
   VStack,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 

@@ -277,6 +277,10 @@ reviews:
         - Actions in inline/table/card contexts use `size="sm"`; icons come from the cached sprite.
         - Theme and aria behavior remain accessible; no full-width customer accent bar.
         A change that adds a direct class/import/inline style fails `consistency.test.ts`; call it blocking.
+        `src/ui/` is presentational: it must not import `store.ts`, `routers/`, `middleware/`, `pages/`,
+        `@storyshelf/core/models` or `@storyshelf/core/test-helpers` (also enforced by `consistency.test.ts`).
+        Anything that needs app state (the document layout, sidebar, top bar, CSRF field, client scripts)
+        belongs in `src/shell/`, not in `ui/`.
 
     - path: "packages/app/src/jobs-setup.ts"
       instructions: |

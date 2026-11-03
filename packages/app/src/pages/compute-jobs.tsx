@@ -1,6 +1,7 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -14,7 +15,6 @@ import {
   Table,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Build statuses the retry button of the jobs table offers. */
 const RETRYABLE: ReadonlySet<string> = new Set(["failed", "cancelled", "pending"]);

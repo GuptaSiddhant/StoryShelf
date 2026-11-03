@@ -169,7 +169,10 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   never raw `btn`/`tabs`/`card` classes, `style="..."`, or direct family imports. Styles are colocated
   via `packages/app/src/ui/css.ts`: one labeled `css` template per variant composed with `${base}`
   (not `cx`), static values only. `packages/app/src/ui/consistency.test.ts` is a zero-tolerance
-  ratchet. **A new component or variant ships with a story** (`*.stories.tsx` beside it, titled
+  ratchet. `src/ui/` is presentational: it never imports `store.ts`, `routers/`, `middleware/`,
+  `pages/`, `@storyshelf/core/models` or `@storyshelf/core/test-helpers` (the same test enforces it);
+  the app-coupled chrome (`DocumentLayout`, `csrfField`, sidebar, top bar, client scripts) lives in
+  `packages/app/src/shell/`, so extracting `ui/` later is a folder move. **A new component or variant ships with a story** (`*.stories.tsx` beside it, titled
   `UI/<Component>`; pages are `Pages/<Area>/<Page>`, one story per state): `packages/app/.storybook/`
   renders the real hono/jsx with the app's own styles, tokens and theme, and `turbo verify` builds it,
   so a broken story fails the PR. Story-only fixtures live in `src/stories-fixtures/` (typed with the

@@ -1,5 +1,6 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { UsageReport } from "../insights/usage-report.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Card,
   EmptyState,
@@ -9,7 +10,6 @@ import {
   Stat,
   Table,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 

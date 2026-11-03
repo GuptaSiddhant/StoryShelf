@@ -3,14 +3,14 @@ import type { FC } from "hono/jsx";
 import { assetManifest } from "../asset-manifest.ts";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { getStore } from "../store.ts";
-import { Style, css } from "./css.ts";
-import { BareShell } from "./shell/bare.tsx";
-import { bootScript } from "./shell/boot-script.ts";
-import type { NavConfig } from "./shell/nav.ts";
-import { Sidebar } from "./shell/sidebar.tsx";
-import { ToastRegion, TopBar } from "./shell/topbar.tsx";
-import { baseStyle } from "./styles.ts";
-import { DARK_THEME, LIGHT_THEME } from "./theme.ts";
+import { Style, css } from "../ui/css.ts";
+import { baseStyle } from "../ui/styles.ts";
+import { DARK_THEME, LIGHT_THEME } from "../ui/theme.ts";
+import { BareShell } from "./bare.tsx";
+import { bootScript } from "./boot-script.ts";
+import type { NavConfig } from "./nav.ts";
+import { Sidebar } from "./sidebar.tsx";
+import { ToastRegion, TopBar } from "./topbar.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 

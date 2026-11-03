@@ -2,6 +2,7 @@
 import type { Build, Comment, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Badge,
   Button,
@@ -11,7 +12,6 @@ import {
   TextareaField,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 import { CommentCard, RequestChangeField } from "./build-diff-comments.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */

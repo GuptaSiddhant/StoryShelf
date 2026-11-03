@@ -1,6 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Badge,
@@ -13,7 +14,6 @@ import {
   SelectField,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Project member row as rendered in the members settings tab. */
 export interface SettingsMember {

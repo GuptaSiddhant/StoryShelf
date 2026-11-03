@@ -2,6 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Badge,
   Button,
@@ -13,7 +14,6 @@ import {
   TextareaField,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 import {
   reviewComment,
   reviewCommentActions,
