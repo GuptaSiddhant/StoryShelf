@@ -53,12 +53,14 @@ function emit(key, value) {
 
 /**
  * The commit that introduced `version` (the merged `chore(release): v<version>` commit, also when
- * the pull request was squashed and carries a suffix such as `(#123)`), or HEAD when none matches.
- * A retry after a partial publish must publish and tag that commit, not whatever `main` has become.
+ * the pull request was squashed and carries a suffix such as `(#123)`). A retry after a partial
+ * publish must publish and tag that commit, not whatever `main` has become, so no match is an
+ * error: guessing another commit could ship a different tree under the same version.
  *
  * @param {string} version The shared version.
  * @param {string} [cwd] The repository.
  * @returns {string} A commit sha.
+ * @throws {Error} When no commit reachable from HEAD carries the release subject.
  */
 export function findReleaseCommit(version, cwd = root) {
   const escaped = version.replaceAll(/[.+-]/gu, String.raw`\$&`);
@@ -68,7 +70,10 @@ export function findReleaseCommit(version, cwd = root) {
     ["log", "-1", "--format=%H", "--extended-regexp", `--grep=${pattern}`],
     { cwd, encoding: "utf8" },
   ).trim();
-  return found || execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" }).trim();
+  if (found === "") {
+    throw new Error(`no "chore(release): v${version}" commit is reachable from HEAD`);
+  }
+  return found;
 }
 
 function tagExistsFor(tag) {
@@ -104,8 +109,21 @@ function main() {
     channel: result.channel,
     version: state.version,
     tag: `v${state.version}`,
-    sha: findReleaseCommit(state.version),
+    sha: shaFor(result.channel, state.version),
   });
+}
+
+/** Only a stable release is pinned to its commit; the other channels build the tip of `main`. */
+function shaFor(channel, version) {
+  if (channel !== "stable") {
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  }
+  try {
+    return findReleaseCommit(version);
+  } catch (error) {
+    console.error(`::error::${error.message}`);
+    process.exit(1);
+  }
 }
 
 function emitAll(values) {

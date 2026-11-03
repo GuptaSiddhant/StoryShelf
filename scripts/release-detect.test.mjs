@@ -82,11 +82,14 @@ describe("findReleaseCommit", () => {
     }
   });
 
-  it("does not mistake another version for it, and falls back to HEAD", () => {
+  it("does not mistake another version for it, and fails closed when none matches", () => {
     const { dir, shas } = repo(["chore(release): v0.9.0", "chore(release): v0.9.01", "fix: x"]);
     try {
       assert.equal(findReleaseCommit("0.9.0", dir), shas[0]);
-      assert.equal(findReleaseCommit("1.0.0", dir), shas[2]);
+      assert.throws(
+        () => findReleaseCommit("1.0.0", dir),
+        /no "chore\(release\): v1\.0\.0" commit/u,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
