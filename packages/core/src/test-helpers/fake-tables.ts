@@ -485,6 +485,7 @@ const notificationSubscriptions = defineTable("notification_subscriptions", {
   events: "events",
   via: "via",
   enabled: "enabled",
+  reviewRequests: "review_requests",
   createdAt: "created_at",
 });
 

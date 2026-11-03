@@ -22,6 +22,7 @@ function toPublic(row: NotificationSubscriptionRow): {
   events: string[];
   via: string[];
   enabled: boolean;
+  reviewRequests: boolean;
 } {
   return {
     projectId: row.projectId,
@@ -29,6 +30,7 @@ function toPublic(row: NotificationSubscriptionRow): {
     events: NotificationSubscriptionModel.eventsOf(row),
     via: NotificationSubscriptionModel.viaOf(row),
     enabled: row.enabled,
+    reviewRequests: row.reviewRequests,
   };
 }
 

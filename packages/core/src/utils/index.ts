@@ -18,8 +18,10 @@ export { HttpError } from "./http.ts";
 export {
   COMMENT_CREATED,
   COMMENT_MENTIONED,
+  NOTIFICATION_EVENTS,
   REVIEW_COMMENT_ALIAS,
   matchesEvent,
+  type NotificationEvent,
 } from "./event-match.ts";
 export {
   mentionSpans,

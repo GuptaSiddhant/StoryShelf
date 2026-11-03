@@ -1,5 +1,6 @@
-import { NotificationChannelModel } from "@storyshelf/core/models";
+import { NotificationChannelModel, NotificationSubscriptionModel } from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
+import { NOTIFICATION_EVENTS } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -95,7 +96,7 @@ function testApp(
 
 function postForm(
   path: string,
-  body: Record<string, string>,
+  body: Record<string, string> | URLSearchParams,
   app: ReturnType<typeof createShelfApp>,
 ) {
   return app.request(path, {
@@ -207,6 +208,82 @@ describe("notifications settings tab", () => {
       headers: { cookie: "storyshelf_session=ok" },
     });
     expect(await page.text()).toContain('value="build:approved" checked');
+  });
+
+  it("stores all topics as null when every box or none is ticked, and a list otherwise", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, true);
+    const path = "/projects/notify-project/settings/notifications/me";
+    const subscriptions = new NotificationSubscriptionModel(seeded.db);
+    const all = new URLSearchParams();
+    all.set("enabled", "on");
+    for (const entry of NOTIFICATION_EVENTS) {
+      all.append("events", entry.event);
+    }
+    await postForm(path, all, app);
+    expect((await subscriptions.getFor("p1", member.id))?.events).toBeNull();
+
+    await postForm(path, { enabled: "on", events: "build:approved" }, app);
+    expect((await subscriptions.getFor("p1", member.id))?.events).toBe('["build:approved"]');
+
+    await postForm(path, { enabled: "on" }, app);
+    expect((await subscriptions.getFor("p1", member.id))?.events).toBeNull();
+  });
+
+  it("keeps the subscription when email is switched off, and keeps its topics for later", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, true);
+    const path = "/projects/notify-project/settings/notifications/me";
+    const subscriptions = new NotificationSubscriptionModel(seeded.db);
+    await postForm(path, { enabled: "on", events: "build:approved", reviewRequests: "on" }, app);
+
+    await postForm(path, { reviewRequests: "on" }, app);
+    const off = await subscriptions.getFor("p1", member.id);
+    expect(off).toMatchObject({
+      enabled: false,
+      events: '["build:approved"]',
+      reviewRequests: true,
+    });
+
+    await postForm(path, { enabled: "on", events: "build:approved", reviewRequests: "on" }, app);
+    expect(await subscriptions.getFor("p1", member.id)).toMatchObject({ enabled: true });
+  });
+
+  it("flips only the review-request switch, and records it for someone with no subscription", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, true);
+    const path = "/projects/notify-project/settings/notifications/me";
+    const subscriptions = new NotificationSubscriptionModel(seeded.db);
+    await postForm(path, {}, app);
+    expect(await subscriptions.getFor("p1", member.id)).toMatchObject({
+      enabled: false,
+      reviewRequests: false,
+      events: null,
+      via: null,
+    });
+
+    await postForm(path, { enabled: "on", events: "build:approved", reviewRequests: "on" }, app);
+    await postForm(path, { enabled: "on", events: "build:approved" }, app);
+    expect(await subscriptions.getFor("p1", member.id)).toMatchObject({
+      enabled: true,
+      events: '["build:approved"]',
+      via: '["email"]',
+      reviewRequests: false,
+    });
+  });
+
+  it("lists every subscribable topic, review ones included, and the review switch", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, true);
+    const page = await app.request("/projects/notify-project/settings/notifications", {
+      headers: { cookie: "storyshelf_session=ok" },
+    });
+    const html = await page.text();
+    for (const entry of NOTIFICATION_EVENTS) {
+      expect(html).toContain(`value="${entry.event}"`);
+    }
+    expect(html).toContain('value="review:verdict"');
+    expect(html).toContain("Send me review requests");
   });
 
   it("creates a git channel with the token as its secret and no event filter", async () => {

@@ -29,6 +29,7 @@ export const notificationSubscriptions = pgTable("notification_subscriptions", {
   events: text("events"),
   via: text("via"),
   enabled: boolean("enabled").notNull().default(true),
+  reviewRequests: boolean("review_requests").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
 });
 
@@ -55,5 +56,6 @@ export interface NotificationSubscription {
   events: string | null;
   via: string | null;
   enabled: boolean;
+  reviewRequests: boolean;
   createdAt: string;
 }

@@ -405,6 +405,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   events TEXT,
   via TEXT,
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  review_requests BOOLEAN NOT NULL DEFAULT TRUE,
   created_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_notification_subscriptions_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_notification_subscriptions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

@@ -1,4 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
+import { NOTIFICATION_EVENTS } from "@storyshelf/core/utils";
 import type { FC } from "hono/jsx";
 import {
   Alert,
@@ -18,20 +19,6 @@ import {
 import { csrfField } from "../ui/csrf-field.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
-
-/** Notification topic catalog (mirrors the webhook event names). */
-export const NOTIFICATION_TOPICS: { event: string; label: string }[] = [
-  { event: "build:created", label: "Build created" },
-  { event: "build:reviewing", label: "Build needs review" },
-  { event: "build:approved", label: "Build approved" },
-  { event: "build:rejected", label: "Build rejected" },
-  { event: "build:pending", label: "Build sent back to pending" },
-  { event: "build:failed", label: "Build failed" },
-  { event: "build:cancelled", label: "Build cancelled" },
-  { event: "baseline:created", label: "Baseline created" },
-  { event: "baseline:updated", label: "Baseline updated" },
-  { event: "comment:created", label: "Comment posted" },
-];
 
 /** A wired provider as offered by the create forms. */
 export interface SettingsNotifyProvider {
@@ -60,6 +47,8 @@ export interface SettingsMySubscription {
   events: string[];
   via: string[];
   enabled: boolean;
+  /** Whether `review:requested` reaches them (on unless they turned it off). */
+  reviewRequests: boolean;
 }
 
 /** Form state for the notifications tab (field errors, global error). */
@@ -97,7 +86,18 @@ const MyNotificationsCard: FC<{
           name="enabled"
           checked={mySubscription?.enabled ?? false}
         />
-        {NOTIFICATION_TOPICS.map((topic) => (
+        <CheckField
+          label="Send me review requests"
+          name="reviewRequests"
+          checked={mySubscription?.reviewRequests ?? true}
+        />
+        <p>
+          <Meta as="span">
+            Approvers and admins get an email when a build needs a review, unless this is off. It
+            changes nothing else below.
+          </Meta>
+        </p>
+        {NOTIFICATION_EVENTS.map((topic) => (
           <CheckField
             label={topic.label}
             name="events"
@@ -106,7 +106,7 @@ const MyNotificationsCard: FC<{
           />
         ))}
         <p>
-          <Meta as="span">No boxes ticked means all topics.</Meta>
+          <Meta as="span">Ticking every box, or none, means all topics, including new ones.</Meta>
         </p>
         <FormActions>
           <Button variant="primary" type="submit" icon="check">

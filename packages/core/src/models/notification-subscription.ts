@@ -16,6 +16,8 @@ export interface NotificationSubscriptionInput {
   events?: string[];
   via?: string[];
   enabled?: boolean;
+  /** `review:requested` on or off; left as stored when omitted (true for a new row). */
+  reviewRequests?: boolean;
 }
 
 /** Data operations for per-user notification subscriptions. */
@@ -69,6 +71,7 @@ export class NotificationSubscriptionModel {
         events: encodeList(input.events),
         via: encodeList(input.via),
         enabled: input.enabled ?? true,
+        reviewRequests: input.reviewRequests ?? existing.reviewRequests,
       })) as unknown as NotificationSubscriptionRow;
     }
     return (await this.db.insert(this.tables.notificationSubscriptions, {
@@ -78,8 +81,45 @@ export class NotificationSubscriptionModel {
       events: encodeList(input.events),
       via: encodeList(input.via),
       enabled: input.enabled ?? true,
+      reviewRequests: input.reviewRequests ?? true,
       createdAt: new Date().toISOString(),
     })) as unknown as NotificationSubscriptionRow;
+  }
+
+  /**
+   * Switch an existing subscription on or off, keeping its topics, channels and review-request
+   * choice. Off keeps the row: deleting it would hand the person back to the default recipients,
+   * so "stop emailing me" must stay recorded. Without a row there is nothing to switch.
+   */
+  async setEnabled(projectId: string, userId: string, enabled: boolean): Promise<void> {
+    const existing = await this.getFor(projectId, userId);
+    if (existing) {
+      await this.db.update(this.tables.notificationSubscriptions, existing.id, { enabled });
+    }
+  }
+
+  /**
+   * Turn `review:requested` on or off for a person, touching nothing else. Someone with no row
+   * who turns it off gets a disabled one (no topics, no channels), so the opt-out is recorded
+   * without subscribing them to anything. Turning it back on for such a placeholder (disabled, no
+   * topics, no channels) deletes it, which returns them to the defaults.
+   */
+  async setReviewRequests(projectId: string, userId: string, on: boolean): Promise<void> {
+    const existing = await this.getFor(projectId, userId);
+    if (!existing) {
+      if (!on) {
+        await this.upsert(projectId, userId, { enabled: false, reviewRequests: false });
+      }
+      return;
+    }
+    const placeholder = !existing.enabled && existing.events === null && existing.via === null;
+    if (on && placeholder) {
+      await this.remove(projectId, userId);
+      return;
+    }
+    await this.db.update(this.tables.notificationSubscriptions, existing.id, {
+      reviewRequests: on,
+    });
   }
 
   /** Remove a user's subscription (opt out). */

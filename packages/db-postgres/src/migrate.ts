@@ -102,6 +102,8 @@ const USER_AUTH_ALTERS = [
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false",
 ];
 const COMMENT_STORY_ID_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS story_id TEXT";
+const SUBSCRIPTION_REVIEW_REQUESTS_ALTER =
+  "ALTER TABLE notification_subscriptions ADD COLUMN IF NOT EXISTS review_requests BOOLEAN NOT NULL DEFAULT TRUE";
 const COMMENT_MENTIONS_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS mentions TEXT";
 const COMMENT_KIND_ALTER =
   "ALTER TABLE comments ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'comment'";
@@ -292,6 +294,7 @@ async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
 async function migrateCommentColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, COMMENT_STORY_ID_ALTER);
   await execIgnore(run, COMMENT_MENTIONS_ALTER);
+  await execIgnore(run, SUBSCRIPTION_REVIEW_REQUESTS_ALTER);
   await execIgnore(run, COMMENT_KIND_ALTER);
   await execIgnore(run, COMMENT_RESOLVED_AT_ALTER);
   await execIgnore(run, COMMENT_RESOLVED_BY_ALTER);

@@ -47,4 +47,58 @@ describe("NotificationSubscriptionModel", () => {
     expect(rows.map((row) => row.projectId)).toContain("p1");
     expect(rows.map((row) => row.projectId)).toContain("p2");
   });
+
+  it("starts with review requests on and keeps the choice across later saves", async () => {
+    const { db } = makeDatabase();
+    const first = await model(db).upsert("p1", "u1", { via: ["email"] });
+    expect(first.reviewRequests).toBe(true);
+    await model(db).setReviewRequests("p1", "u1", false);
+    await model(db).upsert("p1", "u1", { events: ["build:approved"], via: ["email"] });
+    const row = await model(db).getFor("p1", "u1");
+    expect(row!.reviewRequests).toBe(false);
+    expect(NotificationSubscriptionModel.eventsOf(row!)).toEqual(["build:approved"]);
+    await model(db).upsert("p1", "u1", { via: ["email"], reviewRequests: true });
+    expect((await model(db).getFor("p1", "u1"))!.reviewRequests).toBe(true);
+  });
+
+  it("records an opt-out for someone with no row without subscribing them, and undoes it", async () => {
+    const { db } = makeDatabase();
+    await model(db).setReviewRequests("p1", "u1", true);
+    expect(await model(db).getFor("p1", "u1")).toBeNull();
+    await model(db).setReviewRequests("p1", "u1", false);
+    const row = await model(db).getFor("p1", "u1");
+    expect(row).toMatchObject({ enabled: false, reviewRequests: false, events: null, via: null });
+    await model(db).setReviewRequests("p1", "u1", true);
+    expect(await model(db).getFor("p1", "u1")).toBeNull();
+  });
+
+  it("switches a subscription off and on without losing topics, channels or the review choice", async () => {
+    const { db } = makeDatabase();
+    await model(db).setEnabled("p1", "u1", false);
+    expect(await model(db).getFor("p1", "u1")).toBeNull();
+    await model(db).upsert("p1", "u1", {
+      events: ["build:approved"],
+      via: ["email"],
+      reviewRequests: false,
+    });
+    await model(db).setEnabled("p1", "u1", false);
+    let row = await model(db).getFor("p1", "u1");
+    expect(row).toMatchObject({ enabled: false, reviewRequests: false });
+    expect(NotificationSubscriptionModel.eventsOf(row!)).toEqual(["build:approved"]);
+    await model(db).setEnabled("p1", "u1", true);
+    row = await model(db).getFor("p1", "u1");
+    expect(row).toMatchObject({ enabled: true, reviewRequests: false });
+    expect(NotificationSubscriptionModel.viaOf(row!)).toEqual(["email"]);
+  });
+
+  it("keeps a subscription that has topics when review requests come back on", async () => {
+    const { db } = makeDatabase();
+    await model(db).upsert("p1", "u1", { events: ["build:approved"], enabled: false });
+    await model(db).setReviewRequests("p1", "u1", false);
+    await model(db).setReviewRequests("p1", "u1", true);
+    expect(await model(db).getFor("p1", "u1")).toMatchObject({
+      enabled: false,
+      reviewRequests: true,
+    });
+  });
 });

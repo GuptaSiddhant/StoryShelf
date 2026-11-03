@@ -99,6 +99,25 @@ describe("notification subscriptions", () => {
     expect(await after.json()).toBeNull();
   });
 
+  it("reports review requests on by default and keeps an explicit off across later saves", async () => {
+    const { db, storage } = await seed();
+    const app = appWith(db, storage);
+    const put = async (body: unknown) =>
+      await app.request(mePath, {
+        method: "PUT",
+        headers: { "content-type": "application/json", ...memberCookie },
+        body: JSON.stringify(body),
+      });
+    expect(await (await put({ via: ["email"] })).json()).toMatchObject({ reviewRequests: true });
+    expect(await (await put({ via: ["email"], reviewRequests: false })).json()).toMatchObject({
+      reviewRequests: false,
+    });
+    const later = await put({ events: ["build:approved"], via: ["email"] });
+    expect(await later.json()).toMatchObject({ reviewRequests: false });
+    const read = await app.request(mePath, { headers: memberCookie });
+    expect(await read.json()).toMatchObject({ reviewRequests: false });
+  });
+
   it("isolates subscriptions per user", async () => {
     const { db, storage } = await seed();
     const app = appWith(db, storage);

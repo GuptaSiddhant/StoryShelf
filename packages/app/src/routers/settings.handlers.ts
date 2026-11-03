@@ -174,6 +174,7 @@ async function loadMySubscription(
     events: NotificationSubscriptionModel.eventsOf(row),
     via: NotificationSubscriptionModel.viaOf(row),
     enabled: row.enabled,
+    reviewRequests: row.reviewRequests,
   };
 }
 
