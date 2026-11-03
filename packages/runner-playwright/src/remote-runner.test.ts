@@ -271,6 +271,8 @@ describe("a remote target", () => {
       verification: "not verified against live infrastructure",
     });
     expect(JSON.stringify(info.mock.calls)).not.toMatch(/farm\.example|sekret/u);
+    // Nothing about this host is measured for a remote target.
+    expect(info.mock.calls.some(([, message]) => message === "capture sizing")).toBe(false);
   });
 
   it("falls back to the configured OS when the page cannot be probed, and omits what it cannot know", async () => {

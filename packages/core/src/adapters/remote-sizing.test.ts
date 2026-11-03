@@ -74,7 +74,7 @@ describe("remoteSizingOf", () => {
     let live = 4;
     const remote = service({ sessions: () => live, maxPagesPerConnection: 9 });
     live = Number.NaN;
-    expect(remoteSizingOf("chromium@grid", remote, { size: 3 })).toMatchObject({
+    expect(remoteSizingOf("chromium@grid", remote, { gate: { size: 3 } })).toMatchObject({
       pages: 3,
       effectivePagesPerConnection: 3,
     });
@@ -85,6 +85,31 @@ describe("remoteSizingOf", () => {
     const sizing = remoteSizingOf("chromium@grid", bare as never);
     expect(sizing.experimental).toBe(false);
     expect(sizing).not.toHaveProperty("verification");
+  });
+
+  it("reads an unknown page limit when the gate's sessions callback throws", () => {
+    const gate = {
+      get size(): number {
+        throw new Error("boom");
+      },
+    };
+    expect(remoteSizingOf("chromium@grid", service(), { gate }).pages).toBeNull();
+  });
+
+  it("never reports more pages per connection than the run's concurrency allows", () => {
+    const sizing = remoteSizingOf("chromium@grid", service({ sessions: 8 }), {
+      gate: { size: 8 },
+      concurrency: 1,
+    });
+    expect(sizing).toMatchObject({ pages: 8, effectivePagesPerConnection: 1 });
+  });
+
+  it("ignores maxPagesPerConnection in the effective limit when the runner does not enforce it", () => {
+    const remote = service({ sessions: 8, maxPagesPerConnection: 1 });
+    expect(remoteSizingOf("chromium@grid", remote, { pagesPerConnection: false })).toMatchObject({
+      pagesPerConnection: 1,
+      effectivePagesPerConnection: 8,
+    });
   });
 
   it("says an experimental preset is unverified", () => {

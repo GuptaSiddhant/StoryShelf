@@ -22,20 +22,34 @@ export interface RemoteSizing {
   verification?: typeof UNVERIFIED_NOTE;
 }
 
-/** The configured and effective limits of `remote`; the shared page `gate`, when given, is the effective page limit. */
+/** What the runner actually enforces, so the effective limit is not overstated. */
+export interface RemoteSizingEnforced {
+  /** The shared page gate of the target; its size is the effective page limit. */
+  gate?: { readonly size: number } | undefined;
+  /** The run's configured page concurrency, when set. */
+  concurrency?: number | undefined;
+  /** Whether the runner applies `maxPagesPerConnection` (default true). */
+  pagesPerConnection?: boolean | undefined;
+}
+
+/** The configured and effective limits of `remote`, as far as the runner enforces them. */
 export function remoteSizingOf(
   target: CaptureTarget,
   remote: RemoteBrowser,
-  gate?: { readonly size: number },
+  enforced: RemoteSizingEnforced = {},
 ): RemoteSizing {
-  const pages = gate?.size ?? pagesOf(remote);
+  const pages = enforced.gate === undefined ? pagesOf(remote) : gatePagesOf(enforced.gate);
   const perConnection = remote.maxPagesPerConnection ?? null;
-  const lowest = [pages, perConnection].filter((value): value is number => value !== null);
+  const limits = [
+    pages,
+    enforced.pagesPerConnection === false ? null : perConnection,
+    enforced.concurrency ?? null,
+  ].filter((value): value is number => value !== null);
   return {
     target,
     pages,
     pagesPerConnection: perConnection,
-    effectivePagesPerConnection: lowest.length === 0 ? null : Math.min(...lowest),
+    effectivePagesPerConnection: limits.length === 0 ? null : Math.min(...limits),
     maxConnections: remote.maxConnections ?? null,
     scope: { pages: "target", connections: "process" },
     experimental: remote.experimental === true,
@@ -48,9 +62,18 @@ export function logRemoteSizing(
   logger: { info(fields: object, message: string): void } | undefined,
   target: CaptureTarget,
   remote: RemoteBrowser,
-  gate?: { readonly size: number },
+  enforced?: RemoteSizingEnforced,
 ): void {
-  logger?.info(remoteSizingOf(target, remote, gate), "remote sizing");
+  logger?.info(remoteSizingOf(target, remote, enforced), "remote sizing");
+}
+
+/** The shared gate's cap; a `sessions` callback that throws reads as unknown. */
+function gatePagesOf(gate: { readonly size: number }): number | null {
+  try {
+    return gate.size;
+  } catch {
+    return null;
+  }
 }
 
 /** The page limit now; a `sessions` function that throws or returns nonsense reads as unknown. */

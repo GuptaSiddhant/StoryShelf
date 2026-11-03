@@ -73,7 +73,7 @@ export async function renderAll(
   return await finishing(
     async () => {
       server = await serve(input, session);
-      input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
+      logHostSizing(input, name, remote);
       // Measured while the browser is open: Puppeteer cannot read the version of a closed one.
       const environment = await measureEnvironment(session, remote, input, active.abort?.signal);
       ctx = buildContext(session, server.url, input);
@@ -112,7 +112,11 @@ export function launchContextOf(
 
 /** The input with its target resolved, and the session gate when the target is remote. */
 export function planRun<
-  T extends { target?: CaptureTarget | undefined; logger?: PuppeteerRenderInput["logger"] },
+  T extends {
+    target?: CaptureTarget | undefined;
+    concurrency?: number | undefined;
+    logger?: PuppeteerRenderInput["logger"];
+  },
 >(
   rawInput: T,
   driver: TargetDriver,
@@ -133,7 +137,11 @@ export function planRun<
       );
     });
   if (remote) {
-    logRemoteSizing(rawInput.logger, name, remote.remote, gate);
+    logRemoteSizing(rawInput.logger, name, remote.remote, {
+      gate,
+      concurrency: rawInput.concurrency,
+      pagesPerConnection: false,
+    });
   }
   return { input: { ...rawInput, target: name, gate }, name, remote };
 }
@@ -384,4 +392,15 @@ function pushRenderFailure(
 ): void {
   failures.push({ storyId, viewportName, error: messageOf(error) });
   input.logger?.error({ storyId, viewport: viewportName, err: error }, "render failed for story");
+}
+
+/** The host's sizing of a capture; a remote target runs elsewhere, so nothing is measured here. */
+function logHostSizing(
+  input: { logger?: PuppeteerRenderInput["logger"]; concurrency?: number | undefined },
+  name: CaptureTarget,
+  remote: RemoteTarget | undefined,
+): void {
+  if (!remote) {
+    input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
+  }
 }

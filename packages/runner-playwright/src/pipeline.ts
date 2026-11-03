@@ -65,7 +65,7 @@ export async function renderAll(
     await driver.launch(name, input.logger, launchContextOf(input, "render", active.abort?.signal));
   const browser = await launch();
   const server = await serve(input, browser);
-  input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
+  logHostSizing(input, name, remote);
   const measured = remote
     ? await measureRemote(browser, remote.remote, {
         logger: input.logger,
@@ -108,7 +108,11 @@ export function launchContextOf(
 
 /** The input with its target resolved, and the session gate when the target is remote. */
 export function planRun<
-  T extends { target?: CaptureTarget | undefined; logger?: PlaywrightRenderInput["logger"] },
+  T extends {
+    target?: CaptureTarget | undefined;
+    concurrency?: number | undefined;
+    logger?: PlaywrightRenderInput["logger"];
+  },
 >(
   rawInput: T,
   driver: TargetDriver,
@@ -133,7 +137,10 @@ export function planRun<
       );
     });
   if (remote) {
-    logRemoteSizing(rawInput.logger, name, remote.remote, gate);
+    logRemoteSizing(rawInput.logger, name, remote.remote, {
+      gate,
+      concurrency: rawInput.concurrency,
+    });
   }
   return {
     input: {
@@ -490,4 +497,15 @@ function pushRenderFailure(
 ): void {
   failures.push({ storyId, viewportName, error: messageOf(error) });
   input.logger?.error({ storyId, viewport: viewportName, err: error }, "render failed for story");
+}
+
+/** The host's sizing of a capture; a remote target runs elsewhere, so nothing is measured here. */
+function logHostSizing(
+  input: { logger?: PlaywrightRenderInput["logger"]; concurrency?: number | undefined },
+  name: CaptureTarget,
+  remote: RemoteTarget | undefined,
+): void {
+  if (!remote) {
+    input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
+  }
 }
