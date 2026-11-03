@@ -29,6 +29,19 @@ describe("component url", () => {
       "https://shelf.example.com/projects/app/components/src/My%20Card.stories.tsx",
     );
   });
+
+  it("selects one build with ?build=, encoded, and adds nothing without one", () => {
+    const urls = createUrlBuilder("https://shelf.example.com/");
+    expect(urls.component("app", "src/Button.stories.tsx", { build: "01B/1" })).toBe(
+      "https://shelf.example.com/projects/app/components/src/Button.stories.tsx?build=01B%2F1",
+    );
+    expect(urls.component("app", "src/Button.stories.tsx", {})).toBe(
+      "https://shelf.example.com/projects/app/components/src/Button.stories.tsx",
+    );
+    expect(urls.component("app", "src/Button.stories.tsx", { build: undefined })).toBe(
+      "https://shelf.example.com/projects/app/components/src/Button.stories.tsx",
+    );
+  });
 });
 
 describe("snapshot url", () => {

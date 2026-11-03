@@ -1,3 +1,9 @@
+/** Options of {@link UrlBuilder.component}. */
+export interface ComponentUrlOptions {
+  /** Show this build's states, results and comments instead of the newest build that has the file. */
+  build?: string | undefined;
+}
+
 /** Type-safe URL builder for project pages and published Storybooks. */
 export interface UrlBuilder {
   projectsList(): string;
@@ -13,8 +19,8 @@ export interface UrlBuilder {
   jobs(slug: string): string;
   labels(slug: string): string;
   label(slug: string, key: string, value: string): string;
-  /** Stable component page, keyed by the story file's import path. */
-  component(slug: string, importPath: string): string;
+  /** Stable component page, keyed by the story file's import path; `build` selects one build. */
+  component(slug: string, importPath: string, options?: ComponentUrlOptions): string;
   storybook(slug: string): string;
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
@@ -47,8 +53,10 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     labels: (slug) => `${root}/projects/${slug}/labels`,
     label: (slug, key, value) =>
       `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodePath(value)}`,
-    component: (slug, importPath) =>
-      `${root}/projects/${slug}/components/${encodePath(importPath.replace(/^(?:\.\/)+/u, ""))}`,
+    component: (slug, importPath, options) =>
+      `${root}/projects/${slug}/components/${encodePath(importPath.replace(/^(?:\.\/)+/u, ""))}${
+        options?.build ? `?build=${encodeURIComponent(options.build)}` : ""
+      }`,
     storybook: (slug) =>
       publishedBaseDomain
         ? `https://${slug}.${publishedBaseDomain}`

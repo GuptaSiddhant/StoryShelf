@@ -2,6 +2,8 @@ import {
   BuildModel,
   componentHistory,
   componentPresence,
+  type ComponentHistoryRow,
+  type ComponentPresence,
   normalizeImportPath,
   ProjectModel,
   SnapshotModel,
@@ -11,6 +13,7 @@ import type { Context } from "hono";
 import { groupSnapshots } from "../pages/build-diff-model.ts";
 import {
   componentTabs,
+  type BuildSelection,
   type CapturedComponent,
   type ComponentPageData,
   type ComponentTab,
@@ -82,29 +85,59 @@ interface CapturedLoad {
   states: Snapshot[];
   /** Title of the newest snapshot (retitles update in place). */
   title: string;
+  /** The newest build that has the file: what the page shows when no build is requested. */
+  defaultBuildId: string;
 }
 
 /** History, states and tombstone presence of a story file from its snapshots. */
-async function loadCaptured(project: Project, importPath: string): Promise<CapturedLoad | null> {
+async function loadCaptured(
+  project: Project,
+  importPath: string,
+  requested?: Build,
+): Promise<CapturedLoad | null> {
   const { db } = getStore();
   const snapshots = await new SnapshotModel(db).listByImportPath(project.id, importPath);
   const history = componentHistory(snapshots, await buildsOf(snapshots));
-  const shownBuild = history[0]?.build;
-  if (!shownBuild) return null;
+  const [newest] = history;
+  // A requested build that has no states of the file shows none; it never falls back to another.
+  const shownBuild = shownBuildOf(history, requested);
+  if (!newest || !shownBuild) return null;
   const states = snapshots.filter((snap) => snap.buildId === shownBuild.id);
-  const latest = await latestProjectBuild(project);
-  const latestSnapshots = latest ? await new SnapshotModel(db).listByBuild(latest.id) : [];
   const title = states[0]?.storyTitle ?? importPath;
   return {
     states,
     title,
+    defaultBuildId: newest.build.id,
     captured: {
       shownBuild,
       groups: groupSnapshots(states),
       history,
-      presence: componentPresence(history, latest?.id ?? null, latestSnapshots, title),
+      presence: await presenceOf(project, history, title),
     },
   };
+}
+
+/** Whether the file is in, moved from or gone from the project's latest build. */
+async function presenceOf(
+  project: Project,
+  history: ComponentHistoryRow[],
+  title: string,
+): Promise<ComponentPresence> {
+  const latest = await latestProjectBuild(project);
+  const latestSnapshots = latest
+    ? await new SnapshotModel(getStore().db).listByBuild(latest.id)
+    : [];
+  return componentPresence(history, latest?.id ?? null, latestSnapshots, title);
+}
+
+/** The build whose states the page shows: the requested one when it has any, else the newest. */
+function shownBuildOf(
+  history: readonly { build: Build }[],
+  requested: Build | undefined,
+): Build | undefined {
+  return requested
+    ? history.find((row) => row.build.id === requested.id)?.build
+    : history[0]?.build;
 }
 
 /**
@@ -118,41 +151,116 @@ export async function loadComponentPage(
   rawPath: string,
   requestedTab: string | undefined,
   story?: string,
+  requestedBuild?: string,
 ): Promise<ComponentPageData | null> {
   const project = await new ProjectModel(getStore().db).getBySlug(slug);
   const importPath = normalizeImportPath(rawPath);
   if (!project || !importPath) return null;
-  const testing = testingEnabled();
-  const [loaded, catalog] = await Promise.all([
-    testing ? loadCaptured(project, importPath) : Promise.resolve(null),
-    loadCatalogView(project, importPath).catch(() => null),
-  ]);
-  const view = catalog ?? (loaded ? viewOfCaptured(loaded) : null);
-  if (!view) return null;
-  const tab = resolveTab(requestedTab, testing, loaded !== null);
-  const tabData = loaded
-    ? await loadTabData(c, { project, shownBuild: loaded.captured.shownBuild }, tab, loaded.states)
-    : { design: [], usage: [] };
+  const requested = await requestedBuildOf(project, requestedBuild);
+  // An explicit build that is not this project's is a 404, never a fallback to the newest build.
+  if (requested === null) return null;
+  const sources = await loadSources(project, importPath, requested);
+  if (!sources) return null;
+  const { captured, view } = sources;
+  const tabbed = await loadTab(c, project, captured, requestedTab);
   return {
     project,
     importPath,
-    title: loaded?.title ?? view.title,
-    tab,
-    testing,
+    title: captured?.title ?? view.title,
+    testing: testingEnabled(),
     catalog: view,
-    captured: loaded?.captured ?? null,
+    captured: captured?.captured ?? null,
+    selection: requested ? selectionOf(requested, captured, view) : null,
     story,
     previewBase: await previewBaseOf(project, view.build),
     publishedBaseDomain: getStore().config.publishedBaseDomain,
     review: await loadComponentReview(project, view.build),
-    ...tabData,
+    ...tabbed,
   };
+}
+
+/** The open tab, and the data only that tab needs. */
+async function loadTab(
+  c: Context,
+  project: Project,
+  captured: CapturedLoad | null,
+  requestedTab: string | undefined,
+): Promise<Pick<ComponentPageData, "tab" | "design" | "usage">> {
+  const tab = resolveTab(requestedTab, testingEnabled(), captured !== null);
+  const data = captured
+    ? await loadTabData(
+        c,
+        { project, shownBuild: captured.captured.shownBuild },
+        tab,
+        captured.states,
+      )
+    : { design: [], usage: [] };
+  return { tab, ...data };
+}
+
+/** The captured snapshots (with `testing`) and the catalog view of a file; null when it is unknown. */
+async function loadSources(
+  project: Project,
+  importPath: string,
+  requested: Build | undefined,
+): Promise<{ captured: CapturedLoad | null; view: ComponentCatalogView } | null> {
+  const [captured, catalog] = await Promise.all([
+    testingEnabled() ? loadCaptured(project, importPath, requested) : Promise.resolve(null),
+    loadCatalogView(project, importPath, requested).catch(() => null),
+  ]);
+  const view =
+    catalog ??
+    (captured ? viewOfCaptured(captured) : null) ??
+    (await absentView(project, importPath, requested));
+  return view ? { captured, view } : null;
+}
+
+/**
+ * The build `?build=` names: undefined without the parameter, null when it is not one of this
+ * project's builds (the page then answers 404 like any other hidden resource).
+ */
+async function requestedBuildOf(
+  project: Project,
+  id: string | undefined,
+): Promise<Build | null | undefined> {
+  if (id === undefined || id === "") return undefined;
+  const build = await new BuildModel(getStore().db).get(id);
+  return build?.projectId === project.id ? build : null;
+}
+
+/** Which build the page was asked to show, whether it is the newest, and whether it holds the file. */
+function selectionOf(
+  build: Build,
+  loaded: CapturedLoad | null,
+  view: ComponentCatalogView,
+): BuildSelection {
+  return {
+    build,
+    newest: build.id === (loaded?.defaultBuildId ?? view.defaultBuildId),
+    present: loaded !== null || view.entries.length > 0,
+  };
+}
+
+/**
+ * The view of a valid build that does not hold a file captured elsewhere: no stories, titled as
+ * its newest capture. Null without a requested build or when no build ever captured the file.
+ */
+async function absentView(
+  project: Project,
+  importPath: string,
+  requested: Build | undefined,
+): Promise<ComponentCatalogView | null> {
+  const elsewhere = requested && testingEnabled() ? await loadCaptured(project, importPath) : null;
+  return requested && elsewhere
+    ? { ...viewOfCaptured(elsewhere), build: requested, entries: [] }
+    : null;
 }
 
 /** A catalog view for a captured file whose published index is gone: its snapshots stand in. */
 function viewOfCaptured(loaded: CapturedLoad): ComponentCatalogView {
   return {
     build: loaded.captured.shownBuild,
+    defaultBuildId: loaded.defaultBuildId,
     title: loaded.title,
     entries: entriesFromSnapshots(loaded.states),
     history: [],

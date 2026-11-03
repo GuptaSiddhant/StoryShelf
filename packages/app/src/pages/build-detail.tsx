@@ -391,7 +391,7 @@ export async function renderBuildDetailPage(
                     <Button
                       variant="ghost"
                       size="sm"
-                      href={`${urls.component(project.slug, snap.storyImportPath)}#${snap.storyId}`}
+                      href={`${urls.component(project.slug, snap.storyImportPath, { build: snap.buildId })}#${snap.storyId}`}
                     >
                       Component
                     </Button>
