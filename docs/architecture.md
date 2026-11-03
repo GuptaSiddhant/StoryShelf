@@ -1035,7 +1035,8 @@ StoryShelf/
         routers/          # API + UI routes (incl. health, OpenAPI)
         routes/           # route classification table (hosting/testing/review/both) + completeness test
         pages/            # UI page components (server-rendered JSX)
-        ui/               # DocumentLayout, theme, components, styles
+        ui/               # presentational components, theme, styles (no app state)
+        shell/            # DocumentLayout, csrfField, sidebar/top bar, client scripts (app-coupled)
         middleware/       # request id/logging/gate/rate-limit/scope/auth
         store.ts          # AsyncLocalStorage request context
         assets/           # vendored HTMX (served locally, no CDN)

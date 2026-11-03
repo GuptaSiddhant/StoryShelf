@@ -21,8 +21,8 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   `CardSection`, `PageHeader`, `SectionTitle`, `Meta`, `HStack`, `VStack`,
   `Icon`, `Avatar`, `Kbd`, `Segmented`, `SubNavLayout`, `Table`,
   `Thumbnail`, `Dropdown`, `Progress`, `CompareStage`, `CodeBlock`,
-  `FilterInput`, `RelativeTime`) and the shell (`../shell/document.tsx`:
-  `DocumentLayout`), plus shared cross-page style objects
+  `FilterInput`, `RelativeTime`) and the shell (`../shell/document.tsx`: `DocumentLayout`;
+  `../shell/csrf-field.tsx`: `csrfField`; no other `shell/` module), plus shared cross-page style objects
   (`../ui/styles/review.ts`: snapshot cards, comment threads;
   `../ui/styles/review-layout.ts`: review workspace layout) and
   `../ui/css.ts` (page-local one-off styles only — last resort after

@@ -48,7 +48,18 @@ function reachesAppState(specifier: string): boolean {
   if (specifier.startsWith("@storyshelf/core/")) {
     return /^@storyshelf\/core\/(?:models|test-helpers)(?:\/|$)/u.test(specifier);
   }
-  return /^\.\.?\/(?:.*\/)?(?:store\.tsx?$|(?:routers|middleware|pages)\/)/u.test(specifier);
+  return /^\.\.?\/(?:.*\/)?(?:store(?:\.tsx?)?$|(?:routers|middleware|pages)\/)/u.test(specifier);
+}
+
+/** Patterns for a runtime reference to `@storyshelf/core/urls`; erased `type` forms are not matched. */
+const RUNTIME_URLS_REFERENCES: readonly RegExp[] = [
+  /^\s*(?:import|export)\s+(?!type\b)[^;]*?from\s+["']@storyshelf\/core\/urls["']/mu,
+  /^\s*import\s+["']@storyshelf\/core\/urls["']/mu,
+  /\bimport\s*\(\s*["']@storyshelf\/core\/urls["']/u,
+];
+
+function usesUrlsAtRuntime(source: string): boolean {
+  return RUNTIME_URLS_REFERENCES.some((pattern) => pattern.test(source));
 }
 
 function countMatches(source: string, pattern: RegExp): number {
@@ -65,7 +76,7 @@ describe("ui-building-blocks contract", () => {
 
   it("imports UI only through the facade, the document shell, shared review styles, and page-local css", async () => {
     const directImport =
-      /from\s+"\.\.\/ui\/(?!components\.tsx|document\.tsx|csrf-field\.tsx|css\.ts|styles\/review(?:-[a-z]+)?\.ts)[^"]+"/u;
+      /from\s+"(?:\.\.\/ui\/(?!components\.tsx|css\.ts|styles\/review(?:-[a-z]+)?\.ts)[^"]+|\.\.\/shell\/(?!document\.tsx|csrf-field\.tsx)[^"]+)"/u;
     const offenders = (await pageSources()).filter(({ source }) => directImport.test(source));
     expect(offenders.map(({ file }) => file)).toEqual([]);
   });
@@ -80,8 +91,7 @@ describe("ui-building-blocks contract", () => {
   });
 
   it("imports @storyshelf/core/urls in src/ui as types only", async () => {
-    const valueImport = /^\s*import\s+(?!type\b)[^;]*?from\s+"@storyshelf\/core\/urls"/mu;
-    const offenders = (await uiSources()).filter(({ source }) => valueImport.test(source));
+    const offenders = (await uiSources()).filter(({ source }) => usesUrlsAtRuntime(source));
     expect(offenders.map(({ file }) => file)).toEqual([]);
   });
 
@@ -89,6 +99,8 @@ describe("ui-building-blocks contract", () => {
     const forbidden = [
       "../store.ts",
       "../../store.ts",
+      "../store",
+      "../../store",
       "../routers/ui.ts",
       "../middleware/csrf.ts",
       "../pages/login.tsx",
@@ -98,6 +110,26 @@ describe("ui-building-blocks contract", () => {
     const allowed = ["./css.ts", "../ui/components.tsx", "hono/jsx", "@storyshelf/core/urls"];
     expect(forbidden.filter((specifier) => !reachesAppState(specifier))).toEqual([]);
     expect(allowed.filter((specifier) => reachesAppState(specifier))).toEqual([]);
+  });
+
+  it("recognises runtime references to @storyshelf/core/urls and ignores type-only ones", () => {
+    const urls = '"@storyshelf/core/urls"';
+    const runtime = [
+      `import { createUrlBuilder } from ${urls};`,
+      `import {\n  createUrlBuilder,\n} from ${urls};`,
+      `import { type UrlBuilder } from ${urls};`,
+      `export { createUrlBuilder } from ${urls};`,
+      `export * from ${urls};`,
+      `import ${urls};`,
+      `const urls = await import(${urls});`,
+    ];
+    const erased = [
+      `import type { UrlBuilder } from ${urls};`,
+      `export type { UrlBuilder } from ${urls};`,
+      "const unrelated = 1;",
+    ];
+    expect(runtime.filter((source) => !usesUrlsAtRuntime(source))).toEqual([]);
+    expect(erased.filter((source) => usesUrlsAtRuntime(source))).toEqual([]);
   });
 
   it("has no inline styles in pages/", async () => {
