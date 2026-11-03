@@ -60,6 +60,16 @@ describe("resolveMentions", () => {
     expect(ids("@Sam Lee and @Sam Park", candidates)).toEqual(["u1", "u2"]);
   });
 
+  it("does not fall back to a shorter unique handle when a longer one is shared", () => {
+    const candidates = [
+      { userId: "u1", handles: ["alex1", "Alex Smith"] },
+      { userId: "u2", handles: ["alexs", "Alex Smith"] },
+      { userId: "u3", handles: ["alex.t", "Alex"] },
+    ];
+    expect(ids("@Alex Smith please", candidates)).toEqual([]);
+    expect(ids("@Alex please", candidates)).toEqual(["u3"]);
+  });
+
   it("returns one entry per member, the first mention winning", () => {
     expect(resolveMentions("@sam then @Sam Lee then @sam", members)).toEqual([
       { userId: "u-sam", handle: "sam" },

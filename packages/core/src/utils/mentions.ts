@@ -70,35 +70,43 @@ function ownersOf(candidates: readonly MentionCandidate[]): Map<string, Set<stri
   return owners;
 }
 
-/** Lower-cased handle -> the one member it names; a handle shared by several members is dropped. */
-function uniqueHandles(candidates: readonly MentionCandidate[]): Map<string, string> {
-  const unique = new Map<string, string>();
+/**
+ * Lower-cased handle -> the one member it names, or `undefined` when several members share it. A
+ * shared handle stays listed as a blocker so a longer shared handle (`@Alex Smith`) never falls
+ * back to a shorter unique one (`@Alex`) at the same `@`.
+ */
+function listedHandles(candidates: readonly MentionCandidate[]): Map<string, string | undefined> {
+  const listed = new Map<string, string | undefined>();
   for (const [handle, ids] of ownersOf(candidates)) {
     const [only] = ids;
-    if (ids.size === 1 && only !== undefined) {
-      unique.set(handle, only);
-    }
+    listed.set(handle, ids.size === 1 ? only : undefined);
   }
-  return unique;
+  return listed;
 }
 
-/** The first handle (longest first, so `@alex.doe` beats `@alex`) that matches at `index`. */
+/**
+ * The first handle (longest first, so `@alex.doe` beats `@alex`) that matches at `index`. A shared
+ * handle matches as a blocker and yields no mention at that `@`.
+ */
 function matchAt(
   body: string,
   index: number,
-  handles: readonly [string, string][],
+  handles: readonly [string, string | undefined][],
 ): { userId: string; typed: string } | undefined {
   for (const [handle, userId] of handles) {
     const typed = handleAt(body, index, handle);
     if (typed !== undefined) {
-      return { userId, typed };
+      return userId === undefined ? undefined : { userId, typed };
     }
   }
   return undefined;
 }
 
 /** Every mention of a listed handle in `body`, in order, one entry per occurrence. */
-function scan(body: string, handles: readonly [string, string][]): (MentionSpan & FoundMention)[] {
+function scan(
+  body: string,
+  handles: readonly [string, string | undefined][],
+): (MentionSpan & FoundMention)[] {
   const found: (MentionSpan & FoundMention)[] = [];
   let index = body.indexOf("@");
   while (index !== -1) {
@@ -123,7 +131,7 @@ export function resolveMentions(
   body: string,
   candidates: readonly MentionCandidate[],
 ): FoundMention[] {
-  const handles = [...uniqueHandles(candidates)].toSorted((a, b) => b[0].length - a[0].length);
+  const handles = [...listedHandles(candidates)].toSorted((a, b) => b[0].length - a[0].length);
   const seen = new Set<string>();
   const out: FoundMention[] = [];
   for (const mention of scan(body, handles)) {
