@@ -9,7 +9,8 @@
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/d1";
-import { CAPTURE_JOB_BACKFILL, DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
+import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
+import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { schema } from "./schema/index.ts";
 

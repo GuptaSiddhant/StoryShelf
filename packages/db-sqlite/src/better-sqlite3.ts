@@ -8,7 +8,8 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
  */
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { CAPTURE_JOB_BACKFILL, DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
+import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
+import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
 import { schema } from "./schema/index.ts";
