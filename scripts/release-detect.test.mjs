@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
-import { chooseChannel } from "./release-detect.mjs";
+import { chooseChannel, findReleaseCommit } from "./release-detect.mjs";
 
 const push = { event: "push", version: "0.9.0", tagExists: true, pending: 0 };
 
@@ -48,5 +52,43 @@ describe("chooseChannel", () => {
       requested: "0.9.0-rc.1",
     });
     assert.match(result.error, /prerelease/u);
+  });
+});
+
+function repo(subjects) {
+  const dir = mkdtempSync(join(tmpdir(), "release-detect-"));
+  const git = (...args) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@x", ...args], {
+      cwd: dir,
+      encoding: "utf8",
+    }).trim();
+  git("init", "-q");
+  const shas = subjects.map((subject, index) => {
+    writeFileSync(join(dir, "f"), String(index));
+    git("add", "f");
+    git("commit", "-q", "--no-verify", "-m", subject);
+    return git("rev-parse", "HEAD");
+  });
+  return { dir, shas };
+}
+
+describe("findReleaseCommit", () => {
+  it("finds the merged release commit even after later pushes to main", () => {
+    const { dir, shas } = repo(["feat: a", "chore(release): v0.9.0 (#500)", "docs: later"]);
+    try {
+      assert.equal(findReleaseCommit("0.9.0", dir), shas[1]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not mistake another version for it, and falls back to HEAD", () => {
+    const { dir, shas } = repo(["chore(release): v0.9.0", "chore(release): v0.9.01", "fix: x"]);
+    try {
+      assert.equal(findReleaseCommit("0.9.0", dir), shas[0]);
+      assert.equal(findReleaseCommit("1.0.0", dir), shas[2]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -2,8 +2,8 @@
 // oxlint-disable curly no-console
 /**
  * Decide which release channel a run of `release.yml` is for (ADR 0043). Reads the working tree and
- * the repository's tags, changes nothing, and emits `channel`, `version` and `tag`
- * (stdout + GITHUB_OUTPUT when present).
+ * the repository's tags, changes nothing, and emits `channel`, `version`, `tag` and `sha`
+ * (stdout + GITHUB_OUTPUT when present), plus `sha`, the commit the stable jobs publish and tag.
  *
  * - `stable`: a push to `main` whose shared version is not a prerelease and has no `v<version>` tag
  *   yet (a release pull request was just merged), or a `workflow_dispatch` re-run of that version.
@@ -51,6 +51,26 @@ function emit(key, value) {
   }
 }
 
+/**
+ * The commit that introduced `version` (the merged `chore(release): v<version>` commit, also when
+ * the pull request was squashed and carries a suffix such as `(#123)`), or HEAD when none matches.
+ * A retry after a partial publish must publish and tag that commit, not whatever `main` has become.
+ *
+ * @param {string} version The shared version.
+ * @param {string} [cwd] The repository.
+ * @returns {string} A commit sha.
+ */
+export function findReleaseCommit(version, cwd = root) {
+  const escaped = version.replaceAll(/[.+-]/gu, String.raw`\$&`);
+  const pattern = `^chore\\(release\\): v${escaped}( |$)`;
+  const found = execFileSync(
+    "git",
+    ["log", "-1", "--format=%H", "--extended-regexp", `--grep=${pattern}`],
+    { cwd, encoding: "utf8" },
+  ).trim();
+  return found || execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" }).trim();
+}
+
 function tagExistsFor(tag) {
   const out = execFileSync("git", ["tag", "--list", tag], { cwd: root, encoding: "utf8" });
   return out.trim() === tag;
@@ -80,7 +100,12 @@ function main() {
     console.error(`::error::${result.error}`);
     process.exit(1);
   }
-  emitAll({ channel: result.channel, version: state.version, tag: `v${state.version}` });
+  emitAll({
+    channel: result.channel,
+    version: state.version,
+    tag: `v${state.version}`,
+    sha: findReleaseCommit(state.version),
+  });
 }
 
 function emitAll(values) {

@@ -62,8 +62,9 @@ version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is m
 - **Re-running.** `scripts/publish-npm.mjs` and `scripts/publish-jsr.mjs` skip versions already on
   their registry; the tag and the GitHub Release creation tolerate "already exists" (an existing tag
   is kept, even at another commit). A JSR failure does not stop the tag or the release
-  (`continue-on-error`); re-run to publish what JSR lacks. The dispatch tags the commit it runs on, so
-  run it while the release commit is still the tip of `main`.
+  (`continue-on-error`); re-run to publish what JSR lacks. Every stable job checks out, publishes and
+  tags the release commit (the merged `chore(release): v<version>` commit, found by `detect`), not the
+  tip of `main`, so a retry after later merges still ships the original tree.
 - **Verification.** The release pull request is verified by CI like any other, and
   `release:prepare` runs `release-validate.mjs` and `nub publish -r --dry-run` before it commits.
   The publish run validates the fixed versions again and builds before it publishes.

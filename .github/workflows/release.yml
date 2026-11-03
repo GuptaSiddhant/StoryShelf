@@ -42,6 +42,7 @@ jobs:
       channel: ${{ steps.detect.outputs.channel }}
       version: ${{ steps.detect.outputs.version }}
       tag: ${{ steps.detect.outputs.tag }}
+      sha: ${{ steps.detect.outputs.sha }} # the release commit: stable jobs publish and tag this, not main's tip
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -122,6 +123,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ needs.detect.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -133,7 +135,7 @@ jobs:
 
   # npm publish. Skips versions already on npm, so a re-run resumes.
   publish-npm:
-    needs: [validate]
+    needs: [detect, validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -142,6 +144,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ needs.detect.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -182,10 +185,12 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ needs.detect.outputs.tag }}
+      RELEASE_SHA: ${{ needs.detect.outputs.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ needs.detect.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -195,9 +200,9 @@ jobs:
           existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq .object.sha 2>/dev/null || true)
           if [ -z "$existing" ]; then
             gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
-              -f ref="refs/tags/${RELEASE_TAG}" -f sha="${GITHUB_SHA}"
-            echo "created ${RELEASE_TAG} at ${GITHUB_SHA}"
-          elif [ "$existing" = "$GITHUB_SHA" ]; then
+              -f ref="refs/tags/${RELEASE_TAG}" -f sha="${RELEASE_SHA}"
+            echo "created ${RELEASE_TAG} at ${RELEASE_SHA}"
+          elif [ "$existing" = "$RELEASE_SHA" ]; then
             echo "${RELEASE_TAG} already exists at this commit"
           else
             echo "::notice::${RELEASE_TAG} already exists at ${existing}; keeping it"
@@ -237,7 +242,7 @@ jobs:
   # JSR publish. Depends on validate, independent of npm: `continue-on-error` means a failure here
   # never fails the workflow or blocks publish-npm. A re-run publishes only what JSR lacks.
   publish-jsr:
-    needs: [validate]
+    needs: [detect, validate]
     runs-on: ubuntu-latest
     continue-on-error: true
     permissions:
@@ -247,6 +252,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ needs.detect.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
