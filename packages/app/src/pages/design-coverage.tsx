@@ -8,15 +8,18 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   EmptyState,
   HStack,
   Meta,
   PageHeader,
+  RelativeTime,
   SectionTitle,
   Stat,
   Table,
   VStack,
 } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -28,12 +31,16 @@ export interface CoverageLink {
   /** Design node name from the cache, when one is stored. */
   name: string | null;
   drift: DesignDrift;
+  /** When the design last changed, as the provider reported it; null when unknown. */
+  changedAt: string | null;
 }
 
 /** A component (story file) and the design links it resolves to. */
 export interface CoverageComponent {
   title: string;
   importPath: string;
+  /** How many stories the component has. */
+  stories: number;
   links: CoverageLink[];
 }
 
@@ -52,13 +59,53 @@ export interface DesignCoverageData {
   unknown: number;
   /** Providers whose links cannot be checked because the project has no token for them. */
   withoutToken: string[];
+  /** When the linked designs' metadata was last fetched; null when it never was. */
+  lastChecked: string | null;
   /** Whether links declared in stories were read (they need captured snapshots, so `testing`). */
   storyLinksRead: boolean;
 }
 
+/* Secondary columns drop out on phones; the date moves under the reason (see the spec on #458). */
+const wideOnly = css`
+  /* coverage-wide-only */
+  @media (max-width: 640px) {
+    & {
+      display: none;
+    }
+  }
+`;
+
+const narrowOnly = css`
+  /* coverage-narrow-only */
+  display: none;
+  @media (max-width: 640px) {
+    & {
+      display: block;
+    }
+  }
+`;
+
+const statLink = css`
+  /* coverage-stat-link */
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  &:hover,
+  &:focus-visible {
+    text-decoration: none;
+  }
+`;
+
+const widePath = css`
+  /* coverage-wide-path */
+  ${wideOnly}
+  overflow-wrap: anywhere;
+`;
+
 /** The design coverage page: what lacks a design, what drifted, and how much is in sync. */
 export function renderDesignCoveragePage(data: DesignCoverageData): RenderedContent {
   const { project, build } = data;
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <DocumentLayout
       title="Design coverage"
@@ -66,37 +113,46 @@ export function renderDesignCoveragePage(data: DesignCoverageData): RenderedCont
         active: "library",
         projectSlug: project.slug,
         projectName: project.name,
-        trail: [{ label: "Design coverage" }],
+        trail: [
+          { label: "Library", href: urls.library(project.slug) },
+          { label: "Design coverage" },
+        ],
       }}
     >
       <PageHeader
         title="Design coverage"
-        description={
-          build ? (
-            <>
-              Components of the latest accepted build ({build.gitBranch} ·{" "}
-              {build.gitSha.slice(0, 7)}) against their design links.
-            </>
-          ) : (
-            <>Components against their design links.</>
-          )
+        description="Which components have a design file, and which have drifted from it."
+        meta={
+          build
+            ? `Latest accepted build: ${build.gitBranch} · ${build.gitSha.slice(0, 7)}`
+            : undefined
         }
       />
       {build ? (
         <CoverageBody data={data} />
       ) : (
         <EmptyState
-          title="No accepted build yet"
-          description="Coverage is read from the latest accepted build's Storybook. Upload and approve a build first."
+          title="No build to check yet"
+          description="Design coverage is read from the latest accepted build. Upload a Storybook and accept a build first."
+          action={
+            <Button variant="secondary" size="sm" href={urls.buildsList(project.slug)}>
+              Go to builds
+            </Button>
+          }
         />
       )}
     </DocumentLayout>
   );
 }
 
+/** Drift cannot be told for the linked designs: some provider has no token and nothing is known to have drifted. */
+function driftUnavailable(data: DesignCoverageData): boolean {
+  return data.withoutToken.length > 0 && data.drifted.length === 0;
+}
+
 function CoverageBody(props: { data: DesignCoverageData }): Rendered {
   const { data } = props;
-  const linked = data.drifted.length + data.current + data.unknown;
+  const unavailable = driftUnavailable(data);
   return (
     <VStack>
       {data.storyLinksRead ? null : (
@@ -106,13 +162,27 @@ function CoverageBody(props: { data: DesignCoverageData }): Rendered {
         </Alert>
       )}
       <div class="grid grid--3">
-        <Stat label="Components" value={linked + data.unlinked.length} />
-        <Stat label="With a design link" value={linked} tone={linked > 0 ? "success" : "neutral"} />
-        <Stat
-          label="Needing attention"
-          value={data.unlinked.length + data.drifted.length}
-          tone={data.unlinked.length + data.drifted.length > 0 ? "warning" : "success"}
-        />
+        <a href="#no-link" class={statLink}>
+          <Stat
+            label="No design link"
+            value={data.unlinked.length}
+            tone={data.unlinked.length > 0 ? "warning" : "success"}
+          />
+        </a>
+        <a href="#drift" class={statLink}>
+          <Stat
+            label={unavailable ? "Needs attention · Unavailable" : "Needs attention"}
+            value={unavailable ? "–" : data.drifted.length}
+            tone={unavailable ? "neutral" : data.drifted.length > 0 ? "warning" : "success"}
+          />
+        </a>
+        <a href="#current" class={statLink}>
+          <Stat
+            label="Up to date"
+            value={data.current}
+            tone={data.current > 0 ? "success" : "neutral"}
+          />
+        </a>
       </div>
       <UnlinkedSection data={data} />
       <DriftSection data={data} />
@@ -121,56 +191,114 @@ function CoverageBody(props: { data: DesignCoverageData }): Rendered {
   );
 }
 
-function ComponentLink(props: { project: Project; component: CoverageComponent }): Rendered {
+/** Where a component's design links are managed: its Design tab with testing, else the project's design settings. */
+function linkTarget(data: DesignCoverageData, component: CoverageComponent): string {
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
-  const { project, component } = props;
-  return <a href={urls.component(project.slug, component.importPath)}>{component.title}</a>;
+  return data.storyLinksRead
+    ? urls.component(data.project.slug, component.importPath, "design")
+    : `${urls.settings(data.project.slug)}/design`;
+}
+
+function ComponentLink(props: {
+  data: DesignCoverageData;
+  component: CoverageComponent;
+}): Rendered {
+  const { data, component } = props;
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const href = data.storyLinksRead
+    ? urls.component(data.project.slug, component.importPath, "design")
+    : urls.component(data.project.slug, component.importPath);
+  return <a href={href}>{component.title}</a>;
+}
+
+function UnlinkedRow(props: { data: DesignCoverageData; component: CoverageComponent }): Rendered {
+  const { data, component } = props;
+  return (
+    <tr>
+      <td>
+        <ComponentLink data={data} component={component} />
+        <div class={narrowOnly}>
+          <Meta as="span" mono>
+            {component.importPath}
+          </Meta>
+        </div>
+      </td>
+      <td class={widePath}>
+        <span class="mono">{component.importPath}</span>
+      </td>
+      <td class={wideOnly}>{component.stories}</td>
+      <td>
+        <Button
+          variant="ghost"
+          size="sm"
+          href={linkTarget(data, component)}
+          aria-label={`Link a design to ${component.title}`}
+        >
+          Link a design
+        </Button>
+      </td>
+    </tr>
+  );
 }
 
 function UnlinkedSection(props: { data: DesignCoverageData }): Rendered {
-  const { project, unlinked } = props.data;
+  const { data } = props;
+  const { unlinked } = data;
   return (
-    <VStack>
-      <SectionTitle>No design link ({unlinked.length})</SectionTitle>
-      {unlinked.length === 0 ? (
-        <Meta>Every component has a design link.</Meta>
-      ) : (
-        <Table>
-          <table>
-            <thead>
-              <tr>
-                <th>Component</th>
-                <th>Story file</th>
-              </tr>
-            </thead>
-            <tbody>
-              {unlinked.map((component) => (
-                <tr key={component.importPath}>
-                  <td>
-                    <ComponentLink project={project} component={component} />
-                  </td>
-                  <td class="mono">{component.importPath}</td>
+    <Card id="no-link">
+      <VStack>
+        <SectionTitle>No design link ({unlinked.length})</SectionTitle>
+        {unlinked.length === 0 ? (
+          <EmptyState title="Every component has a design link" />
+        ) : (
+          <Table>
+            <table>
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th class={wideOnly}>Path</th>
+                  <th class={wideOnly}>Stories</th>
+                  <th>
+                    <span class="visually-hidden">Action</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
-      )}
-    </VStack>
+              </thead>
+              <tbody>
+                {unlinked.map((component) => (
+                  <UnlinkedRow key={component.importPath} data={data} component={component} />
+                ))}
+              </tbody>
+            </table>
+          </Table>
+        )}
+      </VStack>
+    </Card>
   );
 }
 
+const REASONS: Record<"stale" | "deleted", { badge: string; title: string }> = {
+  stale: { badge: "Design changed", title: "Design changed after approval" },
+  deleted: { badge: "Deleted", title: "Design file deleted" },
+};
+
 function DriftBadge(props: { drift: DesignDrift }): Rendered {
-  return props.drift === "deleted" ? (
-    <Badge tone="danger">Design deleted</Badge>
-  ) : (
-    <Badge tone="warning">Design changed</Badge>
+  const reason = props.drift === "deleted" ? REASONS.deleted : REASONS.stale;
+  return (
+    <span title={reason.title}>
+      <Badge tone={props.drift === "deleted" ? "danger" : "warning"} icon>
+        {reason.badge}
+      </Badge>
+    </span>
   );
+}
+
+function ChangedAt(props: { value: string | null }): Rendered {
+  return props.value ? <RelativeTime value={props.value} /> : <Meta as="span">unknown</Meta>;
 }
 
 /** One row per drifted design link of a component. */
-function DriftRows(props: { project: Project; component: CoverageComponent }): Rendered {
-  const { project, component } = props;
+function DriftRows(props: { data: DesignCoverageData; component: CoverageComponent }): Rendered {
+  const { data, component } = props;
   return (
     <>
       {component.links
@@ -179,26 +307,32 @@ function DriftRows(props: { project: Project; component: CoverageComponent }): R
           <tr key={`${component.importPath}|${link.url}`}>
             <td>
               <VStack>
-                <ComponentLink project={project} component={component} />
-                <span>
-                  <DriftBadge drift={link.drift} />
-                </span>
+                <ComponentLink data={data} component={component} />
+                <HStack wrap={false}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon="external-link"
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open in {link.providerName}
+                  </Button>
+                </HStack>
+                {link.name ? <Meta as="span">{link.name}</Meta> : null}
               </VStack>
             </td>
             <td>
-              <HStack wrap={false}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon="external-link"
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open in {link.providerName}
-                </Button>
-                {link.name ? <Meta as="span">{link.name}</Meta> : null}
-              </HStack>
+              <DriftBadge drift={link.drift} />
+              <div class={narrowOnly}>
+                <Meta as="span">
+                  <ChangedAt value={link.changedAt} />
+                </Meta>
+              </div>
+            </td>
+            <td class={wideOnly}>
+              <ChangedAt value={link.changedAt} />
             </td>
           </tr>
         ))}
@@ -206,52 +340,90 @@ function DriftRows(props: { project: Project; component: CoverageComponent }): R
   );
 }
 
-function DriftSection(props: { data: DesignCoverageData }): Rendered {
-  const { project, drifted, withoutToken } = props.data;
+/** Says which providers cannot be checked and where to add a token. */
+function DriftAlert(props: { data: DesignCoverageData }): Rendered {
+  const { project, withoutToken } = props.data;
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
-    <VStack>
-      <SectionTitle>Design changed or deleted ({drifted.length})</SectionTitle>
-      {withoutToken.length > 0 ? (
-        <Alert tone="info" title="Design status is unavailable for some links">
-          {withoutToken.join(", ")} has no token for this project, so StoryShelf cannot tell whether
-          those designs changed or were deleted. Add one under Settings → Design.
-        </Alert>
-      ) : null}
-      {drifted.length === 0 ? (
-        <Meta>No linked design is known to have changed or been deleted.</Meta>
-      ) : (
-        <Table>
-          <table>
-            <thead>
-              <tr>
-                <th>Component</th>
-                <th>Design</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drifted.map((component) => (
-                <DriftRows key={component.importPath} project={project} component={component} />
-              ))}
-            </tbody>
-          </table>
-        </Table>
-      )}
-    </VStack>
+    <Alert tone="info" title="Drift can't be checked">
+      {withoutToken.join(", ")} has no access token for this project, so StoryShelf cannot see which
+      designs changed. Add one in Settings → Design.
+      <div class="mt-1">
+        <Button variant="secondary" size="sm" href={`${urls.settings(project.slug)}/design`}>
+          Open design settings
+        </Button>
+      </div>
+    </Alert>
+  );
+}
+
+function DriftTable(props: { data: DesignCoverageData }): Rendered {
+  const { data } = props;
+  return (
+    <Table>
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Reason</th>
+            <th class={wideOnly}>Design changed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.drifted.map((component) => (
+            <DriftRows key={component.importPath} data={data} component={component} />
+          ))}
+        </tbody>
+      </table>
+    </Table>
+  );
+}
+
+function DriftSection(props: { data: DesignCoverageData }): Rendered {
+  const { data } = props;
+  const { drifted, withoutToken, lastChecked } = data;
+  const unavailable = driftUnavailable(data);
+  return (
+    <Card id="drift">
+      <VStack>
+        <SectionTitle>
+          {unavailable ? "Needs attention" : `Needs attention (${drifted.length})`}
+        </SectionTitle>
+        {unavailable ? null : (
+          <Meta>
+            {lastChecked ? (
+              <>
+                Last checked <RelativeTime value={lastChecked} />
+              </>
+            ) : (
+              "Not checked yet"
+            )}
+          </Meta>
+        )}
+        {withoutToken.length > 0 ? <DriftAlert data={data} /> : null}
+        {drifted.length > 0 ? <DriftTable data={data} /> : null}
+        {drifted.length === 0 && !unavailable ? <EmptyState title="No drift found" /> : null}
+      </VStack>
+    </Card>
   );
 }
 
 function CurrentSection(props: { data: DesignCoverageData }): Rendered {
   const { current, unknown } = props.data;
+  const unknownText = `${unknown} more ${unknown === 1 ? "has" : "have"} a link but nothing stored says whether the design changed.`;
   return (
-    <VStack>
-      <SectionTitle>Up to date ({current})</SectionTitle>
-      <Meta>
-        {current} linked {current === 1 ? "component is" : "components are"} up to date with the
-        approved baseline.
-        {unknown > 0
-          ? ` ${unknown} more ${unknown === 1 ? "has" : "have"} a link but nothing stored says whether the design changed.`
-          : ""}
-      </Meta>
-    </VStack>
+    <Card id="current">
+      <VStack>
+        <SectionTitle>Up to date</SectionTitle>
+        <Meta>
+          {current > 0
+            ? `${current} ${current === 1 ? "component is" : "components are"} linked and ${current === 1 ? "matches" : "match"} their approved design.`
+            : unknown === 0
+              ? "No linked components yet."
+              : ""}
+          {unknown > 0 ? ` ${unknownText}` : ""}
+        </Meta>
+      </VStack>
+    </Card>
   );
 }

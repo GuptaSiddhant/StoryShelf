@@ -20,6 +20,14 @@ describe("safeImageUrl", () => {
 });
 
 describe("component url", () => {
+  it("selects a tab only when asked", () => {
+    const urls = createUrlBuilder("https://shelf.example.com");
+    expect(urls.component("app", "./src/Button.stories.tsx", "design")).toBe(
+      "https://shelf.example.com/projects/app/components/src/Button.stories.tsx?tab=design",
+    );
+    expect(urls.component("app", "src/Button.stories.tsx")).not.toContain("?");
+  });
+
   it("keys by import path without a leading ./ and keeps slashes", () => {
     const urls = createUrlBuilder("https://shelf.example.com/");
     expect(urls.component("app", "./src/ui/Button.stories.tsx")).toBe(

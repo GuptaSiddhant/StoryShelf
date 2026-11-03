@@ -49,10 +49,16 @@ export async function coverageOf(
     const links = (resolutions.get(key)?.urls ?? []).map((url): CoverageLink =>
       linkOf(url, cached.get(url), baseline, withToken),
     );
-    return { title: group.title, importPath: group.importPath, links };
+    return {
+      title: group.title,
+      importPath: group.importPath,
+      stories: group.stories.length,
+      links,
+    };
   });
   return {
     ...summarize(project, build, rows, urls, withToken),
+    lastChecked: newestFetch(urls.flatMap((url) => cached.get(url)?.fetchedAt ?? [])),
     storyLinksRead: testingEnabled(),
   };
 }
@@ -67,7 +73,13 @@ function linkOf(
   // Without a project token nothing says whether the design changed, whatever a member's own
   // connection cached: report it as unknown rather than guess.
   const drift = withToken.has(kind) ? designDrift(node, baseline) : "unknown";
-  return { url, providerName: providerNameFor(url), name: node?.name ?? null, drift };
+  return {
+    url,
+    providerName: providerNameFor(url),
+    name: node?.name ?? null,
+    drift,
+    changedAt: node?.lastModified ?? null,
+  };
 }
 
 /**
@@ -120,6 +132,26 @@ async function providersWithToken(project: Project, urls: readonly string[]): Pr
   return new Set(have.flatMap((kind) => (kind === null ? [] : [kind])));
 }
 
+/** The most recent time any of the linked designs' metadata was fetched, or null when none was. */
+function newestFetch(times: readonly string[]): string | null {
+  return times.toSorted().at(-1) ?? null;
+}
+
+/** The newest `changedAt` among a component's drifted links (0 when none is known). */
+function changedMs(component: CoverageComponent): number {
+  const times = component.links.flatMap((link) =>
+    link.changedAt ? [Date.parse(link.changedAt)] : [],
+  );
+  return Math.max(0, ...times.filter((time) => Number.isFinite(time)));
+}
+
+const deletedFirst = (row: CoverageComponent): number => (worst(row.links) === "deleted" ? 0 : 1);
+
+/** Deleted designs first, then the most recently changed. */
+function byUrgency(a: CoverageComponent, b: CoverageComponent): number {
+  return deletedFirst(a) - deletedFirst(b) || changedMs(b) - changedMs(a);
+}
+
 function worst(links: readonly CoverageLink[]): DesignDrift {
   return SEVERITY.find((drift) => links.some((link) => link.drift === drift)) ?? "unknown";
 }
@@ -130,14 +162,18 @@ function summarize(
   rows: readonly CoverageComponent[],
   urls: readonly string[],
   withToken: ReadonlySet<string>,
-): Omit<DesignCoverageData, "storyLinksRead"> {
+): Omit<DesignCoverageData, "storyLinksRead" | "lastChecked"> {
   const linked = rows.filter((row) => row.links.length > 0);
   const kinds = [...new Set(urls.map((url) => parseDesignUrl(getStore().design, url)?.provider))];
   return {
     project,
     build,
-    unlinked: rows.filter((row) => row.links.length === 0),
-    drifted: linked.filter((row) => ["deleted", "stale"].includes(worst(row.links))),
+    unlinked: rows
+      .filter((row) => row.links.length === 0)
+      .toSorted((a, b) => a.importPath.localeCompare(b.importPath)),
+    drifted: linked
+      .filter((row) => ["deleted", "stale"].includes(worst(row.links)))
+      .toSorted(byUrgency),
     current: linked.filter((row) => worst(row.links) === "current").length,
     unknown: linked.filter((row) => worst(row.links) === "unknown").length,
     withoutToken: kinds.flatMap((provider) =>

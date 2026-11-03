@@ -16,6 +16,7 @@ const NO_COVERAGE: Omit<DesignCoverageData, "project"> = {
   current: 0,
   unknown: 0,
   withoutToken: [],
+  lastChecked: null,
   storyLinksRead: false,
 };
 

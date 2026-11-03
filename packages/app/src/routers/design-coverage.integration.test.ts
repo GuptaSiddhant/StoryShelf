@@ -189,6 +189,10 @@ async function seed(options: Options = {}) {
   return { app, db };
 }
 
+/** The part of the page between two section anchors (or to the end). */
+const between = (page: string, from: string, to?: string): string =>
+  page.slice(page.indexOf(`id="${from}"`), to ? page.indexOf(`id="${to}"`) : undefined);
+
 const text = async (response: Response | Promise<Response>) => await (await response).text();
 const ADMIN_TOKEN = "admin-token-0123456789-abcdef";
 const bearer = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
@@ -198,10 +202,7 @@ describe("design coverage page", () => {
   it("lists components with no design link, and not the hand-mapped one", async () => {
     const { app } = await seed();
     const page = await text(app.request(URL_PATH));
-    const section = page.slice(
-      page.indexOf("No design link"),
-      page.indexOf("Design changed or deleted"),
-    );
+    const section = between(page, "no-link", "drift");
     expect(section).toContain("No design link (2)");
     for (const name of ["Card", "Modal"]) {
       expect(section).toContain(`Kit/${name}`);
@@ -212,28 +213,55 @@ describe("design coverage page", () => {
     }
   });
 
+  it("sends each unlinked component to its Design tab, with a labelled action", async () => {
+    const { app } = await seed();
+    const section = between(await text(app.request(URL_PATH)), "no-link", "drift");
+    expect(section).toContain('aria-label="Link a design to Kit/Card"');
+    expect(section).toContain("/projects/app/components/src/Card.stories.tsx?tab=design");
+    expect(section).toContain("Link a design");
+  });
+
+  it("anchors the three stats to their sections, in the spec's words", async () => {
+    const { app } = await seed();
+    const page = await text(app.request(URL_PATH));
+    for (const id of ["no-link", "drift", "current"]) {
+      expect(page).toContain(`href="#${id}"`);
+      expect(page).toContain(`id="${id}"`);
+    }
+    for (const label of ["No design link", "Needs attention", "Up to date"]) {
+      expect(page).toContain(label);
+    }
+    expect(page).not.toContain("With a design link");
+  });
+
   it("lists linked components whose design changed after the baseline, or was deleted", async () => {
     const { app } = await seed();
     const page = await text(app.request(URL_PATH));
-    const section = page.slice(
-      page.indexOf("Design changed or deleted"),
-      page.indexOf("Up to date"),
-    );
-    expect(section).toContain("Design changed or deleted (2)");
+    const section = between(page, "drift", "current");
+    expect(section).toContain("Needs attention (2)");
     expect(section).toContain("Kit/Button");
     expect(section).toContain("Design changed");
+    expect(section).toContain('title="Design changed after approval"');
     expect(section).toContain("Kit/Tag");
-    expect(section).toContain("Design deleted");
+    expect(section).toContain('title="Design file deleted"');
     expect(section).toContain(`href="${BUTTON}"`);
     expect(section).not.toContain("Kit/Input");
+    // Deleted designs come first.
+    expect(section.indexOf("Kit/Tag")).toBeLessThan(section.indexOf("Kit/Button"));
+  });
+
+  it("says when the design changed and when the designs were last checked", async () => {
+    const { app } = await seed();
+    const section = between(await text(app.request(URL_PATH)), "drift", "current");
+    expect(section).toContain('datetime="2026-02-01T00:00:00.000Z"');
+    expect(section).toContain("Last checked");
+    expect(section).toContain(`datetime="${NOW}"`);
   });
 
   it("counts linked components that are up to date, and those with no stored status", async () => {
     const { app } = await seed();
-    const page = await text(app.request(URL_PATH));
-    const section = page.slice(page.indexOf("Up to date"));
-    expect(section).toContain("Up to date (1)");
-    expect(section).toContain("1 linked component is up to date");
+    const section = between(await text(app.request(URL_PATH)), "current");
+    expect(section).toContain("1 component is linked and matches their approved design.");
     expect(section).toContain(
       "1 more has a link but nothing stored says whether the design changed",
     );
@@ -244,12 +272,8 @@ describe("design coverage page", () => {
     // before the baseline promoted since (2026-01), so the approved screenshot already shows it.
     const { app } = await seed();
     const page = await text(app.request(URL_PATH));
-    const changed = page.slice(
-      page.indexOf("Design changed or deleted"),
-      page.indexOf("Up to date"),
-    );
-    expect(changed).not.toContain("Kit/Input");
-    expect(page.slice(page.indexOf("Up to date"))).toContain("Up to date (1)");
+    expect(between(page, "drift", "current")).not.toContain("Kit/Input");
+    expect(between(page, "current")).toContain("1 component is linked");
   });
 
   it("reports drift when any baseline of the component predates the design change", async () => {
@@ -267,37 +291,42 @@ describe("design coverage page", () => {
       createdAt: "2025-11-01T00:00:00.000Z",
       updatedAt: "2025-11-01T00:00:00.000Z",
     } as never);
-    const page = await text(app.request(URL_PATH));
-    const changed = page.slice(
-      page.indexOf("Design changed or deleted"),
-      page.indexOf("Up to date"),
-    );
-    expect(changed).toContain("Design changed or deleted (3)");
+    const changed = between(await text(app.request(URL_PATH)), "drift", "current");
+    expect(changed).toContain("Needs attention (3)");
     expect(changed).toContain("Kit/Input");
   });
 
   it("counts a hand-mapped component as linked, not as missing a design", async () => {
     const { app } = await seed();
     const page = await text(app.request(URL_PATH));
-    expect(page).toContain("With a design link");
-    expect(page).not.toMatch(
-      /No design link \(\d+\)[\s\S]*Kit\/Menu[\s\S]*Design changed or deleted/u,
-    );
+    expect(between(page, "no-link", "drift")).not.toContain("Kit/Menu");
   });
 
-  it("says why design status is unavailable when the project has no token", async () => {
+  it("does not claim drift was checked when the project has no token", async () => {
     const { app } = await seed({ token: false });
     const page = await text(app.request(URL_PATH));
-    expect(page).toContain("Design status is unavailable for some links");
-    expect(page).toContain("Figma has no token for this project");
-    // What the cache holds is not trusted without a token: nothing is reported as drifted.
-    expect(page).toContain("Design changed or deleted (0)");
-    expect(page).not.toContain("Design deleted");
+    const drift = between(page, "drift", "current");
+    expect(drift).toContain("Drift can&#39;t be checked");
+    expect(drift).toContain("Figma has no access token for this project");
+    expect(drift).toContain("Open design settings");
+    expect(drift).toContain("/projects/app/settings/design");
+    // No all-clear, no count: the answer is unknown, not zero.
+    expect(drift).not.toContain("Needs attention (");
+    expect(drift).not.toContain("No drift found");
+    expect(drift).not.toContain("Last checked");
+    expect(page).toContain("Needs attention · Unavailable");
+    expect(page).not.toContain("Design file deleted");
+    // Nothing is called up to date either: only the unknown links are mentioned.
+    const current = between(page, "current");
+    expect(current).not.toContain("linked and match");
+    expect(current).toContain("have a link but nothing stored says whether the design changed");
   });
 
   it("does not warn about a missing token when the project has one", async () => {
     const { app } = await seed();
-    expect(await text(app.request(URL_PATH))).not.toContain("Design status is unavailable");
+    const page = await text(app.request(URL_PATH));
+    expect(page).not.toContain("can&#39;t be checked");
+    expect(page).not.toContain("Open design settings");
   });
 
   it("makes no design provider call while rendering", async () => {
@@ -315,7 +344,9 @@ describe("design coverage page", () => {
     async (build) => {
       const { app } = await seed({ build });
       const page = await text(app.request(URL_PATH));
-      expect(page).toContain("No accepted build yet");
+      expect(page).toContain("No build to check yet");
+      expect(page).toContain("Go to builds");
+      expect(page).toContain('href="/projects/app/builds"');
       expect(page).not.toContain("No design link (");
     },
   );
@@ -370,22 +401,22 @@ describe("design coverage page gating", () => {
     const page = await response.text();
     expect(page).toContain("Only mapped design links are counted");
     // Story-declared links need captured snapshots; the hand-mapped Menu is still linked.
-    expect(page).toContain("No design link (5)");
-    expect(page).not.toContain(">Kit/Menu<");
+    const unlinked = between(page, "no-link", "drift");
+    expect(unlinked).toContain("No design link (5)");
+    expect(unlinked).not.toContain(">Kit/Menu<");
+    // Without testing a component has no Design tab, so linking goes to the project's settings.
+    expect(unlinked).toContain("/projects/app/settings/design");
+    expect(unlinked).not.toContain("?tab=design");
     // Without snapshots nothing was compared with a baseline, so no link counts as up to date.
-    expect(page).toContain("Up to date (0)");
+    expect(between(page, "current")).not.toContain("linked and match");
   });
 
   it("ignores retained baselines when testing is off", async () => {
     // The seed holds baselines for every story; without testing none of them is compared.
     const { app } = await seed({ testing: false });
     const page = await text(app.request(URL_PATH));
-    const changed = page.slice(
-      page.indexOf("Design changed or deleted"),
-      page.indexOf("Up to date"),
-    );
-    expect(changed).not.toContain("Kit/Button");
-    expect(page).toContain("Up to date (0)");
+    expect(between(page, "drift", "current")).not.toContain("Kit/Button");
+    expect(between(page, "current")).not.toContain("linked and match");
   });
 
   it("does not say links are skipped when testing reads them", async () => {
