@@ -26,7 +26,7 @@ Manage via `GET /api/v1/projects/:slug/webhooks` and `DELETE`. See `POST /api/v1
 
 - Payload is JSON `{ event, project: { slug }, build: { id, gitSha, gitBranch, status } }`.
 - Header `X-StoryShelf-Signature: sha256=<hmac>` — verify with the shared `secret` (HMAC-SHA256 of the raw body).
-- Header `X-StoryShelf-Event: <event>` — the event name, for example `comment:created`. `review:comment` is a filter alias for notification channels and subscriptions only; it is never sent, so a webhook receives `comment:created`.
+- Header `X-StoryShelf-Event: <event>` — the event name, for example `comment:created`. `review:comment` keeps working as a filter (in a webhook's `events`, a notification channel or a subscription): it matches build and story comments, and the delivered event name is `comment:created`.
 - A comment event carries `data.eventId`, the comment id, and a retried delivery repeats it. De-duplicate retries by that id.
 - Retries: transient 5xx / network errors are retried with backoff; 4xx is not retried. Delivery logs are not yet exposed beyond capture logs — track separately if you need audit.
 

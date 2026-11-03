@@ -24,6 +24,7 @@ import {
 } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
+import { matchesEvent } from "@storyshelf/core/utils";
 import { credentialKeys } from "./credential-keys.ts";
 import { clearPaused, notificationOrigin, warnPaused } from "./notifications-pause.ts";
 import { getStore } from "./store.ts";
@@ -109,31 +110,6 @@ function recordOutcomes(
   };
 }
 
-/** The one event raised for every comment; its `data.scope` is `build`, `story` or `snapshot`. */
-export const COMMENT_CREATED = "comment:created";
-
-/**
- * `review:comment` is a filter alias, never an emitted event (ADR 0013, decision 10): a filter that
- * lists it matches a {@link COMMENT_CREATED} whose scope is `build` or `story`.
- */
-export const REVIEW_COMMENT_ALIAS = "review:comment";
-
-/**
- * Whether an allowlist admits an event (empty admits all). Matches the event name, or the
- * `review:comment` alias for a build or story comment; a list holding both names admits it once.
- */
-export function eventMatches(
-  allowed: readonly string[],
-  event: string,
-  data: Record<string, unknown>,
-): boolean {
-  if (allowed.length === 0 || allowed.includes(event)) {
-    return true;
-  }
-  const reviewScope = data["scope"] === "build" || data["scope"] === "story";
-  return event === COMMENT_CREATED && reviewScope && allowed.includes(REVIEW_COMMENT_ALIAS);
-}
-
 /** Subscriptions matching an event (enabled + allowlist, alias included). */
 function matchingSubs(
   rows: NotificationSubscriptionRow[],
@@ -141,7 +117,7 @@ function matchingSubs(
   data: Record<string, unknown>,
 ): NotificationSubscriptionRow[] {
   return rows.filter(
-    (row) => row.enabled && eventMatches(NotificationSubscriptionModel.eventsOf(row), event, data),
+    (row) => row.enabled && matchesEvent(NotificationSubscriptionModel.eventsOf(row), event, data),
   );
 }
 
@@ -152,7 +128,7 @@ function admittedChannels(
   data: Record<string, unknown>,
 ): NotificationChannel[] {
   return channels
-    .filter((channel) => eventMatches(channel.events, event, data))
+    .filter((channel) => matchesEvent(channel.events, event, data))
     .map((channel) => Object.assign({}, channel, { events: [] }));
 }
 

@@ -23,6 +23,34 @@ function expectNoUrlSecrets(lines: string[]): void {
   }
 }
 
+/** Which `X-StoryShelf-Event` headers a webhook filtering on `subscribed` receives for one comment. */
+async function received(subscribed: string[], scope: string): Promise<string[]> {
+  const { db } = makeDatabase();
+  await new WebhookModel(db, webhookTables(db), TEST_SECRET).create("p1", {
+    url: "https://example.com/hook",
+    secret: "whsec-plain",
+    events: subscribed,
+  });
+  const headers: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init: { headers: Record<string, string> }) => {
+      await Promise.resolve();
+      headers.push(init.headers["X-StoryShelf-Event"] ?? "");
+      return new Response("{}", { status: 200 });
+    }),
+  );
+  await emitWebhookEvent(
+    db,
+    webhookTables(db),
+    "p1",
+    "comment:created",
+    { scope, buildId: "b1" },
+    TEST_SECRET,
+  );
+  return headers;
+}
+
 describe("emitWebhookEvent", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -143,6 +171,23 @@ describe("emitWebhookEvent", () => {
 
     expect(signatures).toHaveLength(2);
     expect(signatures.every((signature) => signature.length === 64)).toBe(true);
+  });
+
+  describe("the review:comment filter alias", () => {
+    it("keeps delivering build and story comments to a webhook that lists review:comment", async () => {
+      expect(await received(["review:comment"], "build")).toEqual(["comment:created"]);
+      expect(await received(["review:comment"], "story")).toEqual(["comment:created"]);
+    });
+
+    it("does not deliver snapshot comments to the alias, and delivers once when both names are listed", async () => {
+      expect(await received(["review:comment"], "snapshot")).toEqual([]);
+      expect(await received(["review:comment", "comment:created"], "story")).toEqual([
+        "comment:created",
+      ]);
+      expect(await received(["review:comment", "comment:created"], "snapshot")).toEqual([
+        "comment:created",
+      ]);
+    });
   });
 
   it("never reads the receiver's response body, on 2xx or on an error", async () => {

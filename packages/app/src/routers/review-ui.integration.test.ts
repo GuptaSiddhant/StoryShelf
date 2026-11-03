@@ -773,6 +773,21 @@ describe("review events", () => {
       await booted.stop();
     });
 
+    it("keeps delivering build and story comments to a webhook that lists only review:comment", async () => {
+      const booted = await boot();
+      const id = await publish(booted, "feature/x");
+      const seen = await deliveries(booted, ["review:comment"]);
+      await postComment(booted, id, {});
+      await postComment(booted, id, { storyId: "card--basic" });
+      await postComment(booted, id, { snapshotId: "snap1" });
+      await vi.waitFor(() => expect(seen).toHaveLength(2));
+      expect(seen.map((item) => [item.event, item.header, item.data["scope"]])).toEqual([
+        ["comment:created", "comment:created", "build"],
+        ["comment:created", "comment:created", "story"],
+      ]);
+      await booted.stop();
+    });
+
     it("keeps the same event id (the comment id) when a delivery is retried", async () => {
       const booted = await boot();
       const id = await publish(booted, "feature/x");

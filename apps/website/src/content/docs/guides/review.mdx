@@ -116,12 +116,12 @@ The build's git channels show `<prefix>/review` (`pending`, then `success` or `f
 
 Review raises three [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
 
-| Event              | When                                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins.                      |
-| `comment:created`  | Any comment is posted. `data.scope` is `build`, `story` or `snapshot`; `data.eventId` is the comment id.                       |
-| `review:comment`   | A filter alias, never sent: matches a `comment:created` of scope `build` or `story` in a notification channel or subscription. |
-| `review:verdict`   | A reviewer approves or rejects a build.                                                                                        |
+| Event              | When                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins.                                  |
+| `comment:created`  | Any comment is posted. `data.scope` is `build`, `story` or `snapshot`; `data.eventId` is the comment id.                                   |
+| `review:comment`   | A filter alias, never sent: in a webhook, notification channel or subscription it matches a `comment:created` of scope `build` or `story`. |
+| `review:verdict`   | A reviewer approves or rejects a build.                                                                                                    |
 
 ### Builds nobody finishes
 

@@ -7,18 +7,14 @@
  *   and admins (see `notify.ts`).
  * - `comment:created`: every comment, the one canonical event; `data.scope` is `build`, `story` or
  *   `snapshot`. `review:comment` is only a filter alias for the build and story scopes (see
- *   `eventMatches` in `notify.ts`), never emitted.
+ *   `matchesEvent` in core), never emitted.
  * - `review:verdict`: a reviewer approved or rejected a build.
  */
 import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
 import type { Build, Project } from "@storyshelf/core/schema";
+import { COMMENT_CREATED, REVIEW_COMMENT_ALIAS } from "@storyshelf/core/utils";
 import { credentialKeys } from "./credential-keys.ts";
-import {
-  COMMENT_CREATED,
-  notifyProjectWith,
-  REVIEW_COMMENT_ALIAS,
-  type NotifyDeps,
-} from "./notify.ts";
+import { notifyProjectWith, type NotifyDeps } from "./notify.ts";
 import { getStore } from "./store.ts";
 
 /** Event names of the review topics. `comment` is the alias, `commentCreated` the emitted event. */
