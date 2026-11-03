@@ -283,3 +283,182 @@ describe("sharp engine", () => {
     expect(result.diffPixels).toBe(200);
   });
 });
+
+/**
+ * A worker module that misbehaves in its first incarnation only (a marker file tells the two apart)
+ * and runs the real worker otherwise, so the pool's replacement can be seen to work.
+ */
+function misbehavingWorker(firstWorker: string, secondWorker = ""): URL {
+  const dir = mkdtempSync(join(tmpdir(), "storyshelf-pool-"));
+  const marker = join(dir, "first");
+  const second = join(dir, "second");
+  const source = `import { existsSync, writeFileSync } from "node:fs";
+    import { parentPort } from "node:worker_threads";
+    const first = !existsSync(${JSON.stringify(marker)});
+    if (first) writeFileSync(${JSON.stringify(marker)}, "1");
+    const isSecond = !first && ${JSON.stringify(secondWorker)} !== "" && !existsSync(${JSON.stringify(second)});
+    if (isSecond) writeFileSync(${JSON.stringify(second)}, "1");
+    // afterResult(fn): run fn right after the first job's result has been posted (a barrier on the
+    // job, not on the clock).
+    const post = parentPort.postMessage.bind(parentPort);
+    let afterResult = () => {};
+    parentPort.postMessage = (message, transfer) => {
+      post(message, transfer);
+      if (message?.type === "result") setImmediate(() => { const run = afterResult; afterResult = () => {}; run(); });
+    };
+    const realWorker = ${JSON.stringify(WORKER_URL.href)};
+    if (isSecond) { ${secondWorker} }
+    else if (!first) { await import(realWorker); }
+    else { ${firstWorker} }`;
+  return new URL(`data:text/javascript,${encodeURIComponent(source)}`);
+}
+
+function poolWithEvents(workerUrl: URL): { pool: DiffPool; events: string[] } {
+  const events: string[] = [];
+  const pool = new DiffPool({
+    size: 1,
+    workerUrl,
+    onFallback: () => {},
+    onWorkerEvent: (reason) => events.push(reason),
+  });
+  pools.push(pool);
+  return { pool, events };
+}
+
+// The first worker answers diffs properly (it is the real worker), then misbehaves while idle.
+const idleThen = (action: string): string =>
+  `afterResult = () => { ${action} }; await import(realWorker);`;
+const expected = async (): Promise<unknown> => await diffImages(base(), changed(), failOnResize);
+
+describe("worker messages that answer no job", () => {
+  it("replaces a worker whose id-less error arrives while idle, without crashing", async () => {
+    const stray = `parentPort.postMessage({ type: "error", name: "Error", message: "boom" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(idleThen(stray)));
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await until(() => events.length > 0);
+    await until(() => pool.workerCount === 0);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatch(/without a job id/u);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(pool.workerCount).toBe(1);
+  });
+
+  it("rejects the in-flight job once for an id-less error, then recovers", async () => {
+    const stray = `parentPort.on("message", () => parentPort.postMessage({ type: "error", message: "boom" }));
+      parentPort.postMessage({ type: "ready" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(stray));
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(
+      /answer the pool cannot use/u,
+    );
+    expect(events).toHaveLength(1);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("ignores and reports an answer for a job that is not in flight", async () => {
+    const late = `parentPort.postMessage({ type: "error", id: 424242, name: "Error", message: "late" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(idleThen(late)));
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await until(() => events.length > 0);
+    expect(events[0]).toMatch(/not in flight/u);
+    expect(pool.workerCount).toBe(1);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("replaces a worker that exits while idle", async () => {
+    const { pool, events } = poolWithEvents(misbehavingWorker(idleThen("process.exit(5);")));
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await until(() => pool.workerCount === 0);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(pool.workerCount).toBe(1);
+    expect(events).toEqual([]);
+  });
+
+  it("rejects the job and replaces the worker for an answer it cannot settle", async () => {
+    const broken = `parentPort.on("message", (request) => parentPort.postMessage({ type: "result", id: request.id }));
+      parentPort.postMessage({ type: "ready" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(broken));
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(
+      /answer the pool cannot use/u,
+    );
+    expect(events).toEqual(["diff worker sent a malformed answer; replacing the worker"]);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("rejects the job for a result whose overlay is not bytes", async () => {
+    const broken = `parentPort.on("message", (request) => parentPort.postMessage({ type: "result", id: request.id, result: { diffImage: {} } }));
+      parentPort.postMessage({ type: "ready" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(broken));
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(
+      /answer the pool cannot use/u,
+    );
+    expect(events).toHaveLength(1);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("falls back in-thread when a worker faults before ready on every start", async () => {
+    const faulty = `import { parentPort } from "node:worker_threads";
+      parentPort.postMessage({ type: "error", message: "boom" });`;
+    const fallbacks: string[] = [];
+    const pool = new DiffPool({
+      size: 1,
+      workerUrl: new URL(`data:text/javascript,${encodeURIComponent(faulty)}`),
+      onFallback: (reason) => fallbacks.push(reason),
+      onWorkerEvent: () => {},
+    });
+    pools.push(pool);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(fallbacks).toHaveLength(1);
+  });
+
+  it("does not count the queued messages of a worker it already retired", async () => {
+    // Worker 1 serves a job then goes bad while idle; worker 2 posts three id-less errors in a row
+    // before ready (only the first may count as a start failure); worker 3 is the real one.
+    const stray = `parentPort.postMessage({ type: "error", message: "boom" });`;
+    const burst = stray.repeat(3);
+    const fallbacks: string[] = [];
+    const events: string[] = [];
+    const pool = new DiffPool({
+      size: 1,
+      workerUrl: misbehavingWorker(idleThen(stray), burst),
+      onFallback: (reason) => fallbacks.push(reason),
+      onWorkerEvent: (reason) => events.push(reason),
+    });
+    pools.push(pool);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await until(() => pool.workerCount === 0);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(fallbacks).toEqual([]);
+    // One event for worker 1's idle fault and exactly one for worker 2's burst: it did fault, and
+    // its other two queued messages were not heard (without the guard there are four events).
+    expect(events).toHaveLength(2);
+  });
+
+  it("still cleans up when the event reporter throws", async () => {
+    const stray = `parentPort.on("message", () => parentPort.postMessage({ type: "error", message: "boom" }));
+      parentPort.postMessage({ type: "ready" });`;
+    const pool = new DiffPool({
+      size: 1,
+      workerUrl: misbehavingWorker(stray),
+      onFallback: () => {},
+      onWorkerEvent: () => {
+        throw new Error("reporter broke");
+      },
+    });
+    pools.push(pool);
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(
+      /answer the pool cannot use/u,
+    );
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("ignores messages that are not this pool's protocol, like node --watch's", async () => {
+    const foreign = `parentPort.postMessage("garbage");
+      parentPort.postMessage({ "watch:require": ["/some/preload.cjs"] });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(idleThen(foreign)));
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    // The second job completes after the worker's earlier messages were delivered, in order.
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(events).toEqual([]);
+    expect(pool.workerCount).toBe(1);
+  });
+});

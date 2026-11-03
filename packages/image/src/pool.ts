@@ -20,6 +20,11 @@ export interface DiffPoolOptions {
    * to a process warning, since every later diff then blocks the event loop.
    */
   onFallback?: (reason: string) => void;
+  /**
+   * Called when a worker sends a message that answers no job (no job id, or one not in flight).
+   * The pool never throws for it. Defaults to a process warning that carries no message body.
+   */
+  onWorkerEvent?: (reason: string) => void;
 }
 
 /** Workers dying before `ready` in a row, after one has started fine, before the pool gives up. */
@@ -65,6 +70,7 @@ export class DiffPool {
   private everReady = false;
   private startFailures = 0;
   private readonly onFallback: (reason: string) => void;
+  private readonly onWorkerEvent: (reason: string) => void;
   private workerClass: WorkerCtor | null | undefined;
 
   constructor(options: DiffPoolOptions) {
@@ -72,6 +78,7 @@ export class DiffPool {
     this.workerUrl = options.workerUrl;
     this.engine = options.engine ?? "pngjs";
     this.onFallback = options.onFallback ?? warnFallback;
+    this.onWorkerEvent = options.onWorkerEvent ?? warnWorkerEvent;
   }
 
   /**
@@ -196,18 +203,67 @@ export class DiffPool {
   }
 
   private onMessage(slot: Slot, message: DiffResponse): void {
-    if (message.type === "ready") {
-      this.markReady(slot);
-    } else if (slot.task?.id === message.id) {
-      const { task } = slot;
-      slot.task = null;
-      slot.worker.unref();
-      settle(task, message);
+    if (!this.slots.includes(slot)) {
+      // A worker the pool already retired or lost: whatever it still has queued is not heard.
+      return;
     }
-    if (this.broken && !slot.task) {
+    if (isReady(message)) {
+      this.markReady(slot);
+    } else if (!answerJob(slot, message)) {
+      this.onStrayMessage(slot, message);
+    }
+    if (this.broken && !slot.task && this.slots.includes(slot)) {
       this.retire(slot);
     }
     this.pump();
+  }
+
+  /**
+   * A message that answers no job in flight. Messages that are not this pool's protocol (Node's
+   * `--watch` mode posts `{ "watch:require": [...] }` on the same port) are ignored. A `result` or
+   * `error` with no job id means the worker itself is at fault: report it once, fail its job (if
+   * any) and replace the worker. A job id that is not in flight is a late answer for work already
+   * settled: report it and ignore it.
+   */
+  private onStrayMessage(slot: Slot, message: unknown): void {
+    if (!isAnswer(message)) {
+      return;
+    }
+    const id = jobIdOf(message);
+    if (id !== undefined && id !== slot.task?.id) {
+      this.report("diff worker answered a job that is not in flight; ignored");
+      return;
+    }
+    // No job id, or the job's own id with an answer that cannot be settled: the worker is at fault.
+    this.failWorker(
+      slot,
+      id === undefined
+        ? "diff worker sent a message without a job id; replacing the worker"
+        : "diff worker sent a malformed answer; replacing the worker",
+    );
+  }
+
+  /** Report a faulty worker, fail the job it held (once) and replace it. */
+  private failWorker(slot: Slot, reason: string): void {
+    this.report(reason);
+    const { task } = slot;
+    slot.task = null;
+    this.retire(slot);
+    task?.reject(new Error("diff worker failed: it sent an answer the pool cannot use"));
+    if (!slot.ready) {
+      // A worker that faults before `ready` counts like one that dies there, so a worker that does
+      // it on every start ends in the in-thread fallback instead of an endless restart loop.
+      this.onStartFailure(`diff worker faulted before it was ready: ${reason}`);
+    }
+  }
+
+  /** Tell `onWorkerEvent`; a reporter that throws must not break the pool's cleanup. */
+  private report(reason: string): void {
+    try {
+      this.onWorkerEvent(reason);
+    } catch {
+      // Reporting is best effort.
+    }
   }
 
   private markReady(slot: Slot): void {
@@ -291,6 +347,57 @@ function installExitHook(pool: DiffPool): void {
 }
 
 function ignore(): void {}
+
+/** Settle the slot's job when `message` answers it by id; false when it answers nothing. */
+function answerJob(slot: Slot, message: DiffResponse): boolean {
+  const { task } = slot;
+  const id = jobIdOf(message);
+  if (!task || id !== task.id || message.type === "ready" || !isWellFormed(message)) {
+    return false;
+  }
+  slot.task = null;
+  slot.worker.unref();
+  settle(task, message);
+  return true;
+}
+
+/** An answer `settle` can use: a `result` carrying its result, an `error` carrying its message. */
+function isWellFormed(message: DiffResponse): boolean {
+  if (message.type === "result") {
+    const result: unknown = message.result;
+    if (typeof result !== "object" || result === null) {
+      return false;
+    }
+    const { diffImage } = result as { diffImage?: unknown };
+    return diffImage === null || ArrayBuffer.isView(diffImage);
+  }
+  return message.type === "error" && typeof message.message === "string";
+}
+
+/** A `result` or `error` message: this pool's answer to a job, whatever its job id. */
+function isAnswer(message: unknown): boolean {
+  const type = (message as { type?: unknown } | null)?.type;
+  return type === "result" || type === "error";
+}
+
+function isReady(message: unknown): boolean {
+  return (
+    typeof message === "object" && message !== null && (message as DiffResponse).type === "ready"
+  );
+}
+
+/** The job id a worker message carries, when it is a real one. */
+function jobIdOf(message: unknown): number | undefined {
+  if (typeof message !== "object" || message === null) {
+    return undefined;
+  }
+  const { id } = message as { id?: unknown };
+  return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : undefined;
+}
+
+function warnWorkerEvent(reason: string): void {
+  process.emitWarning(reason, { code: "STORYSHELF_DIFF_WORKER_EVENT" });
+}
 
 function warnFallback(reason: string): void {
   process.emitWarning(`${reason}; running image diffs on the main thread from now on`, {

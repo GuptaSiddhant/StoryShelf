@@ -17,7 +17,9 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import {
   createDatabaseCaptureQueue,
   LEASE_EXHAUSTED_ERROR,
+  MAX_HOOK_RUNS,
   type DatabaseCaptureQueue,
+  type DatabaseCaptureQueueOptions,
   type DatabaseJob,
 } from "../capture/db-queue/index.ts";
 import { attemptRowId, CaptureJobModel } from "../models/capture-job.ts";
@@ -50,6 +52,7 @@ async function fleet(
   makeDb: SharedDatabaseFactory,
   size: number,
   kinds: readonly CaptureJobKind[] = ["capture"],
+  hooks: Pick<DatabaseCaptureQueueOptions, "onExhausted" | "onAbandoned"> = {},
 ): Promise<Fleet> {
   const db = await makeDb();
   const clock = { now: Date.now() };
@@ -60,6 +63,7 @@ async function fleet(
       retries: RETRIES,
       owner: `instance-${String(index)}`,
       now: () => clock.now,
+      ...hooks,
     }),
   );
   const advance = (ms: number): void => {
@@ -106,6 +110,7 @@ export function databaseQueueMultiInstanceSuite(
     leaseCases(makeDb, size, options.timeoutMs);
     retryCases(makeDb, size, options.timeoutMs);
     cancelAndKindCases(makeDb, size, options.timeoutMs);
+    exhaustingCases(makeDb, size, options.timeoutMs);
   });
 }
 
@@ -270,4 +275,128 @@ function cancelAndKindCases(makeDb: SharedDatabaseFactory, size: number, timeout
     },
     timeoutMs,
   );
+}
+
+/** Spend every attempt of a job's lease on `queues`, leaving the next claim to the exhausted-job hook. */
+async function spendLeases(fleetOf: Fleet, buildId: string): Promise<void> {
+  const { queues, advance } = fleetOf;
+  await queues[0]!.enqueue({ buildId });
+  for (let attempt = 1; attempt <= RETRIES + 1; attempt += 1) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- attempts are sequential
+    const job = await claimOn(queues[attempt % queues.length]!, buildId);
+    expect(job?.attempt).toBe(attempt);
+    advance(LEASE_MS + 1);
+  }
+}
+
+/** Poll one instance after another, each past the lease of the run before, until `done` holds. */
+async function runsUntil(
+  fleetOf: Fleet,
+  buildId: string,
+  done: () => Promise<boolean>,
+): Promise<number> {
+  let polls = 0;
+  // oxlint-disable-next-line eslint/no-await-in-loop -- one poll per lease
+  while (!(await done()) && polls < MAX_HOOK_RUNS + 3) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- see above
+    await claimOn(fleetOf.queues[polls % fleetOf.queues.length]!, buildId);
+    fleetOf.advance(LEASE_MS + 1);
+    polls += 1;
+  }
+  return polls;
+}
+
+async function failingHook(): Promise<void> {
+  await Promise.resolve();
+  throw new Error("hook broke");
+}
+
+function exhaustingCases(makeDb: SharedDatabaseFactory, size: number, timeoutMs?: number): void {
+  it(
+    "re-runs a throwing exhausted-job hook on another instance once its lease ended",
+    async () => {
+      const calls: string[] = [];
+      const hook = async (job: DatabaseJob): Promise<void> => {
+        calls.push(job.buildId);
+        await Promise.resolve();
+        if (calls.length === 1) {
+          throw new Error("hook broke");
+        }
+      };
+      const env = await fleet(makeDb, size, ["capture"], { onExhausted: hook });
+      const buildId = `${env.runId}-hook`;
+      await spendLeases(env, buildId);
+      await claimOn(env.queues[0]!, buildId);
+      expect(await env.queues[1]!.status(buildId)).toMatchObject({ status: "recovering" });
+      expect(await claimOn(env.queues[1]!, buildId)).toBeNull();
+      expect(calls).toHaveLength(1);
+      env.advance(LEASE_MS + 1);
+      // Every instance races for the expired hook run; exactly one wins and the build is failed once.
+      await Promise.all(env.queues.map(async (queue) => await queue.poll()));
+      expect(calls).toHaveLength(2);
+      expect(await env.queues[2 % size]!.status(buildId)).toMatchObject({
+        status: "failed",
+        error: LEASE_EXHAUSTED_ERROR,
+      });
+    },
+    timeoutMs,
+  );
+
+  it(
+    "fails the job and alerts exactly once after the hook failed every allowed run",
+    async () => {
+      const runs: string[] = [];
+      const alerts: string[] = [];
+      const env = await fleet(makeDb, size, ["capture"], {
+        onExhausted: async (job) => {
+          runs.push(job.buildId);
+          await Promise.resolve();
+          throw new Error("hook broke");
+        },
+        onAbandoned: async (job) => {
+          alerts.push(job.buildId);
+          await Promise.resolve();
+        },
+      });
+      const buildId = `${env.runId}-abandon`;
+      await spendLeases(env, buildId);
+      await runsUntil(env, buildId, async () => alerts.length > 0);
+      expect(runs.filter((id) => id === buildId)).toHaveLength(MAX_HOOK_RUNS);
+      expect(alerts.filter((id) => id === buildId)).toEqual([buildId]);
+      expect(await env.queues[0]!.status(buildId)).toMatchObject({ status: "failed" });
+      env.advance(LEASE_MS + 1);
+      await Promise.all(env.queues.map(async (queue) => await queue.poll()));
+      expect(alerts.filter((id) => id === buildId)).toHaveLength(1);
+    },
+    timeoutMs,
+  );
+
+  it(
+    "lets a late finish win while the hook is retried, and cancels an exhausting job",
+    async () => {
+      const env = await fleet(makeDb, size, ["capture"], { onExhausted: failingHook });
+      const [late, cancelled] = [`${env.runId}-late`, `${env.runId}-cancel-exhausting`];
+      await spendLeases(env, late);
+      await spendLeases(env, cancelled);
+      await claimOn(env.queues[0]!, late);
+      await claimOn(env.queues[0]!, cancelled);
+      expect((await env.queues[1]!.status(late))?.status).toBe("recovering");
+      expect(await env.queues[1]!.cancel(cancelled)).toBe(true);
+      await env.queues[2 % size]!.ack({
+        buildId: late,
+        receipt: `${await jobIdOf(env, late)}:${String(RETRIES + 1)}`,
+      });
+      env.advance(LEASE_MS + 1);
+      await claimOn(env.queues[3 % size]!, late);
+      await claimOn(env.queues[3 % size]!, cancelled);
+      expect((await env.queues[1]!.status(late))?.status).toBe("completed");
+      expect((await env.queues[1]!.status(cancelled))?.status).toBe("cancelled");
+    },
+    timeoutMs,
+  );
+}
+
+async function jobIdOf(env: Fleet, buildId: string): Promise<string> {
+  const row = await new CaptureJobModel(env.db).latestForBuild(buildId, ["capture"]);
+  return row!.jobId;
 }

@@ -27,13 +27,7 @@
     "build-storybook": {
       "dependsOn": ["^build"],
       "outputs": ["storybook-static/**"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "!**/*.test.ts",
-        "!**/*.test.tsx",
-        "!README.md",
-        "!LICENSE"
-      ]
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts", "!**/*.test.tsx", "!README.md", "!LICENSE"]
     },
     "dev": {
       "persistent": true,

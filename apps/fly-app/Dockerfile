@@ -46,6 +46,7 @@ WORKDIR /app
 # Copy bundled server + chunks and hoisted node_modules (external npm deps + native)
 COPY --from=builder /app/apps/fly-app/dist ./dist
 COPY --from=builder /app/apps/fly-app/package.json ./package.json
+COPY --from=builder /app/apps/fly-app/migrate-to-s3.sh ./migrate-to-s3.sh
 COPY --from=builder /app/node_modules ./node_modules
 # Install the browser + system deps (node:slim has none) with the app's own
 # hoisted playwright-core, so the browser build always matches the locked
