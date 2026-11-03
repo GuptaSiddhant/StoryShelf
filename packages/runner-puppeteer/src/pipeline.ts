@@ -3,6 +3,7 @@
 import {
   TargetLaunchError,
   engineOf,
+  logRemoteSizing,
   type CaptureEnvironment,
   type CaptureTarget,
   type RemoteTarget,
@@ -72,7 +73,7 @@ export async function renderAll(
   return await finishing(
     async () => {
       server = await serve(input, session);
-      input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
+      logSizing(input, name, remote);
       // Measured while the browser is open: Puppeteer cannot read the version of a closed one.
       const environment = await measureEnvironment(session, remote, input, active.abort?.signal);
       ctx = buildContext(session, server.url, input);
@@ -380,4 +381,16 @@ function pushRenderFailure(
 ): void {
   failures.push({ storyId, viewportName, error: messageOf(error) });
   input.logger?.error({ storyId, viewport: viewportName, err: error }, "render failed for story");
+}
+
+/** The host sizing of a capture, and for a remote target its limits (never its endpoint). */
+function logSizing(
+  input: { logger?: PuppeteerRenderInput["logger"]; concurrency?: number | undefined },
+  name: CaptureTarget,
+  remote: RemoteTarget | undefined,
+): void {
+  input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
+  if (remote) {
+    logRemoteSizing(input.logger, name, remote.remote);
+  }
 }

@@ -47,8 +47,8 @@ Credentials are operator-level: they are passed in the server's code, from the e
 | Preset                                      | Package                                | Protocol                       | Reaches the Storybook through                       |
 | ------------------------------------------- | -------------------------------------- | ------------------------------ | --------------------------------------------------- |
 | `playwrightServer(...)`                     | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork` (default)                           |
-| `azurePlaywright(...)`                      | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
-| `browserstack(...)`                         | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
+| `azurePlaywright(...)` (experimental)       | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
+| `browserstack(...)` (experimental)          | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
 | `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
 | `cdp(...)`                                  | `@storyshelf/runner-puppeteer/remote`  | CDP                            | a Storybook URL                                     |
 
@@ -139,6 +139,10 @@ A field the runner cannot determine (a page that would not open) is omitted, and
 - A failure that no retry fixes (refused credentials, a missing endpoint, mismatched versions) also marks the target `unavailable` with the reason on **System → Capture browsers**, until the server restarts. A service that is merely down does not: it stays offered, and the next build tries again.
 - A browser that dies while rendering is a crash like a local one and goes through crash isolation as usual.
 - Browser recycling (`recycleBrowserEvery`) releases the old connection and opens a new remote session instead of relaunching; it never sends `Browser.close`.
+
+### What each run logs
+
+At the start of a remote run the runner logs one `remote sizing` line per target with the limits as configured and as they apply: `pages` (the target's page limit, per target and per process), `pagesPerConnection`, `effectivePagesPerConnection` (the lower of the two), and `maxConnections` (per process; `null` means no cap), plus `scope`, `experimental` and, for an experimental preset, `verification`. A `sessions` function is read at that moment. The line carries no endpoint, header, credential or lease, and nothing is measured on the app host: the browser's environment is still measured in the browser.
 
 ## Self-hosted farm
 
@@ -272,7 +276,9 @@ cdp({
 
 ## Other services
 
+**Experimental presets.** `azurePlaywright` and `browserstack` are marked experimental: they were written against the providers' documentation and are **not verified against live infrastructure**, because no provider credentials were available to check them. Treat a first run as a trial, pin versions, and report what you find. The mark is `experimental: true` on the returned service and shows in the run's sizing log (`verification: "not verified against live infrastructure"`). It changes no behavior; it is removed once someone verifies the preset.
+
 - **Browserless** and other CDP services: `cdp({ name, endpoint, headers, sessions })` on the Puppeteer runner, or `remote({ protocol: "cdp", reach: "url", connect: { endpoint } })` on the Playwright runner (Chromium only, and noticeably lower fidelity than Playwright's own protocol, which is acceptable because the target is its own engine with its own baselines). Both need a Storybook URL.
-- **Azure Playwright Workspaces**: `azurePlaywright({ endpoint, token, os, sessions })`, with the workspace's browser endpoint (`PLAYWRIGHT_SERVICE_URL`) and access token; it passes `os` and the API version as query parameters.
-- **BrowserStack**: `browserstack({ username, accessKey, os, browserVersion, engines, sessions })`; the credentials travel in the connection's capabilities and are scrubbed from messages. Needs a Storybook URL.
+- **Azure Playwright Workspaces** (experimental): `azurePlaywright({ endpoint, token, os, sessions })`, with the workspace's browser endpoint (`PLAYWRIGHT_SERVICE_URL`) and access token; it passes `os` and the API version as query parameters.
+- **BrowserStack** (experimental): `browserstack({ username, accessKey, os, browserVersion, engines, sessions })`; the credentials travel in the connection's capabilities and are scrubbed from messages. Needs a Storybook URL.
 - Real devices and real Safari go through WebDriver and Appium, not a connect endpoint, and are not covered.

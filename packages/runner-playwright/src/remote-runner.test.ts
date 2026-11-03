@@ -255,6 +255,24 @@ describe("a remote target", () => {
     });
   });
 
+  it("logs the remote's limits once at run start, without its endpoint or credentials", async () => {
+    const info = vi.fn();
+    await createPlaywrightCaptureRunner({
+      browsers: [farm({ maxPagesPerConnection: 1, maxConnections: 2, experimental: true })],
+    }).render(input({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
+    const sizing = info.mock.calls.filter(([, message]) => message === "remote sizing");
+    expect(sizing).toHaveLength(1);
+    expect(sizing[0]?.[0]).toMatchObject({
+      pages: 2,
+      pagesPerConnection: 1,
+      maxConnections: 2,
+      scope: { pages: "target", connections: "process" },
+      experimental: true,
+      verification: "not verified against live infrastructure",
+    });
+    expect(JSON.stringify(info.mock.calls)).not.toMatch(/farm\.example|sekret/u);
+  });
+
   it("falls back to the configured OS when the page cannot be probed, and omits what it cannot know", async () => {
     fake.state.probeFails = true;
     const warn = vi.fn();

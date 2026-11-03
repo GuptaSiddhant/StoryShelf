@@ -81,6 +81,12 @@ export interface RemoteOptions<TLease = unknown> {
    * cancel or shutdown ends the wait. Per process; the deployment-wide cap is another issue.
    */
   maxConnections?: number | undefined;
+  /**
+   * Marks a vendor preset as experimental: written against the provider's documentation and not
+   * verified against live infrastructure. Reported in the run's sizing log and the docs; it changes
+   * no behavior.
+   */
+  experimental?: boolean | undefined;
   /** Declared, never inferred: how the runner talks to the service. */
   protocol: RemoteProtocol;
   /**
@@ -134,6 +140,8 @@ export interface RemoteBrowser {
   readonly sessions: number | (() => number);
   readonly maxPagesPerConnection?: number | undefined;
   readonly maxConnections?: number | undefined;
+  /** A vendor preset not verified against live infrastructure (see {@link RemoteOptions.experimental}). */
+  readonly experimental: boolean;
   readonly protocol: RemoteProtocol;
   readonly reach: TargetReach;
   readonly connect: RemoteOptions["connect"];
@@ -190,6 +198,7 @@ const KNOWN = new Set([
   "sessions",
   "maxPagesPerConnection",
   "maxConnections",
+  "experimental",
   "protocol",
   "reach",
   "connect",
@@ -219,6 +228,7 @@ export function defineRemote<TLease = unknown>(
     sessions: options.sessions,
     maxPagesPerConnection: options.maxPagesPerConnection,
     maxConnections: options.maxConnections,
+    experimental: options.experimental === true,
     protocol: options.protocol,
     reach: options.reach,
     connect: options.connect,
