@@ -129,6 +129,45 @@ describe("forked capture child: git-state delivery through the durable queue", (
     expect(child.sent.map((message) => (message as { type: string }).type)).toEqual(["done"]);
   });
 
+  it("hands a job to a consumer that is already polling, found at a later poll and not by a wake-up", async () => {
+    const w = await world();
+    const queue = createDatabaseCaptureQueue(w.db, { kinds: ["notify"], owner: "parent" });
+    const poll = queue.poll.bind(queue);
+    let polls = 0;
+    queue.poll = async (options) => {
+      polls += 1;
+      return await poll(options);
+    };
+    const consumer = createCaptureConsumer({
+      queue,
+      cadence,
+      logger: silent,
+      config: { concurrency: 1 },
+      handlers: { notify: createNotifyHandler({ deps: w.deps }) },
+    });
+    const started = consumer.start();
+    // The consumer's polls come up empty first; the child's enqueue is in a different queue handle.
+    await vi.waitFor(() => {
+      expect(polls).toBeGreaterThanOrEqual(2);
+    });
+    expect(w.git.calls).toEqual([]);
+    const child = startChild(w);
+
+    await child.run(w.build.id);
+
+    await vi.waitFor(
+      async () => {
+        expect(w.git.calls.length).toBeGreaterThan(0);
+        expect((await notifyJobs(w)).map((row) => row.status)).toEqual(["done"]);
+      },
+      { timeout: 5000 },
+    );
+    await consumer.stop();
+    await started;
+    await child.stop();
+    expect(child.sent.map((message) => (message as { type: string }).type)).toEqual(["done"]);
+  });
+
   it("keeps the job queued when no consumer is configured: neither dropped nor delivered inline", async () => {
     const w = await world();
     const child = startChild(w);

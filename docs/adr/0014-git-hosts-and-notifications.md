@@ -157,7 +157,8 @@ Details of the job kind:
   ends a successor job takes the key for one more pass. A forked capture child queues its jobs on
   the database queue; the parent's consumer runs them. The child's enqueue is in another process and
   sends no wake-up, so the parent finds the job at its next poll (about 2 s after recent work and 15 s
-  when idle, each stretched by up to 20 %, ADR 0006 decision 11); an IPC wake-up would only shorten
+  when idle, each stretched by up to 20 %, ADR 0006 decision 11, and only while a delivery slot is
+  free: with all four busy a job waits for one); an IPC wake-up would only shorten
   that and is a possible later optimization. With no consumer running, the job stays `queued`: it is
   neither dropped nor delivered inline, and the next consumer to start claims it.
 - **Guarantee.** Delivery converges on the build's current state per `(channel, build)`, with at
