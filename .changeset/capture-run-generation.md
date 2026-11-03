@@ -1,3 +1,4 @@
+---
 "@storyshelf/core": patch
 "@storyshelf/db-sqlite": patch
 "@storyshelf/db-postgres": patch
