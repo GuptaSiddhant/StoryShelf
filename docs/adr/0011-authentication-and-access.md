@@ -155,6 +155,10 @@ function effectiveRole(user, project): "admin" | "approver" | "developer" | "vie
   same for build, story and snapshot comments.
 - **Anonymous access** is limited to public builds (ADR 0010, Projects, Published Storybook and
   Labels): a build marked public or on a branch matching the project's public-branch pattern.
+  Anyone else who asks for a private project's published Storybook, signed in or not, gets the
+  same 404 as for an unknown project; the sign-in prompt is the 404 page's "Sign in" link, which
+  brings a visitor who is not signed in back to the page and is on every not-found, so it tells
+  nobody which one they hit.
 - **Access is the same in every mode.** Hosting-only (ADR 0006, Testing Option, Hosting-Only Mode
   and the Database Queue) does not open anything up: route classes gate features, never access, and
   the project review switch never widens who can view a project.

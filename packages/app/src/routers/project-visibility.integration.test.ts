@@ -121,7 +121,12 @@ type Booted = Awaited<ReturnType<typeof boot>>;
 async function observed(response: Response): Promise<Record<string, unknown>> {
   return {
     status: response.status,
-    body: (await response.text()).replaceAll(/\b(?:hidden|ghost)\b/gu, ":slug"),
+    body: (await response.text())
+      .replaceAll(/hidden|ghost/gu, ":slug")
+      .replaceAll(privateBuildId, ":id")
+      .replaceAll(UNKNOWN_BUILD_ID, ":id")
+      // Every page carries a fresh CSRF token, whatever the request.
+      .replaceAll(/name="csrf-token" content="[^"]*"/gu, 'name="csrf-token" content=":token"'),
     cacheControl: response.headers.get("cache-control"),
     contentType: response.headers.get("content-type"),
     location: response.headers
@@ -222,21 +227,27 @@ describe("a project the caller cannot see", () => {
 });
 
 /** Every way to reach a build's published Storybook, for a project slug and a build id. */
-const storybookPaths = [
-  (slug: string, id: string) => `/projects/${slug}/storybook`,
-  (slug: string, id: string) => `/projects/${slug}/storybook/build/${id}/`,
-  (slug: string, id: string) => `/projects/${slug}/storybook/build/${id}/index.html`,
-  (slug: string, id: string) => `/projects/${slug}/storybook/branch/main`,
-  (slug: string, id: string) => `/_/${id}/`,
-  (slug: string, id: string) => `/_/${id}/index.html`,
-  (slug: string) => `/_/${slug}/`,
+const storybookPaths: ((slug: string, id: string) => string)[] = [
+  (slug) => `/projects/${slug}/storybook`,
+  (slug, id) => `/projects/${slug}/storybook/build/${id}/`,
+  (slug, id) => `/projects/${slug}/storybook/build/${id}/index.html`,
+  (slug) => `/projects/${slug}/storybook/branch/main`,
+  (_slug, id) => `/_/${id}/`,
+  (_slug, id) => `/_/${id}/index.html`,
+  (slug) => `/_/${slug}/`,
 ];
 
-async function getAs(app: Booted, path: string, cookie?: string): Promise<Record<string, unknown>> {
+async function getAs(
+  app: Booted,
+  path: string,
+  cookie?: string,
+  accept = "*/*",
+): Promise<Record<string, unknown>> {
   requests += 1;
   return await observed(
     await app.request(path, {
       headers: {
+        accept,
         ...(cookie ? { cookie } : {}),
         "x-forwarded-for": `10.2.${Math.floor(requests / 250)}.${requests % 250}`,
       },
@@ -246,16 +257,18 @@ async function getAs(app: Booted, path: string, cookie?: string): Promise<Record
 
 describe("a private project's published Storybook", () => {
   it.each([
-    ["an anonymous caller", undefined],
-    ["a signed-in caller with no role", "storyshelf_session=outsider"],
-  ])("answers %s exactly as for a project that does not exist", async (_name, cookie) => {
+    ["an anonymous caller", undefined, "*/*"],
+    ["a signed-in caller with no role", "storyshelf_session=outsider", "*/*"],
+    ["an anonymous browser", undefined, "text/html"],
+    ["a signed-in browser with no role", "storyshelf_session=outsider", "text/html"],
+  ])("answers %s exactly as for a project that does not exist", async (_name, cookie, accept) => {
     const app = await boot();
     for (const path of storybookPaths) {
-      // oxlint-disable-next-line eslint/no-await-in-loop -- one route at a time keeps failures readable
-      const hidden = await getAs(app, path("hidden", privateBuildId), cookie);
-      // oxlint-disable-next-line eslint/no-await-in-loop -- same
-      const unknown = await getAs(app, path("ghost", UNKNOWN_BUILD_ID), cookie);
       const where = path("hidden", privateBuildId);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one route at a time keeps failures readable
+      const hidden = await getAs(app, where, cookie, accept);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      const unknown = await getAs(app, path("ghost", UNKNOWN_BUILD_ID), cookie, accept);
       expect(hidden, where).toEqual(unknown);
       // The auth gate answers an anonymous short link, for any id, before the route runs.
       const byGate = cookie === undefined && where.startsWith("/_/");
