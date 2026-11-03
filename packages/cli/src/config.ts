@@ -15,6 +15,8 @@ export interface StorybookConfig {
   buildScriptName?: string;
   skip?: string;
   affectedOnly?: boolean;
+  /** Append `--stats-json` to the build script when affected capture is on (default true). */
+  buildStats?: boolean;
   /** Glob patterns excluded from affected tracing (union with `--untraced`). */
   untraced?: string[];
 }
@@ -84,7 +86,7 @@ const OPTIONAL_CONFIG_KEYS = [
 ] as const;
 
 /** Optional config keys with boolean values. */
-const BOOLEAN_CONFIG_KEYS = ["affectedOnly"] as const;
+const BOOLEAN_CONFIG_KEYS = ["affectedOnly", "buildStats"] as const;
 
 /** Optional config keys with string-array values. */
 const STRING_ARRAY_CONFIG_KEYS = ["untraced"] as const;
@@ -185,6 +187,7 @@ function checkCrossFieldRules(
   }
   const { buildDir, buildCommand, buildScriptName, skip } = parts.values;
   const affectedOnly = parts.flags["affectedOnly"];
+  const buildStats = parts.flags["buildStats"];
   const untraced = parts.lists["untraced"];
   return {
     ok: true,
@@ -196,6 +199,7 @@ function checkCrossFieldRules(
       ...(buildScriptName === undefined ? {} : { buildScriptName }),
       ...(skip === undefined ? {} : { skip }),
       ...(affectedOnly === undefined ? {} : { affectedOnly }),
+      ...(buildStats === undefined ? {} : { buildStats }),
       ...(untraced === undefined ? {} : { untraced }),
     },
   };
