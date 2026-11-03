@@ -122,6 +122,7 @@ const designNodes = defineTable("design_nodes", {
   state: "state",
   renderPath: "render_path",
   renderVersion: "render_version",
+  notifiedVersion: "notified_version",
   fetchedAt: "fetched_at",
   createdAt: "created_at",
   updatedAt: "updated_at",

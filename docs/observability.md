@@ -53,7 +53,6 @@ persist), with every log line carrying the same `trace_id`.
 | `OTEL_SDK_DISABLED`                               | `false`                               | `true` forces noop even with an endpoint.                                        |
 | `STORYSHELF_OTEL_ENABLED`                         | auto (on iff endpoint set)            | Explicit kill-switch (`false`) or force-on (`true`).                             |
 | `STORYSHELF_OTEL_METRICS_INTERVAL_MS`             | `60000`                               | Metric export interval.                                                          |
-| `OTEL_DENO`                                       | unset                                 | Deno-only: `true` uses Deno's native OTEL; the Node SDK never starts under Deno. |
 
 ## Span catalog
 
@@ -102,13 +101,6 @@ ADR 0015 §6); your collector/agent forwards stdout as usual.
   (keep errors + slow captures) for the best cost/fidelity tradeoff.
 - Captures are long (minutes); ensure your backend's trace timeout exceeds
   your longest capture.
-
-## Deno
-
-The instrumentation code uses `@opentelemetry/api` only, which Deno bridges
-natively: run with `OTEL_DENO=true` plus your endpoint and spans/metrics
-light up with no SDK setup. The Node SDK (`@storyshelf/observability/node`)
-refuses to start under Deno by design.
 
 ## Troubleshooting
 

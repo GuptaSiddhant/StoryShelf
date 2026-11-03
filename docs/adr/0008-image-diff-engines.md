@@ -67,7 +67,7 @@ dependencies, so one `docker run` keeps working.
    copied; `sharp` returns Buffers over native memory that cannot be transferred, so its encoded
    overlay is copied once. Inside pool workers `sharp` is capped at one libvips thread each, since
    the pool already parallelises. The pool falls back to the synchronous path when
-   `worker_threads` is unavailable (Deno, edge) or the worker fails to load. A worker dying before
+   `worker_threads` is unavailable (edge) or the worker fails to load. A worker dying before
    `ready` is a load failure only while no worker has ever started; afterwards it is a crash, and
    the pool gives up only after three in a row. A busy worker always finishes its diff before the
    pool stops, and the fallback emits one `STORYSHELF_DIFF_POOL_FALLBACK` process warning. The

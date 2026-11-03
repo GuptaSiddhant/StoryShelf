@@ -255,6 +255,26 @@ describe("a remote target", () => {
     });
   });
 
+  it("logs the remote's limits once at run start, without its endpoint or credentials", async () => {
+    const info = vi.fn();
+    await createPlaywrightCaptureRunner({
+      browsers: [farm({ maxPagesPerConnection: 1, maxConnections: 2, experimental: true })],
+    }).render(input({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
+    const sizing = info.mock.calls.filter(([, message]) => message === "remote sizing");
+    expect(sizing).toHaveLength(1);
+    expect(sizing[0]?.[0]).toMatchObject({
+      pages: 2,
+      pagesPerConnection: 1,
+      maxConnections: 2,
+      scope: { pages: "target", connections: "process" },
+      experimental: true,
+      verification: "not verified against live infrastructure",
+    });
+    expect(JSON.stringify(info.mock.calls)).not.toMatch(/farm\.example|sekret/u);
+    // Nothing about this host is measured for a remote target.
+    expect(info.mock.calls.some(([, message]) => message === "capture sizing")).toBe(false);
+  });
+
   it("falls back to the configured OS when the page cannot be probed, and omits what it cannot know", async () => {
     fake.state.probeFails = true;
     const warn = vi.fn();
@@ -374,6 +394,19 @@ describe("a remote target", () => {
       await pending;
     }
     expect(fake.state.peak).toBe(2);
+  });
+
+  it("logs the limits even when the connection fails, and reports the shared gate's size", async () => {
+    const info = vi.fn();
+    fake.state.failure = new Error("connect ECONNREFUSED");
+    await createPlaywrightCaptureRunner({
+      browsers: [farm({ retry: { attempts: 0, backoffMs: 1 } })],
+    })
+      .render(input({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
+      .catch(() => {});
+    const sizing = info.mock.calls.filter(([, message]) => message === "remote sizing");
+    expect(sizing).toHaveLength(1);
+    expect(sizing[0]?.[0]).toMatchObject({ pages: 2 });
   });
 
   it("keeps a target offered when the service is down, but fails the job at once with no endpoint in the message", async () => {

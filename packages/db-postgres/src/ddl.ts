@@ -306,6 +306,7 @@ CREATE TABLE IF NOT EXISTS design_nodes (
   state TEXT NOT NULL DEFAULT 'ok',
   render_path TEXT,
   render_version TEXT,
+  notified_version TEXT,
   fetched_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL

@@ -49,7 +49,7 @@ Each push to `main` builds the public packages and publishes commit-based previe
 Run the CLI preview with `npx https://pkg.pr.new/GuptaSiddhant/StoryShelf/storyshelf@main`.
 pkg.pr.new assigns the preview version when packing, after the build, so compiled version metadata retains the repository's package version. In particular, CLI-generated projects use the repository version for npm dependencies rather than attempting to install preview versions from npm.
 
-The [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new) must be installed on this repository for the workflow to publish. Preview availability and retention are managed by pkg.pr.new; use stable npm releases for durable dependencies. The separate `release.yml` workflow remains responsible for npm and JSR releases.
+The [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new) must be installed on this repository for the workflow to publish. Preview availability and retention are managed by pkg.pr.new; use stable npm releases for durable dependencies. The separate `release.yml` workflow remains responsible for npm releases.
 
 ## Handling secrets
 
