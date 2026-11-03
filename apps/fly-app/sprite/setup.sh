@@ -93,8 +93,15 @@ echo "7/7 publish: make the URL public, then check from outside that strangers a
 # therefore the last step, and is undone if the proxy is not seen refusing an unauthenticated request.
 # However this script ends from here on, a failure leaves the URL private again: the EXIT trap runs
 # even when `set -e` stops the script on a failed lookup, which is exactly when it matters.
-revert_to_private() { sprite config update -s "$NAME" --url-auth sprite >/dev/null 2>&1 || true; }
-trap 'status=$?; if [ "$status" -ne 0 ]; then revert_to_private; echo "publishing failed; the URL is private again" >&2; fi' EXIT
+# It says so only when the rollback worked: if it did not, the URL may still be public.
+revert_to_private() {
+  if sprite config update -s "$NAME" --url-auth sprite >/dev/null 2>&1; then
+    echo "publishing failed; the URL is private again" >&2
+  else
+    echo "publishing failed AND the rollback failed: the URL may still be public. Run: sprite config update -s $NAME --url-auth sprite" >&2
+  fi
+}
+trap 'status=$?; if [ "$status" -ne 0 ]; then revert_to_private; fi' EXIT
 sprite config update -s "$NAME" --url-auth public
 URL="$(sprite info -s "$NAME" | sed -n 's/^URL: *//p' | head -1 || true)"
 CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 90 "${URL%/}/healthz" || true)"
