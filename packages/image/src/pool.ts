@@ -203,6 +203,10 @@ export class DiffPool {
   }
 
   private onMessage(slot: Slot, message: DiffResponse): void {
+    if (!this.slots.includes(slot)) {
+      // A worker the pool already retired or lost: whatever it still has queued is not heard.
+      return;
+    }
     if (isReady(message)) {
       this.markReady(slot);
     } else if (!answerJob(slot, message)) {

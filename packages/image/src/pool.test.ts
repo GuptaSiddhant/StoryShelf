@@ -288,13 +288,16 @@ describe("sharp engine", () => {
  * A worker module that misbehaves in its first incarnation only (a marker file tells the two apart)
  * and runs the real worker otherwise, so the pool's replacement can be seen to work.
  */
-function misbehavingWorker(firstWorker: string): URL {
+function misbehavingWorker(firstWorker: string, secondWorker = ""): URL {
   const dir = mkdtempSync(join(tmpdir(), "storyshelf-pool-"));
   const marker = join(dir, "first");
+  const second = join(dir, "second");
   const source = `import { existsSync, writeFileSync } from "node:fs";
     import { parentPort } from "node:worker_threads";
     const first = !existsSync(${JSON.stringify(marker)});
     if (first) writeFileSync(${JSON.stringify(marker)}, "1");
+    const isSecond = !first && ${JSON.stringify(secondWorker)} !== "" && !existsSync(${JSON.stringify(second)});
+    if (isSecond) writeFileSync(${JSON.stringify(second)}, "1");
     // afterResult(fn): run fn right after the first job's result has been posted (a barrier on the
     // job, not on the clock).
     const post = parentPort.postMessage.bind(parentPort);
@@ -304,7 +307,8 @@ function misbehavingWorker(firstWorker: string): URL {
       if (message?.type === "result") setImmediate(() => { const run = afterResult; afterResult = () => {}; run(); });
     };
     const realWorker = ${JSON.stringify(WORKER_URL.href)};
-    if (!first) { await import(realWorker); }
+    if (isSecond) { ${secondWorker} }
+    else if (!first) { await import(realWorker); }
     else { ${firstWorker} }`;
   return new URL(`data:text/javascript,${encodeURIComponent(source)}`);
 }
@@ -404,6 +408,25 @@ describe("worker messages that answer no job", () => {
     pools.push(pool);
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
     expect(fallbacks).toHaveLength(1);
+  });
+
+  it("does not count the queued messages of a worker it already retired", async () => {
+    // Worker 1 serves a job then goes bad while idle; worker 2 posts three id-less errors in a row
+    // before ready (only the first may count as a start failure); worker 3 is the real one.
+    const stray = `parentPort.postMessage({ type: "error", message: "boom" });`;
+    const burst = stray.repeat(3);
+    const fallbacks: string[] = [];
+    const pool = new DiffPool({
+      size: 1,
+      workerUrl: misbehavingWorker(idleThen(stray), burst),
+      onFallback: (reason) => fallbacks.push(reason),
+      onWorkerEvent: () => {},
+    });
+    pools.push(pool);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await until(() => pool.workerCount === 0);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(fallbacks).toEqual([]);
   });
 
   it("still cleans up when the event reporter throws", async () => {
