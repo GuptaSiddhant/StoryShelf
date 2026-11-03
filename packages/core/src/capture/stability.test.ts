@@ -389,17 +389,23 @@ describe("unstable render detection across shards", () => {
       await executeCaptureShard({ buildId: job.buildId, shard: job.shard }, options);
     }
 
-    const rows = (await db.list(db.tables.snapshots)).filter((row) => row.buildId === feature.id);
-    const byStory = Object.fromEntries(rows.map((row) => [row.storyId, row]));
+    const featureRows = (await db.list(db.tables.snapshots)).filter(
+      (row) => row.buildId === feature.id,
+    );
+    const byStory = Object.fromEntries(featureRows.map((row) => [row.storyId, row]));
     expect(byStory[STORY.id]).toMatchObject({ status: "changed", unstable: false });
     expect(byStory[STORY_B.id]).toMatchObject({ status: "changed", unstable: true });
     expect(byStory[STORY_C.id]).toMatchObject({ status: "changed", unstable: false });
     // Each shard rendered its own story, then re-rendered only that story.
     expect(stories.every((call) => call.length === 1)).toBe(true);
-    const counts = stories.flat().reduce<Record<string, number>>((all, id) => {
-      all[id] = (all[id] ?? 0) + 1;
-      return all;
-    }, {});
-    expect(counts).toEqual({ [STORY.id]: 2, [STORY_B.id]: 2, [STORY_C.id]: 2 });
+    const counts = new Map<string, number>();
+    for (const id of stories.flat()) counts.set(id, (counts.get(id) ?? 0) + 1);
+    expect(counts).toEqual(
+      new Map([
+        [STORY.id, 2],
+        [STORY_B.id, 2],
+        [STORY_C.id, 2],
+      ]),
+    );
   });
 });
