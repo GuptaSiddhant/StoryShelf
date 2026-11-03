@@ -70,8 +70,23 @@ async function buildFixture(): Promise<void> {
   }
 }
 
+/** Whether the build carries `preview-stats.json`, the dependency graph affected capture reads. */
+async function fixtureHasStats(): Promise<boolean> {
+  try {
+    await access(join(FIXTURE_STATIC_DIR, "preview-stats.json"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The built fixture, building it when missing or when an older build left no stats file (the
+ * fixtures build with `--stats-json` since #499). A build that still has none is returned as is:
+ * the suites that need stats report that themselves.
+ */
 export async function ensureFixtureBuilt(): Promise<string> {
-  if (!(await fixtureBuilt())) {
+  if (!(await fixtureBuilt()) || !(await fixtureHasStats())) {
     await buildFixture();
   }
   return FIXTURE_STATIC_DIR;

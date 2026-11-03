@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ensureFixtureBuilt } from "./integration-harness.ts";
 
+/** A missing or stats-less fixture is built first, which `runFixtureCommand` allows 300 s. */
+const FIXTURE_BUILD_TIMEOUT_MS = 360_000;
+
 /** Story files of the built fixture, spelled as the dependency graph names them (no leading `./`). */
 async function storyFiles(dir: string): Promise<string[]> {
   const index = JSON.parse(await readFile(join(dir, "index.json"), "utf8")) as {
@@ -22,27 +25,31 @@ async function storyFiles(dir: string): Promise<string[]> {
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
   "fixture stats for affected capture",
   () => {
-    it("builds a dependency graph that reaches every story file and the components they import", async () => {
-      const dir = await ensureFixtureBuilt();
-      const graph = await new StorybookAdapter().loadDependencyGraph(dir);
-      expect(graph, "preview-stats.json is missing or has no edges").not.toBeNull();
-      if (!graph) return;
+    it(
+      "builds a dependency graph that reaches every story file and the components they import",
+      async () => {
+        const dir = await ensureFixtureBuilt();
+        const graph = await new StorybookAdapter().loadDependencyGraph(dir);
+        expect(graph, "preview-stats.json is missing or has no edges").not.toBeNull();
+        if (!graph) return;
 
-      const stories = await storyFiles(dir);
-      expect(stories.length).toBeGreaterThan(0);
-      const nodes = new Set([...Object.keys(graph.imports), ...Object.keys(graph.importedBy)]);
-      // A change to a story file can only affect that story if the file is a node of the graph.
-      expect(stories.filter((story) => !nodes.has(story))).toEqual([]);
+        const stories = await storyFiles(dir);
+        expect(stories.length).toBeGreaterThan(0);
+        const nodes = new Set([...Object.keys(graph.imports), ...Object.keys(graph.importedBy)]);
+        // A change to a story file can only affect that story if the file is a node of the graph.
+        expect(stories.filter((story) => !nodes.has(story))).toEqual([]);
 
-      // And a source file a story imports leads back to that story: the trace affected capture runs.
-      const storySet = new Set(stories);
-      const components = Object.entries(graph.importedBy).filter(
-        ([file, dependents]) =>
-          !file.includes("node_modules") &&
-          !storySet.has(file) &&
-          dependents.some((dependent) => storySet.has(dependent)),
-      );
-      expect(components.length).toBeGreaterThan(0);
-    });
+        // And a source file a story imports leads back to that story: the trace affected capture runs.
+        const storySet = new Set(stories);
+        const components = Object.entries(graph.importedBy).filter(
+          ([file, dependents]) =>
+            !file.includes("node_modules") &&
+            !storySet.has(file) &&
+            dependents.some((dependent) => storySet.has(dependent)),
+        );
+        expect(components.length).toBeGreaterThan(0);
+      },
+      FIXTURE_BUILD_TIMEOUT_MS,
+    );
   },
 );
