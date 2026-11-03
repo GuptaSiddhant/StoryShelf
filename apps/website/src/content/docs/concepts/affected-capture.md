@@ -49,6 +49,8 @@ Affected capture never fails an upload. When it cannot prove a story unchanged, 
 | `too-many-changed-files`       | Change list exceeds 10,000 files (large merges, vendored drops)                                              |
 | First build                    | No baseline revision exists yet (`baselineSha: null`)                                                        |
 
+**Known limitation: a Storybook in a repository subdirectory** (a package of a monorepo) is not traced correctly yet: changed files are repo-relative while the stats are relative to the Storybook project, so nothing matches and no story is treated as affected. Upload with `--full` until this is fixed ([#502](https://github.com/GuptaSiddhant/StoryShelf/issues/502)).
+
 Typical CLI output:
 
 ```bash
@@ -75,7 +77,7 @@ For project-wide exclusions that apply to every upload, commit them once in `.st
 
 Config and flag globs are combined (union, deduplicated). Untraced files are dropped _before_ tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
 
-**Custom stats file.** The graph is read from `<buildDir>/preview-stats.json` by default (emitted by the Vite builder). Override per run:
+**Custom stats file.** The graph is read from `<buildDir>/preview-stats.json` by default (written by `storybook build --stats-json`; without that flag the file does not exist and every upload renders everything). Override per run:
 
 ```bash
 storyshelf upload --stats-file ./stats/preview-stats.json

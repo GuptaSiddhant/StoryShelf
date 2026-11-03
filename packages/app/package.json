@@ -46,7 +46,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
-    "build-storybook": "storybook build -o storybook-static",
+    "build-storybook": "storybook build -o storybook-static --stats-json",
     "fmt": "oxfmt ./src ./.storybook",
     "lint": "oxlint --type-aware --type-check ./src ./.storybook",
     "lint:fix": "nub run lint -- --fix",

@@ -66,25 +66,30 @@ Match Chromatic settings where applicable:
 - name: Checkout
   uses: actions/checkout@v4
   with:
+    ref: ${{ github.event.pull_request.head.sha || github.sha }} # the PR head, not the merge commit
     fetch-depth: 0 # affected capture diffs against history
 
 - name: Build Storybook
-  run: npx build-storybook -o storybook-static
+  run: npx storybook build -o storybook-static --stats-json # the stats file feeds affected capture
 
 - name: Upload to StoryShelf
-  run: npx storyshelf upload --token ${{ secrets.STORYSHELF_TOKEN }} --sha ${{ github.sha }} --branch ${{ github.ref_name }}
+  run: npx storyshelf upload --token ${{ secrets.STORYSHELF_TOKEN }} --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
   env:
     STORYSHELF_URL: https://shelf.example.com
     STORYSHELF_SLUG: my-design-system
+    UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
 ```
 
-Or with `.storybook/storyshelf.json` committed:
+Or with `.storybook/storyshelf.json` committed (on a pull request, still pass the head SHA and branch as above: the environment's `GITHUB_SHA` and `GITHUB_REF_NAME` are the merge commit and `<n>/merge`):
 
 ```yaml
 - name: Upload to StoryShelf
-  run: npx storyshelf
+  run: npx storyshelf upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
   env:
     STORYSHELF_TOKEN: ${{ secrets.STORYSHELF_TOKEN }}
+    UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
 ```
 
 ## 5. Parameter compatibility (dual-key)
