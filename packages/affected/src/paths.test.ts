@@ -73,6 +73,18 @@ describe("keys", () => {
     );
   });
 
+  it("drop the slash before a Windows drive letter in the /@fs/ form", () => {
+    const key = keyOfModuleId(BASE, "/@fs/C:/work/repo/packages/core/src/b.ts");
+    expect(key).not.toContain("//");
+    expect(key?.startsWith("/@fs")).toBe(false);
+  });
+
+  it("treat backslash separators like slashes", () => {
+    expect(keyOfModuleId(BASE, ".\\src\\ui\\kbd.tsx")).toBe(
+      keyOfChangedFile(BASE, "packages/app/src/ui/kbd.tsx"),
+    );
+  });
+
   it("read a leading-slash id outside the repository as relative to the project", () => {
     expect(keyOfModuleId(BASE, "/src/ui/kbd.tsx")).toBe("/work/repo/packages/app/src/ui/kbd.tsx");
   });

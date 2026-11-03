@@ -27,6 +27,7 @@ export const normalize = fn("path.normalize");
 export const dirname = fn("path.dirname");
 export const isAbsolute = fn("path.isAbsolute");
 export const sep = "/";
+export const realpathSync = fn("fs.realpathSync");
 export const posix = { join: fn("path.posix.join"), sep: "/" };
 export const fileURLToPath = fn("url.fileURLToPath");
 export const pathToFileURL = fn("url.pathToFileURL");

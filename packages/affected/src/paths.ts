@@ -92,7 +92,9 @@ function insideRepo(base: PathBase, absolute: string): boolean {
  */
 export function keyOfModuleId(base: PathBase, id: string): string | null {
   // Vite's `/@fs/<absolute path>` is a real file; the other `/@…` ids are virtual.
-  const path = posix(id).replace(/^\/@fs\//u, "/");
+  const path = posix(id)
+    .replace(/^\/@fs\//u, "/")
+    .replace(/^\/(?=[a-z]:\/)/iu, "");
   if (!posix(id).startsWith("/@fs/") && namesNoFile(path)) return null;
   if (isAbsolute(path) && insideRepo(base, posix(resolve(path)))) {
     return fold(base, posix(resolve(path)));
