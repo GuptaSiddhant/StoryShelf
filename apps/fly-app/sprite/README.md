@@ -22,7 +22,7 @@ fly secrets set FLY_SPRITES_TOKEN="$FLY_SPRITES_TOKEN" SPRITE_BROWSER_SECRET="$S
 
 Rebuild after a Playwright upgrade: client and server versions must match.
 
-**Rotating the secret** is a re-run: put the new value in `SPRITE_BROWSER_SECRET`, run `setup.sh` again (it is idempotent), and set the same value as the Fly secret. The script rewrites the secret file, restarts the service (the proxy reads the secret only at start-up), warms up, takes a new checkpoint and re-checks from outside that the URL refuses strangers. The previous secret stops working at once. Delete superseded checkpoints with `sprite checkpoint delete`.
+**Rotating the secret** is a re-run: put the new value in `SPRITE_BROWSER_SECRET`, run `setup.sh` again (it is idempotent), and set the same value as the Fly secret. The script rewrites the secret file, restarts the service (the proxy reads the secret only at start-up), warms up, takes a new checkpoint and re-checks from outside that the URL refuses strangers. The previous secret stops working at once. **After restoring any checkpoint** (`sprite restore`), run `setup.sh` again with the current secret: a checkpoint holds the secret file as it was when taken, so restoring one from before a rotation brings the superseded secret back until you do. Delete superseded checkpoints with `sprite checkpoint delete`.
 
 ## What was measured (live Sprite, 2026-11-03)
 

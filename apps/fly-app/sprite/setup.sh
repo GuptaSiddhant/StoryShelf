@@ -91,12 +91,15 @@ echo "7/7 publish: make the URL public, then check from outside that strangers a
 # A Playwright client cannot log in with a Fly account and the Playwright server itself has no
 # authentication: the proxy (proxy.mjs) and its shared secret are the only boundary. Publishing is
 # therefore the last step, and is undone if the proxy is not seen refusing an unauthenticated request.
+# However this script ends from here on, a failure leaves the URL private again: the EXIT trap runs
+# even when `set -e` stops the script on a failed lookup, which is exactly when it matters.
+revert_to_private() { sprite config update -s "$NAME" --url-auth sprite >/dev/null 2>&1 || true; }
+trap 'status=$?; if [ "$status" -ne 0 ]; then revert_to_private; echo "publishing failed; the URL is private again" >&2; fi' EXIT
 sprite config update -s "$NAME" --url-auth public
-URL="$(sprite info -s "$NAME" | sed -n 's/^URL: *//p' | head -1)"
+URL="$(sprite info -s "$NAME" | sed -n 's/^URL: *//p' | head -1 || true)"
 CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 90 "${URL%/}/healthz" || true)"
 if [ -z "$URL" ] || [ "$CODE" != 401 ]; then
-  sprite config update -s "$NAME" --url-auth sprite
-  echo "the public URL did not refuse an unauthenticated request (got '${CODE:-none}'); reverted to private" >&2
+  echo "the public URL did not refuse an unauthenticated request (got '${CODE:-none}')" >&2
   exit 1
 fi
 echo "    $URL refuses requests without the secret (401)"
