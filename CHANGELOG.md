@@ -40,6 +40,8 @@ The CLI builds Storybook with `--stats-json` when affected capture is on, so the
 
 Fixed: a diff worker message that answers no job no longer crashes the server. A `result` or `error` without a job id replaces that worker and fails only its own job; an answer for a job that is not in flight is reported and ignored; messages that are not the pool's (such as Node's `--watch` protocol) are ignored.
 
+Fixed: a capture job that loses its last lease can no longer leave its build stuck in `capturing`, and a late recovery can no longer fail a newer run (#259, #431, #432). A build now records the job that owns its current run (`builds.capture_job_id`, added by an additive migration that also backfills builds in flight), and the recovery hook only fails the build while that job still owns it. The job moves to a leased `exhausting` phase (shown as `recovering` in the queue views): if the hook throws or its instance dies, any instance re-runs it once the lease ends, up to five runs, and after that the job fails and admins get one `sys:capture-failed` alert. A late `done` and a cancel still win. The in-memory three-try retry of the hook is gone.
+
 ## 0.8.0 — Remote browser leases, ignore regions, redaction and retention safety (2026-11-03)
 
 **Added: ignore regions (#456).** Elements matched by `parameters.storyshelf.ignoreSelectors` (or `parameters.chromatic.ignoreSelectors`), `[data-storyshelf-ignore]`, `.chromatic-ignore` or `[data-chromatic="ignore"]` are hidden before the screenshot, keeping the layout, so dynamic content such as timestamps no longer produces a diff. Both runners apply the same mask; a selector the browser rejects is skipped with a warning and never fails the capture. Adding a mask to a story produces one expected diff the first time.
