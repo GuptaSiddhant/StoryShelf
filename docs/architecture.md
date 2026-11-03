@@ -671,10 +671,12 @@ baseline that applies _now_ (own branch, else default):
 
 ### Capture environment fingerprint
 
-Each baseline and snapshot stores a `Fingerprint` (JSON, `packages/core/src/capture/fingerprint.ts`) next
-to its `infraHash`: engine, browser version, platform, device scale factor, fonts digest, viewport and
-sizing. The hash covers exactly those components; a difference on the default branch is an environment
-migration (ADR 0009), on a feature branch it rides along as `envChange`.
+A baseline stores a `Fingerprint` (JSON, `packages/core/src/capture/fingerprint.ts`) next to its
+`infraHash`; a snapshot stores the `infraHash` of its capture and, when the environment differed from
+its baseline's, the before and after fingerprints in `envChange`. A fingerprint holds: engine, browser
+version, platform, device scale factor, fonts digest, viewport and sizing. The hash covers exactly those
+components; a difference on the default branch is an environment migration (ADR 0009), on a feature
+branch it rides along as `envChange`.
 
 **Measurement version.** `measurementVersion` says how the browser-measured components were read. It is
 **not part of `infraHash`**, so changing it never changes a baseline's identity or causes a mass

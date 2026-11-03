@@ -83,24 +83,26 @@ export function EnvironmentChangeSnapshotNotice(props: {
   if (!change) {
     return null;
   }
+  const unknown = (change.unknown ?? []).map((field) => labelOf(field));
+  const note = unknown.length > 0 ? <PartlyUnknownNotice count={1} fields={unknown} /> : null;
   if (change.changed.length === 0) {
-    return (
-      <PartlyUnknownNotice
-        count={1}
-        fields={(change.unknown ?? []).map((field) => labelOf(field))}
-      />
-    );
+    return note;
   }
   const what = change.changed.map((field) => labelOf(field)).join(", ");
-  return props.migrated ? (
-    <Alert tone="info" title="No diff: capture environment changed">
-      This snapshot was not compared pixel by pixel. What changed: {what}.
-    </Alert>
-  ) : (
-    <Alert tone="info" title="Capture environment changed">
-      The baseline was captured in a different environment ({what}), so a difference may come from
-      the environment rather than the code.
-    </Alert>
+  return (
+    <>
+      {props.migrated ? (
+        <Alert tone="info" title="No diff: capture environment changed">
+          This snapshot was not compared pixel by pixel. What changed: {what}.
+        </Alert>
+      ) : (
+        <Alert tone="info" title="Capture environment changed">
+          The baseline was captured in a different environment ({what}), so a difference may come
+          from the environment rather than the code.
+        </Alert>
+      )}
+      {note}
+    </>
   );
 }
 

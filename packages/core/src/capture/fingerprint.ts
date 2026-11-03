@@ -12,7 +12,7 @@ import { SIZING_DEFAULTS } from "./sizing.ts";
 export const MEASUREMENT_VERSION = 1;
 
 /** The components a comparison reads: the environment fields and the screenshot sizing. */
-type MeasuredField =
+export type MeasuredField =
   | "engine"
   | "browserVersion"
   | "platform"
@@ -25,7 +25,8 @@ type MeasuredField =
  * is the baseline of the scheme, so nothing is listed yet. Between two versions, a listed
  * component is compared as unknown, never as a mismatch (it must not cause an environment migration).
  */
-const REMEASURED_IN: MeasurementHistory = {};
+// A test that needs a re-measured component adds a version here and deletes it again.
+export const REMEASURED_IN: Record<number, readonly MeasuredField[]> = {};
 
 /** Components whose measurement changed, by the version that changed it. Tests pass their own. */
 export type MeasurementHistory = Readonly<Record<number, readonly MeasuredField[]>>;

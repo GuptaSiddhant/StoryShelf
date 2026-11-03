@@ -303,6 +303,22 @@ describe("review page: capture environment migration", () => {
     }
   });
 
+  it("shows both notices when a known component changed and another could not be compared", async () => {
+    const mixed = JSON.stringify({
+      changed: ["browserVersion"],
+      unknown: ["fontsHash"],
+      from: { engine: "chromium", browserVersion: "124.0.1" },
+      to: { engine: "chromium", browserVersion: "126.0.0" },
+    });
+    for (const branch of ["main", "feature/x"]) {
+      // eslint-disable-next-line no-await-in-loop -- two pages
+      const html = await pageWithMigration(true, branch, mixed);
+      expect(html, branch).toContain("browser version");
+      expect(html, branch).toContain("Environment partly unknown (measurement updated)");
+      expect(html, branch).toContain("installed fonts");
+    }
+  });
+
   it("shows nothing about the environment for an ordinary build", async () => {
     const html = await pageWithMigration(false);
     expect(html).not.toContain("Capture environment changed");
