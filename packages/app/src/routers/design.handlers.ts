@@ -135,7 +135,8 @@ export async function loadDesignPreviews(
   );
 }
 
-function nodeModel(): DesignNodeModel {
+/** The design node model wired to the store (cache reads need no provider call). */
+export function nodeModel(): DesignNodeModel {
   const { db, config, logger, storage, design } = getStore();
   const credentials = new DesignCredentialModel(db, credentialKeys(config));
   return new DesignNodeModel(db, credentials, design, {

@@ -15,6 +15,27 @@ export function isDesignStale(
   return Number.isFinite(modified) && Number.isFinite(approved) && modified > approved;
 }
 
+/** Where a linked design stands against its component's approved baseline. */
+export type DesignDrift = "deleted" | "stale" | "current" | "unknown";
+
+/**
+ * Classify a cached design node: `deleted` (the node no longer exists), `stale` (changed after the
+ * baseline was approved), `current`, or `unknown` (nothing cached, the provider refused, there is no baseline
+ * or either timestamp is unreadable, so the state cannot be told). Reads only what was stored; never calls a provider.
+ */
+export function designDrift(
+  node: Pick<DesignNode, "state" | "lastModified"> | null | undefined,
+  baselineVersion: string | null | undefined,
+): DesignDrift {
+  if (node?.state === "deleted") return "deleted";
+  if (isDesignStale(node, baselineVersion)) return "stale";
+  const modified = node?.lastModified ? Date.parse(node.lastModified) : Number.NaN;
+  const approved = baselineVersion ? Date.parse(baselineVersion) : Number.NaN;
+  return node?.state === "ok" && Number.isFinite(modified) && Number.isFinite(approved)
+    ? "current"
+    : "unknown";
+}
+
 /** What happened to a design after its baseline was approved. */
 export type DesignChangeKind = "modified-after-approval" | "deleted";
 

@@ -104,10 +104,12 @@ export {
 export {
   credentialDaysLeft,
   designChange,
+  designDrift,
   DESIGN_TTL_MS,
   isDesignStale,
   type DesignChange,
   type DesignChangeKind,
+  type DesignDrift,
 } from "./design-health.ts";
 export { LabelModel } from "./label.ts";
 export { matchUpstreamStory, PackageUsageModel } from "./usage.ts";
