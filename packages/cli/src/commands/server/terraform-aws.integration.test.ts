@@ -1,24 +1,18 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { generateAwsTerraformFiles, type AwsTerraformOptions } from "./terraform-aws.ts";
+import { terraformGate } from "./test-helpers/terraform-gate.ts";
 
-function terraformAvailable(): boolean {
-  const res = spawnSync("terraform", ["version"], { stdio: "ignore" });
-  return res.status === 0;
-}
+// `terraform init` downloads providers, so the suite runs only when RUN_TERRAFORM=1 (see
+// test-helpers/terraform-gate.ts). With the gate set, a missing binary must fail rather than
+// silently skip the suite below.
+const { runTerraform, hasTerraform } = terraformGate();
 
-const hasTerraform = terraformAvailable();
-
-// CI installs Terraform (ci.yml "Setup Terraform"). A missing binary there must fail rather than
-// silently skip the suite below; locally the suite still skips, so `nub run test` stays hermetic.
-it.runIf(process.env["CI"] === "true" && !hasTerraform)(
-  "has a terraform binary in CI (the suite must not be skipped there)",
-  () => {
-    expect(hasTerraform).toBe(true);
-  },
-);
+it.runIf(runTerraform)("has a terraform binary (RUN_TERRAFORM=1 requires one)", () => {
+  expect(hasTerraform).toBe(true);
+});
 
 /** Repo-local scratch root (`.tmp` is gitignored and absent on a fresh checkout, e.g. CI). */
 function scratchRoot(): string {
@@ -40,7 +34,7 @@ function materialize(options: AwsTerraformOptions): string {
   return dir;
 }
 
-describe.skipIf(!hasTerraform)("generated AWS terraform (gated on terraform binary)", () => {
+describe.skipIf(!hasTerraform)("generated AWS terraform (gated on RUN_TERRAFORM=1)", () => {
   let dir: string;
 
   beforeAll(() => {

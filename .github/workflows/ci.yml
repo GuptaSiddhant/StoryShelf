@@ -129,6 +129,8 @@ jobs:
         # per-package vitest worker pools from oversubscribing a small runner.
         env:
           TURBO_CONCURRENCY: "1"
+          # Switches on the Terraform scaffold suites in packages/cli (setup-terraform installs the binary).
+          RUN_TERRAFORM: "1"
           TURBO_SCM_BASE: origin/main
           TURBO_SCM_HEAD: HEAD
         run: |

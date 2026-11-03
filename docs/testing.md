@@ -94,6 +94,7 @@ Rules:
 - **Unit:** colocated `*.test.ts` next to sources (hermetic — tmp dirs, fake adapters, mocked `fetch`; never a browser, network, or Storybook build).
 - **HTTP-level integration:** `*.integration.test.ts` in the same dirs (real router over HTTP with fake capture runner; still hermetic and CI-always).
 - **Real browser:** gated behind `RUN_INTEGRATION=1` (`nub run test:integration`, Playwright + `fixtures/storybook-8` by default).
+- **Terraform scaffolds:** `packages/cli/src/commands/server/terraform-*.integration.test.ts` run `terraform fmt`, `init` and `validate`; `init` downloads providers, so they are gated behind `RUN_TERRAFORM=1` (not `RUN_INTEGRATION`, which would switch on the browser suites). With the gate set and no `terraform` binary the suites fail; without it they skip even when Terraform is installed. CI's `verify` job sets it next to `setup-terraform`, and `turbo.json` lists it as a `test` env so the cache key includes it.
 - **Real cloud:** `*.live.test.ts` next to sources, gated behind `LIVE_CLOUD=1` — strictly real providers, no fakes, no emulators. See "Live cloud tests" below.
 - **Shared doubles** live in `packages/core/src/test-helpers/` (`fake-adapters.ts`, `create-project.ts`) — never in shippable modules. Test files (and `test-helpers/`) are exempt from size lint rules via `.oxlintrc.json` patterns, not per-file paths.
 
