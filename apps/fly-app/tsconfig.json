@@ -4,5 +4,12 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["server.ts"]
+  "include": [
+    "server.ts",
+    "storage.ts",
+    "storage.test.ts",
+    "migrate.ts",
+    "migrate.test.ts",
+    "migrate-to-s3.ts"
+  ]
 }

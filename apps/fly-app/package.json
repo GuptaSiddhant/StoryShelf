@@ -6,7 +6,8 @@
   "scripts": {
     "build": "rolldown -c rolldown.config.ts",
     "start": "node dist/server.mjs",
-    "lint": "oxlint --type-aware --type-check server.ts",
+    "lint": "oxlint --type-aware --type-check server.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts",
+    "test": "vitest run",
     "dev": "node --conditions=source --experimental-transform-types server.ts"
   },
   "dependencies": {
@@ -21,11 +22,14 @@
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
+    "@storyshelf/storage-s3": "workspace:*",
     "nodemailer": "^10.2.1",
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "rolldown": "*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
