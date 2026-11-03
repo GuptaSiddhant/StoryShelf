@@ -31,6 +31,7 @@ const runner = createPlaywrightCaptureRunner({
       endpoint: "ws://playwright:3000/storyshelf",
       sessions: 8, // concurrency cap, see below
     }), // → chromium@grid, firefox@grid, webkit@grid
+    // Experimental: not verified against live infrastructure.
     azurePlaywright({
       endpoint: process.env.PLAYWRIGHT_SERVICE_URL!,
       token: process.env.PLAYWRIGHT_SERVICE_ACCESS_TOKEN!,

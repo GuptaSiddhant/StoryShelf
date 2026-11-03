@@ -46,7 +46,7 @@ createPlaywrightCaptureRunner({
 
 ## Remote browsers
 
-An entry can also be a **remote service**, from the `/remote` subpath: the runner then connects to a browser on another machine instead of launching one, and offers `<engine>@<name>` targets (`chromium@grid`) with their own baselines.
+An entry can also be a **remote service**, from the `/remote` subpath: the runner then connects to a browser on another machine instead of launching one, and offers `<engine>@<name>` targets (`chromium@grid`) with their own baselines. The vendor presets (`azurePlaywright`, `browserstack`) are experimental: not verified against live infrastructure.
 
 ```ts
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
