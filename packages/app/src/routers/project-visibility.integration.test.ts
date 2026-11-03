@@ -33,10 +33,13 @@ const auth = stubAuth(null, {
 });
 
 let scratchDir = "";
+let booted: { lifecycle: { teardown: () => Promise<void> } } | undefined;
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-visibility-"));
 });
 afterEach(async () => {
+  await booted?.lifecycle.teardown();
+  booted = undefined;
   await rm(scratchDir, { recursive: true, force: true });
 });
 
@@ -74,6 +77,7 @@ async function boot() {
     logger: pino({ level: "silent" }),
   });
   await app.lifecycle.setup();
+  booted = app;
   return app;
 }
 
@@ -151,7 +155,6 @@ describe("a project the caller cannot see", () => {
     ]) {
       expect(statuses.get(key), key).toBe(404);
     }
-    await app.lifecycle.teardown();
   });
 
   it("still answers 403 to a member whose role is too low", async () => {
@@ -171,7 +174,6 @@ describe("a project the caller cannot see", () => {
     expect(await asViewer("GET", "/api/v1/projects/hidden/tokens")).toBe(403);
     expect(await asViewer("DELETE", "/api/v1/projects/hidden/tokens/t1")).toBe(403);
     expect(await asViewer("GET", "/api/v1/projects/hidden/builds")).toBe(200);
-    await app.lifecycle.teardown();
   });
 
   it("shows a site admin every project", async () => {
@@ -180,6 +182,5 @@ describe("a project the caller cannot see", () => {
       headers: { cookie: "storyshelf_session=admin" },
     });
     expect(response.status).toBe(200);
-    await app.lifecycle.teardown();
   });
 });
