@@ -122,3 +122,4 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
     </DocumentLayout>
   );
 }
+// affected-capture proof for #490 (throwaway, reverted in the next commit)

@@ -114,3 +114,10 @@ jobs:
             grep -E 'Affected capture|Full capture' upload.log || echo "No capture-mode line in the upload output."
             echo "Build: ${base}/projects/${slug}/builds/${build}"
           } | tee -a "$GITHUB_STEP_SUMMARY"
+          # THROWAWAY (reverted next): read the build's rendered/inherited counts for the #490 proof.
+          for attempt in $(seq 1 40); do
+            json=$(curl -fsS -H "Authorization: Bearer $STORYSHELF_TOKEN" "${base}/api/v1/projects/${slug}/builds/${build}" || echo '{}')
+            status=$(echo "$json" | jq -r '.status // "unknown"')
+            case "$status" in pending|capturing|comparing|unknown) sleep 10 ;; *) break ;; esac
+          done
+          echo "$json" | jq -c '{status, snapshotCount, inheritedCount, changedCount}' | tee -a "$GITHUB_STEP_SUMMARY"
