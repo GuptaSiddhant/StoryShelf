@@ -78,6 +78,35 @@ async function upgrade(port: number, headers: Record<string, string>): Promise<s
   return chunk.toString();
 }
 
+/** Send an upgrade, keep the client half open after the answer, and expect the server to let go. */
+async function expectSocketDropped(
+  headers: Record<string, string>,
+  upstreamPort: number,
+  status: string,
+): Promise<void> {
+  const server: Server = createProxy({ secret: SECRET, upstreamPort });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  open.push({ close: () => server.close() });
+  const socket: Socket = connect({
+    port: (server.address() as AddressInfo).port,
+    host: "127.0.0.1",
+    allowHalfOpen: true,
+  });
+  open.push({ close: () => socket.destroy() });
+  const lines = Object.entries(headers).map(([name, value]) => `${name}: ${value}\r\n`);
+  socket.write(
+    `GET /pw HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n${lines.join("")}\r\n`,
+  );
+  const [chunk] = (await once(socket, "data")) as [Buffer];
+  expect(chunk.toString()).toContain(status);
+  const count = async () =>
+    await new Promise<number>((resolve) => {
+      server.getConnections((_error, n) => resolve(n));
+    });
+  await expect.poll(count).toBe(0);
+}
+
 async function get(port: number, path: string, headers: Record<string, string> = {}) {
   const response = await fetch(`http://127.0.0.1:${port}${path}`, { headers });
   return { status: response.status, text: await response.text() };
@@ -159,6 +188,14 @@ describe("the browser proxy", () => {
     expect(upstream.open()).toBe(1);
     socket.destroy();
     await expect.poll(() => upstream.open()).toBe(0);
+  });
+
+  it("drops a 401'd upgrade's socket even when the client never hangs up", async () => {
+    await expectSocketDropped({}, 1, "401");
+  });
+
+  it("drops a 503'd upgrade's socket even when the client never hangs up", async () => {
+    await expectSocketDropped({ "x-storyshelf-secret": SECRET }, await closedPort(), "503");
   });
 
   it("reports 503 while the Playwright server is not up yet", async () => {

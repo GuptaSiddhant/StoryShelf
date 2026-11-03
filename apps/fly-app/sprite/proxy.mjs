@@ -54,12 +54,21 @@ export function createProxy(options) {
   });
   server.on("upgrade", (request, socket, head) => {
     if (!secretMatches(secret, request.headers[SECRET_HEADER])) {
-      socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+      refuse(socket, "401 Unauthorized");
       return;
     }
     bridge(request, head, socket, { upstreamPort, upstreamHost });
   });
   return server;
+}
+
+/**
+ * Answer an upgrade with a bodiless refusal and drop the socket once it is flushed. `end()` alone
+ * half-closes: a client that never sends FIN would keep the descriptor open for ever.
+ */
+function refuse(socket, status) {
+  socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  socket.destroySoon();
 }
 
 /** Pipe an authenticated upgrade through to the Playwright server, or answer 503 while it is down. */
@@ -84,9 +93,7 @@ function bridge(request, head, socket, { upstreamPort, upstreamHost }) {
   upstream.on("error", () => {
     if (!connected && socket.writable) {
       answered = true;
-      socket.end(
-        "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
-      );
+      refuse(socket, "503 Service Unavailable");
     }
     close();
   });
