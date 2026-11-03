@@ -318,6 +318,7 @@ const comments = defineTable("comments", {
   createdAt: "created_at",
   updatedAt: "updated_at",
   storyId: "story_id",
+  mentions: "mentions",
   kind: "kind",
   resolvedAt: "resolved_at",
   resolvedBy: "resolved_by",

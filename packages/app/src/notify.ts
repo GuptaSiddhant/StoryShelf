@@ -24,7 +24,7 @@ import {
 } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
-import { matchesEvent } from "@storyshelf/core/utils";
+import { COMMENT_MENTIONED, matchesEvent } from "@storyshelf/core/utils";
 import { credentialKeys } from "./credential-keys.ts";
 import { clearPaused, notificationOrigin, warnPaused } from "./notifications-pause.ts";
 import { getStore } from "./store.ts";
@@ -184,23 +184,30 @@ async function defaultTargets(
     (member) => REVIEWER_ROLES.has(member.role) && !subscribed.has(member.userId),
   );
   const targets = await Promise.all(
-    members.map(async (member): Promise<NotificationChannel[]> => {
-      const user = await new UserModel(db).get(member.userId);
-      return !user || user.disabled
-        ? []
-        : [
-            {
-              id: `default:${projectId}:${member.userId}`,
-              projectId,
-              provider: "email",
-              config: { to: user.email },
-              events: [],
-              enabled: true,
-            },
-          ];
-    }),
+    members.map(async (member) => await emailTarget(db, projectId, member.userId)),
   );
   return targets.flat();
+}
+
+/** The default email target of one user (none for a missing or disabled account). */
+async function emailTarget(
+  db: DatabaseAdapter,
+  projectId: string,
+  userId: string,
+): Promise<NotificationChannel[]> {
+  const user = await new UserModel(db).get(userId);
+  return !user || user.disabled
+    ? []
+    : [
+        {
+          id: `default:${projectId}:${userId}`,
+          projectId,
+          provider: "email",
+          config: { to: user.email },
+          events: [],
+          enabled: true,
+        },
+      ];
 }
 
 /** Per-subscriber targets for an event (only kinds that are wired). */
@@ -210,8 +217,11 @@ async function subscriberTargets(
   event: string,
   data: Record<string, unknown>,
   wired: ReadonlySet<string>,
+  skipUsers: ReadonlySet<string>,
 ): Promise<NotificationChannel[]> {
-  const rows = await new NotificationSubscriptionModel(db).list(projectId);
+  const rows = (await new NotificationSubscriptionModel(db).list(projectId)).filter(
+    (row) => !skipUsers.has(row.userId),
+  );
   const nested = await Promise.all(
     matchingSubs(rows, event, data).map(async (sub) => await targetsForSub(db, sub, wired)),
   );
@@ -219,6 +229,37 @@ async function subscriberTargets(
     ? await defaultTargets(db, projectId, rows, wired)
     : [];
   return [...nested.flat(), ...defaults];
+}
+
+/** Narrowing options of a project fan-out. */
+export interface NotifyOptions {
+  /** Users who already get this event another way (a mention): their subscriptions skip it. */
+  skipUsers?: ReadonlySet<string>;
+}
+
+/** Send one event to the given channels with the brand and a review link under `origin`. */
+async function deliver(
+  deps: NotifyDeps,
+  project: Pick<Project, "id" | "slug">,
+  message: { event: string; data: Record<string, unknown>; reviewUrl: string | undefined },
+  channels: NotificationChannel[],
+): Promise<void> {
+  await emitNotifications(
+    {
+      event: message.event,
+      projectId: project.id,
+      projectSlug: project.slug,
+      data: message.data,
+      timestamp: now(),
+    },
+    {
+      notifiers: deps.notifiers,
+      channels,
+      brand: brandFor(deps.ui, deps.notificationsConfig, message.reviewUrl),
+      logger: deps.logger,
+      onOutcome: recordOutcomes(deps),
+    },
+  );
 }
 
 /**
@@ -231,6 +272,7 @@ export async function notifyProjectWith(
   event: string,
   data: Record<string, unknown>,
   reviewSuffix?: string,
+  options: NotifyOptions = {},
 ): Promise<void> {
   if (deps.notifiers.length === 0) {
     return;
@@ -242,17 +284,55 @@ export async function notifyProjectWith(
   const reviewUrl = reviewSuffix ? reviewUrlFor(origin, project.slug, reviewSuffix) : undefined;
   const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
   const channels = admittedChannels(await loadChannels(deps, project.id), event, data);
-  const targets = await subscriberTargets(deps.db, project.id, event, data, wired);
-  await emitNotifications(
-    { event, projectId: project.id, projectSlug: project.slug, data, timestamp: now() },
-    {
-      notifiers: deps.notifiers,
-      channels: [...channels, ...targets],
-      brand: brandFor(deps.ui, deps.notificationsConfig, reviewUrl),
-      logger: deps.logger,
-      onOutcome: recordOutcomes(deps),
-    },
+  const targets = await subscriberTargets(
+    deps.db,
+    project.id,
+    event,
+    data,
+    wired,
+    options.skipUsers ?? new Set(),
   );
+  await deliver(deps, project, { event, data, reviewUrl }, [...channels, ...targets]);
+}
+
+/**
+ * Where a mention of `userId` is delivered (#463): their own subscription's channels when they
+ * have one and it is enabled (a disabled one opts them out), else a default email. Never a stored
+ * project channel: a mention is addressed to one person and must not reach a room.
+ */
+async function mentionTargets(
+  db: DatabaseAdapter,
+  projectId: string,
+  userId: string,
+  wired: ReadonlySet<string>,
+): Promise<NotificationChannel[]> {
+  const rows = await new NotificationSubscriptionModel(db).list(projectId);
+  const own = rows.find((row) => row.userId === userId);
+  if (own !== undefined) {
+    return own.enabled ? await targetsForSub(db, own, wired) : [];
+  }
+  return wired.has("email") ? await emailTarget(db, projectId, userId) : [];
+}
+
+/** Notify one project member that a comment mentions them. Best-effort, like every fan-out. */
+export async function notifyMentionWith(
+  deps: NotifyDeps,
+  project: Pick<Project, "id" | "slug">,
+  userId: string,
+  data: Record<string, unknown>,
+  reviewSuffix: string,
+): Promise<void> {
+  if (deps.notifiers.length === 0) {
+    return;
+  }
+  const origin = await originOrPause(deps, COMMENT_MENTIONED);
+  if (origin === undefined) {
+    return;
+  }
+  const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
+  const targets = await mentionTargets(deps.db, project.id, userId, wired);
+  const reviewUrl = reviewUrlFor(origin, project.slug, reviewSuffix);
+  await deliver(deps, project, { event: COMMENT_MENTIONED, data, reviewUrl }, targets);
 }
 
 /**
@@ -264,8 +344,9 @@ export async function notifyProject(
   event: string,
   data: Record<string, unknown>,
   reviewSuffix?: string,
+  options?: NotifyOptions,
 ): Promise<void> {
-  await notifyProjectWith(getStore(), project, event, data, reviewSuffix);
+  await notifyProjectWith(getStore(), project, event, data, reviewSuffix, options);
 }
 
 /** Fan out a site-wide admin alert to project-less channels. */

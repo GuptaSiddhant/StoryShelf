@@ -28,7 +28,7 @@ export type { BuildReview } from "./build-review.ts";
 export type { BuildComponent } from "./build-component.ts";
 export type { SiteSetting } from "./site-setting.ts";
 /** Review comment row as stored in the `comments` table. */
-export type { Comment } from "./comment.ts";
+export type { Comment, CommentMention } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
 /** A user's OAuth connection to an external service. */

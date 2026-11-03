@@ -229,6 +229,7 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   story_id TEXT,
+  mentions TEXT,
   kind TEXT NOT NULL DEFAULT 'comment',
   resolved_at TEXT,
   resolved_by TEXT

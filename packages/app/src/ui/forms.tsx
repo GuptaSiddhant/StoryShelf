@@ -310,9 +310,11 @@ export const TextareaField: FC<{
   placeholder?: string;
   rows?: number;
   required?: boolean;
+  /** Focus the box when it is swapped in (HTMX acts on `autofocus` of swapped content). */
+  autofocus?: boolean;
   hint?: string;
   error?: string;
-}> = ({ label, name, id, value, placeholder, rows = 3, required, hint, error }) => {
+}> = ({ label, name, id, value, placeholder, rows = 3, required, autofocus, hint, error }) => {
   const domId = id ?? name;
   return (
     <div class={fieldWrap}>
@@ -326,6 +328,7 @@ export const TextareaField: FC<{
         placeholder={placeholder}
         rows={rows}
         required={required}
+        autofocus={autofocus}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={fieldDescribedBy(domId, error, hint)}
       >

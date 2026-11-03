@@ -93,6 +93,8 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "POST /projects/:slug/builds/:buildId/insights/generate": "testing",
   // review
   "POST /projects/:slug/builds/:buildId/comments": "review",
+  "POST /projects/:slug/builds/:buildId/mention-suggest": "review",
+  "POST /projects/:slug/builds/:buildId/mention-complete": "review",
   "POST /projects/:slug/builds/:buildId/comments/:commentId/resolve": "review",
   "POST /projects/:slug/builds/:buildId/comments/:commentId/reopen": "review",
   "POST /projects/:slug/builds/:buildId/reviews": "review",

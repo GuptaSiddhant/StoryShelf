@@ -554,6 +554,32 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("adds comments.mentions to a volume created before it, keeping existing comments", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-mentions-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        ALTER TABLE comments DROP COLUMN mentions;
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO builds (id, project_id, git_sha, git_branch, created_at, updated_at) VALUES ('b', 'p', 'sha', 'main', 't', 't');
+        INSERT INTO comments (id, project_id, build_id, body, created_at, updated_at) VALUES ('c', 'p', 'b', 'older comment', 't', 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      const row = await db.get(schema.comments, "c");
+      expect(row?.["body"]).toBe("older comment");
+      expect(row?.["mentions"]).toBeNull();
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("adds the fingerprint columns to a volume created before them, keeping existing rows", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-fingerprint-"));
     const path = join(dir, "legacy.db");
