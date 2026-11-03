@@ -25,13 +25,22 @@ else. Every other value moved to a subpath (new entries: `core/logger`,
 
 ```ts
 // Before
-import { createShelfLogger, executeCaptureJob, InMemoryCaptureQueue, StorybookAdapter } from "@storyshelf/core";
+import {
+  createShelfLogger,
+  executeCaptureJob,
+  InMemoryCaptureQueue,
+  StorybookAdapter,
+} from "@storyshelf/core";
 import type { CaptureQueue } from "@storyshelf/core";
 import type { Logger } from "@storyshelf/core/types";
 // After
 import { createShelfApp } from "@storyshelf/core";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
-import { executeCaptureJob, InMemoryCaptureQueue, StorybookAdapter } from "@storyshelf/core/capture";
+import {
+  executeCaptureJob,
+  InMemoryCaptureQueue,
+  StorybookAdapter,
+} from "@storyshelf/core/capture";
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 ```
 

@@ -315,6 +315,9 @@ const comments = defineTable("comments", {
   updatedAt: "updated_at",
   storyId: "story_id",
   mentions: "mentions",
+  kind: "kind",
+  resolvedAt: "resolved_at",
+  resolvedBy: "resolved_by",
 });
 
 const labelTypes = defineTable("label_types", {

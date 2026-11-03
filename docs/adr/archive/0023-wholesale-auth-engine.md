@@ -26,8 +26,8 @@ Go wholesale on Better Auth, lean core:
 
 - **Better Auth owns OIDC/SAML/WebAuthn wire protocols** ([`better-auth@1.7.6`](https://www.better-auth.com/docs), [`@better-auth/passkey@1.7.6`](https://www.better-auth.com/docs/plugins/passkey), [`@better-auth/sso@1.7.6`](https://www.better-auth.com/docs/plugins/sso), samlify via the SSO plugin — never hand-rolled XML; see [Hono integration](https://www.better-auth.com/docs/integrations/hono)).
 - **StoryShelf owns users, memberships, invites, and UI.** Engine identities
-   mirror into the shelf `users` table (source of truth for roles) via [database hooks](https://www.better-auth.com/docs/concepts/hooks#databasehooks); all logins
-   flow through engine endpoints mounted at `/api/auth/*`.
+  mirror into the shelf `users` table (source of truth for roles) via [database hooks](https://www.better-auth.com/docs/concepts/hooks#databasehooks); all logins
+  flow through engine endpoints mounted at `/api/auth/*`.
 - **Core gains one optional method** (`DatabaseAdapter.transact?`); the opaque
   `DBAdapter` bridge in `@storyshelf/auth` maps engine models onto
   shelf tables with zero dialect knowledge (sqlite, Turso, Postgres fragments).

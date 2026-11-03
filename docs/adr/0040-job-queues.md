@@ -26,10 +26,10 @@ semantics.
 - A **queue** in the app is a consumer over a set of kinds with its own retry limit, built by
   `createJobQueue(options, kinds, maxRetries)` in `packages/app/src/jobs-setup.ts`. Today:
 
-| Queue | Kinds | Retry limit | Where |
-| --- | --- | --- | --- |
-| Main | `capture` (when `testing.runner` is set), `publish` (long-running host) | `testing.retries` (default 2, three attempts) | `queuesFor`, `databaseConsumer` |
-| Notify | `notify` (long-running host) | `NOTIFY_MAX_ATTEMPTS` (5) minus one; handler retry delay 10 s doubling to 5 min | `queuesFor`, `notifyConsumer` |
+| Queue  | Kinds                                                                   | Retry limit                                                                     | Where                           |
+| ------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------- |
+| Main   | `capture` (when `testing.runner` is set), `publish` (long-running host) | `testing.retries` (default 2, three attempts)                                   | `queuesFor`, `databaseConsumer` |
+| Notify | `notify` (long-running host)                                            | `NOTIFY_MAX_ATTEMPTS` (5) minus one; handler retry delay 10 s doubling to 5 min | `queuesFor`, `notifyConsumer`   |
 
 - A host with no consumer (serverless) runs neither queue: build state is delivered inline without
   durability (`packages/app/src/build-state-setup.ts`), and publishing follows ADR 0006 decision 10.
@@ -94,9 +94,9 @@ A lost lease, a failed attempt and a child crash count against the same limit wi
 
 ## Alternatives rejected
 
-| Option | Why not |
-| --- | --- |
-| Priority column on `capture_jobs` | Needs fair-share and starvation rules across instances; separation already gives the isolation needed. |
-| Preempt investigations for capture | Kills work mid-replay and complicates pin release (ADR 0039). |
-| One consumer for every kind | A capture holding every slot delays git statuses; this is why `notify` has its own consumer. |
-| External queue per kind | Rejected in ADR 0006 decision 6; nothing here changes that. |
+| Option                             | Why not                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Priority column on `capture_jobs`  | Needs fair-share and starvation rules across instances; separation already gives the isolation needed. |
+| Preempt investigations for capture | Kills work mid-replay and complicates pin release (ADR 0039).                                          |
+| One consumer for every kind        | A capture holding every slot delays git statuses; this is why `notify` has its own consumer.           |
+| External queue per kind            | Rejected in ADR 0006 decision 6; nothing here changes that.                                            |

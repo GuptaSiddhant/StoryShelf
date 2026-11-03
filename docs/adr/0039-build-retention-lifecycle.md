@@ -88,14 +88,14 @@ by preset, so it cannot by itself carry this guarantee.
 
 All writers use the fenced capability when it is present:
 
-| Path | Mutation |
-| --- | --- |
-| `approveSnapshot` (`app/src/routers/builds.handlers.ts`) | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`) |
-| `core/src/capture/pipeline.ts` | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict |
-| `BaselineModel.upsert` (`core/src/models/baseline.ts`) | Explicit promotion and replacement, swapping the source reference atomically |
-| `core/src/models/baseline-transfer.ts` `import` | Archive replacement or insertion with identity, version and source rechecked |
-| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal |
-| `prepareBaselineReferences` (`db-sqlite`) | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; not invoked as production activation until #374 |
+| Path                                                      | Mutation                                                                                                                                                                          |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `approveSnapshot` (`app/src/routers/builds.handlers.ts`)  | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`)                                                                       |
+| `core/src/capture/pipeline.ts`                            | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict        |
+| `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                      |
+| `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                      |
+| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                     |
+| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; not invoked as production activation until #374 |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check
 followed by an independent write is forbidden.
@@ -137,13 +137,13 @@ followed by an independent write is forbidden.
 
 ## Alternatives rejected
 
-| Option | Why not |
-| --- | --- |
-| Rely on `transact` | Optional, and its isolation differs by preset; it does not prove serialization with deletion claims. |
-| Check references, then delete | Races a concurrent promotion or investigation and can delete a live source build. |
-| Pin every build a historical diff touched | Unbounded retention of comparison graphs; frozen comparison images already keep history reviewable. |
-| Sequential fallback for unsupported adapters | Silently weakens the guarantee instead of failing closed. |
-| Guess legacy sources from the containing build | Wrong for inherited snapshots; presents false provenance. |
+| Option                                         | Why not                                                                                              |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Rely on `transact`                             | Optional, and its isolation differs by preset; it does not prove serialization with deletion claims. |
+| Check references, then delete                  | Races a concurrent promotion or investigation and can delete a live source build.                    |
+| Pin every build a historical diff touched      | Unbounded retention of comparison graphs; frozen comparison images already keep history reviewable.  |
+| Sequential fallback for unsupported adapters   | Silently weakens the guarantee instead of failing closed.                                            |
+| Guess legacy sources from the containing build | Wrong for inherited snapshots; presents false provenance.                                            |
 
 ## Open questions
 

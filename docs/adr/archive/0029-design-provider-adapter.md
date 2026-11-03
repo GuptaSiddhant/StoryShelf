@@ -22,11 +22,11 @@ Figma support (#141) landed as Figma-specific code inside core and the app: URL 
 
 ## Alternatives considered
 
-| Option | Why not |
-|---|---|
-| Keep Figma in core | OAuth and any second tool would keep growing vendor code in core; breaks the adapter convention |
+| Option                                 | Why not                                                                                                     |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Keep Figma in core                     | OAuth and any second tool would keep growing vendor code in core; breaks the adapter convention             |
 | Model other tools now (Penpot, Zeplin) | Speculative; the contract is deliberately only what Figma needs (parse, metadata, renders, credential copy) |
-| Data-copy migration | Cache is disposable and the credential is one paste; breaking changes were allowed |
+| Data-copy migration                    | Cache is disposable and the credential is one paste; breaking changes were allowed                          |
 
 ## Consequences
 

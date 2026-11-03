@@ -144,6 +144,9 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
       ALTER TABLE snapshots DROP COLUMN a11y_violations;
       ALTER TABLE comments DROP COLUMN story_id;
       ALTER TABLE comments DROP COLUMN mentions;
+      ALTER TABLE comments DROP COLUMN kind;
+      ALTER TABLE comments DROP COLUMN resolved_at;
+      ALTER TABLE comments DROP COLUMN resolved_by;
       ALTER TABLE notification_channels DROP COLUMN last_error;
       ALTER TABLE notification_channels DROP COLUMN last_error_at;
     `);
@@ -171,12 +174,15 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
     const columns = await client.query<{ table_name: string; column_name: string }>(`
       SELECT table_name, column_name FROM information_schema.columns
       WHERE (table_name = 'snapshots' AND column_name IN ('duration_ms', 'a11y_violations'))
-         OR (table_name = 'comments' AND column_name IN ('story_id', 'mentions'))
+         OR (table_name = 'comments' AND column_name IN ('story_id', 'mentions', 'kind', 'resolved_at', 'resolved_by'))
          OR (table_name = 'notification_channels' AND column_name IN ('last_error', 'last_error_at'))
       ORDER BY table_name, column_name
     `);
     expect(columns.rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([
+      "comments.kind",
       "comments.mentions",
+      "comments.resolved_at",
+      "comments.resolved_by",
       "comments.story_id",
       "notification_channels.last_error",
       "notification_channels.last_error_at",

@@ -236,7 +236,10 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   story_id TEXT,
-  mentions TEXT
+  mentions TEXT,
+  kind TEXT NOT NULL DEFAULT 'comment',
+  resolved_at TIMESTAMPTZ,
+  resolved_by TEXT
 );
 CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id);
 CREATE TABLE IF NOT EXISTS build_reviews (

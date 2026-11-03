@@ -8,6 +8,7 @@ import { displayNameOf, mentionCandidates, mentionData } from "../mentions.ts";
 import { REVIEW_EVENTS, announceMention, announceReview } from "../review-events.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
+import { resolveTriager } from "./comment-triage.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
@@ -61,12 +62,27 @@ const resolveCommentRoute = createRoute({
   },
 });
 
+const reopenCommentRoute = createRoute({
+  method: "post",
+  tags: ["Review"],
+  summary: "Reopen a resolved comment",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/comments/{commentId}/reopen",
+  request: { params: z.object({ slug: z.string(), buildId: z.string(), commentId: z.string() }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: commentSchema } },
+      description: "Comment reopened",
+    },
+    ...notFound,
+  },
+});
+
 /** A comment as the API returns it: the stored mentions decoded to `{ userId, handle }` entries. */
 function commentJson(comment: Comment): Omit<Comment, "mentions"> & { mentions: CommentMention[] } {
   return { ...comment, mentions: CommentModel.mentionsOf(comment) };
 }
 
-/** Register the build comment list, create, and resolve endpoints. */
+/** Register the build comment list, create, resolve and reopen endpoints. */
 export function registerComments(app: ShelfRouter): void {
   app.openapi(listCommentsRoute, async (c) => {
     const { slug, buildId } = c.req.valid("param");
@@ -88,23 +104,41 @@ export function registerComments(app: ShelfRouter): void {
 
   app.openapi(resolveCommentRoute, async (c) => {
     const { slug, buildId, commentId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
-    const build = await buildForProject(project.id, buildId);
+    const { build } = await resolveTriager(c, slug, buildId);
     const comment = await resolveBuildComment(build.id, commentId);
     hxRefresh(c);
     flashHx(c, "Comment resolved");
     return c.json(commentJson(comment));
   });
+
+  app.openapi(reopenCommentRoute, async (c) => {
+    const { slug, buildId, commentId } = c.req.valid("param");
+    const { build } = await resolveTriager(c, slug, buildId);
+    const comment = await reopenBuildComment(build.id, commentId);
+    hxRefresh(c);
+    flashHx(c, "Comment reopened");
+    return c.json(commentJson(comment));
+  });
 }
 
-/** Mark a comment of `buildId` resolved; 404 for a comment of another build. */
+/** A comment of `buildId`; 404 for a comment of another build. */
+async function commentOfBuild(buildId: string, commentId: string): Promise<Comment> {
+  const found = (await new CommentModel(getStore().db).listByBuild(buildId)).find(
+    (item) => item.id === commentId,
+  );
+  return found ?? throwNotFound("Comment not found");
+}
+
+/** Mark a comment of `buildId` resolved by the current user; 404 for a comment of another build. */
 export async function resolveBuildComment(buildId: string, commentId: string): Promise<Comment> {
-  const comments = new CommentModel(getStore().db);
-  const found = (await comments.listByBuild(buildId)).find((item) => item.id === commentId);
-  if (!found) {
-    throwNotFound("Comment not found");
-  }
-  return await comments.resolve(commentId);
+  await commentOfBuild(buildId, commentId);
+  return await new CommentModel(getStore().db).resolve(commentId, getStore().user?.id ?? null);
+}
+
+/** Open a resolved comment of `buildId` again; 404 for a comment of another build. */
+export async function reopenBuildComment(buildId: string, commentId: string): Promise<Comment> {
+  await commentOfBuild(buildId, commentId);
+  return await new CommentModel(getStore().db).reopen(commentId);
 }
 
 /** A comment anchors to the build, a story or a snapshot (ADR 0013, decision 2), never two. */
@@ -146,6 +180,7 @@ async function announceComment(
     commentId: comment.id,
     snapshotId: comment.snapshotId,
     storyId: comment.storyId,
+    kind: comment.kind,
     body: comment.body.slice(0, 500),
   };
   await announceReview(project, REVIEW_EVENTS.commentCreated, data, buildId, { skipUsers });

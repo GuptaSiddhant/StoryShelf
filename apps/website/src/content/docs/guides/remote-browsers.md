@@ -44,13 +44,13 @@ createShelfApp({ database, storage, testing: { runner } });
 
 Credentials are operator-level: they are passed in the server's code, from the environment or a secret manager. They are never stored per project, and never logged: the endpoint (it can carry a key) and every header value are removed from the messages the runner surfaces.
 
-| Preset                     | Package                                | Protocol   | Reaches the Storybook through |
-| -------------------------- | -------------------------------------- | ---------- | ----------------------------- |
-| `playwrightServer(...)`    | `@storyshelf/runner-playwright/remote` | Playwright | `exposeNetwork` (default)     |
-| `azurePlaywright(...)`     | `@storyshelf/runner-playwright/remote` | Playwright | `exposeNetwork`               |
-| `browserstack(...)`        | `@storyshelf/runner-playwright/remote` | Playwright | a Storybook URL               |
+| Preset                                      | Package                                | Protocol                       | Reaches the Storybook through                       |
+| ------------------------------------------- | -------------------------------------- | ------------------------------ | --------------------------------------------------- |
+| `playwrightServer(...)`                     | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork` (default)                           |
+| `azurePlaywright(...)`                      | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
+| `browserstack(...)`                         | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
 | `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
-| `cdp(...)`                 | `@storyshelf/runner-puppeteer/remote`  | CDP        | a Storybook URL               |
+| `cdp(...)`                                  | `@storyshelf/runner-puppeteer/remote`  | CDP                            | a Storybook URL                                     |
 
 `remote()` is the generic constructor every preset is sugar over, so a provider without a preset needs no new release. A fixed service declares how it is reached and where:
 
@@ -192,14 +192,14 @@ remote<{ id: string }>({
 
 **The context `connect` receives**
 
-| Field        | Meaning                                                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `engine`     | The engine being connected.                                                                                                              |
-| `buildId`    | The StoryShelf build; the same for every shard.                                                                                          |
-| `runId`      | The shard's id; the build id when the render is not sharded.                                                                             |
-| `shardIndex` | The shard's **1-based** position in the plan, and **`undefined` (never `0`) when the build is not sharded**. Stable if a shard is retried. |
-| `purpose`    | `render` (a build or shard), `extract` (the parameter pre-pass) or `tests` (`.test()` entries). The pre-passes connect too.               |
-| `attempt`    | This connection's attempt, from 1; every retry connects anew.                                                                            |
+| Field        | Meaning                                                                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `engine`     | The engine being connected.                                                                                                                    |
+| `buildId`    | The StoryShelf build; the same for every shard.                                                                                                |
+| `runId`      | The shard's id; the build id when the render is not sharded.                                                                                   |
+| `shardIndex` | The shard's **1-based** position in the plan, and **`undefined` (never `0`) when the build is not sharded**. Stable if a shard is retried.     |
+| `purpose`    | `render` (a build or shard), `extract` (the parameter pre-pass) or `tests` (`.test()` entries). The pre-passes connect too.                    |
+| `attempt`    | This connection's attempt, from 1; every retry connects anew.                                                                                  |
 | `signal`     | Aborts while `connect` is pending: on `timeouts.acquireMs`, a cancel (user, build, render budget) and shutdown. Spent once `connect` resolves. |
 
 **Lifecycle**
@@ -261,13 +261,13 @@ cdp({
 
 0.8 is a breaking release for `remote()`; a 0.7 call fails at runner creation with a message naming the replacement. The presets (`playwrightServer`, `azurePlaywright`, `browserstack`, `cdp`) keep their options.
 
-| 0.7                                                      | 0.8                                                                                |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `connect: (engine) => ({ protocol, endpoint, … })`       | `protocol` and `reach` on `remote()`; `connect: { endpoint, headers }`, or a function receiving a context object |
-| `exposeNetwork: "<loopback>"` on the connection          | `reach: "loopback"` (`"url"` for none)                                             |
-| `connectRetries`, `connectBackoffMs`                     | `retry: { attempts, backoffMs }`                                                   |
-| `connectTimeoutMs`                                       | `timeouts: { connectMs }`                                                          |
-| `acquire` (0.7.1 only)                                   | merged into `connect`                                                              |
+| 0.7                                                | 0.8                                                                                                              |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `connect: (engine) => ({ protocol, endpoint, … })` | `protocol` and `reach` on `remote()`; `connect: { endpoint, headers }`, or a function receiving a context object |
+| `exposeNetwork: "<loopback>"` on the connection    | `reach: "loopback"` (`"url"` for none)                                                                           |
+| `connectRetries`, `connectBackoffMs`               | `retry: { attempts, backoffMs }`                                                                                 |
+| `connectTimeoutMs`                                 | `timeouts: { connectMs }`                                                                                        |
+| `acquire` (0.7.1 only)                             | merged into `connect`                                                                                            |
 
 ## Other services
 

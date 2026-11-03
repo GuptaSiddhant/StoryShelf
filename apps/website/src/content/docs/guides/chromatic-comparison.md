@@ -14,7 +14,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 | **Browsers**              | Chrome, Firefox, Safari, Edge (branded, cloud) | Chromium (default), Firefox, WebKit via Playwright (per-project `browser`)                   |
 | **TurboSnap**             | Yes (dependency graph)                         | Yes — affected capture (dependency graph, on by default)                                     |
 | **Modes / Globals**       | Yes                                            | Yes — `parameters.chromatic.modes` / `parameters.storyshelf.modes` ([Modes](/guides/modes/)) |
-| **Accessibility testing** | Yes (aXe)                                      | axe-core checks (on by default), shown in review and non-blocking                               |
+| **Accessibility testing** | Yes (aXe)                                      | axe-core checks (on by default), shown in review and non-blocking                            |
 | **Interaction tests**     | Yes (`play` functions)                         | Yes (`play` functions)                                                                       |
 | **SSO / Enterprise**      | Enterprise plan                                | Better Auth engine (OIDC/SAML via any IdP)                                                   |
 | **Vendor lock-in**        | Yes (proprietary)                              | No (MIT, open source)                                                                        |

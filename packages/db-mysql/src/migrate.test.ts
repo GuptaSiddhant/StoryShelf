@@ -107,6 +107,11 @@ describe("runMigrations: MySQL 8 compatibility", () => {
     expect(queries).toContain("ALTER TABLE comments ADD COLUMN story_id TEXT");
     expect(queries).toContain("ALTER TABLE comments ADD COLUMN mentions TEXT");
     expect(queries).toContain(
+      "ALTER TABLE comments ADD COLUMN kind VARCHAR(32) NOT NULL DEFAULT 'comment'",
+    );
+    expect(queries).toContain("ALTER TABLE comments ADD COLUMN resolved_at DATETIME(3) NULL");
+    expect(queries).toContain("ALTER TABLE comments ADD COLUMN resolved_by VARCHAR(64) NULL");
+    expect(queries).toContain(
       "ALTER TABLE notification_channels ADD COLUMN last_error_at DATETIME(3)",
     );
     expect(queries).toContain("ALTER TABLE comments MODIFY COLUMN user_id VARCHAR(64) NULL");

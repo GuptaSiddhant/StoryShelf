@@ -24,6 +24,9 @@ export const comments = sqliteTable(
     updatedAt: text("updated_at").notNull(),
     storyId: text("story_id"),
     mentions: text("mentions"),
+    kind: text("kind").notNull().default("comment"),
+    resolvedAt: text("resolved_at"),
+    resolvedBy: text("resolved_by"),
   },
   (t) => [index("comments_build_id_idx").on(t.buildId)],
 );
@@ -42,4 +45,7 @@ export interface Comment {
   updatedAt: string;
   storyId: string | null;
   mentions: string | null;
+  kind: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
 }

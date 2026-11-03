@@ -102,6 +102,41 @@ describe("CommentModel", () => {
     expect(resolvedComment.resolved).toBe(true);
   });
 
+  it("is a plain comment unless it asks for a change", async () => {
+    const db = await makeDbWithProject();
+    const model = new CommentModel(db);
+    const plain = await model.create(mockProject.id, "b1", "u", { body: "x" });
+    const request = await model.create(mockProject.id, "b1", "u", {
+      body: "fix this",
+      kind: "change_request",
+    });
+    expect([plain.kind, request.kind]).toEqual(["comment", "change_request"]);
+    expect([request.resolved, request.resolvedAt, request.resolvedBy]).toEqual([false, null, null]);
+    expect((await model.get(request.id))?.kind).toBe("change_request");
+    expect(await model.get("nope")).toBeNull();
+  });
+
+  it("records who resolved a comment and when, and clears both on reopen", async () => {
+    const db = await makeDbWithProject();
+    const model = new CommentModel(db);
+    const request = await model.create(mockProject.id, "b1", "u", {
+      body: "fix this",
+      kind: "change_request",
+    });
+    const resolved = await model.resolve(request.id, "dev-1");
+    expect(resolved).toMatchObject({ resolved: true, resolvedBy: "dev-1", kind: "change_request" });
+    expect(resolved.resolvedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
+    const anonymous = await model.resolve(request.id);
+    expect(anonymous.resolvedBy).toBeNull();
+    const reopened = await model.reopen(request.id);
+    expect([reopened.resolved, reopened.resolvedAt, reopened.resolvedBy]).toEqual([
+      false,
+      null,
+      null,
+    ]);
+    expect(reopened.kind).toBe("change_request");
+  });
+
   it("anchors to a build, a story or a snapshot, never two", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db);

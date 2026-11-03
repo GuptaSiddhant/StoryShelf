@@ -12,7 +12,8 @@ import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { giveVerdict } from "./build-reviews.handlers.ts";
 import { APPROVER_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
-import { createComment, resolveBuildComment } from "./comments.ts";
+import { resolveTriager } from "./comment-triage.ts";
+import { createComment, reopenBuildComment, resolveBuildComment } from "./comments.ts";
 import { flash } from "./flash.ts";
 import { resolveAuthorizedProject, resolveReviewer } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
@@ -36,9 +37,15 @@ export function registerReviewForms(app: ShelfRouter): void {
   });
 
   app.post(`${base}/comments/:commentId/resolve`, async (c) => {
-    const { build } = await target(c, DEVELOPER_ROLES);
+    const { build } = await triager(c);
     await resolveBuildComment(build.id, c.req.param("commentId"));
     return done(c, build.id, "Comment resolved");
+  });
+
+  app.post(`${base}/comments/:commentId/reopen`, async (c) => {
+    const { build } = await triager(c);
+    await reopenBuildComment(build.id, c.req.param("commentId"));
+    return done(c, build.id, "Comment reopened");
   });
 
   app.post(`${base}/reviews`, async (c) => {
@@ -50,6 +57,11 @@ export function registerReviewForms(app: ShelfRouter): void {
     await giveVerdict(project, build, await resolveReviewer(c), input.data);
     return done(c, build.id, "Verdict recorded");
   });
+}
+
+/** The project and build of a resolve or reopen form: developers and above, and the build's author. */
+async function triager(c: Context): Promise<{ project: Project; build: Build }> {
+  return await resolveTriager(c, c.req.param("slug") ?? "", c.req.param("buildId") ?? "");
 }
 
 async function target(

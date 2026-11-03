@@ -37,10 +37,19 @@ The build status flips to `approved` when every `new`/`changed` snapshot is reso
 Threaded review comments live on a build, a story of the build's catalog or a single snapshot, with **resolve**. A comment has exactly one anchor:
 
 - `GET /api/v1/projects/:slug/builds/:id/comments`
-- `POST …/comments { body, snapshotId? | storyId?, parentId? }` (`snapshotId` and `storyId` together are refused with 400)
-- `POST …/comments/:commentId/resolve`
+- `POST …/comments { body, snapshotId? | storyId?, parentId?, kind? }` (`snapshotId` and `storyId` together are refused with 400; `kind` is `comment`, the default, or `change_request`)
+- `POST …/comments/:commentId/resolve` and `POST …/comments/:commentId/reopen`
 
 `developer`, `approver` and `admin` write; `viewer` reads. Build and story comments show on the build page and story comments also on the story's [component page](#component-pages); the snapshot review page shows the thread of the selected snapshot together with the build comments and the comments on that snapshot's story. The forms in the UI post to the same handlers through page routes under `/projects/:slug/builds/:id/…`, since a browser form cannot send JSON.
+
+### Change requests
+
+Tick **Request a change** when you comment to mark the comment as a **change request**: it asks the build's author to address something. A change request has a status badge (**Change requested**, then **Resolved**), is resolved with **Mark resolved** and reopened with **Reopen**, and a resolved one folds to a line saying who resolved it and when.
+
+- **Who resolves.** `developer`, `approver` and `admin` resolve and reopen; so does the build's own author (the signed-in user whose email is the build's git author), even when they only view the project. Any other viewer, and anyone who is not a member, gets `403`.
+- **The checklist.** The build page shows the number of open change requests beside the verdict (nothing when there are none) and a **Change requests** card listing each one with a link to its anchor: the build, a story or a snapshot. Resolved ones sit under **Resolved (N)**.
+- **They do not gate anything.** Open change requests never block approval and never change a build's status or its git status. **Approve build** asks "There are N open change requests. Approve anyway?" while some are open, and the approval then goes through as usual. Making them gating would be a per-project setting; it is an open question in ADR 0013, not built.
+- **Events.** `comment:created` carries the `kind`; resolving or reopening raises no event.
 
 Comments persist until the build is purged (see [Retention](/concepts/retention/)). The UI's diff overlay (baseline | current | diff) is the heat map: red = changed pixels, thresholds from `pixel_threshold` / `max_diff_ratio` or per-story `diffThreshold`.
 
@@ -78,7 +87,7 @@ With review off every review route answers **404** for that project, evaluated o
 The `approver` and `admin` roles are the reviewers; there is no separate reviewer role, no per-build assignment and no "request review from" step. Every approver and admin of the project reviews every build that waits.
 
 - **Being asked.** When a published build waits for a verdict, a `review:requested` event goes to the project's approvers and admins. Unlike other [notification topics](/guides/notifications/), which are opt-in, this one is on by default for those roles: a reviewer with no subscription receives it by email (when an email transport is wired), and turns it off by saving their notification preferences for the project with **Email me** unticked, or with a topic list that leaves it out. Channels and webhooks receive it like any other event.
-- **Commenting.** `developer` and above comment; `viewer` reads only. Unresolved comments never block a verdict.
+- **Commenting.** `developer` and above comment; `viewer` reads only. Unresolved comments and open [change requests](#change-requests) never block a verdict.
 - **A new build needs a new approval.** Verdicts belong to the build, as snapshot approvals do. The build under review is the latest on its branch; earlier pending builds fall away under [retention](#builds-nobody-finishes).
 
 ### The build page
