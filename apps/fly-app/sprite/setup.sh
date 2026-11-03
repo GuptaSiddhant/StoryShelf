@@ -22,7 +22,8 @@ NODE_DIR=/opt/node
 PLAYWRIGHT_VERSION="$(sed -n 's/^  playwright-core@\([0-9][0-9.]*\):.*/\1/p' "$ROOT/nub.lock" | head -1)"
 [ -n "$PLAYWRIGHT_VERSION" ] || { echo "no playwright-core version in nub.lock" >&2; exit 1; }
 
-on() { sprite exec -s "$NAME" "$@"; }
+# --no-stdin: nothing here reads input, and the CLI warns about implicit stdin forwarding otherwise.
+on() { sprite exec -s "$NAME" --no-stdin "$@"; }
 
 echo "1/7 sprite $NAME"
 if sprite list --prefix "$NAME" 2>/dev/null | grep -qx "$NAME"; then
@@ -32,7 +33,7 @@ else
 fi
 # The URL stays private (org members only, the default) while the Sprite is built; step 7 makes
 # it public only once the authenticating proxy is installed, healthy, and seen to refuse strangers.
-sprite url update -s "$NAME" --auth sprite
+sprite config update -s "$NAME" --url-auth sprite
 
 echo "2/7 node 24 in $NODE_DIR"
 on -- sudo bash -c "
@@ -62,10 +63,12 @@ on --dir "$DIR" -- bash -c "
 "
 
 echo "4/7 shared secret (0600, from stdin) and the service"
-printf '%s' "$SPRITE_BROWSER_SECRET" | on -- bash -c "umask 077 && cat > $DIR/secret"
+printf '%s' "$SPRITE_BROWSER_SECRET" | sprite exec -s "$NAME" --stdin -- bash -c "umask 077 && cat > $DIR/secret"
 # The service the Sprite starts on every wake. `http_port` routes the Sprite's URL to the proxy.
-on -- sprite-env services create storyshelf-browser --cmd "$DIR/start.sh" --http-port 8080 || \
-  on -- sprite-env services restart storyshelf-browser
+# `create` is a no-op when the service already exists with this command, and the proxy reads its
+# secret file only at start-up, so restart it unconditionally: a re-run is how the secret is rotated.
+on -- sprite-env services create storyshelf-browser --cmd "$DIR/start.sh" --http-port 8080 >/dev/null || true
+on -- sprite-env services restart storyshelf-browser >/dev/null
 
 echo "5/7 warm up: wait for the proxy, then open and close one browser"
 HEALTHY=0
@@ -88,11 +91,11 @@ echo "7/7 publish: make the URL public, then check from outside that strangers a
 # A Playwright client cannot log in with a Fly account and the Playwright server itself has no
 # authentication: the proxy (proxy.mjs) and its shared secret are the only boundary. Publishing is
 # therefore the last step, and is undone if the proxy is not seen refusing an unauthenticated request.
-sprite url update -s "$NAME" --auth public
-URL="$(sprite url -s "$NAME" | grep -Eo 'https://[^[:space:]]+' | head -1 || true)"
+sprite config update -s "$NAME" --url-auth public
+URL="$(sprite info -s "$NAME" | sed -n 's/^URL: *//p' | head -1)"
 CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 90 "${URL%/}/healthz" || true)"
 if [ -z "$URL" ] || [ "$CODE" != 401 ]; then
-  sprite url update -s "$NAME" --auth sprite
+  sprite config update -s "$NAME" --url-auth sprite
   echo "the public URL did not refuse an unauthenticated request (got '${CODE:-none}'); reverted to private" >&2
   exit 1
 fi

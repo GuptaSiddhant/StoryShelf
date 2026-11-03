@@ -79,7 +79,7 @@ function bridge(request, head, socket, { upstreamPort, upstreamHost }) {
   let answered = false;
   const upstream = connect(upstreamPort, upstreamHost, () => {
     connected = true;
-    upstream.write(upgradeRequest(request));
+    upstream.write(upgradeRequest(request, `${upstreamHost}:${upstreamPort}`));
     upstream.write(head);
     socket.pipe(upstream);
     upstream.pipe(socket);
@@ -104,16 +104,21 @@ function bridge(request, head, socket, { upstreamPort, upstreamHost }) {
   upstream.on("close", close);
 }
 
-/** The upgrade request as the upstream should see it: the client's own, minus the secret. */
-function upgradeRequest(request) {
+/**
+ * The upgrade request as the upstream should see it: the client's own, minus the secret, and with
+ * the upstream's own address as `Host`. Playwright's server answers 403 to a request whose `Host`
+ * is the Sprite's public name (it guards against DNS rebinding), so the client's must not reach it.
+ */
+function upgradeRequest(request, host) {
   let text = `${request.method} ${request.url} HTTP/1.1\r\n`;
   for (let index = 0; index < request.rawHeaders.length; index += 2) {
     const name = request.rawHeaders[index];
-    if (name.toLowerCase() !== SECRET_HEADER) {
+    const lower = name.toLowerCase();
+    if (lower !== SECRET_HEADER && lower !== "host") {
       text += `${name}: ${request.rawHeaders[index + 1]}\r\n`;
     }
   }
-  return `${text}\r\n`;
+  return `${text}Host: ${host}\r\n\r\n`;
 }
 
 /** Whether something accepts TCP connections at the address. */
