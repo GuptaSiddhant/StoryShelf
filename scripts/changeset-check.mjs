@@ -77,11 +77,11 @@ function readBase(base, path) {
   }
 }
 
-/** A manifest's name when it is published, `undefined` when it is private, `null` when it cannot be read. */
+/** A manifest's name when it is published, `undefined` when it is private, `null` when it cannot be read or has no name. */
 function publishedName(text) {
   try {
     const manifest = JSON.parse(text);
-    return manifest.private === true ? undefined : manifest.name;
+    return manifest.private === true ? undefined : (manifest.name ?? null);
   } catch {
     return null;
   }
