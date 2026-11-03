@@ -54,9 +54,12 @@ esac
 curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
   -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main"}'
 
+# --full on both uploads: the fixture now builds with preview-stats.json, and no source file
+# differs between the two builds (the feature build only injects CSS into the built output), so
+# affected capture would inherit every story and the demo would show no diffs.
 upload() { # <dir> <branch> <sha> <message>
   (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$STORYSHELF_ADMIN_TOKEN" \
-    --build-dir "$1" --branch "$2" --sha "$3" --message "$4" "${AUTHOR[@]}")
+    --build-dir "$1" --branch "$2" --sha "$3" --message "$4" "${AUTHOR[@]}" --full)
 }
 
 upload "$STATIC" main "$MAIN_SHA" "chore: design system baseline"
