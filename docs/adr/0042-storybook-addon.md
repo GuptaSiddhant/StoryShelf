@@ -40,6 +40,9 @@ Facts this ADR builds on:
 The first release runs only in a build's published Storybook at the canonical path-based URL on the
 app origin. It reads the project slug and build id from its own `location.pathname`, so nothing is
 injected into the uploaded files and a published build stays byte-for-byte what was uploaded.
+The project URLs without a build id (`/projects/:slug/storybook` and the label form) are resolvers
+that 302-redirect to `/storybook/build/<id>/`, and Storybook's files are served only under that
+path, so the addon always runs on a path that carries the build id. It supports no other shape.
 
 Everywhere else the addon is inert: it registers no panel and makes no request. That covers a
 developer's local `storybook dev`, a Storybook hosted elsewhere, and a project subdomain
@@ -70,13 +73,16 @@ developer's local `storybook dev`, a Storybook hosted elsewhere, and a project s
   API answers for a project the caller cannot see.
 - The body is per-story state only: for each story id the worst snapshot status across its
   viewports and browsers (`rejected`, `changed`, `new`, `pending`, `approved`, `unchanged`), a design
-  drift (`stale`, `deleted`, or absent), and the build's own status. It also carries a relative
-  `reviewPath` for the build, from the store's `UrlBuilder`, which the addon resolves against its own
-  origin. It never carries images, image keys, signed URLs, comments, reviewer identities or
+  drift (`stale`, `deleted`, or absent), and the build's own status. A story with no snapshot (a
+  `disableSnapshot` story, or a catalog story the build has no snapshot row for) is omitted, and the
+  addon shows no badge for an id that is absent; the implementation tests that omission. It also
+  carries a relative `reviewPath` for the build: the path and query of the store's `UrlBuilder` URL
+  with the scheme and host removed, which the addon resolves against its own origin. It never carries images, image keys, signed URLs, comments, reviewer identities or
   absolute links.
 - Read-only by construction: no other method on the path, no write elsewhere in the addon, and no
   verdicts from Storybook.
-- The answer is `Cache-Control: private, no-cache`. It is one request per page load, not per story.
+- The answer is `Cache-Control: private, no-store`: it depends on who asks, so no cache keeps it. It
+  is one request per page load, not per story.
 
 ### 4. Packaging
 
