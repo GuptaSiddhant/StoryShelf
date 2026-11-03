@@ -110,7 +110,7 @@ jobs:
           # graph cannot match a changed packages/*/src file to a story. When one of them changed,
           # render everything; a change confined to packages/app is traced.
           mode=""
-          if [ -z "$DIFF_BASE" ] || git diff --name-only "$DIFF_BASE" "$UPLOAD_SHA" -- packages/core packages/image packages/affected | grep -q .; then
+          if [ -z "$DIFF_BASE" ] || git diff --name-only "$DIFF_BASE" "$UPLOAD_SHA" -- ':(top)packages/core' ':(top)packages/image' ':(top)packages/affected' | grep -q .; then
             mode="--full"
           fi
           # shellcheck disable=SC2086
