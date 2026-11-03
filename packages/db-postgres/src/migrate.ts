@@ -174,6 +174,11 @@ async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
   await execIgnore(run, RUN_TESTS_ALTER);
+  await migrateRecentColumns(run);
+}
+
+/** Columns added after the first adapter release; each is an idempotent `ADD COLUMN IF NOT EXISTS`. */
+async function migrateRecentColumns(run: MigrationRunner): Promise<void> {
   await migrateDesignColumns(run);
   await migrateUnstableColumns(run);
 }
