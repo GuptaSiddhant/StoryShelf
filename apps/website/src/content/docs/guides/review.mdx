@@ -44,6 +44,14 @@ Threaded review comments live on a build, a story of the build's catalog or a si
 
 Comments persist until the build is purged (see [Retention](/concepts/retention/)). The UI's diff overlay (baseline | current | diff) is the heat map: red = changed pixels, thresholds from `pixel_threshold` / `max_diff_ratio` or per-story `diffThreshold`.
 
+### Mentions
+
+Write `@` and the start of a member's name in a comment box and the box suggests the project's members; choosing one fills in their handle. A **handle** is the part of a member's email before the `@`, or their display name, matched without regard to case (`@alex.doe`, `@Alex Doe`). A mention resolves **only against this project's members**: `@someone` who is not a member (or who belongs to another project) stays plain text, and so does a name two members share, because guessing would notify the wrong person. An email address (`ops@example.com`) is not a mention.
+
+The resolved members are stored with the comment as user ids (`mentions` in the API, `[{ userId, handle }]`, set by the server and never read from the request), so a mention is shown highlighted with the member's **current** name even after they rename themselves. A mention that named no member stays plain.
+
+Each mentioned member gets one `comment:mentioned` [notification](/guides/notifications/#mentions), unless they wrote the comment themselves. It goes to that member only: by email by default when email is configured, or through the channels of their own subscription when they have an enabled one (a disabled subscription opts out). It never goes to a project channel or a webhook. A member who is subscribed to `comment:created` and mentioned gets the mention and **not** the comment: one message.
+
 A project can turn comments and verdicts off with its [review switch](#the-review-switch); they are then hidden, not deleted.
 
 ## Review without screenshots
@@ -126,14 +134,15 @@ The build's git channels show `<prefix>/review` (`pending`, then `success` or `f
 
 ### Events
 
-Review raises three [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
+Review raises these [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
 
-| Event              | When                                                                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins.                                  |
-| `comment:created`  | Any comment is posted. `data.scope` is `build`, `story` or `snapshot`; `data.eventId` is the comment id.                                   |
-| `review:comment`   | A filter alias, never sent: in a webhook, notification channel or subscription it matches a `comment:created` of scope `build` or `story`. |
-| `review:verdict`   | A reviewer approves or rejects a build.                                                                                                    |
+| Event               | When                                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `review:requested`  | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins.                                  |
+| `comment:created`   | Any comment is posted. `data.scope` is `build`, `story` or `snapshot`; `data.eventId` is the comment id.                                   |
+| `comment:mentioned` | A comment `@`-mentions a project member. A [notification](/guides/notifications/#mentions) to that member only; never a webhook.           |
+| `review:comment`    | A filter alias, never sent: in a webhook, notification channel or subscription it matches a `comment:created` of scope `build` or `story`. |
+| `review:verdict`    | A reviewer approves or rejects a build.                                                                                                    |
 
 ### Builds nobody finishes
 

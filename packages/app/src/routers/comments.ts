@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { CommentModel, type CommentCreateInput } from "@storyshelf/core/models";
-import type { Comment, Project } from "@storyshelf/core/schema";
+import type { Comment, CommentMention, Project } from "@storyshelf/core/schema";
 import { resolveMentions, type FoundMention } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -61,13 +61,19 @@ const resolveCommentRoute = createRoute({
   },
 });
 
+/** A comment as the API returns it: the stored mentions decoded to `{ userId, handle }` entries. */
+function commentJson(comment: Comment): Omit<Comment, "mentions"> & { mentions: CommentMention[] } {
+  return { ...comment, mentions: CommentModel.mentionsOf(comment) };
+}
+
 /** Register the build comment list, create, and resolve endpoints. */
 export function registerComments(app: ShelfRouter): void {
   app.openapi(listCommentsRoute, async (c) => {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     const build = await buildForProject(project.id, buildId);
-    return c.json(await new CommentModel(getStore().db).listByBuild(build.id));
+    const comments = await new CommentModel(getStore().db).listByBuild(build.id);
+    return c.json(comments.map((comment) => commentJson(comment)));
   });
 
   app.openapi(createCommentRoute, async (c) => {
@@ -77,7 +83,7 @@ export function registerComments(app: ShelfRouter): void {
     const comment = await createComment(project, build.id, c.req.valid("json"));
     hxRefresh(c);
     flashHx(c, "Comment added");
-    return c.json(comment, 201);
+    return c.json(commentJson(comment), 201);
   });
 
   app.openapi(resolveCommentRoute, async (c) => {
@@ -87,7 +93,7 @@ export function registerComments(app: ShelfRouter): void {
     const comment = await resolveBuildComment(build.id, commentId);
     hxRefresh(c);
     flashHx(c, "Comment resolved");
-    return c.json(comment);
+    return c.json(commentJson(comment));
   });
 }
 

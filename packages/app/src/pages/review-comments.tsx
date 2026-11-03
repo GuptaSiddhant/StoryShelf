@@ -2,17 +2,10 @@
 import type { Build, Comment, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
-import {
-  Badge,
-  Button,
-  Card,
-  Meta,
-  SectionTitle,
-  TextareaField,
-  VStack,
-} from "../ui/components.tsx";
+import { Badge, Button, Card, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 import { CommentCard } from "./build-diff-comments.tsx";
+import { CommentBodyField } from "./comment-body-field.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -95,15 +88,10 @@ function CommentForm(props: {
       {csrfField()}
       <VStack>
         {storyId ? <input type="hidden" name="storyId" value={storyId} /> : null}
-        <TextareaField
-          label={storyId ? "Add story comment" : "Add build comment"}
-          name="body"
-          id={storyId ? "story-comment-body" : "build-comment-body"}
-          rows={3}
-          required
-          placeholder={
-            storyId ? "Leave a comment on this story…" : "Leave a comment on this build…"
-          }
+        <CommentBodyField
+          slug={project.slug}
+          buildId={build.id}
+          kind={storyId ? "story" : "build"}
         />
         <div>
           <Button variant="primary" type="submit">

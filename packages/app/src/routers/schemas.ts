@@ -230,6 +230,8 @@ export const commentSchema = z
     userId: z.string().nullable(),
     body: z.string(),
     parentId: z.string().nullable(),
+    /** The project members the body `@`-mentions, resolved when it was posted (never client input). */
+    mentions: z.array(z.object({ userId: z.string(), handle: z.string() })),
     resolved: z.boolean(),
     createdAt: z.string(),
     updatedAt: z.string(),

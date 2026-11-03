@@ -2,7 +2,8 @@
  * The review forms of the build, diff and component pages. HTMX and plain forms post
  * `application/x-www-form-urlencoded`, which the JSON endpoints under `/api/v1` refuse (415), so
  * each form has a page route that reads the form and calls the same handlers as the API. All
- * three are `review` routes: they answer 404 for a project with review off.
+ * three are `review` routes: they answer 404 for a project with review off. The `@` suggestions
+ * of the comment box (`mention-suggest.tsx`) are registered here too, with the same gate.
  */
 import type { Build, Project } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
@@ -15,10 +16,12 @@ import { createComment, resolveBuildComment } from "./comments.ts";
 import { flash } from "./flash.ts";
 import { resolveAuthorizedProject, resolveReviewer } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
+import { registerMentionSuggest } from "./mention-suggest.tsx";
 import { buildReviewCreateSchema, commentCreateSchema } from "./schemas.ts";
 
 /** Register the form routes of review (`review` class). */
 export function registerReviewForms(app: ShelfRouter): void {
+  registerMentionSuggest(app);
   const base = "/projects/:slug/builds/:buildId";
   app.post(`${base}/comments`, async (c) => {
     const { project, build } = await target(c, DEVELOPER_ROLES);
