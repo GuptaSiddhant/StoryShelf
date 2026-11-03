@@ -192,4 +192,63 @@ describe("failCrashedCapture", () => {
     expect(outcome).toBe("finalized");
     expect(await w.status()).toBe("failed");
   });
+  it("fails the build its job still owns", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("failed");
+    expect(await w.status()).toBe("failed");
+  });
+
+  it("leaves a rerun alone when the hook of the run that ended arrives late", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+    // J1 exhausted; the build is retried and queued again as J2 before J1's hook runs.
+    await w.builds.resetStatus(w.build.id, "pending");
+    await w.builds.stampCaptureJob(w.build.id, "J2");
+    await w.builds.setStatus(w.build.id, "capturing");
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("skipped");
+    expect(await w.status()).toBe("capturing");
+    expect((await w.builds.get(w.build.id))?.captureJobId).toBe("J2");
+    expect(w.git.calls).toEqual([]);
+  });
+
+  it("never fails a build no run owns", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("skipped");
+    expect(await w.status()).toBe("capturing");
+  });
+
+  it("does not report a second failure when the hook runs twice", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+    const job = { buildId: w.build.id, jobId: "J1" };
+
+    expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("failed");
+    expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("skipped");
+  });
 });

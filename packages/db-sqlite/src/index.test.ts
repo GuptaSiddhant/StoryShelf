@@ -466,6 +466,44 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("gives a build in flight the capture job that was running when the column was added", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-capture-job-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES
+          ('run', 'p', 'a', 'main', 'capturing', 't', 't'),
+          ('old', 'p', 'b', 'main', 'pending', 't', 't'),
+          ('none', 'p', 'c', 'main', 'pending', 't', 't'),
+          ('done', 'p', 'd', 'main', 'passed', 't', 't');
+        INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, shard_id, status, created_at, updated_at) VALUES
+          ('j1', 'job', 'j1', 'capture', 'run', NULL, 'running', '2026-01-01', 't'),
+          ('j1:1', 'attempt', 'j1', 'capture', 'run', NULL, 'running', '2026-01-02', 't'),
+          ('j2', 'job', 'j2', 'capture', 'old', NULL, 'failed', '2026-01-01', 't'),
+          ('j3', 'job', 'j3', 'capture', 'old', NULL, 'queued', '2026-01-02', 't'),
+          ('s1', 'job', 's1', 'capture', 'run', 'shard', 'queued', '2026-01-03', 't'),
+          ('j4', 'job', 'j4', 'capture', 'done', NULL, 'queued', '2026-01-01', 't');
+        ALTER TABLE builds DROP COLUMN capture_job_id;
+      `);
+      raw.close();
+
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+
+      const rows = (await db.list(schema.builds)) as { id: string; captureJobId: string | null }[];
+      const owners = Object.fromEntries(rows.map((row) => [row.id, row.captureJobId]));
+      expect(owners).toEqual({ run: "j1", old: "j3", none: null, done: null });
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("adds the fingerprint columns to a volume created before them, keeping existing rows", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-fingerprint-"));
     const path = join(dir, "legacy.db");

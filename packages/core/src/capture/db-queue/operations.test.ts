@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { BuildModel } from "../../models/build.ts";
+import { ProjectModel } from "../../models/project.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
 import { createDatabaseCaptureQueue } from "./index.ts";
 
@@ -8,6 +10,23 @@ function queue() {
 }
 
 describe("database queue operations", () => {
+  it("stamps the build with the job of its own run, not with a shard job", async () => {
+    const { db, queue: q } = queue();
+    const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
+    const builds = new BuildModel(db);
+    const build = await builds.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await q.enqueue({ buildId: build.id, shard: "s1" });
+    expect((await builds.get(build.id))?.captureJobId ?? null).toBeNull();
+
+    await q.enqueue({ buildId: build.id });
+    const own = (await q.active()).find((entry) => entry.shard === undefined);
+    const job = await q.poll();
+    expect(own).toBeDefined();
+    expect((await builds.get(build.id))?.captureJobId).toBe(
+      job?.shard === undefined ? job?.jobId : (await q.poll())?.jobId,
+    );
+  });
+
   it("stores request id, trace and shard on the job row", async () => {
     const { queue: q } = queue();
     await q.enqueue({ buildId: "b1", reqId: "r", traceparent: "tp", shard: "s1" });

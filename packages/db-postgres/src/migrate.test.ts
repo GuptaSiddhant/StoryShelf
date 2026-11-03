@@ -261,3 +261,40 @@ describe("runMigrations: users auth columns", () => {
     await client.close();
   }, 60_000);
 });
+
+describe("runMigrations: builds.capture_job_id", () => {
+  it("gives a pending or capturing build the newest unfinished capture job of its own", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES
+        ('run', 'p', 'a', 'main', 'capturing', now(), now()),
+        ('old', 'p', 'b', 'main', 'pending', now(), now()),
+        ('none', 'p', 'c', 'main', 'pending', now(), now()),
+        ('done', 'p', 'd', 'main', 'passed', now(), now());
+      INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, shard_id, status, created_at, updated_at) VALUES
+        ('j1', 'job', 'j1', 'capture', 'run', NULL, 'running', '2026-01-01', '2026-01-01'),
+        ('j1:1', 'attempt', 'j1', 'capture', 'run', NULL, 'running', '2026-01-02', '2026-01-02'),
+        ('j2', 'job', 'j2', 'capture', 'old', NULL, 'failed', '2026-01-01', '2026-01-01'),
+        ('j3', 'job', 'j3', 'capture', 'old', NULL, 'queued', '2026-01-02', '2026-01-02'),
+        ('s1', 'job', 's1', 'capture', 'run', 'shard', 'queued', '2026-01-03', '2026-01-03'),
+        ('j4', 'job', 'j4', 'capture', 'done', NULL, 'queued', '2026-01-01', '2026-01-01');
+      ALTER TABLE builds DROP COLUMN capture_job_id;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const rows = await client.query<{ id: string; capture_job_id: string | null }>(
+      "SELECT id, capture_job_id FROM builds ORDER BY id",
+    );
+    expect(rows.rows).toEqual([
+      { id: "done", capture_job_id: null },
+      { id: "none", capture_job_id: null },
+      { id: "old", capture_job_id: "j3" },
+      { id: "run", capture_job_id: "j1" },
+    ]);
+  }, 60_000);
+});

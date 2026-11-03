@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_files TEXT,
   affected_import_paths TEXT,
   test_results TEXT,
+  capture_job_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -549,6 +550,8 @@ export const IDENTITY_STATEMENTS: string[] = [
   // Pre-adapter Figma tables, replaced by design_nodes / design_credentials (no data is carried over).
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",
+  // A run in flight when `builds.capture_job_id` was added owns the build it was started for.
+  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.build_id = builds.id AND j.status IN ('queued', 'running') ORDER BY j.created_at DESC LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')",
 ];
 
 const CONSTRAINT_PREFIX = /^(?:PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\s/iu;

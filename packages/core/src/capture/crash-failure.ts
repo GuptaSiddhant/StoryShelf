@@ -29,12 +29,12 @@ export type CrashFailureOutcome =
  */
 export async function failCrashedCapture(
   deps: DispatchDeps,
-  job: { buildId: string; shard?: string | undefined },
+  job: { buildId: string; shard?: string | undefined; jobId?: string | undefined },
   error: string,
 ): Promise<CrashFailureOutcome> {
   const outcome = job.shard
     ? await failShard(deps, job.buildId, job.shard, error)
-    : await failBuild(deps, job.buildId, error);
+    : await failBuild(deps, job.buildId, job.jobId, error);
   if (outcome !== "skipped") {
     deps.logger.error(
       { buildId: job.buildId, shard: job.shard, outcome, error },
@@ -47,14 +47,45 @@ export async function failCrashedCapture(
 async function failBuild(
   deps: DispatchDeps,
   buildId: string,
+  jobId: string | undefined,
   error: string,
 ): Promise<CrashFailureOutcome> {
+  if (jobId !== undefined) {
+    return await failOwnedBuild(deps, buildId, jobId, error);
+  }
   const loaded = await load(deps, buildId);
   if (!loaded || (loaded.build.status !== "capturing" && loaded.build.status !== "pending")) {
     return "skipped";
   }
   await closeOpenAttempts(deps, buildId, error);
   await new BuildModel(deps.db, deps.tables).setStatus(buildId, "failed");
+  await deps.buildState.request(buildId);
+  return "failed";
+}
+
+/**
+ * The build fails only while this job's run owns it (`builds.capture_job_id`). A hook that runs
+ * after the build was reset and queued again names a job the build no longer points at, so the
+ * newer run is left alone; a build no run owns (null) is never failed here.
+ */
+async function failOwnedBuild(
+  deps: DispatchDeps,
+  buildId: string,
+  jobId: string,
+  error: string,
+): Promise<CrashFailureOutcome> {
+  const { applied, build } = await new BuildModel(deps.db, deps.tables).failIfOwnedBy(
+    buildId,
+    jobId,
+  );
+  if (!applied) {
+    deps.logger.info(
+      { buildId, jobId, ownerJobId: build?.captureJobId ?? null, status: build?.status },
+      "crashed capture no longer owns its build; left it alone",
+    );
+    return "skipped";
+  }
+  await closeOpenAttempts(deps, buildId, error);
   await deps.buildState.request(buildId);
   return "failed";
 }
