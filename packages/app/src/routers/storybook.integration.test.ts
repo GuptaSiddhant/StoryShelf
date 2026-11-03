@@ -398,10 +398,15 @@ describe("storybook routes", () => {
   it("short link returns 404 for unknown build and slug", async () => {
     const { app } = await seededApp();
     const badUlid = "01ARZ3NDEKTSV4RRFFQ69G5FAV"; // valid 26-char ULID, not a build
-    const r1 = await app.request(`/_/${badUlid}`);
-    expect(r1.status).toBe(404);
-    const r2 = await app.request("/_/nope");
-    expect(r2.status).toBe(404);
+    // The bare form always redirects (so it tells nothing about the id); the 404 is one step on.
+    for (const id of [badUlid, "nope"]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one request at a time keeps failures readable
+      const bare = await app.request(`/_/${id}`);
+      expect(bare.status, id).toBe(302);
+      expect(bare.headers.get("location"), id).toBe(`/_/${id}/`);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      expect((await app.request(`/_/${id}/`)).status, id).toBe(404);
+    }
   });
 
   it("short link serves static assets and rejects traversal", async () => {
@@ -416,7 +421,12 @@ describe("storybook routes", () => {
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
     const js = await app.request(`/_/${ulid}/iframe.js`);
     expect(js.status).toBe(200);
-    const bad = await app.request(`/_/${ulid}/../secrets.txt`);
+    // A traversal that survives URL parsing is refused by the route itself.
+    const bad = await app.request(`/_/${ulid}/..%2Fsecrets.txt`);
     expect(bad.status).toBe(404);
+    // One the URL parser flattens (`/_/secrets.txt`) names no project, so it ends in a 404 too.
+    const flattened = await app.request(`/_/${ulid}/../secrets.txt`);
+    expect(flattened.headers.get("location")).toBe("/_/secrets.txt/");
+    expect((await app.request("/_/secrets.txt/")).status).toBe(404);
   });
 });

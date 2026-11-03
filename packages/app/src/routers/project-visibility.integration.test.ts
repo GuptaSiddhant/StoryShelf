@@ -131,7 +131,7 @@ async function observed(response: Response): Promise<Record<string, unknown>> {
     contentType: response.headers.get("content-type"),
     location: response.headers
       .get("location")
-      ?.replaceAll(/\/projects\/(?:hidden|ghost)\//gu, "/projects/:slug/")
+      ?.replaceAll(/hidden|ghost/gu, ":slug")
       .replaceAll(privateBuildId, ":id")
       .replaceAll(UNKNOWN_BUILD_ID, ":id"),
   };
@@ -235,6 +235,9 @@ const storybookPaths: ((slug: string, id: string) => string)[] = [
   (_slug, id) => `/_/${id}/`,
   (_slug, id) => `/_/${id}/index.html`,
   (slug) => `/_/${slug}/`,
+  // The bare short links redirect to the form with a trailing slash.
+  (slug) => `/_/${slug}`,
+  (_slug, id) => `/_/${id}`,
 ];
 
 async function getAs(
@@ -272,8 +275,10 @@ describe("a private project's published Storybook", () => {
       expect(hidden, where).toEqual(unknown);
       // The auth gate answers an anonymous short link, for any id, before the route runs.
       const byGate = cookie === undefined && where.startsWith("/_/");
-      expect(hidden["status"], where).toBe(byGate ? 302 : 404);
-      expect(hidden["location"] === undefined, where).toBe(!byGate);
+      // A bare short link (`/_/<id>`) redirects to the trailing-slash form for any id.
+      const redirects = byGate || /^\/_\/[^/]+$/u.test(where);
+      expect(hidden["status"], where).toBe(redirects ? 302 : 404);
+      expect(hidden["location"] === undefined, where).toBe(!redirects);
     }
   });
 

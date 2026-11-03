@@ -52,17 +52,10 @@ export function registerStorybook(app: ShelfRouter): void {
   // 26-char ULID → that exact build, whatever its status (visibility check only).
   // Any other id → project slug → latest approved build on the default branch, else 404
   // (no fallback to feature-branch or unreviewed builds). No fall-through on ULID.
-  app.get("/_/:id", async (c) => {
-    const id = c.req.param("id");
-    const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
-    if (isUlid26) {
-      const build = await new BuildModel(getStore().db).get(id);
-      if (!build) notFound();
-    } else {
-      const project = await new ProjectModel(getStore().db).getBySlug(id);
-      if (!project) notFound();
-    }
-    return c.redirect(`/_/${id}/`, 302);
+  app.get("/_/:id", (c) => {
+    // Always redirect, whether or not the id exists: the checks (and the 404) belong to the
+    // trailing-slash route, so a caller without a role cannot tell a project from a missing one (#497).
+    return c.redirect(`/_/${encodeURIComponent(c.req.param("id"))}/`, 302);
   });
 
   app.get("/_/:id/*", async (c) => {
