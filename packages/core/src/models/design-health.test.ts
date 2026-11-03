@@ -49,6 +49,12 @@ describe("designDrift", () => {
     );
   });
 
+  it("is unknown when the baseline version is not a timestamp, such as the none sentinel", () => {
+    const node = { state: "ok", lastModified: "2026-02-01T00:00:00Z" };
+    expect(designDrift(node, "none")).toBe("unknown");
+    expect(designDrift(node, "not a date")).toBe("unknown");
+  });
+
   it("is unknown when the design has no readable modification time", () => {
     expect(designDrift({ state: "ok", lastModified: null }, approved)).toBe("unknown");
     expect(designDrift({ state: "ok", lastModified: "not a date" }, approved)).toBe("unknown");
