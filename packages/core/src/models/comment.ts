@@ -2,7 +2,7 @@
 import { eq } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import type { Comment } from "../schema/comment.ts";
+import type { Comment, CommentMention } from "../schema/comment.ts";
 import type { CommentKind } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
@@ -62,6 +62,10 @@ export class CommentModel {
       userId,
       body: input.body,
       parentId: input.parentId,
+      mentions:
+        input.mentions === undefined || input.mentions.length === 0
+          ? null
+          : JSON.stringify(input.mentions),
       resolved: false,
       kind: input.kind ?? "comment",
       resolvedAt: null,
@@ -69,6 +73,24 @@ export class CommentModel {
       createdAt: now,
       updatedAt: now,
     })) as unknown as Comment;
+  }
+
+  /**
+   * The mentions stored on a comment. Tolerant of anything else in the column (a hand-edited row,
+   * an older shape): such entries are dropped, never thrown on.
+   */
+  static mentionsOf(comment: Pick<Comment, "mentions">): CommentMention[] {
+    if (!comment.mentions) {
+      return [];
+    }
+    try {
+      const parsed: unknown = JSON.parse(comment.mentions);
+      return Array.isArray(parsed)
+        ? parsed.filter((entry): entry is CommentMention => isMention(entry))
+        : [];
+    } catch {
+      return [];
+    }
   }
 
   /** Mark a comment resolved by `userId` (null on an instance without authentication). */
@@ -101,6 +123,17 @@ export interface CommentCreateInput {
   /** Anchor to a story of the build's catalog; not together with `snapshotId` (ADR 0013, decision 2). */
   storyId?: string;
   parentId?: string;
+  /** Members the body mentions, resolved by the caller; stored as ids (see `Comment.mentions`). */
+  mentions?: readonly CommentMention[];
   /** `change_request` asks the build's author to address it; default `comment`. */
   kind?: CommentKind;
+}
+
+function isMention(value: unknown): value is CommentMention {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { userId?: unknown }).userId === "string" &&
+    typeof (value as { handle?: unknown }).handle === "string"
+  );
 }

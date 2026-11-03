@@ -99,6 +99,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'manual'",
   },
   { table: "comments", column: "story_id", definition: "TEXT" },
+  { table: "comments", column: "mentions", definition: "TEXT" },
   { table: "comments", column: "kind", definition: "VARCHAR(32) NOT NULL DEFAULT 'comment'" },
   { table: "comments", column: "resolved_at", definition: "DATETIME(3) NULL" },
   { table: "comments", column: "resolved_by", definition: "VARCHAR(64) NULL" },

@@ -1,5 +1,11 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
-import { BuildModel, CommentModel, MemberModel, WebhookModel } from "@storyshelf/core/models";
+import {
+  BuildModel,
+  CommentModel,
+  MemberModel,
+  NotificationSubscriptionModel,
+  WebhookModel,
+} from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import AdmZip from "adm-zip";
@@ -625,6 +631,13 @@ async function postComment(booted: Booted, id: string, extra: Record<string, unk
   return (await response.json()) as { id: string };
 }
 
+const mentionsOf = async (booted: Booted, id: string) =>
+  (await new CommentModel(booted.db).listByBuild(id)).map((comment) =>
+    CommentModel.mentionsOf(comment).map((mention) => mention.userId),
+  );
+const mentionMessages = (booted: Booted): number =>
+  booted.sent.filter((subject) => subject.includes("comment:mentioned")).length;
+
 describe("review events", () => {
   it("raises review:requested for a published build that waits, not for the default branch", async () => {
     const booted = await boot();
@@ -814,5 +827,180 @@ describe("review events", () => {
       expect(seen.map((item) => item.data["eventId"])).toEqual([created.id, created.id]);
       await booted.stop();
     });
+    describe("mentions (#463)", () => {
+      it("resolves @handles against this project's members only, and stores ids", async () => {
+        const booted = await boot();
+        const id = await publish(booted, "feature/x");
+        const created = await postComment(booted, id, {
+          body: "cc @alice and @Alice Reviewer, @view, @outsider and @admin, mail dev@example.com",
+        });
+        expect(await mentionsOf(booted, id)).toEqual([["alice", "view"]]);
+        // Plain text stays plain and nothing about the non-members is echoed back.
+        const stored = await new CommentModel(booted.db).listByBuild(id);
+        expect(stored[0]?.id).toBe(created.id);
+        expect(JSON.stringify(stored[0]?.mentions)).not.toMatch(/outsider|admin/u);
+        // The API returns them decoded, ids and handles as typed, and names no non-member.
+        const listed = (await (await booted.api("dev", `/builds/${id}/comments`)).json()) as {
+          mentions: { userId: string; handle: string }[];
+        }[];
+        expect(listed[0]?.mentions).toEqual([
+          { userId: "alice", handle: "alice" },
+          { userId: "view", handle: "view" },
+        ]);
+        await booted.stop();
+      });
+
+      it("never takes who is mentioned from the request", async () => {
+        const booted = await boot();
+        const id = await publish(booted, "feature/x");
+        await postComment(booted, id, {
+          body: "no mentions here",
+          mentions: [{ userId: "alice", handle: "alice" }],
+        });
+        expect(await mentionsOf(booted, id)).toEqual([[]]);
+        await booted.stop();
+      });
+
+      it("tells the mentioned member once, with no webhook and no message to the room", async () => {
+        const booted = await boot();
+        const id = await publish(booted, "feature/x");
+        await withChannel(booted);
+        await new NotificationSubscriptionModel(booted.db).upsert("p1", "alice", {
+          via: ["log"],
+          events: ["comment:created"],
+        });
+        const seen = await deliveries(booted, []);
+        await postComment(booted, id, { body: "please look, @alice" });
+        await vi.waitFor(() => expect(mentionMessages(booted)).toBe(1));
+        await vi.waitFor(() => expect(seen).toHaveLength(1));
+        // The room (the stored channel) gets the comment; alice, who is subscribed to comments
+        // and mentioned, gets the mention instead of a second message.
+        const created = booted.sent.filter((subject) => subject.includes("comment:created"));
+        expect(created).toHaveLength(1);
+        expect(seen.map((item) => item.event)).toEqual(["comment:created"]);
+        // The payload carries the comment text as typed, but no resolved mention (no id mapping).
+        expect(seen[0]?.data).not.toHaveProperty("mentions");
+        expect(seen[0]?.data).not.toHaveProperty("mentionedUserId");
+        await booted.stop();
+      });
+
+      it("highlights a self-mention but does not notify the author", async () => {
+        const booted = await boot();
+        const id = await publish(booted, "feature/x");
+        await new NotificationSubscriptionModel(booted.db).upsert("p1", "dev", { via: ["log"] });
+        await postComment(booted, id, { body: "note to self @dev" });
+        expect(await mentionsOf(booted, id)).toEqual([["dev"]]);
+        await vi.waitFor(() => expect(events(booted)).toContain("comment:created"));
+        expect(mentionMessages(booted)).toBe(0);
+        await booted.stop();
+      });
+    });
+  });
+});
+
+/** A page-form POST of `fields`, as HTMX sends it. */
+const urlencoded = (fields: Record<string, string>): RequestInit => ({
+  method: "POST",
+  headers: { "content-type": "application/x-www-form-urlencoded" },
+  body: new URLSearchParams(fields).toString(),
+});
+
+describe("mention suggestions and highlights (#463)", () => {
+  it("offers project members matching what is typed, never a non-member", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    const suggest = async (body: string, user = "dev") =>
+      await booted.page(user, `/builds/${id}/mention-suggest`, urlencoded({ body, kind: "build" }));
+
+    const html = await (await suggest("ask @al")).text();
+    expect(html).toContain("@alice");
+    expect(html).toContain("Alice Reviewer");
+    expect(html).toContain("mention-complete");
+    // Not members of the project: never named, however they are typed.
+    const typedNonMembers = await Promise.all(
+      ["@out", "@outsider", "@adm", "@admin"].map(
+        async (typed) => await (await suggest(`ask ${typed}`)).text(),
+      ),
+    );
+    expect(typedNonMembers).toEqual(["", "", "", ""]);
+    expect(await (await suggest("no mention here")).text()).toBe("");
+    expect(await (await suggest("mail alice@example.com")).text()).toBe("");
+    // Who cannot comment gets no suggestions: viewers and outsiders are turned away.
+    expect((await suggest("ask @al", "view")).status).toBeGreaterThanOrEqual(400);
+    expect((await suggest("ask @al", "outsider")).status).toBeGreaterThanOrEqual(400);
+    await booted.stop();
+  });
+
+  it("fills the chosen member's handle into the box, and refuses anyone else", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    const complete = async (pick: string) =>
+      await booted.page(
+        "dev",
+        `/builds/${id}/mention-complete`,
+        urlencoded({ body: "ask @al", kind: "story", pick }),
+      );
+
+    const ok = await complete("alice");
+    expect(ok.status).toBe(200);
+    const html = await ok.text();
+    expect(html).toContain("story-comment-body");
+    expect(html).toContain("ask @alice ");
+    // A member who was not offered (not matching, or not a member) cannot be forced in.
+    expect((await complete("outsider")).status).toBe(400);
+    expect((await complete("dev")).status).toBe(400);
+    expect((await complete("")).status).toBe(400);
+    await booted.stop();
+  });
+
+  it("completes a mention at the end of a long comment without losing text", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    const body = `${"a".repeat(5000)} ask @al`;
+    const res = await booted.page(
+      "dev",
+      `/builds/${id}/mention-complete`,
+      urlencoded({ body, kind: "build", pick: "alice" }),
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain(`${"a".repeat(5000)} ask @alice `);
+    expect(html).not.toContain("@alice ice");
+    await booted.stop();
+  });
+
+  it("wires the comment boxes to the suggestions", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    const html = await (await booted.page("dev", `/builds/${id}`)).text();
+    expect(html).toContain(`/projects/gate/builds/${id}/mention-suggest`);
+    expect(html).toContain("build-comment-body-mentions");
+    await booted.stop();
+  });
+
+  it("highlights a mention with the member's current name, even after a rename", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    await postComment(booted, id, { body: "please check, @alice, and mail ops@example.com" });
+
+    const before = await (await booted.page("dev", `/builds/${id}`)).text();
+    expect(before).toMatch(/ss-review-mention-[^"]*">@Alice Reviewer</u);
+    expect(before).toContain("mail ops@example.com");
+
+    await booted.db.update(booted.db.tables.users, "alice", { displayNameOverride: "Al R." });
+    const after = await (await booted.page("dev", `/builds/${id}`)).text();
+    expect(after).toMatch(/ss-review-mention-[^"]*">@Al R\.</u);
+    expect(after).not.toContain("@Alice Reviewer");
+    await booted.stop();
+  });
+
+  it("leaves text that named no member plain", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    await postComment(booted, id, { body: "ping @outsider about this" });
+    const html = await (await booted.page("dev", `/builds/${id}`)).text();
+    expect(html).toContain("ping @outsider about this");
+    expect(html).not.toMatch(/ss-review-mention-[^"]*">@outsider</u);
+    await booted.stop();
   });
 });

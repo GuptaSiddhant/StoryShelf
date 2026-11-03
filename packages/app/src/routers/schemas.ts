@@ -231,6 +231,8 @@ export const commentSchema = z
     userId: z.string().nullable(),
     body: z.string(),
     parentId: z.string().nullable(),
+    /** The project members the body `@`-mentions, resolved when it was posted (never client input). */
+    mentions: z.array(z.object({ userId: z.string(), handle: z.string() })),
     resolved: z.boolean(),
     /** `change_request` asks the build's author to address the comment; resolve it when done. */
     kind: z.enum(COMMENT_KINDS),

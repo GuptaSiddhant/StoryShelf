@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   story_id TEXT,
+  mentions TEXT,
   kind VARCHAR(32) NOT NULL DEFAULT 'comment',
   resolved_at DATETIME(3) NULL,
   resolved_by VARCHAR(64) NULL,

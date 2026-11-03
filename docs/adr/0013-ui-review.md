@@ -190,7 +190,11 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
   de-duplicate. `review:comment` is a filter alias, never emitted: a webhook, notification channel or
   subscription listing it receives a `comment:created` of scope `build` or `story`, and one listing
   both names receives it once. One predicate (`matchesEvent` in core) applies the rule to every
-  filter, so the alias has a single definition.
+  filter, so the alias has a single definition. A comment that `@`-mentions a project member also
+  raises `comment:mentioned` to that member alone (#463): a notification, never a webhook, and never
+  to a stored project channel. The mentioned ids are resolved on the server against the project's
+  members only and stored with the comment, so a non-member handle stays plain text and nothing about
+  other projects is disclosed.
 - **Auth.** Review never widens who can view a project (ADR 0011 Authentication and Access).
 
 ## Consequences
