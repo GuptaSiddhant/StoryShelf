@@ -100,6 +100,9 @@ jobs:
     name: verify
     needs: changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write # save-turbo-cache deletes main's older turbo caches
     steps:
       - name: Checkout
         uses: actions/checkout@v7
