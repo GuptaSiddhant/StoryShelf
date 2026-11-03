@@ -1,3 +1,4 @@
+import "./shims/globals.ts";
 import type { Preview } from "@storybook/html-vite";
 import { baseStyle } from "../src/ui/styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "../src/ui/theme.ts";
