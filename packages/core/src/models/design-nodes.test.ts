@@ -215,6 +215,17 @@ describe("DesignNodeModel.claimChange", () => {
     expect(await nodes.claimChange(node, { ...change, key: "deleted:2" })).toBe(true);
   });
 
+  it("refuses a claim made from an observation the design has since moved past", async () => {
+    const { fake, nodes } = await setup();
+    const observed = (await nodes.refresh("p1", NODE_A, T0)) as never;
+    fake.version = "2";
+    fake.lastModified = "2026-03-01T00:00:00Z";
+    await nodes.refresh("p1", NODE_A, later(T0, HOUR));
+    expect(await nodes.claimChange(observed, change)).toBe(false);
+    const current = (await nodes.refresh("p1", NODE_A, later(T0, 2 * HOUR))) as never;
+    expect(await nodes.claimChange(current, { ...change, key: "deleted:2" })).toBe(true);
+  });
+
   it("never claims for a member's own-connection row or a missing row", async () => {
     const { nodes } = await setup();
     const node = (await nodes.refresh("p1", NODE_A, T0)) as never;

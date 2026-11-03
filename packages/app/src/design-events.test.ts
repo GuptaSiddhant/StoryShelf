@@ -92,24 +92,31 @@ async function setup(publicBaseUrl: string | null = "https://shelf.example.com")
     notifiers: [recorder("email", sent)],
   } as never;
   const node = (await nodes.refresh("p1", URL_A)) as DesignNode;
-  return { deps, nodes, node, sent, fake };
+  let clock = Date.now();
+  /** The design as stored after the provider reports `edit` (one health check later). */
+  const stored = async (edit: (provider: typeof fake) => void): Promise<DesignNode> => {
+    edit(fake);
+    clock += 3_600_000;
+    return (await nodes.refresh("p1", URL_A, new Date(clock))) as DesignNode;
+  };
+  const modified = async (version = "2"): Promise<DesignNode> =>
+    await stored((provider) => {
+      provider.version = version;
+      provider.lastModified = "2026-02-01T00:00:00.000Z";
+    });
+  const deleted = async (): Promise<DesignNode> =>
+    await stored((provider) => provider.states.set("1:2", "deleted"));
+  return { deps, nodes, node, sent, fake, modified, deleted };
 }
 
 function observe(node: DesignNode, patch: Partial<DesignObservation> = {}): DesignObservation[] {
   return [{ url: URL_A, node, componentPath: COMPONENT, baselineVersion: APPROVED, ...patch }];
 }
 
-const modifiedAfter = (node: DesignNode): DesignNode => ({
-  ...node,
-  state: "ok",
-  version: "2",
-  lastModified: "2026-02-01T00:00:00.000Z",
-});
-
 describe("announceDesignChangesWith", () => {
   it("tells subscribers (and only them) and posts the webhook payload once", async () => {
-    const { deps, nodes, node, sent } = await setup();
-    await announceDesignChangesWith(deps, nodes, PROJECT, observe(modifiedAfter(node)));
+    const { deps, nodes, modified, sent } = await setup();
+    await announceDesignChangesWith(deps, nodes, PROJECT, observe(await modified()));
     const recipients = sent.map(
       (item) => (item as { channel: { config: { to: string } } }).channel.config.to,
     );
@@ -129,8 +136,8 @@ describe("announceDesignChangesWith", () => {
   });
 
   it("sends one event per design version even with concurrent health checks", async () => {
-    const { deps, nodes, node, sent } = await setup();
-    const changed = modifiedAfter(node);
+    const { deps, nodes, modified, sent } = await setup();
+    const changed = await modified();
     await Promise.all(
       Array.from({ length: 6 }, async () => {
         await announceDesignChangesWith(deps, nodes, PROJECT, observe(changed));
@@ -139,24 +146,24 @@ describe("announceDesignChangesWith", () => {
     await announceDesignChangesWith(deps, nodes, PROJECT, observe(changed));
     expect(webhooks.emitted).toHaveLength(1);
     expect(sent).toHaveLength(1);
-    await announceDesignChangesWith(deps, nodes, PROJECT, observe({ ...changed, version: "3" }));
+    await announceDesignChangesWith(deps, nodes, PROJECT, observe(await modified("3")));
     expect(webhooks.emitted).toHaveLength(2);
   });
 
   it("announces a deleted node, keeping its last known version", async () => {
-    const { deps, nodes, node } = await setup();
+    const { deps, nodes, deleted } = await setup();
     await announceDesignChangesWith(
       deps,
       nodes,
       PROJECT,
-      observe({ ...node, state: "deleted" }, { baselineVersion: null }),
+      observe(await deleted(), { baselineVersion: null }),
     );
     expect(webhooks.emitted[0]?.[4]).toMatchObject({ change: "deleted", designVersion: "1" });
   });
 
   it("sends nothing and claims nothing without a confirmed origin", async () => {
-    const { deps, nodes, node, sent } = await setup(null);
-    const changed = modifiedAfter(node);
+    const { deps, nodes, modified, sent } = await setup(null);
+    const changed = await modified();
     await announceDesignChangesWith(deps, nodes, PROJECT, observe(changed));
     expect(webhooks.emitted).toHaveLength(0);
     expect(sent).toHaveLength(0);
@@ -170,10 +177,10 @@ describe("announceDesignChangesWith", () => {
   });
 
   it("stays quiet for a current design, a design with no component or an unknown design", async () => {
-    const { deps, nodes, node, sent } = await setup();
+    const { deps, nodes, node, modified, sent } = await setup();
     await announceDesignChangesWith(deps, nodes, PROJECT, [
       ...observe(node, { baselineVersion: "2026-06-01T00:00:00.000Z" }),
-      ...observe(modifiedAfter(node), { componentPath: null }),
+      ...observe(await modified(), { componentPath: null }),
       ...observe(node, { node: undefined }),
     ]);
     expect(webhooks.emitted).toHaveLength(0);
@@ -181,9 +188,9 @@ describe("announceDesignChangesWith", () => {
   });
 
   it("is best-effort: a failing claim is logged, not thrown", async () => {
-    const { deps, node } = await setup();
+    const { deps, modified } = await setup();
     const broken = { claimChange: () => Promise.reject(new Error("db down")) };
-    const observations = observe(modifiedAfter(node));
+    const observations = observe(await modified());
     await expect(
       announceDesignChangesWith(deps, broken, PROJECT, observations),
     ).resolves.toBeUndefined();

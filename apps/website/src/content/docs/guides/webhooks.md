@@ -24,13 +24,13 @@ Manage via `GET /api/v1/projects/:slug/webhooks` and `DELETE`. See `POST /api/v1
 
 ## Delivery
 
-- Payload is JSON `{ event, project: { slug }, build: { id, gitSha, gitBranch, status } }`.
+- Payload is JSON `{ event, projectId, data, timestamp }`; the event-specific fields are inside `data` (for a build event: `buildId` and `status`).
 - Header `X-StoryShelf-Signature: sha256=<hmac>` — verify with the shared `secret` (HMAC-SHA256 of the raw body).
 - Retries: transient 5xx / network errors are retried with backoff; 4xx is not retried. Delivery logs are not yet exposed beyond capture logs — track separately if you need audit.
 
 ## Design changes
 
-Sent when a linked design (Figma node) was modified after the baseline it is compared with was approved, or no longer exists. It is a normal subscribable topic, off unless you opt in through a webhook's `events` filter, a notification channel or your subscription. Without a public URL set or confirmed, nothing is sent (see [Notifications](/guides/notifications/)).
+Sent when a linked design (Figma node) was modified after the baseline it is compared with was approved, or no longer exists. It is a normal subscribable topic and not on by default for reviewers: name `design:changed` in a webhook's `events` filter, a notification channel's events or your subscription's topics to receive it. As with every topic, a webhook, channel or subscription with no topic filter receives all events, this one included. Without a public URL set or confirmed, nothing is sent (see [Notifications](/guides/notifications/)).
 
 The event is sent once per design node and design version, by the first review or component page load that sees the change, even when several load at once. A change seen while notifications are paused is sent once they resume; nothing is replayed at boot. Designs fetched with a member's own connection (no project token) are not announced.
 

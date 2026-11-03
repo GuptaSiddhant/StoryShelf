@@ -1,5 +1,6 @@
 /** Design metadata + render cache: TTL refresh, batched per file, bounded concurrency, abortable. */
 import { and, eq, isNull } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Buffer } from "node:buffer";
 import type { DatabaseAdapter } from "../adapters/database.ts";
@@ -121,12 +122,13 @@ export class DesignNodeModel {
    * Claim the right to announce `change` for a node: true for exactly one caller per
    * `change.key`, even when health checks run concurrently. The claim is a compare-and-set of
    * `notified_version` from the value read here to a fresh `<key>#<token>`; a caller that finds
-   * the key already claimed, or loses the swap, gets false. Shared (project-credential) rows only:
+   * the key already claimed, or loses the swap, gets false. The swap also requires the stored
+   * `state`, `version` and `lastModified` to still be the ones `node` was observed with, so a caller
+   * holding an older observation cannot announce a change the design has since moved past. Shared (project-credential) rows only:
    * a member's own-connection row never announces, so one design is never announced twice.
    */
   async claimChange(node: DesignNode, change: DesignChange): Promise<boolean> {
     if (node.viewerId !== PROJECT_SCOPE) return false;
-    const column = col(this.tables.designNodes, "notifiedVersion");
     const current = (await this.db.get(
       this.tables.designNodes,
       node.id,
@@ -137,9 +139,29 @@ export class DesignNodeModel {
       this.tables.designNodes,
       node.id,
       { notifiedVersion: token },
-      current.notifiedVersion === null ? isNull(column) : eq(column, current.notifiedVersion),
+      this.unchangedSince(node, current.notifiedVersion),
     )) as unknown as DesignNode | null;
     return won?.notifiedVersion === token;
+  }
+
+  /** The row still has the claim last read and the `state`, `version` and `lastModified` of `node`. */
+  private unchangedSince(node: DesignNode, claimed: string | null): SQL {
+    const column = col(this.tables.designNodes, "notifiedVersion");
+    const claim = claimed === null ? isNull(column) : eq(column, claimed);
+    return (
+      and(
+        claim,
+        this.same("state", node.state),
+        this.same("version", node.version),
+        this.same("lastModified", node.lastModified),
+      ) ?? claim
+    );
+  }
+
+  /** The stored column still equals `value` (null matches null). */
+  private same(name: "state" | "version" | "lastModified", value: string | null): SQL {
+    const column = col(this.tables.designNodes, name);
+    return value === null ? isNull(column) : eq(column, value);
   }
 
   /** Refresh one link (see {@link refreshMany}); null for unsupported URLs or nothing cached. */
