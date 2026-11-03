@@ -22,7 +22,7 @@ import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { currentTraceparent } from "@storyshelf/observability";
-import { notifyCaptureFailed } from "./capture-alerts.ts";
+import { notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
 import { createForkedHandler, shouldForkCapture } from "./capture-process.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import type { JobQueue } from "./job-queue.ts";
@@ -88,6 +88,9 @@ export function setupCapture(
     await notifyCaptureFailed(options, config, logger, job.buildId, delivery.publicOrigin);
   };
   jobs.exhausted.capture = failed;
+  jobs.abandoned.capture = async (job): Promise<void> => {
+    await notifyCaptureStuck(options, config, logger, job.buildId, delivery.publicOrigin);
+  };
   const inProcess = createCaptureHandler(handlerOptions);
   const handler = shouldForkCapture(testing, logger)
     ? forkedHandler(options, { fallback: inProcess, retries, onCrashed: failed, logger })

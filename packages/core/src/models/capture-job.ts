@@ -42,6 +42,9 @@ export const TERMINAL_JOB_STATUSES: readonly CaptureJobStatus[] = ["done", "fail
 /** Statuses of rows the poll may claim: a queued job, or a running attempt whose lease ran out. */
 const CANDIDATE_STATUSES = ["queued", "running"];
 
+/** Statuses of unfinished jobs the queue views list: candidates plus a job running its exhausted-job hook. */
+const ACTIVE_STATUSES = [...CANDIDATE_STATUSES, "exhausting"];
+
 /**
  * Data operations of the database queue. Every write is an unconditional update by id or an
  * insert; the only atomic primitive is the unique-key insert of an attempt row ({@link claim}),
@@ -165,10 +168,25 @@ export class CaptureJobModel {
     });
   }
 
+  /**
+   * The last attempt lost its lease: the job row records that the exhausted-job hook runs as
+   * `attempt` (numbered after the allowed attempts, so it also counts the runs) and leaves the
+   * poll's range; the hook run's own attempt row carries the lease.
+   */
+  async markExhausting(jobId: string, attempt: number, error: string, now: string): Promise<void> {
+    await this.#db.update(this.#table, jobId, {
+      status: "exhausting",
+      attempt,
+      visibleAt: null,
+      error,
+      updatedAt: now,
+    });
+  }
+
   /** End a job row for good. */
   async finishJob(
     jobId: string,
-    status: Exclude<CaptureJobStatus, "queued" | "running">,
+    status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">,
     now: string,
     error: string | null = null,
   ): Promise<void> {
@@ -223,13 +241,13 @@ export class CaptureJobModel {
     return rows.toSorted((a, b) => a.attempt - b.attempt);
   }
 
-  /** Job rows of `kinds` that are queued or running, oldest first. */
+  /** Job rows of `kinds` that are unfinished (queued, running or exhausting), oldest first. */
   async listActive(kinds: readonly CaptureJobKind[]): Promise<CaptureJobRow[]> {
     const rows = (await this.#db.list(this.#table, {
       where: and(
         jobEntries(this.#c),
         kindFilter(this.#c, kinds),
-        inArray(this.#c.status, CANDIDATE_STATUSES),
+        inArray(this.#c.status, ACTIVE_STATUSES),
       ),
     })) as unknown as CaptureJobRow[];
     return rows.toSorted(byCreation);

@@ -84,4 +84,44 @@ describe("createJobQueue", () => {
       Date.now = realNow;
     }
   });
+
+  it("hands a job whose hook kept failing to the abandoned hook of its kind", async () => {
+    const realNow = Date.now;
+    let skew = 0;
+    Date.now = () => realNow() + skew;
+    try {
+      const jobs = jobsFor(["capture"], 0);
+      const hook = vi.fn(async () => {
+        await Promise.resolve();
+        throw new Error("hook broke");
+      });
+      const abandoned = vi.fn(async () => {});
+      jobs.exhausted.capture = hook;
+      jobs.abandoned.capture = abandoned;
+      await jobs.view.enqueue({ buildId: "b1" });
+      const queue = jobs.get();
+      expect(await queue.poll()).not.toBeNull();
+      // Six polls, each past the lease of the one before: five hook runs, then the alert.
+      for (let poll = 1; poll <= 6; poll += 1) {
+        skew = poll * 10 * 60_000;
+        // oxlint-disable-next-line eslint/no-await-in-loop -- one poll per lease
+        expect(await queue.poll()).toBeNull();
+      }
+      expect(hook).toHaveBeenCalledTimes(5);
+      expect(abandoned).toHaveBeenCalledTimes(1);
+      expect(abandoned).toHaveBeenCalledWith(
+        expect.objectContaining({ buildId: "b1", kind: "capture" }),
+        expect.stringContaining("lease expired"),
+      );
+      expect(await jobs.view.status("b1")).toMatchObject({ status: "failed" });
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  it("has no hooks for a kind that set none", () => {
+    const jobs = jobsFor(["publish"], 0);
+    expect(jobs.abandoned).toEqual({});
+    expect(jobs.exhausted).toEqual({});
+  });
 });
