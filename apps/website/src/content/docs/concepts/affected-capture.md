@@ -77,6 +77,8 @@ For project-wide exclusions that apply to every upload, commit them once in `.st
 
 Config and flag globs are combined (union, deduplicated). Untraced files are dropped _before_ tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
 
+**Stats when the CLI builds.** When `upload` (or `build`) runs the build script itself and affected capture is on, the CLI appends `--stats-json` to it, so you get the stats file without asking. A custom `buildCommand` is never changed: add `--stats-json` to it yourself, or the CLI prints one warning after the build and the upload renders everything. For a script that rejects the flag, set `"buildStats": false` (or pass `--no-build-stats`).
+
 **Custom stats file.** The graph is read from `<buildDir>/preview-stats.json` by default (written by `storybook build --stats-json`; without that flag the file does not exist and every upload renders everything). Override per run:
 
 ```bash

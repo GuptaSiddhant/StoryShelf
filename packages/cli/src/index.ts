@@ -160,6 +160,7 @@ function buildUploadCommand(): Command {
     .option("--author-email <email>", "author email")
     .option("--author-name <name>", "author name")
     .option("--full", "disable affected capture (render every story)")
+    .option("--no-build-stats", "do not add --stats-json to the build script")
     .option(
       "--untraced <glob>",
       "exclude matching files from affected tracing (repeatable)",
@@ -184,6 +185,7 @@ function buildBuildCommand(): Command {
     .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
     .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
     .option("--force-build", "force rebuild even if buildDir exists")
+    .option("--no-build-stats", "do not add --stats-json to the build script")
     .action(run<BuildOptions>(async () => (await import("./commands/build.ts")).runBuild));
 }
 

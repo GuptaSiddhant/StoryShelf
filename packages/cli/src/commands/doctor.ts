@@ -165,7 +165,7 @@ async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
   } catch {
     return {
       status: "warn",
-      message: `No preview-stats.json in ${buildDir} — affected capture renders all stories`,
+      message: `No preview-stats.json in ${buildDir} — affected capture renders all stories (build with --stats-json)`,
     };
   }
   return { status: "pass", message: "Affected capture ready (history and stats available)" };

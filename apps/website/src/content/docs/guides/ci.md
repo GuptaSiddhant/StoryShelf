@@ -20,6 +20,7 @@ jobs:
           fetch-depth: 0 # affected capture diffs against history; a depth of 1 forces full renders
       - name: Build Storybook
         # --stats-json writes preview-stats.json into the output: affected capture reads it
+        # (`storyshelf upload` adds it itself when it runs the build script; a step like this one owns the flag)
         run: npx storybook build -o storybook-static --stats-json
       - name: Upload to StoryShelf
         env:

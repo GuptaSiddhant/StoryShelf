@@ -75,6 +75,8 @@ export interface UploadOptions {
   full?: boolean;
   /** Explicit affected-capture opt-in/out (default on; `full` wins). */
   affectedOnly?: boolean;
+  /** Append `--stats-json` to the build script (default on; `--no-build-stats` opts out). */
+  buildStats?: boolean;
   /** Files excluded from affected tracing (repeatable globs). */
   untraced?: string[];
   /** Bundler stats file for affected tracing (default `<buildDir>/preview-stats.json`). */
@@ -136,6 +138,7 @@ interface CollectedUploadOptions {
   authorName?: string;
   label?: string[];
   affectedOnly: boolean;
+  buildStats: boolean;
   untraced: string[];
   statsFile?: string;
 }
@@ -182,9 +185,15 @@ function collectUploadOptions(
     authorName: options.authorName,
     label: options.label,
     affectedOnly: resolveAffectedOnly(options, cfg),
+    buildStats: resolveBuildStats(options, cfg),
     untraced: mergeUntraced(cfg?.untraced, options.untraced),
     statsFile: options.statsFile,
   };
+}
+
+/** Add `--stats-json` to the build script unless `--no-build-stats` or `buildStats: false`. */
+function resolveBuildStats(options: UploadOptions, cfg: StorybookConfig | null): boolean {
+  return options.buildStats ?? cfg?.buildStats ?? true;
 }
 
 /** Combine config-file and flag untraced globs, deduplicated in order. */
@@ -260,6 +269,9 @@ async function buildAndPost(
     buildCommand: collected.buildCommand,
     buildScriptName: collected.buildScriptName,
     force,
+    affected: collected.affectedOnly,
+    buildStats: collected.buildStats,
+    statsFile: collected.statsFile,
   });
   await assertBuildOutput(cwd, collected.buildDir);
   if (dryRun) {
