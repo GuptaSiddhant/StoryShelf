@@ -172,8 +172,10 @@ describe("spriteBrowser", () => {
     const controller = new AbortController();
     const service = spriteBrowser(config, {
       fetch: impl,
-      sleep: async () => {
+      sleep: async (_ms, signal) => {
         controller.abort(new Error("Capture cancelled"));
+        // The caller's cancellation must reach the wake's own signal, not just reject the call.
+        expect(signal.aborted).toBe(true);
         throw new Error("Capture cancelled");
       },
     });

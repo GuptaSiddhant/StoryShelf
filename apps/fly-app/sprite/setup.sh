@@ -53,6 +53,7 @@ sprite exec -s "$NAME" \
   --file "$HERE/proxy.mjs:$DIR/proxy.mjs" --file "$HERE/start.sh:$DIR/start.sh" \
   --file "$HERE/warm.mjs:$DIR/warm.mjs" -- chmod +x "$DIR/start.sh"
 on --dir "$DIR" -- bash -c "
+  set -euo pipefail
   export PATH=$NODE_DIR/bin:\$PATH PLAYWRIGHT_BROWSERS_PATH=$DIR/browsers
   [ -f package.json ] || npm init -y >/dev/null
   npm install --save-exact playwright-core@$PLAYWRIGHT_VERSION
