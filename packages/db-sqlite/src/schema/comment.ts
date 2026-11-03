@@ -23,6 +23,7 @@ export const comments = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     storyId: text("story_id"),
+    mentions: text("mentions"),
   },
   (t) => [index("comments_build_id_idx").on(t.buildId)],
 );
@@ -40,4 +41,5 @@ export interface Comment {
   createdAt: string;
   updatedAt: string;
   storyId: string | null;
+  mentions: string | null;
 }

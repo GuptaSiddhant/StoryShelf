@@ -93,6 +93,7 @@ const USER_AUTH_ALTERS = [
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false",
 ];
 const COMMENT_STORY_ID_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS story_id TEXT";
+const COMMENT_MENTIONS_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS mentions TEXT";
 const NOTIFICATION_LAST_ERROR_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error TEXT";
 const NOTIFICATION_LAST_ERROR_AT_ALTER =
@@ -256,6 +257,7 @@ async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
 
 async function migrateCommentsTable(run: MigrationRunner): Promise<void> {
   await execIgnore(run, COMMENT_STORY_ID_ALTER);
+  await execIgnore(run, COMMENT_MENTIONS_ALTER);
   try {
     const rows = (await run(
       "SELECT is_nullable FROM information_schema.columns WHERE table_name='comments' AND column_name='user_id'",

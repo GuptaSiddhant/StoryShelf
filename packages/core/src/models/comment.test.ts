@@ -38,6 +38,11 @@ async function makeDbWithProject(): Promise<DatabaseAdapter> {
   return db;
 }
 
+async function modelOf(): Promise<CommentModel> {
+  const db = await makeDbWithProject();
+  return new CommentModel(db, { comments: db.tables.comments, projects: db.tables.projects });
+}
+
 describe("CommentModel", () => {
   it("creates a comment on a build when project exists", async () => {
     const db = await makeDbWithProject();
@@ -114,5 +119,43 @@ describe("CommentModel", () => {
     await expect(
       model.create(mockProject.id, "b1", "u", { body: "x", storyId: "a--b", snapshotId: "s1" }),
     ).rejects.toThrow("not several");
+  });
+  describe("mentions", () => {
+    it("stores resolved mentions as ids with the handle as typed, and reads them back", async () => {
+      const model = await modelOf();
+      const comment = await model.create(mockProject.id, "b1", "u1", {
+        body: "cc @alex.doe and @Sam Lee",
+        mentions: [
+          { userId: "u2", handle: "alex.doe" },
+          { userId: "u3", handle: "Sam Lee" },
+        ],
+      });
+      expect(CommentModel.mentionsOf(comment)).toEqual([
+        { userId: "u2", handle: "alex.doe" },
+        { userId: "u3", handle: "Sam Lee" },
+      ]);
+      const [listed] = await model.listByBuild("b1");
+      expect(CommentModel.mentionsOf(listed as never)).toHaveLength(2);
+    });
+
+    it("stores null, not an empty list, when nobody is mentioned", async () => {
+      const model = await modelOf();
+      const none = await model.create(mockProject.id, "b1", "u1", { body: "plain" });
+      const empty = await model.create(mockProject.id, "b1", "u1", { body: "x", mentions: [] });
+      expect(none.mentions).toBeNull();
+      expect(empty.mentions).toBeNull();
+      expect(CommentModel.mentionsOf(none)).toEqual([]);
+    });
+
+    it("drops what is not a mention instead of throwing on a hand-edited or older row", () => {
+      expect(CommentModel.mentionsOf({ mentions: undefined })).toEqual([]);
+      expect(CommentModel.mentionsOf({ mentions: "not json" })).toEqual([]);
+      expect(CommentModel.mentionsOf({ mentions: '{"userId":"u"}' })).toEqual([]);
+      expect(
+        CommentModel.mentionsOf({
+          mentions: '[{"userId":"u2","handle":"a"},{"userId":3},"x",null,{"userId":"u4"}]',
+        }),
+      ).toEqual([{ userId: "u2", handle: "a" }]);
+    });
   });
 });

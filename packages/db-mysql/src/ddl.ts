@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   story_id TEXT,
+  mentions TEXT,
   CONSTRAINT fk_comments_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_build_id FOREIGN KEY (build_id) REFERENCES builds(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_snapshot_id FOREIGN KEY (snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE,
