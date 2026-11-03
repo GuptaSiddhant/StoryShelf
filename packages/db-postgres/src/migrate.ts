@@ -72,7 +72,7 @@ const BUILD_TEST_RESULTS_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS te
 const BUILD_CAPTURE_JOB_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS capture_job_id TEXT";
 /** A run in flight when the column was added owns the build it was started for (idempotent). */
 const BUILD_CAPTURE_JOB_BACKFILL =
-  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.build_id = builds.id AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') ORDER BY j.created_at DESC, j.job_id DESC LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')";
+  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id ORDER BY j.created_at DESC LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id AND j.created_at = (SELECT MAX(k.created_at) FROM capture_jobs k WHERE k.entry = 'job' AND k.kind = 'capture' AND k.shard_id IS NULL AND k.cancel_requested_at IS NULL AND k.status IN ('queued', 'running') AND k.build_id = builds.id)) <= 1";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
