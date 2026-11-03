@@ -93,10 +93,24 @@ jobs:
       # Branch and SHA are passed explicitly: on pull_request the environment's GITHUB_SHA and
       # GITHUB_REF_NAME are the merge commit and "<n>/merge", not the PR head and its branch.
       # Values come through env, never inline in the script (a branch name is user input).
+      #
+      # The result goes to the job summary: whether affected capture ran (and how many stories it
+      # renders) or fell back to a full capture, and the build's page on the demo. The server URL
+      # and slug come from storyshelf.json, so they are not repeated here.
       - name: Upload to StoryShelf
         if: steps.gate.outputs.run == 'true'
+        shell: bash
         working-directory: packages/app
         env:
           UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
-        run: npx --yes storyshelf@latest upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
+        run: |
+          npx --yes storyshelf@latest upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH" | tee upload.log
+          build=$(grep -oE 'Build created: [0-9A-Z]+' upload.log | awk '{print $3}')
+          base=$(jq -r .url .storybook/storyshelf.json)
+          slug=$(jq -r .slug .storybook/storyshelf.json)
+          {
+            echo "### Demo upload"
+            grep -E 'Affected capture|Full capture' upload.log || echo "No capture-mode line in the upload output."
+            echo "Build: ${base}/projects/${slug}/builds/${build}"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
