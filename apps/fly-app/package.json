@@ -6,7 +6,7 @@
   "scripts": {
     "build": "rolldown -c rolldown.config.ts",
     "start": "node dist/server.mjs",
-    "lint": "oxlint --type-aware --type-check server.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts",
+    "lint": "oxlint --type-aware --type-check server.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts && oxlint sprite",
     "test": "vitest run",
     "dev": "node --conditions=source --experimental-transform-types server.ts"
   },

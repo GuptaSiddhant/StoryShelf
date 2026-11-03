@@ -29,6 +29,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * core would fork a capture child, so a `testing.workerEntry` would never apply.
  */
 import { mkdirSync } from "node:fs";
+import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
 const env = process.env;
@@ -80,7 +81,11 @@ mkdirSync(dataDir, { recursive: true });
 
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const { storage, log: storageLog } = storageFromEnv(env, dataDir);
+// With FLY_SPRITES_TOKEN and SPRITE_BROWSER_SECRET set, `chromium@sprite` (a hibernating Fly Sprite,
+// apps/fly-app/sprite/) is selectable beside the VM's own Chromium; unset, only the latter.
+const sprite = spriteFromEnv(env);
 const captureRunner = createPlaywrightCaptureRunner({
+  browsers: browsersFor(sprite),
   // Unset: sized from the VM's detected CPU and memory.
   concurrency: Number(env["CAPTURE_CONCURRENCY"]) || undefined,
 });
@@ -90,6 +95,8 @@ const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 // Which storage serves the objects: the origin of the endpoint only, never the bucket or a key.
 shelfLogger.info(storageLog, "object storage");
+// Only whether the Sprite is configured: its token, secret and URL never reach a log.
+shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
 
 // Notifications: SMTP sender from SMTP_* env (undefined keeps invites
 // out-of-band); chat + email providers serve stored channels.

@@ -6,6 +6,8 @@
   },
   "include": [
     "server.ts",
+    "sprite.ts",
+    "sprite.test.ts",
     "storage.ts",
     "storage.test.ts",
     "migrate.ts",
