@@ -6,7 +6,7 @@
  */
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { MentionSuggestion } from "../mentions.ts";
-import { Button, Meta, TextareaField, VStack } from "../ui/components.tsx";
+import { Button, HStack, Meta, TextareaField, VStack } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -68,7 +68,7 @@ export function CommentBodyField(props: {
         rows={3}
         required
         placeholder={field.placeholder}
-        {...(value === undefined ? {} : { value })}
+        {...(value === undefined ? {} : { value, autofocus: true })}
       />
       <div id={`${field.id}-mentions`} aria-live="polite" />
     </div>
@@ -87,21 +87,23 @@ export function MentionSuggestions(props: {
   return (
     <VStack>
       <Meta>Mention a member</Meta>
-      {suggestions.map((suggestion): Rendered => (
-        <Button
-          key={suggestion.userId}
-          variant="ghost"
-          size="sm"
-          type="button"
-          hx-post={mentionUrls(slug, buildId).complete}
-          hx-include={`#${fieldId}`}
-          hx-vals={JSON.stringify({ kind, pick: suggestion.userId })}
-          hx-target={`#${fieldId}-field`}
-          hx-swap="outerHTML"
-        >
-          @{suggestion.handle} <span class="muted">{suggestion.name}</span>
-        </Button>
-      ))}
+      <HStack gap="sm" wrap>
+        {suggestions.map((suggestion): Rendered => (
+          <Button
+            key={suggestion.userId}
+            variant="ghost"
+            size="sm"
+            type="button"
+            hx-post={mentionUrls(slug, buildId).complete}
+            hx-include={`#${fieldId}`}
+            hx-vals={JSON.stringify({ kind, pick: suggestion.userId })}
+            hx-target={`#${fieldId}-field`}
+            hx-swap="outerHTML"
+          >
+            @{suggestion.handle} <span class="muted">{suggestion.name}</span>
+          </Button>
+        ))}
+      </HStack>
     </VStack>
   );
 }

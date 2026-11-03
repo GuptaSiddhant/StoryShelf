@@ -325,6 +325,15 @@ function focusPart(): string {
         var focusable=target.querySelector('[autofocus], input, select, textarea, button');
         if(focusable) try{ focusable.focus(); }catch(_){}
       }
+    });
+    // A text box swapped in with its text filled (the comment box after an @mention is chosen) is
+    // focused by htmx, but a browser puts its caret at the start: move it to the end.
+    document.addEventListener('htmx:afterSettle',function(){
+      var box=document.activeElement;
+      if(box&&box.tagName==='TEXTAREA'&&box.hasAttribute('autofocus')&&box.setSelectionRange){
+        var end=box.value.length;
+        box.setSelectionRange(end,end);
+      }
     });`;
 }
 
