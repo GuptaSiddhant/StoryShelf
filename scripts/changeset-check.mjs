@@ -77,14 +77,29 @@ function readBase(base, path) {
   }
 }
 
-/** The published packages: `packages/<dir>/package.json` paths and names (a package is published unless private). */
+/** A manifest's name when it is published, `undefined` when it is private, `null` when it cannot be read. */
+function publishedName(text) {
+  try {
+    const manifest = JSON.parse(text);
+    return manifest.private === true ? undefined : manifest.name;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The published packages: `packages/<dir>/package.json` paths and names (a package is published
+ * unless private). A manifest that cannot be read is kept with a null name, so `releaseProblems`
+ * reports it instead of the check passing over it.
+ */
 function publishedPackages() {
   return readdirSync(join(root, "packages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => `packages/${entry.name}/package.json`)
-    .map((path) => ({ path, pkg: readHead(path) }))
-    .filter(({ pkg }) => pkg !== null && manifestPublished(pkg))
-    .map(({ path, pkg }) => ({ path, name: JSON.parse(pkg).name }));
+    .map((path) => ({ path, text: readHead(path) }))
+    .filter(({ text }) => text !== null)
+    .map(({ path, text }) => ({ path, name: publishedName(text) }))
+    .filter(({ name }) => name !== undefined);
 }
 
 const labels = (option("--labels") ?? "").split(",").filter(Boolean);
@@ -95,7 +110,7 @@ const published = publishedPackages();
 const malformed = malformedChangesets(
   added,
   (path) => readFileSync(join(root, path), "utf8"),
-  published.map(({ name }) => name),
+  published.map(({ name }) => name).filter((name) => name !== null),
 );
 if (malformed.length > 0) {
   console.error(`::error title=Malformed changeset::${malformed.join("; ")}`);
