@@ -6,7 +6,15 @@
  * tags `v<version>` (`nub version` only handles a single manifest, so the
  * workspace bump lives here).
  *
+ * With no bump argument the version comes from the pending Changesets
+ * (`scripts/version-packages.mjs`: every package to one version, the root
+ * CHANGELOG.md section written, the changesets consumed) and the commit is
+ * `chore(release): v<version>`. An explicit bump is the manual fallback.
+ *
  * Usage:
+ *   nub ./scripts/release.mjs                 # from the pending changesets
+ *   nub ./scripts/release.mjs --dry-run       # same, working tree only
+ *   nub ./scripts/release.mjs --skip-verify   # CI: main was already verified
  *   nub ./scripts/release.mjs patch
  *   nub ./scripts/release.mjs minor
  *   nub ./scripts/release.mjs major
@@ -23,6 +31,7 @@ import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const DRY_RUN_FLAG = "--dry-run";
+const SKIP_VERIFY_FLAG = "--skip-verify";
 const HELP_FLAG = "--help";
 
 function log(msg) {
@@ -44,16 +53,19 @@ function capture(cmd) {
 
 function printHelp() {
   console.log(`
-Usage: nub ./scripts/release.mjs <bump> [options]
+Usage: nub ./scripts/release.mjs [bump] [options]
 
-Bump via nub version with fixed-version guarantee.
+With no bump: version from the pending changesets (Changesets), commit chore(release): v<version>.
+With a bump: manual fixed-version bump (fallback).
 
   bump                       patch|minor|major|premajor|preminor|prepatch|prerelease|from-git|0.2.0
   --preid <id>               prerelease identifier (rc, beta, alpha) — passed to nub version
-  --dry-run                  run checks but do not commit/tag (passes --no-git-tag-version to nub version)
+  --dry-run                  run checks but do not commit/tag (versions change in the working tree only)
+  --skip-verify              skip the turbo verify run (CI has already verified the commit)
   --help                     show this help
 
 Examples:
+  nub ./scripts/release.mjs
   nub ./scripts/release.mjs patch
   nub ./scripts/release.mjs minor
   nub ./scripts/release.mjs prerelease --preid rc
@@ -73,13 +85,8 @@ if (rawArgs.includes(HELP_FLAG) || rawArgs.includes("-h")) {
 }
 
 const dryRun = rawArgs.includes(DRY_RUN_FLAG);
-const argsWithoutDry = rawArgs.filter((a) => a !== DRY_RUN_FLAG);
-
-if (argsWithoutDry.length === 0) {
-  error("missing bump argument: patch|minor|major|prerelease|0.2.0");
-  printHelp();
-  process.exit(1);
-}
+const skipVerify = rawArgs.includes(SKIP_VERIFY_FLAG);
+const argsWithoutDry = rawArgs.filter((a) => a !== DRY_RUN_FLAG && a !== SKIP_VERIFY_FLAG);
 
 // First non-flag is bump
 let bump = null;
@@ -97,7 +104,7 @@ for (let index = 0; index < argsWithoutDry.length; index += 1) {
     error(`unknown flag: ${arg}`);
     printHelp();
     process.exit(1);
-  } else if (!bump) {
+  } else if (bump === null) {
     bump = arg;
   } else {
     error(`unexpected argument: ${arg}`);
@@ -106,10 +113,8 @@ for (let index = 0; index < argsWithoutDry.length; index += 1) {
   }
 }
 
-if (!bump) {
-  error("unable to determine bump argument");
-  process.exit(1);
-}
+// No bump argument: the version comes from the pending changesets.
+const useChangesets = bump === null;
 
 // 1. Guard: clean working tree
 try {
@@ -151,35 +156,33 @@ function getPackageVersions() {
 // manifest and the private root has no version field, so fixed-version bumps
 // across the workspace are done here instead.
 function parseVersion(version) {
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(version);
+  const match = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:-(?<pre>[0-9A-Za-z.-]+))?$/u.exec(
+    version,
+  );
   if (!match) {
     return null;
   }
-  return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
-    pre: match[4] ?? null,
-  };
+  const { major, minor, patch, pre } = match.groups;
+  return { major: Number(major), minor: Number(minor), patch: Number(patch), pre: pre ?? null };
 }
 
 function formatVersion(v) {
   return `${v.major}.${v.minor}.${v.patch}${v.pre ? `-${v.pre}` : ""}`;
 }
 
-function bumpPreid(pre, preid) {
+function bumpPreid(pre, identifier) {
   const parts = pre.split(".");
-  const last = parts[parts.length - 1];
-  if (preid && parts[0] !== preid) {
-    return `${preid}.0`;
+  const last = parts.at(-1);
+  if (identifier && parts[0] !== identifier) {
+    return `${identifier}.0`;
   }
-  if (/^\d+$/.test(last ?? "")) {
+  if (/^\d+$/u.test(last ?? "")) {
     return [...parts.slice(0, -1), String(Number(last) + 1)].join(".");
   }
   return `${pre}.0`;
 }
 
-function resolveBumpVersion(current, bumpKind, preid) {
+function resolveBumpVersion(current, bumpKind, identifier) {
   if (bumpKind === "from-git") {
     const tag = capture("git describe --tags --abbrev=0").trim();
     const version = tag.startsWith("v") ? tag.slice(1) : tag;
@@ -197,7 +200,7 @@ function resolveBumpVersion(current, bumpKind, preid) {
     error(`current version is not valid semver: ${current}`);
     process.exit(1);
   }
-  const pre = preid ? `${preid}.0` : "0";
+  const pre = identifier ? `${identifier}.0` : "0";
   switch (bumpKind) {
     case "major":
       return formatVersion({ major: v.major + 1, minor: 0, patch: 0, pre: null });
@@ -215,7 +218,7 @@ function resolveBumpVersion(current, bumpKind, preid) {
       if (!v.pre) {
         return formatVersion({ major: v.major, minor: v.minor, patch: v.patch + 1, pre });
       }
-      return formatVersion({ ...v, pre: bumpPreid(v.pre, preid) });
+      return formatVersion({ ...v, pre: bumpPreid(v.pre, identifier) });
     default:
       error(
         `unknown bump: ${bumpKind} (want patch|minor|major|premajor|preminor|prepatch|prerelease|from-git|0.2.0)`,
@@ -255,6 +258,24 @@ function writeWorkspaceVersions(packages, oldVersion, newVersion) {
   return written;
 }
 
+/** Version from the pending changesets; the script also rewrites CHANGELOG.md and consumes them. */
+function versionFromChangesets() {
+  log("versioning from the pending changesets");
+  run("node scripts/version-packages.mjs");
+  const [first] = getPackageVersions();
+  return {
+    targetVersion: first.version,
+    filesToAdd: ["packages", ".changeset", "CHANGELOG.md"],
+  };
+}
+
+/** Manual fallback: bump every workspace package by hand. */
+function versionFromBump(current, packages) {
+  const targetVersion = resolveBumpVersion(current, bump, preid);
+  log(`bumping fixed version: ${current} → ${targetVersion}`);
+  return { targetVersion, filesToAdd: writeWorkspaceVersions(packages, current, targetVersion) };
+}
+
 const before = getPackageVersions();
 const uniqBefore = [...new Set(before.map((v) => v.version))];
 if (uniqBefore.length !== 1) {
@@ -265,24 +286,28 @@ if (uniqBefore.length !== 1) {
 log(`current fixed version: ${uniqBefore[0]}`);
 
 // 3. Run checks (verify) before bump
-log("running checks: turbo verify --filter='./packages/*'");
-try {
-  run("nubx turbo verify --filter='./packages/*' --force");
-} catch {
-  error("verify failed — aborting bump");
-  process.exit(1);
+if (skipVerify) {
+  log("skipping turbo verify (--skip-verify)");
+} else {
+  log("running checks: turbo verify --filter='./packages/*'");
+  try {
+    run("nubx turbo verify --filter='./packages/*' --force");
+  } catch {
+    error("verify failed — aborting bump");
+    process.exit(1);
+  }
 }
 
 // 4. Bump the fixed version across the workspace, then commit and tag.
 // Lightweight tag `v<version>` with message `v<version>`, same shape as ever.
-const targetVersion = resolveBumpVersion(uniqBefore[0], bump, preid);
-log(`bumping fixed version: ${uniqBefore[0]} → ${targetVersion}`);
-const bumpedFiles = writeWorkspaceVersions(before, uniqBefore[0], targetVersion);
+const { targetVersion, filesToAdd } = useChangesets
+  ? versionFromChangesets()
+  : versionFromBump(uniqBefore[0], before);
 if (dryRun) {
   log("dry-run: skipping commit/tag (versions bumped in working tree only)");
 } else {
-  run(`git add ${bumpedFiles.join(" ")}`);
-  run(`git commit -m "v${targetVersion}"`);
+  run(`git add ${filesToAdd.join(" ")}`);
+  run(`git commit -m "chore(release): v${targetVersion}"`);
   run(`git tag -a v${targetVersion} -m "v${targetVersion}"`);
 }
 

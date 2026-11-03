@@ -1,16 +1,38 @@
 name: Release
 
-# Tag-push only: `nub ./scripts/release.mjs <bump>` commits and tags v<version>,
-# `git push --follow-tags` triggers this workflow for trusted (OIDC) publish.
+# All npm publishing lives in THIS file: the npm trusted publisher of every package is registered
+# to this workflow file name (ADR 0043). Three ways in:
+#
+# - push to `main`: when changesets are pending, publish a throwaway `x.y.z-next-<sha>` build of
+#   every package to npm under the `next` dist-tag. No pending changeset publishes nothing. The
+#   snapshot version is never committed.
+# - `workflow_dispatch` (confirm: release): a stable release. One run versions from the pending
+#   changesets, commits `chore(release): v<version>` to `main`, tags it, pushes both, then
+#   publishes to `latest` (npm and JSR) and creates the GitHub Release. `dry_run` does everything
+#   except pushing and publishing. A tag pushed with the default token does not start another
+#   workflow, which is why the publish jobs run in the same run.
+# - push of a `v*` tag: the emergency path (a release cut from a workstation with
+#   `nub ./scripts/release.mjs`, then `git push --follow-tags`).
 on:
   push:
+    branches: [main]
     tags:
       - "v*.*.*"
       - "v*.*.*-*"
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "release" to cut a stable release from the pending changesets'
+        required: true
+        type: string
+      dry_run:
+        description: "Version, build and npm publish --dry-run only: push and publish nothing"
+        required: true
+        type: boolean
+        default: true
 
 permissions:
-  contents: write # for GitHub Release creation
+  contents: write # for the release commit, the tag and GitHub Release creation
   id-token: write # for Sigstore provenance + npm trusted publishing + JSR OIDC publishing
 
 concurrency:
@@ -18,35 +40,183 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Version gate: single source of truth. Both publishers depend on this job
-  # (not on each other), so a bad tag/tree fails fast before either registry
-  # is touched — while npm and JSR still never block each other.
-  validate:
+  # ---------------------------------------------------------------------------------------------
+  # `next` channel (push to main)
+  # ---------------------------------------------------------------------------------------------
+
+  # Cheap gate: are there changesets to release? Needs no install (the script has no dependencies).
+  pending:
+    name: pending changesets
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      version: ${{ steps.guard.outputs.version }}
-      dist_tag: ${{ steps.guard.outputs.dist_tag }}
+      count: ${{ steps.count.outputs.pending }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Count pending changesets
+        id: count
+        run: node scripts/version-packages.mjs --pending
+
+  next:
+    name: publish next
+    needs: [pending]
+    if: needs.pending.outputs.count != '0'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Check npm version for OIDC
+        run: node scripts/check-npm-oidc.mjs
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Version a snapshot (working tree only, never committed)
+        # `x.y.z-next-<sha>`: the version the pending changesets calculate, plus a suffix.
+        run: node scripts/version-packages.mjs --snapshot
+
+      - name: Validate the snapshot
+        id: guard
+        run: node scripts/release-validate.mjs --tree
+
+      - name: Build packages
+        run: nub run build --filter='./packages/*'
+
+      - name: Rewrite workspace protocol for npm manifest
+        run: node scripts/rewrite-workspace-protocol.mjs
+
+      - name: Publish to npm under the next tag (trusted / provenance)
+        run: node scripts/publish-npm.mjs "${{ steps.guard.outputs.version }}" next
+
+  # ---------------------------------------------------------------------------------------------
+  # Stable channel (manual)
+  # ---------------------------------------------------------------------------------------------
+
+  # Version from the pending changesets, commit and tag on main, push both.
+  prepare:
+    name: prepare stable release
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.cut.outputs.tag }}
+    steps:
+      - name: Guard
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "release" ]; then
+            echo "::error::confirm must be exactly: release"
+            exit 1
+          fi
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "::error::a stable release is cut from main, not ${GITHUB_REF}"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Version, commit and tag
+        id: cut
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # main was verified by its own CI run; the script still runs `nub publish -r --dry-run`.
+          if [ "$DRY_RUN" = "true" ]; then
+            node scripts/release.mjs --skip-verify --dry-run
+            exit 0
+          fi
+          node scripts/release.mjs --skip-verify
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Push the release commit and tag
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ steps.cut.outputs.tag }}
+        run: |
+          set -e
+          # A plain push: if main moved while this ran it is refused and nothing is published.
+          git push origin HEAD:main
+          git push origin "${TAG}"
+
+  # ---------------------------------------------------------------------------------------------
+  # Publishing a tag (the manual release above, or an emergency tag push)
+  # ---------------------------------------------------------------------------------------------
+
+  # Version gate: single source of truth. Both publishers depend on this job
+  # (not on each other), so a bad tag/tree fails fast before either registry
+  # is touched — while npm and JSR still never block each other.
+  validate:
+    if: >-
+      ${{ !cancelled() && (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+        (github.event_name == 'workflow_dispatch' && needs.prepare.result == 'success' && needs.prepare.outputs.tag != '')
+      ) }}
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.guard.outputs.tag }}
+      version: ${{ steps.guard.outputs.version }}
+      dist_tag: ${{ steps.guard.outputs.dist_tag }}
+    steps:
+      - name: Resolve the tag
+        id: tag
+        env:
+          PREPARED: ${{ needs.prepare.outputs.tag }}
+        run: echo "name=${PREPARED:-${GITHUB_REF_NAME}}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ steps.tag.outputs.name }}
+          fetch-depth: 0
 
       - name: Guard tag and fixed versions
         id: guard
-        run: node scripts/release-validate.mjs "${{ github.ref_name }}"
+        env:
+          # A tag name is user-controlled text: through the environment, never inline in the script.
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          node scripts/release-validate.mjs "${TAG}"
 
   # npm publish. Depends on validate, independent of JSR: a failure here
   # never blocks publish-jsr, and is never blocked by it.
   publish-npm:
-    runs-on: ubuntu-latest
     needs: [validate]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: refs/tags/${{ needs.validate.outputs.tag }}
           fetch-depth: 0
 
       - name: Setup Nub
@@ -85,11 +255,12 @@ jobs:
     permissions:
       contents: write
     env:
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ needs.validate.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: refs/tags/${{ needs.validate.outputs.tag }}
           fetch-depth: 0
 
       - name: Generate release notes
@@ -120,15 +291,15 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ needs.validate.outputs.tag }}
           body_path: release-body.md
           generate_release_notes: false
 
   # JSR publish. Depends on validate, independent of npm: `continue-on-error`
   # means a failure here never fails the workflow or blocks publish-npm.
   publish-jsr:
-    runs-on: ubuntu-latest
     needs: [validate]
+    runs-on: ubuntu-latest
     continue-on-error: true
     permissions:
       contents: read
@@ -137,6 +308,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: refs/tags/${{ needs.validate.outputs.tag }}
           fetch-depth: 0
 
       - name: Setup Nub

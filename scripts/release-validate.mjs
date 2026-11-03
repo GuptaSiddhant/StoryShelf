@@ -10,6 +10,7 @@
  * Usage:
  *   node scripts/release-validate.mjs v0.3.1
  *   node scripts/release-validate.mjs "$GITHUB_REF_NAME"
+ *   node scripts/release-validate.mjs --tree     # `next` build: no tag, the working tree's version is the truth
  */
 import { appendFileSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -34,15 +35,23 @@ function emit(key, value) {
   }
 }
 
-const tag = process.argv[2];
-if (!tag) {
-  fail("missing tag argument: node scripts/release-validate.mjs <tag>");
+const arg = process.argv[2];
+if (!arg) {
+  fail("missing tag argument: node scripts/release-validate.mjs <tag> | --tree");
 }
 
 const corePkg = readJson(join(packagesDir, "core", "package.json"));
-console.log(`tag=${tag} pkg=v${corePkg.version}`);
-if (tag !== `v${corePkg.version}`) {
-  fail(`Tag ${tag} != packages/core version v${corePkg.version}`);
+if (arg === "--tree") {
+  // A `next` snapshot is versioned in the working tree and never tagged.
+  console.log(`tree pkg=v${corePkg.version}`);
+  if (!String(corePkg.version).includes("-next-")) {
+    fail(`--tree expects a snapshot version (x.y.z-next-<sha>), found ${corePkg.version}`);
+  }
+} else {
+  console.log(`tag=${arg} pkg=v${corePkg.version}`);
+  if (arg !== `v${corePkg.version}`) {
+    fail(`Tag ${arg} != packages/core version v${corePkg.version}`);
+  }
 }
 
 // All non-private packages must share same version.

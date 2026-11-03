@@ -43,5 +43,6 @@ Each current ADR below lists the archived ones it supersedes.
 | 0039 | Build Retention Lifecycle and Build References                               | — (amends 0009)                    |
 | 0040 | Job Queues and Adding Queued Work                                            | — (amends 0006)                    |
 | 0041 | Single Source of Truth for the Database Schema (proposed)                    | —                                  |
+| 0043 | Release Channels                                                             | —                                  |
 
 Implementation work is tracked in GitHub issues; the ordered pickup list is issue #370.
