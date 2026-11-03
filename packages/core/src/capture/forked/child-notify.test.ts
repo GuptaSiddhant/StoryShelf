@@ -12,15 +12,16 @@ import type { BuildStatePublisher } from "../build-state/types.ts";
 import { createCaptureConsumer } from "../consumer/index.ts";
 import { createDatabaseCaptureQueue } from "../db-queue/index.ts";
 
-const seen = vi.hoisted(() => ({ buildStates: [] as unknown[] }));
+// The capture itself is stubbed: a pushed job only asks the publisher the child built to show the
+// build's state, as a real capture does when its status changes.
 vi.mock("../dispatch.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../dispatch.ts")>();
   return {
     ...actual,
-    createDispatchJob: (deps: { buildState: unknown }) => {
-      seen.buildStates.push(deps.buildState);
-      return vi.fn(async () => {});
-    },
+    createDispatchJob:
+      (deps: { buildState: BuildStatePublisher }) => async (job: { buildId: string }) => {
+        await deps.buildState.request(job.buildId);
+      },
   };
 });
 
@@ -29,12 +30,12 @@ const { runCaptureChild } = await import("./child.ts");
 const silent = createShelfLogger({ level: "silent" });
 const cadence = { idleMs: 20, activeMs: 10, activeWindowMs: 1000, jitter: 0 };
 
-/** A child process whose publisher (the one the child built for its handler) the test can call. */
-async function startChild(w: World) {
-  seen.buildStates.length = 0; // only the publisher this child builds, not an earlier test's
+/** A child process that runs a pushed job to its end, like the parent's `run` message does. */
+function startChild(w: World) {
   // oxlint-disable-next-line unicorn/prefer-event-target -- stands in for Node's process emitter
   const events = new EventEmitter();
   const sent: unknown[] = [];
+  let runs = 0;
   const done = runCaptureChild(
     {
       db: w.db,
@@ -54,13 +55,25 @@ async function startChild(w: World) {
       exit: vi.fn(),
     },
   );
-  await vi.waitFor(() => {
-    expect(seen.buildStates.length).toBeGreaterThan(0);
-  });
-  const buildState = seen.buildStates.at(-1) as BuildStatePublisher;
   return {
-    buildState,
     sent,
+    /** Push a job and wait until the child reports it done. */
+    run: async (buildId: string): Promise<void> => {
+      // The child starts listening once its image engine has loaded.
+      await vi.waitFor(() => {
+        expect(events.listenerCount("message")).toBeGreaterThan(0);
+      });
+      runs += 1;
+      const runId = `run-${String(runs)}`;
+      events.emit("message", {
+        type: "run",
+        runId,
+        job: { buildId, receipt: `${buildId}:1` },
+      });
+      await vi.waitFor(() => {
+        expect(sent).toContainEqual(expect.objectContaining({ type: "done", runId }));
+      });
+    },
     stop: async (): Promise<void> => {
       events.emit("SIGTERM");
       await done;
@@ -84,9 +97,9 @@ async function notifyJobs(w: World): Promise<{ status: string; buildId: string |
 describe("forked capture child: git-state delivery through the durable queue", () => {
   it("leaves a durable job before any consumer runs, then a separate consumer delivers it without an IPC wake", async () => {
     const w = await world();
-    const child = await startChild(w);
+    const child = startChild(w);
 
-    await child.buildState.request(w.build.id);
+    await child.run(w.build.id);
 
     // Durable and undelivered: the child wrote a row, and nobody has claimed it yet.
     expect(await notifyJobs(w)).toEqual([{ status: "queued", buildId: w.build.id }]);
@@ -112,17 +125,16 @@ describe("forked capture child: git-state delivery through the durable queue", (
     await started;
     await child.stop();
 
-    // Delivered by polling alone: the child sent the parent nothing.
-    expect(child.sent).toEqual([]);
+    // Delivered by polling alone: the child's only message was the job's result, no wake-up.
+    expect(child.sent.map((message) => (message as { type: string }).type)).toEqual(["done"]);
   });
 
   it("keeps the job queued when no consumer is configured: neither dropped nor delivered inline", async () => {
     const w = await world();
-    const child = await startChild(w);
+    const child = startChild(w);
 
-    await child.buildState.request(w.build.id);
-    await child.buildState.request(w.build.id); // coalesced into the waiting job
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await child.run(w.build.id);
+    await child.run(w.build.id); // coalesced into the waiting job
     await child.stop();
 
     expect(await notifyJobs(w)).toEqual([{ status: "queued", buildId: w.build.id }]);
