@@ -47,6 +47,17 @@ async function echoUpstream(): Promise<{
   };
 }
 
+/** A port nothing listens on: one a server just released, so the connection is refused. */
+async function closedPort(): Promise<number> {
+  const server = createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address() as AddressInfo;
+  server.close();
+  await once(server, "close");
+  return port;
+}
+
 async function proxyTo(upstreamPort: number): Promise<number> {
   const server: Server = createProxy({ secret: SECRET, upstreamPort });
   server.listen(0, "127.0.0.1");
@@ -132,7 +143,7 @@ describe("the browser proxy", () => {
   });
 
   it("answers an authenticated upgrade with 503 while the Playwright server is not up yet", async () => {
-    const port = await proxyTo(1);
+    const port = await proxyTo(await closedPort());
     expect(await upgrade(port, { "x-storyshelf-secret": SECRET })).toMatch(/^HTTP\/1\.1 503 /u);
   });
 
@@ -151,7 +162,7 @@ describe("the browser proxy", () => {
   });
 
   it("reports 503 while the Playwright server is not up yet", async () => {
-    const port = await proxyTo(1);
+    const port = await proxyTo(await closedPort());
     expect(await get(port, "/healthz", { "x-storyshelf-secret": SECRET })).toEqual({
       status: 503,
       text: "starting\n",

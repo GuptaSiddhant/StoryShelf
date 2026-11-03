@@ -57,32 +57,42 @@ export function createProxy(options) {
       socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
       return;
     }
-    let connected = false;
-    const upstream = connect(upstreamPort, upstreamHost, () => {
-      connected = true;
-      upstream.write(upgradeRequest(request));
-      upstream.write(head);
-      socket.pipe(upstream);
-      upstream.pipe(socket);
-    });
-    const close = () => {
-      upstream.destroy();
-      socket.destroy();
-    };
-    // The Playwright server is not up yet (the Sprite is still waking): say so, rather than hang up.
-    upstream.on("error", () => {
-      if (!connected && socket.writable) {
-        socket.write(
-          "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
-        );
-      }
-      close();
-    });
-    socket.on("error", close);
-    socket.on("close", close);
-    upstream.on("close", close);
+    bridge(request, head, socket, { upstreamPort, upstreamHost });
   });
   return server;
+}
+
+/** Pipe an authenticated upgrade through to the Playwright server, or answer 503 while it is down. */
+function bridge(request, head, socket, { upstreamPort, upstreamHost }) {
+  let connected = false;
+  let answered = false;
+  const upstream = connect(upstreamPort, upstreamHost, () => {
+    connected = true;
+    upstream.write(upgradeRequest(request));
+    upstream.write(head);
+    socket.pipe(upstream);
+    upstream.pipe(socket);
+  });
+  const close = () => {
+    upstream.destroy();
+    // A 503 being flushed ends the client socket itself; destroying it here would drop the answer.
+    if (!answered) {
+      socket.destroy();
+    }
+  };
+  // The Playwright server is not up yet (the Sprite is still waking): say so, rather than hang up.
+  upstream.on("error", () => {
+    if (!connected && socket.writable) {
+      answered = true;
+      socket.end(
+        "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
+      );
+    }
+    close();
+  });
+  socket.on("error", close);
+  socket.on("close", close);
+  upstream.on("close", close);
 }
 
 /** The upgrade request as the upstream should see it: the client's own, minus the secret. */
