@@ -41,9 +41,10 @@ export async function coverageOf(
       .catch(() => new Map<string, DesignNode>()),
     providersWithToken(project, urls),
   ]);
+  const baselines = latestBaselineVersions(snapshots);
   const rows = components.map((group) => {
     const key = normalizeImportPath(group.importPath);
-    const baseline = latestBaselineVersion(snapshots, key);
+    const baseline = baselines.get(key) ?? null;
     const links = (resolutions.get(key)?.urls ?? []).map((url): CoverageLink =>
       linkOf(url, cached.get(url), baseline, withToken),
     );
@@ -68,14 +69,20 @@ function linkOf(
   return { url, providerName: providerNameFor(url), name: node?.name ?? null, drift };
 }
 
-/** When the component's baselines were last approved: the newest `baselineVersion` among its snapshots. */
-function latestBaselineVersion(snapshots: readonly Snapshot[], importPath: string): string | null {
-  const versions = snapshots
-    .filter(
-      (snap) => snap.storyImportPath && normalizeImportPath(snap.storyImportPath) === importPath,
-    )
-    .flatMap((snap) => (snap.baselineVersion ? [snap.baselineVersion] : []));
-  return versions.toSorted().at(-1) ?? null;
+/**
+ * When each component's baselines were last approved: the newest real `baselineVersion` among its
+ * snapshots, by normalized story file. A snapshot with no baseline (`none`) has no approval time.
+ */
+function latestBaselineVersions(snapshots: readonly Snapshot[]): Map<string, string> {
+  const latest = new Map<string, string>();
+  for (const snap of snapshots) {
+    const version = snap.baselineVersion;
+    if (!snap.storyImportPath || !version || !Number.isFinite(Date.parse(version))) continue;
+    const key = normalizeImportPath(snap.storyImportPath);
+    const known = latest.get(key);
+    if (known === undefined || Date.parse(version) > Date.parse(known)) latest.set(key, version);
+  }
+  return latest;
 }
 
 /** Provider kinds, among those the links use, that the project has a token for. */

@@ -55,12 +55,13 @@ async function mayView(c: Context, project: Project): Promise<boolean> {
   return (await currentProjectRole(project.id)) !== null;
 }
 
-const firstApproved = (list: readonly Build[]): Build | undefined =>
-  list.find((build) => build.status === "approved");
-
 /** Newest approved build on the default branch, else the newest approved on any branch. */
 async function latestAcceptedBuild(project: Project): Promise<Build | undefined> {
   const builds = new BuildModel(getStore().db);
-  const onDefault = await builds.list(project.id, { branch: project.gitDefaultBranch, limit: 50 });
-  return firstApproved(onDefault) ?? firstApproved(await builds.list(project.id, { limit: 50 }));
+  const approved = { status: "approved", limit: 1 } as const;
+  const [onDefault] = await builds.list(project.id, {
+    ...approved,
+    branch: project.gitDefaultBranch,
+  });
+  return onDefault ?? (await builds.list(project.id, approved))[0];
 }

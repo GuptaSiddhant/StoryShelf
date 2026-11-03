@@ -158,14 +158,16 @@ async function seed(options: Options = {}) {
     database: db,
     storage,
     logger: pino({ level: "silent" }),
-    config: { secret: SECRET },
+    config: { secret: SECRET, ...(auth ? { adminToken: ADMIN_TOKEN } : {}) },
     ...(providers ? { design: [figma] } : {}),
     ...(auth ? { auth: stub } : {}),
   });
-  return { app };
+  return { app, db };
 }
 
 const text = async (response: Response | Promise<Response>) => await (await response).text();
+const ADMIN_TOKEN = "admin-token-0123456789-abcdef";
+const bearer = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
 const as = (who: string) => ({ headers: { cookie: `storyshelf_session=${who}` } });
 
 describe("design coverage page", () => {
@@ -273,6 +275,32 @@ describe("design coverage page gating", () => {
     expect((await app.request(URL_PATH, as("outsider"))).status).toBe(404);
   });
 
+  it("sends anonymous requests to sign in, whatever bearer token they carry", async () => {
+    // Pages sit behind the session gate: a bearer token opens `/api/v1`, not this page.
+    const { app } = await seed({ auth: true });
+    const requests = [undefined, bearer("wrong-token"), bearer(ADMIN_TOKEN)];
+    const responses = await Promise.all(
+      requests.map(async (init) => await app.request(URL_PATH, init)),
+    );
+    expect(responses.map((response) => response.status)).toEqual([302, 302, 302]);
+    expect(responses[0]?.headers.get("location")).toContain("login");
+  });
+
+  it("is 404 to a member of a different project", async () => {
+    const { app, db } = await seed({ auth: true });
+    await db.insert(db.tables.projects, {
+      id: "p2",
+      name: "Other",
+      slug: "other",
+      gitDefaultBranch: "main",
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as never);
+    await new MemberModel(db).set("p2", "u-out", "admin");
+    expect((await app.request(URL_PATH, as("outsider"))).status).toBe(404);
+    expect((await app.request(URL_PATH, as("viewer"))).status).toBe(200);
+  });
+
   it("is a hosting route: it works without testing, counting only mapped links", async () => {
     expect(PAGE_ROUTE_CLASSES["GET /projects/:slug/design/coverage"]).toBe("hosting");
     const { app } = await seed({ testing: false });
@@ -283,6 +311,8 @@ describe("design coverage page gating", () => {
     // Story-declared links need captured snapshots; the hand-mapped Menu is still linked.
     expect(page).toContain("No design link (5)");
     expect(page).not.toContain(">Kit/Menu<");
+    // Without snapshots nothing was compared with a baseline, so no link counts as up to date.
+    expect(page).toContain("Up to date (0)");
   });
 
   it("does not say links are skipped when testing reads them", async () => {

@@ -43,9 +43,9 @@ describe("designDrift", () => {
     expect(designDrift({ state: "deleted", lastModified: null }, null)).toBe("deleted");
   });
 
-  it("is current without a baseline to compare with (nothing to be stale against)", () => {
+  it("is unknown without a baseline to compare with (nothing was compared)", () => {
     expect(designDrift({ state: "ok", lastModified: "2026-02-01T00:00:00Z" }, null)).toBe(
-      "current",
+      "unknown",
     );
   });
 
