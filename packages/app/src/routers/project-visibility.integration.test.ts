@@ -38,9 +38,12 @@ beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-visibility-"));
 });
 afterEach(async () => {
-  await booted?.lifecycle.teardown();
-  booted = undefined;
-  await rm(scratchDir, { recursive: true, force: true });
+  try {
+    await booted?.lifecycle.teardown();
+  } finally {
+    booted = undefined;
+    await rm(scratchDir, { recursive: true, force: true });
+  }
 });
 
 async function boot() {
@@ -76,8 +79,8 @@ async function boot() {
     config: { secret: "s", scratchDir, publicBaseUrl: "https://shelf.example" },
     logger: pino({ level: "silent" }),
   });
-  await app.lifecycle.setup();
   booted = app;
+  await app.lifecycle.setup();
   return app;
 }
 
