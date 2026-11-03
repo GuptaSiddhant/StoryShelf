@@ -50,6 +50,8 @@ const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXIST
 const SNAPSHOT_DURATION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS duration_ms INTEGER";
 const SNAPSHOT_A11Y_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS a11y_violations TEXT";
+const DESIGN_NODE_NOTIFIED_ALTER =
+  "ALTER TABLE design_nodes ADD COLUMN IF NOT EXISTS notified_version TEXT";
 const DESIGN_LINKS_UNIQUE_INDEX =
   "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)";
 /** Pre-adapter Figma tables (replaced by design_nodes / design_credentials; no data is carried over). */
@@ -169,6 +171,11 @@ async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
   await execIgnore(run, RUN_TESTS_ALTER);
+  await migrateDesignColumns(run);
+}
+
+async function migrateDesignColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, DESIGN_NODE_NOTIFIED_ALTER);
 }
 
 async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> {

@@ -58,6 +58,7 @@ export const designNodes = pgTable(
     state: text("state").notNull().default("ok"),
     renderPath: text("render_path"),
     renderVersion: text("render_version"),
+    notifiedVersion: text("notified_version"),
     fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "string" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
@@ -120,6 +121,7 @@ export interface DesignNode {
   renderPath: string | null;
   /** File `version` the cached render was taken at. */
   renderVersion: string | null;
+  notifiedVersion: string | null;
   fetchedAt: string;
   createdAt: string;
   updatedAt: string;

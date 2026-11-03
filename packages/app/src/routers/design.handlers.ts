@@ -11,6 +11,7 @@ import {
 import type { DesignNode, Project, Snapshot } from "@storyshelf/core/schema";
 import { connectionModel } from "../connections.ts";
 import { credentialKeys } from "../credential-keys.ts";
+import { announceDesignChangesWith } from "../design-events.ts";
 import type {
   DesignConnect,
   DesignItem,
@@ -75,6 +76,17 @@ export async function loadReviewDesign(
   const cached = await nodes
     .cachedFor(project.id, urls, viewerId)
     .catch(() => new Map<string, DesignNode>());
+  await announceDesignChangesWith(
+    getStore(),
+    nodes,
+    project,
+    urls.map((url) => ({
+      url,
+      node: cached.get(url),
+      componentPath: snapshot.storyImportPath,
+      baselineVersion: snapshot.baselineVersion,
+    })),
+  );
   const connects = await loadConnectStates(
     project.id,
     urls.map((url) => kindOf(url)),

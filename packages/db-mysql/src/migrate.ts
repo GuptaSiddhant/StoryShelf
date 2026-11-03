@@ -106,6 +106,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'oidc'",
   },
   { table: "users", column: "disabled", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  { table: "design_nodes", column: "notified_version", definition: "TEXT" },
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
 ];
