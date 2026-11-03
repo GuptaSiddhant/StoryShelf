@@ -114,6 +114,8 @@ export class NotificationSubscriptionModel {
       }
       return;
     }
+    // Shape check by design: an API-made row in this shape is read as the placeholder too, and
+    // switching review requests back on restores the defaults (Architect decision on #542).
     const placeholder =
       !existing.enabled &&
       !existing.reviewRequests &&
