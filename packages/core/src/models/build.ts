@@ -184,8 +184,10 @@ export class BuildModel {
         eq(col(columns, "captureJobId"), jobId),
       ) as SQL,
     )) as unknown as Build | null;
-    // `updateWhere` returns the row either way; only our own write carries our stamp.
-    const applied = current?.status === "failed" && current.updatedAt === stamp;
+    // `updateWhere` returns the row either way; only our own write carries our stamp. Compared as
+    // instants: Postgres hands the column back as `2026-11-03 19:46:04.101+00`, not as the ISO we wrote.
+    const applied =
+      current?.status === "failed" && instantOf(current.updatedAt) === instantOf(stamp);
     return { applied, build: current };
   }
 
@@ -323,6 +325,16 @@ export interface BuildListFilter {
 }
 
 let lastStamp = 0;
+
+/** The instant a stored timestamp names, in epoch ms, whichever string form the driver returns. */
+function instantOf(value: string): number {
+  const direct = Date.parse(value);
+  if (!Number.isNaN(direct)) {
+    return direct;
+  }
+  // `2026-11-03 19:46:04.101+00` (Postgres) is not ISO: make it so, for runtimes that do not guess.
+  return Date.parse(value.replace(" ", "T").replace(/(?<hours>[+-]\d{2})$/u, "$<hours>:00"));
+}
 
 /** An ISO timestamp strictly later than the previous one this process handed out. */
 function nextStamp(): string {

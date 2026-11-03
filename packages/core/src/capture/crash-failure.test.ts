@@ -256,10 +256,13 @@ describe("failCrashedCapture", () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
     await w.builds.stampCaptureJob(w.build.id, "J1");
-    await w.builds.failIfOwnedBy(w.build.id, "J1");
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    const { build: failed } = await w.builds.failIfOwnedBy(w.build.id, "J1");
     const attempts = new CaptureAttemptModel(w.db, tables(w.db));
     const newer = await attempts.startAttempt(w.project.id, w.build.id);
+    // Begun after the build failed: an explicit time, so the order does not depend on the clock.
+    await w.db.update(tables(w.db).captureAttempts, newer.id, {
+      createdAt: new Date(Date.parse(failed?.updatedAt ?? "") + 1000).toISOString(),
+    });
     await attempts.markRunning(newer.id);
 
     const outcome = await failCrashedCapture(

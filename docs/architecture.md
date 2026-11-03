@@ -513,7 +513,8 @@ visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates ha
 4. **Finish.** `ack` marks the attempt and the job `done`. `nack` is ignored from a superseded
    holder; otherwise it requeues with a delay (`visible_at`), or fails the job past `max_attempts`
    or with `requeue: false`, or ends it `cancelled` when flagged. A final attempt that loses its
-   lease fails the job too (one limit covers failures and lost leases).
+   lease moves the job to `exhausting` instead (one limit covers failures and lost leases): the
+   host's `onExhausted` hook runs under a lease, five runs at most, and then the job fails.
 5. **Cancel.** `cancel(jobId | buildId)` ends a queued job at once and flags a running one on its
    job and attempt rows; a build id covers every job kind of the build (capture, publish, notify).
 
