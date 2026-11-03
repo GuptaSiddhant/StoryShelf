@@ -14,7 +14,7 @@ name: CI
 # website or the fixtures this run does not use.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     # Epic branches collect the task PRs of one epic (AGENTS.md); each push to one runs the
     # full verify like main, without main's deploy and preview workflows.
@@ -100,6 +100,9 @@ jobs:
     name: verify
     needs: changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write # save-turbo-cache deletes main's older turbo caches
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -122,13 +125,16 @@ jobs:
       - name: Check ADR references and size
         run: nub run docs:check
 
-      - name: Verify (build + lint + test)
+      - name: Verify (build + Storybook + lint + test)
+        # `verify` builds the app's Storybook once (build-storybook), so a broken story fails the PR.
         # The website has its own job (below), so it runs in parallel and only when it changed.
         # PRs run only affected packages (plus their dependents); global/risky changes, pushes
         # to main and manual runs use the full workspace. One test task at a time keeps
         # per-package vitest worker pools from oversubscribing a small runner.
         env:
           TURBO_CONCURRENCY: "1"
+          # Switches on the Terraform scaffold suites in packages/cli (setup-terraform installs the binary).
+          RUN_TERRAFORM: "1"
           TURBO_SCM_BASE: origin/main
           TURBO_SCM_HEAD: HEAD
         run: |
@@ -205,10 +211,32 @@ jobs:
   # The one check to require in branch protection: `capture` and `fly` are skipped for
   # docs-only PRs, and a skipped reusable-workflow job creates no child checks, so requiring
   # those by name would wait forever. This passes when every job passed or was skipped.
+  # A pull request that changes the source of a package (or a published manifest) must add a
+  # changeset, so the change reaches the `next` build and the changelog (ADR 0043). The `no-release`
+  # label opts out for changes that ship nothing. Cheap: no install, and it re-runs when labelled.
+  changeset:
+    name: changeset
+    if: ${{ github.event_name == 'pull_request' && (github.base_ref == 'main' || startsWith(github.base_ref, 'epic/')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The PR's merge commit and its first parent (the base branch tip).
+          fetch-depth: 2
+
+      - name: Test the changeset helpers
+        run: node --test scripts/changeset-lib.test.mjs scripts/release-detect.test.mjs
+
+      - name: Require a changeset for shipped changes
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: node scripts/changeset-check.mjs --labels "$LABELS"
+
   ci:
     name: ci
     if: ${{ always() }}
-    needs: [changes, verify, website, capture, fly]
+    needs: [changes, verify, website, capture, fly, changeset]
     runs-on: ubuntu-latest
     steps:
       - name: Check results

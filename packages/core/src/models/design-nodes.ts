@@ -1,5 +1,5 @@
 /** Design metadata + render cache: TTL refresh, batched per file, bounded concurrency, abortable. */
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Buffer } from "node:buffer";
 import type { DatabaseAdapter } from "../adapters/database.ts";
@@ -19,7 +19,7 @@ import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
 import type { ConnectionModel } from "./connections.ts";
 import { PROJECT_SCOPE, type DesignCredentialModel } from "./design-credentials.ts";
-import { DESIGN_TTL_MS } from "./design-health.ts";
+import { DESIGN_TTL_MS, type DesignChange } from "./design-health.ts";
 import { DesignRenderStore } from "./design-renders.ts";
 import type { DesignCredentialStatus } from "./design-resolve.ts";
 
@@ -115,6 +115,31 @@ export class DesignNodeModel {
       }),
     );
     return new Map(rows.flatMap(([url, row]) => (row ? [[url, row] as const] : [])));
+  }
+
+  /**
+   * Claim the right to announce `change` for a node: true for exactly one caller per
+   * `change.key`, even when health checks run concurrently. The claim is a compare-and-set of
+   * `notified_version` from the value read here to a fresh `<key>#<token>`; a caller that finds
+   * the key already claimed, or loses the swap, gets false. Shared (project-credential) rows only:
+   * a member's own-connection row never announces, so one design is never announced twice.
+   */
+  async claimChange(node: DesignNode, change: DesignChange): Promise<boolean> {
+    if (node.viewerId !== PROJECT_SCOPE) return false;
+    const column = col(this.tables.designNodes, "notifiedVersion");
+    const current = (await this.db.get(
+      this.tables.designNodes,
+      node.id,
+    )) as unknown as DesignNode | null;
+    if (!current || current.notifiedVersion?.startsWith(`${change.key}#`) === true) return false;
+    const token = `${change.key}#${ulid()}`;
+    const won = (await this.db.updateWhere(
+      this.tables.designNodes,
+      node.id,
+      { notifiedVersion: token },
+      current.notifiedVersion === null ? isNull(column) : eq(column, current.notifiedVersion),
+    )) as unknown as DesignNode | null;
+    return won?.notifiedVersion === token;
   }
 
   /** Refresh one link (see {@link refreshMany}); null for unsupported URLs or nothing cached. */
@@ -324,6 +349,7 @@ export class DesignNodeModel {
         nodeId: ref.nodeId ?? "",
         renderPath: null,
         renderVersion: null,
+        notifiedVersion: null,
         createdAt: stamp,
         ...values,
       })) as unknown as DesignNode;

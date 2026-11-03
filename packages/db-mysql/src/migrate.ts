@@ -70,6 +70,8 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   { table: "snapshots", column: "duration_ms", definition: "INT" },
   { table: "snapshots", column: "a11y_violations", definition: "TEXT" },
+  { table: "snapshots", column: "unstable", definition: "TINYINT(1)" },
+  { table: "projects", column: "detect_unstable", definition: "TINYINT(1) NOT NULL DEFAULT 1" },
   { table: "baselines", column: "infra_hash", definition: "TEXT" },
   { table: "baselines", column: "fingerprint", definition: "TEXT" },
   { table: "baselines", column: "source_build_id", definition: "TEXT" },
@@ -107,6 +109,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'oidc'",
   },
   { table: "users", column: "disabled", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  { table: "design_nodes", column: "notified_version", definition: "TEXT" },
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
 ];

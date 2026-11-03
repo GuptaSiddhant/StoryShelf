@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/runner-playwright",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Pure Playwright CaptureRunner implementation for StoryShelf: renders Storybook screenshots in-process (no db/storage coupling).",
   "keywords": [
     "playwright",
@@ -80,14 +80,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "browser": false,
-      "workerd": false,
-      "bun": true
-    }
   }
 }

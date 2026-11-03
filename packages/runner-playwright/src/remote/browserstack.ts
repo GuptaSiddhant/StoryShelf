@@ -32,7 +32,8 @@ const BROWSER: Record<BrowserName, string> = {
 /**
  * Targets on BrowserStack, for example `chromium@browserstack`. BrowserStack cannot route back to
  * this host, so each target needs a signed Storybook URL (ADR 0007, decision 5). The credentials
- * travel in the endpoint's capabilities and are scrubbed from every message and log.
+ * travel in the endpoint's capabilities and are scrubbed from every message and log. Experimental:
+ * not verified against live infrastructure.
  */
 export function browserstack(options: BrowserStackOptions): RemoteBrowser {
   return remote({
@@ -47,6 +48,7 @@ export function browserstack(options: BrowserStackOptions): RemoteBrowser {
     }),
     sessions: options.sessions ?? 1,
     platform: options.os?.name.toLowerCase().replace(/^os x$/u, "macos"),
+    experimental: true,
   });
 }
 

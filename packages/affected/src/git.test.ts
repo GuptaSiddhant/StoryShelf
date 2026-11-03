@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -7,6 +7,7 @@ import {
   changedFiles,
   gitBranchName,
   gitHeadSha,
+  gitRepoRoot,
   gitRepoStatus,
   isShallowRepo,
   LOCAL_BRANCH,
@@ -70,8 +71,34 @@ describe("changedFiles", () => {
     expect(changedFiles(dir, base, base)).toEqual(["new.ts"]);
   });
 
+  it("lists every path relative to the repository root, even when run from a package", () => {
+    const base = git(["rev-parse", "HEAD"]);
+    mkdirSync(join(dir, "packages/app"), { recursive: true });
+    mkdirSync(join(dir, "packages/core"), { recursive: true });
+    writeFileSync(join(dir, "packages/app/inside.ts"), "new");
+    writeFileSync(join(dir, "packages/core/outside.ts"), "new");
+    writeFileSync(join(dir, "root.ts"), "new");
+    expect(changedFiles(join(dir, "packages/app"), base, base)).toEqual([
+      "packages/app/inside.ts",
+      "packages/core/outside.ts",
+      "root.ts",
+    ]);
+  });
+
   it("throws for unknown revisions", () => {
     expect(() => changedFiles(dir, "deadbee", "deadbee")).toThrow();
+  });
+});
+
+describe("gitRepoRoot", () => {
+  it("is the repository root from the root and from a package of it", () => {
+    mkdirSync(join(dir, "packages/app"), { recursive: true });
+    expect(gitRepoRoot(dir)).toBe(realpathSync(dir));
+    expect(gitRepoRoot(join(dir, "packages/app"))).toBe(realpathSync(dir));
+  });
+
+  it("is null outside a repository", () => {
+    expect(gitRepoRoot(tmpdir())).toBeNull();
   });
 });
 

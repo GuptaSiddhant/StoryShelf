@@ -1,6 +1,5 @@
 /**
- * Span helpers over `@opentelemetry/api` (runtime-agnostic: Node SDK or
- * Deno's native bridge). Without a configured provider these are cheap
+ * Span helpers over `@opentelemetry/api` (runtime-agnostic). Without a configured provider these are cheap
  * noops, so call sites need no enabled-checks.
  */
 import {
@@ -12,6 +11,27 @@ import {
   type Context,
   type Span,
 } from "@opentelemetry/api";
+import { HttpError, redactSecrets } from "@storyshelf/core/utils";
+
+/**
+ * What a span records of a caught error: a copy with the same `name` and a `redactSecrets` message
+ * (connection strings, tokens and keys stay out of exported spans), and for an `HttpError` its
+ * status only, never the response body. The caller still gets the original error rethrown.
+ * Intentional copy of core's `spanException` (ADR 0015 §5 no-cycle rule: do not deduplicate).
+ */
+function recordedError(error: unknown): Error | string {
+  if (!(error instanceof Error)) {
+    return redactSecrets(String(error));
+  }
+  const message =
+    error instanceof HttpError ? `HTTP ${String(error.status)}` : redactSecrets(error.message);
+  const copy = new Error(message);
+  copy.name = error.name;
+  const header = `${error.name}: ${error.message}`;
+  const frames = error.stack?.startsWith(header) ? error.stack.slice(header.length) : "";
+  copy.stack = `${error.name}: ${message}${redactSecrets(frames)}`;
+  return copy;
+}
 
 /** Instrumentation scope for observability-package spans. */
 const SCOPE = "storyshelf.observability";
@@ -43,7 +63,7 @@ export async function withSpan<T>(
       try {
         return await fn(span);
       } catch (error) {
-        span.recordException(error instanceof Error ? error : String(error));
+        span.recordException(recordedError(error));
         span.setStatus({ code: SpanStatusCode.ERROR });
         throw error;
       } finally {

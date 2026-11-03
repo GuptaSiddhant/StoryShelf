@@ -1,9 +1,23 @@
 name: Save turbo cache
-description: Save turbo's task cache for later runs. Does nothing outside main. Run last in a job that did setup-workspace.
+description: >-
+  Save turbo's task cache for later runs, keeping only entries this job wrote, and delete
+  main's older turbo caches. Does nothing outside main. Run last in a job that did
+  setup-workspace; the job needs `actions: write`.
 
 runs:
   using: composite
   steps:
+    # The restored cache plus this run's entries would grow on every commit (main runs with
+    # --force, so nothing restored is reused). Drop every entry older than the run-start mark.
+    - name: Prune entries from earlier runs
+      if: ${{ github.ref == 'refs/heads/main' }}
+      shell: bash
+      run: |
+        if [ -f .turbo/run-start ]; then
+          find .turbo/cache -type f ! -newer .turbo/run-start -delete
+        fi
+        du -sh .turbo/cache || true
+
     # Keys are immutable, so concurrent saves for one commit just warn and keep the first.
     - name: Save turbo cache
       if: ${{ github.ref == 'refs/heads/main' }}
@@ -11,3 +25,17 @@ runs:
       with:
         path: .turbo/cache
         key: turbo-${{ runner.os }}-${{ github.sha }}
+
+    # Only the newest turbo cache is ever restored, so older ones are dead weight against
+    # the repository's 10 GB quota. A failure here never fails the job.
+    - name: Delete older turbo caches
+      if: ${{ github.ref == 'refs/heads/main' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        KEEP: turbo-${{ runner.os }}-${{ github.sha }}
+        PREFIX: turbo-${{ runner.os }}-
+      run: |
+        gh cache list --repo "$GITHUB_REPOSITORY" --key "$PREFIX" --limit 200 --json id,key \
+          --jq ".[] | select(.key != env.KEEP) | .id" |
+          while read -r id; do gh cache delete "$id" --repo "$GITHUB_REPOSITORY" || true; done

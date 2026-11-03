@@ -15,6 +15,8 @@ export interface BuildOptions {
   buildScriptName?: string;
   /** Force rebuild even if buildDir exists. */
   forceBuild?: boolean;
+  /** Append `--stats-json` to the build script (default on; `--no-build-stats` opts out). */
+  buildStats?: boolean;
   /** Working directory (defaults to process.cwd()). Test seam for fs access. */
   cwd?: string;
 }
@@ -35,6 +37,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     buildCommand: options.buildCommand ?? cfg?.buildCommand,
     buildScriptName: options.buildScriptName ?? cfg?.buildScriptName,
     force: options.forceBuild,
+    affected: cfg?.affectedOnly !== false && process.env["STORYSHELF_FULL"] !== "1",
+    buildStats: options.buildStats ?? cfg?.buildStats ?? true,
   });
   await assertBuildOutput(cwd, buildDir);
   printLine(`Build ready: ${resolve(cwd, buildDir)}`);

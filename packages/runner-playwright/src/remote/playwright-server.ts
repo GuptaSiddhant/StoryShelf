@@ -25,6 +25,11 @@ export interface PlaywrightServerOptions {
   sessions?: number;
   /** Maximum concurrent pages on each connection; the shared sessions limit still applies. */
   maxPagesPerConnection?: number;
+  /**
+   * Maximum connections this process holds to the server at once (default: no cap), separate from
+   * the page limits above. Renders over the cap wait; per process, not per deployment.
+   */
+  maxConnections?: number;
   /** Engines to offer (default all three; the server must have them installed). */
   engines?: readonly BrowserName[];
   /** OS the server runs on, reported when the page cannot tell. */
@@ -51,6 +56,7 @@ export function playwrightServer(options: PlaywrightServerOptions): RemoteBrowse
     connect: { endpoint: options.endpoint, headers },
     sessions: options.sessions ?? 1,
     maxPagesPerConnection: options.maxPagesPerConnection,
+    maxConnections: options.maxConnections,
     platform: options.platform,
     timeouts: { connectMs: options.connectTimeoutMs },
   });

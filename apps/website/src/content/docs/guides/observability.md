@@ -82,6 +82,6 @@ Background capture work never appears in the header (there is no response
 to attach it to). Per-build timing breakdowns live in the attempt log
 history instead (`GET /api/v1/projects/:id/builds/:buildId/attempts/:attemptNo/logs`).
 
-For the full reference (span/metric catalogs, sampling, Deno, troubleshooting),
+For the full reference (span/metric catalogs, sampling, troubleshooting),
 see `docs/observability.md` in the repository and
 [ADR 0015](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0015-observability-and-logging.md).

@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/core",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "StoryShelf core: adapter interfaces, models, capture pipeline, diff, and retention (no HTTP).",
   "keywords": [
     "chromatic-alternative",
@@ -228,14 +228,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "bun": true,
-      "workerd": false,
-      "browser": false
-    }
   }
 }

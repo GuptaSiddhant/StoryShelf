@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storage-gcs",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Google Cloud Storage adapter for StoryShelf.",
   "keywords": [
     "gcs",
@@ -67,14 +67,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "browser": false,
-      "workerd": false,
-      "bun": true
-    }
   }
 }

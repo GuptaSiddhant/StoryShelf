@@ -46,10 +46,11 @@ describe("Azure Terraform modules", () => {
   it("pins terraform and provider versions", () => {
     const versions = generateAzureVersions();
     expect(versions).toContain(">= 1.9");
-    expect(versions).toContain("hashicorp/azurerm");
+    // Each provider is bounded to the major version CI validates, so a new major cannot break it.
     // azurerm 5.x renamed enable_rbac_authorization; the generated Key Vault uses the 4.x name.
-    expect(versions).toContain('version = "~> 4.0"');
-    expect(versions).toContain("hashicorp/azuread");
+    expect(versions).toMatch(/source\s*=\s*"hashicorp\/azurerm"\s*version\s*=\s*"~> 4\.0"/u);
+    expect(versions).toMatch(/source\s*=\s*"hashicorp\/azuread"\s*version\s*=\s*"~> 3\.0"/u);
+    expect(versions).toMatch(/source\s*=\s*"hashicorp\/random"\s*version\s*=\s*"~> 3\.0"/u);
   });
 
   it("declares only live variables", () => {

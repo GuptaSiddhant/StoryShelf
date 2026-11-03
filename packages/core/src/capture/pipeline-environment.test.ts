@@ -7,7 +7,7 @@ import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
-import type { EnvironmentChange } from "./fingerprint.ts";
+import { REMEASURED_IN, type EnvironmentChange } from "./fingerprint.ts";
 import { persistCapture, type CaptureContext } from "./pipeline.ts";
 
 const VIEWPORT = { name: "desktop", width: 1280, height: 720 };
@@ -302,6 +302,62 @@ describe("capture environment migration", () => {
 
     expect((await snapshotOf("b2"))?.status).toBe("unchanged");
     expect((await baselines())[0]?.fingerprint).toBeNull();
+  });
+
+  it("keeps the identity of a baseline stored before measurement versions: same environment, no change", async () => {
+    const { db, run, baselines, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    const [seeded] = await baselines();
+    // The fingerprint as an older version stored it: no `measurementVersion` field.
+    const { measurementVersion, ...legacy } = JSON.parse(seeded?.fingerprint ?? "{}") as Record<
+      string,
+      unknown
+    >;
+    expect(measurementVersion).toBe(1);
+    await db.update(db.tables.baselines, seeded?.id ?? "", { fingerprint: JSON.stringify(legacy) });
+
+    for (const isDefault of [true, false]) {
+      // eslint-disable-next-line no-await-in-loop -- sequential builds share one world
+      const ctx = await run({ shot: RED, environment: ENV_A, isDefault });
+      // eslint-disable-next-line no-await-in-loop -- sequential builds share one world
+      const snapshot = await snapshotOf(ctx.build.id);
+      expect(snapshot?.envChange).toBeNull();
+      expect(snapshot?.status).toBe("unchanged");
+      expect(snapshot?.infraHash).toBe(seeded?.infraHash);
+    }
+  });
+
+  it("never migrates, and diffs, when only a re-measured component differs across versions", async () => {
+    const { db, run, baselines, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    const [seeded] = await baselines();
+    // A baseline measured under an older version whose fonts value differs from today's reading.
+    const older = { ...JSON.parse(seeded?.fingerprint ?? "{}"), measurementVersion: 0 };
+    await db.update(db.tables.baselines, seeded?.id ?? "", {
+      fingerprint: JSON.stringify({ ...older, fontsHash: "old-way" }),
+    });
+    REMEASURED_IN[1] = ["fontsHash"];
+    try {
+      // On the default branch a real environment change would migrate without a diff.
+      const ctx = await run({ shot: GREEN, environment: ENV_A, isDefault: true });
+      const snapshot = await snapshotOf(ctx.build.id);
+      expect(snapshot?.diffPixels).toBeGreaterThan(0);
+      const change = JSON.parse(snapshot?.envChange ?? "{}") as EnvironmentChange;
+      expect(change.changed).toEqual([]);
+      expect(change.unknown).toEqual(["fontsHash"]);
+      // A component measured the same way in both versions still migrates.
+      const real = await run({
+        shot: GREEN,
+        environment: { ...ENV_A, browserVersion: "130.0.0" },
+        isDefault: true,
+      });
+      const migrated = await snapshotOf(real.build.id);
+      const realChange = JSON.parse(migrated?.envChange ?? "{}") as EnvironmentChange;
+      expect(realChange.changed).toEqual(["browserVersion"]);
+      expect(migrated?.diffPixels).toBe(0);
+    } finally {
+      delete REMEASURED_IN[1];
+    }
   });
 
   it("is stable for runners that report no environment", async () => {

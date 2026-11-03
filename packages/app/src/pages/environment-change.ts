@@ -45,7 +45,7 @@ export function summariseEnvironmentChanges(
 ): EnvironmentChangeSummary | null {
   const changes = snapshots
     .map((snapshot) => environmentChangeOf(snapshot))
-    .filter((change): change is EnvironmentChange => change !== null);
+    .filter((change): change is EnvironmentChange => change !== null && change.changed.length > 0);
   if (changes.length === 0) {
     return null;
   }
@@ -53,6 +53,29 @@ export function summariseEnvironmentChanges(
     labelOf(field),
   );
   return { count: changes.length, fields, ...browserVersionOf(changes) };
+}
+
+/** Snapshots compared with a baseline measured another way, and the components that could not be compared. */
+export interface PartlyUnknownSummary {
+  count: number;
+  fields: string[];
+}
+
+/**
+ * Summarise the snapshots whose baseline was measured under another measurement version, so some
+ * components were compared as unknown (never as a change); null when there were none.
+ */
+export function summarisePartlyUnknown(
+  snapshots: readonly Pick<Snapshot, "envChange">[],
+): PartlyUnknownSummary | null {
+  const unknown = snapshots
+    .map((snapshot) => environmentChangeOf(snapshot)?.unknown ?? [])
+    .filter((fields) => fields.length > 0);
+  if (unknown.length === 0) {
+    return null;
+  }
+  const fields = [...new Set(unknown.flat())].map((field) => labelOf(field));
+  return { count: unknown.length, fields };
 }
 
 /** Human label for a changed component. */

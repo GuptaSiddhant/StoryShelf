@@ -50,6 +50,8 @@ const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXIST
 const SNAPSHOT_DURATION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS duration_ms INTEGER";
 const SNAPSHOT_A11Y_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS a11y_violations TEXT";
+const DESIGN_NODE_NOTIFIED_ALTER =
+  "ALTER TABLE design_nodes ADD COLUMN IF NOT EXISTS notified_version TEXT";
 const DESIGN_LINKS_UNIQUE_INDEX =
   "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)";
 /** Pre-adapter Figma tables (replaced by design_nodes / design_credentials; no data is carried over). */
@@ -73,6 +75,9 @@ const BUILD_CAPTURE_JOB_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS cap
 /** A run in flight when the column was added owns the build it was started for (idempotent). */
 const BUILD_CAPTURE_JOB_BACKFILL =
   "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
+const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
+const DETECT_UNSTABLE_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
@@ -173,6 +178,22 @@ async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
   await execIgnore(run, RUN_TESTS_ALTER);
+  await migrateRecentColumns(run);
+}
+
+/** Columns added after the first adapter release; each is an idempotent `ADD COLUMN IF NOT EXISTS`. */
+async function migrateRecentColumns(run: MigrationRunner): Promise<void> {
+  await migrateDesignColumns(run);
+  await migrateUnstableColumns(run);
+}
+
+async function migrateUnstableColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, SNAPSHOT_UNSTABLE_ALTER);
+  await execIgnore(run, DETECT_UNSTABLE_ALTER);
+}
+
+async function migrateDesignColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, DESIGN_NODE_NOTIFIED_ALTER);
 }
 
 async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> {

@@ -2,8 +2,7 @@
  * Node-only OTEL SDK lifecycle.
  *
  * Separate entrypoint (`@storyshelf/observability/node`) so the cross-runtime
- * root never pulls Node SDK modules. Never import this file under Deno —
- * `initObservabilityFromEnv` noops there and Deno's native OTEL owns export.
+ * root never pulls Node SDK modules.
  */
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -80,7 +79,7 @@ function startSdk(config: ObservabilityConfig): ObservabilityHandle {
  *
  * Starts the Node SDK when `OTEL_EXPORTER_OTLP_ENDPOINT` (or
  * `STORYSHELF_OTEL_ENABLED=true`) is set; otherwise returns a noop handle
- * (also under Deno or `OTEL_SDK_DISABLED=true`). Call before
+ * (also when `OTEL_SDK_DISABLED=true`). Call before
  * `createShelfApp` and flush via the handle next to `app.lifecycle.teardown`.
  *
  * @param env - Environment record (defaults to `process.env`).

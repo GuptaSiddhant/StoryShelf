@@ -1,5 +1,5 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { DesignCredentialModel, DesignModel } from "@storyshelf/core/models";
+import { DesignCredentialModel, DesignModel, DesignNodeModel } from "@storyshelf/core/models";
 import { fakeUrl, makeFakeDesign } from "@storyshelf/core/test-helpers";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
@@ -94,5 +94,21 @@ describe("legacy Figma tables", () => {
       "design_credentials",
       "design_nodes",
     ]);
+  });
+});
+
+describe("design change claims on a real database", () => {
+  it("lets one of many concurrent health checks claim a design version", async () => {
+    const { db, credentials } = await setup();
+    await credentials.set("p1", "fake", "tok");
+    const nodes = new DesignNodeModel(db, credentials, [makeFakeDesign().provider]);
+    const node = await nodes.refresh("p1", URL_A);
+    const change = { change: "deleted", key: "deleted:1", designVersion: "1" } as const;
+    const claims = await Promise.all(
+      Array.from({ length: 6 }, async () => await nodes.claimChange(node as never, change)),
+    );
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    const stored = await db.get(db.tables.designNodes, (node as { id: string }).id);
+    expect((stored as { notifiedVersion: string } | null)?.notifiedVersion).toMatch(/^deleted:1#/u);
   });
 });

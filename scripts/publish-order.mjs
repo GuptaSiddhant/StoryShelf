@@ -95,16 +95,6 @@ export function topoSort(nodes, edges) {
 }
 
 /**
- * Public package directories published to JSR, in publish order.
- * Skips packages opted out via `"jsr": false` in package.json.
- *
- * @returns {string[]} Directory names, deterministic.
- */
-export function getJsrPublishOrder() {
-  return getPublishOrder().filter((dir) => readManifest(dir)?.jsr !== false);
-}
-
-/**
  * Public package directories in publish order (dependencies first).
  *
  * @returns {string[]} Directory names, deterministic.

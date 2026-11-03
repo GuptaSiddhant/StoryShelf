@@ -42,6 +42,7 @@ projects (
   public_branch_regex text,                    -- branches whose builds are publicly viewable (ADR 0010)
   run_a11y            boolean NOT NULL DEFAULT true,   -- axe accessibility checks during capture; results are shown in review and never block (ADR 0004, decision 6)
   run_tests           boolean NOT NULL DEFAULT false,  -- run Storybook 10 `.test()` entries as interaction tests during capture (ADR 0004, decision 10)
+  detect_unstable     boolean NOT NULL DEFAULT true,   -- re-render a changed snapshot once and flag it when the two renders differ (advisory; `capture/stability.ts`)
   review_enabled      boolean NOT NULL DEFAULT true,   -- review on: non-default builds wait for a verdict (ADR 0013, decision 1)
   review_approvals    integer NOT NULL DEFAULT 1,      -- approvals a build needs with `testing` off (ADR 0013, decision 3)
   storybook_url_ttl_seconds integer,           -- lifetime of the signed Storybook URLs of a render; NULL derives it from the build (ADR 0007, decision 5)
@@ -93,6 +94,7 @@ snapshots (
   reviewed_by         text,
   reviewed_at         text,
   a11y_violations     text,                    -- JSON array of the axe violation lines found on this capture (non-blocking); NULL when none or not checked (axe runs on the primary target only; `browser` names the target)
+  unstable            boolean,                 -- true: a second render of this changed snapshot differed from the first (likely flaky); false: it matched; NULL: not re-rendered. Never changes `status`
   created_at          text NOT NULL,
   updated_at          text NOT NULL,
   baseline_id         text,                    -- baseline row the diff was computed against (NULL: none, or legacy row)
@@ -669,6 +671,31 @@ baseline that applies _now_ (own branch, else default):
 - Re-diff skips approved/rejected snapshots (decisions), inherited snapshots (never rendered), and
   default-branch builds (authoritative); the build roll-up is refreshed afterwards.
 
+### Capture environment fingerprint
+
+A baseline stores a `Fingerprint` (JSON, `packages/core/src/capture/fingerprint.ts`) next to its
+`infraHash`; a snapshot stores the `infraHash` of its capture and, when the environment differed from
+its baseline's, the before and after fingerprints in `envChange`. A fingerprint holds: engine, browser
+version, platform, device scale factor, fonts digest, viewport and sizing. The hash covers exactly those
+components; a difference on the default branch is an environment migration (ADR 0009), on a feature
+branch it rides along as `envChange`.
+
+**Measurement version.** `measurementVersion` says how the browser-measured components were read. It is
+**not part of `infraHash`**, so changing it never changes a baseline's identity or causes a mass
+migration; a fingerprint stored without it is version 1.
+
+- Between two different versions, a component whose measurement changed (listed per version in
+  `REMEASURED_IN`) is compared as **unknown**, never as a mismatch: it cannot cause a migration, an
+  earlier value of it is not carried over a capture that lacks it, and the review says "Environment
+  partly unknown (measurement updated)". Components measured the same way still compare; with equal
+  versions nothing differs from before.
+- Bump `MEASUREMENT_VERSION` only together with a probe change, and add the components that probe change
+  re-measures to `REMEASURED_IN` in the same commit.
+
+| Version | What it measures                                                                               |
+| ------- | ---------------------------------------------------------------------------------------------- |
+| 1       | The in-browser probe of the first fingerprint release: browser version, platform, scale, fonts |
+
 ### Baseline Portability (export/import)
 
 Baselines are portable between instances (backup/restore, migration, staging → prod promotion):
@@ -1081,7 +1108,7 @@ StoryShelf/
 
     observability/
       src/
-        index.ts          # runtime-agnostic OTEL entrypoint (api only; Deno-safe)
+        index.ts          # runtime-agnostic OTEL entrypoint (api only)
         node.ts           # Node SDK lifecycle (OTLP/HTTP exporters)
         config.ts         # env resolution (OTEL_* standard, STORYSHELF_OTEL_* gaps)
         tracing.ts        # withSpan helper

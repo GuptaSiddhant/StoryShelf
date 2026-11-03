@@ -22,6 +22,16 @@ CLI=(node "$PWD/packages/cli/dist/index.js")
 AUTH=(-H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" -H "content-type: application/json")
 AUTHOR=(--author-name "Alex Doe" --author-email alex@example.com)
 
+# DEMO_BROWSER (e.g. chromium@sprite) renders the demo on that target; unset keeps the VM's Chromium.
+# The create endpoint has no browsers field, so it is set with an update. A target the server does
+# not offer (its secrets are unset) answers 400 and stops the seed. Idempotent, so it also runs when
+# the demo is already up to date, otherwise a newly set DEMO_BROWSER would be ignored.
+set_demo_browser() {
+  [ -n "${DEMO_BROWSER:-}" ] || return 0
+  curl -fsS "${AUTH[@]}" -X PATCH "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
+    -d "$(jq -nc --arg b "$DEMO_BROWSER" '{browsers: [$b]}')"
+}
+
 sha_for() { printf '%s:%s' "$1" "$(sha256sum "$STATIC/index.json" | cut -c1-64)" | sha256sum | cut -c1-40; }
 MAIN_SHA="$(sha_for main)"
 FEATURE_SHA="$(sha_for feature/new-button)"
@@ -36,6 +46,7 @@ case "$CODE" in
     if jq -e --arg a "$MAIN_SHA" --arg b "$FEATURE_SHA" \
       '[.[] | select(.status != "failed") | .gitSha] | (index($a) != null) and (index($b) != null)' \
       "$BUILDS_FILE" >/dev/null; then
+      set_demo_browser
       echo "Demo project is up to date; nothing to do."
       exit 0
     fi
@@ -53,10 +64,15 @@ esac
 # minted through it has no owner, which makes it a viewer that cannot upload.
 curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
   -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main"}'
+# Before the first upload, so the first build already renders on the chosen target.
+set_demo_browser
 
+# --full on both uploads: the fixture now builds with preview-stats.json, and no source file
+# differs between the two builds (the feature build only injects CSS into the built output), so
+# affected capture would inherit every story and the demo would show no diffs.
 upload() { # <dir> <branch> <sha> <message>
   (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$STORYSHELF_ADMIN_TOKEN" \
-    --build-dir "$1" --branch "$2" --sha "$3" --message "$4" "${AUTHOR[@]}")
+    --build-dir "$1" --branch "$2" --sha "$3" --message "$4" "${AUTHOR[@]}" --full)
 }
 
 upload "$STATIC" main "$MAIN_SHA" "chore: design system baseline"

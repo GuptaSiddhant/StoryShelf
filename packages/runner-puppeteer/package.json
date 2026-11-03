@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/runner-puppeteer",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Puppeteer CaptureRunner for StoryShelf (Chromium via chrome-headless-shell, smaller image).",
   "keywords": [
     "puppeteer",
@@ -54,7 +54,7 @@
     "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "test": "vitest run",
-    "test:integration": "RUN_INTEGRATION=1 vitest run a11y.integration.test.ts settle.integration.test.ts remote.integration.test.ts",
+    "test:integration": "RUN_INTEGRATION=1 vitest run a11y.integration.test.ts settle.integration.test.ts remote.integration.test.ts ignore-regions.integration.test.ts",
     "prepublishOnly": "nub run build",
     "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts"
   },
@@ -78,14 +78,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "browser": false,
-      "workerd": false,
-      "bun": true
-    }
   }
 }

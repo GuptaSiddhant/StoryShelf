@@ -26,6 +26,11 @@ interface CdpBase {
   platform?: string;
   /** How long one connect attempt waits in ms (default 30 000). */
   connectTimeoutMs?: number;
+  /**
+   * Maximum connections this process holds to the service at once (default: no cap), separate from
+   * the pages in `sessions`. Renders over the cap wait; per process, not per deployment.
+   */
+  maxConnections?: number;
 }
 
 /** A service at a fixed address. */
@@ -68,6 +73,7 @@ export function cdp<TLease = unknown>(options: CdpOptions<TLease>): RemoteBrowse
     protocol: "cdp",
     reach: "url",
     sessions: options.sessions ?? 1,
+    maxConnections: options.maxConnections,
     platform: options.platform,
   } as const;
   if (typeof options.connect === "function") {

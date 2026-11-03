@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/app",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "StoryShelf app: Hono app, API routes, and server-rendered UI over @storyshelf/core.",
   "keywords": [
     "chromatic-alternative",
@@ -46,10 +46,12 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
-    "fmt": "oxfmt ./src",
-    "lint": "oxlint --type-aware --type-check ./src",
+    "build-storybook": "storybook build -o storybook-static --stats-json",
+    "fmt": "oxfmt ./src ./.storybook",
+    "lint": "oxlint --type-aware --type-check ./src ./.storybook",
     "lint:fix": "nub run lint -- --fix",
     "prepublishOnly": "nub run build",
+    "storybook": "storybook dev -p 6006",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
@@ -68,6 +70,7 @@
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
+    "@storybook/html-vite": "10.6.5",
     "@storyshelf/auth": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/design-figma": "workspace:*",
@@ -78,20 +81,12 @@
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "pino": "catalog:",
+    "storybook": "10.6.5",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "browser": false,
-      "workerd": false,
-      "bun": true
-    }
   }
 }
