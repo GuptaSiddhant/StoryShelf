@@ -125,7 +125,8 @@ jobs:
       - name: Check ADR references and size
         run: nub run docs:check
 
-      - name: Verify (build + lint + test)
+      - name: Verify (build + Storybook + lint + test)
+        # `verify` builds the app's Storybook once (build-storybook), so a broken story fails the PR.
         # The website has its own job (below), so it runs in parallel and only when it changed.
         # PRs run only affected packages (plus their dependents); global/risky changes, pushes
         # to main and manual runs use the full workspace. One test task at a time keeps

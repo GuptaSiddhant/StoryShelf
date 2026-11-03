@@ -56,6 +56,7 @@
     "deprecate": "nub ./scripts/deprecate-packages.mjs",
     "deprecate:dry": "nub ./scripts/deprecate-packages.mjs --dry-run",
     "serve": "nub run --filter dev-server serve",
+    "storybook": "nub run --filter @storyshelf/app storybook",
     "fmt": "turbo fmt",
     "hook:install": "git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/commit-msg",
     "lint": "turbo lint",
