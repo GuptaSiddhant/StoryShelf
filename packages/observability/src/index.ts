@@ -1,8 +1,8 @@
 /**
  * StoryShelf observability: runtime-agnostic OTEL instrumentation.
  *
- * This entrypoint is cross-runtime (`@opentelemetry/api` only — Node SDK or
- * Deno's native bridge supplies the provider). The Node SDK lifecycle
+ * This entrypoint is runtime-agnostic (`@opentelemetry/api` only; the Node SDK
+ * supplies the provider). The Node SDK lifecycle
  * (`initObservabilityFromEnv`) lives under `@storyshelf/observability/node`
  * and must never be imported here.
  */

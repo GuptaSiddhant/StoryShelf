@@ -296,7 +296,8 @@ Comment bodies are included only as truncated, redacted text.
   degrades with markers at runtime, never silently.
 - The self-hosted differentiator holds: a local default, data stays in the deployer's network, and
   later features add consumers and task keys only, with no contract/schema/package change.
-- New runtime dependencies (`ai`, `@ai-sdk/otel`) to track for npm and JSR publishing. Peer-major
+- New runtime dependencies (`ai`, `@ai-sdk/otel`) to track for npm and JSR publishing. (Amendment
+  2026-11-03, #482: JSR publishing was removed; packages publish to npm only.) Peer-major
   alignment between the pinned `ai` core and user-installed `@ai-sdk/*` packages is documented; the
   startup check compares `specificationVersion`.
 - The `insights` table joins the retention and purge surface.

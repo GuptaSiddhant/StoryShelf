@@ -15,16 +15,13 @@ export interface EnsureBuildDirOptions {
 
 /**
  * Script invocation per runner. npm needs `--` to forward args; pnpm, bun,
- * yarn, deno, and nub append trailing args to the script directly (a literal
+ * yarn, and nub append trailing args to the script directly (a literal
  * `--` would be forwarded as a positional and can break the build).
  */
 function scriptCommand(runner: PackageRunner, scriptName: string, buildDir: string): string {
   const args = `--output-dir ${buildDir}`;
   if (runner === "npm") {
     return `npm run ${scriptName} -- ${args}`;
-  }
-  if (runner === "deno") {
-    return `deno task ${scriptName} ${args}`;
   }
   if (runner === "yarn") {
     return `yarn ${scriptName} ${args}`;

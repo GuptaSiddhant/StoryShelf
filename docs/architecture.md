@@ -1081,7 +1081,7 @@ StoryShelf/
 
     observability/
       src/
-        index.ts          # runtime-agnostic OTEL entrypoint (api only; Deno-safe)
+        index.ts          # runtime-agnostic OTEL entrypoint (api only)
         node.ts           # Node SDK lifecycle (OTLP/HTTP exporters)
         config.ts         # env resolution (OTEL_* standard, STORYSHELF_OTEL_* gaps)
         tracing.ts        # withSpan helper

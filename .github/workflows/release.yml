@@ -4,8 +4,8 @@ name: Release
 # to this workflow file name (ADR 0043). A run picks one channel (`detect`):
 #
 # - stable: a push to `main` whose shared version has no `v<version>` tag yet, which is what merging a
-#   release pull request (`nub run release:prepare`) produces. Validate, publish `latest` to npm and
-#   JSR, create tag `v<version>`, create the GitHub Release.
+#   release pull request (`nub run release:prepare`) produces. Validate, publish `latest` to npm,
+#   create tag `v<version>`, create the GitHub Release.
 # - next: any other push to `main` while changesets are pending. A throwaway `x.y.z-next-<sha>`
 #   build of every package goes to npm under the `next` dist-tag; the version is never committed.
 # - none: nothing to publish.
@@ -106,9 +106,7 @@ jobs:
   # Stable channel (a merged release pull request)
   # ---------------------------------------------------------------------------------------------
 
-  # Version gate: single source of truth. Both publishers depend on this job (not on each other),
-  # so a bad tree fails fast before either registry is touched, while npm and JSR never block each
-  # other.
+  # Version gate: single source of truth. A bad tree fails here, before anything is published.
   validate:
     name: validate release
     needs: [detect]
@@ -175,7 +173,7 @@ jobs:
 
   # The tag and the GitHub Release. They follow a successful npm publish, and the tag is what marks
   # the version released: until it exists, every push to main (and a manual re-run) retries the
-  # stable path. A JSR failure does not hold them back. Both steps tolerate "already exists".
+  # stable path. Both steps tolerate "already exists".
   github-release:
     name: tag and GitHub Release
     needs: [detect, validate, publish-npm]
@@ -238,44 +236,3 @@ jobs:
           tag_name: ${{ needs.detect.outputs.tag }}
           body_path: release-body.md
           generate_release_notes: false
-
-  # JSR publish. Depends on validate, independent of npm: `continue-on-error` means a failure here
-  # never fails the workflow or blocks publish-npm. A re-run publishes only what JSR lacks.
-  publish-jsr:
-    needs: [detect, validate]
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      contents: read
-      id-token: write # OIDC: JSR authenticates publish + attaches provenance, no token
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.detect.outputs.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Setup Nub
-        uses: nubjs/setup-nub@v0
-
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.6.7
-
-      - name: Install dependencies
-        run: nub ci
-
-      - name: Build packages (regenerates deno.json with current version)
-        run: nub run build --filter='./packages/*'
-
-      - name: "Rewrite workspace protocol for JSR manifest"
-        # Same rewrite as the npm job; --allow-dirty tolerates it at publish.
-        run: node scripts/rewrite-workspace-protocol.mjs
-
-      - name: "Publish to JSR (dependency order: core first)"
-        # deno publish directly (no npx jsr wrapper): the wrapper re-downloads itself and its deno
-        # binary per package (~5 min each). Pinned deno via Setup Deno makes every package publish
-        # in seconds.
-        run: node scripts/publish-jsr.mjs

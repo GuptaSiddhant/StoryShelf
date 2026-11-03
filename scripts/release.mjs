@@ -67,7 +67,7 @@ log("versioning from the pending changesets");
 run("node scripts/version-packages.mjs"); // fails clearly when none are pending
 
 const version = coreVersion();
-run(`node scripts/release-validate.mjs v${version}`); // one shared version, deno.json in step
+run(`node scripts/release-validate.mjs v${version}`); // one shared version
 
 log("packaging check: nub publish -r --dry-run");
 run("nub publish -r --dry-run --no-git-checks");
@@ -86,5 +86,5 @@ log(`${previous} → ${version} committed on ${branch}`);
 console.log(`
 Next: git push -u origin ${branch}
       open a pull request titled "chore(release): v${version}" into main.
-      Merging it publishes ${version} to npm (latest) and JSR, tags v${version}
+      Merging it publishes ${version} to npm (latest), tags v${version}
       and creates the GitHub Release (release.yml).`);

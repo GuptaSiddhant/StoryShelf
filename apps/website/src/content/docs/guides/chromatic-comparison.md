@@ -79,7 +79,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 - **Full data control** — Your database, your storage, your network.
 - **No vendor lock-in** — MIT licensed, open source, standard APIs.
 - **Flexible SSO** — Any OIDC provider (Keycloak, Okta, Entra ID, Auth0, Cognito).
-- **Self-hosted on any platform** — Node, Bun, Deno, Fly.io, Railway, Render, Vercel, Cloudflare Workers, AWS Lambda, etc.
+- **Self-hosted on any platform** — Node, Bun, Fly.io, Railway, Render, Vercel, Cloudflare Workers, AWS Lambda, etc.
 - **Per-branch baselines with fallback** — Cleaner model for long-lived feature branches.
 
 ## Migration considerations

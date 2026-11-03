@@ -3,8 +3,7 @@
 /**
  * Release validation gate — single source of truth for the release workflow.
  * Checks: tag matches the fixed workspace version, all non-private packages
- * share one version, every non-private package declares `engines.node >=24`, every JSR-published package has a matching deno.json
- * version (packages with `"jsr": false` are exempt).
+ * share one version, every non-private package declares `engines.node >=24`,
  * Emits `version` and `dist_tag` (stdout + GITHUB_OUTPUT when present).
  *
  * Usage:
@@ -99,47 +98,6 @@ if (missingEngines.length > 0) {
   fail(`packages must declare engines.node ${MIN_NODE}:\n${missingEngines.join("\n")}`);
 }
 console.log(`all packages declare engines.node ${MIN_NODE}`);
-
-// deno.json versions must match package.json.
-const bad = [];
-const missing = [];
-for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
-  if (!entry.isDirectory()) {
-    continue;
-  }
-  let pkg;
-  try {
-    pkg = readJson(join(packagesDir, entry.name, "package.json"));
-  } catch {
-    continue;
-  }
-  if (pkg.private) {
-    continue;
-  }
-  if (pkg.jsr === false) {
-    continue;
-  }
-  let jsr = null;
-  try {
-    jsr = readJson(join(packagesDir, entry.name, "deno.json"));
-  } catch {
-    // Missing or invalid deno.json
-  }
-  if (!jsr) {
-    missing.push(entry.name);
-    continue;
-  }
-  if (jsr.version !== pkg.version) {
-    bad.push(`${entry.name}: deno=${jsr.version} pkg=${pkg.version}`);
-  }
-}
-if (missing.length > 0) {
-  fail(`missing deno.json:\n${missing.join("\n")}`);
-}
-if (bad.length > 0) {
-  fail(`deno.json/package.json version mismatch:\n${bad.join("\n")}`);
-}
-console.log("all deno.json versions match package.json");
 
 const distTag = String(corePkg.version).includes("-") ? "next" : "latest";
 emit("version", corePkg.version);

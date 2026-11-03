@@ -28,7 +28,6 @@ describe("resolveBuildCommand", () => {
     ["pnpm", "pnpm-lock.yaml", "pnpm run build-storybook --output-dir storybook-static"],
     ["yarn", "yarn.lock", "yarn build-storybook --output-dir storybook-static"],
     ["bun", "bun.lockb", "bun run build-storybook --output-dir storybook-static"],
-    ["deno", "deno.lock", "deno task build-storybook --output-dir storybook-static"],
     ["nub", "nub.lock", "nub run build-storybook --output-dir storybook-static"],
   ])("builds a %s command from its lockfile", async (_runner, lockfile, expected) => {
     writeFileSync(join(dir, lockfile), "");

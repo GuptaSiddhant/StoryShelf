@@ -40,7 +40,9 @@ describe("defineRemote", () => {
       retry: { attempts: 3, backoffMs: 500 },
       timeouts: { acquireMs: 30_000, connectMs: 30_000, releaseMs: 30_000, probeMs: 15_000 },
       platform: undefined,
+      experimental: false,
     });
+    expect(defineRemote(options({ experimental: true }), all).experimental).toBe(true);
     expect(isRemoteBrowser("chromium")).toBe(false);
     expect(isRemoteBrowser(null)).toBe(false);
   });

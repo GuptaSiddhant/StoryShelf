@@ -5,7 +5,7 @@
  *
  *   node scripts/version-packages.mjs             stable: consume the pending changesets, bump
  *                                                 every package to one version, write the root
- *                                                 CHANGELOG.md section, keep deno.json in step
+ *                                                 CHANGELOG.md section
  *   node scripts/version-packages.mjs --pending   print the number of pending changesets (emits
  *                                                 `pending=<n>`); changes nothing
  *   node scripts/version-packages.mjs --snapshot  CI `next` build: a throwaway version
@@ -77,21 +77,6 @@ function packageDirs() {
     .map((entry) => entry.name);
 }
 
-/** Write `version` into one `deno.json`; a package without one is not published to JSR. */
-function setDenoVersion(dir, version) {
-  const file = join(packagesDir, dir, "deno.json");
-  let text;
-  try {
-    text = readFileSync(file, "utf8");
-  } catch {
-    return;
-  }
-  if (!/"version":\s*"[^"]*"/u.test(text)) {
-    fail(`${file}: no "version" field to update`);
-  }
-  writeFileAtomic(file, text.replace(/"version":\s*"[^"]*"/u, `"version": "${version}"`));
-}
-
 /** The commit hash Changesets puts in a snapshot version is the full one; the issue wants a short one. */
 const SNAPSHOT_SUFFIX = /(?<head>-next-)(?<sha>[0-9a-f]{40})$/u;
 
@@ -120,13 +105,6 @@ function shortenSnapshot(version) {
   return short;
 }
 
-/** Make every `deno.json` carry the version `changeset version` wrote to its package.json. */
-function syncDenoVersions(version) {
-  for (const dir of packageDirs()) {
-    setDenoVersion(dir, version);
-  }
-}
-
 function requirePending() {
   const pending = listPending(changesetDir);
   if (pending.length === 0) {
@@ -142,13 +120,11 @@ if (mode === "--pending") {
   requirePending();
   changeset("version", "--snapshot", "next");
   const version = shortenSnapshot(sharedVersion());
-  syncDenoVersions(version);
   emit("version", version);
 } else if (mode === undefined) {
   const entries = renderEntries(requirePending());
   changeset("version");
   const version = sharedVersion();
-  syncDenoVersions(version);
   const file = join(root, "CHANGELOG.md");
   const date = new Date().toISOString().slice(0, 10);
   writeFileAtomic(file, mergeChangelog(readFileSync(file, "utf8"), { version, date, entries }));

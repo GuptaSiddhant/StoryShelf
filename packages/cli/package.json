@@ -73,6 +73,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": false
+  }
 }
