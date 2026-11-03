@@ -40,6 +40,16 @@ export async function publishedAccess(
 }
 
 /**
+ * For a signed-in caller with no role on `project`, the answer is the one for a project that does
+ * not exist, whatever else the route would say (a missing build, no access): the project's
+ * existence is not theirs to learn (#497). Anyone else gets `fallback`.
+ */
+export async function hiddenFrom(project: Project): Promise<boolean> {
+  const { authEnabled, user } = getStore();
+  return authEnabled && user !== null && (await currentProjectRole(project.id)) === null;
+}
+
+/**
  * Whether anyone who can reach the app may fetch the build's published Storybook with no
  * credentials: the instance has no sign-in, or the build is public (ADR 0011).
  */

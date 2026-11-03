@@ -9,3 +9,4 @@ export { storeScope, type StoreScopeDeps } from "./store-scope.ts";
 export { authGate, resolveRequestUser } from "./auth-gate.ts";
 export { requireTesting } from "./require-testing.ts";
 export { requireReview } from "./require-review.ts";
+export { requireProjectVisible } from "./require-visible.ts";

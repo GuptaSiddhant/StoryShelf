@@ -306,7 +306,9 @@ user_invite_tokens (
   created_at          text NOT NULL
 );
 
--- Project-scoped authorization: a user's role on a specific project
+-- Project-scoped authorization: a user's role on a specific project. A caller with no role at all gets
+-- 404 `Project not found` on every project-scoped route (`assertRole`, the `requireProjectVisible` page
+-- gate, `hiddenFrom` on the Storybook routes), identical to an unknown slug; 403 means a role that is too low.
 project_members (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

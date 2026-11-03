@@ -115,7 +115,8 @@ describe("notification subscriptions", () => {
     const { db, storage } = await seed();
     const app = appWith(db, storage);
     const anon = await app.request(mePath);
-    expect(anon.status).toBe(403);
+    // No role on the project: the answer for a project that does not exist (#497).
+    expect(anon.status).toBe(404);
     const openApp = createShelfApp({
       database: db,
       storage: storage as never,

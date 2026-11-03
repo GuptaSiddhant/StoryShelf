@@ -9,7 +9,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
-import { publishedAccess } from "./published-access.ts";
+import { hiddenFrom, publishedAccess } from "./published-access.ts";
 import { publishedRelativePath, servePublishedFile } from "./published-files.ts";
 
 /** Check whether a build's extracted statics are available for serving. */
@@ -37,12 +37,13 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!project) {
       notFound("Project not found");
     }
+    const hidden = await hiddenFrom(project);
     const build = await new BuildModel(getStore().db).latestApprovedDefault(project);
     if (!build) {
-      notFound("No approved build on the default branch yet");
+      notFound(hidden ? "Project not found" : "No approved build on the default branch yet");
     }
     if (!(await publishedAccess(build, project))) {
-      return c.redirect("/auth/login", 302);
+      return hidden ? notFound("Project not found") : c.redirect("/auth/login", 302);
     }
     return c.redirect(`/projects/${slug}/storybook/build/${build.id}/`, 302);
   });
@@ -115,13 +116,14 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!project) {
       notFound("Project not found");
     }
+    const hidden = await hiddenFrom(project);
     const build = await new BuildModel(getStore().db).get(buildId);
     if (!build || build.projectId !== project.id) {
-      notFound("Build not found");
+      notFound(hidden ? "Project not found" : "Build not found");
     }
     const access = await publishedAccess(build, project);
     if (!access) {
-      return c.redirect("/auth/login", 302);
+      return hidden ? notFound("Project not found") : c.redirect("/auth/login", 302);
     }
 
     if (rest === "") {
@@ -162,13 +164,14 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!project) {
       notFound("Project not found");
     }
+    const hidden = await hiddenFrom(project);
     const buildId = await new LabelModel(getStore().db).latestBuildId(project.id, key, value);
     if (!buildId) {
-      notFound("No build carries that label");
+      notFound(hidden ? "Project not found" : "No build carries that label");
     }
     const build = await new BuildModel(getStore().db).get(buildId);
     if (!build || !(await publishedAccess(build, project))) {
-      return c.redirect("/auth/login", 302);
+      return hidden ? notFound("Project not found") : c.redirect("/auth/login", 302);
     }
     return c.redirect(`/projects/${slug}/storybook/build/${buildId}/`, 302);
   });

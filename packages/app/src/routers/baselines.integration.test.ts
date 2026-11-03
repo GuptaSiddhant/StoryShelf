@@ -236,6 +236,7 @@ describe("baseline export/import permissions", () => {
   it("requires authentication when auth is enabled", async () => {
     const { app } = await seedWithAuth();
     const response = await app.request("/api/v1/projects/demo/baselines/export");
-    expect([401, 403]).toContain(response.status);
+    // No role on the project: the answer for a project that does not exist (#497).
+    expect(response.status).toBe(404);
   });
 });

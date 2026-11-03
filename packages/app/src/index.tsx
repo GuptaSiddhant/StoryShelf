@@ -28,6 +28,7 @@ import {
   authGate,
   csrf,
   createRateLimiter,
+  requireProjectVisible,
   requireReview,
   requireTesting,
   rateLimitKey,
@@ -193,7 +194,16 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
   app.use("*", authGate());
-  // Routes classified `review` answer 404 for a project with review off (ADR 0013, decision 10).
+  mountProjectGates(app);
+}
+
+/**
+ * Gates on what a project's routes tell a caller: pages answer 404 to a caller with no role on the
+ * project, as for an unknown slug (#497); routes classified `review` answer 404 for a project with
+ * review off (ADR 0013, decision 10).
+ */
+function mountProjectGates(app: ShelfRouter): void {
+  app.use("*", requireProjectVisible());
   app.use("*", requireReview());
 }
 

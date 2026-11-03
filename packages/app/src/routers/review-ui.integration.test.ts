@@ -239,8 +239,12 @@ describe("the review gate", () => {
   it("tells nothing about a project to someone who cannot view it", async () => {
     const booted = await boot({ project: { reviewEnabled: false } });
     const response = await booted.api("outsider", "/builds/b1/comments");
-    expect(response.status).toBe(403);
-    expect(await response.text()).not.toContain(REVIEW_DISABLED_MESSAGE);
+    // 404 as for an unknown project, not the 403 that would show the project exists (#497).
+    expect(response.status).toBe(404);
+    const unknown = await booted.app.request("/api/v1/projects/ghost/builds/b1/comments", {
+      headers: { cookie: "storyshelf_session=outsider" },
+    });
+    expect(await response.text()).toBe(await unknown.text());
     await booted.stop();
   });
 
