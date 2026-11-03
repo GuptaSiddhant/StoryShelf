@@ -22,12 +22,18 @@ function stateHelpers(): string {
         b.setAttribute('aria-pressed', b.getAttribute('data-view-value')===value ? 'true' : 'false');
       });
     }
+    function allows(stage,attr,value){
+      var list=stage.getAttribute(attr);
+      return !list || list.split(',').indexOf(value)>-1;
+    }
     function setMode(stage,mode,persist){
+      if(!allows(stage,'data-modes',mode)) return;
       stage.setAttribute('data-view',mode);
       press(stage.querySelector('[data-compare-mode]'),mode);
       if(persist) remember('ss_compare_mode',mode);
     }
     function setZoom(stage,zoom,persist){
+      if(!allows(stage,'data-zooms',zoom)) return;
       stage.setAttribute('data-zoom',zoom);
       press(stage.querySelector('[data-compare-zoom]'),zoom);
       if(persist) remember('ss_compare_zoom',zoom);
@@ -131,11 +137,20 @@ function clickControls(): string {
       var dialog=document.querySelector('dialog[data-shortcuts]');
       if(dialog&&typeof dialog.showModal==='function'&&!dialog.open){ dialog.showModal(); }
     }
+    function chooseSource(btn,value){
+      var root=btn.closest('[data-compare-sources]');
+      if(!root) return;
+      root.querySelectorAll('[data-compare-source]').forEach(function(pane){
+        pane.hidden = pane.getAttribute('data-compare-source')!==value;
+      });
+      press(btn.closest('[data-compare-source-switch]'),value);
+    }
     function chooseSegment(btn){
       var value=btn.getAttribute('data-view-value');
       var stage=btn.closest('[data-compare]');
       if(stage&&btn.closest('[data-compare-mode]')){ setMode(stage,value,true); }
       else if(stage&&btn.closest('[data-compare-zoom]')){ setZoom(stage,value,true); }
+      else if(btn.closest('[data-compare-source-switch]')){ chooseSource(btn,value); }
       else if(btn.closest('[data-filter-switch]')){
         var list=document.querySelector('[data-diff-nav]');
         if(list){ list.setAttribute('data-filter',value); }
@@ -189,7 +204,7 @@ function keyboardShortcuts(): string {
     }
     document.addEventListener('keydown',function(e){
       if(e.metaKey||e.ctrlKey||e.altKey||typing(e.target)) return;
-      var stage=document.querySelector('[data-compare]');
+      var stage=document.querySelector('[data-compare-source]:not([hidden]) [data-compare]')||document.querySelector('[data-compare]');
       if(!stage||document.querySelector('dialog[open]')) return;
       if(handleKey(e.key,stage)){ e.preventDefault(); }
     });`;

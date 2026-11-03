@@ -8,12 +8,13 @@ import { A11yViolationsNotice, a11yCarrierOf } from "./a11y-violations.tsx";
 import { DefaultComparisonView } from "./build-diff-default.tsx";
 import { EnvironmentChangeSnapshotNotice } from "./build-diff-environment.tsx";
 import {
+  designSources,
   diffPercent,
   snapshotImageUrl,
   snapshotPageUrl,
   snapshotVariant,
 } from "./build-diff-model.ts";
-import { BaselineReferenceNotice } from "./build-diff-reference.tsx";
+import { BaselineReferenceNotice, ComparisonSources } from "./build-diff-reference.tsx";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
@@ -155,7 +156,7 @@ function baselineUrl(props: DiffViewerProps): string | null {
 
 function PrimaryComparison(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, reference } = props;
-  return (
+  const stage = (
     <CompareStage
       baselineSrc={baselineUrl(props)}
       baselineEmpty={
@@ -169,6 +170,14 @@ function PrimaryComparison(props: DiffViewerProps): HtmlEscapedString | Promise<
       subject={`${selected.storyTitle} / ${selected.storyName}`}
       diffEmpty={diffEmptyText(selected.status)}
       diffMeta={diffPercent(selected) ?? undefined}
+    />
+  );
+  return (
+    <ComparisonSources
+      baseline={stage}
+      sources={designSources(props.design ?? [])}
+      currentSrc={snapshotImageUrl(project, build, selected, "image")}
+      subject={`${selected.storyTitle} / ${selected.storyName}`}
     />
   );
 }
