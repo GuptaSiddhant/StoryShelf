@@ -15,18 +15,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # On a pull request, check out the PR head rather than the temporary merge commit
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0 # affected capture diffs against history; a depth of 1 forces full renders
       - name: Build Storybook
-        run: npx build-storybook -o storybook-static
+        # --stats-json writes preview-stats.json into the output: affected capture reads it
+        run: npx storybook build -o storybook-static --stats-json
       - name: Upload to StoryShelf
+        env:
+          # On pull_request, GITHUB_SHA is a merge commit and GITHUB_REF_NAME is "<n>/merge": pass
+          # the PR head and its branch instead. Through env, because a branch name is user input.
+          UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           npx storyshelf upload \
             --url ${{ secrets.STORYSHELF_URL }} \
             --slug ${{ vars.STORYSHELF_SLUG }} \
             --token ${{ secrets.STORYSHELF_TOKEN }} \
-            --sha "$GITHUB_SHA" \
-            --branch "$GITHUB_REF_NAME"
+            --sha "$UPLOAD_SHA" \
+            --branch "$UPLOAD_BRANCH"
 ```
+
+Run `npx storyshelf doctor` after the build to check the setup before uploading. It reports a shallow clone or a missing `preview-stats.json` as a **warning** (the upload still works, rendering every story); fail the step on a warning if you want affected capture to be a requirement.
+
+If you commit `.storybook/storyshelf.json` (url and slug), the `--url` and `--slug` flags can go, and only the token comes from CI (`STORYSHELF_TOKEN`).
 
 ## GitLab CI
 
@@ -35,7 +47,7 @@ visual:
   variables:
     GIT_DEPTH: 0 # affected capture diffs against history; a shallow clone forces full renders
   script:
-    - npx build-storybook -o storybook-static
+    - npx storybook build -o storybook-static --stats-json # the stats file is what affected capture reads
     - npx storyshelf upload --url "$STORYSHELF_URL" --slug "$STORYSHELF_SLUG" --token "$STORYSHELF_TOKEN" --sha "$CI_COMMIT_SHA" --branch "$CI_COMMIT_REF_NAME"
 ```
 
