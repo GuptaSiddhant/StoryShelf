@@ -29,12 +29,12 @@ export type CrashFailureOutcome =
  */
 export async function failCrashedCapture(
   deps: DispatchDeps,
-  job: { buildId: string; shard?: string | undefined },
+  job: { buildId: string; shard?: string | undefined; jobId?: string | undefined },
   error: string,
 ): Promise<CrashFailureOutcome> {
   const outcome = job.shard
     ? await failShard(deps, job.buildId, job.shard, error)
-    : await failBuild(deps, job.buildId, error);
+    : await failBuild(deps, job.buildId, job.jobId, error);
   if (outcome !== "skipped") {
     deps.logger.error(
       { buildId: job.buildId, shard: job.shard, outcome, error },
@@ -47,8 +47,12 @@ export async function failCrashedCapture(
 async function failBuild(
   deps: DispatchDeps,
   buildId: string,
+  jobId: string | undefined,
   error: string,
 ): Promise<CrashFailureOutcome> {
+  if (jobId !== undefined) {
+    return await failOwnedBuild(deps, buildId, jobId, error);
+  }
   const loaded = await load(deps, buildId);
   if (!loaded || (loaded.build.status !== "capturing" && loaded.build.status !== "pending")) {
     return "skipped";
@@ -57,6 +61,48 @@ async function failBuild(
   await new BuildModel(deps.db, deps.tables).setStatus(buildId, "failed");
   await deps.buildState.request(buildId);
   return "failed";
+}
+
+/**
+ * The build fails only while this job's run owns it (`builds.capture_job_id`). A hook that runs
+ * after the build was reset and queued again names a job the build no longer points at, so the
+ * newer run is left alone; a build no run owns (null) is never failed here.
+ */
+async function failOwnedBuild(
+  deps: DispatchDeps,
+  buildId: string,
+  jobId: string,
+  error: string,
+): Promise<CrashFailureOutcome> {
+  const { applied, build } = await new BuildModel(deps.db, deps.tables).failIfOwnedBy(
+    buildId,
+    jobId,
+  );
+  // A retry of a hook that failed part-way: this job already failed the build, so finish the cleanup.
+  const retry = !applied && build?.status === "failed" && build.captureJobId === jobId;
+  if (!applied && !retry) {
+    deps.logger.info(
+      { buildId, jobId, ownerJobId: build?.captureJobId ?? null, status: build?.status },
+      "crashed capture no longer owns its build; left it alone",
+    );
+    return "skipped";
+  }
+  const closed = await closeRunAttempts(deps, buildId, build, error);
+  if (retry && closed === 0) {
+    return "skipped"; // nothing was left to do: the first pass finished
+  }
+  await deps.buildState.request(buildId);
+  return "failed";
+}
+
+/** Close the attempts that began before the build was failed: a newer run's are left open. */
+async function closeRunAttempts(
+  deps: DispatchDeps,
+  buildId: string,
+  failed: Build | null,
+  error: string,
+): Promise<number> {
+  return await closeOpenAttempts(deps, buildId, error, Date.parse(failed?.updatedAt ?? ""));
 }
 
 async function failShard(
@@ -109,12 +155,16 @@ async function closeOpenAttempts(
   deps: DispatchDeps,
   buildId: string,
   error: string,
-): Promise<void> {
+  startedBefore = Number.POSITIVE_INFINITY,
+): Promise<number> {
   const attempts = new CaptureAttemptModel(deps.db, deps.tables);
   const open = (await attempts.listByBuild(buildId)).filter(
-    (attempt) => attempt.status === "queued" || attempt.status === "running",
+    (attempt) =>
+      (attempt.status === "queued" || attempt.status === "running") &&
+      Date.parse(attempt.createdAt) <= startedBefore,
   );
   await Promise.all(
     open.map(async (attempt) => await attempts.markFinished(attempt.id, "failed", error)),
   );
+  return open.length;
 }

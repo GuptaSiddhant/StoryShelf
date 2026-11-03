@@ -45,6 +45,10 @@
       "description": "Render only impacted stories (default true).",
       "type": "boolean"
     },
+    "buildStats": {
+      "description": "Append --stats-json to the build script when affected capture is on (default true). Set false for a script that rejects the flag.",
+      "type": "boolean"
+    },
     "untraced": {
       "description": "Glob patterns excluded from affected tracing (union with --untraced).",
       "type": "array",

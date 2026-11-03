@@ -20,6 +20,7 @@ jobs:
           fetch-depth: 0 # affected capture diffs against history; a depth of 1 forces full renders
       - name: Build Storybook
         # --stats-json writes preview-stats.json into the output: affected capture reads it
+        # (`storyshelf upload` adds it itself when it runs the build script; a step like this one owns the flag)
         run: npx storybook build -o storybook-static --stats-json
       - name: Upload to StoryShelf
         env:
@@ -50,6 +51,20 @@ visual:
     - npx storybook build -o storybook-static --stats-json # the stats file is what affected capture reads
     - npx storyshelf upload --url "$STORYSHELF_URL" --slug "$STORYSHELF_SLUG" --token "$STORYSHELF_TOKEN" --sha "$CI_COMMIT_SHA" --branch "$CI_COMMIT_REF_NAME"
 ```
+
+## Storybook in a monorepo package
+
+When Storybook lives in a package of the repository (`packages/app`, a workspace), build and upload from that package so affected capture can place the Storybook inside the repository. Keep `fetch-depth: 0` (or `GIT_DEPTH: 0`) on the checkout:
+
+```yaml
+- name: Build and upload
+  working-directory: packages/app
+  run: |
+    npx build-storybook -o storybook-static --stats-json
+    npx storyshelf upload --url "$STORYSHELF_URL" --slug "$STORYSHELF_SLUG" --token "$STORYSHELF_TOKEN"
+```
+
+Changes in the package and in sibling workspace packages it imports both trigger the stories that depend on them. See [Affected capture](/concepts/affected-capture/#storybook-in-a-monorepo-package).
 
 ## Merge gate
 

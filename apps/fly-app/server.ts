@@ -13,9 +13,8 @@ import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-import { createLocalStorage } from "@storyshelf/storage-local";
 /**
- * Fly demo server — local adapters only.
+ * Fly demo server — SQLite on the volume, objects on the volume or in S3-compatible storage.
  *
  * Bundled by rolldown from workspace sources (`rolldown.config.ts`), so it
  * deploys whatever is on `main` with no publish step. `nub run dev` runs this
@@ -23,13 +22,15 @@ import { createLocalStorage } from "@storyshelf/storage-local";
  *
  * Mirrors apps/dev-server/src/server.ts wiring:
  *  - @storyshelf/db-sqlite → {DATA_DIR}/shelf.db
- *  - @storyshelf/storage-local → DATA_DIR
+ *  - @storyshelf/storage-local → DATA_DIR, or @storyshelf/storage-s3 (Tigris) when AWS_BUCKET is set
  *  - @storyshelf/runner-playwright → chrome-headless-shell installed in the image
  *
  * Capture stays in-process: the 1-CPU Fly VM is below the threshold where
  * core would fork a capture child, so a `testing.workerEntry` would never apply.
  */
 import { mkdirSync } from "node:fs";
+import { browsersFor, spriteFromEnv } from "./sprite.ts";
+import { storageFromEnv } from "./storage.ts";
 
 const env = process.env;
 const dataDir = env["DATA_DIR"] ?? "/data";
@@ -79,8 +80,12 @@ const ui = buildUi();
 mkdirSync(dataDir, { recursive: true });
 
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
-const storage = createLocalStorage(dataDir);
+const { storage, log: storageLog } = storageFromEnv(env, dataDir);
+// With FLY_SPRITES_TOKEN and SPRITE_BROWSER_SECRET set, `chromium@sprite` (a hibernating Fly Sprite,
+// apps/fly-app/sprite/) is selectable beside the VM's own Chromium; unset, only the latter.
+const sprite = spriteFromEnv(env);
 const captureRunner = createPlaywrightCaptureRunner({
+  browsers: browsersFor(sprite),
   // Unset: sized from the VM's detected CPU and memory.
   concurrency: Number(env["CAPTURE_CONCURRENCY"]) || undefined,
 });
@@ -88,6 +93,10 @@ const captureRunner = createPlaywrightCaptureRunner({
 // Observability first (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
+// Which storage serves the objects: the origin of the endpoint only, never the bucket or a key.
+shelfLogger.info(storageLog, "object storage");
+// Only whether the Sprite is configured: its token, secret and URL never reach a log.
+shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
 
 // Notifications: SMTP sender from SMTP_* env (undefined keeps invites
 // out-of-band); chat + email providers serve stored channels.

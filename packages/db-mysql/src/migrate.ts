@@ -91,6 +91,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "affected_import_paths", definition: "TEXT" },
   { table: "builds", column: "inherited_count", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "test_results", definition: "TEXT" },
+  { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
   {
@@ -113,6 +114,10 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
 ];
 
+/** A run in flight when `builds.capture_job_id` was added owns the build it was started for. */
+const BUILD_CAPTURE_JOB_BACKFILL =
+  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
+
 const IDENTITY_INDEXES = [
   {
     table: "snapshots",
@@ -130,6 +135,7 @@ const IDENTITY_INDEXES = [
 export async function runMigrations(run: MigrationRunner): Promise<void> {
   await runDdl(run);
   await ensureColumns(run);
+  await run(BUILD_CAPTURE_JOB_BACKFILL);
   await migrateIndexes(run);
   await migrateLegacyColumns(run);
   await ensureForeignKeys(run);

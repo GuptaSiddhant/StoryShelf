@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/mcp",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "StoryShelf MCP server: let AI agents read builds, diffs and AI insights, and comment on reviews.",
   "keywords": [
     "agents",

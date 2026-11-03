@@ -71,6 +71,10 @@ const BUILD_AFFECTED_PATHS_ALTER =
 const BUILD_INHERITED_COUNT_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS inherited_count INTEGER NOT NULL DEFAULT 0";
 const BUILD_TEST_RESULTS_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS test_results TEXT";
+const BUILD_CAPTURE_JOB_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS capture_job_id TEXT";
+/** A run in flight when the column was added owns the build it was started for (idempotent). */
+const BUILD_CAPTURE_JOB_BACKFILL =
+  "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
@@ -205,6 +209,7 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, BUILD_AFFECTED_PATHS_ALTER);
   await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
   await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
+  await execIgnore(run, BUILD_CAPTURE_JOB_ALTER);
 }
 
 /** Run the full migration set through any row-query runner. */
@@ -213,6 +218,8 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
   await migrateCoreColumns(run);
   await migrateUserAuthColumns(run);
   await migrateProjectExtras(run);
+  // Not swallowed: an unfenced build would let a late crash hook fail a newer run.
+  await run(BUILD_CAPTURE_JOB_BACKFILL);
   await applyIdentityStatements(run);
   await migrateCommentsTable(run);
   await migrateNotificationColumns(run);

@@ -4,8 +4,9 @@
  * One table holds two kinds of row, told apart by `entry`:
  *
  * - a **job** row (`id` = job id, `jobId` = its own id) carries delivery state: `status` is
- *   `queued | running | done | failed | cancelled`, `attempt` counts the attempts started so far,
- *   and `visibleAt` is when a queued job may next be claimed;
+ *   `queued | running | exhausting | done | failed | cancelled`, `attempt` counts the attempts
+ *   started so far (an `exhausting` job counts its exhausted-job hook runs too, numbered after the
+ *   last allowed attempt), and `visibleAt` is when a queued job may next be claimed;
  * - an **attempt** row (`id` = `<jobId>:<attempt>`) is one claim of a job, created by a unique-key
  *   insert. It holds the `owner`, the lease expiry (in `visibleAt`) and, once over, its outcome:
  *   `status` is `running | done | failed | expired`.
@@ -21,7 +22,13 @@ export type CaptureJobEntry = "job" | "attempt";
 export type CaptureJobKind = "capture" | "publish" | "notify";
 
 /** Lifecycle of a job row. */
-export type CaptureJobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
+export type CaptureJobStatus =
+  | "queued"
+  | "running"
+  | "exhausting"
+  | "done"
+  | "failed"
+  | "cancelled";
 
 /** Lifecycle of an attempt row; `expired` is a lease another instance took over. */
 export type CaptureAttemptStatus = "running" | "done" | "failed" | "expired";

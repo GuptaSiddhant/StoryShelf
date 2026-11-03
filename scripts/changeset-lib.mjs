@@ -1,7 +1,8 @@
 /**
- * Pure helpers for the release flow (ADR 0043): reading pending changesets, rendering them into the
- * root CHANGELOG.md, and deciding whether a pull request needs a changeset. No I/O except
- * `listPending`; the CLIs (`version-packages.mjs`, `changeset-check.mjs`) call these.
+ * Pure helpers for the release flow (ADR 0043): reading pending changesets, choosing and writing the
+ * next version, rendering the root CHANGELOG.md, writing a new changeset file, and deciding whether a
+ * pull request needs a changeset (or is a release). No I/O except `listPending`; the CLIs
+ * (`version-packages.mjs`, `changeset-add.mjs`, `changeset-check.mjs`) call these.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -87,6 +88,145 @@ export function renderEntries(changesets) {
     .toSorted((a, b) => rank(a) - rank(b) || a.file.localeCompare(b.file))
     .map((changeset) => changeset.body)
     .filter((body) => body !== "");
+}
+
+/**
+ * The largest bump over all the changesets (every package moves by it: they share one version).
+ *
+ * @param {ReturnType<typeof parseChangeset>[]} changesets Pending changesets.
+ * @returns {"major" | "minor" | "patch"} The bump to apply.
+ */
+export function highestBump(changesets) {
+  const largest = Math.min(...changesets.map((changeset) => rank(changeset)));
+  return BUMPS[largest] ?? "patch";
+}
+
+/**
+ * Apply a bump to a plain `major.minor.patch` version (a minor bump of 0.8.0 is 0.9.0, a major one 1.0.0).
+ *
+ * @param {string} version The shared version.
+ * @param {string} bump `major`, `minor` or `patch`.
+ * @returns {string} The next version.
+ */
+export function bumpVersion(version, bump) {
+  const match = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$/u.exec(version);
+  if (!match?.groups || !BUMPS.includes(bump)) {
+    throw new Error(`cannot apply a ${bump} bump to version "${version}" (want major.minor.patch)`);
+  }
+  const [major, minor, patch] = [match.groups.major, match.groups.minor, match.groups.patch].map(
+    Number,
+  );
+  if (bump === "major") {
+    return `${major + 1}.0.0`;
+  }
+  return bump === "minor" ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
+}
+
+/**
+ * The package names changesets release that are not published packages of the repository.
+ *
+ * @param {ReturnType<typeof parseChangeset>[]} changesets Pending changesets.
+ * @param {Iterable<string>} known Names of the published packages.
+ * @returns {string[]} One message per unknown name (empty when every name is known).
+ */
+export function unknownReleases(changesets, known) {
+  const names = new Set(known);
+  return changesets.flatMap((changeset) =>
+    changeset.releases
+      .filter((release) => !names.has(release.name))
+      .map(
+        (release) =>
+          `${changeset.file}: unknown package "${release.name}" (known: ${[...names].toSorted().join(", ")})`,
+      ),
+  );
+}
+
+/** The body a new changeset starts with when no message is given: CI rejects a changeset that keeps it. */
+export const PLACEHOLDER_BODY =
+  "Describe what a user sees, starting with a bold lead (**Fixed: …**, **Added: …**, **Changed: …** or **Breaking: …**) and the issue numbers.";
+
+/**
+ * The text of a new changeset file.
+ *
+ * @param {object} input What the changeset says.
+ * @param {string[]} input.packages Package names it releases.
+ * @param {string} input.bump `major`, `minor` or `patch`.
+ * @param {string} [input.message] The CHANGELOG entry (the placeholder when absent).
+ * @returns {string} The file contents.
+ */
+export function renderChangeset({ packages, bump, message }) {
+  if (!BUMPS.includes(bump)) {
+    throw new Error(`unknown bump "${bump}" (want ${BUMPS.join(", ")})`);
+  }
+  if (packages.length === 0) {
+    throw new Error("a changeset names at least one package");
+  }
+  const lines = packages.map((name) => `"${name}": ${bump}`);
+  const body = message?.trim() ? message.trim() : PLACEHOLDER_BODY;
+  return `---\n${lines.join("\n")}\n---\n\n${body}\n`;
+}
+
+const WORDS = {
+  adjectives: [
+    "brave",
+    "calm",
+    "eager",
+    "fair",
+    "gentle",
+    "happy",
+    "kind",
+    "lucky",
+    "proud",
+    "quiet",
+    "silly",
+    "witty",
+  ],
+  nouns: [
+    "apples",
+    "bears",
+    "clouds",
+    "dogs",
+    "eagles",
+    "foxes",
+    "geese",
+    "hills",
+    "lions",
+    "moons",
+    "otters",
+    "pandas",
+  ],
+  verbs: [
+    "dance",
+    "glow",
+    "hum",
+    "jump",
+    "laugh",
+    "listen",
+    "run",
+    "shine",
+    "sing",
+    "sleep",
+    "smile",
+    "wave",
+  ],
+};
+
+/**
+ * A new changeset file name made of three words (`brave-otters-sing`), free of `taken` ones.
+ *
+ * @param {(max: number) => number} random Returns an integer in `[0, max)`.
+ * @param {(name: string) => boolean} taken Whether a file of that name already exists.
+ * @returns {string} A name without the `.md` extension.
+ */
+export function changesetName(random, taken) {
+  const pick = (list) => list[random(list.length)];
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const name = `${pick(WORDS.adjectives)}-${pick(WORDS.nouns)}-${pick(WORDS.verbs)}`;
+    if (!taken(name)) {
+      return name;
+    }
+  }
+  throw new Error("could not find a free changeset name");
 }
 
 /**
@@ -184,7 +324,10 @@ export function malformedChangesets(added, read) {
   const problems = [];
   for (const path of added.filter((entry) => CHANGESET_FILE.test(entry))) {
     try {
-      parseChangeset(read(path), path);
+      const parsed = parseChangeset(read(path), path);
+      if (parsed.body === PLACEHOLDER_BODY) {
+        problems.push(`${path}: replace the placeholder text with the CHANGELOG entry`);
+      }
     } catch (error) {
       problems.push(error.message);
     }
@@ -222,4 +365,66 @@ export function checkChangeset({ changed, added, labels, isPublished }) {
     ok: false,
     reason: `changes shipped source (${shipped.slice(0, 5).join(", ")}${shipped.length > 5 ? ", …" : ""}) without a changeset`,
   };
+}
+
+const RELEASE_BRANCH = /^release\/v(?<version>\d+\.\d+\.\d+)$/u;
+
+/**
+ * The version a release branch names.
+ *
+ * @param {string | undefined} headRef The pull request's head branch.
+ * @returns {string | null} `1.2.3` for `release/v1.2.3`, else null.
+ */
+export function releaseBranchVersion(headRef) {
+  return RELEASE_BRANCH.exec(headRef ?? "")?.groups?.version ?? null;
+}
+
+/** Why a changed manifest is not a pure version bump to `version`, or null when it is one. */
+function manifestProblem(path, version, base, head) {
+  let before;
+  let after;
+  try {
+    before = JSON.parse(base ?? "");
+    after = JSON.parse(head ?? "");
+  } catch {
+    return `${path} cannot be read on both sides`;
+  }
+  if (after.version !== version) {
+    return `${path} is at ${after.version}, not ${version}`;
+  }
+  return JSON.stringify({ ...before, version }) === JSON.stringify(after)
+    ? null
+    : `${path} changes more than its version`;
+}
+
+/**
+ * What a release pull request (branch `release/v<version>`) may change: the `version` of package
+ * manifests, `CHANGELOG.md`, and the changesets it consumes (deleted). Anything else is a problem,
+ * so the branch name cannot be used to skip the changeset check.
+ *
+ * @param {object} input The pull request.
+ * @param {string} input.version The version the branch names.
+ * @param {{ status: string, path: string }[]} input.entries Changed paths with their git status letter.
+ * @param {(path: string) => string | null} input.readBase A file at the base (null when absent).
+ * @param {(path: string) => string | null} input.readHead A file at the head (null when absent).
+ * @returns {string[]} One message per problem (empty for a valid release pull request).
+ */
+export function releaseProblems({ version, entries, readBase, readHead }) {
+  return entries
+    .map(({ status, path }) => entryProblem({ status, path, version, readBase, readHead }))
+    .filter((problem) => problem !== null);
+}
+
+/** Why one changed path is not part of a release, or null when it is. */
+function entryProblem({ status, path, version, readBase, readHead }) {
+  if (path === "CHANGELOG.md") {
+    return null;
+  }
+  if (CHANGESET_FILE.test(path)) {
+    return status === "D" ? null : `${path} must be deleted by a release, not changed`;
+  }
+  if (PACKAGE_MANIFEST.test(path)) {
+    return manifestProblem(path, version, readBase(path), readHead(path));
+  }
+  return `${path} is not part of a release`;
 }

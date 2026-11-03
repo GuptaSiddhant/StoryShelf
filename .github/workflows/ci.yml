@@ -231,7 +231,8 @@ jobs:
       - name: Require a changeset for shipped changes
         env:
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: node scripts/changeset-check.mjs --labels "$LABELS"
+          HEAD_REF: ${{ github.head_ref }}
+        run: node scripts/changeset-check.mjs --labels "$LABELS" --head-ref "$HEAD_REF"
 
   ci:
     name: ci

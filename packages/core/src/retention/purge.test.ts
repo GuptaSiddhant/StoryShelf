@@ -375,6 +375,8 @@ describe("Retention and the database queue", () => {
     await queue.enqueue({ buildId: "b-new" });
     const running = await queue.poll();
     expect(running).not.toBeNull();
+    // Queueing a build stamps it (and so touches it); put its age back before the purge.
+    await db.update(db.tables.builds, "b-old", { updatedAt: new Date(old).toISOString() });
 
     const retention = new Retention(db, storage, retentionTables(db));
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
