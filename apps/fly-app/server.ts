@@ -29,6 +29,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * core would fork a capture child, so a `testing.workerEntry` would never apply.
  */
 import { mkdirSync } from "node:fs";
+import { aiFromEnv, aiLogFields } from "./ai.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
@@ -90,6 +91,10 @@ const captureRunner = createPlaywrightCaptureRunner({
   concurrency: Number(env["CAPTURE_CONCURRENCY"]) || undefined,
 });
 
+// AI insights (ADR 0016) only with ANTHROPIC_API_KEY set: text only, Haiku, a small daily budget.
+// Unset, no `ai` is passed and the app answers `501 ai-disabled` with no AI UI, as before.
+const ai = aiFromEnv(env);
+
 // Observability first (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
@@ -97,6 +102,8 @@ const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 shelfLogger.info(storageLog, "object storage");
 // Only whether the Sprite is configured: its token, secret and URL never reach a log.
 shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
+// Only the model in use (null while AI is off): the Anthropic key never reaches a log.
+shelfLogger.info(aiLogFields(ai), "ai insights");
 
 // Notifications: SMTP sender from SMTP_* env (undefined keeps invites
 // out-of-band); chat + email providers serve stored channels.
@@ -110,6 +117,7 @@ const app = createShelfApp({
   storage,
   testing: { runner: captureRunner },
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
+  ai,
   notifications: {
     notifiers: [...chatNotifiers, ...emailNotifiers],
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),

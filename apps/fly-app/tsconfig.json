@@ -6,6 +6,9 @@
   },
   "include": [
     "server.ts",
+    "ai.ts",
+    "ai.test.ts",
+    "vitest.config.ts",
     "sprite.ts",
     "sprite.test.ts",
     "storage.ts",
