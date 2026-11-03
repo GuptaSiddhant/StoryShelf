@@ -275,6 +275,7 @@ describe("runMigrations: builds.capture_job_id", () => {
         ('none', 'p', 'c', 'main', 'pending', now(), now()),
         ('cancelled', 'p', 'e', 'main', 'pending', now(), now()),
         ('tie', 'p', 'f', 'main', 'pending', now(), now()),
+        ('many', 'p', 'g', 'main', 'pending', now(), now()),
         ('done', 'p', 'd', 'main', 'passed', now(), now());
       INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, shard_id, status, created_at, updated_at) VALUES
         ('j1', 'job', 'j1', 'capture', 'run', NULL, 'running', '2026-01-01', '2026-01-01'),
@@ -286,7 +287,9 @@ describe("runMigrations: builds.capture_job_id", () => {
         ('j5', 'job', 'j5', 'capture', 'cancelled', NULL, 'running', '2026-01-01', '2026-01-01');
       INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, shard_id, status, created_at, updated_at) VALUES
         ('t1', 'job', 't1', 'capture', 'tie', NULL, 'queued', '2026-01-05', '2026-01-05'),
-        ('t2', 'job', 't2', 'capture', 'tie', NULL, 'queued', '2026-01-05', '2026-01-05');
+        ('t2', 'job', 't2', 'capture', 'tie', NULL, 'queued', '2026-01-05', '2026-01-05'),
+        ('m1', 'job', 'm1', 'capture', 'many', NULL, 'queued', '2026-01-01', '2026-01-01'),
+        ('m2', 'job', 'm2', 'capture', 'many', NULL, 'queued', '2026-01-09', '2026-01-09');
       UPDATE capture_jobs SET cancel_requested_at = now() WHERE id = 'j5';
       ALTER TABLE builds DROP COLUMN capture_job_id;
     `);
@@ -300,6 +303,7 @@ describe("runMigrations: builds.capture_job_id", () => {
     expect(rows.rows).toEqual([
       { id: "cancelled", capture_job_id: null },
       { id: "done", capture_job_id: null },
+      { id: "many", capture_job_id: null },
       { id: "none", capture_job_id: null },
       { id: "old", capture_job_id: "j3" },
       { id: "run", capture_job_id: "j1" },

@@ -481,6 +481,7 @@ describe("createSqliteDatabase", () => {
           ('old', 'p', 'b', 'main', 'pending', 't', 't'),
           ('none', 'p', 'c', 'main', 'pending', 't', 't'),
           ('tie', 'p', 'e', 'main', 'pending', 't', 't'),
+          ('many', 'p', 'f', 'main', 'pending', 't', 't'),
           ('done', 'p', 'd', 'main', 'passed', 't', 't');
         INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, shard_id, status, created_at, updated_at) VALUES
           ('j1', 'job', 'j1', 'capture', 'run', NULL, 'running', '2026-01-01', 't'),
@@ -490,7 +491,9 @@ describe("createSqliteDatabase", () => {
           ('s1', 'job', 's1', 'capture', 'run', 'shard', 'queued', '2026-01-03', 't'),
           ('j4', 'job', 'j4', 'capture', 'done', NULL, 'queued', '2026-01-01', 't'),
           ('t1', 'job', 't1', 'capture', 'tie', NULL, 'queued', '2026-01-05', 't'),
-          ('t2', 'job', 't2', 'capture', 'tie', NULL, 'queued', '2026-01-05', 't');
+          ('t2', 'job', 't2', 'capture', 'tie', NULL, 'queued', '2026-01-05', 't'),
+          ('m1', 'job', 'm1', 'capture', 'many', NULL, 'queued', '2026-01-01', 't'),
+          ('m2', 'job', 'm2', 'capture', 'many', NULL, 'queued', '2026-01-09', 't');
         ALTER TABLE builds DROP COLUMN capture_job_id;
       `);
       raw.close();
@@ -500,7 +503,14 @@ describe("createSqliteDatabase", () => {
 
       const rows = (await db.list(schema.builds)) as { id: string; captureJobId: string | null }[];
       const owners = Object.fromEntries(rows.map((row) => [row.id, row.captureJobId]));
-      expect(owners).toEqual({ run: "j1", old: "j3", none: null, tie: null, done: null });
+      expect(owners).toEqual({
+        run: "j1",
+        old: "j3",
+        none: null,
+        tie: null,
+        many: null,
+        done: null,
+      });
       await closeDb(db);
     } finally {
       rmSync(dir, { recursive: true, force: true });

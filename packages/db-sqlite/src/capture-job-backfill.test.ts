@@ -10,11 +10,14 @@ function database(): DatabaseSync {
     INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
     INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES
       ('one', 'p', 'a', 'main', 'capturing', 't', 't'),
-      ('tie', 'p', 'b', 'main', 'pending', 't', 't');
+      ('tie', 'p', 'b', 'main', 'pending', 't', 't'),
+      ('many', 'p', 'c', 'main', 'pending', 't', 't');
     INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, status, created_at, updated_at) VALUES
       ('j1', 'job', 'j1', 'capture', 'one', 'running', '2026-01-01', 't'),
       ('t1', 'job', 't1', 'capture', 'tie', 'queued', '2026-01-02', 't'),
-      ('t2', 'job', 't2', 'capture', 'tie', 'queued', '2026-01-02', 't');
+      ('t2', 'job', 't2', 'capture', 'tie', 'queued', '2026-01-02', 't'),
+      ('m1', 'job', 'm1', 'capture', 'many', 'queued', '2026-01-01', 't'),
+      ('m2', 'job', 'm2', 'capture', 'many', 'queued', '2026-01-09', 't');
   `);
   return sqlite;
 }
@@ -28,10 +31,10 @@ function owners(sqlite: DatabaseSync): Record<string, unknown> {
 }
 
 describe("CAPTURE_JOB_BACKFILL", () => {
-  it("owns a build by its single newest job and leaves a tie unowned", () => {
+  it("owns a build only when exactly one eligible job belongs to it", () => {
     const sqlite = database();
     sqlite.exec(CAPTURE_JOB_BACKFILL);
-    expect(owners(sqlite)).toEqual({ one: "j1", tie: null });
+    expect(owners(sqlite)).toEqual({ one: "j1", tie: null, many: null });
   });
 
   it("is idempotent and never overwrites an owner", () => {
@@ -39,6 +42,6 @@ describe("CAPTURE_JOB_BACKFILL", () => {
     sqlite.exec(CAPTURE_JOB_BACKFILL);
     sqlite.exec("UPDATE builds SET capture_job_id = 'kept' WHERE id = 'one'");
     sqlite.exec(CAPTURE_JOB_BACKFILL);
-    expect(owners(sqlite)).toEqual({ one: "kept", tie: null });
+    expect(owners(sqlite)).toEqual({ one: "kept", tie: null, many: null });
   });
 });
