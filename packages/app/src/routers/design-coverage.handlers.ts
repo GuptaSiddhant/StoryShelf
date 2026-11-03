@@ -9,7 +9,7 @@ import {
   resolveDesigns,
   type DesignDrift,
 } from "@storyshelf/core/models";
-import type { Build, DesignNode, Project, Snapshot } from "@storyshelf/core/schema";
+import type { Baseline, Build, DesignNode, Project, Snapshot } from "@storyshelf/core/schema";
 import { credentialKeys } from "../credential-keys.ts";
 import type {
   CoverageComponent,
@@ -81,17 +81,27 @@ async function approvedVersions(
   project: Project,
   entries: readonly CatalogEntry[],
 ): Promise<Map<string, string>> {
-  const oldest = new Map<string, string>();
-  if (!testingEnabled()) return oldest;
+  if (!testingEnabled()) return new Map();
+  const baselines = await new BaselineModel(getStore().db).list(project.id);
+  return oldestPerFile(
+    baselines.filter((baseline) => baseline.branch === project.gitDefaultBranch),
+    entries,
+  );
+}
+
+/** The oldest `updatedAt` of the given baselines, by the normalized story file of their story. */
+function oldestPerFile(
+  baselines: readonly Baseline[],
+  entries: readonly CatalogEntry[],
+): Map<string, string> {
   const fileOf = new Map(
     entries.map((entry) => [entry.id, normalizeImportPath(entry.importPath)] as const),
   );
-  const baselines = await new BaselineModel(getStore().db).list(project.id);
+  const oldest = new Map<string, string>();
   for (const baseline of baselines) {
     const key = fileOf.get(baseline.storyId);
-    if (!key || baseline.branch !== project.gitDefaultBranch) continue;
-    const known = oldest.get(key);
-    if (known === undefined || Date.parse(baseline.updatedAt) < Date.parse(known)) {
+    const known = key === undefined ? undefined : oldest.get(key);
+    if (key !== undefined && (known === undefined || baseline.updatedAt < known)) {
       oldest.set(key, baseline.updatedAt);
     }
   }
