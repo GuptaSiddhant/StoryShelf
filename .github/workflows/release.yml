@@ -1,35 +1,26 @@
 name: Release
 
 # All npm publishing lives in THIS file: the npm trusted publisher of every package is registered
-# to this workflow file name (ADR 0043). Three ways in:
+# to this workflow file name (ADR 0043). A run picks one channel (`detect`):
 #
-# - push to `main`: when changesets are pending, publish a throwaway `x.y.z-next-<sha>` build of
-#   every package to npm under the `next` dist-tag. No pending changeset publishes nothing. The
-#   snapshot version is never committed.
-# - `workflow_dispatch` (confirm: release): a stable release. One run versions from the pending
-#   changesets, commits `chore(release): v<version>` to `main`, tags it, pushes both, then
-#   publishes to `latest` (npm and JSR) and creates the GitHub Release. `dry_run` does everything
-#   except pushing and publishing. A tag pushed with the default token does not start another
-#   workflow, which is why the publish jobs run in the same run.
-# - push of a `v*` tag: the emergency path (a release cut from a workstation with
-#   `nub ./scripts/release.mjs`, then `git push --follow-tags`).
+# - stable: a push to `main` whose shared version has no `v<version>` tag yet, which is what merging a
+#   release pull request (`nub run release:prepare`) produces. Validate, publish `latest` to npm and
+#   JSR, create tag `v<version>`, create the GitHub Release.
+# - next: any other push to `main` while changesets are pending. A throwaway `x.y.z-next-<sha>`
+#   build of every package goes to npm under the `next` dist-tag; the version is never committed.
+# - none: nothing to publish.
+#
+# `workflow_dispatch` (input: version) re-runs the stable path for the version already on `main`
+# after a failed publish. Pushing a tag starts nothing.
 on:
   push:
     branches: [main]
-    tags:
-      - "v*.*.*"
-      - "v*.*.*-*"
   workflow_dispatch:
     inputs:
-      confirm:
-        description: 'Type "release" to cut a stable release from the pending changesets'
+      version:
+        description: "Stable version already on main whose publish failed (for example 0.9.0)"
         required: true
         type: string
-      dry_run:
-        description: "Version, build and npm publish --dry-run only: push and publish nothing"
-        required: true
-        type: boolean
-        default: true
 
 # Read-only by default; each job that writes or publishes states what it needs.
 permissions:
@@ -40,33 +31,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ---------------------------------------------------------------------------------------------
-  # `next` channel (push to main)
-  # ---------------------------------------------------------------------------------------------
-
-  # Cheap gate: are there changesets to release? Needs no install (the script has no dependencies).
-  pending:
-    name: pending changesets
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  # Which channel is this run for? Cheap and dependency-free; also the guard for a manual re-run.
+  detect:
+    name: detect channel
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      count: ${{ steps.count.outputs.pending }}
+      channel: ${{ steps.detect.outputs.channel }}
+      version: ${{ steps.detect.outputs.version }}
+      tag: ${{ steps.detect.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          fetch-depth: 0 # tags decide whether this version was released
           persist-credentials: false
 
-      - name: Count pending changesets
-        id: count
-        run: node scripts/version-packages.mjs --pending
+      - name: Detect
+        id: detect
+        env:
+          EVENT: ${{ github.event_name }}
+          REQUESTED: ${{ inputs.version }}
+        run: node scripts/release-detect.mjs "$EVENT" "$REQUESTED"
+
+  # ---------------------------------------------------------------------------------------------
+  # `next` channel
+  # ---------------------------------------------------------------------------------------------
 
   next:
     name: publish next
-    needs: [pending]
-    if: needs.pending.outputs.count != '0'
+    needs: [detect]
+    if: needs.detect.outputs.channel == 'next'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -105,120 +102,36 @@ jobs:
         run: node scripts/publish-npm.mjs "${{ steps.guard.outputs.version }}" next
 
   # ---------------------------------------------------------------------------------------------
-  # Stable channel (manual)
+  # Stable channel (a merged release pull request)
   # ---------------------------------------------------------------------------------------------
 
-  # Version from the pending changesets, commit and tag on main, push both.
-  prepare:
-    name: prepare stable release
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # the release commit and tag are pushed with this token
-    outputs:
-      tag: ${{ steps.cut.outputs.tag }}
-    steps:
-      - name: Guard
-        env:
-          CONFIRM: ${{ inputs.confirm }}
-        run: |
-          if [ "$CONFIRM" != "release" ]; then
-            echo "::error::confirm must be exactly: release"
-            exit 1
-          fi
-          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
-            echo "::error::a stable release is cut from main, not ${GITHUB_REF}"
-            exit 1
-          fi
-
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Setup Nub
-        uses: nubjs/setup-nub@v0
-
-      - name: Install dependencies
-        run: nub ci
-
-      - name: Version, commit and tag
-        id: cut
-        env:
-          DRY_RUN: ${{ inputs.dry_run }}
-          # One test task at a time, as in CI's verify job: a small runner times out otherwise.
-          TURBO_CONCURRENCY: "1"
-        run: |
-          set -e
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # release.mjs verifies this exact tree first (turbo verify), then versions, commits, tags
-          # and runs `nub publish -r --dry-run`. A run is never cut from an unverified commit, even
-          # if CI on main is red or still pending.
-          if [ "$DRY_RUN" = "true" ]; then
-            node scripts/release.mjs --dry-run
-            exit 0
-          fi
-          node scripts/release.mjs
-          VERSION=$(node -p "require('./packages/core/package.json').version")
-          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Push the release commit and tag
-        if: ${{ !inputs.dry_run }}
-        env:
-          TAG: ${{ steps.cut.outputs.tag }}
-        run: |
-          set -e
-          # One atomic push: the commit and the tag both land or neither does, so a failure cannot
-          # leave main with a release commit, consumed changesets and no tag. If main moved while
-          # this ran, the push is refused and nothing is published.
-          git push --atomic origin HEAD:main "refs/tags/${TAG}"
-
-  # ---------------------------------------------------------------------------------------------
-  # Publishing a tag (the manual release above, or an emergency tag push)
-  # ---------------------------------------------------------------------------------------------
-
-  # Version gate: single source of truth. Both publishers depend on this job
-  # (not on each other), so a bad tag/tree fails fast before either registry
-  # is touched — while npm and JSR still never block each other.
+  # Version gate: single source of truth. Both publishers depend on this job (not on each other),
+  # so a bad tree fails fast before either registry is touched, while npm and JSR never block each
+  # other.
   validate:
-    if: >-
-      ${{ !cancelled() && (
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
-        (github.event_name == 'workflow_dispatch' && needs.prepare.result == 'success' && needs.prepare.outputs.tag != '')
-      ) }}
-    needs: [prepare]
+    name: validate release
+    needs: [detect]
+    if: needs.detect.outputs.channel == 'stable'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      tag: ${{ steps.guard.outputs.tag }}
       version: ${{ steps.guard.outputs.version }}
       dist_tag: ${{ steps.guard.outputs.dist_tag }}
     steps:
-      - name: Resolve the tag
-        id: tag
-        env:
-          PREPARED: ${{ needs.prepare.outputs.tag }}
-        run: echo "name=${PREPARED:-${GITHUB_REF_NAME}}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ steps.tag.outputs.name }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Guard tag and fixed versions
+      - name: Guard the fixed versions
         id: guard
         env:
-          # A tag name is user-controlled text: through the environment, never inline in the script.
-          TAG: ${{ steps.tag.outputs.name }}
-        run: |
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          node scripts/release-validate.mjs "${TAG}"
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: node scripts/release-validate.mjs "$TAG"
 
-  # npm publish. Depends on validate, independent of JSR: a failure here
-  # never blocks publish-jsr, and is never blocked by it.
+  # npm publish. Skips versions already on npm, so a re-run resumes.
   publish-npm:
     needs: [validate]
     runs-on: ubuntu-latest
@@ -229,8 +142,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.validate.outputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
@@ -244,57 +157,69 @@ jobs:
         run: nub ci
 
       - name: Build packages
-        # Not strictly required — prepublishOnly runs build — but fail-fast before provenance.
+        # Not strictly required (prepublishOnly runs build), but fail-fast before provenance.
         run: nub run build --filter='./packages/*'
 
       - name: Rewrite workspace protocol for npm manifest
-        # Plain npm publish ships dependencies verbatim, so workspace:*
-        # must become caret ranges. Repo files keep workspace:*; only this
-        # CI working tree is rewritten.
+        # Plain npm publish ships dependencies verbatim, so workspace:* must become caret ranges.
+        # Repo files keep workspace:*; only this CI working tree is rewritten.
         run: node scripts/rewrite-workspace-protocol.mjs
 
       - name: Publish to npm (trusted / provenance)
-        # OIDC trusted publishing: npm exchanges the workflow OIDC token
-        # automatically — no NODE_AUTH_TOKEN. Requires a trusted publisher
-        # configured per package on npmjs.com (one-time).
+        # OIDC trusted publishing: npm exchanges the workflow OIDC token automatically, no
+        # NODE_AUTH_TOKEN. Requires a trusted publisher per package on npmjs.com (one-time).
         run: node scripts/publish-npm.mjs "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.dist_tag }}"
 
-  # GitHub Release. Runs only after a successful npm publish (same semantics
-  # as when these steps lived at the tail of publish-npm); JSR outcome can't
-  # affect it. Needs no toolchain — just git history and the tag.
+  # The tag and the GitHub Release. They follow a successful npm publish, and the tag is what marks
+  # the version released: until it exists, every push to main (and a manual re-run) retries the
+  # stable path. A JSR failure does not hold them back. Both steps tolerate "already exists".
   github-release:
+    name: tag and GitHub Release
+    needs: [detect, validate, publish-npm]
     runs-on: ubuntu-latest
-    needs: [validate, publish-npm]
     permissions:
-      contents: write
+      contents: write # create the tag through the API and the release
     env:
-      RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.detect.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.validate.outputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Generate release notes
-        id: log
-        # CHANGELOG.md is the source of truth (minor releases roll up the previous
-        # minor line); fall back to the git log when the tag has no section.
+      - name: Create the tag through the API
         run: |
           set -e
-          TAG="${RELEASE_TAG}"
-          if node scripts/release-notes.mjs "$TAG" > release-body.md; then
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq .object.sha 2>/dev/null || true)
+          if [ -z "$existing" ]; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${RELEASE_TAG}" -f sha="${GITHUB_SHA}"
+            echo "created ${RELEASE_TAG} at ${GITHUB_SHA}"
+          elif [ "$existing" = "$GITHUB_SHA" ]; then
+            echo "${RELEASE_TAG} already exists at this commit"
+          else
+            echo "::notice::${RELEASE_TAG} already exists at ${existing}; keeping it"
+          fi
+
+      - name: Generate release notes
+        # CHANGELOG.md is the source of truth (minor releases roll up the previous minor line);
+        # fall back to the git log when the tag has no section.
+        run: |
+          set -e
+          if node scripts/release-notes.mjs "$RELEASE_TAG" > release-body.md; then
             echo "notes from CHANGELOG.md"
           else
-            PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-            echo "no changelog section; git log fallback prev=$PREV_TAG current=$TAG"
+            PREV_TAG=$(git describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || echo "")
+            echo "no changelog section; git log fallback prev=$PREV_TAG current=$RELEASE_TAG"
             if [ -z "$PREV_TAG" ]; then
               LOG=$(git log --pretty='- %s (%h)' --no-merges)
             else
-              LOG=$(git log "$PREV_TAG..HEAD" --pretty='- %s (%h)' --no-merges)
+              LOG=$(git log "$PREV_TAG..${RELEASE_TAG}" --pretty='- %s (%h)' --no-merges)
             fi
             {
-              echo "## $TAG"
+              echo "## $RELEASE_TAG"
               echo ""
               echo "$LOG"
             } > release-body.md
@@ -302,27 +227,28 @@ jobs:
           cat release-body.md
 
       - name: Create GitHub Release
+        # Updates the release when a re-run finds it.
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.validate.outputs.tag }}
+          tag_name: ${{ needs.detect.outputs.tag }}
           body_path: release-body.md
           generate_release_notes: false
 
-  # JSR publish. Depends on validate, independent of npm: `continue-on-error`
-  # means a failure here never fails the workflow or blocks publish-npm.
+  # JSR publish. Depends on validate, independent of npm: `continue-on-error` means a failure here
+  # never fails the workflow or blocks publish-npm. A re-run publishes only what JSR lacks.
   publish-jsr:
     needs: [validate]
     runs-on: ubuntu-latest
     continue-on-error: true
     permissions:
       contents: read
-      id-token: write # OIDC — JSR authenticates publish + attaches provenance, no token
+      id-token: write # OIDC: JSR authenticates publish + attaches provenance, no token
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.validate.outputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
@@ -343,7 +269,7 @@ jobs:
         run: node scripts/rewrite-workspace-protocol.mjs
 
       - name: "Publish to JSR (dependency order: core first)"
-        # deno publish directly (no npx jsr wrapper): the wrapper re-downloads
-        # itself and its deno binary per package (~5 min each). Pinned deno
-        # via Setup Deno above makes every package publish in seconds.
+        # deno publish directly (no npx jsr wrapper): the wrapper re-downloads itself and its deno
+        # binary per package (~5 min each). Pinned deno via Setup Deno makes every package publish
+        # in seconds.
         run: node scripts/publish-jsr.mjs

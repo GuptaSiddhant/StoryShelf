@@ -225,7 +225,7 @@ jobs:
           fetch-depth: 2
 
       - name: Test the changeset helpers
-        run: node --test scripts/changeset-lib.test.mjs
+        run: node --test scripts/changeset-lib.test.mjs scripts/release-detect.test.mjs
 
       - name: Require a changeset for shipped changes
         env:
