@@ -1,6 +1,6 @@
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
-import { connect, type AddressInfo, type Socket } from "node:net";
+import { connect, Socket, type AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 // @ts-expect-error -- plain ES module run by the Sprite itself, with no type declarations
 import { createProxy, MIN_SECRET_LENGTH, secretMatches } from "./proxy.mjs";
@@ -196,6 +196,15 @@ describe("the browser proxy", () => {
 
   it("drops a 503'd upgrade's socket even when the client never hangs up", async () => {
     await expectSocketDropped({ "x-storyshelf-secret": SECRET }, await closedPort(), "503");
+  });
+
+  it("survives a client reset while the 401 is being written", () => {
+    const server: Server = createProxy({ secret: SECRET, upstreamPort: 1 });
+    const socket = new Socket();
+    socket.write = (() => true) as Socket["write"];
+    socket.destroySoon = () => {};
+    server.emit("upgrade", { headers: {} }, socket, Buffer.alloc(0));
+    expect(() => socket.emit("error", new Error("read ECONNRESET"))).not.toThrow();
   });
 
   it("reports 503 while the Playwright server is not up yet", async () => {

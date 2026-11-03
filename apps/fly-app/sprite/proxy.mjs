@@ -67,6 +67,8 @@ export function createProxy(options) {
  * half-closes: a client that never sends FIN would keep the descriptor open for ever.
  */
 function refuse(socket, status) {
+  // An upgraded socket has no error handler of its own: a client reset mid-write must not crash the proxy.
+  socket.on("error", () => {});
   socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
   socket.destroySoon();
 }
