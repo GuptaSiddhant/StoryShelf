@@ -138,7 +138,7 @@ middleware calls light up through the native bridge with no SDK init.
 
 > **Amendment (2026-11-03, #482):** Deno and JSR support was removed. `initObservabilityFromEnv` no
 > longer detects Deno and `OTEL_DENO` is no longer read; the JSR mentions in this ADR no longer apply.
-> The split entrypoint stays: the root remains `@opentelemetry/api` only, for non-Node bundlers.
+> The split entrypoint stays and the exports map is unchanged.
 
 ### 12. Metrics catalog (bounded cardinality)
 
