@@ -26,10 +26,10 @@ semantics.
 - A **queue** in the app is a consumer over a set of kinds with its own retry limit, built by
   `createJobQueue(options, kinds, maxRetries)` in `packages/app/src/jobs-setup.ts`. Today:
 
-| Queue | Kinds | Retry limit | Where |
-| --- | --- | --- | --- |
-| Main | `capture` (when `testing.runner` is set), `publish` (long-running host) | `testing.retries` (default 2, three attempts) | `queuesFor`, `databaseConsumer` |
-| Notify | `notify` (long-running host) | `NOTIFY_MAX_ATTEMPTS` (5) minus one; handler retry delay 10 s doubling to 5 min | `queuesFor`, `notifyConsumer` |
+| Queue  | Kinds                                                                   | Retry limit                                                                     | Where                           |
+| ------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------- |
+| Main   | `capture` (when `testing.runner` is set), `publish` (long-running host) | `testing.retries` (default 2, three attempts)                                   | `queuesFor`, `databaseConsumer` |
+| Notify | `notify` (long-running host)                                            | `NOTIFY_MAX_ATTEMPTS` (5) minus one; handler retry delay 10 s doubling to 5 min | `queuesFor`, `notifyConsumer`   |
 
 - A host with no consumer (serverless) runs neither queue: build state is delivered inline without
   durability (`packages/app/src/build-state-setup.ts`), and publishing follows ADR 0006 decision 10.
@@ -48,6 +48,8 @@ semantics.
 - Lease renewal through `keepJobLease` for any phase that can run longer than a third of the lease.
 - Cancellation by build id, honored within the cancel latency of ADR 0006 decision 11.
 - Its retry limit stated where the queue is built, not inferred from `testing.retries`.
+- Kinds that must be single-flight per key use `active_key` (a unique column, cleared in the write
+  that ends the job), never a check before the insert.
 
 ### 3. Precedence comes from separation and admission, not priorities (proposed rule)
 
@@ -94,9 +96,9 @@ A lost lease, a failed attempt and a child crash count against the same limit wi
 
 ## Alternatives rejected
 
-| Option | Why not |
-| --- | --- |
-| Priority column on `capture_jobs` | Needs fair-share and starvation rules across instances; separation already gives the isolation needed. |
-| Preempt investigations for capture | Kills work mid-replay and complicates pin release (ADR 0039). |
-| One consumer for every kind | A capture holding every slot delays git statuses; this is why `notify` has its own consumer. |
-| External queue per kind | Rejected in ADR 0006 decision 6; nothing here changes that. |
+| Option                             | Why not                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Priority column on `capture_jobs`  | Needs fair-share and starvation rules across instances; separation already gives the isolation needed. |
+| Preempt investigations for capture | Kills work mid-replay and complicates pin release (ADR 0039).                                          |
+| One consumer for every kind        | A capture holding every slot delays git statuses; this is why `notify` has its own consumer.           |
+| External queue per kind            | Rejected in ADR 0006 decision 6; nothing here changes that.                                            |

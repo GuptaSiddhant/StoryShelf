@@ -4,7 +4,7 @@ import type {
   CaptureJobKind,
   CaptureJobStatus,
 } from "@storyshelf/core/schema";
-import { index, int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { index, int, mysqlTable, text, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 import { datetime } from "./datetime.ts";
 
 /**
@@ -27,6 +27,8 @@ export const captureJobs = mysqlTable(
     owner: text("owner"),
     payload: text("payload"),
     cancelRequestedAt: datetime("cancel_requested_at", { mode: "string", fsp: 3 }),
+    activeKey: varchar("active_key", { length: 191 }),
+    rerunRequestedAt: datetime("rerun_requested_at", { mode: "string", fsp: 3 }),
     error: text("error"),
     startedAt: datetime("started_at", { mode: "string", fsp: 3 }),
     finishedAt: datetime("finished_at", { mode: "string", fsp: 3 }),
@@ -38,5 +40,6 @@ export const captureJobs = mysqlTable(
     index("capture_jobs_job_id_idx").on(table.jobId),
     index("capture_jobs_build_id_idx").on(table.buildId),
     index("capture_jobs_entry_created_idx").on(table.entry, table.createdAt),
+    uniqueIndex("capture_jobs_active_key_idx").on(table.activeKey),
   ],
 );

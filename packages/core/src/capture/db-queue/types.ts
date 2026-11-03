@@ -55,6 +55,12 @@ export interface QueueJobInput {
   data?: Record<string, unknown>;
   /** Attempts allowed in total for this job; defaults to the queue's (`retries` + 1). */
   maxAttempts?: number;
+  /**
+   * Single-flight key (ADR 0040): at most one non-terminal job holds it. A request while a queued
+   * job holds it is coalesced into that job; while a running one holds it, that job is marked and
+   * one more pass runs after it ends. The id returned is the job that covers the request.
+   */
+  activeKey?: string;
 }
 
 /** A job claimed from the database queue. */

@@ -106,6 +106,9 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'oidc'",
   },
   { table: "users", column: "disabled", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  // Single-flight jobs (ADR 0040); the unique index on active_key is in IDENTITY_INDEXES.
+  { table: "capture_jobs", column: "active_key", definition: "VARCHAR(191)" },
+  { table: "capture_jobs", column: "rerun_requested_at", definition: "DATETIME(3)" },
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
 ];
@@ -120,6 +123,11 @@ const IDENTITY_INDEXES = [
     table: "baselines",
     name: "baselines_project_story_mode_browser_branch_idx",
     sql: "CREATE UNIQUE INDEX baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
+  },
+  {
+    table: "capture_jobs",
+    name: "capture_jobs_active_key_idx",
+    sql: "CREATE UNIQUE INDEX capture_jobs_active_key_idx ON capture_jobs (active_key)",
   },
 ];
 

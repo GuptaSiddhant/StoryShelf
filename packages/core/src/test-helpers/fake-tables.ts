@@ -200,6 +200,8 @@ const captureJobs = defineTable("capture_jobs", {
   owner: "owner",
   payload: "payload",
   cancelRequestedAt: "cancel_requested_at",
+  activeKey: "active_key",
+  rerunRequestedAt: "rerun_requested_at",
   error: "error",
   startedAt: "started_at",
   finishedAt: "finished_at",
