@@ -186,8 +186,12 @@ export class BuildModel {
     )) as unknown as Build | null;
     // `updateWhere` returns the row either way; only our own write carries our stamp. Compared as
     // instants: Postgres hands the column back as `2026-11-03 19:46:04.101+00`, not as the ISO we wrote.
+    // A millisecond stamp can coincide with another instance's, but a refused write returns the row of
+    // whichever job owns it, so the owner must be ours as well.
     const applied =
-      current?.status === "failed" && instantOf(current.updatedAt) === instantOf(stamp);
+      current?.status === "failed" &&
+      current.captureJobId === jobId &&
+      instantOf(current.updatedAt) === instantOf(stamp);
     return { applied, build: current };
   }
 
