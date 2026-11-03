@@ -1,4 +1,4 @@
-import { gitRepoStatus } from "@storyshelf/affected";
+import { gitRepoRoot, gitRepoStatus, pathBase } from "@storyshelf/affected";
 import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClient } from "../client.ts";
@@ -160,6 +160,13 @@ async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
       message: "Shallow clone detected — affected capture renders all stories (use fetch-depth: 0)",
     };
   }
+  const base = pathBase(gitRepoRoot(cwd), cwd);
+  if (!base) {
+    return {
+      status: "warn",
+      message: `Cannot place ${cwd} inside its git repository — affected capture renders all stories (path-base-unknown)`,
+    };
+  }
   try {
     await access(resolve(cwd, buildDir, "preview-stats.json"));
   } catch {
@@ -168,7 +175,10 @@ async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
       message: `No preview-stats.json in ${buildDir} — affected capture renders all stories`,
     };
   }
-  return { status: "pass", message: "Affected capture ready (history and stats available)" };
+  return {
+    status: "pass",
+    message: `Affected capture ready (history and stats available; Storybook project ${base.projectRoot}, repository root ${base.repoRoot})`,
+  };
 }
 
 /** Resolve the connection, recording success or failure as a check. */
