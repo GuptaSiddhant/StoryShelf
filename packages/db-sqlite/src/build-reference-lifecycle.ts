@@ -65,7 +65,7 @@ export async function prepareBaselineReferences(
   return await inTransaction(path, async (db) => {
     const rows = db
       .prepare(
-        "SELECT id FROM baselines WHERE source_build_id IS NOT NULL OR snapshot_id IS NOT NULL",
+        "SELECT id FROM baselines WHERE source_build_id IS NOT NULL OR snapshot_id IS NOT NULL ORDER BY id",
       )
       .all() as unknown as [string][];
     const outcomes: Prepared[] = [];

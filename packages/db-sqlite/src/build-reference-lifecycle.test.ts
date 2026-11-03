@@ -412,11 +412,16 @@ describe("SQLite reference lifecycle primitive", () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
       try {
-        // "healthy" is prepared first (insertion order) and must not keep its pin.
-        await db.insert(schema.baselines, { ...baselineRow, id: "healthy", sourceBuildId: "one" });
+        // Preparation runs in id order: "a-healthy" is pinned first, then "z-doomed" stops the run;
+        // the pin must not survive the rollback.
         await db.insert(schema.baselines, {
           ...baselineRow,
-          id: "doomed",
+          id: "a-healthy",
+          sourceBuildId: "one",
+        });
+        await db.insert(schema.baselines, {
+          ...baselineRow,
+          id: "z-doomed",
           storyId: "other",
           sourceBuildId: "two",
         });
@@ -427,15 +432,15 @@ describe("SQLite reference lifecycle primitive", () => {
 
         expect(error).toBeInstanceOf(BaselineSourceIntegrityError);
         expect(error).toMatchObject({
-          baselineId: "doomed",
+          baselineId: "z-doomed",
           buildId: "two",
           problem: "tombstoned",
         });
-        expect((error as Error).message).toContain("doomed");
+        expect((error as Error).message).toContain("z-doomed");
         expect((error as Error).message).toContain("two");
         expect(referenceRows(path)).toBe(0);
-        expect(await lifecycle.referenceGeneration(ownerOf("healthy"))).toBe(0);
-        expect((await db.get(schema.baselines, "doomed"))?.["sourceBuildId"]).toBe("two");
+        expect(await lifecycle.referenceGeneration(ownerOf("a-healthy"))).toBe(0);
+        expect((await db.get(schema.baselines, "z-doomed"))?.["sourceBuildId"]).toBe("two");
         expect((await db.get(schema.builds, "two"))?.["retentionState"]).toBe("deleting");
       } finally {
         await db.lifecycle?.teardown();
@@ -462,10 +467,14 @@ describe("SQLite reference lifecycle primitive", () => {
           createdAt: now,
           updatedAt: now,
         });
-        await db.insert(schema.baselines, { ...baselineRow, id: "healthy", sourceBuildId: "one" });
         await db.insert(schema.baselines, {
           ...baselineRow,
-          id: "crossed",
+          id: "a-healthy",
+          sourceBuildId: "one",
+        });
+        await db.insert(schema.baselines, {
+          ...baselineRow,
+          id: "z-crossed",
           storyId: "other",
           sourceBuildId: "foreign",
         });
@@ -474,15 +483,15 @@ describe("SQLite reference lifecycle primitive", () => {
 
         expect(error).toBeInstanceOf(BaselineSourceIntegrityError);
         expect(error).toMatchObject({
-          baselineId: "crossed",
+          baselineId: "z-crossed",
           buildId: "foreign",
           problem: "other-project",
         });
         expect((error as Error).message).toContain("another project");
         expect(referenceRows(path)).toBe(0);
-        expect((await db.get(schema.baselines, "crossed"))?.["sourceBuildId"]).toBe("foreign");
+        expect((await db.get(schema.baselines, "z-crossed"))?.["sourceBuildId"]).toBe("foreign");
         expect(
-          await createBuildReferenceLifecycle(path).referenceGeneration(ownerOf("healthy")),
+          await createBuildReferenceLifecycle(path).referenceGeneration(ownerOf("a-healthy")),
         ).toBe(0);
       } finally {
         await db.lifecycle?.teardown();
