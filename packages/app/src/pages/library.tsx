@@ -4,6 +4,7 @@ import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { loadHealthPanel, type HealthPanelData } from "../insights/health-panel.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { catalogOf, getStore, testingEnabled } from "../store.ts";
 import {
   Button,
@@ -16,7 +17,6 @@ import {
   statusTone,
   Badge,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { ProjectDesignLinks } from "./design-links.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 import { LibraryGrid } from "./library-grid.tsx";

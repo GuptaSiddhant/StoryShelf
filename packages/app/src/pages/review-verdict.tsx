@@ -2,6 +2,7 @@
 import { BUILD_STATUSES } from "@storyshelf/core/types";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Badge,
   Button,
@@ -14,7 +15,6 @@ import {
   VStack,
   statusTone,
 } from "../ui/components.tsx";
-import { csrfField } from "../shell/csrf-field.tsx";
 import { openChangeRequests, openRequestsLabel } from "./review-change-requests.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */

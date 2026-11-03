@@ -1,6 +1,6 @@
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { Button, Card, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 
 /** Landing hero card: card surface with centered marketing padding. */
 const heroCard = css`

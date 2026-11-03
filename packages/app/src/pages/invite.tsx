@@ -1,6 +1,6 @@
-import { Alert, Button, Card, Field, PageHeader, VStack } from "../ui/components.tsx";
 import { csrfField } from "../shell/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
+import { Alert, Button, Card, Field, PageHeader, VStack } from "../ui/components.tsx";
 
 export interface InvitePageState {
   inviteId: string;

@@ -2,6 +2,7 @@ import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models
 import type { Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { loadHealthBadge } from "../insights/health-panel.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
   Button,
@@ -15,7 +16,6 @@ import {
   VStack,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { ProjectCard, type ProjectSummary } from "./projects-card.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */

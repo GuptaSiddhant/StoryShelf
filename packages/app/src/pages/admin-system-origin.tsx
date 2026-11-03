@@ -1,5 +1,6 @@
 import type { ResolvedPublicOrigin, StoredPublicOrigin } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Badge,
@@ -11,7 +12,6 @@ import {
   Meta,
   SectionTitle,
 } from "../ui/components.tsx";
-import { csrfField } from "../shell/csrf-field.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 

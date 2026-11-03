@@ -1,5 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Badge,
@@ -15,7 +16,6 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../shell/csrf-field.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
 

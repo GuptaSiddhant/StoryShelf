@@ -3,10 +3,10 @@ import type { FC } from "hono/jsx";
 import { getStore } from "../store.ts";
 import { Avatar } from "../ui/avatar.tsx";
 import { Button } from "../ui/buttons.tsx";
-import { csrfField } from "./csrf-field.tsx";
 import { css } from "../ui/css.ts";
 import { Dropdown, DropdownDivider, DropdownItem } from "../ui/dropdown.tsx";
 import { Icon } from "../ui/icons/icon.tsx";
+import { csrfField } from "./csrf-field.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 

@@ -1,6 +1,7 @@
 import { isServerlessHost } from "@storyshelf/core/config";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
@@ -11,7 +12,6 @@ import {
   SelectField,
   TextareaField,
 } from "../ui/components.tsx";
-import { csrfField } from "../shell/csrf-field.tsx";
 import type { NotificationsFormState, SettingsNotifyProvider } from "./settings-notifications.tsx";
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */

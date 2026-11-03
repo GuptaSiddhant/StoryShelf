@@ -2,6 +2,7 @@ import { BuildModel, ProjectModel, averageInheritedRatio } from "@storyshelf/cor
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { loadHealthPanel } from "../insights/health-panel.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
@@ -16,7 +17,6 @@ import {
   Stat,
   VStack,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 

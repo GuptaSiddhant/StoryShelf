@@ -1,6 +1,6 @@
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import { Alert, Button, Card, Field, Meta, PageHeader, VStack } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { passkeyLoginScript } from "./passkey-ceremony.ts";
 
 /** One engine login widget (descriptor-driven). */

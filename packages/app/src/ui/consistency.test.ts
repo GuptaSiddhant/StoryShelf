@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
  *   test-helpers (the app-coupled chrome lives in `src/shell/`).
  */
 const pagesDir = fileURLToPath(new URL("../pages", import.meta.url));
-const uiDir = fileURLToPath(new URL(".", import.meta.url));
+const uiDir = `${import.meta.dirname}/`;
 
 async function pageSources(): Promise<Array<{ file: string; source: string }>> {
   const entries = await readdir(pagesDir);

@@ -1,6 +1,8 @@
 import type { AuthUser } from "@storyshelf/core/types";
 import { safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
+import { csrfField } from "../shell/csrf-field.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Alert,
   Badge,
@@ -12,9 +14,7 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../shell/csrf-field.tsx";
 import { css } from "../ui/css.ts";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { passkeyRegisterScript } from "./passkey-ceremony.ts";
 
