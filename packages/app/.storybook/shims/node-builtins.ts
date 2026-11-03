@@ -30,7 +30,7 @@ export const sep = "/";
 export const posix = { join: fn("path.posix.join"), sep: "/" };
 export const fileURLToPath = fn("url.fileURLToPath");
 export const pathToFileURL = fn("url.pathToFileURL");
-export const Buffer = { from: fn("buffer.from") };
+export { Buffer } from "./buffer.ts";
 export const createHmac = fn("crypto.createHmac");
 export const createCipheriv = fn("crypto.createCipheriv");
 export const createDecipheriv = fn("crypto.createDecipheriv");
