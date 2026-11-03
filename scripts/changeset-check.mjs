@@ -15,7 +15,7 @@
  *   node scripts/changeset-check.mjs [--labels a,b] [--head-ref <branch>] [--base <ref>]
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   checkChangeset,
@@ -77,11 +77,26 @@ function readBase(base, path) {
   }
 }
 
+/** The published packages: `packages/<dir>/package.json` paths and names (a package is published unless private). */
+function publishedPackages() {
+  return readdirSync(join(root, "packages"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `packages/${entry.name}/package.json`)
+    .map((path) => ({ path, pkg: readHead(path) }))
+    .filter(({ pkg }) => pkg !== null && manifestPublished(pkg))
+    .map(({ path, pkg }) => ({ path, name: JSON.parse(pkg).name }));
+}
+
 const labels = (option("--labels") ?? "").split(",").filter(Boolean);
 const base = option("--base") ?? "HEAD^1";
 const headRef = option("--head-ref");
 const { changed, added, entries } = diff(base);
-const malformed = malformedChangesets(added, (path) => readFileSync(join(root, path), "utf8"));
+const published = publishedPackages();
+const malformed = malformedChangesets(
+  added,
+  (path) => readFileSync(join(root, path), "utf8"),
+  published.map(({ name }) => name),
+);
 if (malformed.length > 0) {
   console.error(`::error title=Malformed changeset::${malformed.join("; ")}`);
   process.exit(1);
@@ -93,6 +108,7 @@ if (releaseVersion !== null) {
     entries,
     readBase: (path) => readBase(base, path),
     readHead,
+    published: published.map(({ path }) => path),
   });
   if (problems.length > 0) {
     console.error(
