@@ -48,7 +48,24 @@ function reachesAppState(specifier: string): boolean {
   if (specifier.startsWith("@storyshelf/core/")) {
     return /^@storyshelf\/core\/(?:models|test-helpers)(?:\/|$)/u.test(specifier);
   }
-  return /^\.\.?\/(?:.*\/)?(?:store(?:\.tsx?)?$|(?:routers|middleware|pages)\/)/u.test(specifier);
+  return /^\.\.?\/(?:.*\/)?(?:store(?:\.tsx?)?$|(?:routers|middleware|pages|shell)\/)/u.test(
+    specifier,
+  );
+}
+
+const PAGE_UI_IMPORTS = /^\.\.\/ui\/(?:components\.tsx|css\.ts|styles\/review(?:-[a-z]+)?\.ts)$/u;
+const PAGE_SHELL_IMPORTS = /^\.\.\/shell\/(?:document|csrf-field)\.tsx$/u;
+
+/** A page import that bypasses the facade, or reaches a shell module other than document and csrf-field. */
+function breaksPageContract(specifier: string): boolean {
+  if (specifier.startsWith("../ui/")) {
+    return !PAGE_UI_IMPORTS.test(specifier);
+  }
+  return specifier.startsWith("../shell/") && !PAGE_SHELL_IMPORTS.test(specifier);
+}
+
+function pageSourceBreaksContract(source: string): boolean {
+  return importSpecifiers(source).some((specifier) => breaksPageContract(specifier));
 }
 
 /** Patterns for a runtime reference to `@storyshelf/core/urls`; erased `type` forms are not matched. */
@@ -75,9 +92,9 @@ describe("ui-building-blocks contract", () => {
   });
 
   it("imports UI only through the facade, the document shell, shared review styles, and page-local css", async () => {
-    const directImport =
-      /from\s+"(?:\.\.\/ui\/(?!components\.tsx|css\.ts|styles\/review(?:-[a-z]+)?\.ts)[^"]+|\.\.\/shell\/(?!document\.tsx|csrf-field\.tsx)[^"]+)"/u;
-    const offenders = (await pageSources()).filter(({ source }) => directImport.test(source));
+    const offenders = (await pageSources()).filter(({ source }) =>
+      pageSourceBreaksContract(source),
+    );
     expect(offenders.map(({ file }) => file)).toEqual([]);
   });
 
@@ -104,12 +121,33 @@ describe("ui-building-blocks contract", () => {
       "../routers/ui.ts",
       "../middleware/csrf.ts",
       "../pages/login.tsx",
+      "../shell/document.tsx",
       "@storyshelf/core/models",
       "@storyshelf/core/test-helpers",
     ];
     const allowed = ["./css.ts", "../ui/components.tsx", "hono/jsx", "@storyshelf/core/urls"];
     expect(forbidden.filter((specifier) => !reachesAppState(specifier))).toEqual([]);
     expect(allowed.filter((specifier) => reachesAppState(specifier))).toEqual([]);
+  });
+
+  it("recognises page imports that break the facade or reach other shell modules", () => {
+    const sources = [
+      'import { Sidebar } from "../shell/sidebar.tsx";',
+      'export { navItems } from "../shell/nav.ts";',
+      'import "../shell/client-script.ts";',
+      'const nav = await import("../shell/nav.ts");',
+      'import { Button } from "../ui/buttons.tsx";',
+    ];
+    const allowed = [
+      'import { DocumentLayout } from "../shell/document.tsx";',
+      'import { csrfField } from "../shell/csrf-field.tsx";',
+      'import { Button } from "../ui/components.tsx";',
+      'import { css } from "../ui/css.ts";',
+      'import { grid } from "../ui/styles/review-layout.ts";',
+      'import { helper } from "./settings-links.tsx";',
+    ];
+    expect(sources.filter((source) => !pageSourceBreaksContract(source))).toEqual([]);
+    expect(allowed.filter((source) => pageSourceBreaksContract(source))).toEqual([]);
   });
 
   it("recognises runtime references to @storyshelf/core/urls and ignores type-only ones", () => {
