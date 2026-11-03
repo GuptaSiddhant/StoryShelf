@@ -8,11 +8,11 @@ export default meta;
 
 export const Snippets = jsxStory(() => (
   <VStack>
-    <CodeBlock code="npx storyshelf upload ./storybook-static" />
+    <CodeBlock code="npx storyshelf upload --slug design-system --build-dir ./storybook-static" />
     <CodeBlock
       label="Copy command"
       code={
-        "npx storyshelf upload ./storybook-static \\\n  --project design-system \\\n  --branch main"
+        "npx storyshelf upload \\\n  --slug design-system \\\n  --build-dir ./storybook-static \\\n  --branch main"
       }
     />
   </VStack>

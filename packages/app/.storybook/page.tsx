@@ -52,11 +52,13 @@ export function pageStory(render: () => PageHtml, options: PageStoryOptions = {}
   return {
     parameters: { layout: "fullscreen" },
     loaders: [
-      async () => {
-        setStoryStore(options.store);
-        await useStoryDataset(options.dataset ?? "populated");
-        return { html: await withFrozenClock(async () => await resolveHtml(await render())) };
-      },
+      async () => ({
+        html: await withFrozenClock(async () => {
+          setStoryStore(options.store);
+          await useStoryDataset(options.dataset ?? "populated");
+          return await resolveHtml(await render());
+        }),
+      }),
     ],
     render: (_args, context) => {
       const frame = globalThis.document.createElement("iframe");

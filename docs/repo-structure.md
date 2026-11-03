@@ -91,7 +91,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `package.json` (root)       | Workspaces list, `catalog` pins (dev tools: TS, tsdown, vitest, oxlint/oxfmt, pino, yaml)                                                                          |
 | `nub.jsonc`                 | `source` condition, isolated linker, public hoists                                                                                                                 |
-| `turbo.json`                | `build → ^build`; `lint/test/test:integration` need `^build`; `verify = build+lint+test`                                                                           |
+| `turbo.json`                | `build → ^build`; `lint/test/test:integration` need `^build`; `verify = build+build-storybook+lint+test`                                                                           |
 | `config/tsconfig.base.json` | Strict TS, `hono/jsx`, `customConditions: ["source"]`                                                                                                              |
 | `config/tsdown.ts`          | `libConfig` / `cliConfig`                                                                                                                                          |
 | `.oxlintrc.json`            | Rule-based lint (no per-file path exemptions)                                                                                                                      |

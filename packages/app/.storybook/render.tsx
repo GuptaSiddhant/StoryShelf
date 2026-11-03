@@ -11,6 +11,15 @@ export const STORY_NOW = "2026-01-15T12:00:00.000Z";
  * HTML is the same on every machine and every day (stories become baselines).
  */
 export async function withFrozenClock<T>(render: () => Promise<T>): Promise<T> {
+  const turn = queue.then(async () => await frozen(render));
+  queue = turn.catch(() => null);
+  return await turn;
+}
+
+/** Story renders run one at a time: they share the frozen clock and the story store. */
+let queue: Promise<unknown> = Promise.resolve();
+
+async function frozen<T>(render: () => Promise<T>): Promise<T> {
   const RealDate = globalThis.Date;
   const now = RealDate.parse(STORY_NOW);
   class FrozenDate extends RealDate {
@@ -59,14 +68,27 @@ export async function renderJsx(node: unknown): Promise<string> {
   );
 }
 
+export interface JsxStoryOptions {
+  /** Show popover menus (native `<details>`) open, so their items can be seen without clicking. */
+  open?: boolean;
+}
+
+/** Story-only: mark every `<details>` open in already-rendered HTML (no production change). */
+function openDetails(html: string): string {
+  return html.replaceAll("<details ", "<details open ");
+}
+
 /**
  * A story from a JSX factory. Components are async, so the render runs in a `loaders` step and
  * the story returns the finished HTML (`loaded.html`).
  */
-export function jsxStory(factory: () => unknown): StoryObj {
+export function jsxStory(factory: () => unknown, options: JsxStoryOptions = {}): StoryObj {
+  const finish = options.open ? openDetails : (html: string): string => html;
   return {
     loaders: [
-      async () => ({ html: await withFrozenClock(async () => await renderJsx(factory())) }),
+      async () => ({
+        html: finish(await withFrozenClock(async () => await renderJsx(factory()))),
+      }),
     ],
     render: (_args, context) => String(context.loaded["html"]),
   };

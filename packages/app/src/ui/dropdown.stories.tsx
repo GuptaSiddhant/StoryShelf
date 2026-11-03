@@ -1,7 +1,16 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
 import { jsxStory } from "../../.storybook/render.tsx";
-import { Avatar, Dropdown, DropdownDivider, DropdownItem, HStack } from "./components.tsx";
+import {
+  Avatar,
+  Card,
+  Dropdown,
+  DropdownDivider,
+  DropdownItem,
+  HStack,
+  Meta as MetaText,
+  VStack,
+} from "./components.tsx";
 
 const meta: Meta = { title: "UI/Dropdown" };
 export default meta;
@@ -34,3 +43,22 @@ export const Closed = jsxStory(() => (
     </Dropdown>
   </HStack>
 ));
+
+/** The menu open, with room below it so the items are visible in a capture. */
+export const Open = jsxStory(
+  () => (
+    <VStack gap="lg">
+      <HStack>
+        <Dropdown label="Account">{items}</Dropdown>
+      </HStack>
+      <Card>
+        <MetaText>Space the open menu overlaps.</MetaText>
+        <br />
+        <br />
+        <br />
+        <br />
+      </Card>
+    </VStack>
+  ),
+  { open: true },
+);
