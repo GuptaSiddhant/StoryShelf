@@ -23,11 +23,19 @@ describe.skipIf(url === undefined || url === "")(
   () => {
     const created: DatabaseAdapter[] = [];
 
-    // The suite builds one adapter per case and some cases never tear theirs down.
+    // The suite builds one adapter per case and some cases never tear theirs down. `teardown` is
+    // idempotent, so one that already ran returns at once. Every adapter is attempted, and a failed
+    // close is reported afterwards (not swallowed), so a leaked pool shows up as a failure.
     afterAll(async () => {
-      await Promise.all(
-        created.map(async (adapter) => await adapter.lifecycle?.teardown().catch(() => {})),
+      const results = await Promise.allSettled(
+        created.map(async (adapter) => await adapter.lifecycle?.teardown()),
       );
+      const failures = results.flatMap((result) =>
+        result.status === "rejected" ? [result.reason as unknown] : [],
+      );
+      if (failures.length > 0) {
+        throw new AggregateError(failures, "Database adapter teardown failed");
+      }
     });
 
     databaseContractSuite("mysql", () => {
