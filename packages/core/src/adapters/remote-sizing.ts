@@ -22,9 +22,13 @@ export interface RemoteSizing {
   verification?: typeof UNVERIFIED_NOTE;
 }
 
-/** The configured and effective limits of `remote`, read now (a `sessions` function is live). */
-export function remoteSizingOf(target: CaptureTarget, remote: RemoteBrowser): RemoteSizing {
-  const pages = pagesOf(remote);
+/** The configured and effective limits of `remote`; the shared page `gate`, when given, is the effective page limit. */
+export function remoteSizingOf(
+  target: CaptureTarget,
+  remote: RemoteBrowser,
+  gate?: { readonly size: number },
+): RemoteSizing {
+  const pages = gate?.size ?? pagesOf(remote);
   const perConnection = remote.maxPagesPerConnection ?? null;
   const lowest = [pages, perConnection].filter((value): value is number => value !== null);
   return {
@@ -34,18 +38,19 @@ export function remoteSizingOf(target: CaptureTarget, remote: RemoteBrowser): Re
     effectivePagesPerConnection: lowest.length === 0 ? null : Math.min(...lowest),
     maxConnections: remote.maxConnections ?? null,
     scope: { pages: "target", connections: "process" },
-    experimental: remote.experimental,
-    ...(remote.experimental ? { verification: UNVERIFIED_NOTE } : {}),
+    experimental: remote.experimental === true,
+    ...(remote.experimental === true ? { verification: UNVERIFIED_NOTE } : {}),
   };
 }
 
-/** Log the limits at run start, once per target. */
+/** Log the limits at run start, before any connection is attempted. */
 export function logRemoteSizing(
   logger: { info(fields: object, message: string): void } | undefined,
   target: CaptureTarget,
   remote: RemoteBrowser,
+  gate?: { readonly size: number },
 ): void {
-  logger?.info(remoteSizingOf(target, remote), "remote sizing");
+  logger?.info(remoteSizingOf(target, remote, gate), "remote sizing");
 }
 
 /** The page limit now; a `sessions` function that throws or returns nonsense reads as unknown. */

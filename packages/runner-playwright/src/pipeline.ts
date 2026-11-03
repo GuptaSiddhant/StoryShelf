@@ -65,7 +65,7 @@ export async function renderAll(
     await driver.launch(name, input.logger, launchContextOf(input, "render", active.abort?.signal));
   const browser = await launch();
   const server = await serve(input, browser);
-  logSizing(input, name, remote);
+  input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
   const measured = remote
     ? await measureRemote(browser, remote.remote, {
         logger: input.logger,
@@ -132,6 +132,9 @@ export function planRun<
         "sessions() returned an invalid value; keeping the last good one",
       );
     });
+  if (remote) {
+    logRemoteSizing(rawInput.logger, name, remote.remote, gate);
+  }
   return {
     input: {
       ...rawInput,
@@ -487,16 +490,4 @@ function pushRenderFailure(
 ): void {
   failures.push({ storyId, viewportName, error: messageOf(error) });
   input.logger?.error({ storyId, viewport: viewportName, err: error }, "render failed for story");
-}
-
-/** The host sizing of a capture, and for a remote target its limits (never its endpoint). */
-function logSizing(
-  input: { logger?: PlaywrightRenderInput["logger"]; concurrency?: number | undefined },
-  name: CaptureTarget,
-  remote: RemoteTarget | undefined,
-): void {
-  input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
-  if (remote) {
-    logRemoteSizing(input.logger, name, remote.remote);
-  }
 }

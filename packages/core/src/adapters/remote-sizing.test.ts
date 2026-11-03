@@ -70,6 +70,23 @@ describe("remoteSizingOf", () => {
     expect(remoteSizingOf("chromium@grid", broken).pages).toBeNull();
   });
 
+  it("reports the shared gate's size as the page limit when one is given", () => {
+    let live = 4;
+    const remote = service({ sessions: () => live, maxPagesPerConnection: 9 });
+    live = Number.NaN;
+    expect(remoteSizingOf("chromium@grid", remote, { size: 3 })).toMatchObject({
+      pages: 3,
+      effectivePagesPerConnection: 3,
+    });
+  });
+
+  it("treats a hand-built service without the flag as not experimental", () => {
+    const { experimental: _flag, ...bare } = service();
+    const sizing = remoteSizingOf("chromium@grid", bare as never);
+    expect(sizing.experimental).toBe(false);
+    expect(sizing).not.toHaveProperty("verification");
+  });
+
   it("says an experimental preset is unverified", () => {
     const sizing = remoteSizingOf("chromium@grid", service({ experimental: true }));
     expect(sizing).toMatchObject({ experimental: true, verification: UNVERIFIED_NOTE });

@@ -141,7 +141,7 @@ export interface RemoteBrowser {
   readonly maxPagesPerConnection?: number | undefined;
   readonly maxConnections?: number | undefined;
   /** A vendor preset not verified against live infrastructure (see {@link RemoteOptions.experimental}). */
-  readonly experimental: boolean;
+  readonly experimental?: boolean | undefined;
   readonly protocol: RemoteProtocol;
   readonly reach: TargetReach;
   readonly connect: RemoteOptions["connect"];

@@ -394,6 +394,19 @@ describe("a remote target", () => {
     expect(fake.state.peak).toBe(2);
   });
 
+  it("logs the limits even when the connection fails, and reports the shared gate's size", async () => {
+    const info = vi.fn();
+    fake.state.failure = new Error("connect ECONNREFUSED");
+    await createPlaywrightCaptureRunner({
+      browsers: [farm({ retry: { attempts: 0, backoffMs: 1 } })],
+    })
+      .render(input({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
+      .catch(() => {});
+    const sizing = info.mock.calls.filter(([, message]) => message === "remote sizing");
+    expect(sizing).toHaveLength(1);
+    expect(sizing[0]?.[0]).toMatchObject({ pages: 2 });
+  });
+
   it("keeps a target offered when the service is down, but fails the job at once with no endpoint in the message", async () => {
     const runner = createPlaywrightCaptureRunner({
       browsers: [farm({ retry: { attempts: 1, backoffMs: 1 } })],
