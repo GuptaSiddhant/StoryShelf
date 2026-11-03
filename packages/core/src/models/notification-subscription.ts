@@ -101,8 +101,10 @@ export class NotificationSubscriptionModel {
   /**
    * Turn `review:requested` on or off for a person, touching nothing else. Someone with no row
    * who turns it off gets a disabled one (no topics, no channels), so the opt-out is recorded
-   * without subscribing them to anything. Turning it back on for such a placeholder (disabled, no
-   * topics, no channels) deletes it, which returns them to the defaults.
+   * without subscribing them to anything. Turning it back on for exactly that placeholder
+   * (disabled, no topics, no channels, review requests off) deletes it, which returns them to the
+   * defaults. A disabled row with review requests still on is an "Email me" opt-out, never a
+   * placeholder, so it stays and keeps them silent.
    */
   async setReviewRequests(projectId: string, userId: string, on: boolean): Promise<void> {
     const existing = await this.getFor(projectId, userId);
@@ -112,7 +114,11 @@ export class NotificationSubscriptionModel {
       }
       return;
     }
-    const placeholder = !existing.enabled && existing.events === null && existing.via === null;
+    const placeholder =
+      !existing.enabled &&
+      !existing.reviewRequests &&
+      existing.events === null &&
+      existing.via === null;
     if (on && placeholder) {
       await this.remove(projectId, userId);
       return;

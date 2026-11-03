@@ -118,6 +118,38 @@ describe("notification subscriptions", () => {
     expect(await read.json()).toMatchObject({ reviewRequests: false });
   });
 
+  it("changes only the switch on a PUT that carries only reviewRequests", async () => {
+    const { db, storage } = await seed();
+    const app = appWith(db, storage);
+    const put = async (body: unknown) =>
+      await app.request(mePath, {
+        method: "PUT",
+        headers: { "content-type": "application/json", ...memberCookie },
+        body: JSON.stringify(body),
+      });
+    await put({ events: ["build:approved"], via: ["email"], enabled: false });
+    const flipped = await put({ reviewRequests: false });
+    expect(await flipped.json()).toMatchObject({
+      events: ["build:approved"],
+      via: ["email"],
+      enabled: false,
+      reviewRequests: false,
+    });
+  });
+
+  it("answers a review-only PUT without a subscription with the defaults and stores nothing on", async () => {
+    const { db, storage } = await seed();
+    const app = appWith(db, storage);
+    const res = await app.request(mePath, {
+      method: "PUT",
+      headers: { "content-type": "application/json", ...memberCookie },
+      body: JSON.stringify({ reviewRequests: true }),
+    });
+    expect(await res.json()).toMatchObject({ enabled: false, events: [], reviewRequests: true });
+    const read = await app.request(mePath, { headers: memberCookie });
+    expect(await read.json()).toBeNull();
+  });
+
   it("isolates subscriptions per user", async () => {
     const { db, storage } = await seed();
     const app = appWith(db, storage);

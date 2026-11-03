@@ -91,6 +91,16 @@ describe("NotificationSubscriptionModel", () => {
     expect(NotificationSubscriptionModel.viaOf(row!)).toEqual(["email"]);
   });
 
+  it("keeps an email opt-out when review requests are switched on, off and on again", async () => {
+    const { db } = makeDatabase();
+    await model(db).upsert("p1", "u1", { enabled: false });
+    await model(db).setReviewRequests("p1", "u1", true);
+    expect(await model(db).getFor("p1", "u1")).toMatchObject({ enabled: false });
+    await model(db).setReviewRequests("p1", "u1", false);
+    await model(db).setReviewRequests("p1", "u1", true);
+    expect(await model(db).getFor("p1", "u1")).toBeNull();
+  });
+
   it("keeps a subscription that has topics when review requests come back on", async () => {
     const { db } = makeDatabase();
     await model(db).upsert("p1", "u1", { events: ["build:approved"], enabled: false });
