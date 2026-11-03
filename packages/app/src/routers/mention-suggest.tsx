@@ -24,13 +24,15 @@ import { getStore } from "../store.ts";
 import { DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 
-/** A comment is at most this long (see `commentCreateSchema`); the box's text is cut to it. */
+/** Mentions are looked for in this much of the box's text; any text after it is kept as typed. */
 const MAX_BODY = 4000;
 
 interface Typing {
   slug: string;
   buildId: string;
   kind: CommentFieldKind;
+  /** The whole posted body; `text` is its first `MAX_BODY` characters. */
+  body: string;
   text: string;
   typed: TypedMention | undefined;
   suggestions: MentionSuggestion[];
@@ -60,13 +62,15 @@ async function typing(c: Context): Promise<Typing> {
   const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
   await buildForProject(project.id, buildId);
   const form = await c.req.formData();
-  const text = textOf(form, "body").slice(0, MAX_BODY);
+  const body = textOf(form, "body");
+  const text = body.slice(0, MAX_BODY);
   const typed = typedMention(text);
   const asked = textOf(form, "kind");
   return {
     slug,
     buildId,
     kind: COMMENT_FIELD_KINDS.find((known) => known === asked) ?? "build",
+    body,
     text,
     typed,
     suggestions: await suggestionsFor(project.id, typed),
@@ -91,12 +95,12 @@ export function registerMentionSuggest(app: ShelfRouter): void {
   });
 
   app.post("/projects/:slug/builds/:buildId/mention-complete", async (c) => {
-    const { slug, buildId, kind, text, typed, suggestions, pick } = await typing(c);
+    const { slug, buildId, kind, body, text, typed, suggestions, pick } = await typing(c);
     const chosen = suggestions.find((suggestion) => suggestion.userId === pick);
     if (typed === undefined || chosen === undefined) {
       throw new HTTPException(400, { message: "Pick a member from the list" });
     }
-    const value = completeMention(text, typed, chosen.handle);
+    const value = completeMention(text, typed, chosen.handle) + body.slice(text.length);
     return c.html(<CommentBodyField slug={slug} buildId={buildId} kind={kind} value={value} />);
   });
 }

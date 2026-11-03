@@ -953,6 +953,22 @@ describe("mention suggestions and highlights (#463)", () => {
     await booted.stop();
   });
 
+  it("keeps the text after the 4000-character cut when a member is picked", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    const body = `${"a".repeat(3992)} ask @al and the rest of the comment`;
+    const res = await booted.page(
+      "dev",
+      `/builds/${id}/mention-complete`,
+      urlencoded({ body, kind: "build", pick: "alice" }),
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("ask @alice ");
+    expect(html).toContain("and the rest of the comment");
+    await booted.stop();
+  });
+
   it("wires the comment boxes to the suggestions", async () => {
     const booted = await boot();
     const id = await publish(booted, "feature/x");
