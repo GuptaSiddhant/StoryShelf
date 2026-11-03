@@ -13,7 +13,11 @@ on:
     branches: [main]
   pull_request:
     paths:
+      # The Storybook bundles code from these workspace packages, so a change to one can change a story.
       - "packages/app/**"
+      - "packages/core/**"
+      - "packages/image/**"
+      - "packages/affected/**"
       - ".github/workflows/app-storybook.yml"
 
 # One upload per ref at a time: a newer push cancels an older PR upload, never one on main.
@@ -95,6 +99,4 @@ jobs:
         env:
           UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
-        # --full until #502 is fixed: affected capture matches nothing for a Storybook that lives in a
-        # repository subdirectory, so it would silently inherit every story. Drop --full once it lands.
-        run: npx --yes storyshelf@latest upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH" --full
+        run: npx --yes storyshelf@latest upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
