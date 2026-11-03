@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // oxlint-disable curly no-console
 /**
- * Versioning for the Changesets release flow (ADR 0043).
+ * Versioning for the Changesets release flow (ADR 0043), done here and not by the Changesets CLI.
  *
  *   node scripts/version-packages.mjs             stable: consume the pending changesets, bump
  *                                                 every package to one version, write the root
@@ -12,12 +12,28 @@
  *                                                 `<next>-next-<sha>` in the working tree, never
  *                                                 committed (emits `version=<v>`)
  *
- * Stable and snapshot runs both need at least one pending changeset and fail clearly without one.
+ * The next version is the shared version raised by the largest bump over all pending changesets
+ * (the packages share one version). Stable and snapshot runs both need at least one pending
+ * changeset and fail clearly without one, and on a changeset that names an unknown package.
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
-import { listPending, mergeChangelog, renderEntries } from "./changeset-lib.mjs";
+import {
+  bumpVersion,
+  highestBump,
+  listPending,
+  mergeChangelog,
+  renderEntries,
+  unknownReleases,
+} from "./changeset-lib.mjs";
 
 const root = join(import.meta.dirname, "..");
 const changesetDir = join(root, ".changeset");
@@ -32,16 +48,6 @@ function emit(key, value) {
   console.log(`${key}=${value}`);
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
-  }
-}
-
-function changeset(...args) {
-  const result = spawnSync(join(root, "node_modules", ".bin", "changeset"), args, {
-    cwd: root,
-    stdio: "inherit",
-  });
-  if (result.status !== 0) {
-    fail(`changeset ${args.join(" ")} failed`);
   }
 }
 
@@ -77,58 +83,99 @@ function packageDirs() {
     .map((entry) => entry.name);
 }
 
-/** The commit hash Changesets puts in a snapshot version is the full one; the issue wants a short one. */
-const SNAPSHOT_SUFFIX = /(?<head>-next-)(?<sha>[0-9a-f]{40})$/u;
+/** The manifests of the published packages: `{ file, name }`. */
+function publishedManifests() {
+  return packageDirs()
+    .map((dir) => join(packagesDir, dir, "package.json"))
+    .map((file) => ({ file, pkg: JSON.parse(readFileSync(file, "utf8")) }))
+    .filter(({ pkg }) => !pkg.private)
+    .map(({ file, pkg }) => ({ file, name: pkg.name }));
+}
 
-/** Rewrite the `version` of every package.json from `from` to `to` (only that field). */
-function renameVersion(from, to) {
-  for (const dir of packageDirs()) {
-    const file = join(packagesDir, dir, "package.json");
+const VERSION_LINE = /^(?<head>\s*"version":\s*")[^"]+(?<tail>")/mu;
+
+/** Set the `version` field of every published package.json, touching nothing else in the file. */
+function writeVersion(version) {
+  for (const { file, name } of publishedManifests()) {
     const text = readFileSync(file, "utf8");
-    if (text.includes(`"version": "${from}"`)) {
-      writeFileAtomic(file, text.replace(`"version": "${from}"`, `"version": "${to}"`));
+    if (!VERSION_LINE.test(text)) {
+      fail(`${name}: no "version" field to update in ${file}`);
+    }
+    writeFileAtomic(file, text.replace(VERSION_LINE, `$<head>${version}$<tail>`));
+  }
+}
+
+/** Delete every changeset file (empty ones too): all of them are consumed by a version run. */
+function deleteChangesets() {
+  for (const name of readdirSync(changesetDir)) {
+    if (name.endsWith(".md") && name !== "README.md") {
+      unlinkSync(join(changesetDir, name));
     }
   }
 }
 
-/** Shorten a snapshot version's commit hash to 7 characters across the workspace; returns the new version. */
-function shortenSnapshot(version) {
-  const match = SNAPSHOT_SUFFIX.exec(version);
-  if (!match?.groups) {
-    return version;
+/** Read the pending changesets, failing clearly on an unreadable file. */
+function loadPending() {
+  try {
+    return listPending(changesetDir);
+  } catch (error) {
+    return fail(error.message);
   }
-  const short = version.replace(
-    SNAPSHOT_SUFFIX,
-    `${match.groups.head}${match.groups.sha.slice(0, 7)}`,
-  );
-  renameVersion(version, short);
-  return short;
 }
 
-function requirePending() {
-  const pending = listPending(changesetDir);
+/** The pending changesets; fails when there is none or one names an unknown package. */
+function readPending() {
+  const pending = loadPending();
   if (pending.length === 0) {
-    fail("no pending changesets: add one with `nubx changeset` before versioning");
+    fail(
+      "no pending changesets: add one with `nub run changeset <patch|minor|major>` before versioning",
+    );
+  }
+  const unknown = unknownReleases(
+    pending,
+    publishedManifests().map(({ name }) => name),
+  );
+  if (unknown.length > 0) {
+    fail(unknown.join("\n"));
   }
   return pending;
+}
+
+/** The pending changesets and the version they lead to. */
+function plan() {
+  const pending = readPending();
+  return { pending, next: bumpVersion(sharedVersion(), highestBump(pending)) };
+}
+
+/** The first 7 characters of HEAD's commit hash, for a snapshot version. */
+function shortSha() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+  if (result.status !== 0) {
+    fail("cannot read HEAD's commit hash (a snapshot version names it)");
+  }
+  return result.stdout.trim().slice(0, 7);
 }
 
 const mode = process.argv[2];
 if (mode === "--pending") {
   emit("pending", listPending(changesetDir).length);
 } else if (mode === "--snapshot") {
-  requirePending();
-  changeset("version", "--snapshot", "next");
-  const version = shortenSnapshot(sharedVersion());
+  const version = `${plan().next}-next-${shortSha()}`;
+  writeVersion(version);
+  deleteChangesets();
   emit("version", version);
 } else if (mode === undefined) {
-  const entries = renderEntries(requirePending());
-  changeset("version");
-  const version = sharedVersion();
+  const { pending, next } = plan();
   const file = join(root, "CHANGELOG.md");
   const date = new Date().toISOString().slice(0, 10);
-  writeFileAtomic(file, mergeChangelog(readFileSync(file, "utf8"), { version, date, entries }));
-  emit("version", version);
+  const entries = renderEntries(pending);
+  writeFileAtomic(
+    file,
+    mergeChangelog(readFileSync(file, "utf8"), { version: next, date, entries }),
+  );
+  writeVersion(next);
+  deleteChangesets();
+  emit("version", next);
 } else {
   fail(`unknown option ${mode} (want --pending or --snapshot, or none for a stable release)`);
 }

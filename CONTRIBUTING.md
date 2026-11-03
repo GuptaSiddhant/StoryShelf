@@ -41,11 +41,11 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package and its de
 3. **Commit with [conventional commits](https://www.conventionalcommits.org/)** (`feat:`, `fix:`, `docs:`, `chore:` …). The pre-commit hook enforces the format.
 4. **Open a pull request** against `main`. CI must be green.
 5. **Merges are squash merges.** One task is one commit on `main`, titled `feat(<task-id>): <short description>`. Reference the issue with `Closes #<n>`.
-6. **Add a changeset** when the change affects what a published package does: `nubx changeset`, then commit the file it creates. Write it like a `CHANGELOG.md` entry. Docs, test and CI changes need none; put the `no-release` label on the pull request so the check passes. Never edit `CHANGELOG.md` or package versions by hand.
+6. **Add a changeset** when the change affects what a published package does: `nub run changeset <patch|minor|major> --message "<entry>"`, then commit the file it creates. Write it like a `CHANGELOG.md` entry. Docs, test and CI changes need none; put the `no-release` label on the pull request so the check passes. Never edit `CHANGELOG.md` or package versions by hand.
 
 ## Releases and previews
 
-Packages are released through [Changesets](https://github.com/changesets/changesets) (ADR 0043). All published packages share one version.
+Packages are released from [Changesets](https://github.com/changesets/changesets)-format files, versioned by our own `scripts/version-packages.mjs` (ADR 0043). All published packages share one version.
 
 - **`next` builds.** Each push to `main` that has pending changesets publishes every package to npm under the `next` dist-tag, versioned `<next version>-next-<short sha>`, for example `npm install @storyshelf/core@next`. A push without a pending changeset publishes nothing, and `latest` is never touched.
 - **Stable releases** are cut by pull request, on request. `nub run release:prepare` versions the pending changesets on a `release/v<version>` branch (one version, the `CHANGELOG.md` section, `chore(release): v<version>`); open a pull request from it. Merging it to `main` publishes to `latest` on npm, tags `v<version>`, and creates the GitHub Release. If a publish fails, the next push to `main` retries it, or run the `Release` workflow by hand with that version.

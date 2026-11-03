@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  PLACEHOLDER_BODY,
+  bumpVersion,
+  changesetName,
   checkChangeset,
+  highestBump,
   malformedChangesets,
   manifestPublished,
   mergeChangelog,
   parseChangeset,
+  releaseBranchVersion,
+  releaseProblems,
+  renderChangeset,
   renderEntries,
+  unknownReleases,
 } from "./changeset-lib.mjs";
 
 const CHANGELOG = `# Changelog
@@ -202,5 +210,213 @@ describe("malformedChangesets", () => {
   it("looks only at changeset files, not the README or other paths", () => {
     assert.deepEqual(malformedChangesets([".changeset/README.md", "docs/x.md"], read), []);
     assert.deepEqual(malformedChangesets([".changeset/good.md"], read), []);
+  });
+});
+
+const changesetOf = (file, ...releases) => ({
+  file,
+  releases: releases.map(([name, bump]) => ({ name, bump })),
+  body: "",
+});
+
+describe("highestBump and bumpVersion", () => {
+  it("takes the largest bump of any changeset", () => {
+    const patch = changesetOf("a.md", ["@storyshelf/app", "patch"]);
+    const minor = changesetOf("b.md", ["@storyshelf/core", "minor"], ["@storyshelf/app", "patch"]);
+    const major = changesetOf("c.md", ["@storyshelf/cli", "major"]);
+    assert.equal(highestBump([patch]), "patch");
+    assert.equal(highestBump([patch, minor]), "minor");
+    assert.equal(highestBump([minor, major, patch]), "major");
+  });
+
+  it("applies a bump like semver, zeroing what is below it", () => {
+    assert.equal(bumpVersion("0.8.0", "minor"), "0.9.0");
+    assert.equal(bumpVersion("0.8.3", "minor"), "0.9.0");
+    assert.equal(bumpVersion("0.8.3", "patch"), "0.8.4");
+    assert.equal(bumpVersion("0.8.3", "major"), "1.0.0");
+    assert.equal(bumpVersion("1.9.12", "minor"), "1.10.0");
+  });
+
+  it("refuses a version or a bump it cannot apply", () => {
+    assert.throws(() => bumpVersion("0.9.0-next-abc1234", "patch"), /major\.minor\.patch/u);
+    assert.throws(() => bumpVersion("0.8", "patch"), /major\.minor\.patch/u);
+    assert.throws(() => bumpVersion("0.8.0", "huge"), /huge/u);
+  });
+});
+
+describe("unknownReleases", () => {
+  const known = ["@storyshelf/core", "storyshelf"];
+
+  it("is empty when every released package is published here", () => {
+    assert.deepEqual(
+      unknownReleases([changesetOf("a.md", ["@storyshelf/core", "minor"])], known),
+      [],
+    );
+  });
+
+  it("names each unknown package with its file and the known ones", () => {
+    const problems = unknownReleases(
+      [changesetOf("a.md", ["@storyshelf/nope", "patch"], ["storyshelf", "patch"])],
+      known,
+    );
+    assert.equal(problems.length, 1);
+    assert.match(
+      problems[0],
+      /a\.md: unknown package "@storyshelf\/nope" \(known: @storyshelf\/core, storyshelf\)/u,
+    );
+  });
+});
+
+describe("renderChangeset", () => {
+  it("writes front matter that parses back, and the message as the body", () => {
+    const text = renderChangeset({
+      packages: ["@storyshelf/core", "storyshelf"],
+      bump: "minor",
+      message: "  **Added: a thing (#1)**  ",
+    });
+    assert.equal(
+      text,
+      '---\n"@storyshelf/core": minor\n"storyshelf": minor\n---\n\n**Added: a thing (#1)**\n',
+    );
+    const parsed = parseChangeset(text, "x.md");
+    assert.deepEqual(parsed.releases, [
+      { name: "@storyshelf/core", bump: "minor" },
+      { name: "storyshelf", bump: "minor" },
+    ]);
+    assert.equal(parsed.body, "**Added: a thing (#1)**");
+  });
+
+  it("uses the placeholder without a message, and CI refuses a file that keeps it", () => {
+    const text = renderChangeset({ packages: ["storyshelf"], bump: "patch" });
+    assert.match(text, new RegExp(PLACEHOLDER_BODY.slice(0, 20), "u"));
+    const problems = malformedChangesets([".changeset/new.md"], () => text);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /replace the placeholder/u);
+    assert.deepEqual(
+      malformedChangesets([".changeset/new.md"], () =>
+        text.replace(PLACEHOLDER_BODY, "**Fixed: x (#1)**"),
+      ),
+      [],
+    );
+  });
+
+  it("refuses an unknown bump or no package", () => {
+    assert.throws(() => renderChangeset({ packages: ["storyshelf"], bump: "huge" }), /huge/u);
+    assert.throws(() => renderChangeset({ packages: [], bump: "patch" }), /at least one package/u);
+  });
+});
+
+/** The first name the word lists produce when `random` always picks index 0. */
+const isFirstName = (name) => name === "brave-apples-dance";
+
+describe("changesetName", () => {
+  it("builds three words and skips a name that is taken", () => {
+    const picks = [0, 0, 0, 1, 1, 1];
+    const random = () => picks.shift();
+    assert.equal(changesetName(random, isFirstName), "calm-bears-glow");
+  });
+
+  it("gives up when every name is taken", () => {
+    assert.throws(
+      () =>
+        changesetName(
+          () => 0,
+          () => true,
+        ),
+      /free changeset name/u,
+    );
+  });
+});
+
+describe("releaseBranchVersion", () => {
+  it("reads the version of release/v<version> and nothing else", () => {
+    assert.equal(releaseBranchVersion("release/v0.9.0"), "0.9.0");
+    assert.equal(releaseBranchVersion("release/v10.2.31"), "10.2.31");
+    for (const other of [
+      "release/0.9.0",
+      "release/v0.9",
+      "release/v0.9.0-next",
+      "feature/release/v0.9.0",
+      "main",
+      "",
+      undefined,
+    ]) {
+      assert.equal(releaseBranchVersion(other), null);
+    }
+  });
+});
+
+const releaseManifest = (version, extra = {}) =>
+  JSON.stringify({ name: "@storyshelf/core", version, ...extra }, null, 2);
+
+/** `releaseProblems` for release 0.9.0 whose manifests went from 0.8.0 to 0.9.0 unless `files` says otherwise. */
+const runRelease = (entries, files = {}) =>
+  releaseProblems({
+    version: "0.9.0",
+    entries,
+    readBase: (path) => files[`base:${path}`] ?? releaseManifest("0.8.0"),
+    readHead: (path) => files[`head:${path}`] ?? releaseManifest("0.9.0"),
+  });
+
+describe("releaseProblems, a valid release", () => {
+  it("passes new versions, the changelog and consumed changesets", () => {
+    assert.deepEqual(
+      runRelease([
+        { status: "M", path: "packages/core/package.json" },
+        { status: "M", path: "packages/app/package.json" },
+        { status: "M", path: "CHANGELOG.md" },
+        { status: "D", path: ".changeset/brave-apples-dance.md" },
+        { status: "D", path: ".changeset/calm-bears-glow.md" },
+      ]),
+      [],
+    );
+  });
+
+  it("leaves the changelog alone and still counts the changesets README as foreign", () => {
+    assert.deepEqual(runRelease([{ status: "M", path: "CHANGELOG.md" }]), []);
+    assert.deepEqual(runRelease([{ status: "M", path: ".changeset/README.md" }]), [
+      ".changeset/README.md is not part of a release",
+    ]);
+  });
+});
+
+describe("releaseProblems, a branch that is not only a release", () => {
+  it("fails anything else a release branch changes", () => {
+    const problems = runRelease([
+      { status: "M", path: "packages/core/package.json" },
+      { status: "M", path: "packages/core/src/index.ts" },
+      { status: "A", path: "docs/notes.md" },
+    ]);
+    assert.deepEqual(problems, [
+      "packages/core/src/index.ts is not part of a release",
+      "docs/notes.md is not part of a release",
+    ]);
+  });
+
+  it("fails a changeset that is added or edited, not deleted", () => {
+    assert.deepEqual(runRelease([{ status: "A", path: ".changeset/new-one.md" }]), [
+      ".changeset/new-one.md must be deleted by a release, not changed",
+    ]);
+  });
+
+  it("fails a manifest that changes more than its version, or to another version", () => {
+    const entry = [{ status: "M", path: "packages/core/package.json" }];
+    const wider = releaseManifest("0.9.0", { dependencies: { left: "1.0.0" } });
+    assert.deepEqual(runRelease(entry, { "head:packages/core/package.json": wider }), [
+      "packages/core/package.json changes more than its version",
+    ]);
+    assert.deepEqual(
+      runRelease(entry, { "head:packages/core/package.json": releaseManifest("0.9.1") }),
+      ["packages/core/package.json is at 0.9.1, not 0.9.0"],
+    );
+  });
+
+  it("fails a manifest it cannot read", () => {
+    assert.deepEqual(
+      runRelease([{ status: "M", path: "packages/core/package.json" }], {
+        "head:packages/core/package.json": "{",
+      }),
+      ["packages/core/package.json cannot be read on both sides"],
+    );
   });
 });

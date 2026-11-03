@@ -221,7 +221,7 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
 - **Commits** are conventional (`feat:`, `fix:`); pre-commit rejects unformatted or unlinted files.
   Fix with `nub run fmt` and re-stage; do not bypass hooks.
 - **Changesets.** A pull request that changes shipped behavior (the source of `packages/*`, or a
-  published `package.json`) adds a changeset: `nubx changeset`, one Markdown file in `.changeset/`
+  published `package.json`) adds a changeset: `nub run changeset <patch|minor|major>`, one Markdown file in `.changeset/`
   written like a `CHANGELOG.md` entry. Never edit `CHANGELOG.md` by hand and never bump versions;
   `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
   tells the CI check so. Task PRs on an epic branch add theirs there.

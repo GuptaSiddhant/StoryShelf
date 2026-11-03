@@ -5,11 +5,13 @@ here that says which packages change and what a user should know. Docs, test, CI
 add none (or carry the `no-release` label).
 
 ```sh
-nubx changeset
+nub run changeset <patch|minor|major> [--package <name>…] [--message "<text>"]
 ```
 
-Pick every package the change touches (all packages share one version, so the choice only decides
-the bump size) and write the entry the way the root `CHANGELOG.md` is written: start with a bold
+It writes `.changeset/<three-random-words>.md` for every published package (all packages share one
+version, so the choice of package only decides the bump size; `--package` narrows it). Give the entry
+with `--message`, or edit the file: CI rejects a file that still holds the placeholder. Write it the
+way the root `CHANGELOG.md` is written: start with a bold
 lead (`**Fixed: …**`, `**Added: …**`, `**Changed: …**`, `**Breaking: …**`) and say what a user
 sees, with the issue numbers.
 
