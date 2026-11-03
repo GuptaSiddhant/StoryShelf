@@ -71,15 +71,18 @@ jobs:
         working-directory: packages/app
         run: nub run build-storybook
 
-      # `doctor` reports a shallow clone or missing stats as a warning (a customer's upload still
-      # works, rendering everything). Our own pipeline is strict: any warning fails the job.
+      # `doctor` reports a shallow clone or missing stats as a warning (!), and a failed check as ✗
+      # (it also exits 1 for those). A customer's upload still works after a warning, rendering
+      # everything; our own pipeline is strict: any ! or ✗ line fails the job. `shell: bash` adds
+      # pipefail, so doctor's own exit status is not swallowed by the pipe to tee.
       - name: Check the upload would succeed
         if: steps.gate.outputs.run == 'true'
+        shell: bash
         working-directory: packages/app
         run: |
           npx --yes storyshelf@latest doctor | tee doctor.log
-          if grep -q '^!' doctor.log; then
-            echo "::error title=storyshelf doctor::doctor reported warnings (missing stats, shallow clone or config); see the log."
+          if grep -qE '^(!|✗)' doctor.log; then
+            echo "::error title=storyshelf doctor::doctor reported a warning or a failed check; see the log."
             exit 1
           fi
 

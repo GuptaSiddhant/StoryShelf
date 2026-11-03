@@ -1,5 +1,5 @@
 {
-  "url": "https://storyshelf.fly.dev/",
+  "url": "https://storyshelf.fly.dev",
   "slug": "storyshelf-ui",
   "untraced": [
     "**/assets/htmx.ts",
