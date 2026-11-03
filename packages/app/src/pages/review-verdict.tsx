@@ -61,14 +61,20 @@ function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
     return null;
   }
   if (data.publishing === "pending") {
-    return <Meta>Waiting for the Storybook to publish. You can give a verdict once it has.</Meta>;
+    return (
+      <VStack>
+        <Meta>Waiting for the Storybook to publish. You can give a verdict once it has.</Meta>
+        <VerdictForm data={data} disabled />
+      </VStack>
+    );
   }
   return data.publishing === "success" ? <VerdictForm data={data} /> : null;
 }
 
-/** The reviewer's controls: an optional note and the two verdicts. */
-function VerdictForm(props: { data: ReviewSectionData }): Rendered {
+/** The reviewer's controls: an optional note and the two verdicts; `disabled` while the build cannot take one yet. */
+function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Rendered {
   const { project, build } = props.data;
+  const { disabled } = props;
   const url = `/projects/${project.slug}/builds/${build.id}/reviews`;
   return (
     <form method="post" action={url} hx-post={url} hx-target="body" class="mt-1 max-w-prose">
@@ -81,10 +87,22 @@ function VerdictForm(props: { data: ReviewSectionData }): Rendered {
           rows={2}
         />
         <HStack>
-          <Button variant="primary" type="submit" name="verdict" value="approved">
+          <Button
+            variant="primary"
+            type="submit"
+            name="verdict"
+            value="approved"
+            disabled={disabled}
+          >
             Approve build
           </Button>
-          <Button variant="danger" type="submit" name="verdict" value="rejected">
+          <Button
+            variant="danger"
+            type="submit"
+            name="verdict"
+            value="rejected"
+            disabled={disabled}
+          >
             Reject build
           </Button>
         </HStack>

@@ -385,7 +385,8 @@ describe("the build page without testing", () => {
     expect((await new BuildModel(booted.db).get(build.id))?.status).toBe("pending");
     const html = await (await booted.page("alice", `/builds/${build.id}`)).text();
     expect(html).toContain("Waiting for the Storybook to publish");
-    expect(html).not.toContain("Approve build");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*value="approved"/u);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*value="rejected"/u);
     await booted.stop();
   });
 
