@@ -69,6 +69,12 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   are the reference implementations.
 - Pages follow the same rule: section components in `<page>-<section>.tsx`
   (`build-diff-header/nav/viewer/comments.tsx`), composed by a thin `<page>.tsx`.
+- Storybook (`packages/app/.storybook/`, `src/**/*.stories.tsx`, `src/stories-fixtures/`) is the
+  design-system showcase: every shared component and the key pages, light and dark, from the real
+  source. `main.ts` aliases a few server-only modules to `.storybook/shims/` (store, csrf, icon sprite,
+  Node built-ins); `render.tsx` renders JSX to HTML like `c.html()`; `page.tsx` shows a page's full
+  document in a frame. It is a dev dependency only: `files` and `exports` are unchanged, nothing
+  story-related is published, and `turbo verify` builds it (`build-storybook`).
 - UI primitives live in `ui/` by family (`buttons`, `feedback`, `forms`, `layout`)
   behind the `ui/components.tsx` facade — import from the facade.
 

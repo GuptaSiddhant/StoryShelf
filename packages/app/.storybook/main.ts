@@ -25,9 +25,16 @@ const config: StorybookConfig = {
         replacement: here("./shims/sprite.ts"),
       },
       { find: /^(?:\.{1,2}\/)+store\.ts$/u, replacement: here("./shims/store.ts") },
+      { find: /^(?:sharp|unzipper|pngjs|graceful-fs)$/u, replacement: here("./shims/inert.ts") },
       {
-        find: /^node:(?:path|url|buffer|zlib|crypto|timers\/promises)$/u,
+        find: /^node:(?:[a-z_]+(?:\/[a-z]+)?)$/u,
         replacement: here("./shims/node-builtins.ts"),
+      },
+      {
+        // The package barrel also holds the contract suites (which import vitest): stories need
+        // only the in-memory database.
+        find: "@storyshelf/core/test-helpers",
+        replacement: here("../../core/src/test-helpers/fake-database.ts"),
       },
       { find: /^(?:\.{1,2}\/)+middleware\/csrf\.ts$/u, replacement: here("./shims/csrf.ts") },
     ];
@@ -38,6 +45,8 @@ const config: StorybookConfig = {
     return {
       ...viteConfig,
       resolve: { ...viteConfig.resolve, alias: [...aliases, ...current] },
+      // One bundle holds every story and the app's UI code: the size is expected, not a warning.
+      build: { ...viteConfig.build, chunkSizeWarningLimit: 4000 },
     };
   },
 };

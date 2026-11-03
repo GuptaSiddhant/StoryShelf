@@ -1,16 +1,27 @@
 import type { StoryObj } from "@storybook/html-vite";
 import { markSource } from "../src/assets/mark.ts";
 import type { Store } from "../src/store.ts";
-import { resolveHtml } from "./render.tsx";
+import type { StoryDataset } from "../src/stories-fixtures/database.ts";
+import { baselineShot, currentShot, designShot, diffShot } from "./assets/screens.ts";
+import { resolveHtml, withFrozenClock } from "./render.tsx";
 import { iconSprite } from "./shims/sprite.ts";
-import { setStoryStore } from "./shims/store.ts";
+import { setStoryStore, useStoryDataset } from "./shims/store.ts";
 
 type PageHtml = unknown;
 
 export interface PageStoryOptions {
   /** Store fields for this story (testing off, a signed-in user, …). */
   store?: Partial<Store>;
+  /** The data the page reads: the populated project (default), an empty one, or none at all. */
+  dataset?: StoryDataset;
 }
+
+/** The fixed screenshots standing in for a snapshot's image, diff and baseline URLs. */
+const SCREENSHOTS: Record<string, string> = {
+  image: currentShot,
+  diff: diffShot,
+  baseline: baselineShot,
+};
 
 const markDataUri = `data:image/svg+xml,${encodeURIComponent(markSource)}`;
 
@@ -23,6 +34,11 @@ export function standalonePage(html: string, theme: string): string {
     .replaceAll(/<script\b[^>]*\bsrc=[^>]*><\/script>/gu, "")
     .replaceAll(/<link\b[^>]*\brel="icon"[^>]*>/gu, "")
     .replaceAll("/assets/mark-storybook.svg", markDataUri)
+    .replaceAll(
+      /src="\/api\/v1\/[^"]*\/(?<kind>image|diff|baseline)"/gu,
+      (_match, kind: string) => `src="${SCREENSHOTS[kind] ?? currentShot}"`,
+    )
+    .replaceAll(/src="\/api\/v1\/[^"]*"/gu, `src="${designShot}"`)
     .replace('data-theme="system"', `data-theme="${theme}"`)
     .replace(/<body(?<attributes>[^>]*)>/u, `<body$<attributes>>${iconSprite}`);
 }
@@ -38,7 +54,8 @@ export function pageStory(render: () => PageHtml, options: PageStoryOptions = {}
     loaders: [
       async () => {
         setStoryStore(options.store);
-        return { html: await resolveHtml(await render()) };
+        await useStoryDataset(options.dataset ?? "populated");
+        return { html: await withFrozenClock(async () => await resolveHtml(await render())) };
       },
     ],
     render: (_args, context) => {

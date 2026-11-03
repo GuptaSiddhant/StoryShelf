@@ -129,6 +129,35 @@ mounted in `DocumentLayout` right after the token `<style>` tag) with
   under `declaration: true` (TS4023). Keep the wrappers; don't "simplify"
   them back to `export { css } from "hono/css"` (loses labels + breaks `tsc`).
 
+## Stories: a new component or variant ships with one
+
+The app has its own Storybook (`packages/app/.storybook/`). Add `<name>.stories.tsx` beside the
+component (a family module in `ui/`, or the page in `pages/`):
+
+```tsx
+// oxlint-disable typescript/promise-function-async -- story factories return Hono JSX
+import type { Meta } from "@storybook/html-vite";
+import { jsxStory } from "../../.storybook/render.tsx";
+import { Badge, HStack } from "./components.tsx";
+
+const meta: Meta = { title: "UI/Badge" };
+export default meta;
+
+export const Tones = jsxStory(() => (
+  <HStack><Badge tone="danger">Failed</Badge></HStack>
+));
+```
+
+- One story per variant or state (empty, populated, error, permission-denied, testing off); no
+  clicking through. Compose the shared components, never `style="..."` (the consistency ratchet
+  covers stories too).
+- Pages use `pageStory(() => renderXPage(...), { dataset, store })` over the seeded in-memory
+  database in `src/stories-fixtures/`; add rows there (typed with the real schema interfaces, fixed
+  ids, times via `hoursAgo()`), never `Date.now()` or randomness.
+- A page that cannot render in the browser needs a story-only stand-in in `.storybook/shims/` and
+  an alias in `.storybook/main.ts`, never an `if` in production code.
+- `nub run storybook` (from `packages/app`) to look at it; `nub run build-storybook` must pass.
+
 ## Gotchas this repo already hit
 
 - **Never render CSS as a JSX text child** (`<style>{cssString}</style>`).
@@ -152,9 +181,10 @@ mounted in `DocumentLayout` right after the token `<style>` tag) with
 3. `nub run test` — includes `ui/consistency.test.ts` (ratchet) and
    `ui/document.test.ts` (unescaped stylesheet + style collection)
 4. `nub run build`
-5. Run the app against seeded data and look at it (light + dark, 375px and
+5. `nub run build-storybook` (from `packages/app/`) and open the story in light and dark.
+6. Run the app against seeded data and look at it (light + dark, 375px and
    desktop). Optionally audit with axe-core — the redesign shipped with zero
    violations across the main pages in both themes.
-6. `nub run screenshots` (repo root; `screenshots:app` / `screenshots:og` for
+7. `nub run screenshots` (repo root; `screenshots:app` / `screenshots:og` for
    one half) when docs screenshots (light + dark, in `apps/website/src/assets/screenshots`) need refreshing; eyeball the PNGs before
    committing

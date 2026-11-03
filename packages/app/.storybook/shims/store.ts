@@ -4,21 +4,13 @@
  * This one holds a fixed, deterministic store that a page story can adjust with `setStoryStore`.
  * Pages call the same `getStore()` / `testingEnabled()` / `catalogOf()` they do in production.
  */
+import type { CatalogLoader } from "@storyshelf/core/capture";
 import type { Store } from "../../src/store.ts";
-
-/** Projects the shell's project picker lists. */
-export const STORY_PROJECTS = [
-  { id: "01JD0000000000000000000001", slug: "design-system", name: "Design system" },
-  { id: "01JD0000000000000000000002", slug: "web-app", name: "Web app" },
-];
-
-const database = {
-  tables: { projects: { name: "projects" } },
-  list: async (): Promise<unknown[]> => await Promise.resolve(STORY_PROJECTS),
-};
+import type { StoryDataset } from "../../src/stories-fixtures/database.ts";
+import { seedStoryDatabase } from "../../src/stories-fixtures/database.ts";
 
 const baseStore = {
-  db: database,
+  db: {},
   storage: {},
   config: { secret: "storybook-secret", publishedBaseDomain: undefined },
   ui: {},
@@ -32,10 +24,19 @@ const baseStore = {
 } as unknown as Store;
 
 let current: Store = baseStore;
+let catalog: CatalogLoader | null = null;
+
+/** Seed the in-memory database for a story and make it the store's database. */
+export async function useStoryDataset(dataset: StoryDataset): Promise<void> {
+  const seeded = await seedStoryDatabase(dataset);
+  catalog = seeded.catalog;
+  current = { ...current, db: seeded.db };
+}
 
 /** Replace the story store for the next render (merged over the defaults, never persisted). */
 export function setStoryStore(overrides: Partial<Store> = {}): void {
   current = { ...baseStore, ...overrides };
+  catalog = null;
 }
 
 export function runWithStore<T>(_store: Store, fn: () => T): T {
@@ -50,7 +51,8 @@ export function testingEnabled(store: Store = current): boolean {
   return store.testing;
 }
 
-/** Pages that read the catalog get the one a story supplies (empty by default). */
-export function catalogOf(): never {
-  throw new Error("This story reads the catalog: pass the data through props instead.");
+/** The catalog of the story's dataset (null catalogs for builds with nothing published). */
+export function catalogOf(): CatalogLoader {
+  if (!catalog) throw new Error("This story reads the catalog: pick a dataset for the page story.");
+  return catalog;
 }

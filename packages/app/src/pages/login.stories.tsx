@@ -15,19 +15,19 @@ const password: EngineMethodLink = {
 const github: EngineMethodLink = {
   kind: "oauth",
   id: "github",
-  label: "Continue with GitHub",
+  label: "GitHub",
   url: "/auth/github",
 };
 const passkey: EngineMethodLink = {
   kind: "passkey",
   id: "passkey",
-  label: "Use a passkey",
+  label: "a passkey",
   url: "/auth/passkey",
 };
 const sso: EngineMethodLink = {
   kind: "sso",
   id: "okta",
-  label: "Sign in with Okta",
+  label: "Okta",
   url: "/auth/okta",
 };
 

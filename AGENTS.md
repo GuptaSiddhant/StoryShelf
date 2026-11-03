@@ -37,6 +37,9 @@ nubx vitest run src/path/to/file.test.ts
 nubx vitest run src/path/to/file.test.ts -t "test name"
 nubx tsc --noEmit -p tsconfig.json
 
+# The app's own Storybook (UI components + key pages), from packages/app:
+#   nub run storybook (dev, :6006) | nub run build-storybook (-> storybook-static/, gitignored)
+
 # Website, from apps/website: nub run dev | build | start   (start needs a prior build)
 # Or from the root: nub run web:dev | web:build | docs
 ```
@@ -165,7 +168,13 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   never raw `btn`/`tabs`/`card` classes, `style="..."`, or direct family imports. Styles are colocated
   via `packages/app/src/ui/css.ts`: one labeled `css` template per variant composed with `${base}`
   (not `cx`), static values only. `packages/app/src/ui/consistency.test.ts` is a zero-tolerance
-  ratchet. Load the `ui-building-blocks` skill before touching UI.
+  ratchet. **A new component or variant ships with a story** (`*.stories.tsx` beside it, titled
+  `UI/<Component>`; pages are `Pages/<Area>/<Page>`, one story per state): `packages/app/.storybook/`
+  renders the real hono/jsx with the app's own styles, tokens and theme, and `turbo verify` builds it,
+  so a broken story fails the PR. Story-only fixtures live in `src/stories-fixtures/` (typed with the
+  real row types, fixed ids, clock frozen at `STORY_NOW`); story-only stand-ins for server modules
+  (`store.ts`, `middleware/csrf.ts`, the icon sprite, Node built-ins) live in `.storybook/shims/`,
+  never as a production branch. Load the `ui-building-blocks` skill before touching UI.
 - **Turbo cache inputs.** CI restores `.turbo/cache`, so a task hash must cover everything it reads.
   Shared files belong in `globalDependencies`; a test reading outside its package needs that file in
   the package's `turbo.json` (`extends: ["//"]`, `inputs: ["$TURBO_DEFAULT$", "$TURBO_ROOT$/<path>"]`).
