@@ -9,7 +9,7 @@ import {
   Stat,
   Table,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 

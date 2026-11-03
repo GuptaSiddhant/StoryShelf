@@ -12,7 +12,7 @@ import {
   SectionTitle,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
 export interface SettingsWebhook {

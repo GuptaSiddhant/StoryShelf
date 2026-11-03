@@ -11,7 +11,7 @@ import {
   SectionTitle,
   SelectField,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import { targetChoices } from "./target-choices.ts";
 
 /** Form state for the settings tabs (field errors and global error). */

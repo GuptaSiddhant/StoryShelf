@@ -9,7 +9,7 @@ import {
   Meta,
   SectionTitle,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 
 /** Tests settings tab: play execution, Storybook 10 test runs, accessibility checks, play timeout. */
 export function renderSettingsTests(

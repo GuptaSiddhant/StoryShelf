@@ -12,9 +12,9 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import { css } from "../ui/css.ts";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { passkeyRegisterScript } from "./passkey-ceremony.ts";
 

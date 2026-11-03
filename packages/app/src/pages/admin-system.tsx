@@ -17,8 +17,8 @@ import {
   Stat,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";

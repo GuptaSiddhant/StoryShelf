@@ -16,7 +16,7 @@ import {
   statusTone,
   Badge,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { ProjectDesignLinks } from "./design-links.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 import { LibraryGrid } from "./library-grid.tsx";

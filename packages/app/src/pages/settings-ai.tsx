@@ -10,7 +10,7 @@ import {
   SectionTitle,
   SelectField,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 
 /** AI availability and profile choices passed to the settings tab. */
 export interface SettingsAiData {

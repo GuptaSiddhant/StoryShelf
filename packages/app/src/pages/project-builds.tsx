@@ -16,7 +16,7 @@ import {
   Stat,
   VStack,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 

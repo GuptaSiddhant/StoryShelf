@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { PREVIEW_SANDBOX, PreviewEmbed } from "./preview-embed.tsx";
-import { clientScript } from "./shell/client-script.ts";
+import { clientScript } from "../shell/client-script.ts";
 
 async function render(): Promise<string> {
   const app = new Hono();

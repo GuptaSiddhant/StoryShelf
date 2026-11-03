@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Field, HStack, PageHeader } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 
 /** Form state for the project creation page (values and validation errors). */
 export interface ProjectCreateFormState {

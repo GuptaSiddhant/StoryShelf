@@ -11,7 +11,7 @@ import {
   SelectField,
   TextareaField,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import type { NotificationsFormState, SettingsNotifyProvider } from "./settings-notifications.tsx";
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */

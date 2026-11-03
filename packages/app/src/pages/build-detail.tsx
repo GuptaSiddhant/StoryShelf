@@ -30,7 +30,7 @@ import {
   VStack,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   snapshotCard,
   snapshotCardBody,

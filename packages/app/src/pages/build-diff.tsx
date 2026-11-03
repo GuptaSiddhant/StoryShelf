@@ -6,7 +6,7 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
 import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
 import { EmptyState } from "../ui/components.tsx";
-import { DocumentLayout, type NavConfig, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type NavConfig, type RenderedContent } from "../shell/document.tsx";
 import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
 import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";

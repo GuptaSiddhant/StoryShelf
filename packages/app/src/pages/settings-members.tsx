@@ -13,7 +13,7 @@ import {
   SelectField,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 
 /** Project member row as rendered in the members settings tab. */
 export interface SettingsMember {

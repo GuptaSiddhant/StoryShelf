@@ -1,7 +1,7 @@
 import { htmxSource } from "./assets/htmx.ts";
 import { markSource } from "./assets/mark.ts";
 import { contentHash, iconSprite, iconSpriteHash, iconSpriteHref } from "./ui/icons/sprite.ts";
-import { clientScript } from "./ui/shell/client-script.ts";
+import { clientScript } from "./shell/client-script.ts";
 
 /**
  * Static assets with content-addressed URLs. A URL that embeds the content

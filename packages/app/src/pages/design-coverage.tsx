@@ -20,7 +20,7 @@ import {
   VStack,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 

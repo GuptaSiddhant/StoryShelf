@@ -14,7 +14,7 @@ import {
   Table,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 
 /** Build statuses the retry button of the jobs table offers. */
 const RETRYABLE: ReadonlySet<string> = new Set(["failed", "cancelled", "pending"]);

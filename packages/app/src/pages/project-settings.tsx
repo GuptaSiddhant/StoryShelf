@@ -6,7 +6,7 @@ import type { Token } from "@storyshelf/core/schema";
 import { testingEnabled } from "../store.ts";
 import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
 import { renderSettingsCapture } from "./settings-capture.tsx";
 import { renderSettingsDesign, type SettingsDesignData } from "./settings-design.tsx";

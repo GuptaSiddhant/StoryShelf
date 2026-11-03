@@ -14,7 +14,7 @@ import {
   VStack,
   statusTone,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import { openChangeRequests, openRequestsLabel } from "./review-change-requests.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */

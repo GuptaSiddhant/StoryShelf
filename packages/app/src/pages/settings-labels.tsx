@@ -12,7 +12,7 @@ import {
   SectionTitle,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 
 /** Labels settings tab: label-type table plus the create-type form. */
 export function renderSettingsLabels(

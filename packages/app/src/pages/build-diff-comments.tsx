@@ -13,7 +13,7 @@ import {
   TextareaField,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   reviewComment,
   reviewCommentActions,
