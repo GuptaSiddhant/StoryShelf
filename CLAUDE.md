@@ -8,7 +8,7 @@ The canonical agent guide is `AGENTS.md` — toolchain, commands, layout, archit
 
 ## Claude Code specifics
 
-- **Model and subagents** (`.claude/settings.json`): developer sessions run Sonnet 5.5 at medium effort, and the `Agent` tool is denied, so never spawn subagents. An issue labelled `model:opus` needs a stronger model: before starting it, comment on the issue and ask the owner to switch your session's model; don't start until they confirm. A personal override belongs in `.claude/settings.local.json`, never in the shared file.
+- **Model and subagents** (`.claude/settings.json`): developer sessions run Sonnet 5.5 at medium effort, and the `Agent` tool is denied, so never spawn subagents. Every task starts on Sonnet; the owner upgrades a session case by case only after it has struggled. A personal override belongs in `.claude/settings.local.json`, never in the shared file.
 - **Skills** live in `.agents/skills/` (tool-neutral); `.claude/skills` is a symlink to it, so `ui-building-blocks` and `adapter-layout` load automatically. Edit them under `.agents/skills/`.
 - **Running a single test:** from the package dir, `nubx vitest run src/path/to/file.test.ts` (add `-t "<name>"` to filter by test name). Integration suites follow the same pattern, e.g. `nubx vitest run src/smoke.integration.test.ts`.
 - **Node 24.x is required** (`devEngines.runtime` fails hard otherwise). If `~/.nub/bin` doesn't exist the toolchain isn't installed yet; run `nub ci` once it is.
