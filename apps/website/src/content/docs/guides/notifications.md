@@ -42,7 +42,11 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
 
 A GitHub channel can post **check runs** as a GitHub App instead of commit statuses (`"mode": "checks"`, `appId`, `installationId` in `config`, the App's private key as `secret`); see [GitHub check runs](/packages/notify-git/#github-check-runs). GitLab always uses statuses. A site-wide git channel, or one without a token (or key), is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
 
-Git delivery is **durable**, unlike messages: each state change is a `notify` job on the database queue that reads the build when it runs and is retried with backoff (five attempts), or delivered inline without durability on a host with no queue consumer. See [Delivery](/packages/notify-git/#delivery). Every channel (message or git) records its **last delivery error and time**: the settings page shows a failing channel with the error, and `GET …/notification-channels` returns `lastError` and `lastErrorAt` (both `null` while the channel delivers cleanly). The next successful delivery clears the error; a git delivery that is given up also raises `sys:notify-failed`.
+Git delivery is **durable**, unlike messages: each state change is a `notify` job on the database queue that reads the build when it runs and is retried with backoff (five attempts), or delivered inline without durability on a host with no queue consumer. See [Delivery](/packages/notify-git/#delivery).
+
+**How soon a git status appears.** A build state change queues the job right away, but a consumer picks it up by polling, so a status shows up about 2 seconds later while the server has been busy, and about 15 seconds later when it has been idle (each wait can be up to 20 % longer). This holds when captures run in a forked worker (`testing.workerEntry`), where the worker queues the job and the server's consumer delivers it. If no consumer is running, the job is kept, not dropped and not delivered by the worker: the status appears once a consumer starts.
+
+Every channel (message or git) records its **last delivery error and time**: the settings page shows a failing channel with the error, and `GET …/notification-channels` returns `lastError` and `lastErrorAt` (both `null` while the channel delivers cleanly). The next successful delivery clears the error; a git delivery that is given up also raises `sys:notify-failed`.
 
 ## Manage your subscriptions
 
