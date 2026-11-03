@@ -210,6 +210,11 @@ as SQLite and Postgres do, in its own database. That file is skipped unless `MYS
 `nub run test` stays hermetic. To run it yourself, against a disposable database:
 
 ```sh
-docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
+docker run -d --name shelf-mysql -p 127.0.0.1:3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
+# a fresh container needs a while to initialise: wait until it answers, for at most 60 s
+for _ in $(seq 60); do docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -ppw --silent && break; sleep 1; done
 MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts   # from packages/db-mysql
 ```
+
+Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not
+pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job uses `--env-mode=loose`).

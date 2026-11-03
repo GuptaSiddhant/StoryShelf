@@ -5,8 +5,11 @@
  * MySQL: without it the whole suite is skipped. Point it at a disposable database; the nightly
  * `nightly-db.yml` MySQL job does, with its own database so it cannot collide with the live suite.
  *
- *   docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
+ *   docker run -d --name shelf-mysql -p 127.0.0.1:3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
+ *   (wait until it accepts connections, see docs/testing.md)
  *   MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts
+ *
+ * Run vitest directly: `nub run test` goes through turbo, which does not pass `MYSQL_URL` on.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { databaseContractSuite } from "@storyshelf/core/test-helpers";
