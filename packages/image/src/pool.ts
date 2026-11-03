@@ -246,6 +246,11 @@ export class DiffPool {
     slot.task = null;
     this.retire(slot);
     task?.reject(new Error("diff worker failed: it sent an answer the pool cannot use"));
+    if (!slot.ready) {
+      // A worker that faults before `ready` counts like one that dies there, so a worker that does
+      // it on every start ends in the in-thread fallback instead of an endless restart loop.
+      this.onStartFailure(`diff worker faulted before it was ready: ${reason}`);
+    }
   }
 
   /** Tell `onWorkerEvent`; a reporter that throws must not break the pool's cleanup. */
@@ -355,7 +360,12 @@ function answerJob(slot: Slot, message: DiffResponse): boolean {
 /** An answer `settle` can use: a `result` carrying its result, an `error` carrying its message. */
 function isWellFormed(message: DiffResponse): boolean {
   if (message.type === "result") {
-    return typeof message.result === "object" && message.result !== null;
+    const result: unknown = message.result;
+    if (typeof result !== "object" || result === null) {
+      return false;
+    }
+    const { diffImage } = result as { diffImage?: unknown };
+    return diffImage === null || ArrayBuffer.isView(diffImage);
   }
   return message.type === "error" && typeof message.message === "string";
 }

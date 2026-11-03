@@ -380,6 +380,32 @@ describe("worker messages that answer no job", () => {
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
   });
 
+  it("rejects the job for a result whose overlay is not bytes", async () => {
+    const broken = `parentPort.on("message", (request) => parentPort.postMessage({ type: "result", id: request.id, result: { diffImage: {} } }));
+      parentPort.postMessage({ type: "ready" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(broken));
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(
+      /answer the pool cannot use/u,
+    );
+    expect(events).toHaveLength(1);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("falls back in-thread when a worker faults before ready on every start", async () => {
+    const faulty = `import { parentPort } from "node:worker_threads";
+      parentPort.postMessage({ type: "error", message: "boom" });`;
+    const fallbacks: string[] = [];
+    const pool = new DiffPool({
+      size: 1,
+      workerUrl: new URL(`data:text/javascript,${encodeURIComponent(faulty)}`),
+      onFallback: (reason) => fallbacks.push(reason),
+      onWorkerEvent: () => {},
+    });
+    pools.push(pool);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(fallbacks).toHaveLength(1);
+  });
+
   it("still cleans up when the event reporter throws", async () => {
     const stray = `parentPort.on("message", () => parentPort.postMessage({ type: "error", message: "boom" }));
       parentPort.postMessage({ type: "ready" });`;
