@@ -61,6 +61,10 @@ describe("aiFromEnv", () => {
     expect(profile?.models?.triage).toMatchObject({ maxTokens: TRIAGE_MAX_TOKENS });
     expect(profile?.models?.health).toMatchObject({ maxTokens: HEALTH_MAX_TOKENS });
     expect([TRIAGE_MAX_TOKENS, HEALTH_MAX_TOKENS]).toEqual([1000, 2000]);
+    // Thinking is off, so it cannot spend the small output cap before the JSON answer.
+    const off = { anthropic: { thinking: { type: "disabled" } } };
+    expect(profile?.models?.triage).toMatchObject({ providerOptions: off });
+    expect(profile?.models?.health).toMatchObject({ providerOptions: off });
   });
 
   it("passes the boot check without a billed call", async () => {

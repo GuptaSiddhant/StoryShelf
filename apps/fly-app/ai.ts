@@ -21,6 +21,13 @@ export const CALLS_PER_PROJECT_PER_HOUR = 5;
 export const TRIAGE_MAX_TOKENS = 1000;
 export const HEALTH_MAX_TOKENS = 2000;
 
+/**
+ * Thinking tokens count against the output cap, so with thinking on a small cap can run out before
+ * the JSON answer starts. The demo asks for none; the provider drops this (with a warning) on a
+ * model that cannot turn thinking off.
+ */
+const NO_THINKING = { anthropic: { thinking: { type: "disabled" } } } as const;
+
 /** An environment value, or undefined when it is unset or empty. */
 function nonEmpty(value: string | undefined): string | undefined {
   return value === undefined || value === "" ? undefined : value;
@@ -49,8 +56,8 @@ export function aiFromEnv(env: Readonly<Record<string, string | undefined>>): Ai
         defaultModel: model,
         models: {
           vision: null,
-          triage: { model, maxTokens: TRIAGE_MAX_TOKENS },
-          health: { model, maxTokens: HEALTH_MAX_TOKENS },
+          triage: { model, maxTokens: TRIAGE_MAX_TOKENS, providerOptions: NO_THINKING },
+          health: { model, maxTokens: HEALTH_MAX_TOKENS, providerOptions: NO_THINKING },
         },
       },
     },
