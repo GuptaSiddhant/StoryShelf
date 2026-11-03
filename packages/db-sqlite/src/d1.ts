@@ -9,7 +9,7 @@
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/d1";
-import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
+import { CAPTURE_JOB_BACKFILL, DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { schema } from "./schema/index.ts";
 
@@ -91,6 +91,7 @@ async function runMigrations(client: D1Database): Promise<void> {
     // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
     await execIgnore(client, statement);
   }
+  await client.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
   await execIgnore(client, WEBHOOK_SECRET_DROP);
   await migrateCommentsTable(client);
 }

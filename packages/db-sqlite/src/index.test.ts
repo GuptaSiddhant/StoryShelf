@@ -504,6 +504,43 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("leaves a cancel-requested job out of the backfill, and stops setup when the backfill fails", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-capture-job-fail-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at)
+          VALUES ('b', 'p', 'a', 'main', 'pending', 't', 't');
+        INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, status, cancel_requested_at, created_at, updated_at)
+          VALUES ('j', 'job', 'j', 'capture', 'b', 'running', 't', 't', 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      expect(
+        ((await db.get(schema.builds, "b"))?.["captureJobId"] ?? null) as string | null,
+      ).toBeNull();
+      await closeDb(db);
+
+      const broken = new DatabaseSync(path);
+      broken.exec(`
+        UPDATE capture_jobs SET cancel_requested_at = NULL;
+        CREATE TRIGGER no_build_update BEFORE UPDATE ON builds BEGIN SELECT RAISE(ABORT, 'locked'); END;
+      `);
+      broken.close();
+      const failing = createSqliteDatabase(path);
+      await expect(initDb(failing)).rejects.toThrow(/locked/u);
+      await closeDb(failing);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("adds the fingerprint columns to a volume created before them, keeping existing rows", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-fingerprint-"));
     const path = join(dir, "legacy.db");

@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
+import { CAPTURE_JOB_BACKFILL, DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
 import { schema } from "./schema/index.ts";
@@ -147,6 +147,7 @@ function applyIdentityStatements(sqlite: DatabaseSync): void {
   for (const statement of IDENTITY_STATEMENTS) {
     execIgnore(sqlite, statement);
   }
+  sqlite.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
 }
 
 function runMigrations(sqlite: DatabaseSync): void {

@@ -8,7 +8,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
  */
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
+import { CAPTURE_JOB_BACKFILL, DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
 import { schema } from "./schema/index.ts";
@@ -163,6 +163,7 @@ function runMigrations(client: Database): void {
   client.exec(DDL);
   ensureColumns(client, DDL);
   applyIdentityStatements(client);
+  client.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
   try {
     client.exec(WEBHOOK_SECRET_DROP);
   } catch {

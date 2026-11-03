@@ -78,14 +78,19 @@ async function failOwnedBuild(
     buildId,
     jobId,
   );
-  if (!applied) {
+  // A retry of a hook that failed part-way: this job already failed the build, so finish the cleanup.
+  const retry = !applied && build?.status === "failed" && build.captureJobId === jobId;
+  if (!applied && !retry) {
     deps.logger.info(
       { buildId, jobId, ownerJobId: build?.captureJobId ?? null, status: build?.status },
       "crashed capture no longer owns its build; left it alone",
     );
     return "skipped";
   }
-  await closeOpenAttempts(deps, buildId, error);
+  const closed = await closeOpenAttempts(deps, buildId, error);
+  if (retry && closed === 0) {
+    return "skipped"; // nothing was left to do: the first pass finished
+  }
   await deps.buildState.request(buildId);
   return "failed";
 }
@@ -140,7 +145,7 @@ async function closeOpenAttempts(
   deps: DispatchDeps,
   buildId: string,
   error: string,
-): Promise<void> {
+): Promise<number> {
   const attempts = new CaptureAttemptModel(deps.db, deps.tables);
   const open = (await attempts.listByBuild(buildId)).filter(
     (attempt) => attempt.status === "queued" || attempt.status === "running",
@@ -148,4 +153,5 @@ async function closeOpenAttempts(
   await Promise.all(
     open.map(async (attempt) => await attempts.markFinished(attempt.id, "failed", error)),
   );
+  return open.length;
 }

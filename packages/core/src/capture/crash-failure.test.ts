@@ -242,7 +242,7 @@ describe("failCrashedCapture", () => {
     expect(await w.status()).toBe("capturing");
   });
 
-  it("does not report a second failure when the hook runs twice", async () => {
+  it("reports one failure when the hook runs twice with nothing left to clean up", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
     await w.builds.stampCaptureJob(w.build.id, "J1");
@@ -250,5 +250,26 @@ describe("failCrashedCapture", () => {
 
     expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("failed");
     expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("skipped");
+  });
+
+  it("finishes the cleanup when the first run failed the build but not its attempts", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+    const attempts = new CaptureAttemptModel(w.db, tables(w.db));
+    const attempt = await attempts.startAttempt(w.project.id, w.build.id);
+    await attempts.markRunning(attempt.id);
+    // The first run got as far as failing the build, then died before closing the attempt.
+    await w.builds.failIfOwnedBy(w.build.id, "J1");
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("failed");
+    const [closed] = await attempts.listByBuild(w.build.id);
+    expect(closed).toMatchObject({ status: "failed", error: "lease exhausted" });
   });
 });
