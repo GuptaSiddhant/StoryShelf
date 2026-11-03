@@ -2,6 +2,7 @@ import {
   refCounted,
   remote,
   type BrowserName,
+  RemoteConnectError,
   type RemoteBrowser,
 } from "@storyshelf/runner-playwright/remote";
 /**
@@ -153,8 +154,18 @@ async function healthy(
       headers: { [SECRET_HEADER]: secret },
       signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
     });
+    if (response.status === 401 || response.status === 403) {
+      // A wrong or rotated secret never becomes right by waiting: fail now, naming the status only.
+      throw new RemoteConnectError(
+        `The browser Sprite refused the secret (${response.status}); check SPRITE_BROWSER_SECRET`,
+        { transient: false },
+      );
+    }
     return response.ok;
-  } catch {
+  } catch (error) {
+    if (error instanceof RemoteConnectError) {
+      throw error;
+    }
     if (signal.aborted) {
       throw signal.reason instanceof Error ? signal.reason : new Error("Cancelled");
     }

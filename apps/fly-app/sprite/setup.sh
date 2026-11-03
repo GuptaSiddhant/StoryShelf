@@ -67,10 +67,16 @@ on -- sprite-env services create storyshelf-browser --cmd "$DIR/start.sh" --http
   on -- sprite-env services restart storyshelf-browser
 
 echo "5/6 warm up: wait for the proxy, then open and close one browser"
+HEALTHY=0
 for _ in $(seq 1 30); do
-  on -- bash -c "curl -fsS -o /dev/null -H \"x-storyshelf-secret: \$(cat $DIR/secret)\" http://127.0.0.1:8080/healthz" && break
+  if on -- bash -c "curl -fsS -o /dev/null -H \"x-storyshelf-secret: \$(cat $DIR/secret)\" http://127.0.0.1:8080/healthz"; then
+    HEALTHY=1
+    break
+  fi
   sleep 1
 done
+# Never checkpoint a service that does not answer: warm.mjs launches Chromium on its own and would pass.
+[ "$HEALTHY" = 1 ] || { echo "the proxy did not become healthy; no checkpoint taken" >&2; exit 1; }
 on --dir "$DIR" -- bash -c "export PATH=$NODE_DIR/bin:\$PATH PLAYWRIGHT_BROWSERS_PATH=$DIR/browsers; node warm.mjs"
 
 echo "6/6 checkpoint"

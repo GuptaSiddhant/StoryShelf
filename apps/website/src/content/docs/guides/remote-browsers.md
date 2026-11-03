@@ -270,6 +270,7 @@ The demo app (`apps/fly-app`) renders on a [Fly Sprite](https://sprites.dev) tha
 ```ts
 import { refCounted, remote } from "@storyshelf/runner-playwright/remote";
 
+const secret = process.env.SPRITE_BROWSER_SECRET ?? "";
 const pool = refCounted<string>({ idleMs: 60_000, open: wakeSprite, close: () => {} });
 remote({
   name: "sprite",
@@ -279,13 +280,13 @@ remote({
   timeouts: { acquireMs: 65_000 },
   connect: pool.connect((url) => ({
     endpoint: url.replace("https:", "wss:"),
-    headers: { "x-storyshelf-secret": process.env.SPRITE_BROWSER_SECRET },
+    headers: { "x-storyshelf-secret": secret },
   })),
   release: pool.release,
 });
 ```
 
-Keep the proxy's secret and the platform token in the host's secrets; both are scrubbed from logs like any other connection header.
+Keep the proxy's secret and the platform token in the host's secrets. Only the connection's endpoint, headers and `lease` are scrubbed: the platform token is used inside `open`, outside that path, so it must never reach an error message there.
 
 ## Upgrading from 0.7
 

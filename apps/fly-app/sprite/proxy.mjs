@@ -57,7 +57,9 @@ export function createProxy(options) {
       socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
       return;
     }
+    let connected = false;
     const upstream = connect(upstreamPort, upstreamHost, () => {
+      connected = true;
       upstream.write(upgradeRequest(request));
       upstream.write(head);
       socket.pipe(upstream);
@@ -67,7 +69,15 @@ export function createProxy(options) {
       upstream.destroy();
       socket.destroy();
     };
-    upstream.on("error", close);
+    // The Playwright server is not up yet (the Sprite is still waking): say so, rather than hang up.
+    upstream.on("error", () => {
+      if (!connected && socket.writable) {
+        socket.write(
+          "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
+        );
+      }
+      close();
+    });
     socket.on("error", close);
     socket.on("close", close);
     upstream.on("close", close);

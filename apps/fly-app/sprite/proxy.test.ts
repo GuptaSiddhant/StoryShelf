@@ -15,21 +15,36 @@ afterEach(() => {
 });
 
 /** An upstream that answers every upgrade with 101 and then echoes bytes, counting connections. */
-async function echoUpstream(): Promise<{ port: number; connections: () => number }> {
+async function echoUpstream(): Promise<{
+  port: number;
+  connections: () => number;
+  open: () => number;
+}> {
   let connections = 0;
+  let live = 0;
   const server = createServer();
   server.on("upgrade", (_request, socket) => {
     connections += 1;
+    live += 1;
+    socket.on("close", () => {
+      live -= 1;
+    });
     socket.write(
       "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
     );
     socket.on("data", (chunk) => socket.write(chunk));
+    // An http server socket keeps its half open after the peer hangs up; close it as a real server does.
+    socket.on("end", () => socket.end());
     socket.on("error", () => {});
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   open.push({ close: () => server.close() });
-  return { port: (server.address() as AddressInfo).port, connections: () => connections };
+  return {
+    port: (server.address() as AddressInfo).port,
+    connections: () => connections,
+    open: () => live,
+  };
 }
 
 async function proxyTo(upstreamPort: number): Promise<number> {
@@ -114,6 +129,25 @@ describe("the browser proxy", () => {
       text: "ok\n",
     });
     expect((await get(port, "/other", { "x-storyshelf-secret": SECRET })).status).toBe(404);
+  });
+
+  it("answers an authenticated upgrade with 503 while the Playwright server is not up yet", async () => {
+    const port = await proxyTo(1);
+    expect(await upgrade(port, { "x-storyshelf-secret": SECRET })).toMatch(/^HTTP\/1\.1 503 /u);
+  });
+
+  it("closes the upstream when the client disconnects after the handshake", async () => {
+    const upstream = await echoUpstream();
+    const port = await proxyTo(upstream.port);
+    const socket: Socket = connect(port, "127.0.0.1");
+    socket.write(
+      `GET /pw HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nx-storyshelf-secret: ${SECRET}\r\n\r\n`,
+    );
+    await once(socket, "data");
+    expect(upstream.connections()).toBe(1);
+    expect(upstream.open()).toBe(1);
+    socket.destroy();
+    await expect.poll(() => upstream.open()).toBe(0);
   });
 
   it("reports 503 while the Playwright server is not up yet", async () => {

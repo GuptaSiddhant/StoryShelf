@@ -136,6 +136,16 @@ describe("spriteBrowser", () => {
     expect(text).not.toContain(SECRET);
   });
 
+  it("fails at once, without the secret in the message, when the proxy refuses it", async () => {
+    const { impl, calls } = fakeFetch([401], DEFAULT_API);
+    const service = spriteBrowser(config, { fetch: impl, sleep: noSleep });
+    const failure = await connect(service).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ name: "RemoteConnectError", transient: false });
+    expect((failure as Error).message).toMatch(/401/u);
+    expect((failure as Error).message).not.toContain(SECRET);
+    expect(calls.filter((c) => c.url.endsWith("/healthz"))).toHaveLength(1);
+  });
+
   it("fails when the API gives no URL", async () => {
     const { impl } = fakeFetch([], {});
     const service = spriteBrowser(config, { fetch: impl, sleep: noSleep });
