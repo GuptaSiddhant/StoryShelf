@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { BuildModel } from "../../models/build.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
 import { claimCandidate, claimNext, LEASE_EXHAUSTED_ERROR } from "./claim.ts";
@@ -11,6 +12,7 @@ function runtime(owner = "me"): { rt: QueueRuntime; clock: { now: number } } {
   const clock = { now: Date.parse("2026-01-01T00:00:00.000Z") };
   const rt: QueueRuntime = {
     model: new CaptureJobModel(db),
+    builds: new BuildModel(db),
     kinds: ["capture"],
     leaseMs: 1000,
     maxAttempts: 2,

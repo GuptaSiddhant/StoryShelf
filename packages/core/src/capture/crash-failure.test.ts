@@ -192,4 +192,105 @@ describe("failCrashedCapture", () => {
     expect(outcome).toBe("finalized");
     expect(await w.status()).toBe("failed");
   });
+  it("fails the build its job still owns", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("failed");
+    expect(await w.status()).toBe("failed");
+  });
+
+  it("leaves a rerun alone when the hook of the run that ended arrives late", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+    // J1 exhausted; the build is retried and queued again as J2 before J1's hook runs.
+    await w.builds.resetStatus(w.build.id, "pending");
+    await w.builds.stampCaptureJob(w.build.id, "J2");
+    await w.builds.setStatus(w.build.id, "capturing");
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("skipped");
+    expect(await w.status()).toBe("capturing");
+    expect((await w.builds.get(w.build.id))?.captureJobId).toBe("J2");
+    expect(w.git.calls).toEqual([]);
+  });
+
+  it("never fails a build no run owns", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("skipped");
+    expect(await w.status()).toBe("capturing");
+  });
+
+  it("reports one failure when the hook runs twice with nothing left to clean up", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+    const job = { buildId: w.build.id, jobId: "J1" };
+
+    expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("failed");
+    expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("skipped");
+  });
+
+  it("leaves open an attempt a newer run began after this run failed the build", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.failIfOwnedBy(w.build.id, "J1");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const attempts = new CaptureAttemptModel(w.db, tables(w.db));
+    const newer = await attempts.startAttempt(w.project.id, w.build.id);
+    await attempts.markRunning(newer.id);
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("skipped");
+    const [open] = await attempts.listByBuild(w.build.id);
+    expect(open?.status).toBe("running");
+  });
+
+  it("finishes the cleanup when the first run failed the build but not its attempts", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+    await w.builds.stampCaptureJob(w.build.id, "J1");
+    const attempts = new CaptureAttemptModel(w.db, tables(w.db));
+    const attempt = await attempts.startAttempt(w.project.id, w.build.id);
+    await attempts.markRunning(attempt.id);
+    // The first run got as far as failing the build, then died before closing the attempt.
+    await w.builds.failIfOwnedBy(w.build.id, "J1");
+
+    const outcome = await failCrashedCapture(
+      w.deps,
+      { buildId: w.build.id, jobId: "J1" },
+      "lease exhausted",
+    );
+
+    expect(outcome).toBe("failed");
+    const [closed] = await attempts.listByBuild(w.build.id);
+    expect(closed).toMatchObject({ status: "failed", error: "lease exhausted" });
+  });
 });

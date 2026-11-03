@@ -10,6 +10,7 @@
 import { hostname } from "node:os";
 import type { DatabaseAdapter } from "../../adapters/database.ts";
 import type { Logger } from "../../logger.ts";
+import { BuildModel } from "../../models/build.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { ulid } from "../../utils/ulid.ts";
 import { extendJob, inspectJob } from "./lease.ts";
@@ -87,6 +88,7 @@ function resolveRuntime(db: DatabaseAdapter, options: DatabaseCaptureQueueOption
   }
   const rt: QueueRuntime = {
     model: new CaptureJobModel(db),
+    builds: new BuildModel(db),
     kinds,
     leaseMs: positive(options.leaseMs, DEFAULT_LEASE_MS),
     maxAttempts: retries + 1,

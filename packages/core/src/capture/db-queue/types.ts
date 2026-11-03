@@ -7,6 +7,7 @@ import type {
 } from "../../adapters/capture-queue.ts";
 import type { AdapterLifecycle } from "../../adapters/metadata.ts";
 import type { Logger } from "../../logger.ts";
+import type { BuildModel } from "../../models/build.ts";
 import type { CaptureJobModel } from "../../models/capture-job.ts";
 import type { CaptureJobKind } from "../../schema/capture-job.ts";
 import type { QueueTimers } from "./timers.ts";
@@ -90,6 +91,8 @@ export interface DatabaseCaptureQueue extends PollableCaptureQueue {
 /** State shared by the queue's modules. */
 export interface QueueRuntime {
   model: CaptureJobModel;
+  /** Stamps the build a capture job was queued for ({@link BuildModel.stampCaptureJob}). */
+  builds: BuildModel;
   kinds: readonly CaptureJobKind[];
   leaseMs: number;
   maxAttempts: number;
