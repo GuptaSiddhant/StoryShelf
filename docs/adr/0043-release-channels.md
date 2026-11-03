@@ -27,9 +27,11 @@ version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is m
 4. **Stable channel, manual.** There is no version pull request. A stable release happens only when
    the owner asks, as a `workflow_dispatch` of `release.yml` (inputs `confirm: release` and
    `dry_run`). One run versions from the pending changesets, commits `chore(release): v<version>` to
-   `main`, tags `v<version>`, pushes both, then publishes to `latest` on npm and JSR and creates the
-   GitHub Release from `CHANGELOG.md`. Tag and publish happen in the same run because a tag pushed
-   with the default token does not start another workflow. `dry_run` does everything except push and
+   `main`, tags `v<version>`, pushes both atomically, then publishes to `latest` on npm and JSR and
+   creates the GitHub Release from `CHANGELOG.md`. The GitHub Release follows npm; a JSR failure does
+   not block it (`continue-on-error`), and re-running publishes only what JSR lacks
+   (`publish-jsr.mjs` skips versions already there). Tag and publish happen in the same run because a
+   tag pushed with the default token does not start another workflow. `dry_run` does everything except push and
    publish. The `v*` tag trigger stays as the emergency path, and `scripts/release.mjs` with no bump
    argument does the same versioning from a workstation.
 5. **All npm publishing stays in `.github/workflows/release.yml`.** The npm trusted publisher of every
@@ -57,8 +59,11 @@ version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is m
 - **Re-running.** `scripts/publish-npm.mjs` skips versions already on npm, so a failed publish can be
   re-run. A failed `prepare` job before its push leaves no tag. Its push is a plain one: if `main`
   moved during the run it is refused and nothing is published.
-- **Verification.** The release commit is not re-verified in the run (`--skip-verify`): `main` already
-  passed CI. `scripts/release.mjs` still runs `nub publish -r --dry-run` before it commits.
+- **Verification.** The run verifies the tree itself before it versions anything (`turbo verify`, one
+  task at a time), so a release is never cut from a commit whose CI is red or still pending.
+  `scripts/release.mjs` then commits, tags and runs `nub publish -r --dry-run`; if that dry run fails
+  the job stops before its push and leaves only a local commit and tag. `--skip-verify` exists for a
+  workstation release when CI has already verified the commit.
 - **Owner setup, once.** Let the release run push to `main` (add GitHub Actions as a bypass actor on
   the `main` ruleset, or provide an App token), create the `no-release` label, and confirm the npm
   trusted publishers do not restrict the workflow to tag refs, since `next` publishes from `main`.

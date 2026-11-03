@@ -31,9 +31,9 @@ on:
         type: boolean
         default: true
 
+# Read-only by default; each job that writes or publishes states what it needs.
 permissions:
-  contents: write # for the release commit, the tag and GitHub Release creation
-  id-token: write # for Sigstore provenance + npm trusted publishing + JSR OIDC publishing
+  contents: read
 
 concurrency:
   group: release
@@ -68,6 +68,9 @@ jobs:
     needs: [pending]
     if: needs.pending.outputs.count != '0'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Sigstore provenance + npm trusted publishing
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -110,6 +113,8 @@ jobs:
     name: prepare stable release
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # the release commit and tag are pushed with this token
     outputs:
       tag: ${{ steps.cut.outputs.tag }}
     steps:
@@ -141,16 +146,20 @@ jobs:
         id: cut
         env:
           DRY_RUN: ${{ inputs.dry_run }}
+          # One test task at a time, as in CI's verify job: a small runner times out otherwise.
+          TURBO_CONCURRENCY: "1"
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # main was verified by its own CI run; the script still runs `nub publish -r --dry-run`.
+          # release.mjs verifies this exact tree first (turbo verify), then versions, commits, tags
+          # and runs `nub publish -r --dry-run`. A run is never cut from an unverified commit, even
+          # if CI on main is red or still pending.
           if [ "$DRY_RUN" = "true" ]; then
-            node scripts/release.mjs --skip-verify --dry-run
+            node scripts/release.mjs --dry-run
             exit 0
           fi
-          node scripts/release.mjs --skip-verify
+          node scripts/release.mjs
           VERSION=$(node -p "require('./packages/core/package.json').version")
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -160,9 +169,10 @@ jobs:
           TAG: ${{ steps.cut.outputs.tag }}
         run: |
           set -e
-          # A plain push: if main moved while this ran it is refused and nothing is published.
-          git push origin HEAD:main
-          git push origin "${TAG}"
+          # One atomic push: the commit and the tag both land or neither does, so a failure cannot
+          # leave main with a release commit, consumed changesets and no tag. If main moved while
+          # this ran, the push is refused and nothing is published.
+          git push --atomic origin HEAD:main "refs/tags/${TAG}"
 
   # ---------------------------------------------------------------------------------------------
   # Publishing a tag (the manual release above, or an emergency tag push)
@@ -212,6 +222,9 @@ jobs:
   publish-npm:
     needs: [validate]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Sigstore provenance + npm trusted publishing
     steps:
       - name: Checkout
         uses: actions/checkout@v7

@@ -101,6 +101,15 @@ describe("mergeChangelog", () => {
     assert.ok(merged.indexOf("## 0.9.0 (d)") < merged.indexOf("## 0.8.0"));
   });
 
+  it("drops an empty Unreleased heading even when the release has nothing to render", () => {
+    const empty =
+      "# Changelog\n\n## Unreleased\n\n## 0.8.0 — Older (2026-11-02)\n\n**Fixed: old.** Old.\n";
+    const merged = mergeChangelog(empty, { version: "0.9.0", date: "d", entries: [] });
+    assert.ok(!merged.includes("## Unreleased"));
+    assert.ok(merged.includes("## 0.8.0"));
+    assert.ok(!merged.includes("## 0.9.0"));
+  });
+
   it("appends the first section to a changelog that has none", () => {
     const merged = mergeChangelog("# Changelog\n", { version: "0.1.0", date: "d", entries: ["E"] });
     assert.equal(merged, "# Changelog\n\n## 0.1.0 (d)\n\nE\n");
@@ -117,7 +126,7 @@ describe("checkChangeset", () => {
       check([
         "packages/core/src/a.test.ts",
         "packages/core/src/a.integration.test.ts",
-        "packages/core/src/test-helpers/x.ts",
+        "packages/db-sqlite/src/test-helpers/x.ts",
       ]).ok,
       true,
     );
@@ -127,6 +136,12 @@ describe("checkChangeset", () => {
     assert.equal(check(["packages/core/src/a.ts"]).ok, false);
     assert.equal(check(["packages/core/package.json"]).ok, false);
     assert.match(check(["packages/core/src/a.ts"]).reason, /without a changeset/u);
+  });
+
+  it("treats core's published test-helpers as shipped, and other packages' as not", () => {
+    assert.equal(check(["packages/core/src/test-helpers/queue-contract.ts"]).ok, false);
+    assert.equal(check(["packages/db-sqlite/src/test-helpers/x.ts"]).ok, true);
+    assert.equal(check(["packages/core/src/test-helpers/queue-contract.test.ts"]).ok, true);
   });
 
   it("ignores a private manifest", () => {

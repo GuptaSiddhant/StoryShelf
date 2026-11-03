@@ -101,9 +101,8 @@ export function renderEntries(changesets) {
 export function mergeChangelog(changelog, { version, date, entries }) {
   const { text, carried } = takeUnreleased(changelog);
   const added = [...carried, ...entries];
-  return added.length === 0
-    ? changelog
-    : insertSection(text, { version, date }, added.join("\n\n"));
+  // With nothing to add, the file still loses an empty `## Unreleased` heading: the release is out.
+  return added.length === 0 ? text : insertSection(text, { version, date }, added.join("\n\n"));
 }
 
 /** Add `block` under the version's heading: extend the section if it exists, else open one above the newest. */
@@ -144,9 +143,12 @@ function takeUnreleased(changelog) {
   };
 }
 
-/** Test and docs files carry no shipped behavior. */
+/**
+ * Test and fixture files carry no shipped behavior. `packages/core/src/test-helpers/` is the
+ * exception: core publishes it as `@storyshelf/core/test-helpers`, so changing it is a shipped change.
+ */
 const NOT_SHIPPED =
-  /(?:\.test\.tsx?$|\.integration\.test\.|\/test-helpers\/|\/__fixtures__\/|\.d\.ts$)/u;
+  /(?:\.test\.tsx?$|\.integration\.test\.|(?<!^packages\/core\/src)\/test-helpers\/|\/__fixtures__\/|\.d\.ts$)/u;
 const SHIPPED_SOURCE = /^packages\/[^/]+\/src\//u;
 const PACKAGE_MANIFEST = /^packages\/[^/]+\/package\.json$/u;
 

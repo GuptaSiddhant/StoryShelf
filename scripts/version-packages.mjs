@@ -15,7 +15,7 @@
  * Stable and snapshot runs both need at least one pending changeset and fail clearly without one.
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { listPending, mergeChangelog, renderEntries } from "./changeset-lib.mjs";
 
@@ -63,6 +63,13 @@ function sharedVersion() {
   return [...versions.keys()][0];
 }
 
+/** Write `text` to a sibling temp file, then rename it over `file`, so an interruption never leaves a truncated file. */
+function writeFileAtomic(file, text) {
+  const temp = `${file}.tmp`;
+  writeFileSync(temp, text);
+  renameSync(temp, file);
+}
+
 /** Package directory names under `packages/`. */
 function packageDirs() {
   return readdirSync(packagesDir, { withFileTypes: true })
@@ -82,7 +89,7 @@ function setDenoVersion(dir, version) {
   if (!/"version":\s*"[^"]*"/u.test(text)) {
     fail(`${file}: no "version" field to update`);
   }
-  writeFileSync(file, text.replace(/"version":\s*"[^"]*"/u, `"version": "${version}"`));
+  writeFileAtomic(file, text.replace(/"version":\s*"[^"]*"/u, `"version": "${version}"`));
 }
 
 /** The commit hash Changesets puts in a snapshot version is the full one; the issue wants a short one. */
@@ -94,7 +101,7 @@ function renameVersion(from, to) {
     const file = join(packagesDir, dir, "package.json");
     const text = readFileSync(file, "utf8");
     if (text.includes(`"version": "${from}"`)) {
-      writeFileSync(file, text.replace(`"version": "${from}"`, `"version": "${to}"`));
+      writeFileAtomic(file, text.replace(`"version": "${from}"`, `"version": "${to}"`));
     }
   }
 }
@@ -144,7 +151,7 @@ if (mode === "--pending") {
   syncDenoVersions(version);
   const file = join(root, "CHANGELOG.md");
   const date = new Date().toISOString().slice(0, 10);
-  writeFileSync(file, mergeChangelog(readFileSync(file, "utf8"), { version, date, entries }));
+  writeFileAtomic(file, mergeChangelog(readFileSync(file, "utf8"), { version, date, entries }));
   emit("version", version);
 } else {
   fail(`unknown option ${mode} (want --pending or --snapshot, or none for a stable release)`);

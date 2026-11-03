@@ -6,6 +6,12 @@ on:
   push:
     branches: ["epic/**"]
 
+# pkg.pr.new resolves a branch to the latest commit published for it, so a newer push supersedes an
+# older preview of the same branch instead of racing it.
+concurrency:
+  group: package-preview-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

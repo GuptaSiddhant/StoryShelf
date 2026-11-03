@@ -14,7 +14,7 @@ name: CI
 # website or the fixtures this run does not use.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     # Epic branches collect the task PRs of one epic (AGENTS.md); each push to one runs the
     # full verify like main, without main's deploy and preview workflows.
