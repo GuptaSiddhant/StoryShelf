@@ -21,7 +21,11 @@ export interface TraceOptions {
 
 /** Inputs for computing the affected story set of a change. */
 export interface AffectedInput {
-  /** Repository root used for `git` commands. */
+  /**
+   * The Storybook project directory: the repository root, or the package of it that holds
+   * `.storybook/` in a monorepo. `buildDir` and the story and module paths are relative to it;
+   * the repository root is found from it with `git`.
+   */
   cwd: string;
   /** Built Storybook directory holding `index.json` and stats. */
   buildDir: string;
@@ -42,7 +46,7 @@ export interface AffectedResult {
    * rendered (missing history, global file change, unreadable graph, …).
    */
   affectedImportPaths: string[] | null;
-  /** Repo-relative files changed between `baseSha` and `headSha`. */
+  /** Files changed between `baseSha` and `headSha`, relative to the repository root. */
   changedFiles: string[];
   /** Ancestor commit the diff was computed against. */
   baselineSha: string | null;

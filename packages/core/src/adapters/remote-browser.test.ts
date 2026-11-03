@@ -40,7 +40,9 @@ describe("defineRemote", () => {
       retry: { attempts: 3, backoffMs: 500 },
       timeouts: { acquireMs: 30_000, connectMs: 30_000, releaseMs: 30_000, probeMs: 15_000 },
       platform: undefined,
+      experimental: false,
     });
+    expect(defineRemote(options({ experimental: true }), all).experimental).toBe(true);
     expect(isRemoteBrowser("chromium")).toBe(false);
     expect(isRemoteBrowser(null)).toBe(false);
   });
@@ -58,6 +60,8 @@ describe("defineRemote", () => {
       probeMs: 15_000,
     });
     expect(defineRemote(options({ timeouts: { probeMs: 2500 } }), all).timeouts.probeMs).toBe(2500);
+    expect(defineRemote(options(), all).maxConnections).toBeUndefined();
+    expect(defineRemote(options({ maxConnections: 3 }), all).maxConnections).toBe(3);
     for (const probeMs of [0, -1, 1.5]) {
       expect(() => defineRemote(options({ timeouts: { probeMs } }), all)).toThrow(
         /timeouts.probeMs must be an integer of at least 1/u,
@@ -85,6 +89,17 @@ describe("defineRemote", () => {
       "fractional pages per connection",
       { maxPagesPerConnection: 1.5 },
       /maxPagesPerConnection must be a positive integer/u,
+    ],
+    ["zero connections", { maxConnections: 0 }, /maxConnections must be a positive integer/u],
+    [
+      "fractional connections",
+      { maxConnections: 1.5 },
+      /maxConnections must be a positive integer/u,
+    ],
+    [
+      "NaN connections",
+      { maxConnections: Number.NaN },
+      /maxConnections must be a positive integer/u,
     ],
     [
       "NaN pages per connection",

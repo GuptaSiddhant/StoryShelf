@@ -161,6 +161,22 @@ A `pending` build waits for a verdict, so it needs an exit. The [retention purge
 
 The [MCP server](/ai/mcp/) can read and write comments, including `storyId` comments, but has no tool to give a verdict: an agent cannot sign off a build.
 
+## Unstable renders
+
+A story that renders differently every time shows up as a real change, and reviewers learn to wave
+it through. When a snapshot differs from its baseline, StoryShelf renders it **once more** in the
+same pass and compares the two renders. If they match, nothing changes. If they differ, the
+snapshot is flagged **Unstable render: likely flaky**, with a note suggesting an [ignore region](/guides/chromatic-migration/#ignore-regions)
+(`data-storyshelf-ignore` or `ignoreSelectors`) or marking the story `flakyTest`.
+
+The flag is advice only. The snapshot is still a change that needs review, the build status does not
+move, and nothing is posted to your git host because of it. The first render is the one kept and
+compared. It is never retried more than once; if the second render itself fails, the snapshot is left
+unflagged. The extra render follows the same rules as any render pass: its own render timeout, a fresh
+signed Storybook URL for a remote browser, and the build's job lease kept alive while it runs. Turn it off under **Settings → Tests → Detect
+unstable renders** (`detectUnstable`). The API returns the flag as `unstable` on each snapshot
+(`true`, `false` once checked and matching, or `null` when it was not checked).
+
 ## Retry & merge gate
 
 - **Flaky capture:** **Retry** on the build page re-enqueues the same build ID (`POST …/builds/:id/retry`) — see [Interaction testing](/guides/interaction-testing/) for `flakyTest` handling.

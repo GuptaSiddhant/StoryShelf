@@ -23,7 +23,7 @@ import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
 import { logInvalidDesigns } from "./design.ts";
 import { assertModeCaps, enrichStories } from "./enrich.ts";
 import { classifyFailures } from "./failure-sets.ts";
-import { captureAcrossBrowsers } from "./matrix.ts";
+import { captureAcrossBrowsers, type MatrixInput } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
 import type { CaptureProgress } from "./progress.ts";
@@ -31,6 +31,7 @@ import type { ExtractionLimits } from "./publish/limits.ts";
 import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
+import { detectUnstableRenders } from "./stability.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { storybookUrlSource } from "./storybook-urls.ts";
 import { StorybookAdapter } from "./storybook.ts";
@@ -296,35 +297,32 @@ async function runCapturePhases(
       return fanned;
     }
 
+    const matrixInput: MatrixInput = {
+      db: options.db,
+      storage: options.storage,
+      tables: options.tables,
+      runner: options.runner,
+      recordLog: input.recordLog,
+      progress: input.progress,
+      build,
+      project,
+      stories,
+      viewports,
+      storybookDir,
+      browsers,
+      affectedPaths: affectedPathsFor(build),
+      renderTimeoutMs: options.renderTimeoutMs,
+      storybookUrl,
+      logger,
+    };
     const renderStart = performance.now();
     const matrix = await timed(
       "capture.render",
       async () =>
-        await withSpan(
-          "capture.render",
-          async () =>
-            await captureAcrossBrowsers({
-              db: options.db,
-              storage: options.storage,
-              tables: options.tables,
-              runner: options.runner,
-              recordLog: input.recordLog,
-              progress: input.progress,
-              build,
-              project,
-              stories,
-              viewports,
-              storybookDir,
-              browsers,
-              affectedPaths: affectedPathsFor(build),
-              renderTimeoutMs: options.renderTimeoutMs,
-              storybookUrl,
-              logger,
-            }),
-          { "storyshelf.browsers": browsers.join(",") },
-        ),
+        await withSpan("capture.render", async () => await captureAcrossBrowsers(matrixInput), {
+          "storyshelf.browsers": browsers.join(","),
+        }),
     );
-    await cleanScratch();
     const result = { captures: matrix.captures, failures: matrix.failures };
     const renderDuration = performance.now() - renderStart;
     logger?.info(
@@ -368,9 +366,13 @@ async function runCapturePhases(
             blockingFailed,
             flakyFailed,
             a11yFailed,
+            async () => {
+              await detectUnstableRenders(matrixInput);
+            },
           );
         }),
     );
+    await cleanScratch();
     const persistDuration = performance.now() - persistStart;
     logger?.info({ durationMs: Math.round(persistDuration) }, "capture persisted");
     await emitAttemptLog(input.recordLog, logger, "info", "capture persisted", {

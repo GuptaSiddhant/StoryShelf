@@ -24,6 +24,11 @@
         "!LICENSE"
       ]
     },
+    "build-storybook": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts", "!**/*.test.tsx", "!README.md", "!LICENSE"]
+    },
     "dev": {
       "persistent": true,
       "cache": false
@@ -38,14 +43,15 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc.json"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "env": ["RUN_TERRAFORM"]
     },
     "test:integration": {
       "dependsOn": ["^build"],
       "cache": false
     },
     "verify": {
-      "dependsOn": ["build", "lint", "test"]
+      "dependsOn": ["build", "build-storybook", "lint", "test"]
     },
     "audit": {
       "cache": false

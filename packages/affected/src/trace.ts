@@ -28,7 +28,6 @@ const LOCKFILE_BASENAMES = new Set([
   "yarn.lock",
   "bun.lock",
   "bun.lockb",
-  "deno.lock",
 ]);
 
 /** Basename of a repo-relative path. */

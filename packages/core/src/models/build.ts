@@ -1,6 +1,6 @@
 /** Build records, status transitions, and publication helpers. */
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
-import type { Table } from "drizzle-orm";
+import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
 import type { Build } from "../schema/build.ts";
@@ -14,6 +14,7 @@ const REVIEWED: ReadonlySet<BuildStatus> = new Set<BuildStatus>(["approved", "re
 /** Reopening attempts when another writer changes the cycle between the read and the write. */
 const REOPEN_ATTEMPTS = 3;
 
+/** The last stamp handed out by `uniqueStamp` or `nextStamp`; both only ever move it forward. */
 let lastStamp = 0;
 
 /**
@@ -145,7 +146,9 @@ export class BuildModel {
    */
   async update(
     id: string,
-    patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>,
+    patch: Partial<
+      Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName" | "captureJobId">
+    >,
     options: { reset?: boolean } = {},
   ): Promise<Build> {
     const values = { ...patch, updatedAt: new Date().toISOString() };
@@ -247,7 +250,53 @@ export class BuildModel {
    * (a user chose it), so it skips the terminal guard of {@link BuildModel.update}.
    */
   async resetStatus(id: string, status: BuildStatus): Promise<Build> {
-    return await this.update(id, { status }, { reset: true });
+    // No run owns the build now: a late crash hook of the run that ended must not touch the next.
+    return await this.update(id, { status, captureJobId: null }, { reset: true });
+  }
+
+  /**
+   * Record `jobId` as the capture job whose run owns the build (called once its job row exists).
+   * A cancelled or missing build is left alone.
+   */
+  async stampCaptureJob(id: string, jobId: string): Promise<void> {
+    await this.db.updateWhere(
+      this.tables.builds,
+      id,
+      { captureJobId: jobId, updatedAt: new Date().toISOString() },
+      ne(col(this.tables.builds, "status"), "cancelled"),
+    );
+  }
+
+  /**
+   * Fail the build only while capture job `jobId` still owns it and it is `pending` or
+   * `capturing`: one conditional write, so a hook that outlived its run cannot fail a newer one.
+   * Resolves to whether the write applied, and the row as it stands (null when the build is gone).
+   */
+  async failIfOwnedBy(
+    id: string,
+    jobId: string,
+  ): Promise<{ applied: boolean; build: Build | null }> {
+    const stamp = nextStamp();
+    const columns = this.tables.builds;
+    const current = (await this.db.updateWhere(
+      columns,
+      id,
+      { status: "failed", updatedAt: stamp },
+      // `and` of two conditions is never undefined.
+      and(
+        inArray(col(columns, "status"), ["pending", "capturing"]),
+        eq(col(columns, "captureJobId"), jobId),
+      ) as SQL,
+    )) as unknown as Build | null;
+    // `updateWhere` returns the row either way; only our own write carries our stamp. Compared as
+    // instants: Postgres hands the column back as `2026-11-03 19:46:04.101+00`, not as the ISO we wrote.
+    // A millisecond stamp can coincide with another instance's, but a refused write returns the row of
+    // whichever job owns it, so the owner must be ours as well.
+    const applied =
+      current?.status === "failed" &&
+      current.captureJobId === jobId &&
+      instantOf(current.updatedAt) === instantOf(stamp);
+    return { applied, build: current };
   }
 
   /**
@@ -381,4 +430,20 @@ export interface BuildListFilter {
   labelValue?: string;
   /** Newest builds to return at most. */
   limit?: number;
+}
+
+/** The instant a stored timestamp names, in epoch ms, whichever string form the driver returns. */
+function instantOf(value: string): number {
+  const direct = Date.parse(value);
+  if (!Number.isNaN(direct)) {
+    return direct;
+  }
+  // `2026-11-03 19:46:04.101+00` (Postgres) is not ISO: make it so, for runtimes that do not guess.
+  return Date.parse(value.replace(" ", "T").replace(/(?<hours>[+-]\d{2})$/u, "$<hours>:00"));
+}
+
+/** An ISO timestamp strictly later than the previous one this process handed out. */
+function nextStamp(): string {
+  lastStamp = Math.max(Date.now(), lastStamp + 1);
+  return new Date(lastStamp).toISOString();
 }

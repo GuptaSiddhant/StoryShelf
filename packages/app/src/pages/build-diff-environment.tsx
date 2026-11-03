@@ -2,7 +2,12 @@ import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Alert } from "../ui/components.tsx";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
-import { environmentChangeOf, labelOf, summariseEnvironmentChanges } from "./environment-change.ts";
+import {
+  environmentChangeOf,
+  labelOf,
+  summariseEnvironmentChanges,
+  summarisePartlyUnknown,
+} from "./environment-change.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -11,6 +16,37 @@ import { environmentChangeOf, labelOf, summariseEnvironmentChanges } from "./env
  * The default branch migrates them without a diff; a feature branch still diffs them (ADR 0005).
  */
 export function EnvironmentChangeNotice(props: {
+  snapshots: readonly Snapshot[];
+  migrated: boolean;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const unknown = summarisePartlyUnknown(props.snapshots);
+  const changed = <EnvironmentMigrationNotice {...props} />;
+  return unknown ? (
+    <>
+      {changed}
+      <PartlyUnknownNotice count={unknown.count} fields={unknown.fields} />
+    </>
+  ) : (
+    changed
+  );
+}
+
+/** The measurement version changed: some components were compared as unknown, not as different. */
+function PartlyUnknownNotice(props: {
+  count: number;
+  fields: string[];
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { count, fields } = props;
+  return (
+    <Alert tone="info" title="Environment partly unknown (measurement updated)">
+      {count} {count === 1 ? "snapshot has" : "snapshots have"} a baseline whose environment was
+      measured an older way, so the {fields.join(", ")} could not be compared. They are not treated
+      as a change, and nothing was migrated because of them.
+    </Alert>
+  );
+}
+
+function EnvironmentMigrationNotice(props: {
   snapshots: readonly Snapshot[];
   migrated: boolean;
 }): HtmlEscapedString | Promise<HtmlEscapedString> | null {
@@ -47,16 +83,26 @@ export function EnvironmentChangeSnapshotNotice(props: {
   if (!change) {
     return null;
   }
+  const unknown = (change.unknown ?? []).map((field) => labelOf(field));
+  const note = unknown.length > 0 ? <PartlyUnknownNotice count={1} fields={unknown} /> : null;
+  if (change.changed.length === 0) {
+    return note;
+  }
   const what = change.changed.map((field) => labelOf(field)).join(", ");
-  return props.migrated ? (
-    <Alert tone="info" title="No diff: capture environment changed">
-      This snapshot was not compared pixel by pixel. What changed: {what}.
-    </Alert>
-  ) : (
-    <Alert tone="info" title="Capture environment changed">
-      The baseline was captured in a different environment ({what}), so a difference may come from
-      the environment rather than the code.
-    </Alert>
+  return (
+    <>
+      {props.migrated ? (
+        <Alert tone="info" title="No diff: capture environment changed">
+          This snapshot was not compared pixel by pixel. What changed: {what}.
+        </Alert>
+      ) : (
+        <Alert tone="info" title="Capture environment changed">
+          The baseline was captured in a different environment ({what}), so a difference may come
+          from the environment rather than the code.
+        </Alert>
+      )}
+      {note}
+    </>
   );
 }
 

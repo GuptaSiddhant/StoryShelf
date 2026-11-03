@@ -31,6 +31,7 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 | `buildScriptName` | `--build-script-name` / `-b` | —                             | package script to run (default `build-storybook`)                                                                                  |
 | `skip`            | `--skip`                     | —                             | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
 | `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                                 |
+| `buildStats`      | `--no-build-stats` (opt-out)  | —                             | Append `--stats-json` to the build script when affected capture is on (default `true`). Set `false` for a script that rejects the flag |
 | `untraced`        | `--untraced` (union)         | —                             | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/)                            |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
@@ -74,12 +75,12 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 `storyshelf upload` (and `storyshelf` with no args defaults to `upload` when config exists, else shows help to run `init`):
 
 1. `skip` glob matches `branch` → exit 0, no `POST`.
-2. `buildDir` missing or empty or `--force-build` → run `buildCommand` or the detected package runner's script invocation (`npm run <buildScriptName> -- --output-dir <buildDir>`; `pnpm`/`bun`/`nub run <buildScriptName> --output-dir <buildDir>`; `yarn <buildScriptName> --output-dir <buildDir>`; `deno task <buildScriptName> --output-dir <buildDir>`) with `STORYBOOK_BUILD_STORIES_JSON=true` (so Storybook emits `stories.json` with `parameters` for per-story controls like `disableSnapshot`/`flakyTest` — see **Interaction testing**). The runner is detected from the invoking agent env, then the `packageManager` field, then lockfiles (`nub.lock`, `bun.lockb`/`bun.lock`, `pnpm-lock.yaml`, `yarn.lock`, `package-lock.json`, `deno.lock`), defaulting to `npm`.
+2. `buildDir` missing or empty or `--force-build` → run `buildCommand` or the detected package runner's script invocation (`npm run <buildScriptName> -- --output-dir <buildDir>`; `pnpm`/`bun`/`nub run <buildScriptName> --output-dir <buildDir>`; `yarn <buildScriptName> --output-dir <buildDir>`) with `STORYBOOK_BUILD_STORIES_JSON=true` (so Storybook emits `stories.json` with `parameters` for per-story controls like `disableSnapshot`/`flakyTest` — see **Interaction testing**). The runner is detected from the invoking agent env, then the `packageManager` field, then lockfiles (`nub.lock`, `bun.lockb`/`bun.lock`, `pnpm-lock.yaml`, `yarn.lock`, `package-lock.json`), defaulting to `npm`. Deno is not detected: a `packageManager: "deno@…"` field and `deno.lock` are ignored, so the runner comes from the agent env or another lockfile, and is `npm` only when none matches. If you build with Deno, set `buildCommand` explicitly.
 3. `zip.addLocalFolder(buildDir)` → `POST /api/v1/projects/{slug}/builds`.
 
 ## Server config vs client config
 
-- **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly`, `untraced` — per-Storybook, committed, non-secret.
+- **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly`, `buildStats`, `untraced` — per-Storybook, committed, non-secret.
 - **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `scratchDir` (default `<os.tmpdir()>/storyshelf`), `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `maxZipEntries`, `maxUnzippedBytes`, `viewports`, `browser` (per-project capture target: an engine the runner offers, or `<engine>@<name>`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
 
 Publishing a Storybook zip is bounded by three options (see [Published Storybook](/concepts/publishing/)):
@@ -135,7 +136,7 @@ So a first deploy needs no redeploy to learn its URL: open **System** once and c
 
 ## Validation
 
-File is validated by the CLI's config parser (`cli/src/config.ts`): unknown keys are ignored, and any present-but-invalid field (`url` shape, `buildCommand`+`buildScriptName` together, non-boolean `affectedOnly`, malformed `untraced`) invalidates the whole file — `upload` then errors on the missing `slug`/`url` with a helpful message.
+File is validated by the CLI's config parser (`cli/src/config.ts`): unknown keys are ignored, and any present-but-invalid field (`url` shape, `buildCommand`+`buildScriptName` together, non-boolean `affectedOnly` or `buildStats`, malformed `untraced`) invalidates the whole file — `upload` then errors on the missing `slug`/`url` with a helpful message.
 
 ## Editor support (`$schema`)
 

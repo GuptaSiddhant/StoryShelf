@@ -116,6 +116,20 @@ describe("runMigrations: MySQL 8 compatibility", () => {
     );
     expect(queries).toContain("ALTER TABLE comments MODIFY COLUMN user_id VARCHAR(64) NULL");
   });
+
+  it("adds builds.capture_job_id, then backfills the run each in-flight build owns", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+
+    const added = queries.indexOf("ALTER TABLE builds ADD COLUMN capture_job_id VARCHAR(26) NULL");
+    const backfill = queries.findIndex((sql) => sql.startsWith("UPDATE builds SET capture_job_id"));
+    expect(added).toBeGreaterThanOrEqual(0);
+    expect(backfill).toBeGreaterThan(added);
+    expect(queries[backfill]).toContain("j.status IN ('queued', 'running')");
+    expect(queries[backfill]).toContain(
+      "WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')",
+    );
+  });
 });
 
 /** The `users` table block of the DDL. */

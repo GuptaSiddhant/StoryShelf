@@ -29,7 +29,7 @@ export {
   type MentionSpan,
 } from "./mentions.ts";
 export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";
-export { httpBytes, httpJson, httpStatus, httpText } from "./http.ts";
+export { httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";
 export {
   baselinePath,
   catalogPath,

@@ -63,6 +63,7 @@ const projects = defineTable("projects", {
   playTimeoutMs: "play_timeout_ms",
   runA11y: "run_a11y",
   runTests: "run_tests",
+  detectUnstable: "detect_unstable",
   browser: "browser",
   viewports: "viewports",
   browsers: "browsers",
@@ -122,6 +123,7 @@ const designNodes = defineTable("design_nodes", {
   state: "state",
   renderPath: "render_path",
   renderVersion: "render_version",
+  notifiedVersion: "notified_version",
   fetchedAt: "fetched_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
@@ -150,6 +152,7 @@ const builds = defineTable("builds", {
   testResults: "test_results",
   reviewCycle: "review_cycle",
   reviewRequestedCycle: "review_requested_cycle",
+  captureJobId: "capture_job_id",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -252,6 +255,7 @@ const captureLogs = defineTable("capture_logs", {
 const snapshots = defineTable("snapshots", {
   durationMs: "duration_ms",
   a11yViolations: "a11y_violations",
+  unstable: "unstable",
   id: "id",
   projectId: "project_id",
   buildId: "build_id",

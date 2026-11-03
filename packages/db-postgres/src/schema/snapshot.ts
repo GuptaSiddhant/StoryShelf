@@ -51,6 +51,7 @@ export const snapshots = pgTable(
     browser: text("browser").notNull().default("chromium"),
     durationMs: integer("duration_ms"),
     a11yViolations: text("a11y_violations"),
+    unstable: boolean("unstable"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -99,6 +100,7 @@ export interface Snapshot {
   browser?: string;
   durationMs: number | null;
   a11yViolations: string | null;
+  unstable: boolean | null;
   createdAt: string;
   updatedAt: string;
 }

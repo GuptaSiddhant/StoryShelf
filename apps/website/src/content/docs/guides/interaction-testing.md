@@ -123,4 +123,6 @@ You **do not** need to edit `.storybook/main.ts`. When `storyshelf upload` build
 
 Retry a flaky capture with **Retry** on the build page (`POST /api/v1/projects/:slug/builds/:id/retry`).
 
+A story that renders differently each time, rather than failing, is flagged automatically: see [Unstable renders](/guides/review/#unstable-renders).
+
 See **Project settings → Tests** for the toggle and **ADR 0017** for the full decision.

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS projects (
   play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
   run_a11y BOOLEAN NOT NULL DEFAULT true,
   run_tests BOOLEAN NOT NULL DEFAULT false,
+  detect_unstable BOOLEAN NOT NULL DEFAULT true,
   browser TEXT NOT NULL DEFAULT 'chromium',
   viewports TEXT,
   browsers TEXT,
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS builds (
   test_results TEXT,
   review_cycle INTEGER NOT NULL DEFAULT 0,
   review_requested_cycle INTEGER,
+  capture_job_id TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -177,6 +179,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   browser TEXT NOT NULL DEFAULT 'chromium',
   duration_ms INTEGER,
   a11y_violations TEXT,
+  unstable BOOLEAN,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -312,6 +315,7 @@ CREATE TABLE IF NOT EXISTS design_nodes (
   state TEXT NOT NULL DEFAULT 'ok',
   render_path TEXT,
   render_version TEXT,
+  notified_version TEXT,
   fetched_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL

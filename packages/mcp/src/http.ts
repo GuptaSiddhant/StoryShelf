@@ -15,7 +15,7 @@ export interface McpHttpOptions {
   allowedOrigins?: readonly string[];
 }
 
-/** Web-standard request handler: mount it on Hono, Node, Deno or Bun. */
+/** Web-standard request handler: mount it on Hono, Node or Bun. */
 export type McpHttpHandler = (request: Request) => Promise<Response>;
 
 /**

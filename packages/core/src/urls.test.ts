@@ -20,6 +20,14 @@ describe("safeImageUrl", () => {
 });
 
 describe("component url", () => {
+  it("selects a tab only when asked", () => {
+    const urls = createUrlBuilder("https://shelf.example.com");
+    expect(urls.component("app", "./src/Button.stories.tsx", { tab: "design" })).toBe(
+      "https://shelf.example.com/projects/app/components/src/Button.stories.tsx?tab=design",
+    );
+    expect(urls.component("app", "src/Button.stories.tsx")).not.toContain("?");
+  });
+
   it("keys by import path without a leading ./ and keeps slashes", () => {
     const urls = createUrlBuilder("https://shelf.example.com/");
     expect(urls.component("app", "./src/ui/Button.stories.tsx")).toBe(
@@ -40,6 +48,15 @@ describe("component url", () => {
     );
     expect(urls.component("app", "src/Button.stories.tsx", { build: undefined })).toBe(
       "https://shelf.example.com/projects/app/components/src/Button.stories.tsx",
+    );
+  });
+});
+
+describe("component url with a build and a tab", () => {
+  it("carries both, build first", () => {
+    const urls = createUrlBuilder("https://shelf.example.com");
+    expect(urls.component("app", "src/Button.stories.tsx", { build: "01B", tab: "design" })).toBe(
+      "https://shelf.example.com/projects/app/components/src/Button.stories.tsx?build=01B&tab=design",
     );
   });
 });
@@ -81,5 +98,14 @@ describe("label and branch encoding", () => {
           .join("/"),
       ).toBe(value);
     }
+  });
+});
+
+describe("design coverage url", () => {
+  it("sits under the project's design path, with the base and a trailing slash trimmed", () => {
+    expect(createUrlBuilder("https://shelf.example.com/").designCoverage("app")).toBe(
+      "https://shelf.example.com/projects/app/design/coverage",
+    );
+    expect(createUrlBuilder("").designCoverage("app")).toBe("/projects/app/design/coverage");
   });
 });

@@ -56,6 +56,11 @@ export interface StoryParameters {
   waitForFonts?: boolean;
   /** Storybook viewport config; adds the story's default viewport to the project list at capture time. */
   viewport?: StoryViewportConfig;
+  /**
+   * CSS selectors hidden (`visibility: hidden`) before the screenshot. `storyshelf` replaces
+   * `chromatic`; `[data-storyshelf-ignore]` and the Chromatic markers always apply.
+   */
+  ignoreSelectors?: string[];
   /** Named modes: extra captures of this story under different globals/viewports. */
   modes?: ModeMap;
 }

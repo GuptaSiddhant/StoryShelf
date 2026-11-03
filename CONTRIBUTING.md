@@ -41,15 +41,15 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package and its de
 3. **Commit with [conventional commits](https://www.conventionalcommits.org/)** (`feat:`, `fix:`, `docs:`, `chore:` …). The pre-commit hook enforces the format.
 4. **Open a pull request** against `main`. CI must be green.
 5. **Merges are squash merges.** One task is one commit on `main`, titled `feat(<task-id>): <short description>`. Reference the issue with `Closes #<n>`.
+6. **Add a changeset** when the change affects what a published package does: `nub run changeset <patch|minor|major> --message "<entry>"`, then commit the file it creates. Write it like a `CHANGELOG.md` entry. Docs, test and CI changes need none; put the `no-release` label on the pull request so the check passes. Never edit `CHANGELOG.md` or package versions by hand.
 
-## Package previews
+## Releases and previews
 
-Each push to `main` builds the public packages and publishes commit-based previews through pkg.pr.new. The workflow does not publish to npm. For example, install the latest main preview with `npm install https://pkg.pr.new/GuptaSiddhant/StoryShelf/@storyshelf/core@main`, or replace `main` with a commit SHA to pin a specific build. Each preview package has a `0.0.0-preview-<sha>` version, and its workspace dependencies point to previews from the same commit.
+Packages are released from [Changesets](https://github.com/changesets/changesets)-format files, versioned by our own `scripts/version-packages.mjs` (ADR 0043). All published packages share one version.
 
-Run the CLI preview with `npx https://pkg.pr.new/GuptaSiddhant/StoryShelf/storyshelf@main`.
-pkg.pr.new assigns the preview version when packing, after the build, so compiled version metadata retains the repository's package version. In particular, CLI-generated projects use the repository version for npm dependencies rather than attempting to install preview versions from npm.
-
-The [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new) must be installed on this repository for the workflow to publish. Preview availability and retention are managed by pkg.pr.new; use stable npm releases for durable dependencies. The separate `release.yml` workflow remains responsible for npm and JSR releases.
+- **`next` builds.** Each push to `main` that has pending changesets publishes every package to npm under the `next` dist-tag, versioned `<next version>-next-<short sha>`, for example `npm install @storyshelf/core@next`. A push without a pending changeset publishes nothing, and `latest` is never touched.
+- **Stable releases** are cut by pull request, on request. `nub run release:prepare` versions the pending changesets on a `release/v<version>` branch (one version, the `CHANGELOG.md` section, `chore(release): v<version>`); open a pull request from it. Merging it to `main` publishes to `latest` on npm, tags `v<version>`, and creates the GitHub Release. If a publish fails, the next push to `main` retries it, or run the `Release` workflow by hand with that version.
+- **Epic-branch previews.** Each push to an `epic/**` branch builds the public packages and publishes commit-based previews through pkg.pr.new, without publishing to npm. For example, `npm install https://pkg.pr.new/GuptaSiddhant/StoryShelf/@storyshelf/core@epic/437-review`, or replace the branch with a commit SHA. Run the CLI preview with `npx https://pkg.pr.new/GuptaSiddhant/StoryShelf/storyshelf@epic/437-review`. pkg.pr.new assigns the preview version when packing, after the build, so CLI-generated projects keep using the repository version for npm dependencies. The [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new) must be installed on this repository; preview retention is managed by pkg.pr.new, so use `next` or stable releases for durable dependencies.
 
 ## Handling secrets
 

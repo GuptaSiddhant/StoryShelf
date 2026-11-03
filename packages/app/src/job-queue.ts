@@ -29,6 +29,8 @@ export interface JobQueue {
   view: CaptureQueue;
   /** Per-kind hooks for exhausted jobs, filled in by the kind's setup. */
   exhausted: Partial<Record<CaptureJobKind, ExhaustedHandler>>;
+  /** Per-kind hooks for a job whose exhausted hook kept failing (the alert of last resort). */
+  abandoned: Partial<Record<CaptureJobKind, ExhaustedHandler>>;
 }
 
 /**
@@ -42,6 +44,7 @@ export function createJobQueue(
 ): JobQueue {
   let queue: DatabaseCaptureQueue | undefined;
   const exhausted: JobQueue["exhausted"] = {};
+  const abandoned: JobQueue["abandoned"] = {};
   const get = (): DatabaseCaptureQueue => {
     queue ??= createDatabaseCaptureQueue(options.database, {
       kinds: kinds.length > 0 ? kinds : ["capture"],
@@ -55,10 +58,13 @@ export function createJobQueue(
       onExhausted: async (job, error) => {
         await exhausted[job.kind]?.(job, error);
       },
+      onAbandoned: async (job, error) => {
+        await abandoned[job.kind]?.(job, error);
+      },
     });
     return queue;
   };
-  return { kinds, get, built: () => queue, view: queueView(get), exhausted };
+  return { kinds, get, built: () => queue, view: queueView(get), exhausted, abandoned };
 }
 
 function queueView(get: () => DatabaseCaptureQueue): CaptureQueue {

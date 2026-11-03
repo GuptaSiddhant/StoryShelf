@@ -1,4 +1,4 @@
-import { gitRepoStatus } from "@storyshelf/affected";
+import { gitRepoRoot, gitRepoStatus, pathBase } from "@storyshelf/affected";
 import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClient } from "../client.ts";
@@ -144,8 +144,8 @@ export async function runDoctor(options: DoctorOptions): Promise<void> {
   reportChecks(checks);
 }
 
-/** Warn when affected capture would silently fall back to a full render. */
-async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
+/** The git history problem that makes affected capture render everything, if there is one. */
+function historyProblem(cwd: string): Check | null {
   const repo = gitRepoStatus(cwd);
   if (repo === "no-git") {
     return {
@@ -154,10 +154,26 @@ async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
         "No git repository — upload uses a synthetic local identity and affected capture renders all stories",
     };
   }
-  if (repo === "shallow") {
+  return repo === "shallow"
+    ? {
+        status: "warn",
+        message:
+          "Shallow clone detected — affected capture renders all stories (use fetch-depth: 0)",
+      }
+    : null;
+}
+
+/** Warn when affected capture would silently fall back to a full render. */
+async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
+  const problem = historyProblem(cwd);
+  if (problem) {
+    return problem;
+  }
+  const base = pathBase(gitRepoRoot(cwd), cwd);
+  if (!base) {
     return {
       status: "warn",
-      message: "Shallow clone detected — affected capture renders all stories (use fetch-depth: 0)",
+      message: `Cannot place ${cwd} inside its git repository — affected capture renders all stories (path-base-unknown)`,
     };
   }
   try {
@@ -165,10 +181,13 @@ async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
   } catch {
     return {
       status: "warn",
-      message: `No preview-stats.json in ${buildDir} — affected capture renders all stories`,
+      message: `No preview-stats.json in ${buildDir} — affected capture renders all stories (build with --stats-json)`,
     };
   }
-  return { status: "pass", message: "Affected capture ready (history and stats available)" };
+  return {
+    status: "pass",
+    message: `Affected capture ready (history and stats available; Storybook project ${base.projectRoot}, repository root ${base.repoRoot})`,
+  };
 }
 
 /** Resolve the connection, recording success or failure as a check. */

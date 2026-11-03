@@ -1,4 +1,5 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,6 +85,41 @@ describe("resolveConnection", () => {
       slug: "demo",
       token: "t",
     });
+  });
+});
+
+describe("resolveConnection url", () => {
+  const withSlash = "https://shelf.example.com/";
+  const clean = "https://shelf.example.com";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("drops a trailing slash from the flag", async () => {
+    const resolved = await resolveConnection({
+      url: withSlash,
+      slug: "demo",
+      token: "t",
+      cwd: dir,
+    });
+    expect(resolved.url).toBe(clean);
+  });
+
+  it("drops a trailing slash from the environment", async () => {
+    vi.stubEnv("STORYSHELF_URL", `${withSlash}//`);
+    const resolved = await resolveConnection({ slug: "demo", token: "t", cwd: dir });
+    expect(resolved.url).toBe(clean);
+  });
+
+  it("drops a trailing slash from the config file and keeps a path prefix", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", url: "https://shelf.example.com/shelf/" }),
+    );
+    const resolved = await resolveConnection({ token: "t", cwd: dir });
+    expect(resolved.url).toBe("https://shelf.example.com/shelf");
   });
 });
 
@@ -197,6 +233,42 @@ describe("runDoctor", () => {
       process.stdout.write = write;
     }
     expect(lines.some((line) => line.includes("No git repository"))).toBe(true);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("reports the project root and repository root affected capture will use", async () => {
+    const repo = realpathSync(dir);
+    const git = (args: string[]): string =>
+      execFileSync("git", args, { cwd: repo, encoding: "utf8" });
+    git(["-c", "init.defaultBranch=main", "init"]);
+    const project = join(repo, "packages", "app");
+    mkdirSync(join(project, ".storybook"), { recursive: true });
+    writeFileSync(join(project, ".storybook", "main.ts"), "export default {};\n");
+    mkdirSync(join(project, "storybook-static"), { recursive: true });
+    writeFileSync(join(project, "storybook-static", "index.json"), "{}");
+    writeFileSync(join(project, "storybook-static", "preview-stats.json"), "{}");
+    git(["add", "."]);
+    git(["-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-m", "init"]);
+    mockFetch(() => ({ name: "Demo", slug: "demo" }));
+    const lines: string[] = [];
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string): boolean => {
+      lines.push(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await runDoctor({
+        url: "https://shelf.example.com",
+        slug: "demo",
+        token: "ci-token",
+        cwd: project,
+      });
+    } finally {
+      process.stdout.write = write;
+    }
+    const ready = lines.find((line) => line.includes("Affected capture ready")) ?? "";
+    expect(ready).toContain(`Storybook project ${project}`);
+    expect(ready).toContain(`repository root ${repo}`);
     expect(process.exitCode).toBeUndefined();
   });
 });

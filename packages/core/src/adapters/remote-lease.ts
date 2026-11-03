@@ -12,6 +12,7 @@ import {
   schemesOf,
   type RemoteConnectContext,
   type RemoteConnection,
+  type RemoteLeaseOutcome,
   type RemoteLeasedConnection,
   type RemoteTarget,
 } from "./remote-browser.ts";
@@ -23,6 +24,7 @@ import {
   stoppedError,
 } from "./remote-lease-error.ts";
 import { holdLease, noLease, withDeadline, type HeldConnection } from "./remote-lease-held.ts";
+import { shutdownEpoch, takeSlot, type ConnectionSlot } from "./remote-limiter.ts";
 
 export { RemoteConnectError, type RemoteConnectErrorOptions } from "./remote-lease-error.ts";
 export type { HeldConnection } from "./remote-lease-held.ts";
@@ -103,7 +105,72 @@ export async function connectLeased<T>(
   }
 }
 
+/**
+ * One connection, counted under the service's `maxConnections` when it has one: the slot is taken
+ * (waiting, cancellably) before `connect` runs and given back when the lease ends, or at once when
+ * the connection never materialises. Without a cap this is just {@link open}.
+ */
 async function acquire(
+  entry: RemoteTarget,
+  context: ConnectLeasedContext,
+  attemptNo: number,
+  logger: Logger | undefined,
+): Promise<HeldConnection> {
+  // No `await` without a cap: an uncapped connection starts exactly as it did before.
+  const epoch = shutdownEpoch();
+  const taking = takeSlot(entry, context.signal, logger);
+  const slot = taking === undefined ? undefined : await taking;
+  stopIfShutDown(slot, epoch);
+  try {
+    const held = await open(entry, context, attemptNo, logger);
+    return slot === undefined ? held : withSlot(held, slot);
+  } catch (error) {
+    slot?.release();
+    throw error;
+  }
+}
+
+/**
+ * A slot granted across a shutdown must not open a connection: the shutdown has already stopped the
+ * attempts and collected the leases, so nothing would release it. The slot is given back and the
+ * connection stops. Called right before `open`, with nothing awaited in between, so a shutdown cannot
+ * slip into the gap (`open` registers its attempt synchronously).
+ */
+function stopIfShutDown(slot: ConnectionSlot | undefined, epoch: number): void {
+  if (slot !== undefined && shutdownEpoch() !== epoch) {
+    slot.release();
+    throw stoppedError();
+  }
+}
+
+/** `held` that gives its slot back, once, after the lease is released. */
+function withSlot(held: HeldConnection, slot: ConnectionSlot): HeldConnection {
+  let ending: Promise<void> | undefined;
+  return {
+    connection: held.connection,
+    // Every caller gets the first call's promise: the inner `end` returns at once for a second call,
+    // which would free the slot while the first release is still running.
+    end: async (outcome, error) => {
+      ending ??= endAndFree(held, slot, outcome, error);
+      await ending;
+    },
+  };
+}
+
+async function endAndFree(
+  held: HeldConnection,
+  slot: ConnectionSlot,
+  outcome: RemoteLeaseOutcome,
+  error: unknown,
+): Promise<void> {
+  try {
+    await held.end(outcome, error);
+  } finally {
+    slot.release();
+  }
+}
+
+async function open(
   entry: RemoteTarget,
   context: ConnectLeasedContext,
   attemptNo: number,

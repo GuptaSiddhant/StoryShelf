@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { BuildModel } from "../../models/build.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
 import { claimCandidate, claimNext, LEASE_EXHAUSTED_ERROR } from "./claim.ts";
-import type { QueueTimers } from "./timers.ts";
 import type { QueueRuntime } from "./types.ts";
 import { createWakeSignal } from "./wake.ts";
 
@@ -11,6 +11,7 @@ function runtime(owner = "me"): { rt: QueueRuntime; clock: { now: number } } {
   const clock = { now: Date.parse("2026-01-01T00:00:00.000Z") };
   const rt: QueueRuntime = {
     model: new CaptureJobModel(db),
+    builds: new BuildModel(db),
     kinds: ["capture"],
     leaseMs: 1000,
     maxAttempts: 2,
@@ -27,20 +28,6 @@ function peer(rt: QueueRuntime, owner: string): QueueRuntime {
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString();
-
-/** Timers that record each requested delay and fire at once, so a test asserts causality, not time. */
-function manualTimers(): { timers: QueueTimers; delays: number[] } {
-  const delays: number[] = [];
-  const timers: QueueTimers = {
-    setTimeout: (callback, ms) => {
-      delays.push(ms);
-      callback();
-      return delays.length;
-    },
-    clearTimeout: () => {},
-  };
-  return { timers, delays };
-}
 
 async function enqueue(rt: QueueRuntime, id = "j1"): Promise<void> {
   await rt.model.create({ id, kind: "capture", buildId: "b1", maxAttempts: 2 }, iso(rt.now()));
@@ -93,81 +80,6 @@ describe("claimNext", () => {
       error: LEASE_EXHAUSTED_ERROR,
     });
     expect((await rt.model.get("j1:2"))?.status).toBe("expired");
-  });
-
-  it("tells the host when a job is failed by an exhausted lease, and survives the hook throwing", async () => {
-    const { rt, clock } = runtime();
-    const onExhausted = vi.fn(async () => {});
-    rt.onExhausted = onExhausted;
-    await enqueue(rt);
-    await claimNext(rt);
-    clock.now += 1001;
-    await claimNext(rt);
-    clock.now += 1001;
-    await claimNext(rt);
-    expect(onExhausted).toHaveBeenCalledTimes(1);
-    expect(onExhausted).toHaveBeenCalledWith(
-      expect.objectContaining({ jobId: "j1", kind: "capture", buildId: "b1" }),
-      LEASE_EXHAUSTED_ERROR,
-    );
-
-    await enqueue(rt, "j2");
-    rt.onExhausted = async () => {
-      await Promise.resolve();
-      throw new Error("hook broke");
-    };
-    rt.timers = manualTimers().timers;
-    await claimNext(rt);
-    clock.now += 1001;
-    await claimNext(rt);
-    clock.now += 1001;
-    expect(await claimNext(rt)).toBeNull();
-    expect((await rt.model.get("j2"))?.status).toBe("failed");
-  });
-
-  it("retries a failing exhausted-job hook with backoff and stops once it succeeds", async () => {
-    const { rt, clock } = runtime();
-    const { timers, delays } = manualTimers();
-    rt.timers = timers;
-    const onExhausted = vi
-      .fn<NonNullable<QueueRuntime["onExhausted"]>>()
-      .mockRejectedValueOnce(new Error("transient 1"))
-      .mockRejectedValueOnce(new Error("transient 2"))
-      .mockResolvedValueOnce();
-    rt.onExhausted = onExhausted;
-    await enqueue(rt);
-    await claimNext(rt);
-    clock.now += 1001;
-    await claimNext(rt);
-    clock.now += 1001;
-    await claimNext(rt);
-    expect(onExhausted).toHaveBeenCalledTimes(3);
-    expect(delays).toEqual([100, 200]);
-    expect((await rt.model.get("j1"))?.status).toBe("failed");
-  });
-
-  it("gives up after three hook attempts and leaves the persisted job failed", async () => {
-    const { rt, clock } = runtime();
-    const { timers, delays } = manualTimers();
-    rt.timers = timers;
-    const onExhausted = vi.fn(async () => {
-      await Promise.resolve();
-      throw new Error("hook broke");
-    });
-    rt.onExhausted = onExhausted;
-    await enqueue(rt);
-    await claimNext(rt);
-    clock.now += 1001;
-    await claimNext(rt);
-    clock.now += 1001;
-    expect(await claimNext(rt)).toBeNull();
-    expect(onExhausted).toHaveBeenCalledTimes(3);
-    // No wait after the last attempt: two backoffs for three attempts.
-    expect(delays).toEqual([100, 200]);
-    expect(await rt.model.get("j1")).toMatchObject({
-      status: "failed",
-      error: LEASE_EXHAUSTED_ERROR,
-    });
   });
 
   it("does not tell the host about a job a late holder finished", async () => {

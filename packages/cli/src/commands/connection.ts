@@ -1,3 +1,4 @@
+import { normalizeBaseUrl } from "../client.ts";
 import { loadStorybookConfig } from "../config.ts";
 
 /** Server connection options shared by read-only commands. */
@@ -34,7 +35,7 @@ export async function resolveConnection(options: ConnectionOptions): Promise<Res
     token: options.token ?? process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"],
   };
   assertConnectionFields(fields);
-  return fields;
+  return { ...fields, url: normalizeBaseUrl(fields.url) };
 }
 
 /** Throw on the first missing connection field. */

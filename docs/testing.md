@@ -94,6 +94,7 @@ Rules:
 - **Unit:** colocated `*.test.ts` next to sources (hermetic — tmp dirs, fake adapters, mocked `fetch`; never a browser, network, or Storybook build).
 - **HTTP-level integration:** `*.integration.test.ts` in the same dirs (real router over HTTP with fake capture runner; still hermetic and CI-always).
 - **Real browser:** gated behind `RUN_INTEGRATION=1` (`nub run test:integration`, Playwright + `fixtures/storybook-8` by default).
+- **Terraform scaffolds:** `packages/cli/src/commands/server/terraform-*.integration.test.ts` run `terraform fmt`, `init` and `validate`; `init` downloads providers, so they are gated behind `RUN_TERRAFORM=1` (not `RUN_INTEGRATION`, which would switch on the browser suites). With the gate set and no `terraform` binary the suites fail; without it they skip even when Terraform is installed. CI's `verify` job sets it next to `setup-terraform`, and `turbo.json` lists it as a `test` env so the cache key includes it.
 - **Real cloud:** `*.live.test.ts` next to sources, gated behind `LIVE_CLOUD=1` — strictly real providers, no fakes, no emulators. See "Live cloud tests" below.
 - **Shared doubles** live in `packages/core/src/test-helpers/` (`fake-adapters.ts`, `create-project.ts`) — never in shippable modules. Test files (and `test-helpers/`) are exempt from size lint rules via `.oxlintrc.json` patterns, not per-file paths.
 
@@ -203,3 +204,17 @@ Database compatibility runs nightly and on demand in
 upgrade test drops columns before rerunning migrations; it is skipped unless
 `MYSQL_SCHEMA_MUTATION_TEST=1` is set. Set that flag only for a disposable database, never a
 shared cloud database. The regular live suite still tests setup, CRUD and queue behavior.
+
+The MySQL job also runs the shared `databaseContractSuite` (`packages/db-mysql/src/contract.test.ts`),
+as SQLite and Postgres do, in its own database. That file is skipped unless `MYSQL_URL` is set, so
+`nub run test` stays hermetic. To run it yourself, against a disposable database:
+
+```sh
+docker run -d --name shelf-mysql -p 127.0.0.1:3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
+# a fresh container needs a while to initialise: wait until it answers, for at most 60 s, and only then run the tests
+timeout 60 sh -c 'until docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -ppw --silent; do sleep 1; done' \
+  && MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts   # from packages/db-mysql
+```
+
+Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not
+pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job uses `--env-mode=loose`).

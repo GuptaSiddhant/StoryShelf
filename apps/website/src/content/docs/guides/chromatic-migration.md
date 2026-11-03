@@ -66,25 +66,30 @@ Match Chromatic settings where applicable:
 - name: Checkout
   uses: actions/checkout@v4
   with:
+    ref: ${{ github.event.pull_request.head.sha || github.sha }} # the PR head, not the merge commit
     fetch-depth: 0 # affected capture diffs against history
 
 - name: Build Storybook
-  run: npx build-storybook -o storybook-static
+  run: npx storybook build -o storybook-static --stats-json # the stats file feeds affected capture
 
 - name: Upload to StoryShelf
-  run: npx storyshelf upload --token ${{ secrets.STORYSHELF_TOKEN }} --sha ${{ github.sha }} --branch ${{ github.ref_name }}
+  run: npx storyshelf upload --token ${{ secrets.STORYSHELF_TOKEN }} --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
   env:
     STORYSHELF_URL: https://shelf.example.com
     STORYSHELF_SLUG: my-design-system
+    UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
 ```
 
-Or with `.storybook/storyshelf.json` committed:
+Or with `.storybook/storyshelf.json` committed (on a pull request, still pass the head SHA and branch as above: the environment's `GITHUB_SHA` and `GITHUB_REF_NAME` are the merge commit and `<n>/merge`):
 
 ```yaml
 - name: Upload to StoryShelf
-  run: npx storyshelf
+  run: npx storyshelf upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
   env:
     STORYSHELF_TOKEN: ${{ secrets.STORYSHELF_TOKEN }}
+    UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
 ```
 
 ## 5. Parameter compatibility (dual-key)
@@ -99,9 +104,24 @@ StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshe
 | `diffThreshold`       | `diffThreshold`       | Works unchanged                |
 | `pauseAnimationAtEnd` | `pauseAnimationAtEnd` | Works unchanged                |
 | `viewports`           | Server config         | Set in `ShelfConfig.viewports` |
+| `ignoreSelectors`     | `ignoreSelectors`     | Works unchanged; see below     |
 | `modes` / `globals`   | Not supported         | **Gap** — no equivalent        |
 
 **No code changes needed** for existing `chromatic:` parameters. They work as-is.
+
+### Ignore regions
+
+Dynamic content (a timestamp, an avatar, an ad) can be hidden before the screenshot so it never causes a diff. StoryShelf hides these elements, whichever of these marks them:
+
+- `parameters.storyshelf.ignoreSelectors: string[]` (or `parameters.chromatic.ignoreSelectors`; `storyshelf:` replaces `chromatic:` when both are set);
+- an element with the attribute `data-storyshelf-ignore`;
+- for migration, `.chromatic-ignore` and `[data-chromatic="ignore"]`, which need no change.
+
+```ts
+export const Clock = { parameters: { storyshelf: { ignoreSelectors: [".clock", "[data-testid=avatar]"] } } };
+```
+
+Both browser engines inject the same stylesheet, which sets `visibility: hidden` and `opacity: 0` on the element, so its whole subtree disappears while the layout stays put. An invalid selector is skipped with a warning in the build log and never fails the build; at most 50 selectors count per story. Baseline keys and the diff itself are unchanged, so **adding a mask produces a one-time expected diff** on the first build after it lands: approve it to refresh the baseline.
 
 ## 6. Baseline model differences
 
@@ -131,7 +151,7 @@ StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshe
 - **Full data ownership** — Your DB, your storage, your network
 - **No vendor lock-in** — MIT license, standard REST API, open source
 - **Flexible SSO** — Any OIDC provider (Keycloak, Okta, Entra ID, etc.)
-- **Deploy anywhere** — Node, Bun, Deno, Fly.io, Vercel, Cloudflare, Lambda, etc.
+- **Deploy anywhere** — Node, Bun, Fly.io, Vercel, Cloudflare, Lambda, etc.
 - **Per-branch baselines with fallback** — Cleaner for long-lived feature branches
 - **Persistent builds** — Tag releases → never purged
 

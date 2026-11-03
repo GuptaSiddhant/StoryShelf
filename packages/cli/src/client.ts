@@ -4,11 +4,13 @@
  * Wraps `fetch` with bearer auth and JSON helpers so commands can call
  * `client.projects.builds.createJson(...)` without hand-rolling URLs or headers.
  *
- * @param baseUrl - Server origin, e.g. `https://shelf.example.com`
+ * @param serverUrl - Server URL, e.g. `https://shelf.example.com`; trailing slashes are dropped and
+ *   a path prefix (`https://host/shelf`) is kept
  * @param token - Optional bearer token (CI or admin token); sent as `Authorization: Bearer <token>`
  * @returns Namespaced client with `projects`, `builds`, `tokens`, and `admin` helpers
  */
-export function createClient(baseUrl: string, token?: string): Client {
+export function createClient(serverUrl: string, token?: string): Client {
+  const baseUrl = normalizeBaseUrl(serverUrl);
   const authHeaders = buildAuthHeaders(token);
   const requestHeaders = (contentType?: string): Record<string, string> =>
     buildRequestHeaders(authHeaders, contentType);
@@ -124,11 +126,49 @@ function buildRequestHeaders(
 }
 
 async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
-  const res = await fetch(url, options);
+  return await readJson(url, await fetch(url, options));
+}
+
+/**
+ * The JSON body of a response. A failed status throws a `RequestError` that keeps the status; an
+ * HTML page there (a proxy or login page) or in place of the JSON is described by `notJsonMessage`
+ * instead of its markup or a parse error.
+ */
+async function readJson(url: string, res: Response): Promise<unknown> {
+  const contentType = res.headers?.get("content-type") ?? "";
   if (!res.ok) {
-    throw new RequestError(res.status, await res.text());
+    throw await failedRequest(url, res, contentType);
   }
-  return res.json() as unknown;
+  try {
+    return (await res.json()) as unknown;
+  } catch (error) {
+    // Only a body that is not JSON gets the url hint; a dropped connection keeps its own error.
+    throw error instanceof SyntaxError
+      ? new Error(notJsonMessage(url, contentType), { cause: error })
+      : error;
+  }
+}
+
+/** The error for a failed status: an HTML page is described, not read, and its body released. */
+async function failedRequest(
+  url: string,
+  res: Response,
+  contentType: string,
+): Promise<RequestError> {
+  if (!/html/iu.test(contentType)) {
+    return new RequestError(res.status, await res.text());
+  }
+  await res.body?.cancel().catch(() => {});
+  return new RequestError(res.status, notJsonMessage(url, contentType));
+}
+
+/** What to tell the user when a JSON endpoint answered with something else (origin only, no path). */
+function notJsonMessage(url: string, contentType: string): string {
+  const origin = URL.canParse(url) ? new URL(url).origin : "[invalid url]";
+  const answered = /html/iu.test(contentType)
+    ? "an HTML page, not JSON"
+    : `a response that is not JSON${contentType ? ` (${contentType})` : ""}`;
+  return `The server at ${origin} answered with ${answered}. Check the url (a wrong path, or a reverse proxy or login page in front of StoryShelf?)`;
 }
 
 function createTokensApi(
@@ -207,11 +247,8 @@ function createBuildsApi(
         body: body as unknown as BodyInit,
         duplex: "half",
       } as RequestInit;
-      const res = await fetch(`${baseUrl}${uploadUrl}`, init);
-      if (!res.ok) {
-        throw new RequestError(res.status, await res.text());
-      }
-      return res.json() as unknown;
+      const url = `${baseUrl}${uploadUrl}`;
+      return await readJson(url, await fetch(url, init));
     },
     retry: async (slug: string, buildId: string) =>
       await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/retry`, {
@@ -285,8 +322,7 @@ function createProjectsApi(
   };
 }
 
-// Re-export old helpers for backward compatibility with tests
-/** Strip trailing slashes from a URL so `base + path` never doubles them. */
+/** Strip trailing slashes from a URL so `base + path` never doubles them; a path prefix stays. */
 export function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/u, "");
 }

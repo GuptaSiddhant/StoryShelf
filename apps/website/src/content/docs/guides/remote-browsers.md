@@ -31,6 +31,7 @@ const runner = createPlaywrightCaptureRunner({
       endpoint: "ws://playwright:3000/storyshelf",
       sessions: 8, // concurrency cap, see below
     }), // → chromium@grid, firefox@grid, webkit@grid
+    // Experimental: not verified against live infrastructure.
     azurePlaywright({
       endpoint: process.env.PLAYWRIGHT_SERVICE_URL!,
       token: process.env.PLAYWRIGHT_SERVICE_ACCESS_TOKEN!,
@@ -44,13 +45,13 @@ createShelfApp({ database, storage, testing: { runner } });
 
 Credentials are operator-level: they are passed in the server's code, from the environment or a secret manager. They are never stored per project, and never logged: the endpoint (it can carry a key) and every header value are removed from the messages the runner surfaces.
 
-| Preset                     | Package                                | Protocol   | Reaches the Storybook through |
-| -------------------------- | -------------------------------------- | ---------- | ----------------------------- |
-| `playwrightServer(...)`    | `@storyshelf/runner-playwright/remote` | Playwright | `exposeNetwork` (default)     |
-| `azurePlaywright(...)`     | `@storyshelf/runner-playwright/remote` | Playwright | `exposeNetwork`               |
-| `browserstack(...)`        | `@storyshelf/runner-playwright/remote` | Playwright | a Storybook URL               |
+| Preset                                      | Package                                | Protocol                       | Reaches the Storybook through                       |
+| ------------------------------------------- | -------------------------------------- | ------------------------------ | --------------------------------------------------- |
+| `playwrightServer(...)`                     | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork` (default)                           |
+| `azurePlaywright(...)` (experimental)       | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
+| `browserstack(...)` (experimental)          | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
 | `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
-| `cdp(...)`                 | `@storyshelf/runner-puppeteer/remote`  | CDP        | a Storybook URL               |
+| `cdp(...)`                                  | `@storyshelf/runner-puppeteer/remote`  | CDP                            | a Storybook URL                                     |
 
 `remote()` is the generic constructor every preset is sugar over, so a provider without a preset needs no new release. A fixed service declares how it is reached and where:
 
@@ -140,6 +141,10 @@ A field the runner cannot determine (a page that would not open) is omitted, and
 - A browser that dies while rendering is a crash like a local one and goes through crash isolation as usual.
 - Browser recycling (`recycleBrowserEvery`) releases the old connection and opens a new remote session instead of relaunching; it never sends `Browser.close`.
 
+### What each run logs
+
+At the start of a remote run the runner logs one `remote sizing` line per target with the limits as configured and as they apply: `pages` (the target's page limit, per target and per process), `pagesPerConnection`, `effectivePagesPerConnection` (the lowest of the applicable limits: `pages`, `pagesPerConnection` where the runner enforces it, and the run's `concurrency`; the Puppeteer runner does not enforce `pagesPerConnection`), and `maxConnections` (per process; `null` means no cap), plus `scope`, `experimental` and, for an experimental preset, `verification`. A `sessions` function is read at that moment. The line carries no endpoint, header, credential or lease, and nothing is measured on the app host: the browser's environment is still measured in the browser.
+
 ## Self-hosted farm
 
 The official Playwright image running `playwright run-server`, **pinned to exactly the `playwright-core` version of the runner**:
@@ -192,14 +197,14 @@ remote<{ id: string }>({
 
 **The context `connect` receives**
 
-| Field        | Meaning                                                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `engine`     | The engine being connected.                                                                                                              |
-| `buildId`    | The StoryShelf build; the same for every shard.                                                                                          |
-| `runId`      | The shard's id; the build id when the render is not sharded.                                                                             |
-| `shardIndex` | The shard's **1-based** position in the plan, and **`undefined` (never `0`) when the build is not sharded**. Stable if a shard is retried. |
-| `purpose`    | `render` (a build or shard), `extract` (the parameter pre-pass) or `tests` (`.test()` entries). The pre-passes connect too.               |
-| `attempt`    | This connection's attempt, from 1; every retry connects anew.                                                                            |
+| Field        | Meaning                                                                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `engine`     | The engine being connected.                                                                                                                    |
+| `buildId`    | The StoryShelf build; the same for every shard.                                                                                                |
+| `runId`      | The shard's id; the build id when the render is not sharded.                                                                                   |
+| `shardIndex` | The shard's **1-based** position in the plan, and **`undefined` (never `0`) when the build is not sharded**. Stable if a shard is retried.     |
+| `purpose`    | `render` (a build or shard), `extract` (the parameter pre-pass) or `tests` (`.test()` entries). The pre-passes connect too.                    |
+| `attempt`    | This connection's attempt, from 1; every retry connects anew.                                                                                  |
 | `signal`     | Aborts while `connect` is pending: on `timeouts.acquireMs`, a cancel (user, build, render budget) and shutdown. Spent once `connect` resolves. |
 
 **Lifecycle**
@@ -211,6 +216,7 @@ remote<{ id: string }>({
 - The connection `connect` returns must be `endpoint`, `headers` and `lease` only: `protocol` and `reach` are declared on `remote()`, and a wrong scheme or an extra field fails the job.
 - `sessions` can be a function, read each time a render pass starts and a page waits for a slot, for a provider whose cap follows the servers it has woken. A value that is not a finite number keeps the last good one (and logs once); below 1 counts as 1.
 - Playwright's `remote()` and `playwrightServer()` accept `maxPagesPerConnection`, a positive integer that limits the pages on each connection independently of the target-wide `sessions` budget. Two pages per connection worked as a starting point on one 2 GB browser host; measure and tune it for your workload. The local loopback Storybook server allows successful files to be cached for one hour within a capture run. Signed Storybook URLs retain their own cache and access policies.
+- `maxConnections` (on `remote()`, `playwrightServer()`, `cdp()` and `defineRemote`) caps how many connections this process holds to the service at once. It is separate from `sessions` (pages) and `maxPagesPerConnection`: a connection counts from the moment it is requested until its render has ended, and one connection shared by several pages counts once. Each lease counts separately, including every lease of one `refCounted` pool, because each is a real connection to the provider: size `maxConnections` against the connections a scale-to-zero pool will open, not against its one shared resource. Renders over the cap wait; a cancelled build ends its wait without taking a slot. A wait longer than `timeouts.acquireMs` is logged once with the target and the limit. Unset means no cap, as before. The cap is per process: it does not coordinate several StoryShelf instances.
 - `createPlaywrightCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
 - Playwright remote captures retry one navigation timeout, screenshot timeout or observed page crash on a fresh page and context, within the same page limits. A disconnected browser is reported as a failure instead of being replaced while sibling captures may be active. Play/assertion failures, cancellation and capture-delivery failures are not retried; retry attempts and outcomes are logged.
 
@@ -257,21 +263,48 @@ cdp({
 });
 ```
 
+### Example: a hibernating Fly Sprite
+
+The demo app (`apps/fly-app`) renders on a [Fly Sprite](https://sprites.dev) that wakes for a build and sleeps afterwards. The Sprite runs `playwright run-server` behind a small proxy that refuses requests without a shared secret. The target is plain configuration: `refCounted` wakes the Sprite by polling its `/healthz`, and the Sprite pauses by itself once the connections close, so `close` has nothing to do.
+
+```ts
+import { refCounted, remote } from "@storyshelf/runner-playwright/remote";
+
+const secret = process.env.SPRITE_BROWSER_SECRET ?? "";
+const pool = refCounted<string>({ idleMs: 60_000, open: wakeSprite, close: () => {} });
+remote({
+  name: "sprite",
+  engines: ["chromium"],
+  protocol: "playwright",
+  reach: "loopback",
+  timeouts: { acquireMs: 65_000 },
+  connect: pool.connect((url) => ({
+    endpoint: url.replace("https:", "wss:"),
+    headers: { "x-storyshelf-secret": secret },
+  })),
+  release: pool.release,
+});
+```
+
+Keep the proxy's secret and the platform token in the host's secrets. Only the connection's endpoint, headers and `lease` are scrubbed: the platform token is used inside `open`, outside that path, so it must never reach an error message there.
+
 ## Upgrading from 0.7
 
 0.8 is a breaking release for `remote()`; a 0.7 call fails at runner creation with a message naming the replacement. The presets (`playwrightServer`, `azurePlaywright`, `browserstack`, `cdp`) keep their options.
 
-| 0.7                                                      | 0.8                                                                                |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `connect: (engine) => ({ protocol, endpoint, … })`       | `protocol` and `reach` on `remote()`; `connect: { endpoint, headers }`, or a function receiving a context object |
-| `exposeNetwork: "<loopback>"` on the connection          | `reach: "loopback"` (`"url"` for none)                                             |
-| `connectRetries`, `connectBackoffMs`                     | `retry: { attempts, backoffMs }`                                                   |
-| `connectTimeoutMs`                                       | `timeouts: { connectMs }`                                                          |
-| `acquire` (0.7.1 only)                                   | merged into `connect`                                                              |
+| 0.7                                                | 0.8                                                                                                              |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `connect: (engine) => ({ protocol, endpoint, … })` | `protocol` and `reach` on `remote()`; `connect: { endpoint, headers }`, or a function receiving a context object |
+| `exposeNetwork: "<loopback>"` on the connection    | `reach: "loopback"` (`"url"` for none)                                                                           |
+| `connectRetries`, `connectBackoffMs`               | `retry: { attempts, backoffMs }`                                                                                 |
+| `connectTimeoutMs`                                 | `timeouts: { connectMs }`                                                                                        |
+| `acquire` (0.7.1 only)                             | merged into `connect`                                                                                            |
 
 ## Other services
 
+**Experimental presets.** `azurePlaywright` and `browserstack` are marked experimental: they were written against the providers' documentation and are **not verified against live infrastructure**, because no provider credentials were available to check them. Treat a first run as a trial, pin versions, and report what you find. The mark is `experimental: true` on the returned service and shows in the run's sizing log (`verification: "not verified against live infrastructure"`). It changes no behavior; it is removed once someone verifies the preset.
+
 - **Browserless** and other CDP services: `cdp({ name, endpoint, headers, sessions })` on the Puppeteer runner, or `remote({ protocol: "cdp", reach: "url", connect: { endpoint } })` on the Playwright runner (Chromium only, and noticeably lower fidelity than Playwright's own protocol, which is acceptable because the target is its own engine with its own baselines). Both need a Storybook URL.
-- **Azure Playwright Workspaces**: `azurePlaywright({ endpoint, token, os, sessions })`, with the workspace's browser endpoint (`PLAYWRIGHT_SERVICE_URL`) and access token; it passes `os` and the API version as query parameters.
-- **BrowserStack**: `browserstack({ username, accessKey, os, browserVersion, engines, sessions })`; the credentials travel in the connection's capabilities and are scrubbed from messages. Needs a Storybook URL.
+- **Azure Playwright Workspaces** (experimental): `azurePlaywright({ endpoint, token, os, sessions })`, with the workspace's browser endpoint (`PLAYWRIGHT_SERVICE_URL`) and access token; it passes `os` and the API version as query parameters.
+- **BrowserStack** (experimental): `browserstack({ username, accessKey, os, browserVersion, engines, sessions })`; the credentials travel in the connection's capabilities and are scrubbed from messages. Needs a Storybook URL.
 - Real devices and real Safari go through WebDriver and Appium, not a connect endpoint, and are not covered.

@@ -41,7 +41,9 @@ describe("GCP Terraform modules", () => {
   it("pins terraform and provider versions", () => {
     const versions = generateGcpVersions();
     expect(versions).toContain(">= 1.9");
-    expect(versions).toContain("hashicorp/google");
+    // Each provider is bounded to the major version CI validates, so a new major cannot break it.
+    expect(versions).toMatch(/source\s*=\s*"hashicorp\/google"\s*version\s*=\s*"~> 8\.0"/u);
+    expect(versions).toMatch(/source\s*=\s*"hashicorp\/random"\s*version\s*=\s*"~> 3\.0"/u);
   });
 
   it("declares only live variables", () => {

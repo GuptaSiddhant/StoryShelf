@@ -44,6 +44,11 @@ export interface Snapshot {
   durationMs: number | null;
   /** JSON array of the axe violations found on this capture (never blocking); null when none or not checked. */
   a11yViolations?: string | null;
+  /**
+   * Whether a second render of this changed snapshot differed from the first (a likely flaky story):
+   * true = it did, false = it matched, null = not re-rendered. Advisory; never changes the status.
+   */
+  unstable?: boolean | null;
   createdAt: string;
   updatedAt: string;
 }

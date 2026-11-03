@@ -54,6 +54,8 @@ export const projectSchema = z
     runA11y: z.boolean().optional(),
     /** Storybook 10 `.test()` entries run as interaction tests during capture (default off). */
     runTests: z.boolean().optional(),
+    /** Changed snapshots are rendered once more and flagged when the renders differ (default on). */
+    detectUnstable: z.boolean().optional(),
     // Stored rows predate enum validation, so the response stays a plain string.
     browser: z.string().optional(),
     /** JSON array of capture targets, primary first, primary first; null = just `browser`. */
@@ -86,6 +88,8 @@ export const projectCreateSchema = z
     runA11y: z.boolean().optional(),
     /** Run Storybook 10 `.test()` entries as interaction tests during capture; off when omitted. */
     runTests: z.boolean().optional(),
+    /** Re-render changed snapshots once and flag unstable ones; on when omitted. */
+    detectUnstable: z.boolean().optional(),
     reviewEnabled: z.boolean().optional(),
     reviewApprovals: reviewApprovalsSchema.optional(),
   })
@@ -107,6 +111,8 @@ export const projectUpdateSchema = z
     runA11y: z.boolean().optional(),
     /** Turn the Storybook 10 `.test()` runs on or off (admins). */
     runTests: z.boolean().optional(),
+    /** Turn unstable-render detection on or off (admins). */
+    detectUnstable: z.boolean().optional(),
     /** Single capture target; clears `browsers`. */
     browser: captureTargetSchema.optional(),
     /** Capture targets, primary first (max 3); null returns to single `browser`. */
@@ -179,6 +185,8 @@ export const snapshotSchema = z
     inherited: z.boolean(),
     /** JSON array of the axe violations found on this capture (non-blocking); null when none. */
     a11yViolations: z.string().nullable().optional(),
+    /** A second render of this changed snapshot differed from the first (likely flaky); null: not checked. */
+    unstable: z.boolean().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

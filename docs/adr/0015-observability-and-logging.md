@@ -104,7 +104,9 @@ exports and no behavioural change, and the hermetic vitest suite stays network-f
   is intentionally internal: no new `core` exports subpath. Core's `withSpan` records a
   redacted copy of a thrown error (`spanException`: same name, `redactSecrets` message) and
   rethrows the original. The HTTP retry loop records a failed attempt it retries through the same
-  `spanException`; no core code passes a raw error to `recordException`.
+  `spanException`; no core code passes a raw error to `recordException`. The `observability` and
+  `ai` span wrappers do the same with their own copy of the helper (the no-cycle rule keeps them
+  separate), so no span records a raw error.
 - `@storyshelf/observability` owns the SDK lifecycle (`node.ts`: OTLP/HTTP exporters, a resource with
   service name, version and environment), the `createInstrumentedDatabase` and
   `createInstrumentedStorage` wrappers (`db.*` and `storage.*` spans plus duration histograms), the pino
@@ -133,6 +135,10 @@ The package root imports `@opentelemetry/api` only and is cross-runtime. The SDK
 `@storyshelf/observability/node` (Node-only). `initObservabilityFromEnv` detects Deno (`globalThis.Deno`
 or `OTEL_DENO`) and returns the noop handle; Deno users set `OTEL_DENO=true` and the `withSpan` and
 middleware calls light up through the native bridge with no SDK init.
+
+> **Amendment (2026-11-03, #482):** Deno and JSR support was removed. `initObservabilityFromEnv` no
+> longer detects Deno and `OTEL_DENO` is no longer read; the JSR mentions in this ADR no longer apply.
+> The split entrypoint stays and the exports map is unchanged.
 
 ### 12. Metrics catalog (bounded cardinality)
 
