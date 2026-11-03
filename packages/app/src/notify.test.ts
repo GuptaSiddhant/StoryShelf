@@ -254,6 +254,34 @@ describe("notifyProject", () => {
       expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
     });
 
+    it("sends nothing to a disabled reviewer, a site admin who is no member, or an instance without email", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      await db.update(db.tables.users, "appr1", { disabled: true });
+      await db.insert(db.tables.users, {
+        id: "site1",
+        email: "site1@example.com",
+        name: "site1",
+        avatarUrl: null,
+        role: "admin",
+        lastLoginAt: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        passwordHash: null,
+        displayNameOverride: null,
+        authProvider: "local",
+        disabled: false,
+      });
+      expect(await recipients(db, "review:requested")).toEqual([
+        "admin1@example.com",
+        "appr2@example.com",
+      ]);
+      const sent: unknown[] = [];
+      await runWithStore(storeFor(db, [recordingProvider("log", sent)]), async () => {
+        await notifyProject({ id: "p1", slug: "test-project" }, "review:requested", {});
+      });
+      expect(sent).toEqual([]);
+    });
+
     it("sends a subscribed reviewer one message, and other topics stay opt-in", async () => {
       const { db } = makeDatabase();
       await seedUsers(db);
