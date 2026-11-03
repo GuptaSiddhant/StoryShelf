@@ -146,7 +146,7 @@ Both browser engines inject the same stylesheet, which sets `visibility: hidden`
 - **Full data ownership** — Your DB, your storage, your network
 - **No vendor lock-in** — MIT license, standard REST API, open source
 - **Flexible SSO** — Any OIDC provider (Keycloak, Okta, Entra ID, etc.)
-- **Deploy anywhere** — Node, Bun, Deno, Fly.io, Vercel, Cloudflare, Lambda, etc.
+- **Deploy anywhere** — Node, Bun, Fly.io, Vercel, Cloudflare, Lambda, etc.
 - **Per-branch baselines with fallback** — Cleaner for long-lived feature branches
 - **Persistent builds** — Tag releases → never purged
 

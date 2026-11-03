@@ -102,14 +102,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": false,
-      "browser": false,
-      "workerd": false,
-      "bun": true
-    }
   }
 }

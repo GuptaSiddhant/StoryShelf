@@ -1,6 +1,5 @@
 /**
- * Span helpers over `@opentelemetry/api` (runtime-agnostic: Node SDK or
- * Deno's native bridge). Without a configured provider these are cheap
+ * Span helpers over `@opentelemetry/api` (runtime-agnostic). Without a configured provider these are cheap
  * noops, so call sites need no enabled-checks.
  */
 import {

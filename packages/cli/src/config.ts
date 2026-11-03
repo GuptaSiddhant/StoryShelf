@@ -588,7 +588,7 @@ export function detectGitDefaultBranch(cwd: string = process.cwd()): string | nu
 }
 
 /** Package runners with distinct script-invocation syntax. */
-export type PackageRunner = "npm" | "pnpm" | "yarn" | "bun" | "deno" | "nub";
+export type PackageRunner = "npm" | "pnpm" | "yarn" | "bun" | "nub";
 
 /** Install/start commands per runner (host-side instructions and scaffolds). */
 const RUNNER_COMMANDS: Record<PackageRunner, { install: string; start: string }> = {
@@ -596,7 +596,6 @@ const RUNNER_COMMANDS: Record<PackageRunner, { install: string; start: string }>
   pnpm: { install: "pnpm install", start: "pnpm start" },
   yarn: { install: "yarn install", start: "yarn start" },
   bun: { install: "bun install", start: "bun run start" },
-  deno: { install: "deno install", start: "deno task start" },
   nub: { install: "nub install", start: "nub run start" },
 };
 
@@ -610,7 +609,7 @@ export function startCommand(runner: PackageRunner): string {
   return RUNNER_COMMANDS[runner].start;
 }
 
-const KNOWN_RUNNERS: ReadonlySet<string> = new Set(["npm", "pnpm", "yarn", "bun", "deno", "nub"]);
+const KNOWN_RUNNERS: ReadonlySet<string> = new Set(["npm", "pnpm", "yarn", "bun", "nub"]);
 
 /** Normalize a runner name from a `a/b` value (`npm_config_user_agent`, `packageManager` field). */
 function asRunner(value: string | undefined): PackageRunner | undefined {
@@ -626,7 +625,6 @@ const RUNNER_LOCKFILES: { file: string; runner: PackageRunner }[] = [
   { file: "pnpm-lock.yaml", runner: "pnpm" },
   { file: "yarn.lock", runner: "yarn" },
   { file: "package-lock.json", runner: "npm" },
-  { file: "deno.lock", runner: "deno" },
 ];
 
 async function readPackageManagerField(cwd: string): Promise<unknown> {

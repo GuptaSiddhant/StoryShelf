@@ -49,8 +49,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
 - `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
 - `@storyshelf/observability` root barrel is runtime-agnostic (`@opentelemetry/api`
-  only); the Node SDK lifecycle lives under `observability/node` and must never
-  be imported under Deno. `core` never imports `observability` (no-cycle rule,
+  only); the Node SDK lifecycle lives under `observability/node`. `core` never imports `observability` (no-cycle rule,
   ADR 0015 §5) — cross-package span/propagation helpers are intentionally
   duplicated, not shared.
 
@@ -90,4 +89,4 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 | `config/tsconfig.base.json` | Strict TS, `hono/jsx`, `customConditions: ["source"]`                                               |
 | `config/tsdown.ts`          | `libConfig` / `cliConfig`                                                                           |
 | `.oxlintrc.json`            | Rule-based lint (no per-file path exemptions)                                                       |
-| `scripts/`                  | Release/publish tooling only (`release.mjs`, `jsr.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`) |
+| `scripts/`                  | Release/publish tooling only (`release.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`) |
