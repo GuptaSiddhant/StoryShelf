@@ -58,7 +58,7 @@ async function runBuilders(
 
 async function buildFixture(): Promise<void> {
   const runners: readonly (readonly [string, readonly string[]])[] = [
-    ["npx", ["storybook", "build", "-o", "storybook-static"]],
+    ["npx", ["storybook", "build", "-o", "storybook-static", "--stats-json"]],
     ["npm", ["run", "build-storybook"]],
     ["nub", ["run", "build-storybook"]],
   ];
