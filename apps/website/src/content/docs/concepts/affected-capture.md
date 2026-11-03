@@ -58,8 +58,6 @@ Affected capture never fails an upload. When it cannot prove a story unchanged, 
 | `too-many-changed-files`       | Change list exceeds 10,000 files (large merges, vendored drops)                                              |
 | First build                    | No baseline revision exists yet (`baselineSha: null`)                                                        |
 
-**Known limitation: a Storybook in a repository subdirectory** (a package of a monorepo) is not traced correctly yet: changed files are repo-relative while the stats are relative to the Storybook project, so nothing matches and no story is treated as affected. Upload with `--full` until this is fixed ([#502](https://github.com/GuptaSiddhant/StoryShelf/issues/502)).
-
 Typical CLI output:
 
 ```bash
