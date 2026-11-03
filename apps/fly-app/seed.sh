@@ -51,10 +51,15 @@ esac
 
 # Create the project with fixed metadata. Uploads use the admin token itself: a project token
 # minted through it has no owner, which makes it a viewer that cannot upload.
+curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
+  -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main"}'
 # DEMO_BROWSER (e.g. chromium@sprite) renders the demo on that target; unset keeps the VM's Chromium.
-PROJECT_JSON="$(jq -nc --arg b "${DEMO_BROWSER:-}" \
-  '{name:"Demo Design System",gitRepository:"acme/design-system",gitDefaultBranch:"main"} + (if $b == "" then {} else {browsers:[$b]} end)')"
-curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null -d "$PROJECT_JSON"
+# The create endpoint has no browsers field, so it is set with an update before the first upload. A
+# target the server does not offer (its secrets are unset) answers 400 and stops the seed.
+if [ -n "${DEMO_BROWSER:-}" ]; then
+  curl -fsS "${AUTH[@]}" -X PATCH "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
+    -d "$(jq -nc --arg b "$DEMO_BROWSER" '{browsers: [$b]}')"
+fi
 
 upload() { # <dir> <branch> <sha> <message>
   (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$STORYSHELF_ADMIN_TOKEN" \

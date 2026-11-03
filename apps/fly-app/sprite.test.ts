@@ -36,11 +36,15 @@ const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 /** A fetch that answers the Sprites API, then `/healthz` with the given statuses in turn. */
 const fakeFetch = (health: number[], apiBody: unknown) => {
-  const calls: { url: string; headers: Record<string, string> }[] = [];
+  const calls: { url: string; headers: Record<string, string>; redirect?: string }[] = [];
   const queue = [...health];
   const impl = vi.fn(async (input: URL | string, init?: RequestInit) => {
     const url = String(input);
-    calls.push({ url, headers: Object.fromEntries(new Headers(init?.headers).entries()) });
+    calls.push({
+      url,
+      headers: Object.fromEntries(new Headers(init?.headers).entries()),
+      redirect: init?.redirect,
+    });
     if (url.startsWith("https://api.sprites.dev/")) {
       return typeof apiBody === "number" ? json({}, apiBody) : json(apiBody);
     }
@@ -106,6 +110,8 @@ describe("spriteBrowser", () => {
     expect(polls.every((c) => c.headers[SECRET_HEADER] === SECRET)).toBe(true);
     expect(polls.every((c) => c.headers["authorization"] === undefined)).toBe(true);
     expect(sleep).toHaveBeenCalledTimes(2);
+    // The token and the secret header must never follow a redirect.
+    expect(calls.every((c) => c.redirect === "error")).toBe(true);
   });
 
   it("skips the API when the URL is configured", async () => {

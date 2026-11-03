@@ -24,17 +24,17 @@ PLAYWRIGHT_VERSION="$(sed -n 's/^  playwright-core@\([0-9][0-9.]*\):.*/\1/p' "$R
 
 on() { sprite exec -s "$NAME" "$@"; }
 
-echo "1/6 sprite $NAME"
+echo "1/7 sprite $NAME"
 if sprite list --prefix "$NAME" 2>/dev/null | grep -qx "$NAME"; then
   echo "    exists, reusing it"
 else
   sprite create --skip-console "$NAME"
 fi
-# Public URL: the proxy (proxy.mjs) is the authentication, with the shared secret. A Playwright
-# client cannot log in with a Fly account, and the Playwright server itself has none.
-sprite url update -s "$NAME" --auth public
+# The URL stays private (org members only, the default) while the Sprite is built; step 7 makes
+# it public only once the authenticating proxy is installed, healthy, and seen to refuse strangers.
+sprite url update -s "$NAME" --auth sprite
 
-echo "2/6 node 24 in $NODE_DIR"
+echo "2/7 node 24 in $NODE_DIR"
 on -- sudo bash -c "
   set -euo pipefail
   if [ -x $NODE_DIR/bin/node ] && $NODE_DIR/bin/node --version | grep -q '^v24\\.'; then exit 0; fi
@@ -47,7 +47,7 @@ on -- sudo bash -c "
   rm -f \$FILE SHASUMS256.txt
 "
 
-echo "3/6 playwright-core@$PLAYWRIGHT_VERSION and its Chromium (with system dependencies)"
+echo "3/7 playwright-core@$PLAYWRIGHT_VERSION and its Chromium (with system dependencies)"
 on -- sudo bash -c "mkdir -p $DIR && chown -R \$(id -u sprite):\$(id -g sprite) $DIR"
 sprite exec -s "$NAME" \
   --file "$HERE/proxy.mjs:$DIR/proxy.mjs" --file "$HERE/start.sh:$DIR/start.sh" \
@@ -61,13 +61,13 @@ on --dir "$DIR" -- bash -c "
     node node_modules/playwright-core/cli.js install --with-deps chromium
 "
 
-echo "4/6 shared secret (0600, from stdin) and the service"
+echo "4/7 shared secret (0600, from stdin) and the service"
 printf '%s' "$SPRITE_BROWSER_SECRET" | on -- bash -c "umask 077 && cat > $DIR/secret"
 # The service the Sprite starts on every wake. `http_port` routes the Sprite's URL to the proxy.
 on -- sprite-env services create storyshelf-browser --cmd "$DIR/start.sh" --http-port 8080 || \
   on -- sprite-env services restart storyshelf-browser
 
-echo "5/6 warm up: wait for the proxy, then open and close one browser"
+echo "5/7 warm up: wait for the proxy, then open and close one browser"
 HEALTHY=0
 for _ in $(seq 1 30); do
   if on -- bash -c "curl -fsS -o /dev/null -H \"x-storyshelf-secret: \$(cat $DIR/secret)\" http://127.0.0.1:8080/healthz"; then
@@ -80,7 +80,21 @@ done
 [ "$HEALTHY" = 1 ] || { echo "the proxy did not become healthy; no checkpoint taken" >&2; exit 1; }
 on --dir "$DIR" -- bash -c "export PATH=$NODE_DIR/bin:\$PATH PLAYWRIGHT_BROWSERS_PATH=$DIR/browsers; node warm.mjs"
 
-echo "6/6 checkpoint"
+echo "6/7 checkpoint"
 sprite checkpoint create -s "$NAME" --comment "ready: playwright-core $PLAYWRIGHT_VERSION, chromium, service storyshelf-browser"
 sprite checkpoint list -s "$NAME"
+
+echo "7/7 publish: make the URL public, then check from outside that strangers are refused"
+# A Playwright client cannot log in with a Fly account and the Playwright server itself has no
+# authentication: the proxy (proxy.mjs) and its shared secret are the only boundary. Publishing is
+# therefore the last step, and is undone if the proxy is not seen refusing an unauthenticated request.
+sprite url update -s "$NAME" --auth public
+URL="$(sprite url -s "$NAME" | grep -Eo 'https://[^[:space:]]+' | head -1 || true)"
+CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 90 "${URL%/}/healthz" || true)"
+if [ -z "$URL" ] || [ "$CODE" != 401 ]; then
+  sprite url update -s "$NAME" --auth sprite
+  echo "the public URL did not refuse an unauthenticated request (got '${CODE:-none}'); reverted to private" >&2
+  exit 1
+fi
+echo "    $URL refuses requests without the secret (401)"
 echo "done. Verify the endpoint refuses a connection without the secret (README) before relying on it."

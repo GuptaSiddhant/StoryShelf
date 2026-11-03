@@ -130,6 +130,8 @@ async function spriteUrl(
 ): Promise<string> {
   const response = await http(`${API}/v1/sprites/${encodeURIComponent(config.name)}`, {
     headers: { authorization: `Bearer ${config.token}` },
+    // Never follow a redirect with the token (or, below, the secret header) attached.
+    redirect: "error",
     signal,
   });
   if (!response.ok) {
@@ -152,6 +154,7 @@ async function healthy(
   try {
     const response = await http(new URL("/healthz", base), {
       headers: { [SECRET_HEADER]: secret },
+      redirect: "error",
       signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
     });
     if (response.status === 401 || response.status === 403) {
