@@ -295,6 +295,53 @@ describe("BuildModel: a cancelled build is terminal", () => {
     expect(await model.stampCaptureJob("missing", "J", 0)).toBe("ignored");
   });
 
+  it("retries a reset that lost the generation race to another reset", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const model = new BuildModel(db, buildTables(db));
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    // Another reset lands between this one's read and its write, once.
+    const rival = new BuildModel(db, buildTables(db));
+    const racing = Object.create(db) as typeof db;
+    let raced = false;
+    racing.updateWhere = async (table, rowId, values, where) => {
+      if (!raced) {
+        raced = true;
+        await rival.resetStatus(rowId, "pending");
+      }
+      return await db.updateWhere(table, rowId, values, where);
+    };
+    const reset = await new BuildModel(racing, buildTables(db)).resetStatus(id, "pending");
+
+    expect(reset.captureGeneration).toBe(2);
+    expect((await model.get(id))?.captureGeneration).toBe(2);
+  });
+
+  it("gives up after repeatedly losing the generation race", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await new BuildModel(db, buildTables(db)).create(project.id, {
+      gitSha: "abc",
+      gitBranch: "main",
+    });
+    const rival = new BuildModel(db, buildTables(db));
+    const racing = Object.create(db) as typeof db;
+    racing.updateWhere = async (table, rowId, values, where) => {
+      await rival.resetStatus(rowId, "pending");
+      return await db.updateWhere(table, rowId, values, where);
+    };
+
+    await expect(
+      new BuildModel(racing, buildTables(db)).resetStatus(id, "pending"),
+    ).rejects.toThrow("lost the race");
+  });
+
   it("does not stamp a cancelled build", async () => {
     const { db } = makeDatabase();
     const model = new BuildModel(db, buildTables(db));
