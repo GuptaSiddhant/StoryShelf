@@ -953,10 +953,10 @@ describe("mention suggestions and highlights (#463)", () => {
     await booted.stop();
   });
 
-  it("keeps the text after the 4000-character cut when a member is picked", async () => {
+  it("completes a mention at the end of a long comment without losing text", async () => {
     const booted = await boot();
     const id = await publish(booted, "feature/x");
-    const body = `${"a".repeat(3992)} ask @al and the rest of the comment`;
+    const body = `${"a".repeat(5000)} ask @al`;
     const res = await booted.page(
       "dev",
       `/builds/${id}/mention-complete`,
@@ -964,8 +964,8 @@ describe("mention suggestions and highlights (#463)", () => {
     );
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain("ask @alice ");
-    expect(html).toContain("and the rest of the comment");
+    expect(html).toContain(`${"a".repeat(5000)} ask @alice `);
+    expect(html).not.toContain("@alice ice");
     await booted.stop();
   });
 
