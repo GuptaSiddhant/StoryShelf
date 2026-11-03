@@ -90,6 +90,7 @@ function tally(outcomes: readonly Prepared[]): PreparationResult {
 async function prepareLegacyBaseline(db: DatabaseSync, id: string): Promise<Prepared> {
   const baseline = (await transactionStore(db).get(schema.baselines, id)) as unknown as Baseline;
   if (baseline.sourceBuildId && !recordedSourcePresent(db, baseline, baseline.sourceBuildId)) {
+    keepRecordUnpinned(db, baseline);
     return "unavailable";
   }
   const source = await provenSource(db, baseline);
@@ -97,9 +98,19 @@ async function prepareLegacyBaseline(db: DatabaseSync, id: string): Promise<Prep
     setPreparedSource(db, baseline, null);
     return "unknown";
   }
-  pinAvailableSource(db, baseline, source.id);
-  setPreparedSource(db, baseline, source.id);
+  protectSource(db, baseline, source.id);
   return "protected";
+}
+
+/** Pin the proven source (never a tombstone) and record it on the baseline. */
+function protectSource(db: DatabaseSync, baseline: Baseline, buildId: string): void {
+  pinAvailableSource(db, baseline, buildId);
+  setPreparedSource(db, baseline, buildId);
+}
+
+/** The record stays (it is verified history), but nothing may pin a build for it. */
+function keepRecordUnpinned(db: DatabaseSync, baseline: Baseline): void {
+  if (releaseReferences(db, baseline)) advanceBaselineGeneration(db, baseline);
 }
 
 /** The build that provably rendered the baseline's image, or null when its history is incomplete. */
@@ -128,16 +139,23 @@ function recordedSourcePresent(db: DatabaseSync, baseline: Baseline, buildId: st
 }
 
 function setPreparedSource(db: DatabaseSync, baseline: Baseline, source: string | null): void {
-  const removed =
-    source === null
-      ? db
-          .prepare(
-            "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ?",
-          )
-          .run(baseline.projectId, baseline.id).changes
-      : 0;
+  const removed = source === null && releaseReferences(db, baseline);
   if ((baseline.sourceBuildId ?? null) === source && !removed) return;
   db.prepare("UPDATE baselines SET source_build_id = ? WHERE id = ?").run(source, baseline.id);
+  advanceBaselineGeneration(db, baseline);
+}
+
+/** Drop every pin the baseline owns; true when there was one. The caller advances the generation. */
+function releaseReferences(db: DatabaseSync, baseline: Baseline): boolean {
+  const removed = db
+    .prepare(
+      "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ?",
+    )
+    .run(baseline.projectId, baseline.id).changes;
+  return removed > 0;
+}
+
+function advanceBaselineGeneration(db: DatabaseSync, baseline: Baseline): void {
   advanceGeneration(db, { type: "baseline", id: baseline.id, projectId: baseline.projectId });
 }
 

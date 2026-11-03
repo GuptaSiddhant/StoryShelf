@@ -389,6 +389,31 @@ describe("SQLite reference lifecycle primitive", () => {
     });
   });
 
+  it("releases a stale pin of a baseline whose recorded source is gone, and keeps the record", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      try {
+        await db.insert(schema.baselines, { ...baselineRow, id: "gone", sourceBuildId: "missing" });
+        const lifecycle = createBuildReferenceLifecycle(path);
+        // A pin on a build that is not the record's source cannot be justified.
+        await lifecycle.replaceFencedReferences(ownerOf("gone"), 0, ["two"], async () => null);
+        expect(await lifecycle.referenceGeneration(ownerOf("gone"))).toBe(1);
+
+        const result = { protected: 0, unknown: 0, unavailable: 1 };
+        expect(await prepareBaselineReferences(path)).toEqual(result);
+        expect(await prepareBaselineReferences(path)).toEqual(result);
+
+        expect((await db.get(schema.baselines, "gone"))?.["sourceBuildId"]).toBe("missing");
+        expect(referenceRows(path, "gone")).toBe(0);
+        // Advanced once, by the removal; the classification and the repeat do not advance it.
+        expect(await lifecycle.referenceGeneration(ownerOf("gone"))).toBe(2);
+        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
+
   it("leaves a baseline of unproven provenance unknown and unpinned", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
