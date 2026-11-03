@@ -58,12 +58,6 @@ function failingLifecycle(error: Error): BuildReferenceLifecycle {
     replaceFencedReferences: async () => {
       throw error;
     },
-    replaceReferences: async () => {
-      throw error;
-    },
-    replaceManyReferences: async () => {
-      throw error;
-    },
     claimDeletion: async () => "missing",
   };
 }

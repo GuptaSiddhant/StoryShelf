@@ -36,8 +36,6 @@ function setup() {
       result: await writeDomain(db),
       generation: generation + 1,
     }),
-    replaceReferences: async (_owner, _ids, writeDomain) => await writeDomain(db),
-    replaceManyReferences: async (_changes, writeDomain) => await writeDomain(db),
     claimDeletion: async () => "missing",
   };
   const tables = { baselines: db.tables.baselines, snapshots: db.tables.snapshots };
