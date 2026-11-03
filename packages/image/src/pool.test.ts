@@ -283,3 +283,90 @@ describe("sharp engine", () => {
     expect(result.diffPixels).toBe(200);
   });
 });
+
+/**
+ * A worker module that misbehaves in its first incarnation only (a marker file tells the two apart)
+ * and runs the real worker otherwise, so the pool's replacement can be seen to work.
+ */
+function misbehavingWorker(firstWorker: string): URL {
+  const dir = mkdtempSync(join(tmpdir(), "storyshelf-pool-"));
+  const marker = join(dir, "first");
+  const source = `import { existsSync, writeFileSync } from "node:fs";
+    import { parentPort } from "node:worker_threads";
+    const first = !existsSync(${JSON.stringify(marker)});
+    if (first) writeFileSync(${JSON.stringify(marker)}, "1");
+    const realWorker = ${JSON.stringify(WORKER_URL.href)};
+    if (!first) { await import(realWorker); }
+    else { ${firstWorker} }`;
+  return new URL(`data:text/javascript,${encodeURIComponent(source)}`);
+}
+
+function poolWithEvents(workerUrl: URL): { pool: DiffPool; events: string[] } {
+  const events: string[] = [];
+  const pool = new DiffPool({
+    size: 1,
+    workerUrl,
+    onFallback: () => {},
+    onWorkerEvent: (reason) => events.push(reason),
+  });
+  pools.push(pool);
+  return { pool, events };
+}
+
+// The first worker answers diffs properly (it is the real worker), then misbehaves while idle.
+const idleThen = (action: string): string =>
+  `await import(realWorker); setTimeout(() => { ${action} }, 80);`;
+const expected = async (): Promise<unknown> => await diffImages(base(), changed(), failOnResize);
+
+describe("worker messages that answer no job", () => {
+  it("replaces a worker whose id-less error arrives while idle, without crashing", async () => {
+    const stray = `parentPort.postMessage({ type: "error", name: "Error", message: "boom" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(idleThen(stray)));
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await until(() => events.length > 0);
+    await until(() => pool.workerCount === 0);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatch(/without a job id/u);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(pool.workerCount).toBe(1);
+  });
+
+  it("rejects the in-flight job once for an id-less error, then recovers", async () => {
+    const stray = `parentPort.on("message", () => parentPort.postMessage({ type: "error", message: "boom" }));
+      parentPort.postMessage({ type: "ready" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(stray));
+    await expect(pool.run(base(), changed(), failOnResize)).rejects.toThrow(/without a job id/u);
+    expect(events).toHaveLength(1);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("ignores and reports an answer for a job that is not in flight", async () => {
+    const late = `parentPort.postMessage({ type: "error", id: 424242, name: "Error", message: "late" });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(idleThen(late)));
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await until(() => events.length > 0);
+    expect(events[0]).toMatch(/not in flight/u);
+    expect(pool.workerCount).toBe(1);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+
+  it("replaces a worker that exits while idle", async () => {
+    const { pool, events } = poolWithEvents(misbehavingWorker(idleThen("process.exit(5);")));
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await until(() => pool.workerCount === 0);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    expect(pool.workerCount).toBe(1);
+    expect(events).toEqual([]);
+  });
+
+  it("ignores messages that are not this pool's protocol, like node --watch's", async () => {
+    const foreign = `parentPort.postMessage("garbage");
+      parentPort.postMessage({ "watch:require": ["/some/preload.cjs"] });`;
+    const { pool, events } = poolWithEvents(misbehavingWorker(idleThen(foreign)));
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(events).toEqual([]);
+    expect(pool.workerCount).toBe(1);
+    expect(await pool.run(base(), changed(), failOnResize)).toEqual(await expected());
+  });
+});
