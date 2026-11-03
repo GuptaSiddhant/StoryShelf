@@ -75,8 +75,9 @@ developer's local `storybook dev`, a Storybook hosted elsewhere, and a project s
   build is readable here only by someone who may read the build, and the route follows whatever the
   API answers for a project the caller cannot see.
 - The body holds one entry per story and a small build envelope. Each story entry is the worst
-  snapshot status across its viewports and browsers (`rejected`, `changed`, `new`, `pending`,
-  `approved`, `unchanged`) and a design drift, present only as `stale` or `deleted`. A `current` or
+  snapshot status across all of its snapshot rows (every viewport, named mode and browser target), one
+  of `rejected`, `changed`, `new`, `pending`, `approved` or `unchanged`, and a design drift, present
+  only as `stale` or `deleted`. A `current` or
   `unknown` drift (nothing cached, no baseline, or a provider refusal) is left out, so the addon
   shows a design badge only for a known problem and an undeterminable design never reads as fresh.
   A story with no snapshot (a `disableSnapshot` story, or a catalog story the build has no snapshot
