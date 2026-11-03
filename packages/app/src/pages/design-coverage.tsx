@@ -195,7 +195,7 @@ function CoverageBody(props: { data: DesignCoverageData }): Rendered {
 function linkTarget(data: DesignCoverageData, component: CoverageComponent): string {
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return data.storyLinksRead
-    ? urls.component(data.project.slug, component.importPath, "design")
+    ? urls.component(data.project.slug, component.importPath, { tab: "design" })
     : `${urls.settings(data.project.slug)}/design`;
 }
 
@@ -206,7 +206,7 @@ function ComponentLink(props: {
   const { data, component } = props;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const href = data.storyLinksRead
-    ? urls.component(data.project.slug, component.importPath, "design")
+    ? urls.component(data.project.slug, component.importPath, { tab: "design" })
     : urls.component(data.project.slug, component.importPath);
   return <a href={href}>{component.title}</a>;
 }

@@ -100,15 +100,13 @@ function rows(
 
 const KIND_TONE = { added: "success", changed: "warning", removed: "danger" } as const;
 
+/** One row of the changeset table. */
 function ChangeRow(props: {
   data: ReviewSectionData;
   kind: Kind;
   item: ChangesetComponent & { previousStoryCount?: number };
 }): Rendered {
   const { data, kind, item } = props;
-  const { project, build } = data;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
-  const story = data.firstStory.get(item.importPath);
   return (
     <tr>
       <td>
@@ -126,23 +124,39 @@ function ChangeRow(props: {
           : item.storyCount}
       </td>
       <td>
-        <HStack>
-          {kind !== "removed" && story ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              href={`${urls.storybookBuild(project.slug, build.id)}/?path=/story/${encodeURIComponent(story)}`}
-            >
-              Story
-            </Button>
-          ) : null}
-          {item.importPath ? (
-            <Button variant="ghost" size="sm" href={urls.component(project.slug, item.importPath)}>
-              Component
-            </Button>
-          ) : null}
-        </HStack>
+        <RowLinks data={data} kind={kind} importPath={item.importPath} />
       </td>
     </tr>
+  );
+}
+
+/** The Story and Component links of a row; a removed file links without the build. */
+function RowLinks(props: { data: ReviewSectionData; kind: Kind; importPath: string }): Rendered {
+  const { data, kind, importPath } = props;
+  const { project, build } = data;
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const story = data.firstStory.get(importPath);
+  const componentBuild = kind === "removed" ? undefined : build.id;
+  return (
+    <HStack>
+      {kind !== "removed" && story ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          href={`${urls.storybookBuild(project.slug, build.id)}/?path=/story/${encodeURIComponent(story)}`}
+        >
+          Story
+        </Button>
+      ) : null}
+      {importPath ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          href={urls.component(project.slug, importPath, { build: componentBuild })}
+        >
+          Component
+        </Button>
+      ) : null}
+    </HStack>
   );
 }

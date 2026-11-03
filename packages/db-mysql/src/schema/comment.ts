@@ -24,6 +24,9 @@ export const comments = mysqlTable(
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
     storyId: text("story_id"),
+    kind: text("kind").notNull().default("comment"),
+    resolvedAt: datetime("resolved_at", { mode: "string", fsp: 3 }),
+    resolvedBy: text("resolved_by"),
   },
   (t) => [index("comments_build_id_idx").on(t.buildId)],
 );
@@ -41,4 +44,7 @@ export interface Comment {
   createdAt: string;
   updatedAt: string;
   storyId: string | null;
+  kind: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
 }

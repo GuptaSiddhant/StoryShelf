@@ -96,3 +96,21 @@ it("drops a build's verdicts with the build and a user's with the user (ON DELET
   await db.remove(db.tables.users, "u1");
   expect(await reviews.listByBuild("b2")).toEqual([]);
 });
+
+it("stores a change request, who resolved it and when, and reopens it", async () => {
+  const comments = new CommentModel(await seeded());
+  const plain = await comments.create("p1", "b1", "u1", { body: "nice" });
+  const request = await comments.create("p1", "b1", "u1", {
+    body: "fix the padding",
+    kind: "change_request",
+    storyId: "a--x",
+  });
+  expect(plain).toMatchObject({ kind: "comment", resolved: false, resolvedAt: null });
+  expect(request).toMatchObject({ kind: "change_request", resolved: false, resolvedBy: null });
+  const resolved = await comments.resolve(request.id, "u1");
+  expect(resolved).toMatchObject({ resolved: true, resolvedBy: "u1", kind: "change_request" });
+  expect(resolved.resolvedAt).toMatch(/^\d{4}-/u);
+  expect(await comments.get(request.id)).toMatchObject({ resolved: true, resolvedBy: "u1" });
+  const reopened = await comments.reopen(request.id);
+  expect(reopened).toMatchObject({ resolved: false, resolvedAt: null, resolvedBy: null });
+});

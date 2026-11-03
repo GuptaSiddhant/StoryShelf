@@ -71,6 +71,10 @@ const BUILD_AFFECTED_PATHS_ALTER =
 const BUILD_INHERITED_COUNT_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS inherited_count INTEGER NOT NULL DEFAULT 0";
 const BUILD_TEST_RESULTS_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS test_results TEXT";
+const BUILD_REVIEW_CYCLE_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS review_cycle INTEGER NOT NULL DEFAULT 0";
+const BUILD_REVIEW_REQUESTED_CYCLE_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS review_requested_cycle INTEGER";
 const BUILD_CAPTURE_JOB_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS capture_job_id TEXT";
 /** A run in flight when the column was added owns the build it was started for (idempotent). */
 const BUILD_CAPTURE_JOB_BACKFILL =
@@ -98,6 +102,11 @@ const USER_AUTH_ALTERS = [
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false",
 ];
 const COMMENT_STORY_ID_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS story_id TEXT";
+const COMMENT_KIND_ALTER =
+  "ALTER TABLE comments ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'comment'";
+const COMMENT_RESOLVED_AT_ALTER =
+  "ALTER TABLE comments ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ";
+const COMMENT_RESOLVED_BY_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS resolved_by TEXT";
 const NOTIFICATION_LAST_ERROR_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error TEXT";
 const NOTIFICATION_LAST_ERROR_AT_ALTER =
@@ -209,6 +218,8 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, BUILD_AFFECTED_PATHS_ALTER);
   await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
   await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
+  await execIgnore(run, BUILD_REVIEW_CYCLE_ALTER);
+  await execIgnore(run, BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
   await execIgnore(run, BUILD_CAPTURE_JOB_ALTER);
 }
 
@@ -278,6 +289,9 @@ async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
 
 async function migrateCommentsTable(run: MigrationRunner): Promise<void> {
   await execIgnore(run, COMMENT_STORY_ID_ALTER);
+  await execIgnore(run, COMMENT_KIND_ALTER);
+  await execIgnore(run, COMMENT_RESOLVED_AT_ALTER);
+  await execIgnore(run, COMMENT_RESOLVED_BY_ALTER);
   try {
     const rows = (await run(
       "SELECT is_nullable FROM information_schema.columns WHERE table_name='comments' AND column_name='user_id'",

@@ -6,7 +6,9 @@ import {
   Badge,
   Button,
   Card,
+  CheckField,
   Meta,
+  RelativeTime,
   SectionTitle,
   TextareaField,
   VStack,
@@ -29,7 +31,9 @@ export interface DiffCommentsProps {
   /** Story of the selected snapshot: its story comments show here too (ADR 0013, decision 2). */
   selectedStoryId?: string;
   comments: Comment[];
-  canReview: boolean;
+  /** Whether the viewer may resolve and reopen comments. */
+  canTriage: boolean;
+  names?: ReadonlyMap<string, string>;
 }
 
 /** One comment's props: where it sits, and what its head shows beside the author. */
@@ -37,40 +41,125 @@ export interface CommentCardProps {
   project: Project;
   build: Build;
   comment: Comment;
-  canReview: boolean;
+  /** Whether the viewer may resolve and reopen it (developers and above, and the build's author). */
+  canTriage: boolean;
   /** What the comment is anchored to (a story badge), shown in its head. */
   anchor?: unknown;
+  /** Display names by user id; a user without one shows by id. */
+  names?: ReadonlyMap<string, string>;
 }
 
-/** One comment with an optional resolve action. */
+/** One comment; a change request carries a status badge and can be resolved and reopened. */
 export function CommentCard(
   props: CommentCardProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, comment, canReview, anchor } = props;
+  const { comment, anchor, names } = props;
+  const who = nameOf(names, comment.userId, "anonymous");
+  const folded = comment.kind === "change_request" && comment.resolved;
   return (
-    <div key={comment.id} class={reviewComment}>
+    <div key={comment.id} id={`comment-${comment.id}`} tabIndex={-1} class={reviewComment}>
       <div class={reviewCommentHead}>
-        <strong>{comment.userId ?? "anonymous"}</strong>
+        <strong>{who}</strong>
         <span>· {new Date(comment.createdAt).toLocaleString()}</span>
         {anchor ?? null}
-        {comment.resolved ? <Badge tone="success">resolved</Badge> : null}
+        <KindBadge comment={comment} />
       </div>
-      <p class={reviewCommentBody}>{comment.body}</p>
-      {!comment.resolved && canReview ? (
-        <form
-          method="post"
-          action={`/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
-          hx-post={`/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
-          hx-target="body"
-          class={reviewCommentActions}
-        >
-          {csrfField()}
-          <Button variant="ghost" size="sm" type="submit">
-            Mark resolved
-          </Button>
-        </form>
-      ) : null}
+      {folded ? (
+        <details>
+          <summary>
+            <ResolvedLine comment={comment} names={names} />
+          </summary>
+          <p class={reviewCommentBody}>{comment.body}</p>
+        </details>
+      ) : (
+        <p class={reviewCommentBody}>{comment.body}</p>
+      )}
+      {props.canTriage ? <TriageAction {...props} who={who} /> : null}
     </div>
+  );
+}
+
+function nameOf(
+  names: ReadonlyMap<string, string> | undefined,
+  userId: string | null,
+  fallback: string,
+): string {
+  return userId === null ? fallback : (names?.get(userId) ?? userId);
+}
+
+/** "Change requested" while open, "Resolved" once done; a plain comment shows only a resolved tag. */
+function KindBadge(props: {
+  comment: Comment;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { comment } = props;
+  if (comment.kind !== "change_request") {
+    return comment.resolved ? <Badge tone="success">resolved</Badge> : null;
+  }
+  return comment.resolved ? (
+    <Badge tone="success" icon>
+      Resolved
+    </Badge>
+  ) : (
+    <Badge tone="warning" icon>
+      Change requested
+    </Badge>
+  );
+}
+
+/** "Resolved by Ana · 2 hours ago", the one line a resolved change request folds to. */
+function ResolvedLine(props: {
+  comment: Comment;
+  names: ReadonlyMap<string, string> | undefined;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { comment, names } = props;
+  return (
+    <>
+      {comment.resolvedBy ? `Resolved by ${nameOf(names, comment.resolvedBy, "")}` : "Resolved"}
+      {comment.resolvedAt ? (
+        <>
+          {" · "}
+          <RelativeTime value={comment.resolvedAt} />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** "Mark resolved" for an open comment, "Reopen" for a resolved one. */
+function TriageAction(
+  props: CommentCardProps & { who: string },
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, comment, who } = props;
+  const verb = comment.resolved ? "reopen" : "resolve";
+  const url = `/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/${verb}`;
+  const what = comment.kind === "change_request" ? "change request" : "comment";
+  return (
+    <form method="post" action={url} hx-post={url} hx-target="body" class={reviewCommentActions}>
+      {csrfField()}
+      <Button
+        variant="ghost"
+        size="sm"
+        type="submit"
+        aria-label={`${comment.resolved ? "Reopen" : "Mark"} ${who}'s ${what}${comment.resolved ? "" : " resolved"}`}
+      >
+        {comment.resolved ? "Reopen" : "Mark resolved"}
+      </Button>
+    </form>
+  );
+}
+
+/** The "Request a change" box under a comment textarea; `id` keeps it unique when forms repeat. */
+export function RequestChangeField(props: {
+  id: string;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <CheckField
+      id={props.id}
+      name="kind"
+      value="change_request"
+      label="Request a change"
+      hint="Asks the author to address this. It doesn't block approval."
+    />
   );
 }
 
@@ -101,6 +190,7 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
           required
           placeholder="Leave feedback on this snapshot…"
         />
+        <RequestChangeField id="snapshot-request-change" />
         <div>
           <Button variant="primary" type="submit">
             Comment
@@ -115,7 +205,7 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
 export function DiffComments(
   props: DiffCommentsProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selectedId, selectedStoryId, comments, canReview } = props;
+  const { project, build, selectedId, selectedStoryId, comments, canTriage, names } = props;
   const visible = comments.filter((c) =>
     c.snapshotId ? c.snapshotId === selectedId : !c.storyId || c.storyId === selectedStoryId,
   );
@@ -129,7 +219,8 @@ export function DiffComments(
             project={project}
             build={build}
             comment={comment}
-            canReview={canReview}
+            canTriage={canTriage}
+            names={names}
           />
         ))}
         {visible.length === 0 ? <Meta>No comments on this snapshot.</Meta> : null}
