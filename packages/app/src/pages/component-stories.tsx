@@ -46,6 +46,8 @@ export function StoriesTab(props: { data: ComponentPageData }): Rendered {
           storyId={selected.id}
           comments={data.review.comments}
           canComment={data.review.canComment}
+          canTriage={data.review.canTriage}
+          names={data.review.names}
         />
       ) : null}
       <Card padded={false}>

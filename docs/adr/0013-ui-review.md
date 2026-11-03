@@ -101,7 +101,15 @@ branch does not carry a verdict over.
 - **Who may comment.** `developer`, `approver` and `admin` write build, story and snapshot comments;
   `viewer` reads only.
 - **Unresolved comments do not block.** A verdict is allowed with open threads. Resolving is a
-  courtesy to the next reader, not a gate, and nothing counts unresolved comments.
+  courtesy to the next reader, not a gate.
+- **Change requests.** A comment can be marked a change request (`comments.kind`, `comment` or
+  `change_request`; `resolved_at` and `resolved_by` record who resolved it and when). Developers,
+  approvers and admins, and the build's author (the signed-in user whose email is the build's git
+  author), resolve and reopen it; a viewer who is not the author cannot. The build page shows the
+  open count beside the verdict and a checklist linking to each anchor (build, story or snapshot),
+  and Approve asks for confirmation while some are open. In this slice open change requests are
+  **non-gating**: they change no status and no git state, and resolving emits no event.
+  `comment:created` carries the `kind`.
 - **A new build needs a new approval.** Approving build N says nothing about build N+1 on the same
   branch. The build under review is the latest one on the branch; earlier pending builds fall away
   under decision 9.
@@ -168,7 +176,7 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
 
 ### 10. Routes, API, MCP and events
 
-- **Route class.** The `review` route class holds comments (list, create, resolve), build verdicts
+- **Route class.** The `review` route class holds comments (list, create, resolve, reopen), build verdicts
   (create, list), the changeset, the review section of the build page and the project review
   settings. It is gated by the project's switch, so the gate is evaluated per request. The route
   completeness test enumerates these routes, and a second test asserts they answer 404 when the
@@ -217,6 +225,9 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
 
 ## Open questions
 
+- Whether open change requests should gate approval, as a per-project setting. Deliberately not
+  built: it would be an owner-decided project switch beside `review_approvals`, and until it exists
+  an open change request is advice only.
 - How comments on a story survive when the story is renamed or removed between builds. (Today a
   story comment stays with the build it was written on; nothing follows a renamed story.)
 

@@ -15,6 +15,7 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
+import { openChangeRequests, openRequestsLabel } from "./review-change-requests.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -23,11 +24,15 @@ type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 /** Build-level verdicts: the approvals so far, each reviewer's latest verdict, and the controls. */
 export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
   const { data } = props;
+  const open = openChangeRequests(data).length;
   return (
     <Card>
       <HStack justify="between">
         <SectionTitle>Review</SectionTitle>
-        <Badge tone={statusTone(data.state.status)}>{standing(data)}</Badge>
+        <HStack>
+          {open > 0 ? <Badge tone="warning">{openRequestsLabel(open)}</Badge> : null}
+          <Badge tone={statusTone(data.state.status)}>{standing(data)}</Badge>
+        </HStack>
       </HStack>
       <Meta>{summary(data)}</Meta>
       <VStack>
@@ -76,6 +81,7 @@ function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Re
   const { project, build } = props.data;
   const { disabled } = props;
   const url = `/projects/${project.slug}/builds/${build.id}/reviews`;
+  const open = openChangeRequests(props.data).length;
   return (
     <form method="post" action={url} hx-post={url} hx-target="body" class="mt-1 max-w-prose">
       {csrfField()}
@@ -93,6 +99,7 @@ function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Re
             name="verdict"
             value="approved"
             disabled={disabled}
+            {...(open > 0 ? approveAnyway(url, open) : {})}
           >
             Approve build
           </Button>
@@ -109,6 +116,21 @@ function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Re
       </VStack>
     </form>
   );
+}
+
+/**
+ * Open change requests do not block an approval, but the Approve button asks first. It posts the
+ * form itself (htmx reads `hx-confirm` from the element that sends the request, and Reject must
+ * not ask), carrying the note and the verdict.
+ */
+function approveAnyway(url: string, open: number): Record<string, string> {
+  return {
+    "hx-post": url,
+    "hx-target": "body",
+    "hx-include": "closest form",
+    "hx-vals": JSON.stringify({ verdict: "approved" }),
+    "hx-confirm": `There are ${open} open change ${open === 1 ? "request" : "requests"}. Approve anyway?`,
+  };
 }
 
 /** The status badge text: the build's status, worded for review. */

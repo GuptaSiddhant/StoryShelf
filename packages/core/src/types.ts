@@ -119,3 +119,9 @@ export const RESERVED_LABEL_KEYS = ["build"] as const;
  * Attach `persistent=true` to keep a build indefinitely, even after its TTL expires.
  */
 export const PERSISTENT_LABEL_KEY = "persistent";
+
+/** What a comment is: plain feedback, or a change request that can be resolved (ADR 0013). */
+export const COMMENT_KINDS = ["comment", "change_request"] as const;
+
+/** One of {@link COMMENT_KINDS}. */
+export type CommentKind = (typeof COMMENT_KINDS)[number];

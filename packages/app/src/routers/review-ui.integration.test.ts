@@ -774,6 +774,17 @@ describe("review events", () => {
       await booted.stop();
     });
 
+    it("carries the kind of the comment, plain or change request", async () => {
+      const booted = await boot();
+      const id = await publish(booted, "feature/x");
+      const seen = await deliveries(booted, ["comment:created"]);
+      await postComment(booted, id, {});
+      await postComment(booted, id, { kind: "change_request" });
+      await vi.waitFor(() => expect(seen).toHaveLength(2));
+      expect(seen.map((item) => item.data["kind"])).toEqual(["comment", "change_request"]);
+      await booted.stop();
+    });
+
     it("keeps delivering build and story comments to a webhook that lists only review:comment", async () => {
       const booted = await boot();
       const id = await publish(booted, "feature/x");
