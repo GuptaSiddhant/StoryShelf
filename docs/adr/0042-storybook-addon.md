@@ -42,9 +42,10 @@ app origin. It reads the project slug and build id from its own `location.pathna
 injected into the uploaded files and a published build stays byte-for-byte what was uploaded.
 The project URLs without a build id, `/projects/:slug/storybook` and the label resolver
 `/projects/:slug/storybook/:key/:value`, 302-redirect to `/projects/:slug/storybook/build/:buildId/`,
-and a signed-in viewer's Storybook files are served only under that path (the signed `/_s/<token>/`
-route is a separate, token-only read that the addon never uses). The addon reads the post-redirect
-pathname, so it always runs on a path that carries the build id. It supports no other shape.
+and a signed-in viewer's Storybook files are served under that path. The `/_/:id/*` short link also
+serves them to a signed-in viewer, and the signed `/_s/<token>/` route is a separate, token-only
+read; the addon runs on neither. It reads the post-redirect pathname, so it runs only on a path that
+carries the build id, and it supports no other shape.
 
 Everywhere else the addon is inert: it registers no panel and makes no request. That covers a
 developer's local `storybook dev`, a Storybook hosted elsewhere, and a project subdomain
@@ -73,14 +74,18 @@ developer's local `storybook dev`, a Storybook hosted elsewhere, and a project s
 - Access is the project's viewer rule (ADR 0011), the same one the review pages apply. A private
   build is readable here only by someone who may read the build, and the route follows whatever the
   API answers for a project the caller cannot see.
-- The body is per-story state only: for each story id the worst snapshot status across its
-  viewports and browsers (`rejected`, `changed`, `new`, `pending`, `approved`, `unchanged`), a design
-  drift (`stale`, `deleted`, or absent), and the build's own status. A story with no snapshot (a
-  `disableSnapshot` story, or a catalog story the build has no snapshot row for) is omitted, and the
-  addon shows no badge for an id that is absent; the implementation tests that omission. It also
-  carries a relative `reviewPath` for the build: the path and query of the store's `UrlBuilder` URL
-  with the scheme and host removed, which the addon resolves against its own origin. It never carries images, image keys, signed URLs, comments, reviewer identities or
-  absolute links.
+- The body holds one entry per story and a small build envelope. Each story entry is the worst
+  snapshot status across its viewports and browsers (`rejected`, `changed`, `new`, `pending`,
+  `approved`, `unchanged`) and a design drift, present only as `stale` or `deleted`. A `current` or
+  `unknown` drift (nothing cached, no baseline, or a provider refusal) is left out, so the addon
+  shows a design badge only for a known problem and an undeterminable design never reads as fresh.
+  A story with no snapshot (a `disableSnapshot` story, or a catalog story the build has no snapshot
+  row for) is omitted, and the addon shows no badge for an absent id; the implementation tests that
+  omission. The envelope is the build's own status and a relative `reviewPath`: the path and query
+  of the store's `UrlBuilder` URL with the scheme and host removed, which the addon resolves against
+  its own origin. Issue #461 asked for per-story state only; the envelope is a deliberate addition
+  (open question 5). The body never carries images, image keys, signed URLs, comments, reviewer
+  identities or absolute links.
 - Read-only by construction: no other method on the path, no write elsewhere in the addon, and no
   verdicts from Storybook.
 - The answer is `Cache-Control: private, no-store`: it depends on who asks, so no cache keeps it. It
@@ -137,3 +142,7 @@ but it belongs with the local-comparison work, not here.
    local-comparison decision?
 4. **Design stale.** It shows only for stories with a linked design (ADR 0018). Keep it in the first
    release, or ship the three review states first?
+5. **Build envelope.** #461 asked for per-story state only. The ADR adds the build's status and a
+   `reviewPath` so the addon links to the review without building URLs itself, which keeps URL
+   construction in the server's `UrlBuilder`. Accept the envelope, or return per-story state only and
+   let the addon derive the link from its own pathname?
