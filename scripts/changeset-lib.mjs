@@ -153,6 +153,46 @@ const SHIPPED_SOURCE = /^packages\/[^/]+\/src\//u;
 const PACKAGE_MANIFEST = /^packages\/[^/]+\/package\.json$/u;
 
 /**
+ * Whether a package manifest ships: it counts when it was published before or after the change, so
+ * making a package private or deleting it (which changes what ships) still needs a changeset.
+ *
+ * @param {...(string | null)} texts The manifest's contents on each side of the change; null when absent.
+ * @returns {boolean} True when any side parses to a manifest that is not `private`.
+ */
+export function manifestPublished(...texts) {
+  return texts.some((text) => {
+    if (text === null) {
+      return false;
+    }
+    try {
+      return JSON.parse(text).private !== true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * The problems in the changesets a pull request adds, so a malformed file fails the pull request
+ * and not the first run on `main` that reads it.
+ *
+ * @param {string[]} added Paths the PR adds or modifies.
+ * @param {(path: string) => string} read Reads a file from the PR's tree.
+ * @returns {string[]} One message per malformed changeset.
+ */
+export function malformedChangesets(added, read) {
+  const problems = [];
+  for (const path of added.filter((entry) => CHANGESET_FILE.test(entry))) {
+    try {
+      parseChangeset(read(path), path);
+    } catch (error) {
+      problems.push(error.message);
+    }
+  }
+  return problems;
+}
+
+/**
  * Whether a pull request must add a changeset: it changes the source of a package or a published
  * manifest, and neither adds a changeset nor carries the `no-release` label.
  *

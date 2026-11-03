@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { checkChangeset, mergeChangelog, parseChangeset, renderEntries } from "./changeset-lib.mjs";
+import {
+  checkChangeset,
+  malformedChangesets,
+  manifestPublished,
+  mergeChangelog,
+  parseChangeset,
+  renderEntries,
+} from "./changeset-lib.mjs";
 
 const CHANGELOG = `# Changelog
 
@@ -153,5 +160,47 @@ describe("checkChangeset", () => {
     assert.equal(check(src, { added: [".changeset/brave-owls.md"] }).ok, true);
     assert.equal(check(src, { added: [".changeset/README.md"] }).ok, false);
     assert.equal(check(src, { labels: ["no-release"] }).ok, true);
+  });
+});
+
+describe("manifestPublished", () => {
+  const published = '{"name":"@storyshelf/x"}';
+  const priv = '{"name":"@storyshelf/x","private":true}';
+
+  it("counts a package published on either side of the change", () => {
+    assert.equal(manifestPublished(published, published), true);
+    assert.equal(manifestPublished(priv, published), true, "made private: it stops shipping");
+    assert.equal(manifestPublished(null, published), true, "deleted: it stops shipping");
+    assert.equal(manifestPublished(published, null), true, "new: it starts shipping");
+  });
+
+  it("ignores a package that was private throughout, or unreadable", () => {
+    assert.equal(manifestPublished(priv, priv), false);
+    assert.equal(manifestPublished(null, null), false);
+    assert.equal(manifestPublished("{not json", null), false);
+  });
+});
+
+describe("malformedChangesets", () => {
+  const files = {
+    ".changeset/good.md": '---\n"@storyshelf/core": patch\n---\n\n**Fixed: x.** Y.\n',
+    ".changeset/bad.md": "no front matter here\n",
+    ".changeset/odd.md": '---\n"@storyshelf/core": huge\n---\n\nBody.\n',
+  };
+  const read = (path) => files[path];
+
+  it("reports each added changeset the parser rejects", () => {
+    const problems = malformedChangesets(
+      [".changeset/good.md", ".changeset/bad.md", ".changeset/odd.md"],
+      read,
+    );
+    assert.equal(problems.length, 2);
+    assert.match(problems[0], /bad\.md: a changeset starts with a --- front matter block/u);
+    assert.match(problems[1], /odd\.md: cannot read/u);
+  });
+
+  it("looks only at changeset files, not the README or other paths", () => {
+    assert.deepEqual(malformedChangesets([".changeset/README.md", "docs/x.md"], read), []);
+    assert.deepEqual(malformedChangesets([".changeset/good.md"], read), []);
   });
 });

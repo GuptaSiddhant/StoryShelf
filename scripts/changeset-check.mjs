@@ -13,7 +13,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkChangeset } from "./changeset-lib.mjs";
+import { checkChangeset, malformedChangesets, manifestPublished } from "./changeset-lib.mjs";
 
 const root = join(import.meta.dirname, "..");
 
@@ -41,16 +41,35 @@ function diff(base) {
   return { changed, added };
 }
 
-function isPublished(manifest) {
+function readHead(path) {
   try {
-    return JSON.parse(readFileSync(join(root, manifest), "utf8")).private !== true;
+    return readFileSync(join(root, path), "utf8");
   } catch {
-    return false; // deleted in the PR
+    return null; // deleted in the PR
+  }
+}
+
+function readBase(base, path) {
+  try {
+    return execFileSync("git", ["show", `${base}:${path}`], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return null; // new in the PR
   }
 }
 
 const labels = (option("--labels") ?? "").split(",").filter(Boolean);
-const { changed, added } = diff(option("--base") ?? "HEAD^1");
+const base = option("--base") ?? "HEAD^1";
+const { changed, added } = diff(base);
+const malformed = malformedChangesets(added, (path) => readFileSync(join(root, path), "utf8"));
+if (malformed.length > 0) {
+  console.error(`::error title=Malformed changeset::${malformed.join("; ")}`);
+  process.exit(1);
+}
+const isPublished = (manifest) => manifestPublished(readHead(manifest), readBase(base, manifest));
 const verdict = checkChangeset({ changed, added, labels, isPublished });
 if (verdict.ok) {
   console.log(`changeset check passed: ${verdict.reason}`);
