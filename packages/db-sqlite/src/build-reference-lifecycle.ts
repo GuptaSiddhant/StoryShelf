@@ -1,5 +1,6 @@
 /** SQLite's write-serialized admission and irreversible deletion claim primitive. */
 import {
+  BaselineSourceIntegrityError,
   ReferenceGenerationConflict,
   type BuildReferenceChange,
   type BuildReferenceLifecycle,
@@ -36,72 +37,136 @@ export function createBuildReferenceLifecycle(
   };
 }
 
-/** Prepare known baseline pins under the same SQLite write lock as reference admission.
- * Do not enable lifecycle-aware deletion until all writers participate in this concurrency domain. */
+/** What preparation did with one baseline. */
+type Prepared = "protected" | "unknown" | "unavailable";
+
+/** Counts of {@link Prepared} outcomes: every baseline with a source or a snapshot is in exactly one. */
+export interface PreparationResult {
+  /** Baselines whose proven source build is now pinned. */
+  protected: number;
+  /** Baselines whose provenance cannot be proven; they stay unpinned and unknown. */
+  unknown: number;
+  /** Baselines whose recorded source build row is gone; the record is kept, nothing is pinned. */
+  unavailable: number;
+}
+
+/**
+ * Prepare known baseline pins under the same SQLite write lock as reference admission.
+ * Do not enable lifecycle-aware deletion until all writers participate in this concurrency domain.
+ *
+ * A recorded source whose build row is missing keeps its `source_build_id` and gets no pin
+ * (`unavailable`). A recorded source that is tombstoned or belongs to another project stops the
+ * whole preparation with a {@link BaselineSourceIntegrityError}; the transaction rolls back.
+ */
 export async function prepareBaselineReferences(
   path: string,
   beforeCommit?: () => Promise<void>,
-): Promise<{ protected: number; unknown: number }> {
+): Promise<PreparationResult> {
   return await inTransaction(path, async (db) => {
     const rows = db
       .prepare(
-        "SELECT id FROM baselines WHERE source_build_id IS NOT NULL OR snapshot_id IS NOT NULL",
+        "SELECT id FROM baselines WHERE source_build_id IS NOT NULL OR snapshot_id IS NOT NULL ORDER BY id",
       )
       .all() as unknown as [string][];
-    const prepared = await Promise.all(
-      rows.map(async ([id]) => await prepareLegacyBaseline(db, id)),
-    );
-    const protectedCount = prepared.filter(Boolean).length;
-    const unknown = rows.length - protectedCount;
+    const outcomes: Prepared[] = [];
+    for (const [id] of rows) {
+      // oxlint-disable-next-line no-await-in-loop -- one baseline at a time: a failure must stop the rest before the rollback
+      outcomes.push(await prepareLegacyBaseline(db, id));
+    }
     await beforeCommit?.();
-    return await Promise.resolve({ protected: protectedCount, unknown });
+    return await Promise.resolve(tally(outcomes));
   });
 }
 
-async function prepareLegacyBaseline(db: DatabaseSync, id: string): Promise<boolean> {
+function tally(outcomes: readonly Prepared[]): PreparationResult {
+  const count = (kind: Prepared): number => outcomes.filter((outcome) => outcome === kind).length;
+  return {
+    protected: count("protected"),
+    unknown: count("unknown"),
+    unavailable: count("unavailable"),
+  };
+}
+
+async function prepareLegacyBaseline(db: DatabaseSync, id: string): Promise<Prepared> {
+  const baseline = (await transactionStore(db).get(schema.baselines, id)) as unknown as Baseline;
+  if (baseline.sourceBuildId && !recordedSourcePresent(db, baseline, baseline.sourceBuildId)) {
+    keepRecordUnpinned(db, baseline);
+    return "unavailable";
+  }
+  const source = await provenSource(db, baseline);
+  if (!source) {
+    setPreparedSource(db, baseline, null);
+    return "unknown";
+  }
+  protectSource(db, baseline, source.id);
+  return "protected";
+}
+
+/** Pin the proven source (never a tombstone) and record it on the baseline. */
+function protectSource(db: DatabaseSync, baseline: Baseline, buildId: string): void {
+  pinAvailableSource(db, baseline, buildId);
+  setPreparedSource(db, baseline, buildId);
+}
+
+/** The record stays (it is verified history), but nothing may pin a build for it. */
+function keepRecordUnpinned(db: DatabaseSync, baseline: Baseline): void {
+  if (releaseReferences(db, baseline)) advanceBaselineGeneration(db, baseline);
+}
+
+/** The build that provably rendered the baseline's image, or null when its history is incomplete. */
+async function provenSource(db: DatabaseSync, baseline: Baseline): Promise<Build | null> {
   const tx = transactionStore(db);
-  const baseline = (await tx.get(schema.baselines, id)) as unknown as Baseline;
-  const source = await resolveBaselineOrigin(baseline, {
+  return await resolveBaselineOrigin(baseline, {
     baseline: async (key) => (await tx.get(schema.baselines, key)) as unknown as Baseline | null,
     snapshot: async (key) => (await tx.get(schema.snapshots, key)) as unknown as Snapshot | null,
     build: async (key) => (await tx.get(schema.builds, key)) as unknown as Build | null,
   });
-  if (!source) {
-    setPreparedSource(db, baseline, null);
-    return false;
+}
+
+/**
+ * Whether the build a baseline records as its source still has a row. A row in another project is
+ * an integrity problem, not a missing build: the record is neither kept nor cleared.
+ */
+function recordedSourcePresent(db: DatabaseSync, baseline: Baseline, buildId: string): boolean {
+  const row = db.prepare("SELECT project_id FROM builds WHERE id = ?").get(buildId) as
+    | unknown[]
+    | undefined;
+  if (!row) return false;
+  if (row[0] !== baseline.projectId) {
+    throw new BaselineSourceIntegrityError(baseline.id, buildId, "other-project");
   }
-  const protectedSource = prepareBaselineReference(db, [id, baseline.projectId, source.id]);
-  setPreparedSource(db, baseline, protectedSource ? source.id : null);
-  return protectedSource;
+  return true;
 }
 
 function setPreparedSource(db: DatabaseSync, baseline: Baseline, source: string | null): void {
-  const removed =
-    source === null
-      ? db
-          .prepare(
-            "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ?",
-          )
-          .run(baseline.projectId, baseline.id).changes
-      : 0;
+  const removed = source === null && releaseReferences(db, baseline);
   if ((baseline.sourceBuildId ?? null) === source && !removed) return;
   db.prepare("UPDATE baselines SET source_build_id = ? WHERE id = ?").run(source, baseline.id);
+  advanceBaselineGeneration(db, baseline);
+}
+
+/** Drop every pin the baseline owns; true when there was one. The caller advances the generation. */
+function releaseReferences(db: DatabaseSync, baseline: Baseline): boolean {
+  const removed = db
+    .prepare(
+      "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ?",
+    )
+    .run(baseline.projectId, baseline.id).changes;
+  return removed > 0;
+}
+
+function advanceBaselineGeneration(db: DatabaseSync, baseline: Baseline): void {
   advanceGeneration(db, { type: "baseline", id: baseline.id, projectId: baseline.projectId });
 }
 
-function prepareBaselineReference(
-  db: DatabaseSync,
-  [id, projectId, buildId]: [string, string, string],
-): boolean {
+/** Pin `buildId` for the baseline, replacing a pin on any other build; a tombstoned build is never pinned. */
+function pinAvailableSource(db: DatabaseSync, baseline: Baseline, buildId: string): void {
+  const { id, projectId } = baseline;
   const row = db
     .prepare("SELECT retention_state FROM builds WHERE id = ? AND project_id = ?")
     .get(buildId, projectId) as unknown[] | undefined;
   if (row?.[0] !== "available") {
-    db.prepare("UPDATE baselines SET source_build_id = NULL WHERE id = ? AND project_id = ?").run(
-      id,
-      projectId,
-    );
-    return false;
+    throw new BaselineSourceIntegrityError(id, buildId, "tombstoned");
   }
   const removed = db
     .prepare(
@@ -114,7 +179,6 @@ function prepareBaselineReference(
     )
     .run(projectId, id, buildId);
   if (result.changes || removed) advanceGeneration(db, { type: "baseline", id, projectId });
-  return true;
 }
 
 async function referenceGeneration(path: string, owner: BuildReferenceOwner): Promise<number> {

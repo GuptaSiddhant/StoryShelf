@@ -13,6 +13,11 @@ import type { Adapter, AdapterMetadata } from "./metadata.ts";
 /** A fenced reference write lost its generation race and should be retried. */
 export class ReferenceGenerationConflict extends Error {}
 
+export {
+  BaselineSourceIntegrityError,
+  type BaselineSourceProblem,
+} from "./baseline-source-integrity-error.ts";
+
 /** Type-safe table map enforced on every DatabaseAdapter. */
 export interface Tables {
   projects: Table;
