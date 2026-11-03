@@ -12,7 +12,7 @@ export interface RemoteSizing {
   pages: number | null;
   /** Pages on one connection, when capped. */
   pagesPerConnection: number | null;
-  /** Pages one connection can hold: the lower of `pages` and `pagesPerConnection`. */
+  /** Pages one connection can hold: the lowest of `pages`, `pagesPerConnection` (when the runner enforces it) and the run's `concurrency`. */
   effectivePagesPerConnection: number | null;
   /** Connections this process holds at once, when capped. Per process. */
   maxConnections: number | null;

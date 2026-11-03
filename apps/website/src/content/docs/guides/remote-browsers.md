@@ -143,7 +143,7 @@ A field the runner cannot determine (a page that would not open) is omitted, and
 
 ### What each run logs
 
-At the start of a remote run the runner logs one `remote sizing` line per target with the limits as configured and as they apply: `pages` (the target's page limit, per target and per process), `pagesPerConnection`, `effectivePagesPerConnection` (the lower of the two), and `maxConnections` (per process; `null` means no cap), plus `scope`, `experimental` and, for an experimental preset, `verification`. A `sessions` function is read at that moment. The line carries no endpoint, header, credential or lease, and nothing is measured on the app host: the browser's environment is still measured in the browser.
+At the start of a remote run the runner logs one `remote sizing` line per target with the limits as configured and as they apply: `pages` (the target's page limit, per target and per process), `pagesPerConnection`, `effectivePagesPerConnection` (the lowest of the applicable limits: `pages`, `pagesPerConnection` where the runner enforces it, and the run's `concurrency`; the Puppeteer runner does not enforce `pagesPerConnection`), and `maxConnections` (per process; `null` means no cap), plus `scope`, `experimental` and, for an experimental preset, `verification`. A `sessions` function is read at that moment. The line carries no endpoint, header, credential or lease, and nothing is measured on the app host: the browser's environment is still measured in the browser.
 
 ## Self-hosted farm
 
