@@ -71,28 +71,31 @@ function linkOf(
 }
 
 /**
- * When each component's baselines were last approved: the newest `updatedAt` among the current
- * default-branch baselines of its stories, by normalized story file. A snapshot's own
- * `baselineVersion` is the baseline it was diffed against, which promotion has since replaced.
+ * How far each component's approval reaches: the OLDEST `updatedAt` among the current
+ * default-branch baselines of its stories (every viewport and browser), by normalized story file.
+ * A design edited after any of those screenshots was approved has drifted from it, so the oldest
+ * decides. A snapshot's own `baselineVersion` is the baseline it was diffed against, which
+ * promotion has since replaced. Without testing there are no baselines to compare with.
  */
 async function approvedVersions(
   project: Project,
   entries: readonly CatalogEntry[],
 ): Promise<Map<string, string>> {
+  const oldest = new Map<string, string>();
+  if (!testingEnabled()) return oldest;
   const fileOf = new Map(
     entries.map((entry) => [entry.id, normalizeImportPath(entry.importPath)] as const),
   );
   const baselines = await new BaselineModel(getStore().db).list(project.id);
-  const latest = new Map<string, string>();
   for (const baseline of baselines) {
     const key = fileOf.get(baseline.storyId);
     if (!key || baseline.branch !== project.gitDefaultBranch) continue;
-    const known = latest.get(key);
-    if (known === undefined || Date.parse(baseline.updatedAt) > Date.parse(known)) {
-      latest.set(key, baseline.updatedAt);
+    const known = oldest.get(key);
+    if (known === undefined || Date.parse(baseline.updatedAt) < Date.parse(known)) {
+      oldest.set(key, baseline.updatedAt);
     }
   }
-  return latest;
+  return oldest;
 }
 
 /** Provider kinds, among those the links use, that the project has a token for. */

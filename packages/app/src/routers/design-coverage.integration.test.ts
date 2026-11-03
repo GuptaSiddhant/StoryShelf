@@ -252,6 +252,30 @@ describe("design coverage page", () => {
     expect(page.slice(page.indexOf("Up to date"))).toContain("Up to date (1)");
   });
 
+  it("reports drift when any baseline of the component predates the design change", async () => {
+    // Input has a January baseline and, for another viewport, a November one: the design changed
+    // (December) after the older screenshot was approved.
+    const { app, db } = await seed();
+    await db.insert(db.tables.baselines, {
+      id: "base-Input-mobile",
+      projectId: "p1",
+      storyId: entry("Input").id,
+      viewportName: "mobile",
+      branch: "main",
+      browser: "chromium",
+      screenshotPath: "p1/Input-mobile.png",
+      createdAt: "2025-11-01T00:00:00.000Z",
+      updatedAt: "2025-11-01T00:00:00.000Z",
+    } as never);
+    const page = await text(app.request(URL_PATH));
+    const changed = page.slice(
+      page.indexOf("Design changed or deleted"),
+      page.indexOf("Up to date"),
+    );
+    expect(changed).toContain("Design changed or deleted (3)");
+    expect(changed).toContain("Kit/Input");
+  });
+
   it("counts a hand-mapped component as linked, not as missing a design", async () => {
     const { app } = await seed();
     const page = await text(app.request(URL_PATH));
@@ -349,6 +373,18 @@ describe("design coverage page gating", () => {
     expect(page).toContain("No design link (5)");
     expect(page).not.toContain(">Kit/Menu<");
     // Without snapshots nothing was compared with a baseline, so no link counts as up to date.
+    expect(page).toContain("Up to date (0)");
+  });
+
+  it("ignores retained baselines when testing is off", async () => {
+    // The seed holds baselines for every story; without testing none of them is compared.
+    const { app } = await seed({ testing: false });
+    const page = await text(app.request(URL_PATH));
+    const changed = page.slice(
+      page.indexOf("Design changed or deleted"),
+      page.indexOf("Up to date"),
+    );
+    expect(changed).not.toContain("Kit/Button");
     expect(page).toContain("Up to date (0)");
   });
 
