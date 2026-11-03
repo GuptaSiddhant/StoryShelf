@@ -261,6 +261,83 @@ describe("BuildModel: a cancelled build is terminal", () => {
     );
   });
 
+  it("stamps the capture job that owns a build, and a reset clears it", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+
+    await model.stampCaptureJob(id, "J1");
+    expect((await model.get(id))?.captureJobId).toBe("J1");
+    await model.resetStatus(id, "pending");
+    expect((await model.get(id))?.captureJobId).toBeNull();
+  });
+
+  it("does not stamp a cancelled build", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await model.setStatus(id, "cancelled");
+
+    await model.stampCaptureJob(id, "J1");
+
+    expect((await model.get(id))?.captureJobId ?? null).toBeNull();
+  });
+
+  it("fails a build only for the job that owns it", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await model.stampCaptureJob(id, "J2");
+
+    const stale = await model.failIfOwnedBy(id, "J1");
+    expect(stale.applied).toBe(false);
+    expect(stale.build?.status).toBe("pending");
+
+    const owner = await model.failIfOwnedBy(id, "J2");
+    expect(owner.applied).toBe(true);
+    expect((await model.get(id))?.status).toBe("failed");
+    expect((await model.failIfOwnedBy(id, "J2")).applied).toBe(false);
+  });
+
+  it("does not take another job's failed row for its own write, even with an equal stamp", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const plain = new BuildModel(db, buildTables(db));
+    const { id } = await plain.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await plain.stampCaptureJob(id, "J2");
+    // J2 failed the build in the same millisecond J1 stamped its write: the refused update of
+    // J1 returns J2's row, whose updatedAt equals J1's stamp.
+    const sameInstant: DatabaseAdapter = {
+      ...db,
+      updateWhere: async (table, rowId, values) => ({
+        ...(await db.get(table, rowId)),
+        status: "failed",
+        updatedAt: (values as { updatedAt: string }).updatedAt,
+      }),
+    } as DatabaseAdapter;
+    const model = new BuildModel(sameInstant, buildTables(db));
+
+    const stale = await model.failIfOwnedBy(id, "J1");
+
+    expect(stale.applied).toBe(false);
+    expect(stale.build?.captureJobId).toBe("J2");
+  });
+
   it("is left only by resetStatus (retry)", async () => {
     const { model, id } = await cancelled();
     expect((await model.resetStatus(id, "pending")).status).toBe("pending");

@@ -44,7 +44,9 @@ semantics.
 - A handler registered on exactly one consumer. A job without a handler fails clearly.
 - Work that is idempotent per attempt (ADR 0006: each attempt is its own fenced row).
 - An `exhausted` hook (`JobQueue.exhausted[kind]`) when losing the final lease must change domain
-  state, as capture (fail the build) and publish (complete as failed) do today.
+  state, as capture (fail the build) and publish (complete as failed) do today. The queue runs it
+  in a leased `exhausting` phase: a failed or lost run is re-run by any instance after its lease,
+  up to five runs, then the job fails and `JobQueue.abandoned[kind]` alerts once (#432).
 - Lease renewal through `keepJobLease` for any phase that can run longer than a third of the lease.
 - Cancellation by build id, honored within the cancel latency of ADR 0006 decision 11.
 - Its retry limit stated where the queue is built, not inferred from `testing.retries`.

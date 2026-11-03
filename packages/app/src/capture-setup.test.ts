@@ -130,6 +130,21 @@ describe("setupCapture", () => {
     expect(failed?.status).toBe("failed");
     expect(alreadyAlerted(failed as never)).toBe(true);
   });
+
+  it("alerts for a build left capturing when the exhausted hook gave up", async () => {
+    const { db, jobs } = wire({ runner: runner() });
+    const project = await new ProjectModel(db).create({ name: "Stuck" });
+    const builds = new BuildModel(db);
+    const build = await builds.create(project.id, { gitSha: "sha", gitBranch: "feature/x" });
+    await builds.setStatus(build.id, "capturing");
+    await jobs.abandoned.capture?.(
+      { buildId: build.id, kind: "capture" } as never,
+      "lease expired on the final attempt",
+    );
+    const stuck = await builds.get(build.id);
+    expect(stuck?.status).toBe("capturing");
+    expect(alreadyAlerted(stuck as never)).toBe(true);
+  });
 });
 
 const forked = () => wire({ runner: runner(), workerEntry: ECHO_CHILD, mode: "fork" });

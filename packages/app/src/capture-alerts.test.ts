@@ -2,7 +2,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
-import { alreadyAlerted, notifyCaptureFailed } from "./capture-alerts.ts";
+import { alreadyAlerted, notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
 
 describe("alreadyAlerted", () => {
   it("lets only the first of several settles of one failed build through", () => {
@@ -65,5 +65,35 @@ describe("notifyCaptureFailed", () => {
     await notifyCaptureFailed(options, {}, logger, "missing");
     const fresh = await new BuildModel(db).get(build.id);
     expect(alreadyAlerted(fresh as never)).toBe(false);
+  });
+});
+
+const notifier = () => ({
+  metadata: { name: "n", version: "0", kind: "n", category: "notifier" },
+  send: vi.fn(async () => ({ ok: true })),
+});
+
+describe("notifyCaptureStuck", () => {
+  const logger = createShelfLogger({ level: "silent" });
+
+  it("alerts once for a build left capturing, which needs no build:failed notice", async () => {
+    const { db, build } = await buildWith("capturing");
+    const one = notifier();
+    const options = { database: db, notifications: { notifiers: [one] } } as never;
+    await notifyCaptureStuck(options, {}, logger, build.id);
+    const fresh = await new BuildModel(db).get(build.id);
+    expect(alreadyAlerted(fresh as never)).toBe(true);
+    // A second call for the same build is a no-op.
+    await expect(notifyCaptureStuck(options, {}, logger, build.id)).resolves.toBeUndefined();
+  });
+
+  it("stays quiet for a build someone settled, cancelled or removed", async () => {
+    const { db, build } = await buildWith("cancelled");
+    const one = notifier();
+    const options = { database: db, notifications: { notifiers: [one] } } as never;
+    await notifyCaptureStuck(options, {}, logger, build.id);
+    await notifyCaptureStuck(options, {}, logger, "missing");
+    expect(one.send).not.toHaveBeenCalled();
+    expect(alreadyAlerted((await new BuildModel(db).get(build.id)) as never)).toBe(false);
   });
 });

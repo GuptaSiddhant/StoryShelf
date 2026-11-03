@@ -3,12 +3,18 @@ import type { Adapter } from "./metadata.ts";
 /** Lifecycle status of a queued capture job. */
 export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
+/**
+ * Status of a queue entry: a {@link JobStatus}, or `recovering` while a job whose last attempt lost
+ * its lease has its exhausted-job hook run (ADR 0040, decision 2).
+ */
+export type QueueEntryStatus = JobStatus | "recovering";
+
 /** Observable state of a single capture queue entry. */
 export interface QueueEntry {
   buildId: string;
   /** Set on the entry of a shard job; the build's own entry has none. */
   shard?: string;
-  status: JobStatus;
+  status: QueueEntryStatus;
   queuedAt: string;
   startedAt?: string;
   finishedAt?: string;
