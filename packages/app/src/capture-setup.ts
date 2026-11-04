@@ -24,6 +24,7 @@ import type { Logger } from "@storyshelf/core/logger";
 import { currentTraceparent } from "@storyshelf/observability";
 import { notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
 import { createForkedHandler, shouldForkCapture } from "./capture-process.ts";
+import { recordShardRepeated } from "./consumer-setup.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import type { JobQueue } from "./job-queue.ts";
 
@@ -128,6 +129,7 @@ function captureHandlerOptions(
     config,
     enqueue: parts.enqueue,
     maxRetries: options.testing?.retries,
+    onShardRepeated: recordShardRepeated,
   };
 }
 

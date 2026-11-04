@@ -44,27 +44,27 @@ persist), with every log line carrying the same `trace_id`.
 
 ## Environment reference
 
-| Variable                                          | Default                               | Meaning                                                                          |
-| ------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`                     | unset (disabled)                      | OTLP/HTTP base URL, e.g. `http://collector:4318`. Unset ⇒ noop.                  |
-| `OTEL_SERVICE_NAME`                               | `storyshelf`                          | Resource `service.name`.                                                         |
-| `OTEL_EXPORTER_OTLP_HEADERS`                      | unset                                 | Extra OTLP headers, `k=v,k2=v2` (e.g. `authorization=Bearer …`).                 |
-| `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` | SDK default (`parentbased_always_on`) | Standard sampling. Production suggestion: `traceidratio` + `0.1`.                |
-| `OTEL_SDK_DISABLED`                               | `false`                               | `true` forces noop even with an endpoint.                                        |
-| `STORYSHELF_OTEL_ENABLED`                         | auto (on iff endpoint set)            | Explicit kill-switch (`false`) or force-on (`true`).                             |
-| `STORYSHELF_OTEL_METRICS_INTERVAL_MS`             | `60000`                               | Metric export interval.                                                          |
+| Variable                                          | Default                               | Meaning                                                           |
+| ------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                     | unset (disabled)                      | OTLP/HTTP base URL, e.g. `http://collector:4318`. Unset ⇒ noop.   |
+| `OTEL_SERVICE_NAME`                               | `storyshelf`                          | Resource `service.name`.                                          |
+| `OTEL_EXPORTER_OTLP_HEADERS`                      | unset                                 | Extra OTLP headers, `k=v,k2=v2` (e.g. `authorization=Bearer …`).  |
+| `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` | SDK default (`parentbased_always_on`) | Standard sampling. Production suggestion: `traceidratio` + `0.1`. |
+| `OTEL_SDK_DISABLED`                               | `false`                               | `true` forces noop even with an endpoint.                         |
+| `STORYSHELF_OTEL_ENABLED`                         | auto (on iff endpoint set)            | Explicit kill-switch (`false`) or force-on (`true`).              |
+| `STORYSHELF_OTEL_METRICS_INTERVAL_MS`             | `60000`                               | Metric export interval.                                           |
 
 ## Span catalog
 
-| Span                                                                                 | Where                                                                | Attributes                                                                   |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `http.server`                                                                        | Every request (`@hono/otel`)                                         | `http.method/route/status`, `storyshelf.req_id`, `enduser.id`                |
-| `capture.job`                                                                        | One per capture                                                      | `storyshelf.build_id`, `storyshelf.req_id`, `storyshelf.attempt_no`          |
-| `capture.extract` / `capture.persist-statics` / `capture.render` / `capture.persist` | Orchestrator phases                                                  | `storyshelf.render_count` (render)                                           |
-| `db.insert/get/list/…`                                                               | Instrumented database adapter                                        | `db.table`                                                                   |
-| `storage.read/write/…`                                                               | Instrumented storage adapter                                         | `storage.path`                                                               |
-| `ai.summarize`                                                                       | One per AI call (`@storyshelf/ai`)                                   | `ai.task`, `ai.profile`, `ai.model`                                          |
-| `invoke_agent {model}` / `chat {model}`                                              | The AI SDK's `@ai-sdk/otel` GenAI spans, nested under `ai.summarize` | `gen_ai.*` usage attributes (prompts, images and outputs are never recorded) |
+| Span                                                                                 | Where                                                                | Attributes                                                                                       |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `http.server`                                                                        | Every request (`@hono/otel`)                                         | `http.method/route/status`, `storyshelf.req_id`, `enduser.id`                                    |
+| `capture.job`                                                                        | One per capture                                                      | `storyshelf.build_id`, `storyshelf.req_id`, `storyshelf.attempt_no`                              |
+| `capture.extract` / `capture.persist-statics` / `capture.render` / `capture.persist` | Orchestrator phases                                                  | `storyshelf.render_count` (render)                                                               |
+| `db.insert/get/list/…`                                                               | Instrumented database adapter                                        | `db.table`                                                                                       |
+| `storage.read/write/…`                                                               | Instrumented storage adapter                                         | `storage.path`                                                                                   |
+| `ai.summarize`                                                                       | One per AI call (`@storyshelf/ai`)                                   | `ai.task`, `ai.profile`, `ai.model`                                                              |
+| `invoke_agent {model}` / `chat {model}`                                              | The AI SDK's `@ai-sdk/otel` GenAI spans, nested under `ai.summarize` | `gen_ai.*` usage attributes (prompts, images and outputs are never recorded)                     |
 | `http.client`                                                                        | Outbound `httpJson` (git hosts, webhooks, OIDC)                      | `http.request.method`, `url.full` (origin only), `http.response.status_code`, `http.retry.count` |
 
 Span names never contain IDs, paths, or branch names. The consumer
@@ -73,15 +73,16 @@ an upload's trace spans the HTTP request **and** the capture job.
 
 ## Metric catalog
 
-| Instrument                                       | Type           | Attributes                                             |
-| ------------------------------------------------ | -------------- | ------------------------------------------------------ |
-| `http.server.request.duration`                   | histogram      | `method`, `route`, `status` (via `@hono/otel`)         |
-| `capture.job.duration`                           | histogram (ms) | —                                                      |
-| `capture.jobs.completed` / `capture.jobs.failed` | counters       | —                                                      |
-| `db.operation.duration`                          | histogram (ms) | `db.operation`, `db.table`                             |
-| `storage.operation.duration`                     | histogram (ms) | `storage.operation` (paths excluded: cardinality)      |
-| `ai.summarize.duration` / `ai.summarize.tokens`  | histograms     | `ai.task`, `outcome` (model and profile stay on spans) |
-| `ai.insights.completed` / `ai.insights.failed`   | counters       | `ai.task`                                              |
+| Instrument                                       | Type           | Attributes                                                                                                                                     |
+| ------------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `http.server.request.duration`                   | histogram      | `method`, `route`, `status` (via `@hono/otel`)                                                                                                 |
+| `capture.job.duration`                           | histogram (ms) | —                                                                                                                                              |
+| `capture.jobs.completed` / `capture.jobs.failed` | counters       | —                                                                                                                                              |
+| `storyshelf.capture.shard.repeated_snapshots`    | counter        | none; snapshots an earlier delivery of a rerun shard had stored, removed before it renders again (including any that fail to render this time) |
+| `db.operation.duration`                          | histogram (ms) | `db.operation`, `db.table`                                                                                                                     |
+| `storage.operation.duration`                     | histogram (ms) | `storage.operation` (paths excluded: cardinality)                                                                                              |
+| `ai.summarize.duration` / `ai.summarize.tokens`  | histograms     | `ai.task`, `outcome` (model and profile stay on spans)                                                                                         |
+| `ai.insights.completed` / `ai.insights.failed`   | counters       | `ai.task`                                                                                                                                      |
 
 No per-story or per-build instruments — labels stay low-cardinality by rule.
 
