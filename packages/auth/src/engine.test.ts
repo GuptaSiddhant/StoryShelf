@@ -744,10 +744,12 @@ function attributesOf(line: string): { name: string; flags: string[]; sameSite: 
 
 describe("the session cookie", () => {
   it("is HttpOnly, SameSite=Lax and Path=/ over http, and not Secure", async () => {
-    const cookie = attributesOf(await signInSetCookie("http://localhost:3000"));
+    const line = await signInSetCookie("http://localhost:3000");
+    const cookie = attributesOf(line);
     expect(cookie.name).toBe("storyshelf_session");
     expect(cookie.flags).toEqual(["httponly", "max-age", "path", "samesite"]);
     expect(cookie.sameSite).toBe("lax");
+    expect(line).toMatch(/Path=\/(?:;|$)/u);
   });
 
   it("is also Secure when the public URL is https", async () => {
