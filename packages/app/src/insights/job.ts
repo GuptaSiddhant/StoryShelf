@@ -1,6 +1,6 @@
 /** Background insight job: summarize, record usage, persist the result, notify. */
 import { AiError, type AiEvidence, type AiSummarizeResult, type AiTask } from "@storyshelf/core/ai";
-import { InsightModel } from "@storyshelf/core/models";
+import { AiUsageModel, InsightModel } from "@storyshelf/core/models";
 import type { InsightRow, Project } from "@storyshelf/core/schema";
 import type { z } from "zod";
 import { notifyProjectWith } from "../notify.ts";
@@ -102,6 +102,9 @@ async function fail(
       images: spec.evidence.images.length,
       status: "failed",
     });
+  } else {
+    // No usage came back: the reserved call stays counted, with zero tokens.
+    await new AiUsageModel(deps.db).settleFailed(row.id);
   }
   await new InsightModel(deps.db).markFailed(row.id, failure.code);
 }

@@ -1,9 +1,15 @@
 import { AiError, type Ai } from "@storyshelf/core/ai";
-import { AiBudgetAlertModel, AiUsageModel, BuildModel } from "@storyshelf/core/models";
+import {
+  AiBudgetAlertModel,
+  AiUsageModel,
+  BuildModel,
+  InsightModel,
+} from "@storyshelf/core/models";
+import type { InsightRow } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { settleInsightJobs } from "../insights/job.ts";
 import { fakeAi } from "../insights/test-support.ts";
@@ -214,6 +220,126 @@ describe("insights generation", () => {
     expect(latest).toMatchObject({ status: "failed", errorCode: "provider" });
     const rows = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
     expect(rows).toMatchObject([{ status: "failed", inputTokens: 7 }]);
+  });
+
+  it("keeps the reserved call as a failed row with zero tokens when the provider gave no usage", async () => {
+    const { db, storage, buildId } = await seed();
+    const app = appWith(db, storage, fakeAi({ fail: new AiError("provider", "boom") }));
+    await app.request(path(buildId), { method: "POST", headers: cookie("admin"), body: "{}" });
+    await settleInsightJobs();
+    const rows = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+    expect(rows).toMatchObject([{ status: "failed", inputTokens: 0, outputTokens: 0 }]);
+    expect(rows[0]?.insightId).not.toBeNull();
+  });
+
+  it("does not leave the insight pending, or the call reserved, when attaching the reservation fails", async () => {
+    const { db, storage, buildId } = await seed();
+    const app = appWith(db, storage, fakeAi());
+    const attach = vi
+      .spyOn(AiUsageModel.prototype, "attach")
+      .mockRejectedValueOnce(new Error("db down"));
+    const res = await app.request(path(buildId), {
+      method: "POST",
+      headers: cookie("admin"),
+      body: "{}",
+    });
+    attach.mockRestore();
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z")).toEqual([]);
+    const latest = (await (
+      await app.request(`${path(buildId)}/latest`, { headers: cookie("admin") })
+    ).json()) as Record<string, unknown>;
+    expect(latest).toMatchObject({ status: "failed", errorCode: "interrupted" });
+  });
+
+  it("reserves a call when the in-flight insight it saw ends before the run starts", async () => {
+    const { db, storage, buildId } = await seed();
+    const gate = Promise.withResolvers<null>();
+    const ai = fakeAi({ gate: gate.promise });
+    const app = appWith(db, storage, ai);
+    const peek = vi
+      .spyOn(InsightModel.prototype, "peek")
+      .mockResolvedValueOnce({ status: "running" } as InsightRow);
+    try {
+      const res = await app.request(path(buildId), {
+        method: "POST",
+        headers: cookie("admin"),
+        body: "{}",
+      });
+      expect(res.status).toBe(202);
+      await vi.waitFor(() => expect(ai.calls).toHaveLength(1));
+      // The reservation is made before the provider answers, not recorded after it.
+      const held = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+      expect(held).toMatchObject([{ status: "pending" }]);
+      expect(held[0]?.insightId).not.toBeNull();
+    } finally {
+      peek.mockRestore();
+      gate.resolve(null);
+      await settleInsightJobs();
+    }
+    expect(await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z")).toMatchObject([
+      { status: "ok" },
+    ]);
+  });
+
+  it("refuses that late run when the hourly calls are used up, and keeps no usage row", async () => {
+    const { db, storage, buildId } = await seed();
+    const ai = fakeAi({ callsPerHour: 0 });
+    const app = appWith(db, storage, ai);
+    const peek = vi
+      .spyOn(InsightModel.prototype, "peek")
+      .mockResolvedValueOnce({ status: "running" } as InsightRow);
+    const res = await app.request(path(buildId), {
+      method: "POST",
+      headers: cookie("admin"),
+      body: "{}",
+    });
+    peek.mockRestore();
+    expect(res.status).toBe(429);
+    expect(ai.calls).toHaveLength(0);
+    expect(await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z")).toEqual([]);
+  });
+
+  it("holds the call as a pending reservation while the provider is still running", async () => {
+    const { db, storage, buildId } = await seed();
+    const gate = Promise.withResolvers<null>();
+    const ai = fakeAi({ gate: gate.promise });
+    const app = appWith(db, storage, ai);
+    try {
+      const res = await app.request(path(buildId), {
+        method: "POST",
+        headers: cookie("admin"),
+        body: "{}",
+      });
+      expect(res.status).toBe(202);
+      await vi.waitFor(() => expect(ai.calls).toHaveLength(1));
+      const held = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+      expect(held).toMatchObject([{ status: "pending" }]);
+      expect(held[0]?.insightId).not.toBeNull();
+    } finally {
+      // A failed assertion must not leave the job blocked on the gate.
+      gate.resolve(null);
+      await settleInsightJobs();
+    }
+    const done = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+    expect(done).toMatchObject([{ status: "ok" }]);
+  });
+
+  it("refuses a new run when the hourly calls are used up, keeping the finished insight", async () => {
+    const { db, storage, buildId } = await seed();
+    const app = appWith(db, storage, fakeAi({ callsPerHour: 1 }));
+    await app.request(path(buildId), { method: "POST", headers: cookie("admin"), body: "{}" });
+    await settleInsightJobs();
+    const over = await app.request(path(buildId), {
+      method: "POST",
+      headers: cookie("admin"),
+      body: JSON.stringify({ force: true }),
+    });
+    expect(over.status).toBe(429);
+    const latest = (await (
+      await app.request(`${path(buildId)}/latest`, { headers: cookie("admin") })
+    ).json()) as Record<string, unknown>;
+    expect(latest).toMatchObject({ status: "done" });
   });
 
   it("enforces the DB-counted daily budget with Retry-After and fires each threshold once", async () => {
