@@ -6,10 +6,12 @@ export function NotificationsPausedNotice(props: {
   paused: boolean | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> | null {
   return props.paused ? (
-    <Alert tone="warning" title="Notifications are paused">
-      Notifications are paused until a public URL is set; set <code>PUBLIC_BASE_URL</code> or
-      confirm the detected origin on the System page. Nothing is sent meanwhile, and no channel is
-      marked as failing.
-    </Alert>
+    <div id="notifications-paused">
+      <Alert tone="warning" title="Notifications are paused">
+        Notifications are paused until a public URL is set; set <code>PUBLIC_BASE_URL</code> or
+        confirm the detected origin on the System page. Nothing is sent meanwhile, and no channel is
+        marked as failing.
+      </Alert>
+    </div>
   ) : null;
 }

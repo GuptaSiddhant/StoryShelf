@@ -156,7 +156,9 @@ describe("retry a git channel's current state", () => {
     const t = await boot({ origin: false });
     const res = await post(t.app, t.target.id, "admin");
     expect(res.status).toBe(409);
-    expect(((await res.json()) as { message: string }).message).toContain("paused");
+    expect(((await res.json()) as { message: string }).message).toContain(
+      "notifications are paused",
+    );
     expect(t.git.calls).toEqual([]);
   });
 
@@ -202,7 +204,10 @@ describe("retry a git channel's current state", () => {
     });
     const html = await page.text();
     expect(html).toContain("Last delivered");
-    expect(html).toContain("Last delivered: never");
+    expect(html).toContain("no delivery yet");
+    expect(html).toContain("Never delivered");
+    expect(html).toContain('aria-label="Retry current state of o/r"');
+    expect(html).toContain('id="channel-');
     expect(html).toContain("Retry current state");
     const form = (who: "admin" | "dev") =>
       t.app.request(`/projects/retry/settings/notifications/${t.target.id}/retry`, {
@@ -215,6 +220,8 @@ describe("retry a git channel's current state", () => {
         body: "",
       });
     expect((await form("dev")).status).toBe(403);
-    expect((await form("admin")).status).toBe(200);
+    const retried = await form("admin");
+    expect(retried.status).toBe(303);
+    expect(retried.headers.get("location")).toContain(`#channel-${t.target.id}`);
   });
 });

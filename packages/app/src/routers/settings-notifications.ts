@@ -6,6 +6,7 @@ import { getStore } from "../store.ts";
 import { retryChannelState } from "./channel-retry.ts";
 import { flash } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
+import { isHxRequest } from "./htmx.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
 import { createGitChannel } from "./settings-git-channel.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -159,8 +160,16 @@ async function handleRetryChannel(c: Context): Promise<Response> {
       result.status,
     );
   }
-  flash(c, result.asked === 0 ? "No open builds to show" : "Asked for the current state again");
-  return c.html((await renderSettingsPage(c, "notifications")) ?? "");
+  flash(
+    c,
+    result.asked === 0
+      ? "No open builds to show"
+      : "Retry queued. The Delivery column updates once the status is sent.",
+  );
+  // Back to the same row, so focus does not reset to the top of the page.
+  const back = `/projects/${project.slug}/settings/notifications#channel-${c.req.param("channelId")}`;
+  c.header("HX-Redirect", back);
+  return isHxRequest(c) ? c.body(null, 200) : c.redirect(back, 303);
 }
 
 async function handleSaveMine(c: Context): Promise<Response> {

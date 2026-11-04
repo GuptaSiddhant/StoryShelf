@@ -6,7 +6,7 @@
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import { requestChannelStateNow } from "../git-status.ts";
-import { NOTIFICATIONS_PAUSED_TEXT, notificationsPaused } from "../notifications-pause.ts";
+import { notificationsPaused } from "../notifications-pause.ts";
 import { getStore } from "../store.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
 
@@ -31,7 +31,11 @@ export async function retryChannelState(
     return { ok: false, status: 409, message: "The channel is disabled; enable it to retry" };
   }
   if (await notificationsPaused()) {
-    return { ok: false, status: 409, message: NOTIFICATIONS_PAUSED_TEXT };
+    return {
+      ok: false,
+      status: 409,
+      message: "Couldn't retry: notifications are paused. Set a public origin first.",
+    };
   }
   return { ok: true, asked: await requestChannelStateNow({ projectId: project.id, channelId }) };
 }
