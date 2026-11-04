@@ -75,9 +75,7 @@ async function reduceRendered(
   input: ShardRunInput,
   final: boolean,
 ): Promise<ShardOutcome> {
-  // A checkpoint before the build is finalized: an abandoned run must not close it or announce it.
-  input.progress?.();
-  const summary = await reduceBuild(target, final);
+  const summary = await reduceBuild(target, final, input.progress);
   if (!summary) {
     return { status: "rendered", finalized: false };
   }
@@ -91,9 +89,7 @@ async function reduceFinished(
   input: ShardRunInput,
   final: boolean,
 ): Promise<ShardOutcome> {
-  // A redelivery of a done shard does no rendering, so nothing else would notice an abandoned run.
-  input.progress?.();
-  const summary = await reduceBuild(target, final);
+  const summary = await reduceBuild(target, final, input.progress);
   if (!summary) {
     return { status: "skipped", reason: "shard already finished" };
   }
