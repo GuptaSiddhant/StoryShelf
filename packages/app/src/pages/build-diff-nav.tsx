@@ -24,9 +24,6 @@ import {
   snapshotPageUrl,
   type SnapshotGroup,
 } from "./build-diff-model.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /**
  * The list filters purely in CSS off `data-filter`, so it works before the
  * review script runs. The selected snapshot always stays visible.

@@ -2,9 +2,6 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
 import type { IconName } from "./icons/paths.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
 type StatTone = "neutral" | "success" | "warning";
 
@@ -256,7 +253,6 @@ type MetaAs = "p" | "span" | "div" | "code" | "pre";
 type MetaTone = "neutral" | "danger";
 
 /** Small status pill with a color tone. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const Badge: FC<{ tone?: BadgeTone; icon?: boolean; children?: unknown }> = ({
   tone = "neutral",
   icon = false,
@@ -315,7 +311,6 @@ function isInfoStatus(status: string): boolean {
  * leave the attribute off when the caller already owns the live region the alert sits in (two
  * nested live regions are announced twice by some screen readers).
  */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const Alert: FC<{
   tone?: BadgeTone;
   title?: string;
@@ -342,7 +337,7 @@ const alertTitle = css`
   font-weight: 650;
 `;
 
-/** Centered empty state with an optional title and call-to-action. */ // eslint-disable-next-line promise-function-async -- JSX component return type
+/** Centered empty state with an optional title and call-to-action. */
 export const EmptyState: FC<{ title?: string; description?: string; action?: unknown }> = ({
   title,
   description,
@@ -358,7 +353,6 @@ export const EmptyState: FC<{ title?: string; description?: string; action?: unk
 };
 
 /** Centered statistic value with a label and an optional value tone. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const Stat: FC<{ label: string; value: string | number; tone?: StatTone }> = ({
   label,
   value,
@@ -373,7 +367,6 @@ export const Stat: FC<{ label: string; value: string | number; tone?: StatTone }
 };
 
 /** Muted secondary text for metadata and descriptions (not a form hint). */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const Meta: FC<{
   as?: MetaAs;
   mono?: boolean;

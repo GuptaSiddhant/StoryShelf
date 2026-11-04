@@ -46,9 +46,6 @@ export interface BuildDiffData {
   /** Base domain for published Storybook deep links. */
   publishedBaseDomain?: string;
 }
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 interface DiffReviewGridProps {
   project: Project;
   build: Build;

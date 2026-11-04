@@ -1,9 +1,6 @@
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Alert, Badge } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Unstable = Pick<Snapshot, "unstable">;
 
 /** Whether a second render of this changed snapshot differed from the first (advisory only). */

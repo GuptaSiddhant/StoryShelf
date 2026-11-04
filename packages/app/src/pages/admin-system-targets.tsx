@@ -2,9 +2,6 @@ import { unavailableReason, type RunnerTarget } from "@storyshelf/core/adapter/c
 import type { HtmlEscapedString } from "hono/utils/html";
 import { targetLabel } from "../targets.ts";
 import { Badge, Card, Meta, SectionTitle, Table } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** The browsers the capture runner offers and whether each can render now (ADR 0007, decision 7). */
 export function CaptureTargetsCard(props: {
   targets: readonly RunnerTarget[];

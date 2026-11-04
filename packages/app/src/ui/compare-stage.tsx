@@ -1,9 +1,6 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Segmented } from "./segmented.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /**
  * Screenshot comparison surface. All modes share one set of images; the
  * `data-view` / `data-zoom` / `data-flip` attributes on the root (driven by

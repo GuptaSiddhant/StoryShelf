@@ -133,6 +133,12 @@
   },
   "overrides": [
     {
+      "files": ["**/*.tsx"],
+      "rules": {
+        "typescript/promise-function-async": "allow"
+      }
+    },
+    {
       "files": ["**/*.test.ts", "**/*.spec.ts", "**/mocks/**", "**/test-helpers/**"],
       "rules": {
         "typescript/no-confusing-void-expression": "allow",
@@ -181,7 +187,6 @@
         "packages/app/src/pages/settings-general.tsx",
         "packages/app/src/pages/settings-labels.tsx",
         "packages/app/src/pages/settings-members.tsx",
-        "packages/app/src/pages/settings-status.tsx",
         "packages/app/src/pages/settings-tests.tsx",
         "packages/app/src/pages/settings-tokens.tsx",
         "packages/app/src/pages/settings-webhooks.tsx",

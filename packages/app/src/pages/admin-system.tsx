@@ -25,9 +25,6 @@ import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.t
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { RetentionPausedNotice } from "./retention-paused.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Data for the site-admin System page (adapters, health, safe config). */
 export interface AdminSystemData {
   report: HealthReport;

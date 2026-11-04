@@ -11,9 +11,6 @@ import { bootScript } from "./boot-script.ts";
 import type { NavConfig } from "./nav.ts";
 import { Sidebar } from "./sidebar.tsx";
 import { ToastRegion, TopBar } from "./topbar.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Active section, project, and breadcrumb trail passed to the shell. */
 export type { NavConfig };
 

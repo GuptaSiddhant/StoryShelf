@@ -13,9 +13,6 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const buildCell = css`
   /* build-cell */
   display: grid;
