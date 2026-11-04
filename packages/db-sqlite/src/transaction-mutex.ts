@@ -8,6 +8,13 @@
  * holds, which would hang, so every mutex takes a {@link NestingGuard} (`nesting-guard.ts`) that
  * turns that into an immediate error saying to use the `tx` the callback was given, where the
  * runtime can track async context.
+ *
+ * A plain statement (an `insert`, a page's `get`) needs the same care: on the one connection it
+ * would run inside whatever transaction is open and be committed or rolled back with it. It takes
+ * a one-statement turn on the same queue, so it can never land inside a transaction, and one
+ * issued on the outer adapter from inside a callback is the same misuse as a nested `transact`.
+ * Only the built-in adapters on a single connection (`node:sqlite`, better-sqlite3, `bun:sqlite`)
+ * use this; Turso, D1, Postgres and MySQL have real transaction handles or pooled connections.
  */
 
 /** Marks the code running inside a transaction, so a nested `transact` can be told apart. */
@@ -23,6 +30,12 @@ export interface NestingGuard {
 /** Runs transaction bodies one at a time, in the order they asked. */
 export interface TransactionMutex {
   run<R>(body: () => Promise<R>): Promise<R>;
+  /**
+   * Run one plain statement (`method` names it in errors) as a turn of its own: after every
+   * transaction and statement that asked before it, never inside one. Throws at once from inside a
+   * transaction's own async context, where waiting would never end.
+   */
+  runStatement<R>(method: string, body: () => Promise<R>): Promise<R>;
 }
 
 /**
@@ -55,21 +68,33 @@ export function createTransactionMutex(
 ): TransactionMutex {
   const limit = options.waitLimitMs ?? (guard.detects ? undefined : UNGUARDED_WAIT_LIMIT_MS);
   let tail: Promise<unknown> = Promise.resolve();
+  /** Take the next place in the queue for `work`; `what` names the caller if its wait runs out. */
+  const queued = async <R>(what: string, work: () => Promise<R>): Promise<R> => {
+    const turn = new Turn(what);
+    const done = tail.then(async () => {
+      turn.begin();
+      return await work();
+    });
+    // The next turn waits for this one to end either way, never for its error.
+    tail = done.catch(() => {});
+    return await (limit === undefined
+      ? done
+      : turn.within(done, limit, options.schedule ?? globalSchedule));
+  };
   return {
     run: async <R>(body: () => Promise<R>): Promise<R> => {
       if (guard.inside()) {
         throw new Error("transact was called inside a transaction of the same database; use `tx`");
       }
-      const turn = new Turn();
-      const done = tail.then(async () => {
-        turn.begin();
-        return await guard.enter(body);
-      });
-      // The next transaction waits for this one to end either way, never for its error.
-      tail = done.catch(() => {});
-      return await (limit === undefined
-        ? done
-        : turn.within(done, limit, options.schedule ?? globalSchedule));
+      return await queued("transaction", async () => await guard.enter(body));
+    },
+    runStatement: async <R>(method: string, body: () => Promise<R>): Promise<R> => {
+      if (guard.inside()) {
+        throw new Error(
+          `a plain ${method} was called on the database inside its own transaction; use \`tx\``,
+        );
+      }
+      return await queued(`plain ${method}`, body);
     },
   };
 }
@@ -78,11 +103,16 @@ export function createTransactionMutex(
 class Turn {
   #started = false;
   #abandoned = false;
+  readonly #what: string;
+
+  constructor(what: string) {
+    this.#what = what;
+  }
 
   /** The turn came: stop if the caller already gave up (the wait limit passed), else go on. */
   begin(): void {
     if (this.#abandoned) {
-      throw new Error("transaction gave up waiting for its turn");
+      throw new Error(`${this.#what} gave up waiting for its turn`);
     }
     this.#started = true;
   }
@@ -100,7 +130,7 @@ class Turn {
         this.#abandoned = true;
         reject(
           new Error(
-            `transaction waited ${String(limitMs)} ms for the previous one to end; a transaction may have opened another on the same database, use \`tx\` instead`,
+            `${this.#what} waited ${String(limitMs)} ms for the previous one to end; a transaction may have opened another on the same database, use \`tx\` instead`,
           ),
         );
       }, limitMs);
