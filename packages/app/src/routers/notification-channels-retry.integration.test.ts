@@ -202,7 +202,8 @@ describe("retry a git channel's current state", () => {
       body: "",
     });
     lookup.mockRestore();
-    expect(res.status).toBe(503);
+    // 409, not 503: the shell only swaps 400/409/422 into the page, so the message is shown.
+    expect(res.status).toBe(409);
     expect(await res.text()).toContain("Couldn&#39;t look up open builds, try again");
   });
 
