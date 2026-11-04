@@ -30,6 +30,8 @@ export const builds = sqliteTable(
     changedFiles: text("changed_files"),
     affectedImportPaths: text("affected_import_paths"),
     testResults: text("test_results"),
+    reviewCycle: integer("review_cycle").notNull().default(0),
+    reviewRequestedCycle: integer("review_requested_cycle"),
     captureJobId: text("capture_job_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -63,6 +65,8 @@ export interface Build {
   changedFiles: string | null;
   affectedImportPaths: string | null;
   testResults: string | null;
+  reviewCycle: number;
+  reviewRequestedCycle: number | null;
   captureJobId: string | null;
   createdAt: string;
   updatedAt: string;

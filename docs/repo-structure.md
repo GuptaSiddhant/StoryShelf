@@ -76,7 +76,10 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   document in a frame. It is a dev dependency only: `files` and `exports` are unchanged, nothing
   story-related is published, and `turbo verify` builds it (`build-storybook`).
 - UI primitives live in `ui/` by family (`buttons`, `feedback`, `forms`, `layout`)
-  behind the `ui/components.tsx` facade — import from the facade.
+  behind the `ui/components.tsx` facade — import from the facade. `ui/` is presentational (no
+  store, routers, middleware, pages or core models; `consistency.test.ts` enforces it). The
+  app-coupled chrome lives in `shell/`: `DocumentLayout`, `csrfField`, the sidebar and top bar,
+  and the boot and client scripts.
 
 ## Test placement
 

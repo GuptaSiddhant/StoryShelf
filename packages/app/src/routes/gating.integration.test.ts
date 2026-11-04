@@ -177,15 +177,15 @@ describe("review gate", () => {
     const app = await bootProjects();
     const off = await refusedBy(app, "off");
     expect(off.passed, "review routes the gate let through").toEqual([]);
-    // Comments (3), verdicts (2), changeset (1) and the three page forms.
-    expect(off.refused).toHaveLength(9);
+    // Comments (4: list, create, resolve, reopen), verdicts (2), changeset (1) and the four page forms.
+    expect(off.refused).toHaveLength(11);
   });
 
   it("lets every review route through for a project with review on", async () => {
     const app = await bootProjects();
     const on = await refusedBy(app, "on");
     expect(on.refused).toEqual([]);
-    expect(on.passed).toHaveLength(9);
+    expect(on.passed).toHaveLength(11);
   });
 
   it("leaves routes of the other classes alone when review is off", async () => {

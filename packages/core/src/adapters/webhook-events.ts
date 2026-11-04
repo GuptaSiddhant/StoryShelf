@@ -2,6 +2,7 @@ import type { Logger } from "pino";
 import { WebhookModel, type WebhookTables } from "../models/webhook.ts";
 import type { Webhook } from "../schema/webhook.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
+import { matchesEvent } from "../utils/event-match.ts";
 import { hmacSha256 } from "../utils/hash.ts";
 import { httpStatus } from "../utils/http.ts";
 import type { DatabaseAdapter } from "./database.ts";
@@ -37,8 +38,7 @@ export async function emitWebhookEvent(
 
   await Promise.allSettled(
     webhooks.map(async (webhook) => {
-      const events = WebhookModel.eventsOf(webhook);
-      if (events.length > 0 && !events.includes(event)) {
+      if (!matchesEvent(WebhookModel.eventsOf(webhook), event, data)) {
         return;
       }
       await deliverToWebhook(webhookModel, webhook, eventPayload, logger);

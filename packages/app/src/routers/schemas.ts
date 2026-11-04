@@ -4,6 +4,7 @@ import { WebhookModel } from "@storyshelf/core/models";
 import {
   BUILD_STATUSES,
   PROJECT_ROLES,
+  COMMENT_KINDS,
   REVIEW_VERDICTS,
   SNAPSHOT_STATUSES,
 } from "@storyshelf/core/types";
@@ -239,6 +240,10 @@ export const commentSchema = z
     body: z.string(),
     parentId: z.string().nullable(),
     resolved: z.boolean(),
+    /** `change_request` asks the build's author to address the comment; resolve it when done. */
+    kind: z.enum(COMMENT_KINDS),
+    resolvedAt: z.string().nullable(),
+    resolvedBy: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -253,6 +258,8 @@ export const commentCreateSchema = z
     /** Anchor to a story of the build; not together with `snapshotId`. */
     storyId: z.string().min(1).optional(),
     parentId: z.string().optional(),
+    /** `change_request` marks it as one the author is asked to address (default `comment`). */
+    kind: z.enum(COMMENT_KINDS).optional(),
   })
   .openapi("CommentCreateInput");
 

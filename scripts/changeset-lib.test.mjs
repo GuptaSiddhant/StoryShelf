@@ -350,10 +350,11 @@ const releaseManifest = (version, extra = {}) =>
   JSON.stringify({ name: "@storyshelf/core", version, ...extra }, null, 2);
 
 /** `releaseProblems` for release 0.9.0 whose manifests went from 0.8.0 to 0.9.0 unless `files` says otherwise. */
-const runRelease = (entries, files = {}) =>
+const runRelease = (entries, files = {}, published = []) =>
   releaseProblems({
     version: "0.9.0",
     entries,
+    published,
     readBase: (path) => files[`base:${path}`] ?? releaseManifest("0.8.0"),
     readHead: (path) => files[`head:${path}`] ?? releaseManifest("0.9.0"),
   });
@@ -418,5 +419,46 @@ describe("releaseProblems, a branch that is not only a release", () => {
       }),
       ["packages/core/package.json cannot be read on both sides"],
     );
+  });
+});
+
+describe("releaseProblems, every published manifest", () => {
+  const changed = [{ status: "M", path: "packages/core/package.json" }];
+
+  it("passes when the manifests the release did not touch are already at the version", () => {
+    assert.deepEqual(runRelease(changed, {}, ["packages/core/package.json", "packages/app/package.json"]), []);
+  });
+
+  it("fails a published package left at the old version, naming it", () => {
+    assert.deepEqual(
+      runRelease(changed, { "head:packages/app/package.json": releaseManifest("0.8.0") }, [
+        "packages/core/package.json",
+        "packages/app/package.json",
+      ]),
+      ["packages/app/package.json is still at 0.8.0, not 0.9.0"],
+    );
+  });
+
+  it("fails an untouched manifest it cannot read", () => {
+    assert.deepEqual(
+      runRelease(changed, { "head:packages/app/package.json": "{" }, ["packages/app/package.json"]),
+      ["packages/app/package.json cannot be read"],
+    );
+  });
+});
+
+describe("malformedChangesets, unknown packages", () => {
+  const file = ".changeset/typo.md";
+  const read = (name) => () => `---\n"${name}": patch\n---\n\nFixed a thing.\n`;
+
+  it("fails a package that is not published here, with the file and the name", () => {
+    const problems = malformedChangesets([file], read("@storyshelf/nope"), ["@storyshelf/core"]);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /\.changeset\/typo\.md: unknown package "@storyshelf\/nope"/u);
+  });
+
+  it("passes a known package, and does not check names without a list", () => {
+    assert.deepEqual(malformedChangesets([file], read("@storyshelf/core"), ["@storyshelf/core"]), []);
+    assert.deepEqual(malformedChangesets([file], read("@storyshelf/nope")), []);
   });
 });

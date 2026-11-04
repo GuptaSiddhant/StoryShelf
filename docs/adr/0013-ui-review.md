@@ -87,10 +87,29 @@ branch does not carry a verdict over.
   the project's approvers and admins through the notification channels and their per-user
   subscriptions (ADR 0014). Unlike other topics, which are opt-in, this one is on by default for
   those roles and can be turned off per user.
+- **One request per review cycle.** A build has a review cycle, `builds.review_cycle`, that starts
+  at 0 and is incremented, in the same write that sets the status, when a build goes back to
+  `pending` from `approved` or `rejected`. Before a request is sent it is claimed with one
+  conditional write that sets `builds.review_requested_cycle` to the cycle, only while the build is
+  `pending` and the cycle was not yet requested; only the caller whose write took effect sends
+  it. A repeated publish completion, a retried hook or a second instance therefore sends nothing,
+  and a reopened build sends one request for its new cycle. The event id is `<buildId>:<cycle>`
+  (`data.eventId`), so its deliveries keep one identity. Testing sign-offs and builds that capture
+  owns never reach the request. Delivery is at-most-once: the claim comes first,
+  and the notification and webhook fan-outs are best-effort and non-fatal like every other
+  notification, so a failed delivery after the claim is not retried for that cycle.
 - **Who may comment.** `developer`, `approver` and `admin` write build, story and snapshot comments;
   `viewer` reads only.
 - **Unresolved comments do not block.** A verdict is allowed with open threads. Resolving is a
-  courtesy to the next reader, not a gate, and nothing counts unresolved comments.
+  courtesy to the next reader, not a gate.
+- **Change requests.** A comment can be marked a change request (`comments.kind`, `comment` or
+  `change_request`; `resolved_at` and `resolved_by` record who resolved it and when). Developers,
+  approvers and admins, and the build's author (the signed-in user whose email is the build's git
+  author), resolve and reopen it; a viewer who is not the author cannot. The build page shows the
+  open count beside the verdict and a checklist linking to each anchor (build, story or snapshot),
+  and Approve asks for confirmation while some are open. In this slice open change requests are
+  **non-gating**: they change no status and no git state, and resolving emits no event.
+  `comment:created` carries the `kind`.
 - **A new build needs a new approval.** Approving build N says nothing about build N+1 on the same
   branch. The build under review is the latest one on the branch; earlier pending builds fall away
   under decision 9.
@@ -157,15 +176,21 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
 
 ### 10. Routes, API, MCP and events
 
-- **Route class.** The `review` route class holds comments (list, create, resolve), build verdicts
+- **Route class.** The `review` route class holds comments (list, create, resolve, reopen), build verdicts
   (create, list), the changeset, the review section of the build page and the project review
   settings. It is gated by the project's switch, so the gate is evaluated per request. The route
   completeness test enumerates these routes, and a second test asserts they answer 404 when the
   project has review off.
 - **MCP.** The MCP server (ADR 0017 MCP Server) stays read plus comment. Comments are `review` routes;
   the verdict is not exposed, because an agent must not be able to sign off a build.
-- **Webhooks and notifications.** Events `review:comment` and `review:verdict` are delivered through
-  the existing webhook and notifier paths (ADR 0014); there is no new transport.
+- **Webhooks and notifications.** Events `comment:created` and `review:verdict` are delivered through
+  the existing webhook and notifier paths (ADR 0014); there is no new transport. Every comment raises
+  exactly one `comment:created`, whose payload names its `scope` (`build`, `story` or `snapshot`) and
+  carries `eventId`, the comment id, so a retried delivery repeats the same id and a receiver can
+  de-duplicate. `review:comment` is a filter alias, never emitted: a webhook, notification channel or
+  subscription listing it receives a `comment:created` of scope `build` or `story`, and one listing
+  both names receives it once. One predicate (`matchesEvent` in core) applies the rule to every
+  filter, so the alias has a single definition.
 - **Auth.** Review never widens who can view a project (ADR 0011 Authentication and Access).
 
 ## Consequences
@@ -200,6 +225,9 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
 
 ## Open questions
 
+- Whether open change requests should gate approval, as a per-project setting. Deliberately not
+  built: it would be an owner-decided project switch beside `review_approvals`, and until it exists
+  an open change request is advice only.
 - How comments on a story survive when the story is renamed or removed between builds. (Today a
   story comment stays with the build it was written on; nothing follows a renamed story.)
 

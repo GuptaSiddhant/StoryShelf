@@ -1,4 +1,4 @@
-import type { IconName } from "../icons/paths.ts";
+import type { IconName } from "../ui/icons/paths.ts";
 
 /** Which nav entry is active and which project (if any) the page belongs to. */
 export interface NavConfig {

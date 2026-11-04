@@ -91,6 +91,8 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "affected_import_paths", definition: "TEXT" },
   { table: "builds", column: "inherited_count", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "test_results", definition: "TEXT" },
+  { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
+  { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
@@ -100,6 +102,9 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'manual'",
   },
   { table: "comments", column: "story_id", definition: "TEXT" },
+  { table: "comments", column: "kind", definition: "VARCHAR(32) NOT NULL DEFAULT 'comment'" },
+  { table: "comments", column: "resolved_at", definition: "DATETIME(3) NULL" },
+  { table: "comments", column: "resolved_by", definition: "VARCHAR(64) NULL" },
   // Auth columns the SQLite `users` table always had (access control: `disabled`).
   { table: "users", column: "password_hash", definition: "TEXT" },
   { table: "users", column: "display_name_override", definition: "TEXT" },
