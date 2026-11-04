@@ -117,7 +117,7 @@ export function buildReferenceContractSuite(
             ],
             marker.write,
           ),
-        ).rejects.toThrow();
+        ).rejects.toBeInstanceOf(ReferenceGenerationConflict);
         expect(await marker.count()).toBe(1);
         expect(await second.referenceGeneration(owner)).toBe(1);
         expect(await second.referenceGeneration(other)).toBe(1);
@@ -394,6 +394,9 @@ export function buildReferenceContractSuite(
         expect(await first.claimDeletion(owner.projectId, won[0]?.value.result as string)).toBe(
           "protected",
         );
+        // The rejected contender left no reference behind.
+        const lostBuild = attempts[0]?.status === "rejected" ? buildIds[0] : buildIds[1];
+        expect(await first.claimDeletion(owner.projectId, lostBuild)).toBe("claimed");
       });
     });
     it("protects referenced builds once however often they are named, and keeps a tombstone irreversible", async () => {
@@ -411,7 +414,7 @@ export function buildReferenceContractSuite(
       });
     });
     it("changes no owner when one owner of a multi-owner admission fails", async () => {
-      await withFixture(async ({ first, owner, buildIds }) => {
+      await withFixture(async ({ first, owner, buildIds, marker }) => {
         const other = { ...owner, id: `${owner.id}-other` };
         await first.replaceManyFencedReferences(
           [
@@ -426,9 +429,10 @@ export function buildReferenceContractSuite(
               { owner, expectedGeneration: 1, buildIds: [] },
               { owner: other, expectedGeneration: 1, buildIds: ["no-such-build"] },
             ],
-            async () => null,
+            marker.write,
           ),
         ).rejects.toThrow();
+        expect(await marker.count()).toBe(0);
         expect(await first.referenceGeneration(owner)).toBe(1);
         expect(await first.referenceGeneration(other)).toBe(1);
         expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("protected");
