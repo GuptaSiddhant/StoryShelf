@@ -1,7 +1,8 @@
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
-import { makeDatabase } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { storybookDir } from "@storyshelf/core/utils";
 import { describe, expect, it, vi } from "vitest";
 import { runBootTasks } from "./boot-tasks.ts";
 import type { LifecycleCell } from "./lifecycle.ts";
@@ -145,5 +146,50 @@ describe("runBootTasks: git state replay", () => {
       (await replay({ origin: "https://x.example", notifiers: [] })).request,
     ).not.toHaveBeenCalled();
     expect((await replay({ origin: "https://x.example" }, false)).request).not.toHaveBeenCalled();
+  });
+});
+
+describe("runBootTasks: content uses backfill", () => {
+  const HASH = "d".repeat(64);
+
+  async function bootWith(ready: { ok: boolean }, withLifecycle: boolean) {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    const record = vi.fn(async () => await Promise.resolve([] as string[]));
+    if (withLifecycle)
+      Object.assign(db, { buildReferenceLifecycle: { recordContentUses: record } });
+    await db.insert(db.tables.builds, {
+      id: "b1",
+      projectId: "p1",
+      gitSha: "s",
+      gitBranch: "main",
+      status: "approved",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    objects.set(`${storybookDir("p1", "b1")}/manifest.json`, Buffer.from(`{"a.js":"${HASH}"}`));
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ...ready, failures: [] }),
+      settled: null,
+    };
+    const runtime = {
+      config: {},
+      logger,
+      notifiers: [],
+      publicOrigin: { url: async () => await Promise.resolve("") },
+    } as unknown as ServerRuntime;
+    runBootTasks(cell, { database: db, storage } as unknown as ShelfOptions, runtime);
+    await Promise.all(cell.background ?? []);
+    return record;
+  }
+
+  it("records the uses of existing builds once adapters are ready and the capability exists", async () => {
+    const record = await bootWith({ ok: true }, true);
+    expect(record).toHaveBeenCalledWith("p1", "b1", [HASH]);
+  });
+
+  it("does nothing without the capability or after a failed setup", async () => {
+    expect(await bootWith({ ok: true }, false)).not.toHaveBeenCalled();
+    expect(await bootWith({ ok: false }, true)).not.toHaveBeenCalled();
   });
 });
