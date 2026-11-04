@@ -1,6 +1,7 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detectGitDefaultBranch,
@@ -22,6 +23,8 @@ function writeMain(): void {
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "storyshelf-cli-config-"));
   vi.stubEnv("npm_config_user_agent", "");
+  // Keep git from finding a checkout above the temp directory (e.g. a tmpdir inside a worktree).
+  vi.stubEnv("GIT_CEILING_DIRECTORIES", dirname(dir));
 });
 
 afterEach(() => {
@@ -36,6 +39,16 @@ describe("detectPackageName", () => {
   });
 
   it("returns null without a package.json", async () => {
+    await expect(detectPackageName(dir)).resolves.toBeNull();
+  });
+
+  it("returns null for invalid JSON", async () => {
+    writeFileSync(join(dir, "package.json"), "{ nope");
+    await expect(detectPackageName(dir)).resolves.toBeNull();
+  });
+
+  it.each([[{ name: 42 }], [{ name: "" }], [{}]])("returns null for %j", async (pkg) => {
+    writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
     await expect(detectPackageName(dir)).resolves.toBeNull();
   });
 });
@@ -66,5 +79,17 @@ describe("detectGitRepository", () => {
 describe("detectGitDefaultBranch", () => {
   it("returns null outside a git checkout", () => {
     expect(detectGitDefaultBranch(dir)).toBeNull();
+  });
+
+  it("falls back to the current branch when origin/HEAD is not set", () => {
+    const git = (...args: string[]): void => {
+      execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", ...args], {
+        cwd: dir,
+        stdio: "ignore",
+      });
+    };
+    git("init", "-q", "-b", "trunk");
+    git("commit", "-q", "--allow-empty", "-m", "init");
+    expect(detectGitDefaultBranch(dir)).toBe("trunk");
   });
 });

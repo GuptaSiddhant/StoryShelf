@@ -65,6 +65,17 @@ describe("detectPackageRunner", () => {
     await expect(detectPackageRunner(dir)).resolves.toBe("pnpm");
   });
 
+  it("falls back to the lockfile when package.json is malformed", async () => {
+    writeFileSync(join(dir, "package.json"), "{ not json");
+    writeFileSync(join(dir, "yarn.lock"), "");
+    await expect(detectPackageRunner(dir)).resolves.toBe("yarn");
+  });
+
+  it("falls back to npm when package.json holds JSON null", async () => {
+    writeFileSync(join(dir, "package.json"), "null");
+    await expect(detectPackageRunner(dir)).resolves.toBe("npm");
+  });
+
   it.each([
     ["nub.lock", "nub"],
     ["bun.lockb", "bun"],
