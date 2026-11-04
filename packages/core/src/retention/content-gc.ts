@@ -14,6 +14,9 @@ import { manifestHashes } from "./build-deletion.ts";
 /** How long a blob must stand without a use before it is collected. */
 export const CONTENT_GRACE_MS = 7 * 86_400_000;
 
+/** How long a claim belongs to its collector; an older one is a crashed pass's and is resumed. */
+export const CLAIM_LEASE_MS = 30 * 60_000;
+
 /** What the collector needs. */
 export interface ContentGcDeps {
   db: DatabaseAdapter;
@@ -25,8 +28,12 @@ export interface ContentGcDeps {
 
 /** Collect unused content; resolves to how many blobs were removed. */
 export async function collectUnreferencedContent(deps: ContentGcDeps): Promise<number> {
-  const cutoff = new Date((deps.now?.() ?? Date.now()) - CONTENT_GRACE_MS).toISOString();
-  const claimed = await deps.lifecycle.claimContent(cutoff);
+  const now = deps.now?.() ?? Date.now();
+  const before = (ms: number): string => new Date(now - ms).toISOString();
+  const claimed = await deps.lifecycle.claimContent(
+    before(CONTENT_GRACE_MS),
+    before(CLAIM_LEASE_MS),
+  );
   if (claimed.length === 0) return 0;
   const free = new Set(claimed);
   await dropLiveHashes(deps, free);

@@ -67,8 +67,9 @@ by preset, so it cannot by itself carry this guarantee.
   nothing to backfill: a blob without a use row is protected by the manifest guard until its builds
   go. A build's release marks all its rows released (kept for the grace period). A collector
   **claims** a blob in the capability's domain (`claimContent`: every use released, the grace
-  passed, no live manifest names it): a claim is durable, so a crashed pass resumes it, and a
-  claimed hash refuses new uses, so a use racing the delete ends in exactly one outcome: the claim
+  passed, no live manifest names it): a claim is durable and leased (30 minutes): it stays with its
+  collector, so two collectors never delete one blob, and a later pass resumes one the lease has
+  outlived. A claimed hash refuses new uses, so a use racing the delete ends in exactly one outcome: the claim
   fails because the use landed, or the use is refused and its caller stores the content again and
   retries. A live manifest found after the claim gives the claim back. A wrong use record can leak
   storage but never delete served content. Without the capability nothing is recorded or collected.

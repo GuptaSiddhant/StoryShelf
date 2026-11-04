@@ -230,18 +230,18 @@ export function buildReferenceContractSuite(
         expect(await second.recordContentUses(project, buildIds[0], [hash])).toEqual([]);
         expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([]);
         // Two builds use it: nothing is idle, however late the cutoff.
-        expect(await first.claimContent(LATER)).toEqual([]);
+        expect(await first.claimContent(LATER, EARLIER)).toEqual([]);
 
         await first.claimDeletion(project, buildIds[0]);
         expect(await first.releaseBuildContent(project, buildIds[0], [hash])).toBe("done");
         expect(await second.releaseBuildContent(project, buildIds[0], [hash])).toBe("already-done");
         // Build two still uses it.
-        expect(await first.claimContent(LATER)).toEqual([]);
+        expect(await first.claimContent(LATER, EARLIER)).toEqual([]);
 
         await first.claimDeletion(project, buildIds[1]);
         await first.releaseBuildContent(project, buildIds[1], [hash]);
-        expect(await first.claimContent(EARLIER)).toEqual([]);
-        expect(await first.claimContent(LATER)).toEqual([hash]);
+        expect(await first.claimContent(EARLIER, EARLIER)).toEqual([]);
+        expect(await first.claimContent(LATER, EARLIER)).toEqual([hash]);
       });
     });
     it("ends a use racing a collection in exactly one outcome", async () => {
@@ -253,7 +253,7 @@ export function buildReferenceContractSuite(
         await first.releaseBuildContent(project, buildIds[0], [hash]);
 
         const [claimed, refused] = await Promise.all([
-          first.claimContent(LATER),
+          first.claimContent(LATER, EARLIER),
           second.recordContentUses(project, buildIds[1], [hash]),
         ]);
 
@@ -266,7 +266,7 @@ export function buildReferenceContractSuite(
         } else {
           // The use won: the blob has an unreleased use and is not claimed.
           expect(refused).toEqual([]);
-          expect(await first.claimContent(LATER)).toEqual([]);
+          expect(await first.claimContent(LATER, EARLIER)).toEqual([]);
         }
       });
     });
@@ -278,13 +278,15 @@ export function buildReferenceContractSuite(
         await first.claimDeletion(project, buildIds[0]);
         await first.releaseBuildContent(project, buildIds[0], [hash]);
 
-        expect(await first.claimContent(LATER)).toEqual([hash]);
-        // The claimer "crashed": another connection resumes it.
-        expect(await second.claimContent(EARLIER)).toEqual([hash]);
+        expect(await first.claimContent(LATER, EARLIER)).toEqual([hash]);
+        // A live claim stays with its claimer; once stale (the claimer "crashed"), another
+        // connection resumes it.
+        expect(await second.claimContent(LATER, EARLIER)).toEqual([]);
+        expect(await second.claimContent(LATER, LATER)).toEqual([hash]);
         await second.abandonContentClaim(hash);
         expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([]);
         // Used again, so it is no longer idle.
-        expect(await first.claimContent(LATER)).toEqual([]);
+        expect(await first.claimContent(LATER, EARLIER)).toEqual([]);
       });
     });
     it("rejects a duplicate owner in a multi-owner update", async () => {

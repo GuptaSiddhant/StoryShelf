@@ -224,10 +224,12 @@ export interface BuildReferenceLifecycle {
   ): Promise<string[]>;
   /**
    * Claim for deletion every hash whose uses are all released, the latest release older than
-   * `idleBefore` (an ISO instant), and no collector holds yet; returns those hashes plus the ones
-   * an earlier, unfinished pass claimed, so a crash resumes. A claimed hash admits no new use.
+   * `idleBefore` (an ISO instant), and no collector holds yet. Also returns, to resume, the hashes
+   * whose claim is older than `staleBefore` (a crashed collector's), and stamps them as claimed
+   * again. A fresh claim is returned to its claimer only, so two collectors never delete one blob.
+   * A claimed hash admits no new use.
    */
-  claimContent(idleBefore: string): Promise<string[]>;
+  claimContent(idleBefore: string, staleBefore: string): Promise<string[]>;
   /** Give a claim back (a live build still serves the blob); its uses stay released. */
   abandonContentClaim(hash: string): Promise<void>;
   /** The blob of a claimed hash is deleted: drop its `content_uses` rows. */

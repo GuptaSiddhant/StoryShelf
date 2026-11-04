@@ -28,10 +28,22 @@ export async function recordContentUses(
   });
 }
 
-/** Claim every idle hash (see the capability) and return it with the hashes still claimed. */
-export async function claimContent(path: string, idleBefore: string): Promise<string[]> {
+/**
+ * Claim every idle hash (see the capability) and return it with the hashes whose earlier claim is
+ * stale, which are stamped again so a second collector does not resume them too.
+ */
+export async function claimContent(
+  path: string,
+  idleBefore: string,
+  staleBefore: string,
+): Promise<string[]> {
   return await inTransaction(path, async (db) => {
     const now = new Date().toISOString();
+    const stale = db
+      .prepare(
+        "SELECT DISTINCT content_hash FROM content_uses WHERE collecting_at IS NOT NULL AND collecting_at < ?",
+      )
+      .all(staleBefore) as unknown as [string][];
     const idle = db
       .prepare(
         `SELECT content_hash FROM content_uses GROUP BY content_hash
@@ -41,11 +53,9 @@ export async function claimContent(path: string, idleBefore: string): Promise<st
       )
       .all(idleBefore) as unknown as [string][];
     const claim = db.prepare("UPDATE content_uses SET collecting_at = ? WHERE content_hash = ?");
-    for (const [hash] of idle) claim.run(now, hash);
-    const claimed = db
-      .prepare("SELECT DISTINCT content_hash FROM content_uses WHERE collecting_at IS NOT NULL")
-      .all() as unknown as [string][];
-    return await Promise.resolve(claimed.map(([hash]) => hash));
+    const hashes = [...stale, ...idle].map(([hash]) => hash);
+    for (const hash of hashes) claim.run(now, hash);
+    return await Promise.resolve(hashes);
   });
 }
 

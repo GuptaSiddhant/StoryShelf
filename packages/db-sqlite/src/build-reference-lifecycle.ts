@@ -47,7 +47,8 @@ export function createBuildReferenceLifecycle(
       await completeDeletion(path, projectId, buildId, removeRows),
     recordContentUses: async (projectId, buildId, hashes) =>
       await recordContentUses(path, projectId, buildId, hashes),
-    claimContent: async (idleBefore) => await claimContent(path, idleBefore),
+    claimContent: async (idleBefore, staleBefore) =>
+      await claimContent(path, idleBefore, staleBefore),
     abandonContentClaim: async (hash) => {
       await abandonContentClaim(path, hash);
     },

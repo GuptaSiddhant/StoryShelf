@@ -237,8 +237,9 @@ describe("resumable build deletion on SQLite", () => {
       ]);
 
       fixture.storage.delete = remove;
-      // Resumed even though the grace clock of this pass would not select it again.
-      expect(await collectUnreferencedContent(deps(fixture))).toBe(1);
+      // The claim is fresh, so it stays with its pass; once stale, a later pass resumes it.
+      expect(await collectUnreferencedContent(deps(fixture))).toBe(0);
+      expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(1);
       expect(fixture.uses(ONLY_ONE).rows).toBe(0);
     });
   });
@@ -380,9 +381,10 @@ describe("content uses", () => {
     await withFixture(async (fixture) => {
       await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
       const idleBefore = new Date(afterGrace()).toISOString();
+      const stillLive = "2000-01-01T00:00:00.000Z";
 
       // The collector wins: the use is refused, nothing is written, and the content comes back.
-      expect(await fixture.lifecycle.claimContent(idleBefore)).toEqual([ONLY_ONE]);
+      expect(await fixture.lifecycle.claimContent(idleBefore, stillLive)).toEqual([ONLY_ONE]);
       expect(
         await fixture.lifecycle.recordContentUses("p", "two", [ONLY_ONE, hashOf("x")]),
       ).toEqual([ONLY_ONE]);
@@ -391,25 +393,29 @@ describe("content uses", () => {
       expect(await fixture.lifecycle.recordContentUses("p", "two", [ONLY_ONE])).toEqual([]);
 
       // The use wins: a blob with an unreleased use is not claimed.
-      expect(await fixture.lifecycle.claimContent(idleBefore)).toEqual([]);
+      expect(await fixture.lifecycle.claimContent(idleBefore, stillLive)).toEqual([]);
     });
   });
 
-  it("claims through independent connections once, and resumes an unfinished claim", async () => {
+  it("hands a blob to one collector only, and resumes a claim once it is stale", async () => {
     await withFixture(async (fixture) => {
       await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
       const idleBefore = new Date(afterGrace()).toISOString();
+      const live = "2000-01-01T00:00:00.000Z";
+      const stale = "9999-12-31T00:00:00.000Z";
       const other = createBuildReferenceLifecycle(fixture.path);
 
       const results = await Promise.all([
-        fixture.lifecycle.claimContent(idleBefore),
-        other.claimContent(idleBefore),
+        fixture.lifecycle.claimContent(idleBefore, live),
+        other.claimContent(idleBefore, live),
       ]);
 
-      // Both see the claim (one made it, the other resumes it); the blob is collected once.
-      expect(results).toEqual([[ONLY_ONE], [ONLY_ONE]]);
+      // Exactly one collector got it; the other must not touch a blob its peer is deleting.
+      expect(results.flat()).toEqual([ONLY_ONE]);
+      // The claimer "crashed": a later pass resumes the stale claim, once.
+      expect(await other.claimContent(idleBefore, stale)).toEqual([ONLY_ONE]);
       await fixture.lifecycle.finishContentCollection(ONLY_ONE);
-      expect(await other.claimContent(idleBefore)).toEqual([]);
+      expect(await other.claimContent(idleBefore, stale)).toEqual([]);
     });
   });
 });
