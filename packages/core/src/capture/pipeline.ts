@@ -3,6 +3,7 @@ import { DEFAULT_BROWSER, type RenderedSnapshot } from "../adapters/capture-runn
 import { ReferenceGenerationConflict, type DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BaselineWriteConflict } from "../models/baseline-conflict.ts";
+import { BaselinePromotionRefused } from "../models/baseline-promotion-refused.ts";
 import { NO_BASELINE } from "../models/baseline-status.ts";
 import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
@@ -439,17 +440,13 @@ async function createWithoutBaseline(
   await snapshots.setStatus(snapshot.id, status);
 
   if (accepted) {
-    const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
-    await baselines.upsert(
-      ctx.project.id,
-      capture.story.id,
-      capture.viewportName,
-      ctx.build.gitBranch,
-      snapshot.id,
+    await promoteBaseline(ctx, {
+      snapshotId: snapshot.id,
+      capture,
       screenshot,
-      now.infraHash,
-      { mode: modeJsonOf(viewport), browser, fingerprint: now.json },
-    );
+      now,
+      options: { mode: modeJsonOf(viewport), browser },
+    });
   }
 }
 
@@ -671,17 +668,55 @@ async function upsertDefaultBaseline(
   screenshot: string,
   now: CaptureFingerprint,
 ): Promise<void> {
-  const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
-  await baselines.upsert(
-    ctx.project.id,
-    capture.story.id,
-    capture.viewportName,
-    ctx.build.gitBranch,
+  await promoteBaseline(ctx, {
     snapshotId,
+    capture,
     screenshot,
-    now.infraHash,
-    { mode: modeJsonOf(capture.viewport), browser: browserOf(capture), fingerprint: now.json },
-  );
+    now,
+    options: { mode: modeJsonOf(capture.viewport), browser: browserOf(capture) },
+  });
+}
+
+/**
+ * Make the captured screenshot the baseline, fenced on the build: a build that was cancelled (or
+ * retried, so this run is stale) while the story was in flight moves no baseline. The snapshot row
+ * already written stays as partial diagnostic data.
+ */
+async function promoteBaseline(
+  ctx: CaptureContext,
+  what: {
+    snapshotId: string;
+    capture: RenderedSnapshot;
+    screenshot: string;
+    now: CaptureFingerprint;
+    options: { mode: string | null; browser: string };
+  },
+): Promise<void> {
+  const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
+  try {
+    await baselines.upsert(
+      ctx.project.id,
+      what.capture.story.id,
+      what.capture.viewportName,
+      ctx.build.gitBranch,
+      what.snapshotId,
+      what.screenshot,
+      what.now.infraHash,
+      {
+        ...what.options,
+        fingerprint: what.now.json,
+        capturingBuild: { id: ctx.build.id, generation: ctx.build.captureGeneration },
+      },
+    );
+  } catch (error) {
+    if (!(error instanceof BaselinePromotionRefused)) {
+      throw error;
+    }
+    ctx.logger?.info(
+      { buildId: ctx.build.id, storyId: what.capture.story.id, reason: error.message },
+      "baseline not promoted: the build was cancelled or retried",
+    );
+  }
 }
 
 /** Snapshot status after diffing: default-branch changes are auto-approved, not queued for review. */
@@ -752,7 +787,16 @@ export async function finalizeBuild(
       },
     );
   }
-  await builds.setStatus(ctx.build.id, status);
+  const written = await builds.setStatus(ctx.build.id, status);
+  if (written.status === "cancelled") {
+    // A cancel landed after the check above: the status write was refused, so the run neither
+    // finishes the build nor drops baselines of the stories a cancelled (partial) run did not reach.
+    ctx.logger?.info(
+      { buildId: ctx.build.id },
+      "build was cancelled during finalize; orphans kept",
+    );
+    return;
+  }
 
   if (ctx.build.isDefault && hasCaptures) {
     const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);

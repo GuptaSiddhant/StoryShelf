@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createUrlBuilder, safeImageUrl } from "./urls.ts";
+import { createUrlBuilder, hasDotSegment, safeImageUrl } from "./urls.ts";
 
 describe("safeImageUrl", () => {
   it("allows https and app-relative paths", () => {
@@ -154,5 +154,57 @@ describe("design coverage url", () => {
       "https://shelf.example.com/projects/app/design/coverage",
     );
     expect(createUrlBuilder("").designCoverage("app")).toBe("/projects/app/design/coverage");
+  });
+});
+
+describe("dot segments", () => {
+  const urls = createUrlBuilder("https://shelf.example.com");
+
+  it("keeps the path form for every value without a dot segment", () => {
+    expect(urls.component("app", "src/a.b/Button.stories.tsx")).toBe(
+      "https://shelf.example.com/projects/app/components/src/a.b/Button.stories.tsx",
+    );
+    expect(urls.component("app", "./Button.stories.tsx")).toBe(
+      "https://shelf.example.com/projects/app/components/Button.stories.tsx",
+    );
+    expect(urls.label("app", "release", "v1.0")).toBe(
+      "https://shelf.example.com/projects/app/labels/release/v1.0",
+    );
+    expect(urls.label("app", "branch", "feat/..x")).toBe(
+      "https://shelf.example.com/projects/app/labels/branch/feat/..x",
+    );
+  });
+
+  it.each([
+    ["../ui/Button.stories.tsx"],
+    ["src/../ui/Button.stories.tsx"],
+    ["src/./Button.stories.tsx"],
+  ])("moves a component path with a dot segment (%s) to the query form", (path) => {
+    const url = new URL(urls.component("app", path, { tab: "design" }));
+    expect(url.pathname).toBe("/projects/app/components/");
+    expect(url.searchParams.get("path")).toBe(path);
+    expect(url.searchParams.get("tab")).toBe("design");
+  });
+
+  it.each([[".."], ["."], ["a/../b"], ["a/./b"]])(
+    "moves the label value %s to the query form",
+    (value) => {
+      const url = new URL(urls.label("app", "branch", value));
+      expect(url.pathname).toBe("/projects/app/labels/branch/");
+      expect(url.searchParams.get("value")).toBe(value);
+    },
+  );
+
+  it("treats a literal %2E%2E as an ordinary value that keeps its path form", () => {
+    const url = new URL(urls.label("app", "x", "%2E%2E"));
+    expect(url.search).toBe("");
+    expect(decodeURIComponent(url.pathname.split("/x/")[1] ?? "")).toBe("%2E%2E");
+  });
+
+  it("names the rule", () => {
+    expect(hasDotSegment("..")).toBe(true);
+    expect(hasDotSegment("a/./b")).toBe(true);
+    expect(hasDotSegment("a/b.")).toBe(false);
+    expect(hasDotSegment("...")).toBe(false);
   });
 });

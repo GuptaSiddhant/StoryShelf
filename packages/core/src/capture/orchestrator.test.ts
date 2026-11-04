@@ -98,11 +98,9 @@ function pngBytes(): Buffer {
   return Buffer.concat([header, Buffer.alloc(100)]);
 }
 
-function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
-  runner: CaptureRunner;
-  render: ReturnType<typeof vi.fn>;
-} {
-  const result: RenderResult = {
+/** What a successful engine pass returns. */
+function passResult(): RenderResult {
+  return {
     captures: [
       {
         story: {
@@ -118,6 +116,13 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
     ],
     failures: [],
   };
+}
+
+function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
+  runner: CaptureRunner;
+  render: ReturnType<typeof vi.fn>;
+} {
+  const result = passResult();
   const render =
     overrides.render ??
     vi.fn(async () => {
@@ -226,6 +231,48 @@ describe("executeCaptureJob", () => {
     const rows = await db.list(db.tables.snapshots);
     expect(rows.map((row) => row.storyName)).toEqual(["Primary"]);
     expect(await scratchExists(project.id, build.id)).toBe(false);
+  });
+
+  it("moves no baseline and keeps the build cancelled when a cancel lands while stories render", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const builds = new BuildModel(db, tables(db));
+    const build = await builds.create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const render = vi.fn(async () => {
+      // The user cancels while the runner is busy; its captures still come back.
+      await builds.setStatus(build.id, "cancelled");
+      return {
+        captures: [
+          {
+            story: {
+              id: STORY_ID,
+              title: "Components/Button",
+              name: "Primary",
+              importPath: "./Button.stories.tsx",
+              type: "story" as const,
+            },
+            viewportName: "desktop",
+            screenshot: pngBytes(),
+          },
+        ],
+        failures: [],
+      };
+    });
+    const { runner } = fakeRunner({ render });
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    expect((await db.get(db.tables.builds, build.id))?.status).toBe("cancelled");
+    expect(await db.list(db.tables.baselines)).toEqual([]);
   });
 
   it("records the build's use of the persisted content, so retention knows who uses it", async () => {
@@ -702,6 +749,103 @@ describe("executeCaptureJob", () => {
         /Cannot launch firefox: executable does not exist/u,
       );
       expect(render).toHaveBeenCalledTimes(1);
+    });
+
+    it("fails the job with the launch reason, not as a story crash, and stores nothing from the engines before it", async () => {
+      const { db, buildId, render, options } = await setupBrowsers({
+        browsers: '["chromium","firefox"]',
+      });
+      render.mockResolvedValueOnce(passResult());
+      render.mockRejectedValueOnce(new TargetLaunchError("firefox", "executable does not exist"));
+      const logged: string[] = [];
+      const recordLog = async (_level: string, message: string): Promise<void> => {
+        await Promise.resolve();
+        logged.push(message);
+      };
+      const job = executeCaptureJob({ buildId, recordLog }, options);
+      await expect(job).rejects.toBeInstanceOf(TargetLaunchError);
+      await expect(job).rejects.toThrow(/Cannot launch firefox: executable does not exist/u);
+      // Each engine was tried once, in order: nothing was isolated or retried as a crashing story.
+      expect(render.mock.calls.map((call) => (call[0] as { target: string }).target)).toEqual([
+        "chromium",
+        "firefox",
+      ]);
+      expect((await new BuildModel(db, tables(db)).get(buildId))?.status).toBe("failed");
+      // The attempt log was written (the failure is in it) and holds no crash-isolation line:
+      // nothing was blamed, narrowed down or retried.
+      expect(logged).toContain("capture failed");
+      expect(
+        logged.filter((message) =>
+          /isolating|crashed the browser|crash interrupted/u.test(message),
+        ),
+      ).toEqual([]);
+      // The launch failure is the build's error: no story is recorded as failed, and the engine that
+      // rendered first has nothing stored either (no partial result).
+      expect(await db.list(db.tables.snapshots)).toEqual([]);
+    });
+
+    it("refuses a later build at once, with the reason, once the target is marked unavailable", async () => {
+      const { db, buildId, render, options } = await setupBrowsers({
+        browsers: '["chromium","firefox"]',
+      });
+      const metadata = options.runner.metadata as { targets?: RunnerTarget[] };
+      metadata.targets = [
+        { target: "chromium", reach: "loopback", status: "ready" },
+        { target: "firefox", reach: "loopback", status: "ready" },
+      ];
+      render.mockResolvedValueOnce(passResult());
+      render.mockRejectedValueOnce(new TargetLaunchError("firefox", "executable does not exist"));
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(
+        /Cannot launch firefox/u,
+      );
+      const rendered = render.mock.calls.length;
+      // What the runner does when a launch cannot succeed: it marks the target with the reason.
+      metadata.targets = [
+        { target: "chromium", reach: "loopback", status: "ready" },
+        {
+          target: "firefox",
+          reach: "loopback",
+          status: { unavailable: "executable does not exist" },
+        },
+      ];
+
+      const [project] = await new ProjectModel(db, tables(db)).list();
+      const second = await new BuildModel(db, tables(db)).create(project?.id ?? "", {
+        gitSha: "sha-again",
+        gitBranch: "main",
+        isDefault: true,
+      });
+      await options.storage.write(storybookZipPath(project?.id ?? "", second.id), zipWithIndex());
+      await expect(executeCaptureJob({ buildId: second.id }, options)).rejects.toThrow(
+        /firefox is unavailable: executable does not exist/u,
+      );
+      // The second build rendered nothing, not even on the engine that is fine.
+      expect(render).toHaveBeenCalledTimes(rendered);
+    });
+
+    it("checks the targets after the Storybook statics are persisted and before anything renders", async () => {
+      const { buildId, render, options } = await setupBrowsers({
+        browsers: '["chromium","firefox"]',
+      });
+      (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+        { target: "chromium", reach: "loopback", status: "ready" },
+      ];
+      const lines: string[] = [];
+      await expect(
+        executeCaptureJob(
+          {
+            buildId,
+            recordLog: async (_level, message) => {
+              lines.push(message);
+              await Promise.resolve();
+            },
+          },
+          options,
+        ),
+      ).rejects.toThrow(/firefox is not offered/u);
+      // The order is part of the contract: the statics are stored first, so the check is not free.
+      expect(lines).toContain("storybook statics persisted");
+      expect(render).not.toHaveBeenCalled();
     });
 
     it("does not isolate a signed URL lifetime failure as a story crash", async () => {
