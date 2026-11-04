@@ -191,6 +191,12 @@ describe("the forked capture handler", () => {
     }
   }, 30_000);
 
+  it("keeps the in-process handler's record of a passed deadline", async () => {
+    const { wiring } = forked();
+    // No attempt is open for a build that is not there: nothing to write, and no failure.
+    await expect(wiring.handler?.deadlineExceeded?.(job("ghost"), 60)).resolves.toBeUndefined();
+  });
+
   it("keeps the in-process handler's own validation of what it accepts", () => {
     const { wiring } = forked();
     expect(wiring.handler?.accepts?.(job("b1"))).toBe(true);

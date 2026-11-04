@@ -402,6 +402,24 @@ describe("createForkedCaptureHandler", () => {
     });
   });
 
+  it("leaves recording a passed deadline to the fallback", async () => {
+    const seen: [string, number][] = [];
+    const back: KindHandler = {
+      run: async () => {},
+      deadlineExceeded: async (j, seconds) => {
+        seen.push([j.buildId, seconds]);
+      },
+    };
+    const handler = createForkedCaptureHandler({ spawn: () => new FakeChild(), fallback: back });
+    await handler.deadlineExceeded?.(job("b1"), 60);
+    expect(seen).toEqual([["b1", 60]]);
+    const plain = createForkedCaptureHandler({
+      spawn: () => new FakeChild(),
+      fallback: { run: async () => {} },
+    });
+    await expect(plain.deadlineExceeded?.(job("b1"), 60)).resolves.toBeUndefined();
+  });
+
   it("accepts what the fallback accepts", () => {
     const back: KindHandler = { run: async () => {}, accepts: (j) => j.buildId !== "bad" };
     const handler = createForkedCaptureHandler({ spawn: () => new FakeChild(), fallback: back });

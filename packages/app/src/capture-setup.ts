@@ -162,6 +162,9 @@ function alerting(
 ): CaptureHandler {
   return {
     accepts: (job) => inner.accepts?.(job) !== false,
+    deadlineExceeded: async (job, seconds) => {
+      await inner.deadlineExceeded?.(job, seconds);
+    },
     run: async (job, context) => {
       try {
         await inner.run(job, context);

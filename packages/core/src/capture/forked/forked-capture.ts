@@ -64,6 +64,10 @@ export function createForkedCaptureHandler(options: ForkedCaptureOptions): Forke
       return forked.tripped;
     },
     accepts: (job) => forked.accepts(job),
+    // The deadline is the parent's: it records it with the in-process handler.
+    deadlineExceeded: async (job, seconds) => {
+      await options.fallback.deadlineExceeded?.(job, seconds);
+    },
     run: async (job, context) => {
       await forked.run(job, context);
     },
