@@ -67,13 +67,13 @@ const AUTH_VALUE_IN_TEXT =
   /\b(?<scheme>bearer|basic)\s+(?:(?=[\w.~+/=-]{8,})|(?=[\w.~+/=-]*[\d=+/]))[\w.~+/=-]+/giu;
 
 /**
- * Provider text without its secrets. The shared `key=value` patterns run first, while a word such as
- * `password:` still sits next to its value; then a URL is cut to its origin and a Bearer/Basic value
- * is replaced.
+ * Provider text without its secrets, in an order that matters. A URL is cut to its origin first,
+ * while it is still a whole URL (the shared patterns would otherwise rewrite its userinfo and leave
+ * a path behind). The shared `key=value` patterns run next, while a word such as `password:` still
+ * sits next to its value. The Bearer/Basic rewrite comes last, because it would hide that key.
  */
 function withoutSecrets(text: string): string {
-  return redactSecrets(text)
-    .replaceAll(URL_IN_TEXT, (url) => redactUrlForLog(url))
+  return redactSecrets(text.replaceAll(URL_IN_TEXT, (url) => redactUrlForLog(url)))
     .replaceAll(AUTH_HEADER_IN_TEXT, "$<header> [redacted]")
     .replaceAll(AUTH_VALUE_IN_TEXT, "$<scheme> [redacted]");
 }

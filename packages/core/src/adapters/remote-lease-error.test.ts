@@ -105,6 +105,14 @@ describe("connectErrorOf", () => {
     expect(bearer.message).not.toContain("abc123xyz");
   });
 
+  it("cuts a URL that follows a key, before the key's own redaction can break the URL apart", () => {
+    const wrapped = connectErrorOf(
+      new Error("connect failed token=wss://u:p@farm.example/session/PRIVATE"),
+    );
+    expect(wrapped.message).not.toContain("PRIVATE");
+    expect(wrapped.message).not.toContain("u:p");
+  });
+
   it("leaves ordinary words after Bearer or Basic alone", () => {
     expect(connectErrorOf(new Error("Basic auth is off")).message).toBe(
       "acquire failed: Basic auth is off",
