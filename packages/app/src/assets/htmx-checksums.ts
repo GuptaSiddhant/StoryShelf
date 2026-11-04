@@ -26,6 +26,19 @@ function isChecksum(value: unknown, withFile: boolean): boolean {
   );
 }
 
+function isRecordedChecksums(value: unknown): value is RecordedChecksums {
+  if (!isRecord(value) || typeof value["version"] !== "string") {
+    return false;
+  }
+  const upstream = value["upstream"];
+  return (
+    isChecksum(upstream, true) &&
+    isChecksum(value["embedded"], false) &&
+    // A record that names one version but hashes another package would skip the comparison.
+    (upstream as RecordedChecksums["upstream"]).package === `htmx.org@${value["version"]}`
+  );
+}
+
 /**
  * The record in `text`, or `undefined` when there is none yet (no `text`).
  *
@@ -37,15 +50,10 @@ export function parseRecorded(text?: string): RecordedChecksums | undefined {
     return undefined;
   }
   const parsed: unknown = JSON.parse(text);
-  if (
-    !isRecord(parsed) ||
-    typeof parsed["version"] !== "string" ||
-    !isChecksum(parsed["upstream"], true) ||
-    !isChecksum(parsed["embedded"], false)
-  ) {
+  if (!isRecordedChecksums(parsed)) {
     throw new Error("htmx.sha256.json is not a valid checksum record; fix or delete it");
   }
-  return parsed as unknown as RecordedChecksums;
+  return parsed;
 }
 
 /** Stop when this version was recorded with other bytes, unless the caller accepted the change. */
