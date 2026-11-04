@@ -30,6 +30,8 @@ const PROJECT_REVIEW_APPROVALS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS review_approvals INTEGER NOT NULL DEFAULT 1";
 const PROJECT_STORYBOOK_URL_TTL_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS storybook_url_ttl_seconds INTEGER";
+const PROJECT_COMPONENT_OWNERS_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS component_owners TEXT";
 const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const SNAPSHOT_INHERITED_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
@@ -212,6 +214,7 @@ async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> 
   await execIgnore(run, PROJECT_REVIEW_ENABLED_ALTER);
   await execIgnore(run, PROJECT_REVIEW_APPROVALS_ALTER);
   await execIgnore(run, PROJECT_STORYBOOK_URL_TTL_ALTER);
+  await execIgnore(run, PROJECT_COMPONENT_OWNERS_ALTER);
 }
 
 async function migrateBuildColumns(run: MigrationRunner): Promise<void> {

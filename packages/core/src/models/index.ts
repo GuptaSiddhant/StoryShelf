@@ -72,6 +72,19 @@ export {
   type ChangedComponent,
   type ChangesetComponent,
 } from "./changeset.ts";
+export {
+  assignOwners,
+  compileOwnerPattern,
+  matchesOwnerPattern,
+  ownerRulesText,
+  parseOwnerRules,
+  readOwnerRules,
+  serializeOwnerRules,
+  type AssignedOwner,
+  type OwnerProblem,
+  type OwnerRule,
+  type ParsedOwnerRules,
+} from "./component-owners.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export { acceptPendingWithoutWork } from "./review-switch-off.ts";
 export {

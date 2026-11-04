@@ -82,7 +82,11 @@ branch does not carry a verdict over.
 
 - **Who reviews.** The `approver` and `admin` roles are the reviewers; there is no separate reviewer
   role. Every approver and admin of the project is a reviewer of every build awaiting review. There
-  is no per-build assignment, no component ownership rule and no "request review from" step.
+  is no "request review from" step. A project may add **component owners** (#465): a setting that
+  maps story-file globs to members. The owners of the components a build added or changed are its
+  assigned reviewers; each gets that cycle's `review:requested` once, even if they opted out of the
+  default email, and the build page lists them. Assignment is advisory: approvals, verdicts and
+  statuses do not read it, and with no matching owner the default recipients are asked.
 - **Being asked.** When a build becomes `pending` with review on, a `review:requested` event goes to
   the project's approvers and admins through the notification channels and their per-user
   subscriptions (ADR 0014). Unlike other topics, which are opt-in, this one is on by default for
