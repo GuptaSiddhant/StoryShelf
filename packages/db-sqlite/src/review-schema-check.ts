@@ -2,7 +2,7 @@
  * Refuse an upgrade that cannot adopt a review table or column made outside StoryShelf, with an
  * error that names the table and column instead of a raw driver message.
  */
-import type { DatabaseSync } from "node:sqlite";
+import type { TableColumns, TableInfoReader } from "./table-info.ts";
 
 /** Columns the review code needs in `build_reviews`. */
 const BUILD_REVIEW_COLUMNS = ["id", "build_id", "user_id", "verdict", "body", "created_at"];
@@ -15,23 +15,18 @@ const INTEGER_COLUMNS = [
   ["builds", "review_requested_cycle"],
 ] as const;
 
-type Columns = Map<string, string>;
-
-/** `PRAGMA table_info` rows are `[cid, name, type, ...]` (the adapter opens with `returnArrays`). */
-function columnsOf(sqlite: DatabaseSync, table: string): Columns {
-  const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as unknown as unknown[][];
-  return new Map(rows.map((row) => [String(row[1]).toLowerCase(), String(row[2]).toUpperCase()]));
-}
-
 function conflict(what: string): Error {
   return new Error(
     `Cannot upgrade the review schema: ${what}. It was not created by StoryShelf; rename or drop it (keep a backup) and start again.`,
   );
 }
 
+/** The tables the check looks at. */
+const REVIEW_TABLES = ["projects", "builds", "build_reviews"];
+
 /** Throw when `build_reviews` or a review column already exists in a shape the upgrade cannot use. */
-export function assertReviewSchema(sqlite: DatabaseSync): void {
-  const reviews = columnsOf(sqlite, "build_reviews");
+export function assertReviewColumns(tables: ReadonlyMap<string, TableColumns>): void {
+  const reviews = tables.get("build_reviews") ?? new Map<string, string>();
   if (reviews.size > 0) {
     const missing = BUILD_REVIEW_COLUMNS.find((column) => !reviews.has(column));
     if (missing !== undefined) {
@@ -39,9 +34,21 @@ export function assertReviewSchema(sqlite: DatabaseSync): void {
     }
   }
   for (const [table, column] of INTEGER_COLUMNS) {
-    const type = columnsOf(sqlite, table).get(column);
+    const type = tables.get(table)?.get(column);
     if (type !== undefined && !type.startsWith("INT")) {
       throw conflict(`column ${table}.${column} has type ${type}, expected INTEGER`);
     }
   }
+}
+
+/**
+ * Read the review tables through the preset's own reader, then check them. A reader that cannot
+ * serve `PRAGMA` (a binding that refuses it) is the preset's to handle: it returns no columns, which
+ * passes, so the check never blocks a database it cannot see.
+ */
+export async function assertReviewSchema(read: TableInfoReader): Promise<void> {
+  const columns = await Promise.all(REVIEW_TABLES.map(async (table) => await read(table)));
+  assertReviewColumns(
+    new Map(REVIEW_TABLES.map((table, index) => [table, columns[index] ?? new Map()])),
+  );
 }
