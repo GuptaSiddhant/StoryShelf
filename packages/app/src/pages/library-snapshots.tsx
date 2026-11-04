@@ -23,9 +23,6 @@ import {
 import { A11yViolationsDetails } from "./a11y-violations.tsx";
 import { groupSnapshots } from "./build-diff-model.ts";
 import { DesignButtons, type DesignPreviewInfo, type ProjectDesignLink } from "./design-links.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Snapshot image with library height cap, extending the shared diff pane image. */

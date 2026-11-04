@@ -12,9 +12,6 @@ import {
   SectionTitle,
   VStack,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Badge tone for a health verdict. */
 export function healthTone(verdict: string | null): "success" | "warning" | "danger" | "neutral" {
   if (verdict === "healthy") {

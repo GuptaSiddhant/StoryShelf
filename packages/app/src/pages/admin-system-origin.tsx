@@ -12,9 +12,6 @@ import {
   Meta,
   SectionTitle,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** What the System page knows about the public origin. */
 export interface PublicOriginView {
   /** What background jobs use now (configured, platform or confirmed); `null` when nothing is confirmed. */

@@ -1,8 +1,5 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const hGaps = { sm: "0.5rem", md: "0.75rem", lg: "1rem" } as const;
 const hAligns = {
   center: "center",
@@ -66,7 +63,6 @@ function vstackClass(props: Required<Omit<VStackProps, "children">>): Promise<st
  * Horizontal stack (replaces `row-actions` divs and ad-hoc flex rows).
  * Defaults match the old `row-actions` utility exactly.
  */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const HStack: FC<HStackProps> = ({
   gap = "sm",
   align = "center",
@@ -81,7 +77,6 @@ export const HStack: FC<HStackProps> = ({
  * Vertical stack (replaces `stack` divs and ad-hoc grid rows).
  * Defaults match the old `stack` utility exactly.
  */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const VStack: FC<VStackProps> = ({ gap = "md", align = "stretch", children }) => {
   return <div class={vstackClass({ gap, align })}>{children}</div>;
 };

@@ -1,7 +1,4 @@
 import type { FC } from "hono/jsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const MINUTE = 60;
 const HOUR = 3600;
 const DAY = 86_400;

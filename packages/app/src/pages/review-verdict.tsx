@@ -18,9 +18,6 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { openChangeRequests, openRequestsLabel } from "./review-change-requests.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Build-level verdicts: the approvals so far, each reviewer's latest verdict, and the controls. */

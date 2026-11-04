@@ -89,9 +89,6 @@ const profileMeta = css`
   color: var(--text-secondary);
   font-size: 0.85rem;
 `;
-
-/* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */
-
 type SecurityState = NonNullable<ProfilePageState["security"]>;
 type PasskeyState = SecurityState["passkeys"][number];
 

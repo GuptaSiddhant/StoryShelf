@@ -1,9 +1,6 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type FieldLayout = "stack" | "inline";
 
 const fieldWrap = css`
@@ -171,8 +168,6 @@ function fieldDescribedBy(
   }
   return undefined;
 }
-
-// eslint-disable-next-line promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString>
 const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string | undefined }> = ({
   name,
   error,
@@ -197,7 +192,6 @@ const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string
 };
 
 /** Labeled text input with error and hint states. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const Field: FC<{
   label: string;
   name: string;
@@ -281,7 +275,6 @@ const checkInput = css`
 `;
 
 /** Inline checkbox row with an optional hint. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const CheckField: FC<{
   label: unknown;
   name: string;
@@ -323,7 +316,6 @@ const TEXTAREA_CLASS = {
 } as const;
 
 /** Labeled textarea with error and hint states. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const TextareaField: FC<{
   label: string;
   name: string;
@@ -378,7 +370,6 @@ export const TextareaField: FC<{
 };
 
 /** Labeled select dropdown with an optional hint. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const SelectField: FC<{
   label: string;
   name: string;

@@ -2,9 +2,6 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
 import type { IconName } from "./icons/paths.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type ButtonSize = "md" | "sm";
 
@@ -223,7 +220,6 @@ export const Button: FC<{
 };
 
 /** Tab navigation bar for section switching. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const Tabs: FC<{
   tabs: { label: string; href: string; active?: boolean }[];
   label?: string;

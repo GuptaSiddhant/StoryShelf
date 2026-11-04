@@ -17,9 +17,6 @@ import {
 import { HealthSlot } from "./health-panel.tsx";
 import { InheritedRatioCard } from "./inherited-ratio-card.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const STATUSES = ["reviewing", "approved", "rejected", "failed", "cancelled", "pending"] as const;
 
 /** Current list filters (from the query string). */

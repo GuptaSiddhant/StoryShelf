@@ -7,9 +7,6 @@ import { css } from "../ui/css.ts";
 import { Dropdown, DropdownDivider, DropdownItem } from "../ui/dropdown.tsx";
 import { Icon } from "../ui/icons/icon.tsx";
 import { breadcrumbs, type NavConfig, type NavCrumb } from "./nav.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Slim, translucent bar: project picker plus breadcrumbs (account lives in the sidebar). */
 const shellTopbar = css`
   /* shell-topbar */

@@ -2,9 +2,6 @@ import type { FC } from "hono/jsx";
 import { css } from "../css.ts";
 import type { IconName } from "./paths.ts";
 import { iconHref } from "./sprite.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type IconSize = "sm" | "md" | "lg";
 
 const iconBase = css`

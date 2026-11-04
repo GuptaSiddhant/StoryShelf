@@ -13,9 +13,6 @@ import {
   TextareaField,
 } from "../ui/components.tsx";
 import type { NotificationsFormState, SettingsNotifyProvider } from "./settings-notifications.tsx";
-
-/* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */
-
 /** GitHub only: show builds as check runs posted by a GitHub App, not as commit statuses. */
 const GitHubAppFields: FC<{ errors?: Record<string, string> }> = ({ errors }) => (
   <>

@@ -17,9 +17,6 @@ import {
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { ProjectCard, type ProjectSummary } from "./projects-card.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const projectGrid = css`
   /* project-grid */
   display: grid;
