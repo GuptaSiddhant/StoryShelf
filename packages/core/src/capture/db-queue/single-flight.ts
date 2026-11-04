@@ -12,7 +12,7 @@
 import type { CaptureJobRow, CaptureJobStatus } from "../../schema/capture-job.ts";
 import { ulid } from "../../utils/ulid.ts";
 import { isoAt } from "./clock.ts";
-import { encodePayload } from "./codec.ts";
+import { encodePayload, toDatabaseJob } from "./codec.ts";
 import type { QueueJobInput, QueueRuntime } from "./types.ts";
 
 /** Rounds a request makes while the holder of its key keeps ending under it. */
@@ -93,6 +93,19 @@ export async function finishJob(
 ): Promise<void> {
   await rt.model.finishJob(row.jobId, status, isoAt(rt), error);
   await startSuccessor(rt, row);
+  await notifyEnded(rt, row);
+}
+
+/** Tell the host a job ended (`onEnded`); its failure is logged and goes no further. */
+export async function notifyEnded(rt: QueueRuntime, row: CaptureJobRow): Promise<void> {
+  if (rt.onEnded === undefined) {
+    return;
+  }
+  try {
+    await rt.onEnded(toDatabaseJob(row, row.attempt, rt.leaseMs));
+  } catch (error) {
+    rt.logger?.error({ err: error, jobId: row.jobId }, "ended-job hook failed");
+  }
 }
 
 /**

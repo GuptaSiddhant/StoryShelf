@@ -351,4 +351,16 @@ describe("CaptureJobModel: single-flight keys", () => {
     expect((await jobs.get("j1"))?.rerunRequestedAt).toBeNull();
     expect(await jobs.requestRerun("missing", T2)).toBeNull();
   });
+
+  it("knows whether a build has an unfinished job of a kind", async () => {
+    const { jobs } = model();
+    expect(await jobs.hasOpenJob("b1", "publish")).toBe(false);
+    await jobs.create({ id: "p1", kind: "publish", buildId: "b1", maxAttempts: 3 }, T0);
+    await jobs.create({ id: "c1", kind: "capture", buildId: "b2", maxAttempts: 3 }, T0);
+    expect(await jobs.hasOpenJob("b1", "publish")).toBe(true);
+    expect(await jobs.hasOpenJob("b1", "capture")).toBe(false);
+    expect(await jobs.hasOpenJob("b2", "publish")).toBe(false);
+    await jobs.finishJob("p1", "done", T1);
+    expect(await jobs.hasOpenJob("b1", "publish")).toBe(false);
+  });
 });

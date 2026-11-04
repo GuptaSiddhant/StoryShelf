@@ -96,8 +96,10 @@ describe("createJobQueue", () => {
         throw new Error("hook broke");
       });
       const abandoned = vi.fn(async () => {});
+      const ended = vi.fn(async () => {});
       jobs.exhausted.capture = hook;
       jobs.abandoned.capture = abandoned;
+      jobs.ended.capture = ended;
       await jobs.view.enqueue({ buildId: "b1" });
       const queue = jobs.get();
       expect(await queue.poll()).not.toBeNull();
@@ -114,6 +116,11 @@ describe("createJobQueue", () => {
         expect.stringContaining("lease expired"),
       );
       expect(await jobs.view.status("b1")).toMatchObject({ status: "failed" });
+      // Told once, after the job itself had ended.
+      expect(ended).toHaveBeenCalledTimes(1);
+      expect(ended).toHaveBeenCalledWith(
+        expect.objectContaining({ buildId: "b1", kind: "capture" }),
+      );
     } finally {
       Date.now = realNow;
     }
@@ -123,5 +130,6 @@ describe("createJobQueue", () => {
     const jobs = jobsFor(["publish"], 0);
     expect(jobs.abandoned).toEqual({});
     expect(jobs.exhausted).toEqual({});
+    expect(jobs.ended).toEqual({});
   });
 });
