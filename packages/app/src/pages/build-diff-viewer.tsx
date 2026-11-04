@@ -84,7 +84,7 @@ function ViewComponentButton(props: {
     <Button
       variant="ghost"
       size="sm"
-      href={`${urls.component(project.slug, selected.storyImportPath)}#${selected.storyId}`}
+      href={`${urls.component(project.slug, selected.storyImportPath, { build: selected.buildId })}#${selected.storyId}`}
     >
       View component
     </Button>

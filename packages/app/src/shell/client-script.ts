@@ -1,4 +1,4 @@
-import { iconSpriteHref } from "../icons/sprite.ts";
+import { iconSpriteHref } from "../ui/icons/sprite.ts";
 import { reviewScript } from "./review-script.ts";
 
 /*

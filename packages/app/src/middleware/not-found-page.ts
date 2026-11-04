@@ -1,8 +1,8 @@
 import type { Context, Next } from "hono";
 import { renderNotFoundPage } from "../pages/not-found.tsx";
 import { safeReturnPath } from "../routers/oauth-state.ts";
+import type { RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
-import type { RenderedContent } from "../ui/document.tsx";
 
 /** Paths whose 404 stays what its route sent: API answers, assets, and signed Storybook URLs. */
 const PLAIN_PREFIXES = ["/api/", "/assets/", "/_s/", "/.well-known/", "/auth/"] as const;

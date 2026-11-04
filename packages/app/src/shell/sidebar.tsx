@@ -1,8 +1,8 @@
 import { createUrlBuilder, safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
-import { getStore } from "../../store.ts";
-import { css } from "../css.ts";
-import { Icon } from "../icons/icon.tsx";
+import { getStore } from "../store.ts";
+import { css } from "../ui/css.ts";
+import { Icon } from "../ui/icons/icon.tsx";
 import { ThemeMenu, UserMenu } from "./account.tsx";
 import {
   adminNavItems,

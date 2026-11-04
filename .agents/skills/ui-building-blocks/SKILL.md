@@ -4,7 +4,7 @@ description: Build or migrate server-rendered UI with strict facade components a
 license: MIT
 metadata:
   audience: maintainers
-  scope: packages/app/src/ui, packages/app/src/pages
+  scope: packages/app/src/ui, packages/app/src/shell, packages/app/src/pages
 ---
 
 # UI Building Blocks — Facade Components + Colocated hono/css
@@ -21,8 +21,8 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   `CardSection`, `PageHeader`, `SectionTitle`, `Meta`, `HStack`, `VStack`,
   `Icon`, `Avatar`, `Kbd`, `Segmented`, `SubNavLayout`, `Table`,
   `Thumbnail`, `Dropdown`, `Progress`, `CompareStage`, `CodeBlock`,
-  `FilterInput`, `RelativeTime`) and the shell (`../ui/document.tsx`:
-  `DocumentLayout`), plus shared cross-page style objects
+  `FilterInput`, `RelativeTime`) and the shell (`../shell/document.tsx`: `DocumentLayout`;
+  `../shell/csrf-field.tsx`: `csrfField`; no other `shell/` module), plus shared cross-page style objects
   (`../ui/styles/review.ts`: snapshot cards, comment threads;
   `../ui/styles/review-layout.ts`: review workspace layout) and
   `../ui/css.ts` (page-local one-off styles only — last resort after
@@ -83,12 +83,14 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   page. The top bar renders `[project picker] › ancestors…` and *drops* the
   current page — its heading names it, so never show a title in both places
   (on phones only the parent shows, as `‹ Parent`, and the project picker shrinks to its icon, keeping its chevron when there are several projects). Account, theme and collapse live in the sidebar footer.
-- **Chrome lives in `ui/shell/`** (`sidebar`, `topbar`, `bare`, boot and
-  client scripts). `DocumentLayout` takes `layout="default" | "wide" |
+- **Chrome lives in `shell/`** (`sidebar`, `topbar`, `bare`, boot and
+  client scripts, `document.tsx`, `csrf-field.tsx`), not in `ui/`: `ui/` is presentational and
+  never imports `store.ts`, `routers/`, `middleware/`, `pages/` or core models (the consistency
+  test fails if it does). A component that needs a URL or a token takes it as a prop. `DocumentLayout` takes `layout="default" | "wide" |
   "bare"` (`bare` = sign-in/invite, no app chrome).
 - **Review comparison:** swipe has a draggable `[data-compare-knob]` (pointer events + capture) mirrored into the `[data-compare-swipe]` range; zoom levels live in `ZOOMS` (`review-script.ts`) and `compare-stage.tsx` — keep them in sync, and keep zoomed images `image-rendering: pixelated`.
 - **The client script runs once per document.** HTMX `body` swaps re-execute
-  inline scripts, so `ui/shell/client-script.ts` guards on `window.__ssInit`:
+  inline scripts, so `shell/client-script.ts` guards on `window.__ssInit`:
   bind `document` listeners once (look elements up lazily), and put
   per-render wiring in `inits`. Never add `document.addEventListener` at
   the top level of a re-executed script.
@@ -168,7 +170,7 @@ export const Tones = jsxStory(() => (
   `hx-target="body"`, so a class *first introduced by swapped content*
   relies on hono/css's fallback append-script. The component set is nearly
   identical across states, so this is safe — but verify with the
-  `storyshelf-css` collection test in `ui/document.test.ts` when adding a
+  `storyshelf-css` collection test in `shell/document.test.ts` when adding a
   conditionally-rendered variant.
 - **No string surgery on rendered HTML.** The tokens-tab secret banner used
   `html.replace('<nav class="tabs"', …)` and broke the moment tabs were
@@ -179,7 +181,7 @@ export const Tones = jsxStory(() => (
 1. `nubx tsc --noEmit -p tsconfig.json` (from `packages/app/`)
 2. `nub run lint` (from `packages/app/`)
 3. `nub run test` — includes `ui/consistency.test.ts` (ratchet) and
-   `ui/document.test.ts` (unescaped stylesheet + style collection)
+   `shell/document.test.ts` (unescaped stylesheet + style collection)
 4. `nub run build`
 5. `nub run build-storybook` (from `packages/app/`) and open the story in light and dark.
 6. Run the app against seeded data and look at it (light + dark, 375px and

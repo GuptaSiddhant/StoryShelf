@@ -2,9 +2,9 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
-import { assetManifest } from "../../asset-manifest.ts";
-import { createShelfApp } from "../../index.tsx";
-import { stubRunner } from "../../test-runner.ts";
+import { assetManifest } from "../asset-manifest.ts";
+import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 type Db = ReturnType<typeof makeDatabase>["db"];
 

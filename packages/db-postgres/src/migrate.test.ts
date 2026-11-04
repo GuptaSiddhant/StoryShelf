@@ -102,6 +102,31 @@ describe("runMigrations: builds and projects gain later columns", () => {
   }, 60_000);
 });
 
+describe("runMigrations: builds gain the review cycle columns", () => {
+  it("adds review_cycle (default 0) and review_requested_cycle (null) to older builds", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, created_at, updated_at)
+        VALUES ('b', 'p', 'abc', 'main', now(), now());
+      ALTER TABLE builds DROP COLUMN review_cycle;
+      ALTER TABLE builds DROP COLUMN review_requested_cycle;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const build = await client.query<{
+      review_cycle: number;
+      review_requested_cycle: number | null;
+    }>("SELECT review_cycle, review_requested_cycle FROM builds WHERE id = 'b'");
+    expect(build.rows).toEqual([{ review_cycle: 0, review_requested_cycle: null }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: review, a11y, comment and notification columns", () => {
   it("back-fills every later column on older tables with the current defaults", async () => {
     const client = new PGlite();
@@ -118,6 +143,9 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
       ALTER TABLE snapshots DROP COLUMN duration_ms;
       ALTER TABLE snapshots DROP COLUMN a11y_violations;
       ALTER TABLE comments DROP COLUMN story_id;
+      ALTER TABLE comments DROP COLUMN kind;
+      ALTER TABLE comments DROP COLUMN resolved_at;
+      ALTER TABLE comments DROP COLUMN resolved_by;
       ALTER TABLE notification_channels DROP COLUMN last_error;
       ALTER TABLE notification_channels DROP COLUMN last_error_at;
     `);
@@ -145,11 +173,14 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
     const columns = await client.query<{ table_name: string; column_name: string }>(`
       SELECT table_name, column_name FROM information_schema.columns
       WHERE (table_name = 'snapshots' AND column_name IN ('duration_ms', 'a11y_violations'))
-         OR (table_name = 'comments' AND column_name = 'story_id')
+         OR (table_name = 'comments' AND column_name IN ('story_id', 'kind', 'resolved_at', 'resolved_by'))
          OR (table_name = 'notification_channels' AND column_name IN ('last_error', 'last_error_at'))
       ORDER BY table_name, column_name
     `);
     expect(columns.rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([
+      "comments.kind",
+      "comments.resolved_at",
+      "comments.resolved_by",
       "comments.story_id",
       "notification_channels.last_error",
       "notification_channels.last_error_at",

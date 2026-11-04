@@ -1,7 +1,7 @@
 import { safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
-import { css } from "../css.ts";
-import { Icon } from "../icons/icon.tsx";
+import { css } from "../ui/css.ts";
+import { Icon } from "../ui/icons/icon.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 

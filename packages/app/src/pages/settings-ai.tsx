@@ -1,5 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 import {
   Alert,
@@ -10,7 +11,6 @@ import {
   SectionTitle,
   SelectField,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 
 /** AI availability and profile choices passed to the settings tab. */
 export interface SettingsAiData {

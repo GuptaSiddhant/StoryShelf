@@ -15,6 +15,7 @@ export {
 } from "./encrypt.ts";
 export { hmacSha256, randomToken, sha256, timingSafeEqualString } from "./hash.ts";
 export { HttpError } from "./http.ts";
+export { COMMENT_CREATED, REVIEW_COMMENT_ALIAS, matchesEvent } from "./event-match.ts";
 export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";
 export { httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";
 export {

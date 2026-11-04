@@ -1,3 +1,24 @@
+/** Options of {@link UrlBuilder.component}. */
+export interface ComponentUrlOptions {
+  /** Show this build's states, results and comments instead of the newest build that has the file. */
+  build?: string | undefined;
+  /** Open this tab of the component page. */
+  tab?: string | undefined;
+}
+
+/** The query string of a component page: `?build=` and `?tab=` when given, else nothing. */
+function componentQuery(options: ComponentUrlOptions | undefined): string {
+  const params = new URLSearchParams();
+  if (options?.build) {
+    params.set("build", options.build);
+  }
+  if (options?.tab !== undefined) {
+    params.set("tab", options.tab);
+  }
+  const query = params.toString();
+  return query === "" ? "" : `?${query}`;
+}
+
 /** Type-safe URL builder for project pages and published Storybooks. */
 export interface UrlBuilder {
   projectsList(): string;
@@ -15,8 +36,8 @@ export interface UrlBuilder {
   jobs(slug: string): string;
   labels(slug: string): string;
   label(slug: string, key: string, value: string): string;
-  /** Stable component page, keyed by the story file's import path; `tab` selects one of its tabs. */
-  component(slug: string, importPath: string, tab?: string): string;
+  /** Stable component page, keyed by the story file's import path; `build` selects one build, `tab` one of its tabs. */
+  component(slug: string, importPath: string, options?: ComponentUrlOptions): string;
   storybook(slug: string): string;
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
@@ -50,10 +71,8 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     labels: (slug) => `${root}/projects/${slug}/labels`,
     label: (slug, key, value) =>
       `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodePath(value)}`,
-    component: (slug, importPath, tab) =>
-      `${root}/projects/${slug}/components/${encodePath(importPath.replace(/^(?:\.\/)+/u, ""))}${
-        tab === undefined ? "" : `?tab=${encodeURIComponent(tab)}`
-      }`,
+    component: (slug, importPath, options) =>
+      `${root}/projects/${slug}/components/${encodePath(importPath.replace(/^(?:\.\/)+/u, ""))}${componentQuery(options)}`,
     storybook: (slug) =>
       publishedBaseDomain
         ? `https://${slug}.${publishedBaseDomain}`
