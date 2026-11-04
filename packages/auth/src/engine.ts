@@ -584,10 +584,7 @@ function buildAuthInstance(options: ShelfAuthOptions, db: DatabaseAdapter): Shel
     // management stays off (see SSO_MANAGEMENT_PATHS).
     ...(options.sso ? { disabledPaths: SSO_MANAGEMENT_PATHS } : {}),
     session: { expiresIn, updateAge: 60 * 60 * 24, cookieCache: { enabled: false } },
-    advanced: {
-      database: { generateId: () => ulid() },
-      cookies: { session_token: { name: SESSION_COOKIE } },
-    },
+    advanced: advancedOptions(options.baseURL),
     databaseHooks: {
       user: {
         create: {
@@ -601,6 +598,44 @@ function buildAuthInstance(options: ShelfAuthOptions, db: DatabaseAdapter): Shel
   });
   // Narrowed to the shelf surface: handler mounting plus session reads.
   return auth;
+}
+
+/** The slice of Better Auth's `advanced` options the shelf sets. */
+interface AdvancedOptions {
+  database: { generateId: () => string };
+  cookies: {
+    session_token: { name: string; attributes: ReturnType<typeof sessionCookieAttributes> };
+  };
+}
+
+/** Better Auth's `advanced` block: ULID ids and our session cookie (name and attributes). */
+function advancedOptions(baseURL: string): AdvancedOptions {
+  return {
+    database: { generateId: (): string => ulid() },
+    cookies: {
+      session_token: { name: SESSION_COOKIE, attributes: sessionCookieAttributes(baseURL) },
+    },
+  };
+}
+
+/**
+ * The session cookie's attributes, stated here instead of left to Better Auth's defaults, so a
+ * library upgrade cannot loosen them (`engine.test.ts` pins them). `SameSite=Lax` is what keeps a
+ * cross-site form post from carrying the session to a cookie-authenticated write; `Secure` follows
+ * the public URL (the app may sit behind a TLS-terminating proxy, so the request is not asked).
+ */
+function sessionCookieAttributes(baseURL: string): {
+  httpOnly: true;
+  sameSite: "lax";
+  path: "/";
+  secure: boolean;
+} {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    secure: new URL(baseURL).protocol === "https:",
+  };
 }
 
 async function resolveAuthUser(
