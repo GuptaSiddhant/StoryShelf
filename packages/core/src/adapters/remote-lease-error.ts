@@ -1,6 +1,7 @@
 /** How a connect failure is classified (ADR 0007, decision 4): retried or not, and what it does to the target. */
 import { isRetryableConnectError } from "../utils/connect-retry.ts";
 import { errorText } from "../utils/error-text.ts";
+import { redactUrlForLog } from "../utils/http.ts";
 
 /** What a connect failure means for the retry loop and for the target. */
 export interface RemoteConnectErrorOptions {
@@ -51,20 +52,34 @@ export function classify(error: unknown): { retry: boolean; unavailable: boolean
   return { retry, unavailable: !retry };
 }
 
-/** A provider's thrown value as a {@link RemoteConnectError}: transient unless it says `transient: false`. */
+/** Longest provider text kept in a connect error. */
+const PROVIDER_TEXT_MAX = 300;
+const URL_IN_TEXT = /\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/giu;
+const AUTH_VALUE_IN_TEXT = /\b(Bearer|Basic)\s+[\w.~+/=-]{8,}/giu;
+
+/** A URL in provider text as its origin, and a Bearer/Basic header value as nothing. */
+function withoutSecrets(text: string): string {
+  return text
+    .replaceAll(URL_IN_TEXT, (url) => redactUrlForLog(url))
+    .replaceAll(AUTH_VALUE_IN_TEXT, "$1 [redacted]");
+}
+
+/**
+ * A provider's thrown value as a {@link RemoteConnectError}: transient unless it says `transient: false`.
+ * Its text is all the error keeps of the provider's: URLs cut to their origin, header values and
+ * known secret shapes redacted, bounded. The thrown value is not kept as `cause`, because a cause
+ * would carry the raw text to whatever walks it.
+ */
 export function connectErrorOf(error: unknown): RemoteConnectError {
   const flags = (typeof error === "object" && error !== null ? error : {}) as {
     transient?: unknown;
     scope?: unknown;
     lease?: unknown;
   };
-  return new RemoteConnectError(
-    `acquire failed: ${error instanceof Error ? error.message : errorText(error)}`,
-    {
-      cause: error,
-      transient: flags.transient !== false,
-      scope: flags.scope === "job" ? "job" : "target",
-      lease: flags.lease,
-    },
-  );
+  const text = errorText(error, { maxLength: PROVIDER_TEXT_MAX, scrub: withoutSecrets });
+  return new RemoteConnectError(`acquire failed: ${text}`, {
+    transient: flags.transient !== false,
+    scope: flags.scope === "job" ? "job" : "target",
+    lease: flags.lease,
+  });
 }

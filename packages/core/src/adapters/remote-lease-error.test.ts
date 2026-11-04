@@ -58,4 +58,40 @@ describe("connectErrorOf", () => {
     expect(wrapped.message).toBe("acquire failed: connect ECONNREFUSED");
     expect(connectErrorOf({}).message).toBe("acquire failed: unknown error");
   });
+
+  it("cuts a URL in the provider's text to its origin", () => {
+    const wrapped = connectErrorOf(
+      new Error("connect to wss://farm.example.com/session/abc123?token=s3cr3t failed"),
+    );
+    expect(wrapped.message).toBe("acquire failed: connect to wss://farm.example.com failed");
+  });
+
+  it("redacts a Bearer or Basic header value and a secret shape in the text", () => {
+    const bearer = connectErrorOf(new Error("401 with Authorization: Bearer abcdef1234567890"));
+    expect(bearer.message).toBe("acquire failed: 401 with Authorization: Bearer [redacted]");
+    expect(connectErrorOf("sent Basic dXNlcjpwYXNzd29yZA== to farm").message).toBe(
+      "acquire failed: sent Basic [redacted] to farm",
+    );
+    expect(connectErrorOf(new Error("failed, api_key=hunter2hunter2")).message).toBe(
+      "acquire failed: failed, api_key=[redacted]",
+    );
+  });
+
+  it("leaves ordinary words after Bearer or Basic alone", () => {
+    expect(connectErrorOf(new Error("Basic auth is off")).message).toBe(
+      "acquire failed: Basic auth is off",
+    );
+  });
+
+  it("bounds a long body", () => {
+    const wrapped = connectErrorOf(new Error(`bad gateway ${"x".repeat(5000)}`));
+    expect(wrapped.message.length).toBe("acquire failed: ".length + 300);
+  });
+
+  it("does not keep the thrown value as the cause, so no raw text travels with the error", () => {
+    const wrapped = connectErrorOf(new Error("secret https://u:p@farm.example.com/k"));
+    expect(wrapped.cause).toBeUndefined();
+    expect(wrapped.message).not.toContain("u:p");
+    expect(wrapped.message).not.toContain("/k");
+  });
 });
