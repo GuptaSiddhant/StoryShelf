@@ -1,3 +1,4 @@
+import { deferred } from "@storyshelf/core/test-helpers";
 import { afterEach, describe, expect, it } from "vitest";
 import { extractAllParameters } from "./runtime-params.ts";
 
@@ -20,19 +21,27 @@ afterEach(() => {
 
 describe("extractAllParameters", () => {
   it("waits for the preview to finish starting instead of extracting too early (SB_PREVIEW_API_0005)", async () => {
+    const readyStarted = deferred();
+    const gate = deferred();
     let initialised = false;
+    let extractCalled = false;
     const preview: Preview = {
       ready: async () => {
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        readyStarted.resolve();
+        await gate.promise;
         initialised = true;
       },
       extract: async () => {
+        extractCalled = true;
         if (!initialised) throw new Error("SB_PREVIEW_API_0005: extract before initialization");
         return ENTRIES;
       },
     };
-    const parameters = await extractAllParameters(pageWith(preview));
-    expect(parameters["a--b"]).toMatchObject({ delay: 5 });
+    const pending = extractAllParameters(pageWith(preview));
+    await readyStarted.promise;
+    expect(extractCalled).toBe(false);
+    gate.resolve();
+    expect((await pending)["a--b"]).toMatchObject({ delay: 5 });
   });
 
   it("still extracts from a preview that has no ready()", async () => {
