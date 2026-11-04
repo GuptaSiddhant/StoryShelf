@@ -311,17 +311,19 @@ function isInfoStatus(status: string): boolean {
 
 /**
  * Alert banner with an optional title. It announces itself assertively (`role="alert"`); pass
- * `role="status"` for a polite message that is not an error to act on at once.
+ * `role="status"` for a polite message that is not an error to act on at once, or `role="none"` to
+ * leave the attribute off when the caller already owns the live region the alert sits in (two
+ * nested live regions are announced twice by some screen readers).
  */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Alert: FC<{
   tone?: BadgeTone;
   title?: string;
-  role?: "alert" | "status";
+  role?: "alert" | "status" | "none";
   children?: unknown;
 }> = ({ tone = "info", title, role = "alert", children }) => {
   return (
-    <div class={alertTones[tone]} role={role}>
+    <div class={alertTones[tone]} role={role === "none" ? undefined : role}>
       <span class={alertIconTones[tone]}>
         <Icon name={toneIcons[tone]} />
       </span>

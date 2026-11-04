@@ -66,6 +66,8 @@ describe("PreviewEmbed under a signed URL", () => {
     expect(box).not.toContain("data-preview-reload");
     expect(box).not.toContain("data-preview-notice");
     expect(html).not.toContain('role="alert"');
+    // One live region only: the notice's Alert adds none inside the region the notes sit in.
+    expect(html.match(/role="status"/gu)).toHaveLength(1);
   });
 
   it("says nothing about renewing under an unsigned preview", async () => {

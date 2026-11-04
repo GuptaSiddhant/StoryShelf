@@ -310,6 +310,37 @@ describe("signed preview frame", () => {
     expect(page.part("reload")?.textContent).toBe("Reload preview");
   });
 
+  /** The first fetch succeeds; later ones answer with something the client cannot use. */
+  function unusableAfterFirst(response: unknown) {
+    let calls = 0;
+    return () => {
+      calls += 1;
+      return calls === 1 ? ok("/_s/new") : Promise.resolve(response);
+    };
+  }
+
+  describe.each([
+    ["a response without a base", { ok: true, json: () => Promise.resolve({}) }],
+    ["a response that is not ok", { ok: false, json: () => Promise.resolve({ base: "/_s/new" }) }],
+  ])("when the renewal gets %s", (_label, response) => {
+    it("shows the notice once the retries are used up", async () => {
+      const page = boot(unusableAfterFirst(response));
+      await failRenewals(page);
+      expect(page.part("notice")?.hidden).toBe(false);
+      expect(page.part("disclosure")?.hidden).toBe(true);
+    });
+
+    it("keeps the notice and says so when the reload gets the same", async () => {
+      const page = boot(unusableAfterFirst(response));
+      await failRenewals(page);
+      page.reload();
+      await tick();
+      expect(page.part("notice")?.hidden).toBe(false);
+      expect(page.part("again")?.hidden).toBe(false);
+      expect(page.frame()?.getAttribute("src")).toBe("/_s/new/iframe.html?id=a");
+    });
+  });
+
   it("clears the notice when a later scheduled renewal succeeds", async () => {
     let fail = false;
     const page = boot(() => (fail ? Promise.reject(new Error("down")) : ok("/_s/new")));

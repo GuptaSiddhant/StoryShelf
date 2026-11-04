@@ -69,7 +69,7 @@ const SignedNotes: FC<{ seconds: number }> = ({ seconds }) => (
       </Meta>
     </div>
     <div data-preview-notice hidden>
-      <Alert tone="warning" title="Preview couldn't be renewed" role="status">
+      <Alert tone="warning" title="Preview couldn't be renewed" role="none">
         <VStack gap="sm">
           <span>
             StoryShelf couldn&apos;t get a new signed link, so this preview will stop loading when
