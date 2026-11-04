@@ -1,6 +1,7 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   BuildModel,
+  BuildReviewModel,
   CommentModel,
   MemberModel,
   NotificationSubscriptionModel,
@@ -342,16 +343,32 @@ describe("the review gate", () => {
           body: JSON.stringify(body),
         })
       ).status;
-    expect(await asForm("dev", viaForm, { verdict: "approved" })).toBe(
-      await asApi("dev", viaApi, { verdict: "approved" }),
-    );
-    expect(await asForm("alice", viaForm, { verdict: "maybe" })).toBe(
-      await asApi("alice", viaApi, { verdict: "maybe" }),
-    );
+    const builds = new BuildModel(booted.db);
+    const reviews = new BuildReviewModel(booted.db);
+    const untouched = async () =>
+      await Promise.all(
+        [viaForm, viaApi].map(async (id) => ({
+          status: (await builds.get(id))?.status,
+          reviews: await reviews.listByBuild(id),
+        })),
+      );
+    const before = await untouched();
+
+    // A developer may not give a verdict; an unknown verdict is a bad request. Both change nothing.
+    expect(await asForm("dev", viaForm, { verdict: "approved" })).toBe(403);
+    expect(await asApi("dev", viaApi, { verdict: "approved" })).toBe(403);
+    expect(await asForm("alice", viaForm, { verdict: "maybe" })).toBe(400);
+    expect(await asApi("alice", viaApi, { verdict: "maybe" })).toBe(400);
+    expect(await untouched()).toEqual(before);
+
     expect(await asForm("alice", viaForm, { verdict: "approved", body: "ok" })).toBe(204);
     expect(await asApi("alice", viaApi, { verdict: "approved", body: "ok" })).toBe(201);
-    const builds = new BuildModel(booted.db);
-    expect((await builds.get(viaForm))?.status).toBe((await builds.get(viaApi))?.status);
+    for (const id of [viaForm, viaApi]) {
+      // eslint-disable-next-line no-await-in-loop -- two builds
+      expect((await builds.get(id))?.status).toBe("approved");
+      // eslint-disable-next-line no-await-in-loop -- two builds
+      expect(await reviews.listByBuild(id)).toMatchObject([{ verdict: "approved", body: "ok" }]);
+    }
     await booted.stop();
   });
 });

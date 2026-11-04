@@ -73,7 +73,7 @@ describe("pendingCandidates", () => {
     const outside = await build("old", OLD);
     await build("old", new Date(Date.now() - 45 * DAY).toISOString());
     const found = await pendingCandidates(db, project.id, CUTOFF);
-    expect(found.map((candidate) => candidate.buildId).toSorted()).not.toContain(inside);
+    expect(found.map((candidate) => candidate.buildId)).not.toContain(inside);
     expect(found).toEqual(expect.arrayContaining([{ buildId: outside, reason: "superseded" }]));
   });
 

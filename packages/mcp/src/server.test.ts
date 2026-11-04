@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { describe, expect, it, vi } from "vitest";
-import { ToolError, type ApiClient } from "./client.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ToolError, createApiClient, type ApiClient } from "./client.ts";
 import { createStoryShelfMcpServer } from "./server.ts";
 
 function fakeClient(overrides: Partial<ApiClient> = {}): ApiClient {
@@ -24,6 +24,10 @@ async function connect(api: ApiClient, testing = true): Promise<Client> {
 function text(result: unknown): string {
   return (result as { content: { text: string }[] }).content[0]?.text ?? "";
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("StoryShelf MCP server", () => {
   it("lists the v1 tools and exposes no approval tool", async () => {
@@ -126,20 +130,27 @@ describe("StoryShelf MCP server", () => {
     );
   });
 
-  it("reports a project with review off as a tool error on the comment tools", async () => {
-    const off = new ToolError("StoryShelf API 404: Review is off for this project.");
+  it("tells the agent only that the build was not found when the project has review off", async () => {
+    // What the app sends for a `review` route of a project with review off, through the real client.
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async () =>
+        Response.json({ error: "Review is off for this project." }, { status: 404 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
     const client = await connect(
-      fakeClient({ get: vi.fn().mockRejectedValue(off), post: vi.fn().mockRejectedValue(off) }),
+      createApiClient({ url: "https://s.example", token: "tok", slug: "web" }),
     );
-    for (const call of [
+    const calls = [
       { name: "list_comments", arguments: { buildId: "b1" } },
       { name: "add_comment", arguments: { buildId: "b1", body: "x" } },
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- two calls
-      const result = await client.callTool(call);
-      expect(result.isError, call.name).toBe(true);
-      expect(text(result), call.name).toContain("Review is off");
+    ];
+    const results = await Promise.all(calls.map(async (call) => await client.callTool(call)));
+    for (const result of results) {
+      expect(result.isError).toBe(true);
+      expect(text(result)).toBe("StoryShelf API: not found: check the project slug and build id");
     }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("returns ToolError text as an error result", async () => {
