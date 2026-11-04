@@ -108,10 +108,10 @@ describe("runCaptureChild", () => {
     dispatch.run.mockReset().mockImplementation(async () => {});
     const { host, events, sent } = fakeHost();
     const running = runCaptureChild(options(), host);
-    await sleep(20);
-    const report = dispatch.repeated.at(-1);
-    expect(report).toBeDefined();
-    report?.({ repeated: 3, attempt: 2, limit: 3 });
+    await vi.waitFor(() => {
+      expect(dispatch.repeated).toHaveLength(1);
+    });
+    dispatch.repeated[0]?.({ repeated: 3, attempt: 2, limit: 3 });
     expect(sent).toEqual([{ type: "shard-repeated", repeated: 3, attempt: 2, limit: 3 }]);
     events.emit("SIGTERM");
     await running;
