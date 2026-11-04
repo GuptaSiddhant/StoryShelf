@@ -73,16 +73,16 @@ an upload's trace spans the HTTP request **and** the capture job.
 
 ## Metric catalog
 
-| Instrument                                       | Type           | Attributes                                             |
-| ------------------------------------------------ | -------------- | ------------------------------------------------------ |
-| `http.server.request.duration`                   | histogram      | `method`, `route`, `status` (via `@hono/otel`)         |
-| `capture.job.duration`                           | histogram (ms) | —                                                      |
-| `capture.jobs.completed` / `capture.jobs.failed` | counters       | —                                                      |
-| `storyshelf.capture.shard.repeated_stories`      | counter        | none (no build or project labels: cardinality)         |
-| `db.operation.duration`                          | histogram (ms) | `db.operation`, `db.table`                             |
-| `storage.operation.duration`                     | histogram (ms) | `storage.operation` (paths excluded: cardinality)      |
-| `ai.summarize.duration` / `ai.summarize.tokens`  | histograms     | `ai.task`, `outcome` (model and profile stay on spans) |
-| `ai.insights.completed` / `ai.insights.failed`   | counters       | `ai.task`                                              |
+| Instrument                                       | Type           | Attributes                                                                                                              |
+| ------------------------------------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `http.server.request.duration`                   | histogram      | `method`, `route`, `status` (via `@hono/otel`)                                                                          |
+| `capture.job.duration`                           | histogram (ms) | —                                                                                                                       |
+| `capture.jobs.completed` / `capture.jobs.failed` | counters       | —                                                                                                                       |
+| `storyshelf.capture.shard.repeated_stories`      | counter        | none; counts snapshots a rerun shard captured again (a story at several viewports or browsers counts once per snapshot) |
+| `db.operation.duration`                          | histogram (ms) | `db.operation`, `db.table`                                                                                              |
+| `storage.operation.duration`                     | histogram (ms) | `storage.operation` (paths excluded: cardinality)                                                                       |
+| `ai.summarize.duration` / `ai.summarize.tokens`  | histograms     | `ai.task`, `outcome` (model and profile stay on spans)                                                                  |
+| `ai.insights.completed` / `ai.insights.failed`   | counters       | `ai.task`                                                                                                               |
 
 No per-story or per-build instruments — labels stay low-cardinality by rule.
 

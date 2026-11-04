@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { metrics } from "@opentelemetry/api";
+import { describe, expect, it, vi } from "vitest";
 import { captureMetrics, dbMetrics, storageMetrics } from "./metrics.ts";
 
 describe("instruments", () => {
@@ -15,5 +16,22 @@ describe("instruments", () => {
     expect(storageMetrics()).toBe(storageMetrics());
     expect(dbMetrics().operationDuration).toBeDefined();
     expect(storageMetrics().operationDuration).toBeDefined();
+  });
+
+  it("names the repeated-stories counter exactly", async () => {
+    vi.resetModules();
+    const created: string[] = [];
+    const meter = {
+      createCounter: (name: string) => {
+        created.push(name);
+        return { add: () => {} };
+      },
+      createHistogram: () => ({ record: () => {} }),
+    };
+    vi.spyOn(metrics, "getMeter").mockReturnValue(meter as never);
+    const fresh = await import("./metrics.ts");
+    fresh.captureMetrics();
+    vi.restoreAllMocks();
+    expect(created).toContain("storyshelf.capture.shard.repeated_stories");
   });
 });
