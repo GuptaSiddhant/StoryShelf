@@ -158,12 +158,13 @@ async function closeEndedAttempt(
   target: { buildId: string; shardId: string },
   error: string,
 ): Promise<CrashFailureOutcome> {
+  // The counts the first pass would have recorded, rebuilt (not by reducing the ended build
+  // again). Done first, so the open check below sits right before the write.
+  const counts = await finalizedCounts(shards, target.buildId);
   const open = await openAttemptOfRun(deps, shards, target);
   if (!open) {
     return "skipped"; // nothing was left to close, or the run is not this hook's
   }
-  // The counts the first pass would have recorded, rebuilt (not by reducing the ended build again).
-  const counts = await finalizedCounts(shards, target.buildId);
   await new CaptureAttemptModel(deps.db, deps.tables).markFinished(
     open.id,
     "failed",
