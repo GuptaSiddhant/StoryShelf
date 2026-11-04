@@ -3,7 +3,7 @@ import { AiBudgetAlertModel, AiUsageModel, BuildModel } from "@storyshelf/core/m
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { settleInsightJobs } from "../insights/job.ts";
 import { fakeAi } from "../insights/test-support.ts";
@@ -214,6 +214,36 @@ describe("insights generation", () => {
     expect(latest).toMatchObject({ status: "failed", errorCode: "provider" });
     const rows = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
     expect(rows).toMatchObject([{ status: "failed", inputTokens: 7 }]);
+  });
+
+  it("keeps the reserved call as a failed row with zero tokens when the provider gave no usage", async () => {
+    const { db, storage, buildId } = await seed();
+    const app = appWith(db, storage, fakeAi({ fail: new AiError("provider", "boom") }));
+    await app.request(path(buildId), { method: "POST", headers: cookie("admin"), body: "{}" });
+    await settleInsightJobs();
+    const rows = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+    expect(rows).toMatchObject([{ status: "failed", inputTokens: 0, outputTokens: 0 }]);
+    expect(rows[0]?.insightId).not.toBeNull();
+  });
+
+  it("does not leave the insight pending, or the call reserved, when attaching the reservation fails", async () => {
+    const { db, storage, buildId } = await seed();
+    const app = appWith(db, storage, fakeAi());
+    const attach = vi
+      .spyOn(AiUsageModel.prototype, "attach")
+      .mockRejectedValueOnce(new Error("db down"));
+    const res = await app.request(path(buildId), {
+      method: "POST",
+      headers: cookie("admin"),
+      body: "{}",
+    });
+    attach.mockRestore();
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z")).toEqual([]);
+    const latest = (await (
+      await app.request(`${path(buildId)}/latest`, { headers: cookie("admin") })
+    ).json()) as Record<string, unknown>;
+    expect(latest).toMatchObject({ status: "failed", errorCode: "interrupted" });
   });
 
   it("enforces the DB-counted daily budget with Retry-After and fires each threshold once", async () => {

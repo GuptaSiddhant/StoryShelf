@@ -65,23 +65,45 @@ async function guardBudget(
   });
 }
 
+/** Tie a reservation to the insight that will use it, or give it back when nothing will run. */
+async function settleReservation(
+  usage: AiUsageModel,
+  reservation: string,
+  started: { row: InsightRow; run: boolean },
+): Promise<void> {
+  await (started.run ? usage.attach(reservation, started.row.id) : usage.release(reservation));
+}
+
+/** Undo a failed start: give the reservation back and do not leave a runnable insight pending. */
+async function undoStart(
+  deps: InsightDeps,
+  reservation: string | null,
+  started: { row: InsightRow; run: boolean } | null,
+): Promise<void> {
+  if (reservation !== null) {
+    await new AiUsageModel(deps.db).release(reservation).catch(() => null);
+  }
+  if (started?.run === true) {
+    // Nothing will run it: later requests would otherwise wait on it.
+    await new InsightModel(deps.db).markFailed(started.row.id, "interrupted").catch(() => null);
+  }
+}
+
 /** Start the insight the reservation is for; the reservation follows the insight or is given back. */
 async function startReserved(
   deps: InsightDeps,
   input: InsightStartInput,
   reservation: string | null,
 ): Promise<{ row: InsightRow; run: boolean }> {
-  const usage = new AiUsageModel(deps.db);
+  let started: { row: InsightRow; run: boolean } | null = null;
   try {
-    const started = await new InsightModel(deps.db).start(input);
+    started = await new InsightModel(deps.db).start(input);
     if (reservation !== null) {
-      await (started.run ? usage.attach(reservation, started.row.id) : usage.release(reservation));
+      await settleReservation(new AiUsageModel(deps.db), reservation, started);
     }
     return started;
   } catch (error) {
-    if (reservation !== null) {
-      await usage.release(reservation).catch(() => null);
-    }
+    await undoStart(deps, reservation, started);
     throw error;
   }
 }

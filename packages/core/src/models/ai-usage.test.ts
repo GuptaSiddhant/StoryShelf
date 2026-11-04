@@ -59,6 +59,35 @@ describe("AiUsageModel", () => {
       expect(await model.countCalls("p1", limit.since)).toBe(3);
     });
 
+    it("refuses every request at a limit of zero, and a later one still gets its turn after a refusal", async () => {
+      const { db } = makeDatabase();
+      const model = new AiUsageModel(db);
+      expect(await model.reserve(reservation, { since: hourAgo(), max: 0 })).toBeNull();
+      expect(await model.countCalls("p1", hourAgo())).toBe(0);
+      expect(await model.reserve(reservation, { since: hourAgo(), max: 1 })).not.toBeNull();
+      expect(await model.reserve(reservation, { since: hourAgo(), max: 1 })).toBeNull();
+    });
+
+    it("keeps serving the queue after a reservation throws", async () => {
+      const { db } = makeDatabase();
+      const model = new AiUsageModel(db);
+      const insert = db.insert.bind(db);
+      let failures = 1;
+      db.insert = (async (...args: Parameters<typeof db.insert>) => {
+        if (failures > 0) {
+          failures -= 1;
+          throw new Error("db down");
+        }
+        return await insert(...args);
+      }) as typeof db.insert;
+      const window = { since: hourAgo(), max: 2 };
+      const results = await Promise.allSettled([
+        model.reserve(reservation, window),
+        model.reserve(reservation, window),
+      ]);
+      expect(results.map((result) => result.status)).toEqual(["rejected", "fulfilled"]);
+    });
+
     it("counts earlier calls and other projects separately", async () => {
       const { db } = makeDatabase();
       const model = new AiUsageModel(db);
