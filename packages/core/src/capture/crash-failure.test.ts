@@ -2,7 +2,7 @@ import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { createShelfLogger } from "../logger.ts";
@@ -19,6 +19,13 @@ import { failCrashedCapture } from "./crash-failure.ts";
 import type { DispatchDeps } from "./dispatch.ts";
 import { executeCaptureJob, type ShardJob } from "./orchestrator.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
+import { reduceBuild } from "./shards/reduce.ts";
+
+// Counts the calls; the real reduction still runs.
+vi.mock("./shards/reduce.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./shards/reduce.ts")>();
+  return { ...original, reduceBuild: vi.fn(original.reduceBuild) };
+});
 
 const SECRET = "test-secret-0123456789abcdef";
 
@@ -123,6 +130,31 @@ async function world(stories = 1) {
   return { db, deps, project, builds, build, queued, status, git };
 }
 
+/** All siblings done, the crashed one last: failing it finalizes the build. */
+async function lastShardCrashed() {
+  const w = await world(25);
+  const attempts = new CaptureAttemptModel(w.db, tables(w.db));
+  const started = await attempts.startAttempt(w.project.id, w.build.id);
+  await attempts.markRunning(started.id);
+  await executeCaptureJob(
+    {
+      buildId: w.build.id,
+      attempt: { id: started.id, attemptNo: started.attemptNo, projectId: w.project.id },
+    },
+    w.deps.jobOptions,
+  );
+  const [crashed, ...rest] = w.queued;
+  for (const job of rest) {
+    // oxlint-disable-next-line no-await-in-loop -- shards one after another
+    await executeCaptureShard(job, w.deps.jobOptions);
+  }
+  const openAttempts = async () =>
+    (await attempts.listByBuild(w.build.id)).filter(
+      (attempt) => attempt.status === "queued" || attempt.status === "running",
+    );
+  return { w, crashed: crashed as ShardJob, attempts, openAttempts };
+}
+
 describe("failCrashedCapture", () => {
   it("fails a whole-build job and closes its open attempt", async () => {
     const w = await world();
@@ -192,6 +224,53 @@ describe("failCrashedCapture", () => {
     expect(outcome).toBe("finalized");
     expect(await w.status()).toBe("failed");
   });
+  describe("a crashed shard whose build was already finalized", () => {
+    it("closes the attempt on retry, without finalizing the build again", async () => {
+      const { w, crashed, attempts, openAttempts } = await lastShardCrashed();
+      // The close step fails once, after `reduceBuild` finalized the build.
+      const close = vi
+        .spyOn(CaptureAttemptModel.prototype, "markFinished")
+        .mockRejectedValueOnce(new Error("database went away"));
+      await expect(failCrashedCapture(w.deps, crashed, "exited 3 times")).rejects.toThrow(
+        "database went away",
+      );
+      close.mockRestore();
+      expect(await w.status()).toBe("failed");
+      expect(await openAttempts()).toHaveLength(1);
+      const finalizedAt = (await w.builds.get(w.build.id))?.updatedAt;
+      vi.mocked(reduceBuild).mockClear();
+
+      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times");
+
+      expect(outcome).toBe("finalized");
+      expect(await openAttempts()).toHaveLength(0);
+      const [closed] = await attempts.listByBuild(w.build.id);
+      expect(closed).toMatchObject({ status: "failed", error: "exited 3 times" });
+      expect(await w.status()).toBe("failed");
+      expect((await w.builds.get(w.build.id))?.updatedAt).toBe(finalizedAt);
+      expect(reduceBuild).not.toHaveBeenCalled();
+    });
+
+    it("skips when the first pass closed everything", async () => {
+      const { w, crashed } = await lastShardCrashed();
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("finalized");
+      vi.mocked(reduceBuild).mockClear();
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+      expect(reduceBuild).not.toHaveBeenCalled();
+    });
+
+    it("leaves a newer run's attempt alone when the hook arrives after a retry", async () => {
+      const { w, crashed, openAttempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "approved");
+      // A retry cleared the plan's rows; its new plan and attempt belong to the newer run.
+      await new CaptureShardModel(w.db).clearBuild(w.build.id);
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+      expect(await openAttempts()).toHaveLength(1);
+    });
+  });
+
   it("fails the build its job still owns", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");

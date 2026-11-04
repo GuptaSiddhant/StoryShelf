@@ -111,16 +111,63 @@ async function failShard(
   shardId: string,
   error: string,
 ): Promise<CrashFailureOutcome> {
-  await new CaptureShardModel(deps.db).fail(shardId, error);
+  const shards = new CaptureShardModel(deps.db);
+  if (!(await shards.get(shardId))) {
+    return "skipped"; // a retry cleared the plan's rows: this hook belongs to a run that is over
+  }
+  await shards.fail(shardId, error);
   const loaded = await load(deps, buildId);
-  if (loaded?.build.status !== "capturing") {
+  if (!loaded) {
     return "skipped";
   }
+  if (loaded.build.status !== "capturing") {
+    return await closeEndedAttempt(deps, shards, { buildId, shardId }, error);
+  }
+  return await reduceAfterFailure(deps, loaded, error);
+}
+
+/** The build is still capturing: the failed shard may have been its last open one. */
+async function reduceAfterFailure(
+  deps: DispatchDeps,
+  loaded: { build: Build; project: Project },
+  error: string,
+): Promise<CrashFailureOutcome> {
   const summary = await reduceBuild({ options: deps.jobOptions, ...loaded });
   if (!summary) {
     return "shard-failed";
   }
   await closeFinalized(deps, loaded, summary, error);
+  return "finalized";
+}
+
+/**
+ * The build left `capturing` already: an earlier pass of this hook finalized it (or the last
+ * sibling did) but may not have closed the attempt, and a retry must not leave it open forever. The
+ * plan's attempt is closed if it is still open, and `reduceBuild` is never run again. The shard row
+ * fences the run: a retry or recovery clears the plan's rows and writes new ones, so a hook that
+ * arrives after that finds its shard gone and leaves the newer run's attempt alone.
+ */
+async function closeEndedAttempt(
+  deps: DispatchDeps,
+  shards: CaptureShardModel,
+  target: { buildId: string; shardId: string },
+  error: string,
+): Promise<CrashFailureOutcome> {
+  const plan = (await shards.get(target.shardId)) ? await shards.plan(target.buildId) : null;
+  if (!plan?.attemptId) {
+    return "skipped";
+  }
+  const attempts = new CaptureAttemptModel(deps.db, deps.tables);
+  const open = (await attempts.listByBuild(target.buildId)).find(
+    (attempt) =>
+      attempt.id === plan.attemptId &&
+      (attempt.status === "queued" || attempt.status === "running"),
+  );
+  if (!open) {
+    return "skipped"; // nothing was left to close: the first pass finished
+  }
+  await attempts.markFinished(open.id, "failed", error);
+  await deps.buildState.request(target.buildId);
   return "finalized";
 }
 
