@@ -61,9 +61,9 @@ that is already merged is captured like any other (there is no `isMerged` check)
 
 - **`@storyshelf/notify-email`** owns `nodemailer`, with `smtp`, `mailpit`, `log` and HTTP-API
   presets.
-- **`@storyshelf/notify-chat`** is zero-dependency, `fetch` only: `slack-webhook`,
+- **`@storyshelf/notify-chat`** uses `fetch` only and no vendor SDK: `slack-webhook`,
   `teams-workflow`, `log` (Mattermost and Discord can follow as renderers).
-- **`@storyshelf/notify-git`** is zero-dependency like `notify-chat` (calls go through `httpJson`): `github`, `gitlab`, and a `git-log` provider for tests and local runs (`log` is taken
+- **`@storyshelf/notify-git`** avoids a git-provider SDK like `notify-chat` (it depends only on core and `zod`; calls go through `httpJson`): `github`, `gitlab`, and a `git-log` provider for tests and local runs (`log` is taken
   by `notify-chat`, and provider kinds are unique across packages).
 
 They are packages, not part of `@storyshelf/core`, because core carries none of the provider code or
@@ -111,7 +111,7 @@ the statuses and the pull-request comment. Its details:
   otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
   A build past capture (`reviewing`, `approved`, `rejected`) with no manifest and no open `publish`
   job (queued, running or exhausting) has lost its content: `failure`, `Storybook content
-  unavailable, see build page` (informational, `neutral` on check runs; the page says to re-upload or
+unavailable, see build page` (informational, `neutral` on check runs; the page says to re-upload or
   purge). While such a job is open it stays `pending`, since capture can finish first. Every end of
   a publish job requests the state again once its row is written (the queue's `onEnded` hook).
 - A build without a commit SHA, or with a synthetic local identity, shows nothing.
