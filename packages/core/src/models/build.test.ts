@@ -338,6 +338,41 @@ describe("BuildModel: a cancelled build is terminal", () => {
     expect(stale.build?.captureJobId).toBe("J2");
   });
 
+  it("fails a build only while it is pending, and says whether its own write applied", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const model = new BuildModel(db, buildTables(db));
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+
+    const first = await model.failIfPending(id);
+    expect(first.applied).toBe(true);
+    expect(first.build?.status).toBe("failed");
+    // Already failed: a second call changes nothing and does not claim the write.
+    expect((await model.failIfPending(id)).applied).toBe(false);
+  });
+
+  it.each(["cancelled", "approved", "capturing"] as const)(
+    "leaves a %s build as it is when failIfPending finds it past pending",
+    async (status) => {
+      const { db } = makeDatabase();
+      const project = await new ProjectModel(db, projectTables(db)).create({
+        name: "Test",
+        gitRepository: "owner/repo",
+      });
+      const model = new BuildModel(db, buildTables(db));
+      const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+      await model.resetStatus(id, status);
+
+      const refused = await model.failIfPending(id);
+
+      expect(refused.applied).toBe(false);
+      expect(refused.build?.status).toBe(status);
+    },
+  );
+
   it("is left only by resetStatus (retry)", async () => {
     const { model, id } = await cancelled();
     expect((await model.resetStatus(id, "pending")).status).toBe("pending");

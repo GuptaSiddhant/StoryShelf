@@ -300,6 +300,27 @@ export class BuildModel {
   }
 
   /**
+   * Fail the build only while it is still `pending`: one conditional write, so a cancel, a verdict
+   * or a retry that landed since the caller read the row is never overwritten. Resolves to whether
+   * this write applied, and the row as it stands (null when the build is gone).
+   */
+  async failIfPending(id: string): Promise<{ applied: boolean; build: Build | null }> {
+    const stamp = nextStamp();
+    const columns = this.tables.builds;
+    const current = (await this.db.updateWhere(
+      columns,
+      id,
+      { status: "failed", updatedAt: stamp },
+      eq(col(columns, "status"), "pending"),
+    )) as unknown as Build | null;
+    // `updateWhere` returns the row either way; only our own write carries our stamp (compared as
+    // instants, as `failIfOwnedBy` does).
+    const applied =
+      current?.status === "failed" && instantOf(current.updatedAt) === instantOf(stamp);
+    return { applied, build: current };
+  }
+
+  /**
    * Record the affected-capture computation for a build. Idempotent: the CLI
    * posts this once after creating the build and before uploading the bundle.
    */

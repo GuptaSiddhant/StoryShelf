@@ -1,5 +1,6 @@
 ---
 "@storyshelf/app": patch
+"@storyshelf/core": patch
 "storyshelf": patch
 ---
 

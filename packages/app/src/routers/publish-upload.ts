@@ -92,17 +92,14 @@ async function publishInline(build: Build): Promise<void> {
  */
 async function rejectInlineZip(build: Build, reason: string): Promise<void> {
   await discardZip(build.projectId, build.id);
-  if (build.status !== "pending") {
-    return;
-  }
-  const failed = await new BuildModel(getStore().db).setStatus(build.id, "failed");
-  if (failed.status !== "failed") {
-    // A cancel landed after the build was read as pending and the write was refused (`cancelled`
-    // is terminal): the build stays as it is and no failure is announced.
+  // One conditional write: only a build still `pending` fails. A cancel, a verdict or a retry that
+  // landed since the route read the build keeps its status and raises no `build:failed`.
+  const { applied } = await new BuildModel(getStore().db).failIfPending(build.id);
+  if (!applied) {
     return;
   }
   getStore().logger.warn({ buildId: build.id, reason }, "inline zip rejected; build failed");
-  await announceBuildStatus(failed.id, "failed", { reason: sanitizeErrorText(reason, 300) });
+  await announceBuildStatus(build.id, "failed", { reason: sanitizeErrorText(reason, 300) });
 }
 
 async function failInlinePublish(build: Build, error: unknown): Promise<void> {
