@@ -707,7 +707,12 @@ describe("executeCaptureJob", () => {
       });
       render.mockResolvedValueOnce(passResult());
       render.mockRejectedValueOnce(new TargetLaunchError("firefox", "executable does not exist"));
-      const job = executeCaptureJob({ buildId }, options);
+      const logged: string[] = [];
+      const recordLog = async (_level: string, message: string): Promise<void> => {
+        await Promise.resolve();
+        logged.push(message);
+      };
+      const job = executeCaptureJob({ buildId, recordLog }, options);
       await expect(job).rejects.toBeInstanceOf(TargetLaunchError);
       await expect(job).rejects.toThrow(/Cannot launch firefox: executable does not exist/u);
       // Each engine was tried once, in order: nothing was isolated or retried as a crashing story.
@@ -716,8 +721,9 @@ describe("executeCaptureJob", () => {
         "firefox",
       ]);
       expect((await new BuildModel(db, tables(db)).get(buildId))?.status).toBe("failed");
-      // No crash isolation was logged: nothing was blamed, narrowed down or retried.
-      const logged = (await db.list(db.tables.captureLogs)).map((row) => String(row["message"]));
+      // The attempt log was written (the failure is in it) and holds no crash-isolation line:
+      // nothing was blamed, narrowed down or retried.
+      expect(logged).toContain("capture failed");
       expect(
         logged.filter((message) =>
           /isolating|crashed the browser|crash interrupted/u.test(message),
