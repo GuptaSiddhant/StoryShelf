@@ -52,11 +52,29 @@ const auth = stubAuth(null, {
 });
 
 let scratchDir = "";
+/** Stop functions of the apps the running test booted; `afterEach` runs them, whatever the outcome. */
+const running: (() => Promise<void>)[] = [];
+
+/** Stop every app the test booted, give each its chance, then report the ones that failed. */
+async function stopApps(): Promise<void> {
+  const stopped = await Promise.allSettled(running.splice(0).map(async (stop) => await stop()));
+  const failures = stopped.flatMap((result) =>
+    result.status === "rejected" ? [result.reason] : [],
+  );
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "an app did not stop cleanly");
+  }
+}
+
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-review-ui-"));
 });
 afterEach(async () => {
-  await rm(scratchDir, { recursive: true, force: true });
+  try {
+    await stopApps();
+  } finally {
+    await rm(scratchDir, { recursive: true, force: true });
+  }
 });
 
 type Stories = Record<string, { title: string; importPath: string; name?: string }>;
@@ -141,6 +159,10 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
     notifications: { notifiers: [providerOf("log", "room"), providerOf("dm", "person")] },
     logger: pino({ level: "silent" }),
   });
+  // Registered before `setup()`: the app starts its timers when it is created, so a failed setup
+  // still has to reach `teardown()`.
+  const stop = async (): Promise<void> => await app.lifecycle.teardown();
+  running.push(stop);
   await app.lifecycle.setup();
   const request =
     (prefix: string) =>
@@ -161,7 +183,7 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
       ...init,
       headers: { "x-csrf-token": getCsrfToken("s", id), ...(init.headers as object) },
     });
-  return { app, db, storage, api, page, sent, stop: async () => await app.lifecycle.teardown() };
+  return { app, db, storage, api, page, sent, stop };
 }
 
 type Booted = Awaited<ReturnType<typeof boot>>;
@@ -219,7 +241,6 @@ describe("the review gate", () => {
       expect(status, key).toBe(404);
       expect(body).toEqual({ error: REVIEW_DISABLED_MESSAGE });
     }
-    await booted.stop();
   });
 
   it("lets the same routes through on a project with review on", async () => {
@@ -233,7 +254,6 @@ describe("the review gate", () => {
       // eslint-disable-next-line no-await-in-loop -- few routes
       expect((await booted.api("alice", path)).status, path).toBe(200);
     }
-    await booted.stop();
   });
 
   it("follows the switch from one request to the next", async () => {
@@ -245,7 +265,6 @@ describe("the review gate", () => {
     expect((await booted.api("alice", `/builds/${id}/comments`)).status).toBe(404);
     expect((await patch(true)).status).toBe(200);
     expect((await booted.api("alice", `/builds/${id}/comments`)).status).toBe(200);
-    await booted.stop();
   });
 
   it("tells nothing about a project to someone who cannot view it", async () => {
@@ -253,7 +272,6 @@ describe("the review gate", () => {
     const response = await booted.api("outsider", "/builds/b1/comments");
     expect(response.status).toBe(403);
     expect(await response.text()).not.toContain(REVIEW_DISABLED_MESSAGE);
-    await booted.stop();
   });
 
   it("does not touch the pages of the build when review is off: they still render", async () => {
@@ -265,7 +283,6 @@ describe("the review gate", () => {
     expect(html).not.toContain("Approve build");
     expect(html).not.toContain("Changes in this build");
     expect(html).not.toContain("Add build comment");
-    await booted.stop();
   });
 
   describe("on the form routes of a project with review off", () => {
@@ -298,7 +315,6 @@ describe("the review gate", () => {
         expect(await outsider.text()).not.toContain(REVIEW_DISABLED_MESSAGE);
       };
       await Promise.all(FORM_ROUTES.map(async (path) => await probe(path)));
-      await booted.stop();
     });
 
     it("answers a project member with the plain 404 and nothing about the project", async () => {
@@ -312,7 +328,6 @@ describe("the review gate", () => {
       expect(response.status).toBe(404);
       expect(await response.text()).toBe(REVIEW_DISABLED_MESSAGE);
       expect((await new BuildModel(booted.db).get(id))?.status).toBe("approved");
-      await booted.stop();
     });
 
     it("keeps the review switch form reachable, so an admin can turn review back on", async () => {
@@ -331,7 +346,6 @@ describe("the review gate", () => {
       expect(saved.status).toBe(204);
       const project = (await (await booted.api("admin", "")).json()) as { reviewEnabled: boolean };
       expect(project.reviewEnabled).toBe(true);
-      await booted.stop();
     });
   });
 
@@ -374,7 +388,6 @@ describe("the review gate", () => {
       // eslint-disable-next-line no-await-in-loop -- two builds
       expect(await reviews.listByBuild(id)).toMatchObject([{ verdict: "approved", body: "ok" }]);
     }
-    await booted.stop();
   });
 });
 
@@ -408,7 +421,6 @@ describe("the changeset", () => {
     expect(body.removed.map((item) => item.title)).toEqual(["Card"]);
     expect(body.changed.map((item) => item.title)).toEqual(["Button"]);
     expect(body.unchanged).toBe(0);
-    await booted.stop();
   });
 
   it("shows the first build's components as added, with no baseline", async () => {
@@ -420,7 +432,6 @@ describe("the changeset", () => {
     };
     expect(body.baseline).toBeNull();
     expect(body.added).toHaveLength(2);
-    await booted.stop();
   });
 });
 
@@ -454,7 +465,6 @@ describe("the build page without testing", () => {
     expect(html).toContain("story button--primary");
     expect(html).toContain("Add build comment");
     expect(html).toContain(`/projects/gate/storybook/build/${id}/?path=/story/table--basic`);
-    await booted.stop();
   });
 
   it("gives developers and viewers no verdict controls, and viewers no comment form", async () => {
@@ -467,7 +477,6 @@ describe("the build page without testing", () => {
     expect(viewer).not.toContain("Approve build");
     expect(viewer).not.toContain("Add build comment");
     expect(viewer).toContain("Changes in this build");
-    await booted.stop();
   });
 
   it("takes a verdict from the form and lists it", async () => {
@@ -486,7 +495,6 @@ describe("the build page without testing", () => {
     expect(html).toContain("Alice Reviewer");
     expect(html).toContain("Looks good");
     expect(html).toContain("1 of 1 approval given");
-    await booted.stop();
   });
 
   it("tells the reviewer a build that is still publishing cannot be reviewed yet", async () => {
@@ -508,7 +516,6 @@ describe("the build page without testing", () => {
     expect(html).toContain("Waiting for the Storybook to publish");
     expect(html).toMatch(/<button[^>]*disabled[^>]*value="approved"/u);
     expect(html).toMatch(/<button[^>]*disabled[^>]*value="rejected"/u);
-    await booted.stop();
   });
 
   it("still renders the build page when the storage probe fails", async () => {
@@ -518,7 +525,6 @@ describe("the build page without testing", () => {
     const response = await booted.page("alice", `/builds/${id}`);
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("Waiting for the Storybook to publish");
-    await booted.stop();
   });
 
   it("takes a comment from the form", async () => {
@@ -573,7 +579,6 @@ describe("the build page without testing", () => {
       body: new URLSearchParams({ body: "viewers read only" }).toString(),
     });
     expect(foreign.status).toBe(403);
-    await booted.stop();
   });
 });
 
@@ -589,7 +594,6 @@ describe("the build page with testing", () => {
     expect(empty).toBeGreaterThan(changes);
     expect(verdict).toBeGreaterThan(empty);
     expect(html).toContain("a verdict is a sign-off");
-    await booted.stop();
   });
 });
 
@@ -622,7 +626,6 @@ describe("the component page", () => {
     ).text();
     expect(viewer).toContain("Primary needs a focus ring");
     expect(viewer).not.toContain("Add story comment");
-    await booted.stop();
   });
 
   it("has no comments section when the project has review off", async () => {
@@ -630,7 +633,6 @@ describe("the component page", () => {
     await publish(booted, "main");
     const html = await (await booted.page("dev", "/components/Button.stories.tsx")).text();
     expect(html).not.toContain("Comments on this story");
-    await booted.stop();
   });
 });
 
@@ -658,7 +660,6 @@ describe("the review settings and the switch-off pass", () => {
       reviewApprovals: number;
     };
     expect(project).toMatchObject({ reviewEnabled: true, reviewApprovals: 3 });
-    await booted.stop();
   });
 
   it("refuses a bad approvals count, and anyone but a project admin", async () => {
@@ -676,7 +677,6 @@ describe("the review settings and the switch-off pass", () => {
       form({ reviewEnabled: "", reviewApprovals: "1" }),
     );
     expect(denied.status).toBe(403);
-    await booted.stop();
   });
 
   it("accepts the pending builds nothing worked on when the form turns review off", async () => {
@@ -699,7 +699,6 @@ describe("the review settings and the switch-off pass", () => {
     // Turning it back on accepts nothing and holds nothing that is already accepted.
     await booted.page("admin", "/settings/review", form({ reviewEnabled: "true" }));
     expect((await builds.get(waiting))?.status).toBe("approved");
-    await booted.stop();
   });
 
   it("runs the same pass when the API turns review off", async () => {
@@ -710,7 +709,6 @@ describe("the review settings and the switch-off pass", () => {
       body: JSON.stringify({ reviewEnabled: false }),
     });
     expect((await new BuildModel(booted.db).get(waiting))?.status).toBe("approved");
-    await booted.stop();
   });
 });
 
@@ -764,7 +762,6 @@ describe("review events", () => {
     await vi.waitFor(() => expect(events(booted)).toContain("review:requested"));
     expect(id).toBeTruthy();
     expect(events(booted)).toContain("review:requested on feature/x");
-    await booted.stop();
   });
 
   describe("review:requested, once per review cycle", () => {
@@ -777,7 +774,6 @@ describe("review events", () => {
       await republishBuild(booted, id);
       await vi.waitFor(() => expect(booted.sent.length).toBeGreaterThan(1));
       expect(reviewRequests(booted)).toBe(1);
-      await booted.stop();
     });
 
     it("sends a new request after a genuine reopening, and none for a build that is not pending", async () => {
@@ -795,7 +791,6 @@ describe("review events", () => {
       await republishBuild(booted, id);
       expect(reviewRequests(booted)).toBe(2);
       expect(await builds.get(id)).toMatchObject({ reviewCycle: 1, reviewRequestedCycle: 1 });
-      await booted.stop();
     });
   });
 
@@ -813,7 +808,6 @@ describe("review events", () => {
     expect(events(booted)).not.toContain("build:pending");
     await give("approved");
     await vi.waitFor(() => expect(events(booted)).toContain("build:pending"));
-    await booted.stop();
   });
 
   it("raises review:verdict for each verdict, and one comment:created for build and story comments", async () => {
@@ -837,7 +831,6 @@ describe("review events", () => {
       expect(booted.sent.filter((subject) => subject.includes("comment:created"))).toHaveLength(2);
     });
     expect(events(booted)).not.toContain("review:comment");
-    await booted.stop();
   });
 
   describe("comment:created", () => {
@@ -871,8 +864,14 @@ describe("review events", () => {
       return seen;
     }
 
-    afterEach(() => {
-      vi.unstubAllGlobals();
+    afterEach(async () => {
+      // Apps stop while the stubs are still in place, as they did before teardown moved here, so a
+      // pending delivery meets the fetch stub and not the network.
+      try {
+        await stopApps();
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
 
     it("emits one comment:created per comment, anchored by scope, with the event header", async () => {
@@ -899,7 +898,6 @@ describe("review events", () => {
         ),
       );
       expect(events(booted)).not.toContain("review:comment");
-      await booted.stop();
     });
 
     it("carries the kind of the comment, plain or change request", async () => {
@@ -910,7 +908,6 @@ describe("review events", () => {
       await postComment(booted, id, { kind: "change_request" });
       await vi.waitFor(() => expect(seen).toHaveLength(2));
       expect(seen.map((item) => item.data["kind"])).toEqual(["comment", "change_request"]);
-      await booted.stop();
     });
 
     it("keeps delivering build and story comments to a webhook that lists only review:comment", async () => {
@@ -925,7 +922,6 @@ describe("review events", () => {
         ["comment:created", "comment:created", "build"],
         ["comment:created", "comment:created", "story"],
       ]);
-      await booted.stop();
     });
 
     it("keeps the same event id (the comment id) when a delivery is retried", async () => {
@@ -933,14 +929,19 @@ describe("review events", () => {
       const id = await publish(booted, "feature/x");
       const statuses = [503, 200];
       const seen = await deliveries(booted, ["comment:created"], () => statuses.shift() ?? 200);
+      const realSetTimeout = globalThis.setTimeout;
       vi.stubGlobal("setTimeout", (callback: () => void) => {
         callback();
         return 0;
       });
-      const created = await postComment(booted, id, {});
-      await vi.waitFor(() => expect(seen).toHaveLength(2));
-      expect(seen.map((item) => item.data["eventId"])).toEqual([created.id, created.id]);
-      await booted.stop();
+      try {
+        const created = await postComment(booted, id, {});
+        await vi.waitFor(() => expect(seen).toHaveLength(2));
+        expect(seen.map((item) => item.data["eventId"])).toEqual([created.id, created.id]);
+      } finally {
+        // Teardown calls setTimeout(...).unref(), so the real timer is back before the apps stop.
+        vi.stubGlobal("setTimeout", realSetTimeout);
+      }
     });
     describe("mentions (#463)", () => {
       it("resolves @handles against this project's members only, and stores ids", async () => {
@@ -962,7 +963,6 @@ describe("review events", () => {
           { userId: "alice", handle: "alice" },
           { userId: "view", handle: "view" },
         ]);
-        await booted.stop();
       });
 
       it("never takes who is mentioned from the request", async () => {
@@ -973,7 +973,6 @@ describe("review events", () => {
           mentions: [{ userId: "alice", handle: "alice" }],
         });
         expect(await mentionsOf(booted, id)).toEqual([[]]);
-        await booted.stop();
       });
 
       it("tells the mentioned member once, with no webhook and no message to the room", async () => {
@@ -996,7 +995,6 @@ describe("review events", () => {
         // The payload carries the comment text as typed, but no resolved mention (no id mapping).
         expect(seen[0]?.data).not.toHaveProperty("mentions");
         expect(seen[0]?.data).not.toHaveProperty("mentionedUserId");
-        await booted.stop();
       });
 
       it("highlights a self-mention but does not notify the author", async () => {
@@ -1007,7 +1005,6 @@ describe("review events", () => {
         expect(await mentionsOf(booted, id)).toEqual([["dev"]]);
         await vi.waitFor(() => expect(events(booted)).toContain("comment:created"));
         expect(mentionMessages(booted)).toBe(0);
-        await booted.stop();
       });
     });
   });
@@ -1043,7 +1040,6 @@ describe("mention suggestions and highlights (#463)", () => {
     // Who cannot comment gets no suggestions: viewers and outsiders are turned away.
     expect((await suggest("ask @al", "view")).status).toBeGreaterThanOrEqual(400);
     expect((await suggest("ask @al", "outsider")).status).toBeGreaterThanOrEqual(400);
-    await booted.stop();
   });
 
   it("fills the chosen member's handle into the box, and refuses anyone else", async () => {
@@ -1065,7 +1061,6 @@ describe("mention suggestions and highlights (#463)", () => {
     expect((await complete("outsider")).status).toBe(400);
     expect((await complete("dev")).status).toBe(400);
     expect((await complete("")).status).toBe(400);
-    await booted.stop();
   });
 
   it("completes a mention at the end of a long comment without losing text", async () => {
@@ -1081,7 +1076,6 @@ describe("mention suggestions and highlights (#463)", () => {
     const html = await res.text();
     expect(html).toContain(`${"a".repeat(5000)} ask @alice `);
     expect(html).not.toContain("@alice ice");
-    await booted.stop();
   });
 
   it("wires the comment boxes to the suggestions", async () => {
@@ -1090,7 +1084,6 @@ describe("mention suggestions and highlights (#463)", () => {
     const html = await (await booted.page("dev", `/builds/${id}`)).text();
     expect(html).toContain(`/projects/gate/builds/${id}/mention-suggest`);
     expect(html).toContain("build-comment-body-mentions");
-    await booted.stop();
   });
 
   it("highlights a mention with the member's current name, even after a rename", async () => {
@@ -1106,7 +1099,6 @@ describe("mention suggestions and highlights (#463)", () => {
     const after = await (await booted.page("dev", `/builds/${id}`)).text();
     expect(after).toMatch(/ss-review-mention-[^"]*">@Al R\.</u);
     expect(after).not.toContain("@Alice Reviewer");
-    await booted.stop();
   });
 
   it("leaves text that named no member plain", async () => {
@@ -1116,6 +1108,5 @@ describe("mention suggestions and highlights (#463)", () => {
     const html = await (await booted.page("dev", `/builds/${id}`)).text();
     expect(html).toContain("ping @outsider about this");
     expect(html).not.toMatch(/ss-review-mention-[^"]*">@outsider</u);
-    await booted.stop();
   });
 });
