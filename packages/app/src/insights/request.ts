@@ -8,10 +8,10 @@ import {
   triageEnvelopeSchema,
   type BuiltEvidence,
 } from "@storyshelf/core/insights";
-import { InsightModel, type InsightStartInput } from "@storyshelf/core/models";
+import { AiUsageModel, InsightModel, type InsightStartInput } from "@storyshelf/core/models";
 import type { Build, InsightRow, Project } from "@storyshelf/core/schema";
 import { createHash } from "node:crypto";
-import { assertWithinBudget } from "./budget.ts";
+import { reserveBudget } from "./budget.ts";
 import type { InsightDeps } from "./deps.ts";
 import { spawnJob } from "./job.ts";
 import { loadHealthEvidence, parseWindow } from "./load-health.ts";
@@ -44,15 +44,45 @@ function digest(data: Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
-/** Budget applies only when a new run would start (cache hits and in-flight rows are free). */
+/**
+ * Budget applies only when a new run would start (cache hits and in-flight rows are free): one
+ * call is reserved for it, whose id is returned (null when nothing was reserved).
+ */
 async function guardBudget(
   deps: InsightDeps,
   input: InsightStartInput,
   existing: InsightRow | null,
-): Promise<void> {
+): Promise<string | null> {
   const inFlight = existing?.status === "pending" || existing?.status === "running";
-  if (!inFlight) {
-    await assertWithinBudget(deps, input.projectId);
+  if (inFlight) {
+    return null;
+  }
+  return await reserveBudget(deps, {
+    projectId: input.projectId,
+    profile: input.profile,
+    task: input.kind,
+    model: input.model,
+  });
+}
+
+/** Start the insight the reservation is for; the reservation follows the insight or is given back. */
+async function startReserved(
+  deps: InsightDeps,
+  input: InsightStartInput,
+  reservation: string | null,
+): Promise<{ row: InsightRow; run: boolean }> {
+  const usage = new AiUsageModel(deps.db);
+  try {
+    const started = await new InsightModel(deps.db).start(input);
+    if (reservation !== null) {
+      await (started.run ? usage.attach(reservation, started.row.id) : usage.release(reservation));
+    }
+    return started;
+  } catch (error) {
+    if (reservation !== null) {
+      await usage.release(reservation).catch(() => null);
+    }
+    throw error;
   }
 }
 
@@ -66,8 +96,8 @@ async function launch(
   if (existing?.status === "done" && existing.inputHash === input.inputHash && !input.force) {
     return { row: existing, status: 200 };
   }
-  await guardBudget(deps, input, existing);
-  const { row, run } = await model.start(input);
+  const reservation = await guardBudget(deps, input, existing);
+  const { row, run } = await startReserved(deps, input, reservation);
   if (run) {
     begin(row);
   }

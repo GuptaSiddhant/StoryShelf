@@ -13,7 +13,7 @@ Set them in `createAi({ budget })`; all fields are optional.
 | `visionWeight`           | Multiplier on tokens counted for calls that sent screenshots (providers under-report image cost) | `5`     |
 | `perProjectCallsPerHour` | Calls one project can start per rolling hour                                                     | `50`    |
 
-The budget is counted from the usage recorded in the database, so it holds across **all server instances combined**. Checks run before a run starts and aren't atomic, so concurrent calls can overshoot slightly. When a limit is hit the API answers `429` with `Retry-After`; at 100% of the daily cap new runs wait for the next UTC day. **Cached results are still served** and cost nothing.
+The budget is counted from the usage recorded in the database, so it holds across **all server instances combined**. A run reserves one of its project's calls before the model is called (a usage row with no tokens yet, counted as a call), so concurrent requests cannot overshoot `perProjectCallsPerHour`. Tokens are only known after the call, so `dailyTokens` can still be overshot by the output of the calls already running. When a limit is hit the API answers `429` with `Retry-After`; at 100% of the daily cap new runs wait for the next UTC day. **Cached results are still served** and cost nothing.
 
 Calls that fail after the provider reported usage still count: the provider billed them.
 

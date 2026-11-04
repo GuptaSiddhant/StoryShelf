@@ -1,7 +1,7 @@
 /** DB-counted budget: pre-flight limits, usage rows and threshold alerts. */
 import { countedTokens, crossedThresholds, utcDay, utcDayStart } from "@storyshelf/core/insights";
 import { AiBudgetAlertModel, AiUsageModel } from "@storyshelf/core/models";
-import type { AiUsageInput } from "@storyshelf/core/models";
+import type { AiUsageInput, AiUsageReservation } from "@storyshelf/core/models";
 import { notifySystemWith } from "../notify.ts";
 import type { InsightDeps } from "./deps.ts";
 import { failWith } from "./errors.ts";
@@ -15,24 +15,33 @@ export async function dayTokens(deps: InsightDeps, now = new Date()): Promise<nu
   return rows.reduce((sum, row) => sum + countedTokens(row, row.images, { visionWeight }), 0);
 }
 
-/** Reject (429 + Retry-After) when the daily cap or the project's hourly limit is hit. */
-export async function assertWithinBudget(
+/**
+ * Reserve one of the project's calls before the model is called, or reject (429 + Retry-After)
+ * when the hourly limit or the daily token cap is hit. The reservation is a `pending` usage row
+ * counted as a call (see `AiUsageModel.reserve`), so concurrent requests cannot all pass a check
+ * and overshoot `perProjectCallsPerHour`. Tokens are only known after the call, so the daily cap
+ * can still be overshot by the output of the calls already running. Returns the reservation id.
+ */
+export async function reserveBudget(
   deps: InsightDeps,
-  projectId: string,
+  reservation: AiUsageReservation,
   now = new Date(),
-): Promise<void> {
+): Promise<string> {
   const budget = deps.ai.budget();
-  const calls = await new AiUsageModel(deps.db).countCalls(
-    projectId,
-    new Date(now.getTime() - HOUR_MS).toISOString(),
-  );
-  if (calls >= budget.perProjectCallsPerHour) {
+  const usage = new AiUsageModel(deps.db);
+  const row = await usage.reserve(reservation, {
+    since: new Date(now.getTime() - HOUR_MS).toISOString(),
+    max: budget.perProjectCallsPerHour,
+  });
+  if (row === null) {
     failWith(429, "ai-hourly-limit", 600);
   }
   if (budget.dailyTokens !== undefined && (await dayTokens(deps, now)) >= budget.dailyTokens) {
+    await usage.release(row.id);
     const midnight = new Date(`${utcDay(now)}T00:00:00.000Z`).getTime() + 86_400_000;
     failWith(429, "ai-daily-budget", Math.max(1, Math.ceil((midnight - now.getTime()) / 1000)));
   }
+  return row.id;
 }
 
 async function fireAlerts(
@@ -57,12 +66,19 @@ async function fireAlerts(
   }
 }
 
-/** Record one call's usage and fire `sys:ai-budget` for each newly crossed threshold. */
+/**
+ * Record one call's usage and fire `sys:ai-budget` for each newly crossed threshold. The insight's
+ * reserved row is filled in when it has one; otherwise a row is added.
+ */
 export async function recordUsage(deps: InsightDeps, input: AiUsageInput): Promise<void> {
   const { dailyTokens, visionWeight } = deps.ai.budget();
   const now = new Date();
   const before = dailyTokens === undefined ? 0 : await dayTokens(deps, now);
-  await new AiUsageModel(deps.db).record(input);
+  const usage = new AiUsageModel(deps.db);
+  const filled = input.insightId !== null && (await usage.complete(input.insightId, input));
+  if (!filled) {
+    await usage.record(input);
+  }
   if (dailyTokens !== undefined) {
     const after = before + countedTokens(input, input.images, { visionWeight });
     await fireAlerts(
