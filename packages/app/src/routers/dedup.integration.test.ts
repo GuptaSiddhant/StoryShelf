@@ -95,7 +95,7 @@ describe("content-addressed dedup", () => {
       });
     expect(recordContentUses).not.toHaveBeenCalled();
     expect((await manifest()).status).toBe(200);
-    expect(recordContentUses).toHaveBeenCalledWith("p1", "b1", [HELLO]);
+    expect(recordContentUses).toHaveBeenCalledWith("p1", "b1", [HELLO], expect.any(String));
     expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(true);
 
     // A blob a collector claimed first: 409, and no manifest makes the build serve it.
