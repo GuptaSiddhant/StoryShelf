@@ -175,7 +175,6 @@
         "packages/core/src/capture/pipeline.ts",
         "packages/app/src/middleware/csrf.ts",
         "packages/app/src/middleware/rate-limit.ts",
-        "packages/core/src/models/baseline.ts",
         "packages/core/src/models/build.ts",
         "packages/app/src/pages/build-detail.tsx",
         "packages/app/src/pages/compute-jobs.tsx",

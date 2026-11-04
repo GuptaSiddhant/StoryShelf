@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import type { Baseline } from "../schema/baseline.ts";
@@ -37,6 +37,21 @@ export interface BaselineUpsertOptions {
   fingerprint?: string | null;
 }
 
+/** What one baseline write needs, resolved: the story, where it comes from, and the caller's options. */
+interface UpsertInput {
+  projectId: string;
+  storyId: string;
+  viewport: string;
+  branch: string;
+  snapshotId: string;
+  sourceBuildId: string | null;
+  originalPath: string;
+  screenshotPath: string;
+  infraHash: string | null | undefined;
+  browser: string;
+  options: BaselineUpsertOptions;
+}
+
 /** Tables required by {@link BaselineModel}. */
 export interface BaselineTables {
   baselines: Table;
@@ -45,7 +60,7 @@ export interface BaselineTables {
 /** Data operations for baseline screenshots. */
 export class BaselineModel {
   private readonly tables: BaselineTables;
-  private readonly storage: StorageAdapter;
+  private readonly storage: StorageAdapter | undefined;
   private readonly secret?: SecretInput;
   private readonly webhookTables?: WebhookTables;
   private readonly db: DatabaseAdapter;
@@ -59,9 +74,17 @@ export class BaselineModel {
   ) {
     this.db = db;
     this.tables = tables ?? { baselines: db.tables.baselines };
-    this.storage = storage as StorageAdapter;
+    this.storage = storage;
     this.secret = secret;
     this.webhookTables = webhookTables;
+  }
+
+  /** The storage adapter: a model built without one can still resolve baselines, but not read or store files. */
+  #files(): StorageAdapter {
+    if (!this.storage) {
+      throw new Error("BaselineModel was created without a storage adapter");
+    }
+    return this.storage;
   }
 
   async getFor(
@@ -160,11 +183,12 @@ export class BaselineModel {
     if (isContentPath(projectId, sourcePath)) {
       return sourcePath;
     }
-    return await storeScreenshot(this.storage, projectId, await this.storage.read(sourcePath));
+    const storage = this.#files();
+    return await storeScreenshot(storage, projectId, await storage.read(sourcePath));
   }
 
   async read(baseline: Baseline): Promise<Buffer> {
-    return await this.storage.read(baseline.screenshotPath);
+    return await this.#files().read(baseline.screenshotPath);
   }
 
   async upsert(
@@ -202,7 +226,7 @@ export class BaselineModel {
     // row points at it. A content source is already referenced by its snapshot row.
     return isContentPath(projectId, sourcePath)
       ? await write()
-      : await withContentClaim(this.storage, projectId, write);
+      : await withContentClaim(this.#files(), projectId, write);
   }
 
   private async sourceBuildId(
@@ -241,132 +265,125 @@ export class BaselineModel {
     infraHash: string | null | undefined,
     options: BaselineUpsertOptions,
   ): Promise<Baseline> {
-    const browser = options.browser ?? DEFAULT_BROWSER;
-
-    const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
+    const input: UpsertInput = {
+      projectId,
+      storyId,
+      viewport,
+      branch,
+      snapshotId,
+      sourceBuildId,
+      originalPath,
+      screenshotPath,
+      infraHash,
+      browser: options.browser ?? DEFAULT_BROWSER,
+      options,
+    };
+    const existing = await this.getFor(projectId, storyId, viewport, branch, input.browser);
     const lifecycle = this.db.buildReferenceLifecycle;
     if (!lifecycle && options.capturingBuild) {
       // No transaction to fence in: the narrowest window is a check right before the write.
       await assertBuildLive(this.db, options.capturingBuild);
     }
-    if (lifecycle) {
-      const approval = options.approval;
-      const baseline = await upsertAtomicBaseline(
-        lifecycle,
-        { baselines: this.tables.baselines, snapshots: this.db.tables.snapshots },
-        {
-          id: existing?.id ?? ulid(),
-          existingId: existing?.id ?? null,
-          existingVersion: existing?.updatedAt ?? null,
-          projectId,
-          storyId,
-          viewport,
-          branch,
-          browser,
-          snapshotId,
-          sourceBuildId,
-          originalPath,
-          screenshotPath,
-          infraHash,
-          fingerprint: options.fingerprint,
-          mode: options.mode,
-          beforeWrite: async (tx): Promise<void> => {
-            if (options.capturingBuild) {
-              await assertBuildLiveInTx(tx, this.db.tables.builds, options.capturingBuild);
-            }
-            if (approval) {
-              await approveInTransaction(tx, this.db.tables, approval);
-            }
-          },
+    const baseline = lifecycle
+      ? await this.#upsertFenced(lifecycle, input, existing)
+      : await this.#upsertUnfenced(input, existing);
+    await this.#emitUpserted(baseline, input, existing !== null);
+    return baseline;
+  }
+
+  /** Write through the lifecycle capability: the row, its references and the checks in one transaction. */
+  async #upsertFenced(
+    lifecycle: BuildReferenceLifecycle,
+    input: UpsertInput,
+    existing: Baseline | null,
+  ): Promise<Baseline> {
+    const { options } = input;
+    const approval = options.approval;
+    return await upsertAtomicBaseline(
+      lifecycle,
+      { baselines: this.tables.baselines, snapshots: this.db.tables.snapshots },
+      {
+        id: existing?.id ?? ulid(),
+        existingId: existing?.id ?? null,
+        existingVersion: existing?.updatedAt ?? null,
+        projectId: input.projectId,
+        storyId: input.storyId,
+        viewport: input.viewport,
+        branch: input.branch,
+        browser: input.browser,
+        snapshotId: input.snapshotId,
+        sourceBuildId: input.sourceBuildId,
+        originalPath: input.originalPath,
+        screenshotPath: input.screenshotPath,
+        infraHash: input.infraHash,
+        fingerprint: options.fingerprint,
+        mode: options.mode,
+        beforeWrite: async (tx): Promise<void> => {
+          if (options.capturingBuild) {
+            await assertBuildLiveInTx(tx, this.db.tables.builds, options.capturingBuild);
+          }
+          if (approval) {
+            await approveInTransaction(tx, this.db.tables, approval);
+          }
         },
-      );
-      if (this.webhookTables) {
-        await emitWebhookEvent(
-          this.db,
-          this.webhookTables,
-          projectId,
-          existing ? "baseline:updated" : "baseline:created",
-          {
-            baselineId: baseline.id,
-            storyId,
-            viewport,
-            browser,
-            mode: options.mode ?? null,
-            branch,
-            snapshotId,
-          },
-          this.secret,
-        );
-      }
-      return baseline;
-    }
-    let baseline: Baseline;
+      },
+    );
+  }
+
+  /** Write without the capability: update the existing row, or insert a new one. */
+  async #upsertUnfenced(input: UpsertInput, existing: Baseline | null): Promise<Baseline> {
+    const { options } = input;
     if (existing) {
-      baseline = (await this.db.update(this.tables.baselines, existing.id, {
-        snapshotId,
-        sourceBuildId,
-        screenshotPath,
-        infraHash: infraHash ?? existing.infraHash ?? null,
+      return (await this.db.update(this.tables.baselines, existing.id, {
+        snapshotId: input.snapshotId,
+        sourceBuildId: input.sourceBuildId,
+        screenshotPath: input.screenshotPath,
+        infraHash: input.infraHash ?? existing.infraHash ?? null,
         fingerprint: options.fingerprint ?? existing.fingerprint ?? null,
         mode: options.mode ?? existing.mode ?? null,
         updatedAt: new Date().toISOString(),
       })) as unknown as Baseline;
-      if (this.webhookTables) {
-        await emitWebhookEvent(
-          this.db,
-          this.webhookTables,
-          projectId,
-          "baseline:updated",
-          {
-            baselineId: baseline.id,
-            storyId,
-            viewport,
-            browser,
-            mode: options.mode ?? null,
-            branch,
-            snapshotId,
-          },
-          this.secret,
-        );
-      }
-    } else {
-      const now = new Date().toISOString();
-      baseline = (await this.db.insert(this.tables.baselines, {
-        id: ulid(),
-        projectId,
-        storyId,
-        viewportName: viewport,
-        branch,
-        snapshotId,
-        sourceBuildId,
-        screenshotPath,
-        infraHash: infraHash ?? null,
-        fingerprint: options.fingerprint ?? null,
-        mode: options.mode ?? null,
-        browser,
-        createdAt: now,
-        updatedAt: now,
-      })) as unknown as Baseline;
-      if (this.webhookTables) {
-        await emitWebhookEvent(
-          this.db,
-          this.webhookTables,
-          projectId,
-          "baseline:created",
-          {
-            baselineId: baseline.id,
-            storyId,
-            viewport,
-            browser,
-            mode: options.mode ?? null,
-            branch,
-            snapshotId,
-          },
-          this.secret,
-        );
-      }
     }
-    return baseline;
+    const now = new Date().toISOString();
+    return (await this.db.insert(this.tables.baselines, {
+      id: ulid(),
+      projectId: input.projectId,
+      storyId: input.storyId,
+      viewportName: input.viewport,
+      branch: input.branch,
+      snapshotId: input.snapshotId,
+      sourceBuildId: input.sourceBuildId,
+      screenshotPath: input.screenshotPath,
+      infraHash: input.infraHash ?? null,
+      fingerprint: options.fingerprint ?? null,
+      mode: options.mode ?? null,
+      browser: input.browser,
+      createdAt: now,
+      updatedAt: now,
+    })) as unknown as Baseline;
+  }
+
+  /** Tell the project's webhooks that a baseline was created or updated, when webhooks are wired. */
+  async #emitUpserted(baseline: Baseline, input: UpsertInput, existed: boolean): Promise<void> {
+    if (!this.webhookTables) {
+      return;
+    }
+    await emitWebhookEvent(
+      this.db,
+      this.webhookTables,
+      input.projectId,
+      existed ? "baseline:updated" : "baseline:created",
+      {
+        baselineId: baseline.id,
+        storyId: input.storyId,
+        viewport: input.viewport,
+        browser: input.browser,
+        mode: input.options.mode ?? null,
+        branch: input.branch,
+        snapshotId: input.snapshotId,
+      },
+      this.secret,
+    );
   }
 
   async list(projectId: string): Promise<Baseline[]> {
@@ -384,7 +401,7 @@ export class BaselineModel {
       return;
     }
     try {
-      await this.storage.delete(baseline.screenshotPath);
+      await this.#files().delete(baseline.screenshotPath);
     } catch {
       // ignore missing file
     }
@@ -422,14 +439,22 @@ export class BaselineModel {
   async removeOrphans(projectId: string, validStoryIds: Set<string>): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => !validStoryIds.has(baseline.storyId));
-    await Promise.all(toRemove.map(async (baseline) => await this.removeRecord(baseline)));
+    await Promise.all(
+      toRemove.map(async (baseline) => {
+        await this.removeRecord(baseline);
+      }),
+    );
     return toRemove.length;
   }
 
   async removeForBranch(projectId: string, branch: string): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => baseline.branch === branch);
-    await Promise.all(toRemove.map(async (baseline) => await this.removeRecord(baseline)));
+    await Promise.all(
+      toRemove.map(async (baseline) => {
+        await this.removeRecord(baseline);
+      }),
+    );
     return toRemove.length;
   }
 
