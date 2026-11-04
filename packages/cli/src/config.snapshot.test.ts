@@ -5,10 +5,11 @@
  * for each environment. A split of the module can then be shown to resolve the same things.
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detectGitDefaultBranch,
@@ -158,6 +159,16 @@ describe("config resolution", () => {
       unversioned: schemaReference(dir, remote),
       badModule: schemaReference(dir, { moduleUrl: "not a url", version: "9.9.9" }),
     }).toMatchSnapshot();
+  });
+
+  it("points the default $schema at the schema file shipped in the CLI package", () => {
+    // Resolved from this module's own location, so it must not move when the module is split.
+    const reference = schemaReference(dir);
+    expect(reference.startsWith(".")).toBe(true);
+    expect(resolve(dir, reference)).toBe(
+      fileURLToPath(new URL("../schema/storyshelf-config.json", import.meta.url)),
+    );
+    expect(existsSync(resolve(dir, reference))).toBe(true);
   });
 
   it.each(MAIN_TABLE)("reads Storybook metadata from %s", async (_name, source) => {
