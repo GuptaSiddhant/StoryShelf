@@ -90,7 +90,7 @@ Feature-branch baselines are GC'd after `branchTtlDays` (default 30, `null` = di
 | -------------------- | -------------- | ------------------------------------------------------------ |
 | `branchTtlDays`      | 30             | Days of inactivity before feature-branch baselines GC'd      |
 | `branchGcIntervalMs` | 86400000 (24h) | How often to run the GC sweep                                |
-| `purgeTtlDays`       | unset (opt-in) | Days before terminal builds are purged daily; unset: no scheduled purge (a manual purge uses 30) |
+| `purgeTtlDays`       | unset (opt-in) | Days before terminal builds are purged daily; unset: no scheduled purge (a manual purge then uses 30) |
 
 ```mermaid
 timeline
@@ -126,7 +126,7 @@ On the build detail page each snapshot shows `Baseline: <branch>@<buildId>` or `
 
 ## Retention vs. baselines
 
-Builds are transient and purged by `purgeTtlDays` once you set it (a manual purge uses 30); baselines outlive their builds and are stored separately. Purging a build does not delete its baseline — the next build on that branch still compares against it until `branchTtlDays` GC.
+Builds are transient and purged by `purgeTtlDays` once you set it (a manual purge uses it too, else 30); baselines outlive their builds and are stored separately. Purging a build does not delete its baseline — the next build on that branch still compares against it until `branchTtlDays` GC.
 
 | What                     | Retention       | Survives purge? |
 | ------------------------ | --------------- | --------------- |

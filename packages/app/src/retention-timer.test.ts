@@ -36,7 +36,8 @@ async function arm(options: {
     removedBaselines: 0,
   });
   const warn = vi.fn();
-  const logger = { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } as unknown as Logger;
+  const error = vi.fn();
+  const logger = { info: vi.fn(), warn, error, debug: vi.fn() } as unknown as Logger;
   const schedule = vi.spyOn(globalThis, "setTimeout");
   const timer = startBranchGcTimer(
     db,
@@ -50,7 +51,7 @@ async function arm(options: {
     if (typeof scheduled !== "function") throw new Error("retention timer was not scheduled");
     await (scheduled as () => Promise<void>)();
   };
-  return { timer, run, purge, warn };
+  return { db, timer, run, purge, warn, error };
 }
 
 describe("background retention", () => {
@@ -130,6 +131,28 @@ describe("background retention", () => {
       await run();
       expect(purge).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledTimes(1);
+      timer?.stop();
+    });
+
+    it("still cleans AI data when the build purge fails", async () => {
+      const { db, timer, run, purge, error } = await arm({
+        capability: true,
+        config: { purgeTtlDays: 14 },
+      });
+      await db.insert(db.tables.aiUsage, {
+        id: "expired",
+        projectId: "p",
+        createdAt: "2020-01-01T00:00:00.000Z",
+      });
+      purge.mockRejectedValue(new Error("storage down"));
+
+      await run();
+
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ stage: "build purge" }),
+        "retention sweep stage failed",
+      );
+      expect(await db.get(db.tables.aiUsage, "expired")).toBeNull();
       timer?.stop();
     });
 

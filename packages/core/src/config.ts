@@ -139,7 +139,7 @@ export interface ShelfConfig {
   /**
    * Days after which the daily sweep purges terminal builds (and idle pending ones). Unset (the
    * default) schedules no build purge, so an upgrade never starts deleting builds; a manual
-   * `POST /api/v1/admin/purge` without a `ttlDays` uses 30 then. Needs a database with safe build
+   * `POST /api/v1/admin/purge` without a `ttlDays` uses this value, else 30. Needs a database with safe build
    * retention (ADR 0039).
    */
   purgeTtlDays?: number;

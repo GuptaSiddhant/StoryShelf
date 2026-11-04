@@ -804,7 +804,7 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 
 ### What is purged
 
-- **Builds in a terminal state** (`approved`/`rejected`/`failed`/`cancelled`) older than `purgeTtlDays` (no default: the daily purge is opt-in; a manual purge without `ttlDays` uses 30).
+- **Builds in a terminal state** (`approved`/`rejected`/`failed`/`cancelled`) older than `purgeTtlDays` (no default: the daily purge is opt-in; a manual purge without `ttlDays` uses `purgeTtlDays` when it is set, else 30).
 - **Old builds of a branch**: retain the most recent build per branch (it is the branch's "current" state and powers the PR status link); purge older ones past TTL.
 - Builds stuck in `capturing`/`comparing`/`reviewing` are **not** purged (a `reviewing` build must not vanish before review).
 - **`pending` builds** (waiting for a review verdict, ADR 0013 decision 9; `core/src/retention/pending.ts`): purged once their last activity (the build's `updated_at`, its newest comment, its newest `build_reviews` row) is older than `purgeTtlDays`. A pending build replaced by a newer one on its branch with no attempts, comments or verdicts is "superseded" and leaves at the same window; the latest-per-branch rule does not shield pending builds, and persistent ones are kept. No new status.

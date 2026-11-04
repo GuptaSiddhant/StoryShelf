@@ -79,16 +79,32 @@ function createSweepRunner(context: SweepContext): () => Promise<void> {
 }
 
 async function sweep(context: SweepContext): Promise<void> {
-  const { db, logger, branchTtlDays, purgeTtlDays, testing } = context;
+  const { db, branchTtlDays, purgeTtlDays, testing } = context;
   // Baseline removal must be coordinated with references: a testing deployment GCs branches only
-  // when its database has the lifecycle capability. Independent AI-data cleanup always runs.
+  // when its database has the lifecycle capability. Independent AI-data cleanup always runs, and
+  // each stage fails on its own: a build-purge error must not stop the others.
   if (branchTtlDays !== null && (!testing || db.buildReferenceLifecycle)) {
-    await sweepBranches(context, branchTtlDays);
+    await stage(context, "branch GC", async () => {
+      await sweepBranches(context, branchTtlDays);
+    });
   }
   if (purgeTtlDays !== undefined) {
-    await sweepBuilds(context, purgeTtlDays);
+    await stage(context, "build purge", async () => {
+      await sweepBuilds(context, purgeTtlDays);
+    });
   }
-  await purgeAiData(db, new Date(), logger);
+  await stage(context, "AI data cleanup", async () => {
+    await purgeAiData(db, new Date(), context.logger);
+  });
+}
+
+/** Run one stage of the sweep; a failure is logged and leaves the next stage to run. */
+async function stage(context: SweepContext, name: string, run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    context.logger.error({ err: error, stage: name }, "retention sweep stage failed");
+  }
 }
 
 function retentionFor(context: SweepContext): Retention {
