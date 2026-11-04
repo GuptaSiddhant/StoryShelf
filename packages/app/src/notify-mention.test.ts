@@ -209,6 +209,16 @@ describe("notifyMentionWith", () => {
     expect(await mention(db, "bob", ["email"])).toEqual([]);
   });
 
+  it("still emails a member whose only opt-out is from review requests", async () => {
+    const { db } = makeDatabase();
+    await seed(db);
+    // What the review-request switch records for someone with no subscription: no topics, no channels.
+    await new NotificationSubscriptionModel(db).setReviewRequests("p1", "bob", false);
+    const sent = await mention(db, "bob", ["email"]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ kind: "email", to: "bob@example.com" });
+  });
+
   it("sends nothing without an email provider or to a disabled account", async () => {
     const { db } = makeDatabase();
     await seed(db, ["cy"]);

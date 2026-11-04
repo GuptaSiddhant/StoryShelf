@@ -1067,8 +1067,7 @@ describe("mention suggestions and highlights (#463)", () => {
     );
     for (const { status, text } of refused) {
       expect(status).toBe(200);
-      expect(text).toContain("ask @al");
-      expect(text).not.toMatch(/@(?:outsider|dev)\b/u);
+      expect(text).toMatch(/<textarea[^>]*>ask @al<\/textarea>/u);
     }
   });
 

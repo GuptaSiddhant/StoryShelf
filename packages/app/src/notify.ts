@@ -362,7 +362,9 @@ async function mentionTargets(
 ): Promise<NotificationChannel[]> {
   const rows = await new NotificationSubscriptionModel(db).list(projectId);
   const own = rows.find((row) => row.userId === userId);
-  if (own !== undefined) {
+  // The record of "no review requests" opts out of those and nothing else: they still get a
+  // mention by default email.
+  if (own !== undefined && !NotificationSubscriptionModel.isReviewOptOutOnly(own)) {
     return own.enabled ? await targetsForSub(db, own, kinds) : [];
   }
   return kinds.personal.has("email") ? await emailTarget(db, projectId, userId) : [];

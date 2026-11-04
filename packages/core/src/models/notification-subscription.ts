@@ -100,6 +100,16 @@ export class NotificationSubscriptionModel {
   }
 
   /**
+   * Whether a row is only the record of "no review requests" (disabled, no topics, no channels,
+   * review requests off), not an "Email me" opt-out. By design a row in this shape counts as that
+   * placeholder even when it came from the API, and switching review requests back on removes it
+   * (Architect decision on #542). It opts the person out of review requests and nothing else.
+   */
+  static isReviewOptOutOnly(row: NotificationSubscriptionRow): boolean {
+    return !row.enabled && !row.reviewRequests && row.events === null && row.via === null;
+  }
+
+  /**
    * Turn `review:requested` on or off for a person, touching nothing else. Someone with no row
    * who turns it off gets a disabled one (no topics, no channels), so the opt-out is recorded
    * without subscribing them to anything. Turning it back on for exactly that placeholder
@@ -115,14 +125,7 @@ export class NotificationSubscriptionModel {
       }
       return;
     }
-    // Shape check by design: an API-made row in this shape is read as the placeholder too, and
-    // switching review requests back on restores the defaults (Architect decision on #542).
-    const placeholder =
-      !existing.enabled &&
-      !existing.reviewRequests &&
-      existing.events === null &&
-      existing.via === null;
-    if (on && placeholder) {
+    if (on && NotificationSubscriptionModel.isReviewOptOutOnly(existing)) {
       await this.remove(projectId, userId);
       return;
     }
