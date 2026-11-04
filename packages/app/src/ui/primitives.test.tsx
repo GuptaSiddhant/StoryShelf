@@ -295,6 +295,11 @@ describe("CodeBlock and FilterInput", () => {
     expect(html).toContain("#i-copy");
   });
 
+  it("makes a scrolling snippet keyboard-focusable", async () => {
+    const html = await render(<CodeBlock code="npx storyshelf upload" />);
+    expect(html).toContain('<pre tabindex="0">');
+  });
+
   it("renders a labeled search input the shell script can find", async () => {
     const html = await render(<FilterInput label="Filter projects" />);
     expect(html).toContain("data-filter-input");
