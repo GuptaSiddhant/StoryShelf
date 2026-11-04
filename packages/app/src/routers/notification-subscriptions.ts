@@ -43,7 +43,7 @@ function assertPersonalKinds(via: readonly string[] | undefined): void {
     const provider = getStore().notifiers.find((candidate) => candidate.metadata.kind === kind);
     if (provider !== undefined && provider.metadata.audience !== "person") {
       throw new HTTPException(422, {
-        message: `${provider.metadata.name} posts to a room; add it as a project channel instead`,
+        message: `${provider.metadata.name} (${kind}) posts to a room; add it as a project channel instead`,
       });
     }
   }

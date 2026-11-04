@@ -276,6 +276,20 @@ describe("notifyProject", () => {
       ]);
     });
 
+    it("sends no default review request through an email provider that is not declared personal", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const emailed: unknown[] = [];
+      const undeclared = recordingProvider("email", emailed);
+      const metadata = { ...undeclared.metadata } as Record<string, unknown>;
+      delete metadata["audience"];
+      const provider = { ...undeclared, metadata } as never as NotifierProvider;
+      await runWithStore(storeFor(db, [provider]), async () => {
+        await notifyProject({ id: "p1", slug: "test-project" }, "review:requested", {});
+      });
+      expect(emailed).toEqual([]);
+    });
+
     it("lets a reviewer opt out by turning their subscription off or narrowing its topics", async () => {
       const { db } = makeDatabase();
       await seedUsers(db);

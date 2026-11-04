@@ -190,6 +190,18 @@ describe("notifyMentionWith", () => {
     expect(lines).toHaveLength(1);
   });
 
+  it("does not email an unsubscribed member through a provider that is not declared personal", async () => {
+    const { db } = makeDatabase();
+    await seed(db);
+    const sent: Sent[] = [];
+    const email = provider("email", sent);
+    const metadata = { ...email.metadata } as Record<string, unknown>;
+    delete metadata["audience"];
+    const undeclared = { ...email, metadata } as never as NotifierProvider;
+    await notifyMentionWith(storeFor(db, [undeclared]), PROJECT, "bob", DATA, "/builds/b1");
+    expect(sent).toEqual([]);
+  });
+
   it("sends nothing to a member who turned their subscription off", async () => {
     const { db } = makeDatabase();
     await seed(db);

@@ -218,7 +218,7 @@ async function defaultTargets(
   rows: NotificationSubscriptionRow[],
   kinds: DeliveryKinds,
 ): Promise<NotificationChannel[]> {
-  if (!kinds.wired.has("email")) {
+  if (!kinds.personal.has("email")) {
     return [];
   }
   const subscribed = new Set(rows.map((row) => row.userId));
@@ -353,7 +353,7 @@ async function mentionTargets(
   if (own !== undefined) {
     return own.enabled ? await targetsForSub(db, own, kinds) : [];
   }
-  return kinds.wired.has("email") ? await emailTarget(db, projectId, userId) : [];
+  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId) : [];
 }
 
 /** Notify one project member that a comment mentions them. Best-effort, like every fan-out. */

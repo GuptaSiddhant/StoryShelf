@@ -133,7 +133,7 @@ describe("notification subscriptions", () => {
     const refused = await put(["email", "slack-webhook"]);
     expect(refused.status).toBe(422);
     expect(await refused.text()).toContain(
-      "Slack posts to a room; add it as a project channel instead",
+      "Slack (slack-webhook) posts to a room; add it as a project channel instead",
     );
     expect((await put(["email"])).status).toBe(200);
     expect((await put(["not-wired"])).status).toBe(200);
