@@ -18,6 +18,8 @@ export interface CheckRepo {
   token: string;
   owner: string;
   repo: string;
+  /** The GitHub App the runs belong to: only its runs are found, updated and mirrored. */
+  appId?: string | undefined;
   logger?: Logger | undefined;
 }
 
@@ -95,22 +97,41 @@ function withBatch(body: CheckRunBody, batch: CheckAnnotation[] | undefined): Wi
   return batch === undefined ? body : { ...body, output: { ...body.output, annotations: batch } };
 }
 
+/** Runs listed per page, and the pages read before giving up. */
+const RUNS_PAGE = 100;
+const RUNS_PAGES = 10;
+
 /** The runs of this commit that carry the status's `external_id`, oldest first. */
 async function findRuns(
   repo: CheckRepo,
   input: { sha: string; context: string },
 ): Promise<ExistingRun[]> {
+  const all = await listRuns(repo, input, { page: 1, seen: [] });
+  return all
+    .filter((run) => run.external_id === externalIdOf(input.context))
+    .toSorted((first, second) => first.id - second.id);
+}
+
+/** Every run of the commit with this name (of this App, when it is known), page by page. */
+async function listRuns(
+  repo: CheckRepo,
+  input: { sha: string; context: string },
+  at: { page: number; seen: ExistingRun[] },
+): Promise<ExistingRun[]> {
+  const app = repo.appId === undefined ? "" : `&app_id=${encodeURIComponent(repo.appId)}`;
   const url = repoPath(
     repo.owner,
     repo.repo,
-    `/commits/${encodeURIComponent(input.sha)}/check-runs?filter=all&per_page=100&check_name=${encodeURIComponent(input.context)}`,
+    `/commits/${encodeURIComponent(input.sha)}/check-runs?filter=all&per_page=${String(RUNS_PAGE)}&page=${String(at.page)}&check_name=${encodeURIComponent(input.context)}${app}`,
   );
   const listed = await httpJson<{ check_runs?: ExistingRun[] }>(url, {
     headers: githubHeaders(repo.token),
   });
-  return (listed.check_runs ?? [])
-    .filter((run) => run.external_id === externalIdOf(input.context))
-    .toSorted((first, second) => first.id - second.id);
+  const runs = listed.check_runs ?? [];
+  const seen = [...at.seen, ...runs];
+  return runs.length < RUNS_PAGE || at.page >= RUNS_PAGES
+    ? seen
+    : await listRuns(repo, input, { page: at.page + 1, seen });
 }
 
 async function createRun(repo: CheckRepo, body: unknown): Promise<number> {

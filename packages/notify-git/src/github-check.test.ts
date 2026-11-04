@@ -64,7 +64,7 @@ describe("postCheckRun", () => {
     const calls = github();
     await postCheckRun(repo, input);
     expect(calls[0]?.url).toBe(
-      "https://api.github.com/repos/acme/widgets/commits/abc123/check-runs?filter=all&per_page=100&check_name=storyshelf%2Ftesting",
+      "https://api.github.com/repos/acme/widgets/commits/abc123/check-runs?filter=all&per_page=100&page=1&check_name=storyshelf%2Ftesting",
     );
     expect(calls[1]?.url).toBe("https://api.github.com/repos/acme/widgets/check-runs");
     expect(calls[1]?.init.method).toBe("POST");
@@ -164,6 +164,53 @@ describe("postCheckRun", () => {
     ]);
     expect(bodyOf(calls[3])).toMatchObject({ status: "completed", conclusion: "success" });
     expect(bodyOf(calls[3])).not.toHaveProperty("head_sha");
+  });
+
+  it("asks only for the runs of the configured App when it is known", async () => {
+    const calls = github();
+    await postCheckRun({ ...repo, appId: "123" }, input);
+    expect(calls[0]?.url).toContain("&app_id=123");
+    vi.unstubAllGlobals();
+    const without = github();
+    await postCheckRun(repo, input);
+    expect(without[0]?.url).not.toContain("app_id");
+  });
+
+  it("reads the next page of runs, so a run past the first hundred is still found and updated", async () => {
+    const others = Array.from({ length: 100 }, (_, at) => ({
+      id: 1000 + at,
+      external_id: "someone-else",
+    }));
+    const calls = stubFetch((url, init) => {
+      if (init.method !== undefined && init.method !== "GET") {
+        return Response.json({ id: 9 });
+      }
+      return Response.json({
+        check_runs: url.includes("&page=1&") ? others : [{ id: 9, external_id: RUN.external_id }],
+      });
+    });
+    await postCheckRun(repo, { ...input, state: "success", description: "Passed" });
+    const lists = calls.filter((call) => call.url.includes("/check-runs?"));
+    expect(lists.map((call) => /[?&]page=(?<page>\d+)/u.exec(call.url)?.groups?.["page"])).toEqual([
+      "1",
+      "2",
+    ]);
+    const writes = calls.filter((call) => call.init.method === "PATCH");
+    expect(writes.map((call) => call.url.split("/").at(-1))).toEqual(["9"]);
+    expect(calls.some((call) => call.init.method === "POST")).toBe(false);
+  });
+
+  it("stops after ten pages of full runs", async () => {
+    const full = Array.from({ length: 100 }, (_, at) => ({ id: at, external_id: "someone-else" }));
+    const calls = stubFetch((_url, init) =>
+      init.method === undefined || init.method === "GET"
+        ? Response.json({ check_runs: full })
+        : Response.json({ id: 77 }),
+    );
+    await postCheckRun(repo, input);
+    // Ten pages, then the create (the re-list after it reads ten pages again).
+    expect(calls.slice(0, 10).every((call) => call.url.includes("/check-runs?"))).toBe(true);
+    expect(calls[10]?.init.method).toBe("POST");
   });
 
   it("finds only runs of this name and id, and orders them oldest first", async () => {

@@ -60,9 +60,9 @@ describe("gitHubNotifier in checks mode", () => {
     });
     expect(calls.map((call) => call.url)).toEqual([
       "https://api.github.com/app/installations/2/access_tokens",
-      "https://api.github.com/repos/acme/widgets/commits/abc/check-runs?filter=all&per_page=100&check_name=storyshelf%2Ftesting",
+      "https://api.github.com/repos/acme/widgets/commits/abc/check-runs?filter=all&per_page=100&page=1&check_name=storyshelf%2Ftesting&app_id=1",
       "https://api.github.com/repos/acme/widgets/check-runs",
-      "https://api.github.com/repos/acme/widgets/commits/abc/check-runs?filter=all&per_page=100&check_name=storyshelf%2Ftesting",
+      "https://api.github.com/repos/acme/widgets/commits/abc/check-runs?filter=all&per_page=100&page=1&check_name=storyshelf%2Ftesting&app_id=1",
     ]);
     expect(calls[2]?.init.headers).toMatchObject({ authorization: "Bearer ghs_inst" });
     expect(bodyOf(calls[2])).toMatchObject({ status: "queued", head_sha: "abc" });
