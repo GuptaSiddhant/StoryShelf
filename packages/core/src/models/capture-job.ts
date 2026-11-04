@@ -1,5 +1,5 @@
 /** Rows of the database queue (`capture_jobs`): job rows, per-attempt claim rows, and their views. */
-import { and, asc, desc, eq, inArray, isNull, lt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte } from "drizzle-orm";
 import type { Column, SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type {
@@ -126,6 +126,24 @@ export class CaptureJobModel {
       { rerunRequestedAt: now, updatedAt: now },
       allOf(eq(this.#c.status, "running"), isNull(this.#c.rerunRequestedAt)),
     )) as unknown as CaptureJobRow | null;
+  }
+
+  /**
+   * Take the rerun request of the ended job `jobId`: one conditional write clears the marker, and
+   * only the writer whose write cleared it gets `true`, so of several settlers reaching the same
+   * ended job exactly one starts the successor. The writer is told apart by the unique `stamp` it
+   * leaves in `updatedAt`; a refused write leaves the winner's stamp there. `after` is the
+   * `updatedAt` the caller read, which the stamp must pass.
+   */
+  async takeRerun(jobId: string, after: string): Promise<boolean> {
+    const stamp = uniqueStamp(after);
+    const row = (await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      { rerunRequestedAt: null, updatedAt: stamp },
+      isNotNull(this.#c.rerunRequestedAt),
+    )) as unknown as CaptureJobRow | null;
+    return row?.rerunRequestedAt === null && sameInstant(row.updatedAt, stamp);
   }
 
   /**
@@ -453,6 +471,31 @@ function jobColumns(table: Table): JobColumns {
 }
 
 /** `and(...)` of conditions that are all present (drizzle types its result as possibly undefined). */
+/** The last stamp handed out; only ever moves forward. */
+let lastStamp = 0;
+
+/** An ISO timestamp no other call in this process returns twice, and later than `after`. */
+function uniqueStamp(after: string): string {
+  const seen = Date.parse(after);
+  lastStamp = Math.max(Date.now(), lastStamp + 1, Number.isNaN(seen) ? 0 : seen + 1);
+  return new Date(lastStamp).toISOString();
+}
+
+const TIMESTAMP_TEXT =
+  /^(?<day>\d{4}-\d\d-\d\d)[T ](?<time>\d\d:\d\d:\d\d(?:\.\d+)?)(?<zone>Z|[+-]\d\d(?::?\d\d)?)?$/u;
+
+/** Whether two timestamp texts (ISO, or a driver's `YYYY-MM-DD HH:MM:SS.mmm+00`) are one instant. */
+function sameInstant(left: string, right: string): boolean {
+  const instants = [left, right].map((text) => {
+    const found = TIMESTAMP_TEXT.exec(text)?.groups;
+    if (!found) return Number.NaN;
+    const zone = found["zone"] ?? "Z";
+    const offset = /^[+-]\d\d$/u.test(zone) ? `${zone}:00` : zone;
+    return Date.parse(`${found["day"]}T${found["time"]}${offset}`);
+  });
+  return !Number.isNaN(instants[0]) && instants[0] === instants[1];
+}
+
 function allOf(first: SQL, ...rest: SQL[]): SQL {
   return and(first, ...rest) ?? first;
 }
