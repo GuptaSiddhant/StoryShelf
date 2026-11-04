@@ -35,7 +35,7 @@ If a build runs out of memory, lower the runner's concurrency first, then add RA
 
 - **Screenshots are stored by content.** A screenshot is saved once under the hash of its bytes, and snapshots and baselines point at it. Approving a change repoints the baseline instead of copying it, and a story that renders identically build after build stores nothing new. Storage therefore grows with the screenshots that **change**, not with every build.
 - **Uploaded Storybooks are deduplicated too.** Files are stored once by hash, so a build that differs from the last in a few files adds only those files.
-- **Old data is removed.** Builds, their screenshots and diff overlays are purged after `purgeTtlDays` (default 30 days); feature-branch baselines are removed after `branchTtlDays` (default 30 days); the default branch's baselines are kept. Screenshots nothing references any more are swept. See [Retention & purge](/concepts/retention/).
+- **Old data is removed.** Builds, their screenshots and diff overlays are purged after `purgeTtlDays` once you set it (it has no default, so nothing is purged until you do; a manual purge uses 30 days); feature-branch baselines are removed after `branchTtlDays` (default 30 days); the default branch's baselines are kept. Screenshots nothing references any more are swept. See [Retention & purge](/concepts/retention/).
 
 To estimate captures per build, multiply the number of stories by the viewports, modes and browsers you capture. A Storybook with 500 stories, two viewports and one browser is 1,000 captures per build; each is one screenshot, compared against its baseline. The compared PNGs are what your storage holds, so measure one real build and multiply by how many branches you expect to keep.
 

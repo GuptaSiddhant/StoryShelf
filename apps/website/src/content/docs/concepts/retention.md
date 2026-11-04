@@ -11,7 +11,7 @@ timeline
     section Build Upload
     Day 0 : Build uploaded — capture starts
     Day 1 : reviewing / approved
-    section purgeTtlDays = 30
+    section purgeTtlDays (opt-in, e.g. 30)
     Day 30 : Build purged — screenshots, diffs, metadata gone
     section Baselines (outlive builds)
     Day 30+ : Baselines persist
@@ -23,7 +23,7 @@ timeline
 
 | What                                                           | Retention key                                     | Survives?                                  |
 | -------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------ |
-| Build metadata, screenshots, diff overlays                     | `purgeTtlDays` (default 30)                       | No — deleted together in one transaction   |
+| Build metadata, screenshots, diff overlays                     | `purgeTtlDays` (opt-in; manual purge: 30)         | No — deleted together in one transaction   |
 | Storybook `content/<hash>` (shared, one `content_uses` row per build) | 7-day grace after the last build releases it | Yes — shared, collected after grace unless a live build's manifest names it (only where the database supports the build lifecycle; otherwise never collected) |
 | Branch baselines (`baselines/{branch}/**`)                     | `branchTtlDays` (default 30, `null` = disabled)   | Until branch GC                            |
 | Default-branch baselines (`baselines/main/**`)                 | Never                                             | Yes                                        |
@@ -46,7 +46,7 @@ Turning a project's review off accepts its pending builds that no capture worked
 
 ## Triggers
 
-- **Scheduled:** one in-server timer, the daily branch GC. Build purge is not scheduled.
+- **Scheduled:** one in-server timer runs the daily branch GC and, **only if you set `purgeTtlDays`**, the build purge too (there is no default, so upgrading never starts deleting builds). The scheduled purge needs retention to be active on the database (SQLite today) and does nothing otherwise. The built-in servers read `PURGE_TTL_DAYS`; in code, set `config.purgeTtlDays`.
 - **With testing enabled**, retention works on **SQLite** (a database file): the server prepares the baseline pins at boot, and then purge and branch GC run, keeping any build a baseline still needs. **Postgres and MySQL** deployments with testing do not purge yet: branch GC is skipped and admin purge answers `503` (builds are retained, and storage grows) until they gain the same support. Hosting-only deployments are unaffected.
 - **Retention paused:** if a baseline's recorded source build is being deleted or belongs to another project, SQLite keeps retention off and the **System** page says "Retention is paused", naming the baseline and the build. Remove or repoint that baseline and restart the server; retention turns on at the next boot.
 - **Manual:** `storyshelf purge --url $SHELF_URL --token $STORYSHELF_ADMIN_TOKEN` or `POST /api/v1/admin/purge` (admin) — runs both sweeps and returns `{ removedBuilds, removedBranches, removedBaselines }`, plus `protected` (builds kept because a baseline still needs them) and `resumed` (builds an earlier interrupted run had started removing) on a database with testing retention.

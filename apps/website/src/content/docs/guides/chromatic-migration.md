@@ -129,7 +129,7 @@ Both browser engines inject the same stylesheet, which sets `visibility: hidden`
 | ---------------------------------- | ----------------------------------------------------------------------------- |
 | Global baseline + branch baselines | Per-branch baselines with default-branch fallback                             |
 | Branch baselines independent       | Feature branch accepts → branch baseline; merge to main → promotes to default |
-| No GC (manual cleanup)             | Auto GC: `branchTtlDays` (default 30), `purgeTtlDays` (default 30)            |
+| No GC (manual cleanup)             | Auto GC: `branchTtlDays` (default 30), `purgeTtlDays` (opt-in)            |
 
 **Implication:** On first run, feature branches will diff against `main` baseline. After accepting changes, they get their own branch baseline. Merging to `main` updates the default baseline automatically.
 

@@ -116,7 +116,10 @@ by preset, so it cannot by itself carry this guarantee.
   adapter without the capability; an operator fixes the data and restarts. Any other preparation
   failure fails the boot instead of guessing. With the capability, `POST /api/v1/admin/purge`
   reports `{ removedBuilds, protected, resumed }` besides the branch figures, and the branch-GC
-  timer runs in a testing deployment; both answer or skip as before without it.
+  timer runs in a testing deployment; both answer or skip as before without it. The daily timer
+  purges builds only when `purgeTtlDays` is set explicitly (no default, so an upgrade never starts
+  deleting builds), runs only this capability's path, and does nothing without it; hosts map
+  `PURGE_TTL_DAYS`, core reads no environment.
 
 ### 4. Provenance is immutable and never guessed
 
