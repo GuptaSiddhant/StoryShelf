@@ -73,6 +73,27 @@ describe("runMigrations: run_a11y default", () => {
   }, 60_000);
 });
 
+describe("runMigrations: an existing run_a11y = false", () => {
+  it("survives every later migration, and so do the stored findings", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, run_a11y, created_at, updated_at)
+        VALUES ('off', 'Off', 'off', false, now(), now());
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run);
+
+    const rows = await client.query<{ run_a11y: boolean }>(
+      "SELECT run_a11y FROM projects WHERE id = 'off'",
+    );
+    expect(rows.rows).toEqual([{ run_a11y: false }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: builds and projects gain later columns", () => {
   it("adds inherited_count, test_results and run_tests to older tables, with defaults", async () => {
     const client = new PGlite();
