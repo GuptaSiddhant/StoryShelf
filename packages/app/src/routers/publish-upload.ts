@@ -15,9 +15,10 @@ import {
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import { BuildModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
-import { storybookZipPath } from "@storyshelf/core/utils";
+import { sanitizeErrorText, storybookZipPath } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
 import { getStore } from "../store.ts";
+import { announceBuildStatus } from "./builds.handlers.ts";
 
 /** How an upload of `zipBytes` will be published, or a 413 when this host cannot publish it. */
 export function planUpload(zipBytes: number): "inline" | "job" {
@@ -74,10 +75,35 @@ async function publishInline(build: Build): Promise<void> {
     await publish?.completer.complete(build.id, { ok: true });
   } catch (error) {
     if (error instanceof ZipInvalidError || error instanceof ZipLimitError) {
-      await discardZip(build.projectId, build.id);
+      await rejectInlineZip(build, error.message);
       throw new HTTPException(422, { message: error.message });
     }
     await failInlinePublish(build, error);
+  }
+}
+
+/**
+ * An inline zip that is invalid or breaks a cap ends the build `failed`: a retry is a new upload
+ * (a new build), so a build left `pending` would never resolve, and a git check already queued for
+ * it would stay pending. The validation message is the sanitized reason, sent with `build:failed`.
+ * Only a build still waiting for its upload (`pending`) fails: a cancelled one stays cancelled and
+ * never raises `build:failed`, and a build past that point (reviewing, approved) keeps its verdict,
+ * so a bad re-upload is just refused with the `422`.
+ */
+async function rejectInlineZip(build: Build, reason: string): Promise<void> {
+  await discardZip(build.projectId, build.id);
+  // One conditional write: only a build still `pending` fails. A cancel, a verdict or a retry that
+  // landed since the route read the build keeps its status and raises no `build:failed`.
+  const { applied } = await new BuildModel(getStore().db).failIfPending(build.id);
+  if (!applied) {
+    return;
+  }
+  getStore().logger.warn({ buildId: build.id, reason }, "inline zip rejected; build failed");
+  try {
+    await announceBuildStatus(build.id, "failed", { reason: sanitizeErrorText(reason, 300) });
+  } catch (error) {
+    // The build is already failed; a notifier or subscription error must not turn the 422 into a 500.
+    getStore().logger.warn({ err: error, buildId: build.id }, "inline zip rejection not announced");
   }
 }
 

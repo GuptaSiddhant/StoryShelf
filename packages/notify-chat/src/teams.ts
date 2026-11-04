@@ -36,6 +36,7 @@ export function getMetadata(): MessageNotifierProvider["metadata"] {
     description: "Chat messages via Teams workflow webhooks",
     kind: "teams-workflow",
     category: "notifier",
+    audience: "room",
     logo: "teams",
     schema: teamsWorkflowConfigSchema,
   };

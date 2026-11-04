@@ -4,7 +4,7 @@ import type {
   CaptureJobKind,
   CaptureJobStatus,
 } from "@storyshelf/core/schema";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * Narrow `capture_jobs` table definition: the database queue's job rows and per-attempt claim rows.
@@ -26,6 +26,8 @@ export const captureJobs = sqliteTable(
     owner: text("owner"),
     payload: text("payload"),
     cancelRequestedAt: text("cancel_requested_at"),
+    activeKey: text("active_key"),
+    rerunRequestedAt: text("rerun_requested_at"),
     error: text("error"),
     startedAt: text("started_at"),
     finishedAt: text("finished_at"),
@@ -37,5 +39,6 @@ export const captureJobs = sqliteTable(
     index("capture_jobs_job_id_idx").on(table.jobId),
     index("capture_jobs_build_id_idx").on(table.buildId),
     index("capture_jobs_entry_created_idx").on(table.entry, table.createdAt),
+    uniqueIndex("capture_jobs_active_key_idx").on(table.activeKey),
   ],
 );

@@ -22,6 +22,7 @@ The touched timing-sensitive files have a `test:flake` script in their package: 
 - **PR required gate:** `turbo verify --affected` includes changed packages and their dependents. Root/global files, package manifests, workflow/config changes, a missing diff, or the `ci:full` label force the full suite. Test tasks run at `TURBO_CONCURRENCY=1`: the Postgres/PGlite suite spawns many memory-heavy workers, and overlapping package suites have been OOM-killed on the runner.
 - **Push to `main`:** full, uncached `turbo verify --filter='!website' --force`.
 - **Nightly:** the same full uncached verify plus `turbo run test:flake`, every Storybook fixture, and the Fly dry run. It is the backstop for anything `--affected` could miss.
+- **Storybook dev smoke (`storybook-dev` job):** `nub run smoke:storybook` in `packages/app` starts `storybook dev`, opens every story once in Chrome and fails on a page error, a console error or Storybook's error display (`scripts/storybook-dev-smoke.mjs`). `turbo verify` only builds Storybook, and the production build tree-shakes code the dev server still runs, so a shim or story can build and still throw for anyone running `nub run storybook`. Runs only when `packages/app`, `packages/core`, the lockfile or `ci.yml` changed.
 - File-level `vitest --changed` is deliberately not a required gate: dynamic imports and cross-package resolution can miss a test. Use it only as an advisory experiment, with the nightly full run as the safety net.
 
 ## Layers
@@ -204,6 +205,16 @@ Database compatibility runs nightly and on demand in
 upgrade test drops columns before rerunning migrations; it is skipped unless
 `MYSQL_SCHEMA_MUTATION_TEST=1` is set. Set that flag only for a disposable database, never a
 shared cloud database. The regular live suite still tests setup, CRUD and queue behavior.
+
+The review-schema upgrade (#269) is tested on every dialect from fixture databases built from the
+old DDL (`src/test-fixtures/pre-review.sql` and `pre-449.sql` in each `db-*` package): SQLite and
+Postgres (PGlite) run hermetically, and MySQL has a hermetic fake-server test plus
+`migrate-review.live.test.ts`, which needs the same flag and a user that may `CREATE DATABASE`
+(it upgrades the fixtures in a scratch database it drops afterwards). Postgres has the same live
+file, gated on `LIVE_CLOUD=1`, `DATABASE_URL` and `POSTGRES_SCHEMA_MUTATION_TEST=1` (a role that
+may `CREATE DATABASE`; set the flag for a disposable server only). The MySQL live file also runs the
+review lifecycle on a real server: one claimant wins a review cycle, a reopening counts once, a
+build's verdicts go with the build and a user's with the user, and an anonymous verdict stays.
 
 The MySQL job also runs the shared `databaseContractSuite` (`packages/db-mysql/src/contract.test.ts`),
 as SQLite and Postgres do, in its own database. That file is skipped unless `MYSQL_URL` is set, so

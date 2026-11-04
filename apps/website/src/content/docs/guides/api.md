@@ -85,7 +85,7 @@ The core CI flow in three calls:
      --data-binary @storybook-static.zip
    ```
 
-   The PUT responds with the `Build` and `HTTP 202`; its status depends on the project and whether publishing has finished. When testing is enabled, capture runs asynchronously. Uploads larger than the server's `maxUploadBytes` (default 1 GiB) are rejected with `413`. An invalid inline zip, or one exceeding extraction caps, is rejected with `422`; upload a corrected archive to the same build.
+   The PUT responds with the `Build` and `HTTP 202`; its status depends on the project and whether publishing has finished. When testing is enabled, capture runs asynchronously. Uploads larger than the server's `maxUploadBytes` (default 1 GiB) are rejected with `413`. An invalid inline zip, or one exceeding extraction caps, is rejected with `422` and the build ends `failed` (`build:failed` carries the reason); a later PUT to that build answers `409`. Create a new build and upload the corrected archive to it.
 
 3. **Follow the build to its terminal state**
 

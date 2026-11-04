@@ -450,12 +450,10 @@ describe("releaseProblems, every published manifest", () => {
   });
 });
 
-/** A reader that returns a changeset naming `name`. */
-const readNaming = (name) => () => `---\n"${name}": patch\n---\n\nFixed a thing.\n`;
+const read = (name) => () => `---\n"${name}": patch\n---\n\nFixed a thing.\n`;
 
 describe("malformedChangesets, unknown packages", () => {
   const file = ".changeset/typo.md";
-  const read = readNaming;
 
   it("fails a package that is not published here, with the file and the name", () => {
     const problems = malformedChangesets([file], read("@storyshelf/nope"), ["@storyshelf/core"]);

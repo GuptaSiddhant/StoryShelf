@@ -46,6 +46,7 @@ export function FilesCard(props: {
           removeAction: isAdmin ? `${base}/files/${file.id}/delete` : undefined,
         }))}
         keyHeading="Label"
+        label="Design files"
         confirm="Remove this design file?"
       />
       {files.length === 0 ? <Meta>No design files linked.</Meta> : null}
@@ -60,10 +61,12 @@ export function FilesCard(props: {
 function LinkTable(props: {
   rows: { id: string; key: string; url: string; removeAction?: string }[];
   keyHeading: string;
+  /** The table's accessible name. */
+  label: string;
   confirm: string;
 }): Rendered {
   return (
-    <Table>
+    <Table label={props.label}>
       <table>
         <thead>
           <tr>
@@ -149,6 +152,7 @@ export function ComponentsCard(props: {
           removeAction: `${base}/components/${component.id}/delete`,
         }))}
         keyHeading="Story file"
+        label="Component design mappings"
         confirm="Remove this mapping?"
       />
       {components.length === 0 ? <Meta>No component mappings.</Meta> : null}

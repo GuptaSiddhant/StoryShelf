@@ -6,7 +6,11 @@ import { PGlite } from "@electric-sql/pglite";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { databaseQueueMultiInstanceSuite, queueContractSuite } from "@storyshelf/core/test-helpers";
+import {
+  databaseQueueMultiInstanceSuite,
+  databaseQueueSingleFlightSuite,
+  queueContractSuite,
+} from "@storyshelf/core/test-helpers";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { createPgliteDatabase } from "./pglite.ts";
 
@@ -52,6 +56,8 @@ queueContractSuite(
 );
 
 databaseQueueMultiInstanceSuite("PGlite", freshDatabase);
+
+databaseQueueSingleFlightSuite("PGlite", freshDatabase);
 
 describe("poll probe on Postgres", () => {
   it("is an index scan of capture_jobs_poll_idx with no sort", async () => {

@@ -39,6 +39,7 @@ function recorder(kind: string, sent: unknown[]): NotifierProvider {
     version: "0.0.0",
     kind,
     category: "notifier" as const,
+    audience: (kind === "email" ? "person" : "room") as "person" | "room",
     schema: {} as never,
   };
   return {

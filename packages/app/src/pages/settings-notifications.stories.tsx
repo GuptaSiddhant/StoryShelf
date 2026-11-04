@@ -1,6 +1,6 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
-import type { Meta, StoryObj } from "@storybook/html-vite";
-import { pageStory } from "../../.storybook/page.tsx";
+import type { Meta } from "@storybook/html-vite";
+import { onAPhone, pageStory } from "../../.storybook/page.tsx";
 import type { RenderedContent } from "../shell/document.tsx";
 import { project } from "../stories-fixtures/dataset.ts";
 import { renderProjectSettingsPage, type ProjectSettingsData } from "./project-settings.tsx";
@@ -33,6 +33,7 @@ const channels: SettingsNotificationChannel[] = [
     enabled: true,
     lastError: null,
     lastErrorAt: null,
+    lastDeliveredAt: "2026-01-15T08:00:00.000Z",
   },
   {
     id: "01JD000000000000000000CHN002",
@@ -44,6 +45,7 @@ const channels: SettingsNotificationChannel[] = [
     enabled: true,
     lastError: "SMTP 550: mailbox unavailable",
     lastErrorAt: "2026-01-15T07:30:00.000Z",
+    lastDeliveredAt: null,
   },
   {
     id: "01JD000000000000000000CHN003",
@@ -55,6 +57,7 @@ const channels: SettingsNotificationChannel[] = [
     enabled: true,
     lastError: null,
     lastErrorAt: null,
+    lastDeliveredAt: null,
   },
 ];
 
@@ -62,9 +65,15 @@ const subscribed: SettingsMySubscription = {
   events: ["build:reviewing", "build:approved", "comment:created"],
   via: ["email"],
   enabled: true,
+  reviewRequests: true,
 };
 
-const optedOut: SettingsMySubscription = { events: [], via: [], enabled: false };
+const optedOut: SettingsMySubscription = {
+  events: [],
+  via: [],
+  enabled: false,
+  reviewRequests: true,
+};
 
 /** The project settings page on its Notifications tab: only the notification data differs per story. */
 const settingsPage = (
@@ -128,8 +137,8 @@ export const EmailOff = pageStory(() =>
 );
 
 /** The Channels table on a 375px phone: the page must not scroll sideways, the table scrolls in its own region. */
-export const OnAPhone: StoryObj = {
-  ...pageStory(() =>
+export const OnAPhone = onAPhone(
+  pageStory(() =>
     settingsPage({
       notificationChannels: channels,
       notifyProviders: providers,
@@ -137,5 +146,4 @@ export const OnAPhone: StoryObj = {
       isAdmin: true,
     }),
   ),
-  globals: { viewport: { value: "phone", isRotated: false } },
-};
+);

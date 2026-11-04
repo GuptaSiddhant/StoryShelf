@@ -73,6 +73,7 @@ const projects = defineTable("projects", {
   reviewEnabled: "review_enabled",
   reviewApprovals: "review_approvals",
   storybookUrlTtlSeconds: "storybook_url_ttl_seconds",
+  componentOwners: "component_owners",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -206,6 +207,8 @@ const captureJobs = defineTable("capture_jobs", {
   owner: "owner",
   payload: "payload",
   cancelRequestedAt: "cancel_requested_at",
+  activeKey: "active_key",
+  rerunRequestedAt: "rerun_requested_at",
   error: "error",
   startedAt: "started_at",
   finishedAt: "finished_at",
@@ -319,6 +322,7 @@ const comments = defineTable("comments", {
   createdAt: "created_at",
   updatedAt: "updated_at",
   storyId: "story_id",
+  mentions: "mentions",
   kind: "kind",
   resolvedAt: "resolved_at",
   resolvedBy: "resolved_by",
@@ -474,6 +478,7 @@ const notificationChannels = defineTable("notification_channels", {
   enabled: "enabled",
   lastError: "last_error",
   lastErrorAt: "last_error_at",
+  lastDeliveredAt: "last_delivered_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -485,6 +490,7 @@ const notificationSubscriptions = defineTable("notification_subscriptions", {
   events: "events",
   via: "via",
   enabled: "enabled",
+  reviewRequests: "review_requests",
   createdAt: "created_at",
 });
 

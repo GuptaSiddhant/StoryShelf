@@ -251,7 +251,7 @@ function UnlinkedSection(props: { data: DesignCoverageData }): Rendered {
         {unlinked.length === 0 ? (
           <EmptyState title="Every component has a design link" />
         ) : (
-          <Table>
+          <Table label="Components without a design link">
             <table>
               <thead>
                 <tr>
@@ -360,7 +360,7 @@ function DriftAlert(props: { data: DesignCoverageData }): Rendered {
 function DriftTable(props: { data: DesignCoverageData }): Rendered {
   const { data } = props;
   return (
-    <Table>
+    <Table label="Design drift">
       <table>
         <thead>
           <tr>

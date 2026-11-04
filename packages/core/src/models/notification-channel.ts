@@ -79,6 +79,7 @@ export class NotificationChannelModel {
       enabled: input.enabled ?? true,
       lastError: null,
       lastErrorAt: null,
+      lastDeliveredAt: null,
       createdAt: now,
       updatedAt: now,
     })) as unknown as NotificationChannelRow;
@@ -132,18 +133,22 @@ export class NotificationChannelModel {
   }
 
   /**
-   * Record the outcome of a delivery attempt: the sanitized error with its time, or
-   * nothing to clear a previous error. Skips the write when the row is already in that state.
+   * Record the outcome of a delivery attempt. A failure keeps the sanitized error with its time and
+   * leaves `lastDeliveredAt` as it was; a success stamps `lastDeliveredAt` and clears the error.
    */
   async recordOutcome(id: string, error?: string): Promise<void> {
     const row = await this.get(id);
-    if (!row || (error === undefined && row.lastError === null)) {
+    if (!row) {
       return;
     }
-    await this.db.update(this.tables.notificationChannels, id, {
-      lastError: error ?? null,
-      lastErrorAt: error === undefined ? null : new Date().toISOString(),
-    });
+    const now = new Date().toISOString();
+    await this.db.update(
+      this.tables.notificationChannels,
+      id,
+      error === undefined
+        ? { lastError: null, lastErrorAt: null, lastDeliveredAt: now }
+        : { lastError: error, lastErrorAt: now },
+    );
   }
 
   /**
