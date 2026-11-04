@@ -60,8 +60,18 @@ export class AdapterLifecycleError extends Error {
   readonly phase: LifecyclePhase;
   /** One entry per adapter hook that failed. */
   readonly failures: AdapterSetupFailure[];
-  constructor(phase: LifecyclePhase, failures: AdapterSetupFailure[]) {
-    super(`Adapter ${phase} failed: ${failures.map((f) => `${f.category}/${f.kind}`).join(", ")}`);
+  /**
+   * With `described`, the message says what is wrong with each adapter, not only which ones: for
+   * failures found by boot validation, whose text is about the adapter's shape and never about a
+   * runtime error (which stays in `failures`).
+   */
+  constructor(phase: LifecyclePhase, failures: AdapterSetupFailure[], described = false) {
+    const names = failures.map((f) => `${f.category}/${f.kind}`);
+    super(
+      described
+        ? `Adapter ${phase} failed: ${failures.map((f) => `${f.category}/${f.kind}: ${f.error}`).join("; ")}`
+        : `Adapter ${phase} failed: ${names.join(", ")}`,
+    );
     this.name = "AdapterLifecycleError";
     this.phase = phase;
     this.failures = failures;
