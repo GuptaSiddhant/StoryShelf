@@ -66,8 +66,10 @@ by preset, so it cannot by itself carry this guarantee.
   be addressed by hash; the former `content_refs` table held per-hash counters on real SQLite
   deployments (the upload route wrote them) and is dropped. That is safe: a blob without a use row
   is never claimed and is protected by the manifest guard while its builds are live. Counters
-  cannot be turned into per-build uses, so pre-upgrade shared blobs leak until a backfill records
-  uses from the live builds' manifests (a follow-up). A build that is gone or being deleted records
+  cannot be turned into per-build uses, so a one-off backfill (`backfillContentUses`, run at boot
+  while the capability exists and a `site_settings` marker is unset) records the uses of every live
+  build's manifest, idempotently and without deleting anything; until it finishes, pre-upgrade
+  shared blobs only leak. A build that is gone or being deleted records
   no use (the capability refuses it), so a late publish cannot pin blobs for good. A build's release marks all its rows released (kept for the grace period).
   A collector **claims** a blob in the capability's domain (`claimContent`: every use released,
   the grace passed, no live manifest names it) under a per-pass token. A claim is durable and
