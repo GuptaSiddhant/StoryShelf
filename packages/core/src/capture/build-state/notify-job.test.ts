@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { StateNotifierProvider } from "../../adapters/notifier/provider.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { rig } from "../consumer/test-fixtures.ts";
 import {
@@ -63,6 +64,64 @@ describe("the notify job", () => {
     expect(await notifyJobs()).toHaveLength(3);
     await consumer.stop();
     await started;
+  });
+
+  it("creates one job when many requests for one channel and build arrive at once", async () => {
+    const { w, enqueue, notifyJobs } = await setup();
+    await Promise.all(
+      Array.from({ length: 10 }, async () => {
+        await enqueue({ channelId: w.channelId, buildId: w.build.id });
+      }),
+    );
+    const rows = await notifyJobs();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      status: "queued",
+      activeKey: `notify:${w.channelId}:${w.build.id}`,
+    });
+  });
+
+  it("delivers the newer state when the build changes during a delivery", async () => {
+    const w = await world();
+    // Once only: the provider is created again for every pass, so the flag lives outside it.
+    let interrupted = false;
+    // The build moves on and a new request comes in while the provider write is in flight.
+    const interrupting: StateNotifierProvider = {
+      ...w.git.provider,
+      create: (opts) => {
+        const adapter = w.git.provider.create(opts);
+        return {
+          ...adapter,
+          setState: async (input) => {
+            await adapter.setState(input);
+            if (!interrupted) {
+              interrupted = true;
+              await w.builds.setStatus(w.build.id, "approved");
+              await enqueue({ channelId: w.channelId, buildId: w.build.id });
+            }
+          },
+        };
+      },
+    };
+    const handler = createNotifyHandler({ deps: { ...w.deps, notifiers: [interrupting] } });
+    const r = rig({ db: w.db, kinds: ["notify"], handlers: { notify: handler } });
+    const enqueue = createNotifyEnqueuer(w.deps, r.queue);
+    const jobs = new CaptureJobModel(w.db);
+
+    await enqueue({ channelId: w.channelId, buildId: w.build.id });
+    const consumer = r.consume();
+    const started = consumer.start();
+    await r.clock.advance(200);
+    await consumer.stop();
+    await started;
+
+    // The first pass wrote the state it read (pending); the request made meanwhile got a second pass
+    // that wrote the build's newer state.
+    const testing = statusLog(w.git).filter(([context]) => context === "storyshelf/testing");
+    expect(testing.map(([, state]) => state)).toEqual(["pending", "success"]);
+    const rows = (await jobs.listForBuild(w.build.id)).filter((row) => row.kind === "notify");
+    expect(rows.map((row) => row.status)).toEqual(["done", "done"]);
+    expect(rows.map((row) => row.activeKey)).toEqual([null, null]);
   });
 
   it("allows five attempts", async () => {

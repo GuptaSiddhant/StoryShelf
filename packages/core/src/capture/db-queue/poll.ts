@@ -4,6 +4,7 @@ import { isTerminalJob, parseAttemptRowId } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { claimNext } from "./claim.ts";
 import { isoAt } from "./clock.ts";
+import { finishJob } from "./single-flight.ts";
 import type { DatabaseJob, QueueRuntime } from "./types.ts";
 
 /** Longest a nack may delay a retry; larger delays are clamped. */
@@ -39,8 +40,9 @@ export async function ackJob(rt: QueueRuntime, job: PollableJob): Promise<void> 
   const ref = attemptRef(job);
   const now = isoAt(rt);
   await rt.model.finishAttempt(ref.receipt, "done", now);
-  if ((await rt.model.get(ref.jobId))?.status !== "cancelled") {
-    await rt.model.finishJob(ref.jobId, "done", now);
+  const row = await rt.model.get(ref.jobId);
+  if (row !== null && row.status !== "cancelled") {
+    await finishJob(rt, row, "done");
   }
 }
 
@@ -79,7 +81,7 @@ async function settleFailure(
     return;
   }
   if (options.requeue === false || row.attempt >= row.maxAttempts) {
-    await rt.model.finishJob(row.jobId, "failed", now, error ?? "failed");
+    await finishJob(rt, row, "failed", error ?? "failed");
     return;
   }
   const delayMs = Math.min(Math.max(options.delayMs ?? 0, 0), MAX_NACK_DELAY_MS);

@@ -17,6 +17,9 @@ import type { CaptureJobKind } from "@storyshelf/core/schema";
 /** What a kind does when a job of it failed because its last attempt lost its lease. */
 export type ExhaustedHandler = (job: DatabaseJob, error: string) => Promise<void>;
 
+/** What a kind does once a job of it has ended. */
+export type EndedHandler = (job: DatabaseJob) => Promise<void>;
+
 /** The shared database queue. */
 export interface JobQueue {
   /** Job kinds this instance polls; empty when it consumes none. */
@@ -31,6 +34,8 @@ export interface JobQueue {
   exhausted: Partial<Record<CaptureJobKind, ExhaustedHandler>>;
   /** Per-kind hooks for a job whose exhausted hook kept failing (the alert of last resort). */
   abandoned: Partial<Record<CaptureJobKind, ExhaustedHandler>>;
+  /** Per-kind hooks run after a job of the kind ended (`done` or `failed`), its row written. */
+  ended: Partial<Record<CaptureJobKind, EndedHandler>>;
 }
 
 /**
@@ -45,6 +50,7 @@ export function createJobQueue(
   let queue: DatabaseCaptureQueue | undefined;
   const exhausted: JobQueue["exhausted"] = {};
   const abandoned: JobQueue["abandoned"] = {};
+  const ended: JobQueue["ended"] = {};
   const get = (): DatabaseCaptureQueue => {
     queue ??= createDatabaseCaptureQueue(options.database, {
       kinds: kinds.length > 0 ? kinds : ["capture"],
@@ -61,10 +67,13 @@ export function createJobQueue(
       onAbandoned: async (job, error) => {
         await abandoned[job.kind]?.(job, error);
       },
+      onEnded: async (job) => {
+        await ended[job.kind]?.(job);
+      },
     });
     return queue;
   };
-  return { kinds, get, built: () => queue, view: queueView(get), exhausted, abandoned };
+  return { kinds, get, built: () => queue, view: queueView(get), exhausted, abandoned, ended };
 }
 
 function queueView(get: () => DatabaseCaptureQueue): CaptureQueue {

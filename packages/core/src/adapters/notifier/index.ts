@@ -1,5 +1,5 @@
 export { emitNotifications, emitSystemNotification } from "./events.ts";
-export { MAX_ANNOTATIONS, statusesForBuild } from "./build-state.ts";
+export { MAX_ANNOTATIONS, statusesForBuild, STORYBOOK_UNAVAILABLE } from "./build-state.ts";
 export type {
   BuildStateBuild,
   BuildStateChange,

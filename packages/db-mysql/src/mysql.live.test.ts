@@ -101,7 +101,7 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
         DROP COLUMN storybook_url_ttl_seconds`,
         "ALTER TABLE snapshots DROP COLUMN duration_ms, DROP COLUMN a11y_violations",
         "ALTER TABLE comments DROP COLUMN story_id",
-        "ALTER TABLE notification_channels DROP COLUMN last_error, DROP COLUMN last_error_at",
+        "ALTER TABLE notification_channels DROP COLUMN last_error, DROP COLUMN last_error_at, DROP COLUMN last_delivered_at",
       ]) {
         // oxlint-disable-next-line no-await-in-loop -- ordered schema rewrites
         await liveDb().all(sql.raw(statement));
@@ -122,13 +122,14 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
         AND (
           (table_name = 'snapshots' AND column_name IN ('duration_ms', 'a11y_violations'))
           OR (table_name = 'comments' AND column_name = 'story_id')
-          OR (table_name = 'notification_channels' AND column_name IN ('last_error', 'last_error_at'))
+          OR (table_name = 'notification_channels' AND column_name IN ('last_error', 'last_error_at', 'last_delivered_at'))
         )
       ORDER BY table_name, column_name
     `),
       );
       expect(columns.map((row) => `${row.tableName}.${row.columnName}`)).toEqual([
         "comments.story_id",
+        "notification_channels.last_delivered_at",
         "notification_channels.last_error",
         "notification_channels.last_error_at",
         "snapshots.a11y_violations",

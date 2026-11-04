@@ -4,7 +4,10 @@ import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { LISTED_TOPICS, REVIEW_REQUESTED_EVENT } from "../pages/settings-notifications.tsx";
 import { getStore } from "../store.ts";
+import { retryChannelState } from "./channel-retry.ts";
 import { flash } from "./flash.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
+import { isHxRequest } from "./htmx.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
 import { createGitChannel } from "./settings-git-channel.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -16,6 +19,7 @@ export function registerNotificationSettings(app: ShelfRouter): void {
   );
   app.post("/projects/:slug/settings/notifications", handleCreateChannel);
   app.post("/projects/:slug/settings/notifications/:channelId/delete", handleDeleteChannel);
+  app.post("/projects/:slug/settings/notifications/:channelId/retry", handleRetryChannel);
   app.post("/projects/:slug/settings/notifications/me", handleSaveMine);
 }
 
@@ -145,6 +149,31 @@ async function handleDeleteChannel(c: Context): Promise<Response> {
   await model.remove(channel.id);
   flash(c, "Channel removed");
   return c.html((await renderSettingsPage(c, "notifications")) ?? "");
+}
+
+/** Admin-only: ask again for the open builds' state on one git channel (nothing else is sent). */
+async function handleRetryChannel(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  const result = await retryChannelState(project, c.req.param("channelId") ?? "");
+  if (!result.ok) {
+    // The shell swaps only 400, 409 and 422 into the page (ADR 0012), so the form answers a failed
+    // lookup (503 on the JSON API) as 409 and the admin sees the message, not a generic toast.
+    const status = result.status === 503 ? 409 : result.status;
+    return c.html(
+      (await renderSettingsPage(c, "notifications", { globalError: result.message })) ?? "",
+      status,
+    );
+  }
+  flash(
+    c,
+    result.asked === 0
+      ? "No open builds to show"
+      : "Retry queued. The Delivery column updates once the status is sent.",
+  );
+  // Back to the same row, so focus does not reset to the top of the page.
+  const back = `/projects/${project.slug}/settings/notifications#channel-${c.req.param("channelId")}`;
+  c.header("HX-Redirect", back);
+  return isHxRequest(c) ? c.body(null, 200) : c.redirect(back, 303);
 }
 
 async function handleSaveMine(c: Context): Promise<Response> {

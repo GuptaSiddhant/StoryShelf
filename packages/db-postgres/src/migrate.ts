@@ -98,6 +98,17 @@ const MEMBER_SOURCE_ALTER =
  * Auth columns the SQLite `users` table always had. Without them the Drizzle model cannot store
  * `disabled` (an admin disabling a user fails) or the auth provider and display-name override.
  */
+/**
+ * Single-flight jobs (ADR 0040): `capture_jobs.active_key` is unique while a job is non-terminal.
+ * Not swallowed like the other follow-ups: without the index two notify jobs for one key could run
+ * at once, so a failure must stop the boot. Every statement is idempotent.
+ */
+const CAPTURE_JOB_SINGLE_FLIGHT = [
+  "ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS active_key TEXT",
+  "ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS rerun_requested_at TIMESTAMPTZ",
+  "CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx ON capture_jobs (active_key)",
+];
+
 const USER_AUTH_ALTERS = [
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT",
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name_override TEXT",
@@ -117,6 +128,8 @@ const NOTIFICATION_LAST_ERROR_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error TEXT";
 const NOTIFICATION_LAST_ERROR_AT_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMPTZ";
+const NOTIFICATION_LAST_DELIVERED_ALTER =
+  "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_delivered_at TIMESTAMPTZ";
 /**
  * Re-runs share `(project_id, git_sha)` by design (ULID build ids), so the
  * lookup index must not be unique. Existing databases created it UNIQUE —
@@ -236,6 +249,7 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
   await run(DDL);
   await migrateCoreColumns(run);
   await migrateUserAuthColumns(run);
+  await migrateCaptureJobSingleFlight(run);
   await migrateProjectExtras(run);
   // Not swallowed: an unfenced build would let a late crash hook fail a newer run.
   await run(BUILD_CAPTURE_JOB_BACKFILL);
@@ -253,6 +267,13 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
 async function migrateUserAuthColumns(run: MigrationRunner): Promise<void> {
   for (const statement of USER_AUTH_ALTERS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered, and a failure must stop the boot
+    await run(statement);
+  }
+}
+
+async function migrateCaptureJobSingleFlight(run: MigrationRunner): Promise<void> {
+  for (const statement of CAPTURE_JOB_SINGLE_FLIGHT) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered (columns, then the index), and a failure must stop the boot
     await run(statement);
   }
 }
@@ -293,6 +314,8 @@ async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {
 async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, NOTIFICATION_LAST_ERROR_ALTER);
   await execIgnore(run, NOTIFICATION_LAST_ERROR_AT_ALTER);
+  // IF NOT EXISTS makes it idempotent, so a real failure must surface rather than be ignored.
+  await run(NOTIFICATION_LAST_DELIVERED_ALTER);
 }
 
 /** The columns the comments table gained after it first shipped. */

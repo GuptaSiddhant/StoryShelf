@@ -331,13 +331,15 @@ capture_jobs (
   owner               text,                    -- instance holding an attempt
   payload             text,                    -- JSON: reqId, traceparent, kind-specific data
   cancel_requested_at text,                    -- cancel flag, never cleared
+  active_key          text,                    -- single-flight job kinds: unique while the job is not terminal; cleared when it ends; never on attempt rows
+  rerun_requested_at  text,                    -- running job: a request for its key arrived, so a successor job runs one more pass
   error               text,
   started_at          text,
   finished_at         text,
   created_at          text NOT NULL,
   updated_at          text NOT NULL
 );
--- capture_jobs_poll_idx (kind, visible_at, status): the poll probe; plus (job_id), (build_id), (entry, created_at)
+-- capture_jobs_poll_idx (kind, visible_at, status): the poll probe; plus (job_id), (build_id), (entry, created_at); unique (active_key): at most one non-terminal job per key (ADR 0040), NULLs never collide
 
 -- Site-wide key-value settings the app learns while running (ADR 0007, decision 6). Key 'public_origin'
 -- holds JSON {origin, confirmed}: the origin a site admin's browser reported (confirmed: false until an admin confirms it), written only by a

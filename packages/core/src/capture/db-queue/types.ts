@@ -41,6 +41,12 @@ export interface DatabaseCaptureQueueOptions {
    * is the host's chance to tell an operator the work behind it may be stuck. Best effort.
    */
   onAbandoned?: (job: DatabaseJob, error: string) => Promise<void>;
+  /**
+   * Called after a job reached `done` or `failed` (its row is written, its key freed): the host
+   * can act on the end itself, as opposed to the work's outcome, which its handler already saw.
+   * Best effort: a throw is logged and never blocks the queue. A cancelled job does not call it.
+   */
+  onEnded?: (job: DatabaseJob) => Promise<void>;
 }
 
 /** Default lease per attempt: long enough for a slow stage, short enough to recover a crash. */
@@ -62,6 +68,12 @@ export interface QueueJobInput {
   data?: Record<string, unknown>;
   /** Attempts allowed in total for this job; defaults to the queue's (`retries` + 1). */
   maxAttempts?: number;
+  /**
+   * Single-flight key (ADR 0040): at most one non-terminal job holds it. A request while a queued
+   * job holds it is coalesced into that job; while a running one holds it, that job is marked and
+   * one more pass runs after it ends. The id returned is the job that covers the request.
+   */
+  activeKey?: string;
 }
 
 /** A job claimed from the database queue. */
@@ -111,6 +123,7 @@ export interface QueueRuntime {
   logger?: Logger;
   onExhausted?: DatabaseCaptureQueueOptions["onExhausted"];
   onAbandoned?: DatabaseCaptureQueueOptions["onAbandoned"];
+  onEnded?: DatabaseCaptureQueueOptions["onEnded"];
 }
 
 /** The capture-shaped job `enqueue` takes, re-exported for the modules. */

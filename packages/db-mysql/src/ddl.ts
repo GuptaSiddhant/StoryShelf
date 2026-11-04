@@ -112,6 +112,8 @@ CREATE TABLE IF NOT EXISTS capture_jobs (
   owner TEXT,
   payload TEXT,
   cancel_requested_at DATETIME(3),
+  active_key VARCHAR(191),
+  rerun_requested_at DATETIME(3),
   error TEXT,
   started_at DATETIME(3),
   finished_at DATETIME(3),
@@ -394,6 +396,7 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   last_error TEXT,
   last_error_at DATETIME(3),
+  last_delivered_at DATETIME(3),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_notification_channels_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

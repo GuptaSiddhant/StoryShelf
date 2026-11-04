@@ -13,6 +13,7 @@ export const notificationChannels = sqliteTable("notification_channels", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   lastError: text("last_error"),
   lastErrorAt: text("last_error_at"),
+  lastDeliveredAt: text("last_delivered_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -44,6 +45,7 @@ export interface NotificationChannel {
   enabled: boolean;
   lastError: string | null;
   lastErrorAt: string | null;
+  lastDeliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

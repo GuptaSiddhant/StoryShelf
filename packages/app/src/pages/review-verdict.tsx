@@ -4,6 +4,7 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
+  Alert,
   Avatar,
   Badge,
   Button,
@@ -109,6 +110,13 @@ function verdictTone(verdict: string | undefined): "success" | "danger" | "neutr
  */
 function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
   const { data } = props;
+  if (data.publishing === "unavailable") {
+    return (
+      <Alert tone="warning" title="Storybook content unavailable">
+        {UNAVAILABLE_TEXT}
+      </Alert>
+    );
+  }
   if (!data.canVerdict || data.build.status === "failed") {
     return null;
   }
@@ -122,6 +130,10 @@ function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
   }
   return data.publishing === "success" ? <VerdictForm data={data} /> : null;
 }
+
+/** What the card says when the build's Storybook content is gone (the git status keeps its own text). */
+const UNAVAILABLE_TEXT =
+  "This build's Storybook content is no longer available, so it can't be reviewed. Re-upload the build to review it.";
 
 /** The reviewer's controls: an optional note and the two verdicts; `disabled` while the build cannot take one yet. */
 function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Rendered {

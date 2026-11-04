@@ -206,6 +206,8 @@ const captureJobs = defineTable("capture_jobs", {
   owner: "owner",
   payload: "payload",
   cancelRequestedAt: "cancel_requested_at",
+  activeKey: "active_key",
+  rerunRequestedAt: "rerun_requested_at",
   error: "error",
   startedAt: "started_at",
   finishedAt: "finished_at",
@@ -475,6 +477,7 @@ const notificationChannels = defineTable("notification_channels", {
   enabled: "enabled",
   lastError: "last_error",
   lastErrorAt: "last_error_at",
+  lastDeliveredAt: "last_delivered_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

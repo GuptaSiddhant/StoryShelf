@@ -442,6 +442,7 @@ export const notificationChannelSchema = z
     enabled: z.boolean(),
     lastError: z.string().nullable(),
     lastErrorAt: z.string().nullable(),
+    lastDeliveredAt: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

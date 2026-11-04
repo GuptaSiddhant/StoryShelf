@@ -109,6 +109,11 @@ the statuses and the pull-request comment. Its details:
 - `storybook` is `success` once the build's published Storybook exists (its manifest is the marker,
   because it is written last), `failure` for a `failed` build that never published, and `pending`
   otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
+  A build past capture (`reviewing`, `approved`, `rejected`) with no manifest and no open `publish`
+  job (queued, running or exhausting) has lost its content: `failure`, `Storybook content
+  unavailable, see build page` (informational, `neutral` on check runs; the page says to re-upload or
+  purge). While such a job is open it stays `pending`, since capture can finish first. Every end of
+  a publish job requests the state again once its row is written (the queue's `onEnded` hook).
 - A build without a commit SHA, or with a synthetic local identity, shows nothing.
 - Links are always absolute: the function takes a URL builder over the resolved public origin, and
   no state is requested or delivered while none resolves (decision 11).
@@ -150,10 +155,20 @@ Details of the job kind:
   (`status`, `active`, `recent`, `cancel`) leave them out so they do not bury a build's capture and
   publish jobs.
 - **Enqueue.** Every build transition and the end of publishing request the build's state. A
-  request queues one job per enabled git channel unless a job for the same `(channel, build)` is
-  still waiting: that one reads the state when it runs. A running job may have read an older state,
-  so a new one queues behind it. A forked capture child queues its jobs on the database queue; the
-  parent's consumer runs them.
+  request inserts one job per enabled git channel, holding the key `notify:<channel>:<build>` in
+  the unique `capture_jobs.active_key` column while the job is not terminal; the database, not a
+  check before the insert, decides. If a queued job holds the key the request is covered (it reads
+  the state when it runs). If a running job holds it, `rerun_requested_at` is set on it, and when it
+  ends a successor job takes the key for one more pass. A forked capture child queues its jobs on
+  the database queue; the parent's consumer runs them. The child's enqueue is in another process and
+  sends no wake-up, so the parent finds the job at its next poll (about 2 s after recent work and 15 s
+  when idle, each stretched by up to 20 %, ADR 0006 decision 11, and only while a delivery slot is
+  free: with all four busy a job waits for one); an IPC wake-up would only shorten
+  that and is a possible later optimization. With no consumer running, the job stays `queued`: it is
+  neither dropped nor delivered inline, and the next consumer to start claims it.
+- **Guarantee.** Delivery converges on the build's current state per `(channel, build)`, with at
+  most one delivery in flight per key while leases hold. It is not exactly-once: after a lost
+  lease a stale holder's HTTP call can still finish, and the next pass rewrites the current state.
 - **Retries.** A job allows five attempts and the retry delay doubles from 10 s to at most five
   minutes (a job states its own attempts and its handler its own backoff; the capture defaults are
   untouched). The consumer retries, the handler only fails.

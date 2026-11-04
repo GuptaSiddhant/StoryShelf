@@ -13,6 +13,7 @@ export const notificationChannels = pgTable("notification_channels", {
   enabled: boolean("enabled").notNull().default(true),
   lastError: text("last_error"),
   lastErrorAt: timestamp("last_error_at", { withTimezone: true, mode: "string" }),
+  lastDeliveredAt: timestamp("last_delivered_at", { withTimezone: true, mode: "string" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
 });
@@ -44,6 +45,7 @@ export interface NotificationChannel {
   enabled: boolean;
   lastError: string | null;
   lastErrorAt: string | null;
+  lastDeliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
