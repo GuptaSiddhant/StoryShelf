@@ -309,15 +309,19 @@ function isInfoStatus(status: string): boolean {
   );
 }
 
-/** Alert banner with an optional title. */
+/**
+ * Alert banner with an optional title. It announces itself assertively (`role="alert"`); pass
+ * `role="status"` for a polite message that is not an error to act on at once.
+ */
 // eslint-disable-next-line promise-function-async -- JSX component return type
-export const Alert: FC<{ tone?: BadgeTone; title?: string; children?: unknown }> = ({
-  tone = "info",
-  title,
-  children,
-}) => {
+export const Alert: FC<{
+  tone?: BadgeTone;
+  title?: string;
+  role?: "alert" | "status";
+  children?: unknown;
+}> = ({ tone = "info", title, role = "alert", children }) => {
   return (
-    <div class={alertTones[tone]} role="alert">
+    <div class={alertTones[tone]} role={role}>
       <span class={alertIconTones[tone]}>
         <Icon name={toneIcons[tone]} />
       </span>

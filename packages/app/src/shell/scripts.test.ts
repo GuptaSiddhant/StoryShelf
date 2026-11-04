@@ -146,10 +146,22 @@ describe("shell scripts", () => {
 const ok = (base: string) => Promise.resolve({ ok: true, json: () => Promise.resolve({ base }) });
 const tick = async () => await new Promise((resolve) => setTimeout(resolve, 0));
 
+function failingAfterFirst() {
+  let calls = 0;
+  return () => {
+    calls += 1;
+    return calls === 1 ? ok("/_s/new") : Promise.reject(new Error("down"));
+  };
+}
+
 describe("signed preview frame", () => {
-  const PAGE = `<div data-preview-embed data-preview-path="/iframe.html?id=a" data-preview-refresh-url="/tok" data-preview-refresh-seconds="2400">
-    <button data-preview-load>Load</button><div data-preview-idle></div>
-    <template data-preview-template><iframe src="/_s/old/iframe.html?id=a"></iframe></template></div>`;
+  const PAGE = `<div data-preview-wrap>
+    <div data-preview-embed data-preview-path="/iframe.html?id=a" data-preview-refresh-url="/tok" data-preview-refresh-seconds="2400">
+      <button data-preview-load>Load</button><div data-preview-idle></div>
+      <template data-preview-template><iframe src="/_s/old/iframe.html?id=a"></iframe></template></div>
+    <div role="status"><div data-preview-disclosure>Signed preview</div>
+      <div data-preview-notice hidden><button data-preview-reload>Reload preview</button>
+        <span data-preview-again hidden>Still can't reach the server.</span></div></div></div>`;
   type Timer = { fn: () => void; ms: number; kind: "interval" | "timeout"; cleared: boolean };
 
   function boot(fetchImpl: (url: string) => Promise<unknown>) {
@@ -181,7 +193,10 @@ describe("signed preview frame", () => {
     const host = window.document.querySelector("[data-preview-embed]") as HTMLElement;
     const frame = () => host.querySelector("iframe");
     const click = () => window.document.querySelector<HTMLElement>("[data-preview-load]")?.click();
-    return { window, host, frame, click, timers };
+    const part = (name: string) =>
+      window.document.querySelector<HTMLElement>(`[data-preview-${name}]`);
+    const reload = () => part("reload")?.click();
+    return { window, host, frame, click, timers, part, reload };
   }
 
   it("mounts the frame under a freshly fetched root, not the one rendered with the page", async () => {
@@ -228,5 +243,85 @@ describe("signed preview frame", () => {
     expect(retries.every((timer) => timer.ms === 60_000)).toBe(true);
     expect(retries.length).toBeGreaterThan(0);
     expect(retries.length).toBeLessThanOrEqual(3);
+  });
+
+  /** Fail every renewal after the first fetch, and run the whole retry chain. */
+  async function failRenewals(page: ReturnType<typeof boot>) {
+    page.click();
+    await tick();
+    page.timers.find((timer) => timer.kind === "interval")?.fn();
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- each retry is scheduled by the previous failure
+      await tick();
+      page.timers.findLast((timer) => timer.kind === "timeout")?.fn();
+    }
+    await tick();
+  }
+
+  it("shows the disclosure, not the notice, while the preview is healthy or retries are left", async () => {
+    const page = boot(failingAfterFirst());
+    expect(page.part("notice")?.hidden).toBe(true);
+    page.click();
+    await tick();
+    page.timers.find((timer) => timer.kind === "interval")?.fn();
+    await tick();
+    expect(page.part("notice")?.hidden).toBe(true);
+    expect(page.part("disclosure")?.hidden).toBe(false);
+  });
+
+  it("swaps the disclosure for the notice once the last retry failed", async () => {
+    const page = boot(failingAfterFirst());
+    await failRenewals(page);
+    expect(page.part("notice")?.hidden).toBe(false);
+    expect(page.part("disclosure")?.hidden).toBe(true);
+  });
+
+  it("reloads on the button: fresh root, notice gone, disclosure back, focus in the frame", async () => {
+    let fail = false;
+    const page = boot(() => (fail ? Promise.reject(new Error("down")) : ok("/_s/new")));
+    page.click();
+    await tick();
+    fail = true;
+    await failRenewals({ ...page, click: () => {} } as never);
+    expect(page.part("notice")?.hidden).toBe(false);
+    fail = false;
+    page.reload();
+    expect(page.part("reload")?.hasAttribute("disabled")).toBe(true);
+    expect(page.part("reload")?.textContent).toBe("Reloading\u2026");
+    expect(page.part("notice")?.getAttribute("aria-busy")).toBe("true");
+    await tick();
+    expect(page.part("notice")?.hidden).toBe(true);
+    expect(page.part("disclosure")?.hidden).toBe(false);
+    expect(page.part("reload")?.hasAttribute("disabled")).toBe(false);
+    expect(page.part("reload")?.textContent).toBe("Reload preview");
+    expect(page.part("notice")?.hasAttribute("aria-busy")).toBe(false);
+    expect(page.frame()?.getAttribute("src")).toBe("/_s/new/iframe.html?id=a");
+    expect(page.window.document.activeElement).toBe(page.frame());
+  });
+
+  it("keeps the notice when the reload fails too, and says so", async () => {
+    const page = boot(failingAfterFirst());
+    await failRenewals(page);
+    page.reload();
+    await tick();
+    expect(page.part("notice")?.hidden).toBe(false);
+    expect(page.part("again")?.hidden).toBe(false);
+    expect(page.part("reload")?.hasAttribute("disabled")).toBe(false);
+    expect(page.part("reload")?.textContent).toBe("Reload preview");
+  });
+
+  it("clears the notice when a later scheduled renewal succeeds", async () => {
+    let fail = false;
+    const page = boot(() => (fail ? Promise.reject(new Error("down")) : ok("/_s/new")));
+    page.click();
+    await tick();
+    fail = true;
+    await failRenewals({ ...page, click: () => {} } as never);
+    expect(page.part("notice")?.hidden).toBe(false);
+    fail = false;
+    page.timers.find((timer) => timer.kind === "interval")?.fn();
+    await tick();
+    expect(page.part("notice")?.hidden).toBe(true);
+    expect(page.part("disclosure")?.hidden).toBe(false);
   });
 });
