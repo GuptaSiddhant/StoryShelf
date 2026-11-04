@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DDL } from "./ddl.ts";
 import { FOREIGN_KEYS } from "./foreign-keys.ts";
 import { runMigrations } from "./migrate.ts";
@@ -365,5 +365,60 @@ describe("runMigrations: only an already-exists error is ignored", () => {
     await expect(
       runMigrations(failingWith("ALTER TABLE projects ADD COLUMN", denied)),
     ).rejects.toThrow("ALTER command denied");
+  });
+});
+
+/** A runner whose group-count query answers with `groups`. */
+function countingRunner(
+  failOn: string,
+  error: Error,
+  groups: number,
+): (sql: string) => Promise<unknown[]> {
+  const { run } = recordingRunner();
+  return async (sql) => {
+    if (sql.startsWith(failOn)) throw error;
+    if (sql.includes("AS duplicate_groups")) return [{ duplicate_groups: String(groups) }];
+    return await run(sql);
+  };
+}
+
+describe("runMigrations: a unique index over rows that already repeat its key", () => {
+  const dupEntry = Object.assign(new Error("Duplicate entry 'secret' for key"), {
+    code: "ER_DUP_ENTRY",
+    errno: 1062,
+  });
+
+  it("boots without the design-link index and says so once, never with a row", async () => {
+    const error = vi.fn();
+    const run = countingRunner("CREATE UNIQUE INDEX design_links", dupEntry, 2);
+
+    await expect(runMigrations(run, { error } as never)).resolves.toBeUndefined();
+
+    expect(error).toHaveBeenCalledOnce();
+    const [fields, message] = error.mock.calls[0] as [Record<string, unknown>, string];
+    expect(fields).toEqual({
+      table: "design_links",
+      index: "design_links_project_import_path_idx",
+      duplicateGroups: 2,
+    });
+    expect(message).toContain("created on the next boot");
+    expect(message).not.toContain("secret");
+  });
+
+  it("still fails the boot on any other error creating that index", async () => {
+    const timeout = Object.assign(new Error("Lock wait timeout exceeded"), {
+      code: "ER_LOCK_WAIT_TIMEOUT",
+      errno: 1205,
+    });
+
+    await expect(
+      runMigrations(countingRunner("CREATE UNIQUE INDEX design_links", timeout, 0)),
+    ).rejects.toThrow("Lock wait timeout");
+  });
+
+  it("never skips the single-flight index on duplicate keys", async () => {
+    await expect(
+      runMigrations(countingRunner("CREATE UNIQUE INDEX capture_jobs_active_key_idx", dupEntry, 1)),
+    ).rejects.toThrow("Duplicate entry");
   });
 });

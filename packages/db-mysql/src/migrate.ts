@@ -6,6 +6,12 @@
  * missing columns/indexes are found in `information_schema`, and only a
  * duplicate-index error from a repeated DDL statement is ignored.
  */
+import {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+} from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { DDL } from "./ddl.ts";
 import { FOREIGN_KEYS, type ForeignKeyMigration } from "./foreign-keys.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
@@ -155,12 +161,12 @@ const IDENTITY_INDEXES = [
 ];
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner): Promise<void> {
+export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);
   await run(BUILD_CAPTURE_JOB_BACKFILL);
-  await migrateIndexes(run);
+  await migrateIndexes(run, logger);
   // Replaced by content_uses (ADR 0039); its per-hash counters cannot become per-build uses.
   await run("DROP TABLE IF EXISTS content_refs");
   await migrateLegacyColumns(run);
@@ -174,7 +180,7 @@ async function ensureColumns(run: MigrationRunner): Promise<void> {
   }
 }
 
-async function migrateIndexes(run: MigrationRunner): Promise<void> {
+async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<void> {
   await dropIndexIfExists(run, "snapshots", "snapshots_build_story_viewport_idx");
   await dropIndexIfExists(run, "baselines", "baselines_project_story_viewport_branch_idx");
   for (const index of IDENTITY_INDEXES) {
@@ -190,11 +196,12 @@ async function migrateIndexes(run: MigrationRunner): Promise<void> {
     "builds_project_gitsha_idx",
     "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)",
   );
-  await ensureIndex(
+  await ensureUniqueIndex(
     run,
     "design_links",
     "design_links_project_import_path_idx",
     "CREATE UNIQUE INDEX design_links_project_import_path_idx ON design_links (project_id, import_path)",
+    logger,
   );
 }
 
@@ -316,6 +323,41 @@ async function ensureIndex(
     return;
   }
   await run(sql);
+}
+
+/** MySQL's duplicate-entry error: a unique index over rows that already repeat its key. */
+const DUPLICATE_ENTRY = 1062;
+
+/**
+ * {@link ensureIndex} for a unique index that existing rows may already violate: that one error is
+ * skipped (the database runs without the index and says so once), every other failure stops the boot.
+ */
+async function ensureUniqueIndex(
+  run: MigrationRunner,
+  table: string,
+  name: string,
+  sql: string,
+  logger: Logger | undefined,
+): Promise<void> {
+  try {
+    await ensureIndex(run, table, name, sql);
+  } catch (error) {
+    const { errno, code } = error as { errno?: unknown; code?: unknown };
+    if (errno !== DUPLICATE_ENTRY && code !== "ER_DUP_ENTRY") {
+      throw error;
+    }
+    const parsed = parseUniqueIndex(sql);
+    if (parsed === null) {
+      throw error;
+    }
+    const rows = (await run(duplicateGroupsSql(parsed.table, parsed.columns))) as {
+      duplicate_groups?: unknown;
+    }[];
+    logSkippedIndex(logger, {
+      ...parsed,
+      duplicateGroups: Number(rows[0]?.duplicate_groups ?? 0),
+    });
+  }
 }
 
 async function hasIndex(run: MigrationRunner, table: string, name: string): Promise<boolean> {

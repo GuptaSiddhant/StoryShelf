@@ -1,5 +1,6 @@
 import type { Client } from "@libsql/client";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import * as drizzleLibsqlCore from "drizzle-orm/libsql/driver-core";
 /**
  * Turso/libSQL preset for the SQLite database adapter.
@@ -18,6 +19,7 @@ import {
   execUnlessAsync,
   isDuplicateColumn,
   isMissingColumn,
+  reportSkippedIndexAsync,
   toleratedFor,
 } from "./migration-errors.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
@@ -69,11 +71,11 @@ export function createTursoDatabase(options: TursoDatabaseOptions): DatabaseAdap
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
+    migrate: async ({ logger }) => {
       await assertReviewSchema(async (table) =>
         parseTableInfo((await client.execute(`PRAGMA table_info(${table})`)).rows),
       );
-      await runMigrations(client);
+      await runMigrations(client, logger);
     },
     close: () => {
       if (owned) {
@@ -136,16 +138,29 @@ function createNodeClient(config: Parameters<CreateClient>[0]): Client {
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
-async function runMigrations(client: LibsqlClient): Promise<void> {
+async function runMigrations(client: LibsqlClient, logger: Logger | undefined): Promise<void> {
   await client.executeMultiple(DDL);
   await ensureColumns(client, DDL);
   for (const statement of IDENTITY_STATEMENTS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
-    await execUnlessAsync(
+    const skipped = await execUnlessAsync(
       async (sql) => await client.execute(sql),
       statement,
       toleratedFor(statement),
     );
+    if (skipped) {
+      // oxlint-disable-next-line no-await-in-loop -- one report per skipped index, in order
+      await reportSkippedIndexAsync(
+        statement,
+        async (sql) => {
+          const rows = (await client.execute(sql)).rows as unknown as {
+            duplicate_groups?: unknown;
+          }[];
+          return Number(rows[0]?.duplicate_groups ?? 0);
+        },
+        logger,
+      );
+    }
   }
   await client.execute(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
   await execUnlessAsync(

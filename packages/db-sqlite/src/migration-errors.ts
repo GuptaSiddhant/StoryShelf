@@ -6,6 +6,12 @@
  * (node:sqlite, better-sqlite3, libSQL and D1 all pass SQLite's message through), so they are
  * matched by their text, which SQLite has kept stable.
  */
+import {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+} from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 
 /** Whether an error is one a migration statement may skip. */
 export type ErrorTest = (error: unknown) => boolean;
@@ -44,16 +50,18 @@ export function toleratedFor(statement: string): ErrorTest {
   return skippable ? isUniqueViolation : () => false;
 }
 
-/** Run a statement, skipping only the error `tolerated` names; any other failure propagates. */
+/** Run a statement, skipping only the error `tolerated` names (resolves true then); any other failure propagates. */
 export function execUnless(
   database: { exec(sql: string): unknown },
   sql: string,
   tolerated: ErrorTest,
-): void {
+): boolean {
   try {
     database.exec(sql);
+    return false;
   } catch (error) {
     if (!tolerated(error)) throw error;
+    return true;
   }
 }
 
@@ -62,10 +70,36 @@ export async function execUnlessAsync(
   exec: (sql: string) => Promise<unknown>,
   sql: string,
   tolerated: ErrorTest,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await exec(sql);
+    return false;
   } catch (error) {
     if (!tolerated(error)) throw error;
+    return true;
   }
+}
+
+/** Say, once, that the unique index `statement` creates was skipped; `count` runs the group count. */
+export function reportSkippedIndex(
+  statement: string,
+  count: (sql: string) => number,
+  logger: Logger | undefined,
+): void {
+  const parsed = parseUniqueIndex(statement);
+  if (parsed === null) return;
+  const duplicateGroups = count(duplicateGroupsSql(parsed.table, parsed.columns));
+  logSkippedIndex(logger, { ...parsed, duplicateGroups });
+}
+
+/** {@link reportSkippedIndex} for a driver whose queries are asynchronous. */
+export async function reportSkippedIndexAsync(
+  statement: string,
+  count: (sql: string) => Promise<number>,
+  logger: Logger | undefined,
+): Promise<void> {
+  const parsed = parseUniqueIndex(statement);
+  if (parsed === null) return;
+  const duplicateGroups = await count(duplicateGroupsSql(parsed.table, parsed.columns));
+  logSkippedIndex(logger, { ...parsed, duplicateGroups });
 }

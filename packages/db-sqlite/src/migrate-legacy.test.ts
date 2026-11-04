@@ -113,6 +113,50 @@ describe.each([nodeSqlite, betterSqlite3])("upgrading an old volume on $name", (
     return path;
   }
 
+  it("boots without the design-link index when rows repeat its key, says so once, and builds it on a later boot", async () => {
+    const path = await volume();
+    driver.raw(
+      path,
+      `DROP INDEX design_links_project_import_path_idx;
+       INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', '${NOW}', '${NOW}');
+       INSERT INTO design_links (id, project_id, import_path, url, created_at, updated_at)
+         VALUES ('d1', 'p', './A.tsx', 'secret-u1', '${NOW}', '${NOW}'), ('d2', 'p', './A.tsx', 'secret-u2', '${NOW}', '${NOW}');`,
+    );
+    const error = vi.fn();
+    const spy = { error } as unknown as typeof silentLogger;
+
+    const first = driver.open(path);
+    await first.lifecycle?.setup({ config: {}, logger: spy });
+    await first.lifecycle?.teardown();
+
+    expect(error).toHaveBeenCalledOnce();
+    const [fields, message] = error.mock.calls[0] as [Record<string, unknown>, string];
+    expect(fields).toEqual({
+      table: "design_links",
+      index: "design_links_project_import_path_idx",
+      duplicateGroups: 1,
+    });
+    expect(message).toContain("created on the next boot");
+    // Never a row's contents.
+    expect(message).not.toContain("secret");
+    expect(JSON.stringify(fields)).not.toContain("secret");
+
+    // Clean the data: the next boot creates the index, and says nothing.
+    driver.raw(path, "DELETE FROM design_links WHERE id = 'd2'");
+    error.mockClear();
+    const second = driver.open(path);
+    await second.lifecycle?.setup({ config: {}, logger: spy });
+    await second.lifecycle?.teardown();
+    expect(error).not.toHaveBeenCalled();
+    expect(() =>
+      driver.raw(
+        path,
+        `INSERT INTO design_links (id, project_id, import_path, url, created_at, updated_at)
+         VALUES ('d3', 'p', './A.tsx', 'u3', '${NOW}', '${NOW}')`,
+      ),
+    ).toThrow(/UNIQUE constraint failed/u);
+  });
+
   it("rebuilds a comments table that still requires a user, keeping its rows and every column", async () => {
     const path = await volume();
     driver.raw(

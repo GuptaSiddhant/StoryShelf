@@ -1,4 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
@@ -11,6 +12,7 @@ import {
   execUnless,
   isDuplicateColumn,
   isMissingColumn,
+  reportSkippedIndex,
   toleratedFor,
 } from "./migration-errors.ts";
 import {
@@ -48,9 +50,9 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
+    migrate: async ({ logger }) => {
       await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
-      runMigrations(sqlite);
+      runMigrations(sqlite, logger);
       await activateRetention(path, retention);
     },
     close: () => {
@@ -160,18 +162,25 @@ function ensureColumns(sqlite: DatabaseSync, ddl: string): void {
 }
 
 /** Swap in the browser-aware unique indexes (after `ensureColumns` added the column). */
-function applyIdentityStatements(sqlite: DatabaseSync): void {
+function applyIdentityStatements(sqlite: DatabaseSync, logger: Logger | undefined): void {
   for (const statement of IDENTITY_STATEMENTS) {
-    execUnless(sqlite, statement, toleratedFor(statement));
+    if (execUnless(sqlite, statement, toleratedFor(statement))) {
+      // The connection opens with `returnArrays`: the count is the first value of the row.
+      reportSkippedIndex(
+        statement,
+        (sql) => Number((sqlite.prepare(sql).get() as unknown as [number | bigint])[0]),
+        logger,
+      );
+    }
   }
   sqlite.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
 }
 
-function runMigrations(sqlite: DatabaseSync): void {
+function runMigrations(sqlite: DatabaseSync, logger: Logger | undefined): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
   sqlite.exec(DDL);
   ensureColumns(sqlite, DDL);
-  applyIdentityStatements(sqlite);
+  applyIdentityStatements(sqlite, logger);
   dropWebhookSecret(sqlite);
   migrateBuildsGitShaIndex(sqlite);
   migrateCommentsTable(sqlite);

@@ -5,6 +5,12 @@
  * runner so all drivers (`postgres.js`, `node-postgres`, Neon, …) share one
  * migration path instead of drifting per preset.
  */
+import {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+} from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { DDL } from "./ddl.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
 
@@ -160,7 +166,7 @@ const IDENTITY_STATEMENTS = [
   "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
 ];
 
-async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
+async function migrateSnapshotColumns(run: MigrationRunner, logger?: Logger): Promise<void> {
   await run(SNAPSHOT_INFRA_HASH_ALTER);
   await run(SNAPSHOT_INHERITED_ALTER);
   await run(SNAPSHOT_BASELINE_ID_ALTER);
@@ -170,7 +176,7 @@ async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
   await run(SNAPSHOT_ENV_CHANGE_ALTER);
   await run(SNAPSHOT_DURATION_ALTER);
   await run(SNAPSHOT_A11Y_ALTER);
-  await migrateCaptureIdentityColumns(run);
+  await migrateCaptureIdentityColumns(run, logger);
 }
 
 async function migrateComparisonColumns(run: MigrationRunner): Promise<void> {
@@ -179,14 +185,14 @@ async function migrateComparisonColumns(run: MigrationRunner): Promise<void> {
   await run(SNAPSHOT_COMPARISON_METADATA_ALTER);
 }
 
-async function migrateCaptureIdentityColumns(run: MigrationRunner): Promise<void> {
+async function migrateCaptureIdentityColumns(run: MigrationRunner, logger?: Logger): Promise<void> {
   await run(SNAPSHOT_MODE_ALTER);
   await run(SNAPSHOT_BROWSER_ALTER);
   await run(BASELINE_MODE_ALTER);
   await run(BASELINE_BROWSER_ALTER);
   await run(PROJECT_BROWSERS_ALTER);
   await run(PROJECT_MODES_ALLOWLIST_ALTER);
-  await runUniqueIndex(run, DESIGN_LINKS_UNIQUE_INDEX);
+  await runUniqueIndex(run, DESIGN_LINKS_UNIQUE_INDEX, logger);
   await Promise.all(
     LEGACY_DESIGN_DROPS.map(async (statement) => {
       await run(statement);
@@ -200,13 +206,13 @@ async function migrateBaselineColumns(run: MigrationRunner): Promise<void> {
   await run(BASELINE_SOURCE_BUILD_ALTER);
 }
 
-async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
+async function migrateProjectExtras(run: MigrationRunner, logger?: Logger): Promise<void> {
   await run(EXECUTE_PLAY_ALTER);
   await run(PLAY_TIMEOUT_MS_ALTER);
   await run(PROJECT_AUTOMIGRATE_ALTER);
   await run(PROJECT_AI_PROFILE_ALTER);
   await migrateProjectReviewColumns(run);
-  await migrateSnapshotColumns(run);
+  await migrateSnapshotColumns(run, logger);
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
   await run(RUN_TESTS_ALTER);
@@ -249,16 +255,16 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
 }
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner): Promise<void> {
+export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await run(DDL);
   await migrateCoreColumns(run);
   await migrateUserAuthColumns(run);
   await migrateCaptureJobSingleFlight(run);
-  await migrateProjectExtras(run);
+  await migrateProjectExtras(run, logger);
   // An unfenced build would let a late crash hook fail a newer run.
   await run(BUILD_CAPTURE_JOB_BACKFILL);
-  await applyIdentityStatements(run);
+  await applyIdentityStatements(run, logger);
   await migrateCommentsTable(run);
   await migrateNotificationColumns(run);
 }
@@ -300,11 +306,11 @@ async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await run(BUILDS_GITSHA_INDEX);
 }
 
-async function applyIdentityStatements(run: MigrationRunner): Promise<void> {
+async function applyIdentityStatements(run: MigrationRunner, logger?: Logger): Promise<void> {
   for (const statement of IDENTITY_STATEMENTS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
     await (statement.startsWith("CREATE UNIQUE INDEX")
-      ? runUniqueIndex(run, statement)
+      ? runUniqueIndex(run, statement, logger)
       : run(statement));
   }
 }
@@ -317,14 +323,29 @@ const UNIQUE_VIOLATION = "23505";
  * statement with a unique violation; that one error is skipped (the index is then not built) and
  * every other failure stops the boot.
  */
-async function runUniqueIndex(run: MigrationRunner, sql: string): Promise<void> {
+async function runUniqueIndex(run: MigrationRunner, sql: string, logger?: Logger): Promise<void> {
   try {
     await run(sql);
   } catch (error) {
     if ((error as { code?: unknown }).code !== UNIQUE_VIOLATION) {
       throw error;
     }
+    await reportSkippedIndex(run, sql, logger);
   }
+}
+
+/** Say once that the index was skipped, with how many keys repeat (never a row). */
+async function reportSkippedIndex(
+  run: MigrationRunner,
+  sql: string,
+  logger: Logger | undefined,
+): Promise<void> {
+  const parsed = parseUniqueIndex(sql);
+  if (parsed === null) return;
+  const rows = (await run(duplicateGroupsSql(parsed.table, parsed.columns))) as {
+    duplicate_groups?: unknown;
+  }[];
+  logSkippedIndex(logger, { ...parsed, duplicateGroups: Number(rows[0]?.duplicate_groups ?? 0) });
 }
 
 async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {

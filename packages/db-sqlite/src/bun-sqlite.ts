@@ -1,4 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 /**
  * Bun preset for the SQLite database adapter.
  *
@@ -17,6 +18,7 @@ import {
   execUnless,
   isDuplicateColumn,
   isMissingColumn,
+  reportSkippedIndex,
   toleratedFor,
 } from "./migration-errors.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
@@ -69,12 +71,12 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
+    migrate: async ({ logger }) => {
       await assertReviewSchema(
         async (table) =>
           await Promise.resolve(parseTableInfo(client.query(`PRAGMA table_info(${table})`).all())),
       );
-      runMigrations(client);
+      runMigrations(client, logger);
     },
     close: () => {
       if (owned) {
@@ -165,17 +167,26 @@ function ensureColumns(client: Database, ddl: string): void {
 }
 
 /** Swap in the browser-aware unique indexes (after `ensureColumns` added the column). */
-function applyIdentityStatements(client: Database): void {
+function applyIdentityStatements(client: Database, logger: Logger | undefined): void {
   for (const statement of IDENTITY_STATEMENTS) {
-    execUnless(client, statement, toleratedFor(statement));
+    if (execUnless(client, statement, toleratedFor(statement))) {
+      reportSkippedIndex(
+        statement,
+        (sql) =>
+          Number(
+            (client.query(sql).get() as { duplicate_groups: number | bigint })["duplicate_groups"],
+          ),
+        logger,
+      );
+    }
   }
 }
 
-function runMigrations(client: Database): void {
+function runMigrations(client: Database, logger: Logger | undefined): void {
   client.exec("PRAGMA foreign_keys = ON");
   client.exec(DDL);
   ensureColumns(client, DDL);
-  applyIdentityStatements(client);
+  applyIdentityStatements(client, logger);
   client.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
   execUnless(client, WEBHOOK_SECRET_DROP, isMissingColumn);
   migrateCommentsTable(client);

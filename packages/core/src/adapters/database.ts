@@ -9,9 +9,18 @@
 import type { SQL } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
+import type { MigrationContext } from "./skipped-index.ts";
 
 /** A fenced reference write lost its generation race and should be retried. */
 export class ReferenceGenerationConflict extends Error {}
+
+export {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+  type MigrationContext,
+  type SkippedIndex,
+} from "./skipped-index.ts";
 
 export {
   BaselineSourceIntegrityError,
@@ -327,7 +336,7 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
 export interface DrizzleAdapterOptions {
   metadata: AdapterMetadata & DatabaseAdapterMetadata;
   tables: Tables;
-  migrate: () => Promise<void> | void;
+  migrate: (context: MigrationContext) => Promise<void> | void;
   close: () => Promise<void> | void;
   /** Cheap liveness probe (e.g. `SELECT 1`); omitted when the driver has none. */
   ping?: () => Promise<void> | void;

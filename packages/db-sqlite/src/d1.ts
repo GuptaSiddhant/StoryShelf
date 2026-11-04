@@ -8,6 +8,7 @@
  * needed).
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { drizzle } from "drizzle-orm/d1";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { commentsRebuildStatements } from "./comments-rebuild.ts";
@@ -17,6 +18,7 @@ import {
   execUnlessAsync,
   isDuplicateColumn,
   isMissingColumn,
+  reportSkippedIndexAsync,
   toleratedFor,
 } from "./migration-errors.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
@@ -75,12 +77,12 @@ export function createD1Database(options: D1DatabaseOptions): DatabaseAdapter {
       supportsTesting: false,
     },
     tables: schema,
-    migrate: async () => {
+    migrate: async ({ logger }) => {
       // A binding that refuses PRAGMA has no columns to check, as in `ensureColumns`.
       await assertReviewSchema(async (table) =>
         parseTableInfo((await inspectRows(client, table)) ?? []),
       );
-      await runMigrations(client);
+      await runMigrations(client, logger);
     },
     close: () => {
       // no-op: the Workers runtime owns the binding
@@ -93,7 +95,7 @@ export function createD1Database(options: D1DatabaseOptions): DatabaseAdapter {
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
-async function runMigrations(client: D1Database): Promise<void> {
+async function runMigrations(client: D1Database, logger: Logger | undefined): Promise<void> {
   // Sequential: DDL order matters (tables before indexes) and D1 has no
   // multi-statement exec.
   for (const statement of splitStatements(DDL)) {
@@ -103,11 +105,24 @@ async function runMigrations(client: D1Database): Promise<void> {
   await ensureColumns(client, DDL);
   for (const statement of IDENTITY_STATEMENTS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
-    await execUnlessAsync(
+    const skipped = await execUnlessAsync(
       async (sql) => await client.exec(sql),
       statement,
       toleratedFor(statement),
     );
+    if (skipped) {
+      // oxlint-disable-next-line no-await-in-loop -- one report per skipped index, in order
+      await reportSkippedIndexAsync(
+        statement,
+        async (sql) => {
+          const { results } = await client.prepare(sql).bind().all();
+          return Number(
+            (results[0] as { duplicate_groups?: unknown } | undefined)?.duplicate_groups ?? 0,
+          );
+        },
+        logger,
+      );
+    }
   }
   await client.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
   await execUnlessAsync(

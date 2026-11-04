@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   execUnless,
   execUnlessAsync,
   isDuplicateColumn,
   isMissingColumn,
   isUniqueViolation,
+  reportSkippedIndex,
+  reportSkippedIndexAsync,
   toleratedFor,
 } from "./migration-errors.ts";
 
@@ -60,10 +62,11 @@ const failing = (error: Error) => ({
 const rejecting = (error: Error) => async () => await Promise.reject(error);
 
 describe("execUnless", () => {
-  it("skips the tolerated error and passes every other one on", () => {
-    expect(() =>
+  it("skips the tolerated error (and says it did) and passes every other one on", () => {
+    expect(
       execUnless(failing(new Error("duplicate column name: x")), "ALTER", isDuplicateColumn),
-    ).not.toThrow();
+    ).toBe(true);
+    expect(execUnless({ exec: () => {} }, "ALTER", isDuplicateColumn)).toBe(false);
     expect(() =>
       execUnless(failing(new Error("database is locked")), "ALTER", isDuplicateColumn),
     ).toThrow("database is locked");
@@ -72,9 +75,47 @@ describe("execUnless", () => {
   it("does the same for an asynchronous driver", async () => {
     await expect(
       execUnlessAsync(rejecting(new Error("duplicate column name: x")), "ALTER", isDuplicateColumn),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(true);
+    await expect(execUnlessAsync(async () => {}, "ALTER", isDuplicateColumn)).resolves.toBe(false);
     await expect(
       execUnlessAsync(rejecting(new Error("disk I/O error")), "ALTER", isDuplicateColumn),
     ).rejects.toThrow("disk I/O error");
+  });
+});
+
+describe("reportSkippedIndex", () => {
+  const statement =
+    "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)";
+
+  it("counts the repeated keys and logs the skipped index", () => {
+    const error = vi.fn();
+    const count = vi.fn(() => 4);
+
+    reportSkippedIndex(statement, count, { error } as never);
+
+    expect(count).toHaveBeenCalledWith(
+      expect.stringContaining("FROM design_links GROUP BY project_id, import_path HAVING"),
+    );
+    expect(error.mock.calls[0]?.[0]).toEqual({
+      table: "design_links",
+      index: "design_links_project_import_path_idx",
+      duplicateGroups: 4,
+    });
+  });
+
+  it("does the same for an asynchronous driver, and ignores a statement that is not a unique index", async () => {
+    const error = vi.fn();
+    await reportSkippedIndexAsync(statement, async () => await Promise.resolve(2), {
+      error,
+    } as never);
+    expect(error.mock.calls[0]?.[0]).toMatchObject({ duplicateGroups: 2 });
+
+    const count = vi.fn(() => 1);
+    reportSkippedIndex("DROP INDEX i", count, { error } as never);
+    await reportSkippedIndexAsync("DROP INDEX i", async () => await Promise.resolve(1), {
+      error,
+    } as never);
+    expect(count).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledOnce();
   });
 });

@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runMigrations } from "./migrate.ts";
 
 /** Run SQL through PGlite as the shared migration runner does (multi-statement allowed). */
@@ -610,7 +610,9 @@ describe("runMigrations: a failing statement stops the boot", () => {
         VALUES ('d1', 'p', './A.tsx', 'u1', now(), now()), ('d2', 'p', './A.tsx', 'u2', now(), now());
     `);
 
-    await expect(runMigrations(run)).resolves.toBeUndefined();
+    const error = vi.fn();
+
+    await expect(runMigrations(run, { error } as never)).resolves.toBeUndefined();
 
     const indexes = await client.query<{ indexname: string }>(
       "SELECT indexname FROM pg_indexes WHERE tablename = 'design_links'",
@@ -618,6 +620,28 @@ describe("runMigrations: a failing statement stops the boot", () => {
     expect(indexes.rows.map((row) => row.indexname)).not.toContain(
       "design_links_project_import_path_idx",
     );
+    // Said once, with the table, index and number of repeated keys, never a row's contents.
+    expect(error).toHaveBeenCalledOnce();
+    const [fields, message] = error.mock.calls[0] as [Record<string, unknown>, string];
+    expect(fields).toEqual({
+      table: "design_links",
+      index: "design_links_project_import_path_idx",
+      duplicateGroups: 1,
+    });
+    expect(message).toContain("created on the next boot");
+    expect(message).not.toContain("u1");
+
+    // Clean the data: the next boot creates the index and says nothing more.
+    await client.exec("DELETE FROM design_links WHERE id = 'd2'");
+    error.mockClear();
+    await runMigrations(run, { error } as never);
+    const after = await client.query<{ indexname: string }>(
+      "SELECT indexname FROM pg_indexes WHERE tablename = 'design_links'",
+    );
+    expect(after.rows.map((row) => row.indexname)).toContain(
+      "design_links_project_import_path_idx",
+    );
+    expect(error).not.toHaveBeenCalled();
     await client.close();
   }, 60_000);
 });
