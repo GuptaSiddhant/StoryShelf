@@ -1,9 +1,10 @@
 /** Shared lifecycle conformance tests. Each fixture must use independent connections. */
 import { describe, expect, it } from "vitest";
-import type {
-  BuildReferenceLifecycle,
-  BuildReferenceOwner,
-  TxStore,
+import {
+  ReferenceGenerationConflict,
+  type BuildReferenceLifecycle,
+  type BuildReferenceOwner,
+  type TxStore,
 } from "../adapters/database.ts";
 
 /** Cutoffs that put every release before / after them. */
@@ -116,7 +117,7 @@ export function buildReferenceContractSuite(
             ],
             marker.write,
           ),
-        ).rejects.toThrow();
+        ).rejects.toBeInstanceOf(ReferenceGenerationConflict);
         expect(await marker.count()).toBe(1);
         expect(await second.referenceGeneration(owner)).toBe(1);
         expect(await second.referenceGeneration(other)).toBe(1);
@@ -133,7 +134,7 @@ export function buildReferenceContractSuite(
         // A worker that last saw generation 2 tries to release; the owner is at 3 now.
         await expect(
           first.replaceFencedReferences(owner, 2, [], async () => null),
-        ).rejects.toThrow();
+        ).rejects.toBeInstanceOf(ReferenceGenerationConflict);
         expect(await second.referenceGeneration(owner)).toBe(3);
         expect(await first.claimDeletion(owner.projectId, buildIds[1])).toBe("protected");
       });
@@ -334,6 +335,108 @@ export function buildReferenceContractSuite(
         ).rejects.toThrow();
         expect(await first.referenceGeneration(owner)).toBe(0);
         expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("claimed");
+      });
+    });
+    it("rejects invalid generations and unavailable builds without advancing the fence", async () => {
+      await withFixture(async ({ first, owner, buildIds }) => {
+        for (const invalid of [-1, 0.5, Number.MAX_SAFE_INTEGER]) {
+          // oxlint-disable-next-line no-await-in-loop -- check each boundary on its own
+          await expect(
+            first.replaceFencedReferences(owner, invalid, [], async () => null),
+          ).rejects.toThrow();
+        }
+        await expect(
+          first.replaceFencedReferences(owner, 0, ["no-such-build"], async () => null),
+        ).rejects.toThrow();
+        expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("claimed");
+        await expect(
+          first.replaceFencedReferences(owner, 0, [buildIds[0]], async () => null),
+        ).rejects.toThrow();
+        expect(await first.referenceGeneration(owner)).toBe(0);
+      });
+    });
+    it("handles an empty multi-owner batch and rolls back both owners when the domain write fails", async () => {
+      await withFixture(async ({ first, owner, buildIds }) => {
+        const other = { ...owner, id: `${owner.id}-other` };
+        expect(await first.replaceManyFencedReferences([], async () => "empty")).toEqual({
+          result: "empty",
+          generations: [],
+        });
+        await expect(
+          first.replaceManyFencedReferences(
+            [
+              { owner, expectedGeneration: 0, buildIds: [buildIds[0]] },
+              { owner: other, expectedGeneration: 0, buildIds: [buildIds[1]] },
+            ],
+            async () => {
+              throw new Error("rollback");
+            },
+          ),
+        ).rejects.toThrow("rollback");
+        expect(await first.referenceGeneration(owner)).toBe(0);
+        expect(await first.referenceGeneration(other)).toBe(0);
+        expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("claimed");
+        expect(await first.claimDeletion(owner.projectId, buildIds[1])).toBe("claimed");
+      });
+    });
+    it("admits exactly one of two updates that saw the same generation, the other failing as a conflict", async () => {
+      await withFixture(async ({ first, second, owner, buildIds }) => {
+        const attempts = await Promise.allSettled([
+          first.replaceFencedReferences(owner, 0, [buildIds[0]], async () => buildIds[0]),
+          second.replaceFencedReferences(owner, 0, [buildIds[1]], async () => buildIds[1]),
+        ]);
+        const won = attempts.filter((attempt) => attempt.status === "fulfilled");
+        const lost = attempts.filter((attempt) => attempt.status === "rejected");
+        expect(won).toHaveLength(1);
+        expect(lost).toHaveLength(1);
+        expect(lost[0]?.reason).toBeInstanceOf(ReferenceGenerationConflict);
+        expect(won[0]?.value.generation).toBe(1);
+        expect(await first.claimDeletion(owner.projectId, won[0]?.value.result as string)).toBe(
+          "protected",
+        );
+        // The rejected contender left no reference behind.
+        const lostBuild = attempts[0]?.status === "rejected" ? buildIds[0] : buildIds[1];
+        expect(await first.claimDeletion(owner.projectId, lostBuild)).toBe("claimed");
+      });
+    });
+    it("protects referenced builds once however often they are named, and keeps a tombstone irreversible", async () => {
+      await withFixture(async ({ first, second, owner, buildIds }) => {
+        await first.replaceFencedReferences(owner, 0, [buildIds[0], buildIds[0]], async () => null);
+        expect(await second.claimDeletion(owner.projectId, buildIds[0])).toBe("protected");
+        await first.replaceFencedReferences(owner, 1, [buildIds[1]], async () => null);
+        expect(await second.claimDeletion(owner.projectId, buildIds[0])).toBe("claimed");
+        expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("deleting");
+        await expect(
+          first.replaceFencedReferences(owner, 2, [buildIds[0]], async () => null),
+        ).rejects.toThrow();
+        expect(await second.claimDeletion(owner.projectId, buildIds[1])).toBe("protected");
+        expect(await second.claimDeletion(owner.projectId, "no-such-build")).toBe("missing");
+      });
+    });
+    it("changes no owner when one owner of a multi-owner admission fails", async () => {
+      await withFixture(async ({ first, owner, buildIds, marker }) => {
+        const other = { ...owner, id: `${owner.id}-other` };
+        await first.replaceManyFencedReferences(
+          [
+            { owner, expectedGeneration: 0, buildIds: [buildIds[0]] },
+            { owner: other, expectedGeneration: 0, buildIds: [buildIds[1]] },
+          ],
+          async () => null,
+        );
+        await expect(
+          first.replaceManyFencedReferences(
+            [
+              { owner, expectedGeneration: 1, buildIds: [] },
+              { owner: other, expectedGeneration: 1, buildIds: ["no-such-build"] },
+            ],
+            marker.write,
+          ),
+        ).rejects.toThrow();
+        expect(await marker.count()).toBe(0);
+        expect(await first.referenceGeneration(owner)).toBe(1);
+        expect(await first.referenceGeneration(other)).toBe(1);
+        expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("protected");
+        expect(await first.claimDeletion(owner.projectId, buildIds[1])).toBe("protected");
       });
     });
   });
