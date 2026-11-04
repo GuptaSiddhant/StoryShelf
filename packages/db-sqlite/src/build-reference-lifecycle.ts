@@ -9,11 +9,14 @@ import {
 } from "@storyshelf/core/adapter/database";
 import { resolveBaselineOrigin } from "@storyshelf/core/models";
 import type { Baseline, Build, Snapshot } from "@storyshelf/core/schema";
-import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync } from "node:sqlite";
-import { setTimeout as delay } from "node:timers/promises";
-import { createDrizzleAdapter } from "./drizzle-factory.ts";
-import { createCallback } from "./index.ts";
+import {
+  completeDeletion,
+  listDeleting,
+  markStorageDeleted,
+  releaseBuildContent,
+} from "./build-deletion-steps.ts";
+import { inTransaction, open, transactionStore } from "./lifecycle-transaction.ts";
 import { schema } from "./schema/index.ts";
 
 /** Not yet exposed by the adapter: all domain mutations and cleanup must be wired first. */
@@ -29,6 +32,13 @@ export function createBuildReferenceLifecycle(
       await replaceFencedReferences(path, owner, generation, ids, writeDomain),
     claimDeletion: async (projectId, buildId) =>
       await claimDeletion(path, projectId, buildId, onContention),
+    listDeleting: async (projectId) => await listDeleting(path, projectId),
+    releaseBuildContent: async (projectId, buildId, hashes) =>
+      await releaseBuildContent(path, projectId, buildId, hashes),
+    markStorageDeleted: async (projectId, buildId) =>
+      await markStorageDeleted(path, projectId, buildId),
+    completeDeletion: async (projectId, buildId, removeRows) =>
+      await completeDeletion(path, projectId, buildId, removeRows),
   };
 }
 
@@ -254,73 +264,11 @@ export async function replaceFencedReferences<T>(
   return { result: updated.result, generation: expectedGeneration + 1 };
 }
 
-async function open(path: string, onContention?: () => void): Promise<DatabaseSync> {
-  if (path === ":memory:") throw new Error("Reference lifecycle requires a shared SQLite file");
-  const db = new DatabaseSync(path, { returnArrays: true });
-  try {
-    db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 0");
-    await acquireWrite(db, onContention);
-    return db;
-  } catch (error) {
-    db.close();
-    throw error;
-  }
-}
-
-/** Avoid blocking this process's event loop while a different connection holds the write lock. */
-async function acquireWrite(db: DatabaseSync, onContention?: () => void): Promise<void> {
-  const deadline = Date.now() + 5000;
-  while (true) {
-    try {
-      db.exec("BEGIN IMMEDIATE");
-      return;
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !error.message.includes("database is locked") ||
-        Date.now() >= deadline
-      )
-        throw error;
-      onContention?.();
-      // oxlint-disable-next-line eslint/no-await-in-loop -- wait for a competing writer to finish
-      await delay(10);
-    }
-  }
-}
-
-function transactionStore(db: DatabaseSync): TxStore {
-  return createDrizzleAdapter(drizzle(createCallback(db), { schema }), {
-    metadata: {
-      name: "SQLite lifecycle transaction",
-      version: "0",
-      kind: "sqlite",
-      category: "database",
-    },
-    tables: schema,
-    migrate: () => {},
-    close: () => {},
-  });
-}
-
 /** Every reference mutation advances the owner's fence. */
 function advanceGeneration(db: DatabaseSync, owner: BuildReferenceOwner): void {
   db.prepare(
     "INSERT INTO build_reference_generations (project_id, owner_type, owner_id, generation) VALUES (?, ?, ?, 1) ON CONFLICT (project_id, owner_type, owner_id) DO UPDATE SET generation = generation + 1",
   ).run(owner.projectId, owner.type, owner.id);
-}
-
-async function inTransaction<T>(path: string, work: (db: DatabaseSync) => Promise<T>): Promise<T> {
-  const db = await open(path);
-  try {
-    const result = await work(db);
-    db.exec("COMMIT");
-    return result;
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  } finally {
-    db.close();
-  }
 }
 
 function saveReferences(db: DatabaseSync, owner: BuildReferenceOwner, ids: string[]): void {

@@ -59,6 +59,10 @@ function failingLifecycle(error: Error): BuildReferenceLifecycle {
       throw error;
     },
     claimDeletion: async () => "missing",
+    listDeleting: async () => [],
+    releaseBuildContent: async () => "not-deleting",
+    markStorageDeleted: async () => "not-deleting",
+    completeDeletion: async () => "not-deleting",
   };
 }
 

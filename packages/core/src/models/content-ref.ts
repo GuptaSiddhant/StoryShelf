@@ -1,6 +1,8 @@
+import { eq, sql } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { ContentRef } from "../schema/content-ref.ts";
+import { col } from "./columns.ts";
 
 /** Content refs for deduplicated Storybook assets. */
 export class ContentRefModel {
@@ -12,8 +14,21 @@ export class ContentRefModel {
     this.tables = tables ?? { contentRefs: db.tables.contentRefs };
   }
 
+  /**
+   * The row of `hash`, found by the `hash` column: the table has no `id` column, which the
+   * adapters' by-key `get` needs, so that call would throw.
+   */
   async get(hash: string): Promise<ContentRef | null> {
-    return (await this.db.get(this.tables.contentRefs, hash)) as unknown as ContentRef | null;
+    const rows = (await this.db.list(this.tables.contentRefs, {
+      where: eq(col(this.tables.contentRefs, "hash"), hash),
+      limit: 1,
+    })) as unknown as ContentRef[];
+    return rows[0] ?? null;
+  }
+
+  /** Drop the row of `hash` (raw statement, for the same reason as {@link ContentRefModel.get}). */
+  async forget(hash: string): Promise<void> {
+    await this.db.all(sql`DELETE FROM content_refs WHERE hash = ${hash}`);
   }
 
   async upsert(hash: string): Promise<ContentRef> {

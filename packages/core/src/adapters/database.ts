@@ -137,6 +137,23 @@ export interface FencedBuildReferenceChange extends BuildReferenceChange {
   expectedGeneration: number;
 }
 
+/** A build tombstoned by `claimDeletion` whose cleanup has not finished, with the steps already recorded. */
+export interface DeletingBuild {
+  projectId: string;
+  buildId: string;
+  /** Its shared content was released: each hash decremented exactly once. */
+  contentReleased: boolean;
+  /** Its storage objects were deleted. */
+  storageDeleted: boolean;
+}
+
+/**
+ * How a recorded deletion step ended. `already-done` means an earlier run recorded it and nothing
+ * changed; `not-deleting` means the build is gone or was never claimed; `out-of-order` means an
+ * earlier step is not recorded yet.
+ */
+export type DeletionStepResult = "done" | "already-done" | "not-deleting" | "out-of-order";
+
 /**
  * An explicit database capability; an ordinary transaction does not establish this contract.
  * Implementations serialize admissions, reference changes, and deletion claims across processes.
@@ -169,6 +186,31 @@ export interface BuildReferenceLifecycle {
     projectId: string,
     buildId: string,
   ): Promise<"claimed" | "protected" | "deleting" | "missing">;
+  /** Builds of the project that are `deleting`, oldest claim first: the list a cleaner resumes. */
+  listDeleting(projectId: string): Promise<DeletingBuild[]>;
+  /**
+   * Step 1 of a claimed build's cleanup. In one transaction, record a release for each distinct
+   * hash and decrement its `content_refs` count (never below zero, keeping the row for the grace
+   * period); a hash already recorded for the build is skipped, so a retry never decrements twice.
+   * Marks the step done. Only a `deleting` build of the project qualifies.
+   */
+  releaseBuildContent(
+    projectId: string,
+    buildId: string,
+    hashes: readonly string[],
+  ): Promise<DeletionStepResult>;
+  /** Step 2: record that the build's storage objects are deleted (needs step 1). */
+  markStorageDeleted(projectId: string, buildId: string): Promise<DeletionStepResult>;
+  /**
+   * Step 3: in one transaction run `removeRows`, delete the build's row and its progress records
+   * (needs step 2). `not-deleting` when the build is already gone, which is how a second cleaner
+   * learns the work is finished.
+   */
+  completeDeletion<T>(
+    projectId: string,
+    buildId: string,
+    removeRows: (tx: TxStore) => Promise<T>,
+  ): Promise<{ result: T } | "not-deleting" | "out-of-order">;
 }
 
 /** Database-specific metadata: the family plus what the backing platform can carry. */
