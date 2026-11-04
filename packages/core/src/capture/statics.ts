@@ -130,6 +130,7 @@ export async function persistStorybookStatics(
     if (!(await storage.exists(contentKey(hash)))) {
       await storage.write(contentKey(hash), buffer);
     }
+    signal?.throwIfAborted();
     // Also write to legacy per-build path for backward compat (can be removed after migration)
     await storage.write(`${destinationPrefix}/${rel}`, buffer);
   });
@@ -137,6 +138,8 @@ export async function persistStorybookStatics(
   signal?.throwIfAborted();
   // The uses are recorded once per hash, before the manifest that names them makes the build serve.
   await recordContentUses(db, storage, { projectId, buildId }, Object.values(manifest));
+  // A cancel that landed while the uses were recorded must not publish the manifest either.
+  signal?.throwIfAborted();
   await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }
 

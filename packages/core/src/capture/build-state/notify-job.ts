@@ -86,7 +86,9 @@ async function deliverOnce(
 ): Promise<void> {
   const channelId = channelIdOf(job);
   try {
-    const result = await deliverBuildState(options.deps, { buildId: job.buildId, channelId });
+    const result = await deliverBuildState(options.deps, { buildId: job.buildId, channelId }, () =>
+      run.cancelled.has(keyOf(job)),
+    );
     if (run.cancelled.has(keyOf(job))) {
       run.logger.info("notify job was cancelled; outcome not recorded");
       return;

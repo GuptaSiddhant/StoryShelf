@@ -20,12 +20,34 @@ import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
 
 /**
  * Show the build's current state on one channel. Throws when the host refuses a status, so the
- * caller can retry; resolves to why nothing was written when the build or channel is gone.
+ * caller can retry; resolves to why nothing was written when the build or channel is gone, or when
+ * `stopped` answered true before the request was made.
  */
 export async function deliverBuildState(
   deps: BuildStateDeps,
   ids: { buildId: string; channelId: string },
+  stopped: () => boolean = () => false,
 ): Promise<"delivered" | SkipReason> {
+  const ready = await resolveDelivery(deps, ids);
+  if (typeof ready === "string") {
+    return ready;
+  }
+  // A job told to stop (a cancel, a lost lease) while it loaded the build starts no request.
+  if (stopped()) {
+    return "cancelled";
+  }
+  await writeTo(deps, ready.loaded, { target: ready.target, origin: ready.origin });
+  return "delivered";
+}
+
+/** What a delivery writes and where, or why there is nothing to write. */
+async function resolveDelivery(
+  deps: BuildStateDeps,
+  ids: { buildId: string; channelId: string },
+): Promise<
+  | Exclude<SkipReason, "cancelled">
+  | { loaded: { build: Build; project: Project }; target: StateTarget; origin: string }
+> {
   const loaded = await loadBuild(deps, ids.buildId);
   // The origin can disappear between queueing and running (a cleared setting): nothing is shown.
   const origin = loaded === null ? undefined : await deps.publicOrigin();
@@ -33,11 +55,7 @@ export async function deliverBuildState(
     return loaded === null ? "no-build" : "no-origin";
   }
   const target = await loadTarget(deps, ids.channelId, loaded.project.id);
-  if (typeof target === "string") {
-    return target;
-  }
-  await writeTo(deps, loaded, { target, origin });
-  return "delivered";
+  return typeof target === "string" ? target : { loaded, target, origin };
 }
 
 /** The build and its project, or null when either is gone. */

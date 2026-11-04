@@ -161,6 +161,24 @@ describe("createPublishHandler", () => {
     expect(left).toBeNull();
   });
 
+  it("does not complete the build when the cancel lands after the last file was stored", async () => {
+    const { handler, storage, build, statusOf, log } = await setup();
+    const job = { buildId: build.id, jobId: "j2", attempt: 1, maxAttempts: 3 } as ConsumerJob;
+    // The run is told to stop while its manifest is written: the extraction itself still succeeds.
+    const write = storage.write.bind(storage);
+    storage.write = async (path: string, data: Buffer) => {
+      await write(path, data);
+      if (path.endsWith("/manifest.json")) await handler.cancel?.(job);
+    };
+
+    await expect(
+      handler.run(job, { logger: log.logger, touch: () => {} }),
+    ).resolves.toBeUndefined();
+
+    expect(await statusOf()).toBe("pending");
+    expect(log.calls.some((c) => c.fields === "publish stopped by a cancel")).toBe(true);
+  });
+
   it("tolerates a cancel for a job that is not running", async () => {
     const { handler, build } = await setup();
     await expect(

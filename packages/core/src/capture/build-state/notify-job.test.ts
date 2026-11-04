@@ -213,6 +213,44 @@ describe("the notify job", () => {
     expect(await lastError(w)).toBeFalsy();
   });
 
+  it("makes no request when the cancel lands while the job is still loading the build", async () => {
+    const { w, handler } = await setup();
+    const job = {
+      buildId: w.build.id,
+      jobId: "n3",
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    // The cancel arrives while the origin is resolved, after the job started and before the write.
+    const origin = w.deps.publicOrigin;
+    (w.deps as { publicOrigin: () => Promise<string | undefined> }).publicOrigin = async () => {
+      await handler.cancel?.(job);
+      return await origin();
+    };
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+    await expect(handler.run(job, { logger, touch: () => {} } as never)).resolves.toBeUndefined();
+
+    expect(statusLog(w.git)).toEqual([]);
+    expect(await lastError(w)).toBeFalsy();
+    expect(logger.info).toHaveBeenCalledWith("notify job was cancelled; outcome not recorded");
+  });
+
+  it("writes when no cancel arrives, with the same setup", async () => {
+    const { w, handler } = await setup();
+    const job = {
+      buildId: w.build.id,
+      jobId: "n4",
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    await handler.run(job, { logger, touch: () => {} } as never);
+    expect(statusLog(w.git).length).toBeGreaterThan(0);
+  });
+
   it("still surfaces the failure of a last attempt that was not cancelled", async () => {
     const onFailed = vi.fn(async () => {});
     const { w, handler } = await setup({ onFailed });

@@ -67,7 +67,23 @@ async function publishOnce(
   context: { logger: Logger; touch: () => void; signal: AbortSignal },
   projectId: string,
 ): Promise<void> {
-  const { completer, storage, scratchDir, limits, db } = options;
+  if ((await attemptPublish(options, job, context, projectId)) === "stored") {
+    await options.completer.complete(job.buildId, { ok: true });
+  }
+}
+
+/**
+ * Store the zip's files. Answers "stored" only for a run that finished and was not told to stop;
+ * a cancelled run, a lost lease and a failure (settled here) all answer "stopped", and the build is
+ * not completed by them.
+ */
+async function attemptPublish(
+  options: PublishHandlerOptions,
+  job: ConsumerJob,
+  context: { logger: Logger; touch: () => void; signal: AbortSignal },
+  projectId: string,
+): Promise<"stored" | "stopped"> {
+  const { storage, scratchDir, limits, db } = options;
   try {
     await publishStoredZip(
       {
@@ -82,16 +98,19 @@ async function publishOnce(
       { projectId, buildId: job.buildId },
     );
   } catch (error) {
-    if (context.signal.aborted) {
-      // Cancelled (or the lease was lost): the consumer settles the job, and the build is not
-      // completed or failed by a run that was told to stop.
-      context.logger.info("publish stopped by a cancel");
-      return;
-    }
+    if (context.signal.aborted) return stopped(context.logger);
     await settleFailure(options.completer, job, error);
-    return;
+    return "stopped";
   }
-  await completer.complete(job.buildId, { ok: true });
+  // The cancel (or the lost lease) may land after the last file: the run finished, but it was told
+  // to stop, so it does not complete the build or run the success hooks.
+  return context.signal.aborted ? stopped(context.logger) : "stored";
+}
+
+/** A run told to stop (cancelled, or its lease lost): the consumer settles the job. */
+function stopped(logger: Logger): "stopped" {
+  logger.info("publish stopped by a cancel");
+  return "stopped";
 }
 
 /** A permanent failure (a cap) or the last attempt fails the build; anything else is retried. */

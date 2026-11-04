@@ -37,7 +37,13 @@ export interface StateTarget {
 }
 
 /** Why a delivery wrote nothing. */
-export type SkipReason = "no-build" | "no-channel" | "disabled" | "no-provider" | "no-origin";
+export type SkipReason =
+  | "no-build"
+  | "no-channel"
+  | "disabled"
+  | "no-provider"
+  | "no-origin"
+  | "cancelled";
 
 /**
  * Asks for a build's current state to be shown on its project's git channels. Never rejects: the
