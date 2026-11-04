@@ -187,12 +187,16 @@ describe("build ids in links", () => {
     expect(buildIdOf(link(OLDER))).toBe(OLDER);
     expect(buildIdOf(link(OLDER, "/diff?snapshot=S1"))).toBe(OLDER);
     expect(buildIdOf(link(OLDER, "?x=1"))).toBe(OLDER);
+    expect(buildIdOf(`${link(OLDER)}#frag`)).toBe(OLDER);
   });
 
   it("reads nothing from a link without a build id", () => {
     expect(buildIdOf()).toBeUndefined();
     expect(buildIdOf(null)).toBeUndefined();
     expect(buildIdOf("https://shelf.example/projects/web/builds/B1")).toBeUndefined();
+    expect(buildIdOf(`https://shelf.example/projects/web?next=/builds/${NEWER}`)).toBeUndefined();
+    expect(buildIdOf(`https://shelf.example/x#/builds/${NEWER}`)).toBeUndefined();
+    expect(buildIdOf("not a url")).toBeUndefined();
     expect(buildIdOf("https://shelf.example/projects/web")).toBeUndefined();
   });
 

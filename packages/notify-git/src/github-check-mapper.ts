@@ -57,12 +57,20 @@ export function externalIdOf(context: string): string {
   return `storyshelf:${context}`;
 }
 
-/** A build link carries the build's ULID: `.../builds/<26 Crockford characters>`, then end, `/`, `?` or `#`. */
-const BUILD_ID_IN_LINK = /\/builds\/([0-9A-HJKMNP-TV-Z]{26})(?=[/?#]|$)/u;
+/** The build id in a link's path: `.../builds/<26 Crockford characters>`, then end or `/`. */
+const BUILD_ID_IN_PATH = /\/builds\/(?<id>[0-9A-HJKMNP-TV-Z]{26})(?=\/|$)/u;
 
-/** The build a link points at, or `undefined` when it names none we can read. */
+/** The build a link points at, or `undefined` when its path names none we can read. */
 export function buildIdOf(link?: string | null): string | undefined {
-  return link === null || link === undefined ? undefined : BUILD_ID_IN_LINK.exec(link)?.[1];
+  if (!link) {
+    return undefined;
+  }
+  try {
+    // Only the path counts: a query or fragment (`?next=/builds/<id>`) never names the build.
+    return BUILD_ID_IN_PATH.exec(new URL(link).pathname)?.groups?.["id"];
+  } catch {
+    return undefined;
+  }
 }
 
 /**
