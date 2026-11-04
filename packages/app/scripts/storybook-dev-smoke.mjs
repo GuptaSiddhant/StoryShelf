@@ -21,8 +21,8 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const START_TIMEOUT_MS = 240_000;
 const STORY_TIMEOUT_MS = 60_000;
 
-/** Console messages that are not a story's fault (the dev server has no favicon route). */
-const IGNORED_ERRORS = [/favicon\.ico/u];
+/** URLs whose failure is not a story's fault: Chrome asks every new origin for a favicon the dev server lacks. */
+const IGNORED_URLS = [/\/favicon\.ico$/u];
 
 function startServer() {
   const server = spawn("storybook", ["dev", "--ci", "--no-open", "-p", String(PORT)], {
@@ -68,9 +68,9 @@ async function check(browser, id) {
   const errors = [];
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
-    const text = message.text();
-    if (message.type() === "error" && !IGNORED_ERRORS.some((ignored) => ignored.test(text))) {
-      errors.push(`console: ${text.slice(0, 300)}`);
+    const { url } = message.location();
+    if (message.type() === "error" && !IGNORED_URLS.some((ignored) => ignored.test(url))) {
+      errors.push(`console: ${message.text().slice(0, 300)}${url ? ` (${url})` : ""}`);
     }
   });
   try {
