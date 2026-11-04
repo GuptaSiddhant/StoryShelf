@@ -929,13 +929,19 @@ describe("review events", () => {
       const id = await publish(booted, "feature/x");
       const statuses = [503, 200];
       const seen = await deliveries(booted, ["comment:created"], () => statuses.shift() ?? 200);
+      const realSetTimeout = globalThis.setTimeout;
       vi.stubGlobal("setTimeout", (callback: () => void) => {
         callback();
         return 0;
       });
-      const created = await postComment(booted, id, {});
-      await vi.waitFor(() => expect(seen).toHaveLength(2));
-      expect(seen.map((item) => item.data["eventId"])).toEqual([created.id, created.id]);
+      try {
+        const created = await postComment(booted, id, {});
+        await vi.waitFor(() => expect(seen).toHaveLength(2));
+        expect(seen.map((item) => item.data["eventId"])).toEqual([created.id, created.id]);
+      } finally {
+        // Teardown calls setTimeout(...).unref(), so the real timer is back before the apps stop.
+        vi.stubGlobal("setTimeout", realSetTimeout);
+      }
     });
     describe("mentions (#463)", () => {
       it("resolves @handles against this project's members only, and stores ids", async () => {
