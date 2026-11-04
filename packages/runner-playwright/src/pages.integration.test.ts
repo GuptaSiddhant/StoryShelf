@@ -1,10 +1,10 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chromium } from "playwright-core";
+import { chromium, type Browser } from "playwright-core";
 import { describe, expect, it } from "vitest";
 import { PagePool } from "./pages.ts";
-import { createStaticServer } from "./static-server.ts";
+import { createStaticServer, type StaticServer } from "./static-server.ts";
 
 const VIEWPORT = { name: "desktop", width: 800, height: 600 };
 
@@ -19,16 +19,19 @@ window.ready = (async () => {
 
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("page reuse in a real browser", () => {
   it("comes back from a reset with no Cache Storage entry and no service worker", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "storyshelf-pages-"));
-    await writeFile(join(dir, "index.html"), PAGE);
-    await writeFile(join(dir, "sw.js"), "self.addEventListener('fetch', () => {});");
-    const server = await createStaticServer(dir);
-    const browser = await chromium.launch(
-      process.env["CHROMIUM_EXECUTABLE_PATH"]
-        ? { executablePath: process.env["CHROMIUM_EXECUTABLE_PATH"] }
-        : {},
-    );
+    let dir: string | undefined;
+    let server: StaticServer | undefined;
+    let browser: Browser | undefined;
     try {
+      dir = await mkdtemp(join(tmpdir(), "storyshelf-pages-"));
+      await writeFile(join(dir, "index.html"), PAGE);
+      await writeFile(join(dir, "sw.js"), "self.addEventListener('fetch', () => {});");
+      server = await createStaticServer(dir);
+      browser = await chromium.launch(
+        process.env["CHROMIUM_EXECUTABLE_PATH"]
+          ? { executablePath: process.env["CHROMIUM_EXECUTABLE_PATH"] }
+          : {},
+      );
       const pool = new PagePool(browser);
       const first = await pool.acquire(VIEWPORT);
       await first.page.goto(server.url);
@@ -52,9 +55,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("page reuse in a real br
       expect(after).toEqual({ caches: [], workers: 0 });
       await pool.dispose();
     } finally {
-      await browser.close();
-      await server.close();
-      await rm(dir, { recursive: true, force: true });
+      await browser?.close();
+      await server?.close();
+      if (dir !== undefined) await rm(dir, { recursive: true, force: true });
     }
   }, 60_000);
 });

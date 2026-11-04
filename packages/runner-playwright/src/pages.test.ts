@@ -19,7 +19,10 @@ function stubOrigin(options: { withCaches?: boolean; withWorkers?: boolean } = {
     databases: ["storybook"],
     deleted: [] as string[],
     caches: new Set(["sb-runtime", "sb-assets"]),
-    workers: [{ unregistered: false }, { unregistered: false }],
+    workers: [
+      { unregistered: false, onUnregister: () => {} },
+      { unregistered: false, onUnregister: () => {} },
+    ],
   };
   vi.stubGlobal("localStorage", {
     clear: () => {
@@ -56,6 +59,7 @@ function stubOrigin(options: { withCaches?: boolean; withWorkers?: boolean } = {
                 state.workers.map((worker) => ({
                   unregister: async () => {
                     worker.unregistered = true;
+                    worker.onUnregister();
                     return await Promise.resolve(true);
                   },
                 })),
@@ -82,6 +86,15 @@ describe("clearBrowserState (as serialized)", () => {
     expect(origin.deleted).toEqual(["storybook"]);
     expect([...origin.caches]).toEqual([]);
     expect(origin.workers.map((worker) => worker.unregistered)).toEqual([true, true]);
+  });
+
+  it("removes a cache that a worker writes as it is unregistered", async () => {
+    const origin = stubOrigin();
+    // A worker with a write still pending completes it the moment it is unregistered.
+    const slow = origin.workers[0];
+    if (slow) slow.onUnregister = () => origin.caches.add("late-write");
+    await clear();
+    expect([...origin.caches]).toEqual([]);
   });
 
   it("copes with a page that has no Cache Storage or service workers (an insecure origin)", async () => {

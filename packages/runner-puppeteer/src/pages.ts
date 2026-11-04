@@ -96,7 +96,7 @@ async function reset(entry: Entry): Promise<boolean> {
 }
 
 /**
- * Runs in the page: clears web storage, IndexedDB, Cache Storage and service worker registrations
+ * Runs in the page: clears web storage, IndexedDB, service worker registrations and Cache Storage
  * for the current origin (the Storybook's). It is serialized into the page, so it must stay one
  * self-contained function.
  */
@@ -120,8 +120,14 @@ export async function clearBrowserState(): Promise<void> {
   for (const database of databases) {
     if (database.name) scope.indexedDB?.deleteDatabase(database.name);
   }
-  const cacheNames = (await scope.caches?.keys()) ?? [];
-  await Promise.all(cacheNames.map(async (name) => await scope.caches?.delete(name)));
+  // Workers go first: one finishing a write as it is unregistered must not outlive the cache sweep.
   const registrations = (await scope.navigator?.serviceWorker?.getRegistrations()) ?? [];
   await Promise.all(registrations.map(async (registration) => await registration.unregister()));
+  // Two sweeps: a write that landed while the first was deleting is caught by the second.
+  for (let sweep = 0; sweep < 2; sweep += 1) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- the second sweep must follow the first
+    const names = (await scope.caches?.keys()) ?? [];
+    // oxlint-disable-next-line eslint/no-await-in-loop -- see above
+    await Promise.all(names.map(async (name) => await scope.caches?.delete(name)));
+  }
 }
