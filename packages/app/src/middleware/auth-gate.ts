@@ -19,6 +19,13 @@ export async function resolveRequestUser(
 }
 
 /**
+ * The published-Storybook routes, which enforce their own auth. Only a `storybook` segment right
+ * after the project counts: a `/storybook` anywhere else in a path (a wildcard tail of a component
+ * or label page, with a query naming another page) must not open the gate.
+ */
+const PUBLISHED_STORYBOOK = /^\/projects\/[^/]+\/storybook(?:\/|$)/u;
+
+/**
  * Gate the server-rendered UI behind auth (ADR 0008): unauthenticated HTML
  * requests redirect to login. API/auth routes answer 401/403 themselves, and
  * published-Storybook routes enforce their own auth (public builds are
@@ -38,7 +45,7 @@ export function authGate() {
       path.startsWith("/assets/") ||
       path.startsWith(STORYBOOK_TOKEN_PREFIX) ||
       path.startsWith("/.well-known/") ||
-      (path.startsWith("/projects/") && path.includes("/storybook")) ||
+      PUBLISHED_STORYBOOK.test(path) ||
       /^\/projects\/[^/]+\/?$/u.test(path)
     ) {
       await next();
