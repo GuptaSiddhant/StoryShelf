@@ -181,6 +181,173 @@ describe("storyshelf protect (GitHub)", () => {
   });
 });
 
+const statusRule = (contexts: string[], extra: Record<string, unknown> = {}) => ({
+  type: "required_status_checks",
+  ruleset_id: 7,
+  ruleset_source_type: "Repository",
+  parameters: { required_status_checks: contexts.map((context) => ({ context })) },
+  ...extra,
+});
+
+describe("storyshelf protect (GitHub rulesets)", () => {
+  const RULES = "/repos/acme/widgets/rules/branches/main";
+  const RULESETS = "/repos/acme/widgets/rulesets";
+  it("confirms a ruleset that already requires the check, and names the mechanism", async () => {
+    const recorded = host({ [`GET ${RULES}`]: [200, [statusRule(["storyshelf/testing"])]] });
+    await runProtect({ ...GH, fetch: recorded.fetch });
+    expect(out).toContain("OK: a ruleset on main already requires storyshelf/testing");
+    expect(out).toContain("Mechanism: GitHub rulesets");
+    expect(writes(recorded.calls)).toEqual([]);
+    expect(recorded.calls).toHaveLength(1);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("reports a missing check as a dry run through rulesets and writes nothing", async () => {
+    const recorded = host({ [`GET ${RULES}`]: [200, [statusRule(["ci/build"])]] });
+    await runProtect({ ...GH, fetch: recorded.fetch });
+    expect(out).toContain("none requires: storyshelf/testing (they require ci/build)");
+    expect(out).toContain("Mechanism: GitHub rulesets");
+    expect(out).toContain("Dry run: nothing was changed");
+    expect(writes(recorded.calls)).toEqual([]);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("adds the check to the repository ruleset that has a status-check rule, keeping the rest", async () => {
+    const recorded = host({
+      [`GET ${RULES}`]: [200, [statusRule(["ci/build"])]],
+      [`GET ${RULESETS}/7`]: [
+        200,
+        {
+          id: 7,
+          name: "Main",
+          rules: [
+            { type: "deletion" },
+            {
+              type: "required_status_checks",
+              parameters: {
+                strict_required_status_checks_policy: true,
+                required_status_checks: [{ context: "ci/build", integration_id: 5 }],
+              },
+            },
+          ],
+        },
+      ],
+      [`PUT ${RULESETS}/7`]: [200, {}],
+    });
+    await runProtect({ ...GH, apply: true, fetch: recorded.fetch });
+    expect(writes(recorded.calls)).toMatchObject([
+      {
+        method: "PUT",
+        body: {
+          rules: [
+            { type: "deletion" },
+            {
+              type: "required_status_checks",
+              parameters: {
+                strict_required_status_checks_policy: true,
+                required_status_checks: [
+                  { context: "ci/build", integration_id: 5 },
+                  { context: "storyshelf/testing" },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ]);
+    expect(out).toContain('Added required checks to the ruleset "Main": storyshelf/testing.');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("creates its own ruleset when rulesets apply but none has a status-check rule here", async () => {
+    const orgOnly = statusRule(["ci/build"], { ruleset_source_type: "Organization" });
+    const recorded = host({
+      [`GET ${RULES}`]: [200, [{ type: "deletion", ruleset_id: 3 }, orgOnly]],
+      [`POST ${RULESETS}`]: [201, {}],
+    });
+    await runProtect({ ...GH, apply: true, fetch: recorded.fetch });
+    expect(writes(recorded.calls)).toMatchObject([
+      {
+        method: "POST",
+        body: {
+          name: "StoryShelf merge gate",
+          target: "branch",
+          enforcement: "active",
+          conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
+          rules: [
+            {
+              type: "required_status_checks",
+              parameters: { required_status_checks: [{ context: "storyshelf/testing" }] },
+            },
+          ],
+        },
+      },
+    ]);
+    expect(out).toContain('Created the ruleset "StoryShelf merge gate" on main');
+  });
+
+  it("is satisfied by classic protection when the rulesets do not require the check", async () => {
+    const recorded = host({
+      [`GET ${RULES}`]: [200, [{ type: "deletion", ruleset_id: 3 }]],
+      [`GET ${PROTECTION}/required_status_checks`]: [
+        200,
+        { contexts: ["storyshelf/testing"], checks: [] },
+      ],
+    });
+    await runProtect({ ...GH, fetch: recorded.fetch });
+    expect(out).toContain("OK: main already requires storyshelf/testing");
+    expect(out).toContain("Mechanism: classic branch protection");
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("keeps the rulesets answer when classic protection cannot be read", async () => {
+    const recorded = host({
+      [`GET ${RULES}`]: [200, [{ type: "deletion", ruleset_id: 3 }]],
+      [`GET ${PROTECTION}/required_status_checks`]: [403, { message: "no" }],
+    });
+    await runProtect({ ...GH, fetch: recorded.fetch });
+    expect(out).toContain("Rulesets apply to main, but none requires");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("falls back to classic protection when no ruleset applies, and says so", async () => {
+    const recorded = host({
+      [`GET ${RULES}`]: [200, []],
+      [`GET ${PROTECTION}/required_status_checks`]: [
+        200,
+        { contexts: ["storyshelf/testing"], checks: [] },
+      ],
+    });
+    await runProtect({ ...GH, fetch: recorded.fetch });
+    expect(out).toContain("Mechanism: classic branch protection");
+    expect(recorded.calls.map((call) => new URL(call.url).pathname)).toEqual([
+      RULES,
+      `${PROTECTION}/required_status_checks`,
+    ]);
+  });
+
+  it("uses classic protection when the host has no rulesets API (404)", async () => {
+    const recorded = host({
+      [`GET ${PROTECTION}/required_status_checks`]: [
+        200,
+        { contexts: ["storyshelf/testing"], checks: [] },
+      ],
+    });
+    await runProtect({ ...GH, fetch: recorded.fetch });
+    expect(out).toContain("OK: main already requires storyshelf/testing");
+  });
+
+  it("surfaces a failure of the rulesets API other than 404", async () => {
+    const recorded = host({ [`GET ${RULES}`]: [403, { message: "no" }] });
+    await expect(runProtect({ ...GH, fetch: recorded.fetch })).rejects.toThrow("403");
+  });
+
+  it("mentions rulesets in the manual steps", async () => {
+    await runProtect({ provider: "github", repo: "acme/widgets", fetch: host({}).fetch });
+    expect(out).toContain("https://github.com/acme/widgets/settings/rules");
+  });
+});
+
 describe("storyshelf protect (GitLab)", () => {
   const GL = { provider: "gitlab", repo: "grp/app", token: "glpat-x" } satisfies ProtectOptions;
   const PROJECT = "/api/v4/projects/grp%2Fapp";

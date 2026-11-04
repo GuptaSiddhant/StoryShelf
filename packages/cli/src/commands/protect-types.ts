@@ -15,6 +15,8 @@ export interface ProtectionResult {
   /** One or two lines: what is in place and what is missing. */
   summary: string;
   satisfied: boolean;
+  /** Which GitHub mechanism the result is about (printed so a dry run says what it would use). */
+  mechanism?: "rulesets" | "classic";
   /** Writes the missing part and says what it did; absent when the rule cannot be written automatically. */
   apply?: () => Promise<string>;
 }
