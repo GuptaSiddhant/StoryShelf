@@ -28,6 +28,7 @@ import type { Browser } from "puppeteer-core";
 import { abortIfCancelled, finishing, messageOf, outcomeOf, safeCloseServer } from "./browser.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
+import { RemoteBrowserLostError, browserLost } from "./remote-loss.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createBrowserSession, type BrowserSession } from "./session.ts";
@@ -258,6 +259,14 @@ async function runAllCaptures(
   });
   try {
     await runBatches(batches, pages, input, active, ctx, { captures, failures, relaunch });
+  } catch (error) {
+    if (error instanceof RemoteBrowserLostError) {
+      input.logger?.warn(
+        { target: input.target },
+        "remote browser lost; ending the pass so the job can be retried",
+      );
+    }
+    throw error;
   } finally {
     pages.dispose();
   }
@@ -334,13 +343,26 @@ async function captureOne(
   out: { captures: RenderedSnapshot[]; failures: RenderResult["failures"] },
 ): Promise<boolean> {
   if (active.cancelled) throw new Error("Capture cancelled");
+  // A lost remote browser ends the pass: nothing more is scheduled on it, and nothing after the
+  // drop is recorded as a story failure.
+  if (lost(active, ctx)) throw new RemoteBrowserLostError();
   try {
     await pushCapture(ctx, story, viewport, out.captures, out.failures, input);
     return false;
   } catch (error) {
+    if (lost(active, ctx)) throw new RemoteBrowserLostError();
     pushRenderFailure(out.failures, input, story.id, viewport.name, error);
     return isTimeoutError(error);
   }
+}
+
+/** Whether the run drives someone else's browser (a remote one) and it has disconnected. */
+function lost(active: ActiveRun, ctx: CaptureContext): boolean {
+  return browserLost(
+    ctx.session.ownership === "connected",
+    active,
+    () => ctx.session.browser.connected,
+  );
 }
 
 async function pushCapture(

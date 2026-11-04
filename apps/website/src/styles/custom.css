@@ -205,3 +205,39 @@ h1#_top,
     display: none;
   }
 }
+
+/* --- API reference (starlight-openapi) ------------------------------------ */
+/*
+ * The plugin paints its example code on the mid-grey panel colour, but the syntax token colours are
+ * chosen for the docs' own code background and fall below 4.5:1 on it. Use the same background as
+ * every other code block.
+ */
+:root[data-theme="light"] .sl-openapi-examples .sl-openapi-example div.expressive-code .frame pre {
+  background-color: var(--sl-color-gray-7);
+}
+:root[data-theme="dark"] .sl-openapi-examples .sl-openapi-example div.expressive-code .frame pre {
+  background-color: var(--sl-color-gray-6);
+}
+/* The "required" labels are Starlight's red: 2.8:1 on the light property panel, 4.4:1 on the dark one. */
+:root[data-theme="light"] :is(.sl-openapi-key-required, .sl-openapi-request-body-required) {
+  color: #b0103a;
+}
+:root[data-theme="dark"] :is(.sl-openapi-key-required, .sl-openapi-request-body-required) {
+  color: #f26a99;
+}
+/* A long path wraps instead of scrolling inside its box, so it needs no keyboard stop. */
+:root .sl-openapi-operation-method-path {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* --- Diagrams (astro-mermaid) ---------------------------------------------- */
+/*
+ * Mermaid's dark theme draws edge labels as #ccc on #585858, which is 4.43:1. It styles them with an
+ * id-scoped rule inside each diagram, so a lighter colour needs !important to win.
+ */
+:root[data-theme="dark"] .mermaid .edgeLabel,
+:root[data-theme="dark"] .mermaid .edgeLabel p {
+  color: #f4f4f5 !important;
+}

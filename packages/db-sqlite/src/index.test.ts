@@ -652,6 +652,45 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("adds the delivery diagnostics columns to a volume created before them, keeping its channels", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-delivery-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        ALTER TABLE notification_channels DROP COLUMN last_error;
+        ALTER TABLE notification_channels DROP COLUMN last_error_at;
+        ALTER TABLE notification_channels DROP COLUMN last_delivered_at;
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO notification_channels (id, project_id, provider, config, created_at, updated_at) VALUES ('n', 'p', 'slack-webhook', '{}', 't', 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      const row = await db.get(schema.notificationChannels, "n");
+      expect(row?.["provider"]).toBe("slack-webhook");
+      expect(row?.["lastError"]).toBeNull();
+      expect(row?.["lastErrorAt"]).toBeNull();
+      expect(row?.["lastDeliveredAt"]).toBeNull();
+      await db.update(schema.notificationChannels, "n", {
+        lastError: "boom",
+        lastErrorAt: "2026-01-01T00:00:00.000Z",
+        lastDeliveredAt: "2026-01-02T00:00:00.000Z",
+      });
+      expect((await db.get(schema.notificationChannels, "n"))?.["lastDeliveredAt"]).toBe(
+        "2026-01-02T00:00:00.000Z",
+      );
+      await initDb(db);
+      expect((await db.get(schema.notificationChannels, "n"))?.["lastError"]).toBe("boom");
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("adds subscriptions.review_requests to an older volume with review requests on", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-review-requests-"));
     const path = join(dir, "legacy.db");
