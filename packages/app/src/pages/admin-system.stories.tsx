@@ -69,3 +69,28 @@ export const HostingOnly = pageStory(
   () => renderAdminSystemPage(data({ testing: false, hiddenSnapshots: 128 })),
   { store: { testing: false } },
 );
+
+export const RetentionPaused = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      retentionPause: { baselineId: "01JBASELINE", buildId: "01JSOURCE", problem: "tombstoned" },
+    }),
+  ),
+);
+
+export const RetentionPausedOtherProject = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      retentionPause: { baselineId: "01JBASELINE", buildId: "01JSOURCE", problem: "other-project" },
+    }),
+  ),
+);
+
+export const RetentionAndNotificationsPaused = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      notificationsPaused: true,
+      retentionPause: { baselineId: "01JBASELINE", buildId: "01JSOURCE", problem: "tombstoned" },
+    }),
+  ),
+);

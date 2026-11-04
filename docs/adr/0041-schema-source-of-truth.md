@@ -31,8 +31,11 @@ columns declared in that dialect's Drizzle schema, and the three DDLs with each 
   exist in SQLite only. Postgres and MySQL lack them in both DDL and Drizzle, although core
   (`core/src/schema/user.ts`) and auth (`setUserDisabled`, `resolveAuthUser`) depend on them, so
   disabling a user is not persisted on those backends. Tracked as #418 (p0).
-- **Intentional, SQLite only until #375/#376.** `builds.retention_state`, `build_references` and
-  `build_reference_generations` (ADR 0039).
+- **Intentional, SQLite only until #375/#376.** `builds.retention_state`, `build_references`,
+  `build_reference_generations`, `build_deletions` and `build_content_releases` (ADR 0039). The
+  last two have DDL only, like `build_references`: the lifecycle capability reads and writes them
+  with its own SQL, so they need no Drizzle schema or core `Tables` entry until another dialect
+  implements the capability.
 - **By design.** The auth engine tables (`user`, `session`, `account`, `verification`, `passkey`,
   `ssoProvider`) have DDL in every dialect but no Drizzle schema in the database packages; the auth
   bridge addresses them through its own model registry.

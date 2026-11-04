@@ -210,6 +210,47 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
     .lifecycle;
 }
 
+describe("setup rerun", () => {
+  it("publishes the new run on the cell before it finishes", async () => {
+    const { db } = makeDatabase();
+    const hold = Promise.withResolvers<null>();
+    let calls = 0;
+    const storage = {
+      ...makeStorage().storage,
+      setup: async (): Promise<void> => {
+        calls += 1;
+        if (calls > 1) await hold.promise;
+      },
+    };
+    const options = { database: db, storage } as unknown as ShelfOptions;
+    const runtime = {
+      config: { branchTtlDays: null },
+      logger: silentLogger,
+    } as unknown as ServerRuntime;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    await cell.ready;
+    const lifecycle = (app as unknown as { lifecycle: { setup(): Promise<void> } }).lifecycle;
+
+    const rerun = lifecycle.setup();
+    const published = cell.ready;
+    let settled = false;
+    const observed = published.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    hold.resolve(null);
+    await rerun;
+    await observed;
+    expect(settled).toBe(true);
+  });
+});
+
 describe("job consumer lifecycle", () => {
   it("starts after setup, once, and drains on teardown", async () => {
     const consumer = fakeConsumer();

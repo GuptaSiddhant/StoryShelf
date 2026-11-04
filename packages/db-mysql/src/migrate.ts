@@ -161,6 +161,8 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
   await ensureColumns(run);
   await run(BUILD_CAPTURE_JOB_BACKFILL);
   await migrateIndexes(run);
+  // Replaced by content_uses (ADR 0039); its per-hash counters cannot become per-build uses.
+  await run("DROP TABLE IF EXISTS content_refs");
   await migrateLegacyColumns(run);
   await ensureForeignKeys(run);
 }

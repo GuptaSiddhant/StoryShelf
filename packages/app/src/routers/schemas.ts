@@ -524,6 +524,8 @@ export const purgeSchema = z
     removedBuilds: z.number(),
     removedBranches: z.number().optional(),
     removedBaselines: z.number().optional(),
+    protected: z.number().optional(),
+    resumed: z.number().optional(),
   })
   .openapi("PurgeResult");
 

@@ -5,7 +5,8 @@ import type { Readable } from "node:stream";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { mapLimit } from "../utils/map-limit.ts";
-import { storybookDir, storybookZipPath } from "../utils/paths.ts";
+import { contentKey, storybookDir, storybookZipPath } from "../utils/paths.ts";
+import { recordContentUses } from "./content-uses.ts";
 import { extractZipStream } from "./publish/extract.ts";
 import {
   DEFAULT_MAX_UNZIPPED_BYTES,
@@ -100,7 +101,7 @@ async function prepareTargetDir(targetDir: string): Promise<string> {
  * @param sourceDir - Extracted Storybook directory.
  * @param projectId - Owning project id.
  * @param buildId - Build the files belong to.
- * @param db - Optional database for content ref tracking (enables GC).
+ * @param db - Optional database; with the lifecycle capability the build's content uses are recorded (enables GC).
  * @param signal - Aborting it stops before the next file, and the manifest is never written.
  */
 export async function persistStorybookStatics(
@@ -126,40 +127,21 @@ export async function persistStorybookStatics(
     const hash = createHash("sha256").update(buffer).digest("hex");
     manifest[rel] = hash;
     // Only write if not already exists (dedup)
-    if (!(await storage.exists(`content/${hash}`))) {
-      await storage.write(`content/${hash}`, buffer);
+    if (!(await storage.exists(contentKey(hash)))) {
+      await storage.write(contentKey(hash), buffer);
     }
     // Also write to legacy per-build path for backward compat (can be removed after migration)
-    // and maintain content_refs for GC
     await storage.write(`${destinationPrefix}/${rel}`, buffer);
-    if (db) {
-      await upsertContentRef(db, hash);
-    }
   });
+  // A cancelled run records no uses and never writes the manifest.
   signal?.throwIfAborted();
+  // The uses are recorded once per hash, before the manifest that names them makes the build serve.
+  await recordContentUses(db, storage, { projectId, buildId }, Object.values(manifest));
   await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }
 
 /** Files persisted at once; bounds how many file buffers are in memory together. */
 const STATICS_CONCURRENCY = 8;
-
-async function upsertContentRef(db: DatabaseAdapter, hash: string): Promise<void> {
-  try {
-    const contentRefs = db.tables.contentRefs;
-    const now = new Date().toISOString();
-    const existing = (await db.get(contentRefs, hash)) as unknown as { refCount: number } | null;
-    if (existing) {
-      await db.update(contentRefs, hash, {
-        refCount: existing.refCount + 1,
-        lastSeenAt: now,
-      });
-    } else {
-      await db.insert(contentRefs, { hash, refCount: 1, lastSeenAt: now, createdAt: now });
-    }
-  } catch {
-    // content_refs table may not exist yet (old DB) — ignore
-  }
-}
 
 async function walkFiles(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });

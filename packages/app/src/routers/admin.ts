@@ -1,5 +1,6 @@
 /* oxlint-disable typescript/promise-function-async -- admin helpers are async by design */
 import { createRoute, z } from "@hono/zod-openapi";
+import type { BuildReferenceLifecycle, RetentionPause } from "@storyshelf/core/adapter/database";
 import { ProjectModel } from "@storyshelf/core/models";
 import { Retention } from "@storyshelf/core/retention";
 import type { ShelfRouter } from "../app-types.ts";
@@ -77,20 +78,12 @@ export function registerAdmin(app: ShelfRouter): void {
 
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin(c);
-    // Until the database provides atomic reference admission and tombstones, deletion in a
-    // testing deployment can race a baseline promotion. Do not expose unsafe purge.
-    if (getStore().testing) {
-      return c.json(
-        {
-          message:
-            "Build purge is unavailable for testing deployments until the database adapter supports safe baseline retention. Builds are retained; contact your administrator.",
-        },
-        503,
-      );
-    }
+    const pass = startPurgePass();
+    if (pass.refusal) return c.json({ message: pass.refusal }, 503);
     const body = c.req.valid("json");
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
-    const removedBuilds = await purgeBuilds(ttlDays);
+    const builds = await purgeBuilds(ttlDays, pass.lifecycle);
+    const { removedBuilds } = builds;
     const branch = await purgeBranches();
     await notifySystem("sys:purge-completed", {
       removedBuilds,
@@ -103,14 +96,54 @@ export function registerAdmin(app: ShelfRouter): void {
         removedBuilds,
         removedBranches: branch.removedBranches,
         removedBaselines: branch.removedBaselines,
+        // Present with the lifecycle capability: builds a baseline still protects, and builds an
+        // earlier unfinished run had claimed that this run finished.
+        ...(builds.protectedBuilds === undefined
+          ? {}
+          : { protected: builds.protectedBuilds, resumed: builds.resumedBuilds ?? 0 }),
       },
       200,
     );
   });
 }
 
+/**
+ * Start a purge pass: read the lifecycle capability once, and decide from that one read whether the
+ * pass is refused. The capability is then handed to every deletion of the pass; it is never read
+ * again, so one that is cleared meanwhile cannot make the pass unfenced (ADR 0039).
+ *
+ * Without atomic reference admission and tombstones, deletion in a testing deployment can race a
+ * baseline promotion. A database that withheld the capability for a data problem refuses too, with
+ * or without `testing`: the unfenced path would delete builds a baseline still names.
+ */
+function startPurgePass(): { lifecycle: BuildReferenceLifecycle | undefined; refusal?: string } {
+  const { testing, db } = getStore();
+  const lifecycle = db.buildReferenceLifecycle;
+  if (lifecycle || !(testing || db.retentionPause)) return { lifecycle };
+  return { lifecycle, refusal: unavailableMessage(db.retentionPause) };
+}
+
+/** Why a testing deployment refuses to purge: no capability, and whether the database paused it. */
+function unavailableMessage(pause: RetentionPause | undefined): string {
+  const base =
+    "Build purge is unavailable for this testing deployment until its database supports safe baseline retention. Builds are retained";
+  return pause
+    ? `${base}: retention is paused because baseline ${pause.baselineId} has an invalid source build ${pause.buildId}. See the System page.`
+    : `${base}; contact your administrator.`;
+}
+
+/** Counts summed over the projects; the protected and resumed counts exist with the capability. */
+interface PurgeTotals {
+  removedBuilds: number;
+  protectedBuilds?: number;
+  resumedBuilds?: number;
+}
+
 // oxlint-disable-next-line typescript/promise-function-async
-async function purgeBuilds(ttlDays: number): Promise<number> {
+async function purgeBuilds(
+  ttlDays: number,
+  lifecycle: BuildReferenceLifecycle | undefined,
+): Promise<PurgeTotals> {
   const projects = await new ProjectModel(getStore().db).list();
   const retention = new Retention(
     getStore().db,
@@ -123,14 +156,30 @@ async function purgeBuilds(ttlDays: number): Promise<number> {
     getStore().logger,
   );
   const results = await Promise.all(
-    projects.map((project) => retention.purge(project, { ttlDays, keepLatestPerBranch: true })),
+    projects.map((project) =>
+      retention.purge(project, { ttlDays, keepLatestPerBranch: true, lifecycle }),
+    ),
   );
-  return results.reduce((sum, result) => sum + result.removedBuilds, 0);
+  const sum = (pick: (result: (typeof results)[number]) => number | undefined): number =>
+    results.reduce((total, result) => total + (pick(result) ?? 0), 0);
+  // With the capability the totals exist even when there is no project (zeros).
+  const claimed = Boolean(lifecycle);
+  return {
+    removedBuilds: sum((result) => result.removedBuilds),
+    ...(claimed
+      ? {
+          protectedBuilds: sum((result) => result.protectedBuilds),
+          resumedBuilds: sum((result) => result.resumedBuilds),
+        }
+      : {}),
+  };
 }
 
 // oxlint-disable-next-line typescript/promise-function-async
 async function purgeBranches(): Promise<{ removedBranches: number; removedBaselines: number }> {
-  const branchTtl = getStore().config.branchTtlDays ?? 30;
+  // `null` turns branch GC off; only an unset value takes the default.
+  const { branchTtlDays } = getStore().config;
+  const branchTtl = branchTtlDays === undefined ? 30 : branchTtlDays;
   if (branchTtl === null) {
     return { removedBranches: 0, removedBaselines: 0 };
   }

@@ -362,7 +362,7 @@ describe("upload inline statics", () => {
       expect(status).toBe(422);
       expect([...objects.keys()].filter((key) => key.includes(buildId))).toEqual([]);
       expect([...objects.keys()].filter((key) => key.startsWith("content/"))).toEqual([]);
-      expect(await db.list(db.tables.contentRefs)).toEqual([]);
+      expect(await db.list(db.tables.contentUses)).toEqual([]);
       const scratch = await readdir(join(scratchDir, SCRATCH_DIRNAME, projectId, buildId)).catch(
         () => null,
       );

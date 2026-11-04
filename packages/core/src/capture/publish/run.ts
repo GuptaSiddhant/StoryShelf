@@ -14,7 +14,7 @@ export interface PublishZipOptions {
   storage: StorageAdapter;
   scratchDir: string;
   limits: ExtractionLimits;
-  /** Records the persisted content in `content_refs`, so retention knows who still uses it. */
+  /** Records the build's use of the persisted content (`content_uses`), so retention knows who still uses it. */
   db?: DatabaseAdapter | undefined;
   logger: Logger;
   /** Called between stages (renews a job's lease). */

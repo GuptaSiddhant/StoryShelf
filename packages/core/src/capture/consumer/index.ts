@@ -169,6 +169,9 @@ function registry(options: CaptureConsumerOptions, logger: Logger): Map<string, 
         await options.queue.enqueue(job);
       },
       maxRetries: options.config?.maxRetries,
+      onShardRepeated: (event) => {
+        options.metrics?.shardRepeated?.(event);
+      },
       ...options.capture,
       logger,
     });

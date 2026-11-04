@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { baselinePath, diffPath, modeSegment, screenshotPath } from "./paths.ts";
+import {
+  baselinePath,
+  contentKey,
+  diffPath,
+  isContentHash,
+  modeSegment,
+  publishedGzipPath,
+  screenshotPath,
+} from "./paths.ts";
 
 describe("storage path builders", () => {
   it("builds screenshot paths", () => {
@@ -45,5 +53,30 @@ describe("browser-aware paths", () => {
     expect(baselinePath("p", "main", "s", "dark", "chromium@grid")).toBe(
       "p/baselines/main/s/dark~chromium@grid.png",
     );
+  });
+});
+
+describe("contentKey", () => {
+  const hash = "0123456789abcdef".repeat(4);
+
+  it("builds the shared content key of a SHA-256 hex digest", () => {
+    expect(isContentHash(hash)).toBe(true);
+    expect(contentKey(hash)).toBe(`content/${hash}`);
+    expect(publishedGzipPath(hash)).toBe(`derived/published-gzip/${hash}.gz`);
+  });
+
+  it.each([
+    "..",
+    "../p1/builds/b1/storybook/index.html",
+    `${hash.slice(0, 32)}/${hash.slice(33)}`,
+    hash.toUpperCase(),
+    hash.slice(1),
+    `${hash}0`,
+    `${hash}\n`,
+    "",
+  ])("refuses %j without echoing it", (bad) => {
+    expect(isContentHash(bad)).toBe(false);
+    // The whole message is fixed text: the refused value is not part of it.
+    expect(() => contentKey(bad)).toThrow(/^Invalid content hash$/u);
   });
 });

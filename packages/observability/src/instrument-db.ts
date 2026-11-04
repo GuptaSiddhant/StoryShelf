@@ -53,6 +53,10 @@ class InstrumentedDatabase implements DatabaseAdapter {
     return this.inner.buildReferenceLifecycle;
   }
 
+  get retentionPause(): DatabaseAdapter["retentionPause"] {
+    return this.inner.retentionPause;
+  }
+
   get tables(): Tables {
     return this.inner.tables;
   }

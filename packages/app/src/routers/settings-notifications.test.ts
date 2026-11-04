@@ -446,6 +446,10 @@ describe("notifications settings tab", () => {
     ).text();
     expect(html).toContain("failing");
     expect(html).toContain("HTTP 401: Bad credentials");
+    // The failure time and the error are separate lines, so the time never wraps mid-phrase, and
+    // the error truncates with its whole text on hover.
+    expect(html).toMatch(/<span class="truncate max-w-cell"><span[^>]*>Failed /u);
+    expect(html).toContain('<span class="truncate max-w-cell" title="HTTP 401: Bad credentials">');
   });
 
   it("reports git form problems on the fields they concern", async () => {
