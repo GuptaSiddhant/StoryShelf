@@ -2,6 +2,8 @@ import type { StoryObj } from "@storybook/html-vite";
 import { Fragment } from "hono/jsx";
 import { HtmlEscapedCallbackPhase, resolveCallback } from "hono/utils/html";
 import { Style } from "../src/ui/css.ts";
+import { loadReviewClient } from "./review-client.ts";
+import { type StageState, stageState } from "./stage-state.ts";
 
 /** The fixed "now" of every story: relative times ("3 d ago") and dates never change. */
 export const STORY_NOW = "2026-01-15T12:00:00.000Z";
@@ -71,6 +73,13 @@ export async function renderJsx(node: unknown): Promise<string> {
 export interface JsxStoryOptions {
   /** Show popover menus (native `<details>`) open, so their items can be seen without clicking. */
   open?: boolean;
+  /** Show a comparison stage in this mode, zoom or flip side (default: split, fit). */
+  stage?: StageState;
+  /**
+   * Load the shell's own client script for this story only, so the comparison controls work. Every
+   * other story stays a fixed state (and a capturable baseline).
+   */
+  interactive?: boolean;
 }
 
 /** Story-only: mark every `<details>` open in already-rendered HTML (no production change). */
@@ -84,12 +93,21 @@ function openDetails(html: string): string {
  */
 export function jsxStory(factory: () => unknown, options: JsxStoryOptions = {}): StoryObj {
   const finish = options.open ? openDetails : (html: string): string => html;
-  return {
+  const story: StoryObj = {
     loaders: [
       async () => ({
-        html: finish(await withFrozenClock(async () => await renderJsx(factory()))),
+        html: stageState(
+          finish(await withFrozenClock(async () => await renderJsx(factory()))),
+          options.stage,
+        ),
       }),
     ],
     render: (_args, context) => String(context.loaded["html"]),
   };
+  if (options.interactive) {
+    story.play = ({ canvasElement }): void => {
+      loadReviewClient(canvasElement);
+    };
+  }
+  return story;
 }

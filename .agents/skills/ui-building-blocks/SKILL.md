@@ -156,6 +156,13 @@ export const Tones = jsxStory(() => (
 - Pages use `pageStory(() => renderXPage(...), { dataset, store })` over the seeded in-memory
   database in `src/stories-fixtures/`; add rows there (typed with the real schema interfaces, fixed
   ids, times via `hoursAgo()`), never `Date.now()` or randomness.
+- A view a script changes (the review comparison stage: mode, zoom, flip) is shown as a fixed state,
+  one story each: `jsxStory(factory, { stage: { view: "swipe" } })` or
+  `pageStory(render, { stage: { zoom: "200" } })` (`.storybook/stage-state.ts` sets the state on the
+  rendered HTML; the component itself still renders its default). Give the component one
+  `interactive: true` story that runs the shell's own boot and client scripts for that story only
+  (`.storybook/review-client.ts`); never load them globally in `preview.ts`, or every other story
+  stops being a fixed, capturable state.
 - A page that cannot render in the browser needs a story-only stand-in in `.storybook/shims/` and
   an alias in `.storybook/main.ts`, never an `if` in production code.
 - `nub run storybook` (from the repo root) to look at it; `nub run build-storybook` (from `packages/app`) must pass.
