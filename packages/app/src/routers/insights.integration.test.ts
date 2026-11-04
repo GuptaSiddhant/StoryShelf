@@ -271,6 +271,44 @@ describe("insights generation", () => {
     expect(rows[0]?.insightId).not.toBeNull();
   });
 
+  it("holds the call as a pending reservation while the provider is still running", async () => {
+    const { db, storage, buildId } = await seed();
+    const gate = Promise.withResolvers<null>();
+    const ai = fakeAi({ gate: gate.promise });
+    const app = appWith(db, storage, ai);
+    const res = await app.request(path(buildId), {
+      method: "POST",
+      headers: cookie("admin"),
+      body: "{}",
+    });
+    expect(res.status).toBe(202);
+    await vi.waitFor(() => expect(ai.calls).toHaveLength(1));
+    const held = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+    expect(held).toMatchObject([{ status: "pending" }]);
+    expect(held[0]?.insightId).not.toBeNull();
+    gate.resolve(null);
+    await settleInsightJobs();
+    const done = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+    expect(done).toMatchObject([{ status: "ok" }]);
+  });
+
+  it("refuses a new run when the hourly calls are used up, keeping the finished insight", async () => {
+    const { db, storage, buildId } = await seed();
+    const app = appWith(db, storage, fakeAi({ callsPerHour: 1 }));
+    await app.request(path(buildId), { method: "POST", headers: cookie("admin"), body: "{}" });
+    await settleInsightJobs();
+    const over = await app.request(path(buildId), {
+      method: "POST",
+      headers: cookie("admin"),
+      body: JSON.stringify({ force: true }),
+    });
+    expect(over.status).toBe(429);
+    const latest = (await (
+      await app.request(`${path(buildId)}/latest`, { headers: cookie("admin") })
+    ).json()) as Record<string, unknown>;
+    expect(latest).toMatchObject({ status: "done" });
+  });
+
   it("enforces the DB-counted daily budget with Retry-After and fires each threshold once", async () => {
     const { db, storage, buildId } = await seed();
     const app = appWith(db, storage, fakeAi({ dailyTokens: 40 }));
