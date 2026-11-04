@@ -165,12 +165,16 @@ async function closeEndedAttempt(
   if (!open) {
     return "skipped"; // nothing was left to close, or the run is not this hook's
   }
-  await new CaptureAttemptModel(deps.db, deps.tables).markFinished(
+  // One conditional write: a close that landed since the read (a finished run, a cancel) wins.
+  const closed = await new CaptureAttemptModel(deps.db, deps.tables).closeIfOpen(
     open.id,
     "failed",
     error,
     counts,
   );
+  if (!closed) {
+    return "skipped";
+  }
   await deps.buildState.request(target.buildId);
   return "finalized";
 }

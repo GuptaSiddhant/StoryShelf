@@ -313,6 +313,30 @@ describe("failCrashedCapture", () => {
       expect(await openAttempts()).toHaveLength(1);
     });
 
+    it("does not overwrite an attempt another writer completes between the read and the write", async () => {
+      const { w, crashed, attempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "failed"); // an earlier pass already finalized the build
+      const [older] = await attempts.listByBuild(w.build.id);
+      const original = CaptureAttemptModel.prototype.closeIfOpen;
+      // The worker that finalized the build completes the attempt just before the hook's write.
+      const close = vi
+        .spyOn(CaptureAttemptModel.prototype, "closeIfOpen")
+        .mockImplementation(async function (this: CaptureAttemptModel, ...args) {
+          await this.markFinished(older?.id ?? "", "completed", undefined, {
+            storyCount: 25,
+            failedCount: 0,
+          });
+          return await original.apply(this, args);
+        });
+
+      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times");
+      close.mockRestore();
+
+      expect(outcome).toBe("skipped");
+      const [kept] = await attempts.listByBuild(w.build.id);
+      expect(kept).toMatchObject({ status: "completed", error: null, storyCount: 25 });
+    });
+
     it("closes only the old run's attempt when a retry replaces the plan mid-cleanup", async () => {
       const { w, crashed, attempts } = await lastShardCrashed();
       const shards = new CaptureShardModel(w.db);
