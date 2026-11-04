@@ -50,6 +50,7 @@ if (!version || !distTag) {
 
 console.log(`publishing ${version} with dist-tag ${distTag}`);
 for (const dir of getPublishOrder()) {
+  // oxlint-disable-next-line eslint/no-await-in-loop -- one package at a time, in dependency order
   if (await isPublished(dir)) {
     console.log(`Skipping ${dir} (version already on npm)`);
     continue;
