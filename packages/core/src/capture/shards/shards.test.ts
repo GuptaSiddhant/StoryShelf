@@ -73,6 +73,8 @@ interface Behaviour {
   crashStories: Set<string>;
   /** Renders that throw outright, counted down. */
   throwTimes: number;
+  /** The next render throws once it has streamed this many captures: a remote browser that is lost mid-pass. */
+  loseAfter?: number | undefined;
   /** The next render waits for this, then throws: a duplicate run that is still going. */
   holdNextThenCrash?: Promise<void> | undefined;
   /** Called when a render has been taken by {@link holdNextThenCrash}, so a test can wait for it. */
@@ -100,7 +102,13 @@ function fakeRunner(behaviour: Behaviour): CaptureRunner {
         throw new Error("browser crashed");
       }
       const failures: { storyId: string; viewportName: string; error: string }[] = [];
+      let streamed = 0;
       for (const story of input.stories) {
+        if (behaviour.loseAfter !== undefined && streamed === behaviour.loseAfter) {
+          behaviour.loseAfter = undefined;
+          throw new Error("the remote browser was lost");
+        }
+        streamed += 1;
         behaviour.rendered.push(story.id);
         if (behaviour.crashStories.has(story.id)) {
           // Dies on this story; the ones before it already streamed out through `onCapture`.
@@ -465,6 +473,42 @@ describe("sharded capture", () => {
     expect(retried).toMatchObject({ status: "rendered", finalized: true });
     expect(await w.status()).toBe("approved");
     expect(await w.snapshots()).toHaveLength(25);
+  });
+
+  it("a remote browser lost before any screenshot is redelivered once, and the retry renders each story once", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    await w.runShard(w.queued[0] as ShardJob);
+    await w.runShard(w.queued[1] as ShardJob);
+    w.behaviour.rendered.length = 0;
+    w.behaviour.throwTimes = Number.POSITIVE_INFINITY;
+
+    await expect(w.runShard(w.queued[2] as ShardJob, false)).rejects.toThrow("browser crashed");
+    expect(await w.status()).toBe("capturing");
+    expect(w.behaviour.rendered).toEqual([]);
+
+    w.behaviour.throwTimes = 0;
+    const retried = await w.runShard(w.queued[2] as ShardJob, true);
+    expect(retried).toMatchObject({ status: "rendered", finalized: true });
+    expect(w.behaviour.rendered).toHaveLength(5);
+    const rows = await w.snapshots();
+    expect(rows).toHaveLength(25);
+    expect(new Set(rows.map((row) => row.storyId)).size).toBe(25);
+    expect(await w.status()).toBe("approved");
+  });
+
+  it("a remote browser lost after some screenshots is absorbed in the same delivery, with no duplicate rows", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    await w.runShard(w.queued[0] as ShardJob);
+    await w.runShard(w.queued[1] as ShardJob);
+    w.behaviour.loseAfter = 3;
+
+    const done = await w.runShard(w.queued[2] as ShardJob, true);
+    expect(done).toMatchObject({ status: "rendered", finalized: true });
+    const rows = await w.snapshots();
+    expect(rows).toHaveLength(25);
+    expect(new Set(rows.map((row) => row.storyId)).size).toBe(25);
   });
 
   it("a rerun of a half-persisted shard starts clean instead of colliding", async () => {
