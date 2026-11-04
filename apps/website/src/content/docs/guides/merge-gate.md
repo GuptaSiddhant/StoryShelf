@@ -132,6 +132,16 @@ Changing a channel's prefix changes the status name. Update the required check w
 4. Open the build in StoryShelf and approve the snapshots. The status should flip to **success** and unblock the merge.
 5. Repeat with **Reject** to confirm a `failure` also blocks.
 
+## Upgrading
+
+Status names changed once, when git hosts became notification channels (`@storyshelf/git-github` and `@storyshelf/git-gitlab` were replaced by `@storyshelf/notify-git`). Since then a name is only ever `<prefix>/testing`, `<prefix>/review` or `<prefix>/storybook`, where `<prefix>` is the git channel's prefix (default `storyshelf`), with no project slug and no second `storyshelf/` added by the provider.
+
+- **Old required checks are not carried over, and nothing posts both names.** StoryShelf never posts a status under an old name next to the new one. If your branch protection still requires a name from before the switch, merges wait on a status that will never arrive: remove it and require the current one.
+- **Find the names to require.** Run [`storyshelf protect`](#let-storyshelf-set-the-rule) without `--apply`: it prints the exact required check names for the channel's prefix and gate, and with a token it also tells you whether the branch's rule has them.
+- **Changing a channel's prefix changes the names.** Update the required checks in the same step ([Several projects in one repo](#several-projects-in-one-repo)).
+- **Check runs keep the status names.** Switching a GitHub channel from commit statuses to [GitHub App check runs](#github-app-checks) (or back) does not change the name you require.
+- **Branch protection is yours.** Neither an upload nor a notification changes it; only `storyshelf protect --apply` does, when you run it.
+
 ## Troubleshooting
 
 - **Status never appears.** Check **Project → Settings → Notifications** has a git channel for this project and that its provider is registered on the server. A channel whose last delivery failed shows as **failing** with the error (a revoked token, a missing scope, an unreachable host) until the next build state is delivered successfully; fix the token or the repository and re-run the build or review action. Rotating the server `SECRET` makes stored tokens undecryptable (the server logs `failed to decrypt channel secret`); re-save them.

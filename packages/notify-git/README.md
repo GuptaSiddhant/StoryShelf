@@ -1,6 +1,6 @@
 # @storyshelf/notify-git
 
-Git notification providers for StoryShelf: a `state` channel makes GitHub or GitLab show the current state of a build as a commit status (the merge gate) and a single pull-request or merge-request comment. Zero runtime dependencies — every call goes through `@storyshelf/core/utils` (`httpJson`: timeout + retry with `Retry-After`).
+Git notification providers for StoryShelf: a `state` channel makes GitHub or GitLab show the current state of a build as a commit status (the merge gate) and a single pull-request or merge-request comment. No git-provider SDK (it depends only on `@storyshelf/core` and `zod`): every call goes through `@storyshelf/core/utils` (`httpJson`: timeout + retry with `Retry-After`).
 
 ## Install
 
