@@ -5,11 +5,16 @@ import { makeStorage } from "@storyshelf/core/test-helpers";
 import { ulid } from "@storyshelf/core/utils";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 
 const silentLogger = pino({ level: "silent" });
+
+// A spy made with `vi.spyOn` must not outlive its test, whether or not the test got to the end.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 const SECRET = "test-secret";
 const FAKE_ISSUER = "https://idp.example.com";
 const BASE_URL = "http://localhost:3000";
@@ -410,9 +415,13 @@ describe("engine auth routes", () => {
     vi.spyOn(shelf.adapter, "acceptInvite").mockRejectedValue(
       new Error("SQLITE_BUSY: database is locked (/var/data/shelf.db)"),
     );
+    const logged = vi.spyOn(silentLogger, "error");
     const failed = await accept(issued.inviteId, issued.token, "correct-horse-12");
     const html = await failed.text();
-    vi.restoreAllMocks();
+    expect(logged).toHaveBeenCalledWith(
+      { err: expect.objectContaining({ message: expect.stringContaining("SQLITE_BUSY") }) },
+      "unexpected error answered with a generic message",
+    );
     expect(failed.status).toBe(400);
     expect(html).toContain("Invalid or expired invite");
     expect(html).not.toContain("SQLITE_BUSY");

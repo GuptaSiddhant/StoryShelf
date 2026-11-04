@@ -12,7 +12,7 @@ import {
   makeStorage,
 } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { requestOpenBuildStatesNow } from "../git-status.ts";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
@@ -25,6 +25,11 @@ vi.mock("../git-status.ts", async (original) => {
 });
 
 const silent = createShelfLogger({ level: "silent" });
+
+// A spy made with `vi.spyOn` must not outlive its test, whether or not the test got to the end.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 const ORIGIN = "https://shelf.example.com";
 
 async function seedApp(options: {
@@ -147,11 +152,15 @@ describe("public origin on the System page", () => {
     vi.spyOn(SiteSettingsModel.prototype, "set").mockRejectedValue(
       new Error("SQLITE_BUSY: database is locked (/var/data/shelf.db)"),
     );
+    const logged = vi.spyOn(silent, "error");
     const failed = await form(app, "/admin/public-origin", token, ORIGIN);
     const message = flashOf(failed)?.message ?? "";
     expect(message).toBe("Invalid origin");
     expect(message).not.toContain("SQLITE");
-    vi.restoreAllMocks();
+    expect(logged).toHaveBeenCalledWith(
+      { err: expect.objectContaining({ message: expect.stringContaining("SQLITE_BUSY") }) },
+      "unexpected error answered with a generic message",
+    );
   });
 
   it("stops asking once the configuration or the platform answers", async () => {
