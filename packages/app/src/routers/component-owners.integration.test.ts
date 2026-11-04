@@ -94,6 +94,7 @@ async function boot(project: Record<string, unknown> = {}) {
     version: "0.0.0",
     kind: "email",
     category: "notifier" as const,
+    audience: "person" as const,
     schema: z.object({}).loose(),
   };
   const email: NotifierProvider = {
