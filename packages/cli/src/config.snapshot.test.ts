@@ -30,13 +30,35 @@ import {
 
 let dir = "";
 
+/** Variables a git hook or worktree exports; they would point git at that checkout instead of `dir`. */
+const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] as const;
+const savedGitEnv = new Map<string, string | undefined>();
+
+function isolateGitEnv(): void {
+  for (const name of GIT_REDIRECTS) {
+    savedGitEnv.set(name, process.env[name]);
+    Reflect.deleteProperty(process.env, name);
+  }
+}
+
+function restoreGitEnv(): void {
+  for (const [name, value] of savedGitEnv) {
+    if (value !== undefined) {
+      process.env[name] = value;
+    }
+  }
+  savedGitEnv.clear();
+}
+
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "storyshelf-cli-config-snapshot-"));
   vi.stubEnv("npm_config_user_agent", "");
+  isolateGitEnv();
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  restoreGitEnv();
   rmSync(dir, { recursive: true, force: true });
 });
 
