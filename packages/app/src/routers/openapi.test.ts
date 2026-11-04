@@ -1,6 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { stubTables } from "@storyshelf/core/test-helpers";
+import { readFileSync } from "node:fs";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -65,6 +66,19 @@ describe("OpenAPI spec", () => {
     expect(doc.paths["/api/v1/admin/purge"]).toBeDefined();
     expect(doc.paths["/api/v1/projects/{slug}/baselines/export"]).toHaveProperty("get");
     expect(doc.paths["/api/v1/projects/{slug}/baselines/import"]).toHaveProperty("post");
+  });
+
+  it("serves exactly the pinned OpenAPI document", async () => {
+    // Pins every key, value and key order, so moving schemas between modules cannot change what
+    // the API publishes. Whitespace is not compared: the file is kept in the repo's formatting.
+    // After a deliberate API change, regenerate it:
+    //   nub ./scripts/generate-openapi.ts --out src/routers/openapi.snapshot.json && nub run fmt
+    const pinned: unknown = JSON.parse(
+      readFileSync(new URL("openapi.snapshot.json", import.meta.url), "utf8"),
+    );
+    const spec: unknown = await (await app().request("/api/v1/openapi.json")).json();
+    expect(spec).toEqual(pinned);
+    expect(JSON.stringify(spec)).toBe(JSON.stringify(pinned));
   });
 
   it("tags and summarises every operation so the API reference can group and label them", async () => {
