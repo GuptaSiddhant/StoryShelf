@@ -19,6 +19,7 @@ import {
   describeSizing,
   createPageLimiter,
   detectCaptureEnvironment,
+  errorText,
   isTimeoutError,
   sessionGateFor,
   storybookBase,
@@ -170,7 +171,7 @@ function assertStorybookRoot(target: CaptureTarget, storybookUrl: string): void 
   try {
     storybookBase(storybookUrl);
   } catch (error) {
-    throw new TargetLaunchError(target, error instanceof Error ? error.message : String(error));
+    throw new TargetLaunchError(target, error instanceof Error ? error.message : errorText(error));
   }
 }
 
