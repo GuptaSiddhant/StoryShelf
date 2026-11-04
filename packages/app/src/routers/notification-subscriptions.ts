@@ -23,6 +23,7 @@ function toPublic(row: NotificationSubscriptionRow): {
   events: string[];
   via: string[];
   enabled: boolean;
+  reviewRequests: boolean;
 } {
   return {
     projectId: row.projectId,
@@ -30,6 +31,7 @@ function toPublic(row: NotificationSubscriptionRow): {
     events: NotificationSubscriptionModel.eventsOf(row),
     via: NotificationSubscriptionModel.viaOf(row),
     enabled: row.enabled,
+    reviewRequests: row.reviewRequests,
   };
 }
 
@@ -56,6 +58,34 @@ function currentUserId(): string {
     unauthorized();
   }
   return user.id;
+}
+
+type SubscriptionPut = z.infer<typeof notificationSubscriptionPutSchema>;
+
+/**
+ * Save the caller's subscription. A PUT replaces it, except when it carries only
+ * `reviewRequests`: that flips the one switch and leaves the topics, channels and on/off state as
+ * stored. With no subscription to flip, the answer shows the defaults (nothing subscribed).
+ */
+async function saveSubscription(
+  projectId: string,
+  userId: string,
+  body: SubscriptionPut,
+): Promise<ReturnType<typeof toPublic>> {
+  const model = new NotificationSubscriptionModel(getStore().db);
+  const reviewOnly =
+    body.reviewRequests !== undefined &&
+    body.events === undefined &&
+    body.via === undefined &&
+    body.enabled === undefined;
+  if (!reviewOnly) {
+    return toPublic(await model.upsert(projectId, userId, body));
+  }
+  await model.setReviewRequests(projectId, userId, body.reviewRequests ?? true);
+  const row = await model.getFor(projectId, userId);
+  return row
+    ? toPublic(row)
+    : { projectId, userId, events: [], via: [], enabled: false, reviewRequests: true };
 }
 
 const getSubscriptionRoute = createRoute({
@@ -138,12 +168,7 @@ export function registerNotificationSubscriptions(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const body = c.req.valid("json");
     assertPersonalKinds(body.via);
-    const row = await new NotificationSubscriptionModel(getStore().db).upsert(
-      project.id,
-      currentUserId(),
-      body,
-    );
-    return c.json(toPublic(row));
+    return c.json(await saveSubscription(project.id, currentUserId(), body));
   });
 
   app.openapi(deleteSubscriptionRoute, async (c) => {

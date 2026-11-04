@@ -95,6 +95,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
+  {
+    table: "notification_subscriptions",
+    column: "review_requests",
+    definition: "BOOLEAN NOT NULL DEFAULT TRUE",
+  },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
   {

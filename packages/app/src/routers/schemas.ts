@@ -466,6 +466,7 @@ export const notificationSubscriptionSchema = z
     events: z.array(z.string()),
     via: z.array(z.string()),
     enabled: z.boolean(),
+    reviewRequests: z.boolean(),
   })
   .openapi("NotificationSubscription");
 
@@ -475,6 +476,8 @@ export const notificationSubscriptionPutSchema = z
     events: z.array(z.string().min(1)).optional(),
     via: z.array(z.string().min(1)).optional(),
     enabled: z.boolean().optional(),
+    /** `review:requested` on or off; left as stored when omitted. */
+    reviewRequests: z.boolean().optional(),
   })
   .openapi("NotificationSubscriptionPutInput");
 

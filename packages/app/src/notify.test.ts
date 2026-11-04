@@ -320,6 +320,36 @@ describe("notifyProject", () => {
       expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
     });
 
+    it("lets a reviewer turn review requests off alone, keeping their other topics", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "appr1", { via: ["email"] });
+      await subscriptions.setReviewRequests("p1", "appr1", false);
+      await subscriptions.setReviewRequests("p1", "appr2", false);
+      expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
+      expect(await recipients(db, "review:verdict")).toEqual(["appr1@example.com"]);
+    });
+
+    it("keeps a reviewer who switched their email off silent, and brings the default back with the review switch", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "appr1", { via: ["email"] });
+      await subscriptions.setEnabled("p1", "appr1", false);
+      expect(await recipients(db, "review:requested")).toEqual([
+        "admin1@example.com",
+        "appr2@example.com",
+      ]);
+      await subscriptions.setReviewRequests("p1", "appr2", false);
+      expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
+      await subscriptions.setReviewRequests("p1", "appr2", true);
+      expect(await recipients(db, "review:requested")).toEqual([
+        "admin1@example.com",
+        "appr2@example.com",
+      ]);
+    });
+
     it("sends nothing to a disabled reviewer, a site admin who is no member, or an instance without email", async () => {
       const { db } = makeDatabase();
       await seedUsers(db);
@@ -381,6 +411,29 @@ describe("notifyProject", () => {
       ]);
       expect((await assignedEmails(db, "appr2")).map((item) => item.to)).toEqual([
         "appr2@example.com",
+      ]);
+    });
+
+    it("overrides the review-requests switch: opted out but assigned still gets it once", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "appr1", { via: ["email"], reviewRequests: false });
+      await subscriptions.upsert("p1", "appr2", { via: ["email"], reviewRequests: false });
+      const emailed: { channel: { config: { to: string } } }[] = [];
+      const store = storeFor(db, [recordingProvider("email", emailed)]);
+      const project = { id: "p1", slug: "test-project" };
+      // appr1 is assigned; appr2 opted out the same way and is not. The switch silences only the
+      // default recipients' send: the assigned owner's send is a different path.
+      await runWithStore(store, async () => {
+        await notifyProject(project, "review:requested", { buildId: "b1" }, "/builds/b1", {
+          skipUsers: new Set(["appr1"]),
+        });
+      });
+      await notifyAssignedWith(store, project, "appr1", { buildId: "b1" }, "/builds/b1");
+      expect(emailed.map((item) => item.channel.config.to).toSorted()).toEqual([
+        "admin1@example.com",
+        "appr1@example.com",
       ]);
     });
 

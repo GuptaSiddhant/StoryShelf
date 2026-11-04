@@ -372,6 +372,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   events TEXT,
   via TEXT,
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  review_requests BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS notification_subscriptions_project_user_idx ON notification_subscriptions (project_id, user_id);

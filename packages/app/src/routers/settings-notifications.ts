@@ -2,6 +2,7 @@ import { NotificationChannelModel, NotificationSubscriptionModel } from "@storys
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { LISTED_TOPICS, REVIEW_REQUESTED_EVENT } from "../pages/settings-notifications.tsx";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
@@ -162,12 +163,48 @@ async function handleSaveMine(c: Context): Promise<Response> {
   );
 }
 
-/** Persist the viewer's own subscription (unchecked means opt out). */
+/**
+ * The topics to store: `undefined` (all) when none or every listed topic is ticked, else the
+ * ticked ones plus `review:requested`, which the review switch alone controls (it has no
+ * checkbox, so a partial list must not leave it out). Ticking everything must not freeze today's
+ * list, or an event added later would be missed.
+ */
+function topicsToStore(ticked: string[]): string[] | undefined {
+  const all = ticked.length === 0 || LISTED_TOPICS.every((entry) => ticked.includes(entry.event));
+  return all ? undefined : [...ticked, REVIEW_REQUESTED_EVENT];
+}
+
+/**
+ * The channels to store when "Email me" is on: those already chosen stay, and email is added when
+ * the row is new, switched off or has none (the form only offers email, so it must not drop
+ * channels set elsewhere, such as through the API).
+ */
+async function channelsToStore(
+  model: NotificationSubscriptionModel,
+  projectId: string,
+  userId: string,
+): Promise<string[]> {
+  const existing = await model.getFor(projectId, userId);
+  const kept = existing ? NotificationSubscriptionModel.viaOf(existing) : [];
+  return existing?.enabled === true && kept.length > 0 ? kept : [...new Set([...kept, "email"])];
+}
+
+/**
+ * Persist the viewer's own preferences. "Email me" off keeps the row (switched off) rather than
+ * deleting it, which would hand them back to the default recipients; the review-request switch
+ * changes only its own column.
+ */
 async function saveSubscription(project: Project, userId: string, form: FormData): Promise<void> {
   const model = new NotificationSubscriptionModel(getStore().db);
+  const reviewRequests = form.get("reviewRequests") === "on";
   if (form.get("enabled") === "on") {
-    await model.upsert(project.id, userId, { events: parseChecks(form, "events"), via: ["email"] });
+    await model.upsert(project.id, userId, {
+      events: topicsToStore(parseChecks(form, "events")),
+      via: await channelsToStore(model, project.id, userId),
+      reviewRequests,
+    });
     return;
   }
-  await model.remove(project.id, userId);
+  await model.setEnabled(project.id, userId, false);
+  await model.setReviewRequests(project.id, userId, reviewRequests);
 }

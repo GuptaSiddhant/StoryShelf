@@ -110,14 +110,20 @@ function recordOutcomes(
   };
 }
 
-/** Subscriptions matching an event (enabled + allowlist, alias included). */
+/** The one default-on topic, which a subscription can switch off with `reviewRequests`. */
+const REVIEW_REQUESTED = "review:requested";
+
+/** Subscriptions matching an event (enabled + allowlist, alias included, review requests on). */
 function matchingSubs(
   rows: NotificationSubscriptionRow[],
   event: string,
   data: Record<string, unknown>,
 ): NotificationSubscriptionRow[] {
   return rows.filter(
-    (row) => row.enabled && matchesEvent(NotificationSubscriptionModel.eventsOf(row), event, data),
+    (row) =>
+      row.enabled &&
+      (event !== REVIEW_REQUESTED || row.reviewRequests) &&
+      matchesEvent(NotificationSubscriptionModel.eventsOf(row), event, data),
   );
 }
 
@@ -202,15 +208,15 @@ async function targetsForSub(
  * Topics that reach a project's approvers and admins unless they opted out (ADR 0013, decision 4).
  * Every other topic (`design:changed` included) reaches only people who subscribed to it.
  */
-const DEFAULT_ON_EVENTS: ReadonlySet<string> = new Set(["review:requested"]);
+const DEFAULT_ON_EVENTS: ReadonlySet<string> = new Set([REVIEW_REQUESTED]);
 
 /** Roles that review builds: the default recipients of {@link DEFAULT_ON_EVENTS}. */
 const REVIEWER_ROLES: ReadonlySet<string> = new Set(["approver", "admin"]);
 
 /**
  * Reviewers with no subscription row for the project: a default-on topic reaches them by email.
- * Anyone with a row decides for themselves (`enabled` off or a topic list without the event opts
- * out), so a row never adds a second message here.
+ * Anyone with a row decides for themselves (`enabled` off, `reviewRequests` off or a topic list
+ * without the event opts out), so a row never adds a second message here.
  */
 async function defaultTargets(
   db: DatabaseAdapter,

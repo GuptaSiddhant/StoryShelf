@@ -118,6 +118,57 @@ describe("notification subscriptions", () => {
     expect(await after.json()).toBeNull();
   });
 
+  it("reports review requests on by default and keeps an explicit off across later saves", async () => {
+    const { db, storage } = await seed();
+    const app = appWith(db, storage);
+    const put = async (body: unknown) =>
+      await app.request(mePath, {
+        method: "PUT",
+        headers: { "content-type": "application/json", ...memberCookie },
+        body: JSON.stringify(body),
+      });
+    expect(await (await put({ via: ["email"] })).json()).toMatchObject({ reviewRequests: true });
+    expect(await (await put({ via: ["email"], reviewRequests: false })).json()).toMatchObject({
+      reviewRequests: false,
+    });
+    const later = await put({ events: ["build:approved"], via: ["email"] });
+    expect(await later.json()).toMatchObject({ reviewRequests: false });
+    const read = await app.request(mePath, { headers: memberCookie });
+    expect(await read.json()).toMatchObject({ reviewRequests: false });
+  });
+
+  it("changes only the switch on a PUT that carries only reviewRequests", async () => {
+    const { db, storage } = await seed();
+    const app = appWith(db, storage);
+    const put = async (body: unknown) =>
+      await app.request(mePath, {
+        method: "PUT",
+        headers: { "content-type": "application/json", ...memberCookie },
+        body: JSON.stringify(body),
+      });
+    await put({ events: ["build:approved"], via: ["email"], enabled: false });
+    const flipped = await put({ reviewRequests: false });
+    expect(await flipped.json()).toMatchObject({
+      events: ["build:approved"],
+      via: ["email"],
+      enabled: false,
+      reviewRequests: false,
+    });
+  });
+
+  it("answers a review-only PUT without a subscription with the defaults and stores nothing on", async () => {
+    const { db, storage } = await seed();
+    const app = appWith(db, storage);
+    const res = await app.request(mePath, {
+      method: "PUT",
+      headers: { "content-type": "application/json", ...memberCookie },
+      body: JSON.stringify({ reviewRequests: true }),
+    });
+    expect(await res.json()).toMatchObject({ enabled: false, events: [], reviewRequests: true });
+    const read = await app.request(mePath, { headers: memberCookie });
+    expect(await read.json()).toBeNull();
+  });
+
   it("refuses a room kind with a 422 naming it, and accepts personal and unwired kinds", async () => {
     const { db, storage } = await seed();
     const app = appWith(db, storage, [

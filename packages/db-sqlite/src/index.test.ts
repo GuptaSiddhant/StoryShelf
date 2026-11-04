@@ -580,6 +580,32 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("adds subscriptions.review_requests to an older volume with review requests on", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-review-requests-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        ALTER TABLE notification_subscriptions DROP COLUMN review_requests;
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO users (id, email, name, created_at) VALUES ('u', 'u@example.com', 'U', 't');
+        INSERT INTO notification_subscriptions (id, project_id, user_id, enabled, created_at) VALUES ('s', 'p', 'u', 0, 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      const row = await db.get(schema.notificationSubscriptions, "s");
+      expect(row?.["enabled"]).toBe(false);
+      expect(row?.["reviewRequests"]).toBe(true);
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("adds the fingerprint columns to a volume created before them, keeping existing rows", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-fingerprint-"));
     const path = join(dir, "legacy.db");
