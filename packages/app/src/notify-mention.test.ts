@@ -29,6 +29,7 @@ function provider(kind: string, sent: Sent[]): NotifierProvider {
     version: "0.0.0",
     kind,
     category: "notifier" as const,
+    audience: (kind === "email" ? "person" : "room") as "person" | "room",
     schema: {} as never,
   };
   return {
@@ -78,14 +79,18 @@ async function seed(db: Db, disabled: string[] = []): Promise<void> {
   }
 }
 
-function storeFor(db: Db, notifiers: NotifierProvider[]): Store {
+function storeFor(
+  db: Db,
+  notifiers: NotifierProvider[],
+  logger: Store["logger"] = pino({ level: "silent" }),
+): Store {
   const { storage } = makeStorage();
   return {
     db,
     storage,
     config: { secret: SECRET, publicBaseUrl: "https://shelf.example.com" },
     ui: {},
-    logger: pino({ level: "silent" }),
+    logger,
     user: null,
     authEnabled: false,
     testing: false,
@@ -97,11 +102,17 @@ function storeFor(db: Db, notifiers: NotifierProvider[]): Store {
 
 const DATA = { eventId: "c1", commentId: "c1", scope: "build", buildId: "b1", message: "hi" };
 
-async function mention(db: Db, userId: string, kinds: string[]): Promise<Sent[]> {
+async function mention(
+  db: Db,
+  userId: string,
+  kinds: string[],
+  logger?: Store["logger"],
+): Promise<Sent[]> {
   const sent: Sent[] = [];
   const store = storeFor(
     db,
     kinds.map((kind) => provider(kind, sent)),
+    logger,
   );
   await notifyMentionWith(store, PROJECT, userId, DATA, "/builds/b1");
   return sent;
@@ -133,9 +144,62 @@ describe("notifyMentionWith", () => {
   it("uses the member's own subscription channels when they have an enabled one", async () => {
     const { db } = makeDatabase();
     await seed(db);
-    await new NotificationSubscriptionModel(db).upsert("p1", "bob", { via: ["slack"] });
+    await new NotificationSubscriptionModel(db).upsert("p1", "bob", { via: ["email"] });
     const sent = await mention(db, "bob", ["email", "slack"]);
-    expect(sent.map((item) => item.kind)).toEqual(["slack"]);
+    expect(sent.map((item) => item.kind)).toEqual(["email"]);
+  });
+
+  it("skips a room kind in the member's subscription, delivers the rest, and warns once", async () => {
+    const { db } = makeDatabase();
+    await seed(db);
+    await new NotificationSubscriptionModel(db).upsert("p1", "bob", { via: ["email", "slack"] });
+    const lines: string[] = [];
+    const logger = pino(
+      { level: "warn" },
+      {
+        write: (line: string) => {
+          lines.push(line);
+        },
+      },
+    );
+    const first = await mention(db, "bob", ["email", "slack"], logger);
+    const second = await mention(db, "bob", ["email", "slack"], logger);
+    expect(first.map((item) => item.kind)).toEqual(["email"]);
+    expect(second.map((item) => item.kind)).toEqual(["email"]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('"kind":"slack"');
+    expect(lines[0]).toContain("subscriptionId");
+    expect(lines[0]).not.toContain("bob@example.com");
+  });
+
+  it("delivers nothing, and warns once, when the member's only kind is a room", async () => {
+    const { db } = makeDatabase();
+    await seed(db);
+    await new NotificationSubscriptionModel(db).upsert("p1", "bob", { via: ["slack"] });
+    const lines: string[] = [];
+    const logger = pino(
+      { level: "warn" },
+      {
+        write: (line: string) => {
+          lines.push(line);
+        },
+      },
+    );
+    expect(await mention(db, "bob", ["email", "slack"], logger)).toEqual([]);
+    expect(await mention(db, "bob", ["email", "slack"], logger)).toEqual([]);
+    expect(lines).toHaveLength(1);
+  });
+
+  it("does not email an unsubscribed member through a provider that is not declared personal", async () => {
+    const { db } = makeDatabase();
+    await seed(db);
+    const sent: Sent[] = [];
+    const email = provider("email", sent);
+    const metadata = { ...email.metadata } as Record<string, unknown>;
+    delete metadata["audience"];
+    const undeclared = { ...email, metadata } as never as NotifierProvider;
+    await notifyMentionWith(storeFor(db, [undeclared]), PROJECT, "bob", DATA, "/builds/b1");
+    expect(sent).toEqual([]);
   });
 
   it("sends nothing to a member who turned their subscription off", async () => {

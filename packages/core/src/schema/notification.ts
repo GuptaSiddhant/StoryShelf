@@ -30,5 +30,10 @@ export interface NotificationSubscriptionRow {
   /** JSON array of channels (e.g. ["email"]); v1 supports email only. */
   via: string | null;
   enabled: boolean;
+  /**
+   * Whether this person takes `review:requested` (default true). False opts them out of that one
+   * default-on topic and leaves their other topics and channels as they are (#450).
+   */
+  reviewRequests: boolean;
   createdAt: string;
 }

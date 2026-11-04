@@ -38,6 +38,8 @@ export interface Project {
    * decision 5); null derives it from the build's stories.
    */
   storybookUrlTtlSeconds?: number | null;
+  /** JSON `OwnerRule[]` mapping story-file globs to member user ids (#465); null when none. */
+  componentOwners?: string | null;
   createdAt: string;
   updatedAt: string;
 }

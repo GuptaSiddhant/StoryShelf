@@ -31,6 +31,8 @@ const PROJECT_REVIEW_APPROVALS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS review_approvals INTEGER NOT NULL DEFAULT 1";
 const PROJECT_STORYBOOK_URL_TTL_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS storybook_url_ttl_seconds INTEGER";
+const PROJECT_COMPONENT_OWNERS_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS component_owners TEXT";
 const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const SNAPSHOT_INHERITED_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
@@ -103,6 +105,8 @@ const USER_AUTH_ALTERS = [
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false",
 ];
 const COMMENT_STORY_ID_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS story_id TEXT";
+const SUBSCRIPTION_REVIEW_REQUESTS_ALTER =
+  "ALTER TABLE notification_subscriptions ADD COLUMN IF NOT EXISTS review_requests BOOLEAN NOT NULL DEFAULT TRUE";
 const COMMENT_MENTIONS_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS mentions TEXT";
 const COMMENT_KIND_ALTER =
   "ALTER TABLE comments ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'comment'";
@@ -211,6 +215,7 @@ async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> 
   await execIgnore(run, PROJECT_REVIEW_ENABLED_ALTER);
   await execIgnore(run, PROJECT_REVIEW_APPROVALS_ALTER);
   await execIgnore(run, PROJECT_STORYBOOK_URL_TTL_ALTER);
+  await execIgnore(run, PROJECT_COMPONENT_OWNERS_ALTER);
 }
 
 async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
@@ -294,6 +299,7 @@ async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
 async function migrateCommentColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, COMMENT_STORY_ID_ALTER);
   await execIgnore(run, COMMENT_MENTIONS_ALTER);
+  await execIgnore(run, SUBSCRIPTION_REVIEW_REQUESTS_ALTER);
   await execIgnore(run, COMMENT_KIND_ALTER);
   await execIgnore(run, COMMENT_RESOLVED_AT_ALTER);
   await execIgnore(run, COMMENT_RESOLVED_BY_ALTER);

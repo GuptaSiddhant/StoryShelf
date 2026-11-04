@@ -49,6 +49,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   { table: "projects", column: "review_approvals", definition: "INT NOT NULL DEFAULT 1" },
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
+  { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
@@ -95,6 +96,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
+  {
+    table: "notification_subscriptions",
+    column: "review_requests",
+    definition: "BOOLEAN NOT NULL DEFAULT TRUE",
+  },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
   {

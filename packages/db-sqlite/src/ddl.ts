@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_enabled INTEGER NOT NULL DEFAULT 1,
   review_approvals INTEGER NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INTEGER,
+  component_owners TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -361,6 +362,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   events TEXT,
   via TEXT,
   enabled INTEGER NOT NULL DEFAULT 1,
+  review_requests INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS notification_subscriptions_project_user_idx ON notification_subscriptions (project_id, user_id);

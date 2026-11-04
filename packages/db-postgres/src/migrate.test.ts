@@ -127,6 +127,31 @@ describe("runMigrations: builds gain the review cycle columns", () => {
   }, 60_000);
 });
 
+describe("runMigrations: subscriptions gain review_requests", () => {
+  it("gives every existing subscription review requests on, and is idempotent", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO users (id, email, name, created_at)
+        VALUES ('u', 'u@example.com', 'U', now());
+      INSERT INTO notification_subscriptions (id, project_id, user_id, enabled, created_at)
+        VALUES ('s', 'p', 'u', false, now());
+      ALTER TABLE notification_subscriptions DROP COLUMN review_requests;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run);
+
+    const rows = await client.query<{ enabled: boolean; review_requests: boolean }>(
+      "SELECT enabled, review_requests FROM notification_subscriptions WHERE id = 's'",
+    );
+    expect(rows.rows).toEqual([{ enabled: false, review_requests: true }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: review, a11y, comment and notification columns", () => {
   it("back-fills every later column on older tables with the current defaults", async () => {
     const client = new PGlite();
