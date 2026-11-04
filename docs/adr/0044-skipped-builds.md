@@ -100,11 +100,11 @@ dialect, so the new value needs no constraint change.
 
 ## Delivery
 
-1. Core: the status, the column, `BuildModel` creation and lookup, every status consumer, and the
+1. Core: #548: The status, the column, `BuildModel` creation and lookup, every status consumer, and the
    status mapping (decisions 1, 5, 7).
-2. App: the two endpoints, eligibility in one transaction, and follow-the-source state requests
+2. App: #549: The two endpoints, eligibility in one transaction, and follow-the-source state requests
    (decisions 3, 4, 6).
-3. CLI: `--skip-unchanged` / `skipUnchanged` (decision 2), plus the website docs.
-4. UI: badge, hidden-by-default filter, skipped build page (decision 9; Designer spec first).
-5. Retention: cascade to skipped builds (decision 8), after #374.
-6. Demo: `app-storybook.yml` passes `--skip-unchanged` once 1 to 3 ship in a release.
+3. CLI: #550: `--skip-unchanged` / `skipUnchanged` (decision 2), plus the website docs.
+4. UI: #551: Badge, hidden-by-default filter, skipped build page (decision 9; Designer spec first).
+5. Retention: #552: Cascade to skipped builds (decision 8), after #374.
+6. Demo: #553: `app-storybook.yml` passes `--skip-unchanged` once 1 to 3 ship in a release.
