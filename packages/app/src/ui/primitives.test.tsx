@@ -96,6 +96,15 @@ describe("Badge and Alert", () => {
     expect(html).toContain("#i-x-circle");
     expect(html).toContain("Nope");
   });
+
+  it("takes role=status for a polite message, and role=none to leave the attribute off", async () => {
+    const polite = await render(<Alert role="status">Heads up</Alert>);
+    expect(polite).toContain('role="status"');
+    expect(polite).not.toContain('role="alert"');
+    const owned = await render(<Alert role="none">Inside a live region</Alert>);
+    expect(owned).not.toContain("role=");
+    expect(owned).toContain("Inside a live region");
+  });
 });
 
 describe("Avatar", () => {

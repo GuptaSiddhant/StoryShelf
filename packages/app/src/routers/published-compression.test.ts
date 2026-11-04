@@ -18,18 +18,24 @@ describe("published gzip variants", () => {
 
   it("serves the original first and reuses a verified gzip variant", async () => {
     const { storage, objects } = makeStorage();
-    const bytes = Buffer.from("storybook asset ".repeat(50_000));
+    const bytes = Buffer.from("storybook asset ".repeat(2_000));
     const hash = hashOf(bytes);
     objects.set(`content/${hash}`, bytes);
-    expect(await publishedGzip(storage, hash, bytes, "application/javascript")).toBeUndefined();
-    await vi.waitFor(() => expect(objects.has(publishedGzipPath(hash))).toBe(true), {
-      timeout: 10_000,
+    // Await the background job's own write instead of polling for its result.
+    const written = Promise.withResolvers<null>();
+    const write = storage.write.bind(storage);
+    vi.spyOn(storage, "write").mockImplementation(async (...args) => {
+      await write(...args);
+      written.resolve(null);
     });
+    expect(await publishedGzip(storage, hash, bytes, "application/javascript")).toBeUndefined();
+    await written.promise;
+    expect(objects.has(publishedGzipPath(hash))).toBe(true);
     const result = await publishedGzip(storage, hash, bytes, "application/javascript");
     expect(result).toBeDefined();
     expect(gunzipSync(result!)).toEqual(bytes);
     expect(objects.get(`content/${hash}`)).toEqual(bytes);
-  }, 15_000);
+  });
 
   it("does not generate for legacy, oversized, binary or non-shrinking files", async () => {
     const { storage, objects } = makeStorage();

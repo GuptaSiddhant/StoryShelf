@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPuppeteerCaptureRunner } from "./capture-runner.ts";
+import { RemoteBrowserLostError } from "./remote-loss.ts";
 import { cdp, type CdpFixedOptions, type CdpLeasedOptions } from "./remote/cdp.ts";
 
 const fake = vi.hoisted(() => {
@@ -30,6 +31,10 @@ const fake = vi.hoisted(() => {
     contextsClosed: 0,
     hang: null as Promise<unknown> | null,
     holdConnect: null as { after: number; promise: Promise<unknown> } | null,
+    connected: true,
+    dropAfterScreenshots: null as number | null,
+    screenshots: 0,
+    screenshotError: null as Error | null,
   };
   const makePage = () => {
     const page = {
@@ -67,6 +72,13 @@ const fake = vi.hoisted(() => {
       $: async (): Promise<null> => await Promise.resolve(null),
       screenshot: async (): Promise<Buffer> => {
         if (page.closed) throw new Error("page closed by cancel");
+        state.screenshots += 1;
+        // The connection drops once this many screenshots have been taken: this one fails with it.
+        if (state.dropAfterScreenshots !== null && state.screenshots > state.dropAfterScreenshots) {
+          state.connected = false;
+          throw new Error("Protocol error: Connection closed.");
+        }
+        if (state.screenshotError !== null) throw state.screenshotError;
         return await Promise.resolve(Buffer.from([0]));
       },
       close: async (): Promise<void> => {
@@ -80,6 +92,9 @@ const fake = vi.hoisted(() => {
     return page;
   };
   const browser = () => ({
+    get connected(): boolean {
+      return state.connected;
+    },
     version: async (): Promise<string> => await Promise.resolve("HeadlessChrome/131.0.1"),
     newPage: async () => {
       state.pagesOpened += 1;
@@ -162,6 +177,10 @@ beforeEach(async () => {
     contextsClosed: 0,
     hang: null,
     holdConnect: null,
+    connected: true,
+    dropAfterScreenshots: null,
+    screenshots: 0,
+    screenshotError: null,
   });
 });
 
@@ -446,6 +465,88 @@ const leased = (overrides: Partial<CdpLeasedOptions<{ id: string }>> = {}) => {
   const service = cdp<{ id: string }>(options);
   return { service, seen, released };
 };
+
+const MANY: StoryEntry[] = Array.from({ length: 6 }, (_unused, index) => ({
+  id: `a--s${index}`,
+  title: "A",
+  name: `S${index}`,
+  type: "story",
+}));
+
+describe("a remote browser lost mid-pass", () => {
+  it("ends the pass with one retryable error, schedules nothing more, and records no story failure", async () => {
+    const onCapture = vi.fn(async () => {});
+    const warn = vi.fn();
+    fake.state.dropAfterScreenshots = 1;
+    const runner = createPuppeteerCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const error: unknown = await runner
+      .render(
+        input({
+          stories: MANY,
+          storybookUrl: URL_ROOT,
+          onCapture,
+          logger: { warn, info: vi.fn(), error: vi.fn() },
+        }),
+      )
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(RemoteBrowserLostError);
+    expect(onCapture).toHaveBeenCalledOnce();
+    expect(fake.state.screenshots).toBe(2);
+    expect(fake.state.gotos).toHaveLength(2);
+    const lostWarnings = warn.mock.calls.filter(([, message]) =>
+      String(message).includes("remote browser lost"),
+    );
+    expect(lostWarnings).toHaveLength(1);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("sekret");
+    expect(String(error)).not.toContain("sekret");
+  });
+
+  it("releases the lease as failed, once", async () => {
+    const { service, released } = leased();
+    fake.state.dropAfterScreenshots = 1;
+    await expect(
+      createPuppeteerCaptureRunner({ browsers: [service], concurrency: 1 }).render(
+        input({ stories: MANY, storybookUrl: URL_ROOT }),
+      ),
+    ).rejects.toBeInstanceOf(RemoteBrowserLostError);
+    expect(released.map((entry) => entry.outcome)).toEqual(["failed"]);
+  });
+
+  it("settles every in-flight sibling into the same single error", async () => {
+    fake.state.dropAfterScreenshots = 0;
+    const runner = createPuppeteerCaptureRunner({
+      browsers: [farm({ sessions: 4 })],
+      concurrency: 4,
+    });
+    await expect(
+      runner.render(input({ stories: MANY, storybookUrl: URL_ROOT })),
+    ).rejects.toBeInstanceOf(RemoteBrowserLostError);
+  });
+
+  it("treats a failure on a connected browser as a story failure, not a lost browser", async () => {
+    const runner = createPuppeteerCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    fake.state.screenshotError = new Error("Page crashed");
+    const result = await runner.render(input({ stories: [STORIES[0]], storybookUrl: URL_ROOT }));
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]?.error).toContain("Page crashed");
+  });
+
+  it("keeps a cancel a cancel when it closes the browser under the run", async () => {
+    const { service, released } = leased();
+    const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+    const hold = holdRenders();
+    const rendering = runner.render(input({ stories: MANY, runId: "s1", storybookUrl: URL_ROOT }));
+    await vi.waitFor(() => {
+      expect(fake.state.gotos.length).toBeGreaterThan(0);
+    });
+    await runner.cancel("b1", "s1");
+    fake.state.connected = false;
+    hold.open();
+    const error: unknown = await rendering.catch((caught: unknown) => caught);
+    expect(error).not.toBeInstanceOf(RemoteBrowserLostError);
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+});
 
 describe("measuring a remote CDP browser", () => {
   it("logs the remote's limits once at run start, without its lease or endpoint", async () => {

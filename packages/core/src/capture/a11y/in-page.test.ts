@@ -185,6 +185,18 @@ describe("inPageRunAxe (as serialized, real axe in jsdom)", () => {
     expect(await run(html, { options: { runOnly: ["image-alt"] } })).toEqual([]);
   });
 
+  it("reports the page-level rules when an explicit whole-document context is given", async () => {
+    const html =
+      '<div id="storybook-root"><h4>Skipped levels</h4><p>Text outside any landmark</p></div>';
+    // `context: "html"` puts the whole document in scope, so a page-level rule can fire (`region`
+    // here; `landmark-one-main` and `page-has-heading-one` need a real browser's document, not jsdom).
+    const ids = (await run(html, { context: "html" })).map((x) => x.id);
+    expect(ids).toContain("region");
+    // The default scan of the story root stays silent on them.
+    const rootIds = (await run(html)).map((x) => x.id);
+    expect(rootIds).not.toContain("region");
+  });
+
   it("returns nothing when the context element is missing", async () => {
     expect(await run("<p>no root</p>")).toEqual([]);
   });

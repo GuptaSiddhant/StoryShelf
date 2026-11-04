@@ -11,7 +11,7 @@ It describes how StoryShelf uses Storybook 8, 9 and 10 (all three are tested aga
 
 A built Storybook is two separate web applications:
 
-|             | Manager                                       | Preview                                                |
+| Aspect      | Manager                                       | Preview                                                |
 | ----------- | --------------------------------------------- | ------------------------------------------------------ |
 | What it is  | The chrome: sidebar, toolbar, panels, addons  | The canvas that renders your stories                   |
 | Entry point | `index.html` (its bundle is in `sb-manager/`) | `iframe.html` (its bundle is in `assets/`)             |
@@ -88,7 +88,7 @@ It deliberately does **not** build on:
 
 ## Differences between Storybook 8, 9 and 10
 
-|                                                                   | Storybook 8                                   | Storybook 9               | Storybook 10                                                        |
+| Aspect                                                            | Storybook 8                                   | Storybook 9               | Storybook 10                                                        |
 | ----------------------------------------------------------------- | --------------------------------------------- | ------------------------- | ------------------------------------------------------------------- |
 | Index file                                                        | `index.json` (format version 5)               | `index.json` (5)          | `index.json` (5)                                                    |
 | Index entries                                                     | `type: "story"`                               | `type: "story"`           | `type: "story"` plus `subtype` (`story` or `test`) and `exportName` |

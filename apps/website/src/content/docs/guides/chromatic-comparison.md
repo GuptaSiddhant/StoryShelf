@@ -42,7 +42,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 
 ## Architecture differences
 
-|                     | Chromatic                                                                  | StoryShelf                                                                                                                      |
+| Aspect              | Chromatic                                                                  | StoryShelf                                                                                                                      |
 | ------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | **Capture**         | Cloud browsers                                                             | Self-hosted on your infra: Playwright (Chromium/Firefox/WebKit) or lightweight Puppeteer (Chromium-only, chrome-headless-shell) |
 | **Baselines**       | Global + branch                                                            | Per-branch with default-branch fallback                                                                                         |
