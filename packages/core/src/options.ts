@@ -42,6 +42,22 @@ function assertTestingBackable(options: ShelfOptions): void {
   }
 }
 
+/**
+ * A warning to log when `testing` runs on a database whose transactions are only sequential (Neon
+ * over HTTP): the queue then ends a single-flight job and starts its successor in two steps, so a
+ * crash between them can lose a queued rerun. `undefined` when there is nothing to say.
+ */
+export function sequentialTransactionsWarning(options: ShelfOptions): string | undefined {
+  if (options.testing === undefined || options.database.metadata.transactions !== "sequential") {
+    return undefined;
+  }
+  return (
+    `The ${options.database.metadata.name} database runs transactions one statement at a time, ` +
+    `so a crash while a capture job ends can lose a queued rerun of its build. Use a database ` +
+    `with real transactions (Postgres over a socket, Turso, MySQL, SQLite on a volume) for testing.`
+  );
+}
+
 function assertTestingProcess(testing: ShelfOptions["testing"]): void {
   if (testing !== undefined && testing.runner === undefined) {
     throw new Error("testing requires testing.runner");
