@@ -19,6 +19,8 @@ export interface PublishZipOptions {
   logger: Logger;
   /** Called between stages (renews a job's lease). */
   touch?: () => void;
+  /** A cancel: aborting it stops the extraction and the persisting, and no manifest is written. */
+  signal?: AbortSignal | undefined;
 }
 
 /**
@@ -41,9 +43,10 @@ export async function publishStoredZip(
       buildId,
       PUBLISH_SCRATCH_ID,
       options.limits,
+      options.signal,
     );
     options.touch?.();
-    await persistStorybookStatics(storage, dir, projectId, buildId, options.db);
+    await persistStorybookStatics(storage, dir, projectId, buildId, options.db, options.signal);
     options.touch?.();
   } finally {
     await removeShardScratch(scratchDir, projectId, buildId, PUBLISH_SCRATCH_ID, logger);

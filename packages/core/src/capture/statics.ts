@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
+import type { Readable } from "node:stream";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { mapLimit } from "../utils/map-limit.ts";
@@ -36,6 +37,7 @@ const DEFAULT_EXTRACTION_LIMITS: ExtractionLimits = {
  * @param buildId - Build whose zip to extract.
  * @param shardId - Shard extracting it; gives the shard a directory of its own.
  * @param limits - Entry and uncompressed-byte caps (safe defaults when omitted).
+ * @param signal - Aborting it stops reading the zip and rejects with the abort reason.
  * @returns The extracted Storybook directory.
  * @throws {ZipLimitError} When the archive breaks a cap or escapes the target directory.
  */
@@ -46,15 +48,39 @@ export async function extractStorybookToScratch(
   buildId: string,
   shardId?: string,
   limits: ExtractionLimits = DEFAULT_EXTRACTION_LIMITS,
+  signal?: AbortSignal,
 ): Promise<string> {
+  signal?.throwIfAborted();
   const base = shardId
     ? shardScratchDir(scratchDir, projectId, buildId, shardId)
     : jobScratchDir(scratchDir, projectId, buildId);
   const targetDir = join(base, "storybook");
   const root = await prepareTargetDir(targetDir);
   const source = await storage.readStream(storybookZipPath(projectId, buildId));
-  await extractZipStream(source, root, limits);
+  await extractAbortable(source, root, { limits, signal });
   return targetDir;
+}
+
+/** Extract the zip stream; aborting `signal` destroys the stream and rejects with its reason. */
+async function extractAbortable(
+  source: Readable,
+  root: string,
+  what: { limits: ExtractionLimits; signal?: AbortSignal | undefined },
+): Promise<void> {
+  const { signal } = what;
+  const stop = (): void => {
+    source.destroy(signal?.reason as Error | undefined);
+  };
+  signal?.addEventListener("abort", stop, { once: true });
+  if (signal?.aborted === true) {
+    stop(); // aborted while the stream was being opened
+  }
+  try {
+    await extractZipStream(source, root, what.limits);
+  } finally {
+    signal?.removeEventListener("abort", stop);
+  }
+  signal?.throwIfAborted();
 }
 
 /** Reset a scratch target directory, returning its resolved root. */
@@ -76,6 +102,7 @@ async function prepareTargetDir(targetDir: string): Promise<string> {
  * @param projectId - Owning project id.
  * @param buildId - Build the files belong to.
  * @param db - Optional database; with the lifecycle capability the build's content uses are recorded (enables GC).
+ * @param signal - Aborting it stops before the next file, and the manifest is never written.
  */
 export async function persistStorybookStatics(
   storage: StorageAdapter,
@@ -83,6 +110,7 @@ export async function persistStorybookStatics(
   projectId: string,
   buildId: string,
   db?: DatabaseAdapter,
+  signal?: AbortSignal,
 ): Promise<void> {
   const root = resolve(sourceDir);
   const destinationPrefix = storybookDir(projectId, buildId);
@@ -93,6 +121,7 @@ export async function persistStorybookStatics(
   // write: the scratch dir is often the storage root, so the per-build path
   // below can be the very file being read (a streamed write would truncate it).
   await mapLimit(files, STATICS_CONCURRENCY, async (file) => {
+    signal?.throwIfAborted();
     const rel = relative(root, file);
     const buffer = await readFile(file);
     const hash = createHash("sha256").update(buffer).digest("hex");
@@ -101,11 +130,16 @@ export async function persistStorybookStatics(
     if (!(await storage.exists(contentKey(hash)))) {
       await storage.write(contentKey(hash), buffer);
     }
+    signal?.throwIfAborted();
     // Also write to legacy per-build path for backward compat (can be removed after migration)
     await storage.write(`${destinationPrefix}/${rel}`, buffer);
   });
+  // A cancelled run records no uses and never writes the manifest.
+  signal?.throwIfAborted();
   // The uses are recorded once per hash, before the manifest that names them makes the build serve.
   await recordContentUses(db, storage, { projectId, buildId }, Object.values(manifest));
+  // A cancel that landed while the uses were recorded must not publish the manifest either.
+  signal?.throwIfAborted();
   await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }
 
