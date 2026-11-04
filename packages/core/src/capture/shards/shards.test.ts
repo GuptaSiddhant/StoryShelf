@@ -506,6 +506,7 @@ describe("sharded capture", () => {
 
     const done = await w.runShard(w.queued[2] as ShardJob, true);
     expect(done).toMatchObject({ status: "rendered", finalized: true });
+    expect(w.behaviour.loseAfter).toBeUndefined(); // the loss fired and was absorbed
     const rows = await w.snapshots();
     expect(rows).toHaveLength(25);
     expect(new Set(rows.map((row) => row.storyId)).size).toBe(25);
