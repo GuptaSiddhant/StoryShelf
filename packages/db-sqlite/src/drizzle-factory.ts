@@ -57,33 +57,38 @@ export function withManualTransactions(
     },
   };
 }
+/** Setup, teardown (once) and health for the adapter; teardown closes the driver a single time. */
+function buildLifecycle(options: DrizzleAdapterOptions): NonNullable<DatabaseAdapter["lifecycle"]> {
+  let closed = false;
+  return {
+    setup: async () => {
+      await options.migrate();
+    },
+    teardown: async () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      await options.close();
+    },
+    health: async () => {
+      if (closed) {
+        return { ok: false, detail: "database closed" };
+      }
+      if (options.ping) {
+        await options.ping();
+      }
+      return { ok: true };
+    },
+  };
+}
+
 export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions): DatabaseAdapter {
   const drizzle = db as DrizzleLike;
-  let closed = false;
   return {
     metadata: options.metadata,
     tables: options.tables,
-    lifecycle: {
-      setup: async () => {
-        await options.migrate();
-      },
-      teardown: async () => {
-        if (closed) {
-          return;
-        }
-        closed = true;
-        await options.close();
-      },
-      health: async () => {
-        if (closed) {
-          return { ok: false, detail: "database closed" };
-        }
-        if (options.ping) {
-          await options.ping();
-        }
-        return { ok: true };
-      },
-    },
+    lifecycle: buildLifecycle(options),
     insert: async <T extends AnySQLiteTable>(
       table: T,
       values: T["$inferInsert"],
@@ -141,11 +146,7 @@ async function insertOne<T extends Table>(
   table: T,
   values: T["$inferInsert"],
 ): Promise<T["$inferSelect"]> {
-  return (await drizzle
-    .insert(table as AnySQLiteTable)
-    .values(values)
-    .returning()
-    .get()) as T["$inferSelect"];
+  return (await drizzle.insert(table).values(values).returning().get()) as T["$inferSelect"];
 }
 
 async function updateOne<T extends Table>(
@@ -155,7 +156,7 @@ async function updateOne<T extends Table>(
   values: Partial<T["$inferInsert"]>,
 ): Promise<T["$inferSelect"]> {
   return (await drizzle
-    .update(table as AnySQLiteTable)
+    .update(table)
     .set(values)
     .where(eq(idOf(table as AnySQLiteTable), id))
     .returning()
@@ -170,7 +171,7 @@ async function getOne<T extends Table>(
   return (
     ((await drizzle
       .select()
-      .from(table as AnySQLiteTable)
+      .from(table)
       .where(eq(idOf(table as AnySQLiteTable), id))
       .limit(1)
       .get()) as T["$inferSelect"] | undefined) ?? null
@@ -179,7 +180,7 @@ async function getOne<T extends Table>(
 
 async function removeOne(drizzle: DrizzleLike, table: Table, id: string): Promise<void> {
   await drizzle
-    .delete(table as AnySQLiteTable)
+    .delete(table)
     .where(eq(idOf(table as AnySQLiteTable), id))
     .run();
 }
@@ -189,21 +190,27 @@ async function listMany<T extends Table>(
   table: T,
   opts: ListOptions = {},
 ): Promise<T["$inferSelect"][]> {
-  let query = drizzle.select().from(table as AnySQLiteTable) as DrizzleSelectChain;
-  if (opts.where) {
-    query = query.where(opts.where);
-  }
-  if (opts.orderBy) {
-    query = query.orderBy(opts.orderBy);
-  }
-  if (opts.limit !== undefined) {
-    query = query.limit(opts.limit);
-  }
-  if (opts.offset !== undefined) {
-    query = query.offset(opts.offset);
-  }
+  const query = applyListOptions(drizzle.select().from(table), opts);
   const rows: unknown = await query.all();
   return rows as T["$inferSelect"][];
+}
+
+/** The `where`, `orderBy`, `limit` and `offset` the caller asked for, in that order. */
+function applyListOptions(query: DrizzleSelectChain, opts: ListOptions): DrizzleSelectChain {
+  let next = query;
+  if (opts.where) {
+    next = next.where(opts.where);
+  }
+  if (opts.orderBy) {
+    next = next.orderBy(opts.orderBy);
+  }
+  if (opts.limit !== undefined) {
+    next = next.limit(opts.limit);
+  }
+  if (opts.offset !== undefined) {
+    next = next.offset(opts.offset);
+  }
+  return next;
 }
 
 /** CRUD subset bound to a transaction handle. */
