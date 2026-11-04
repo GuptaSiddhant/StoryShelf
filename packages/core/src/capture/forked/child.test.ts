@@ -7,6 +7,7 @@ const dispatch = vi.hoisted(() => ({
   run: vi.fn(),
   jobOptions: [] as { shardSize?: number; enqueue?: (job: unknown) => Promise<void> }[],
   maxRetries: [] as (number | undefined)[],
+  repeated: [] as ((event: { repeated: number; attempt?: number; limit?: number }) => void)[],
 }));
 vi.mock("../dispatch.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../dispatch.ts")>();
@@ -15,7 +16,11 @@ vi.mock("../dispatch.ts", async (importOriginal) => {
     createDispatchJob: (deps: {
       jobOptions: (typeof dispatch.jobOptions)[number];
       maxRetries?: number;
+      onShardRepeated?: (typeof dispatch.repeated)[number];
     }) => {
+      if (deps.onShardRepeated) {
+        dispatch.repeated.push(deps.onShardRepeated);
+      }
       dispatch.jobOptions.push(deps.jobOptions);
       dispatch.maxRetries.push(deps.maxRetries);
       return dispatch.run;
@@ -96,6 +101,20 @@ describe("runCaptureChild", () => {
     events.emit("SIGTERM");
     await running;
     expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("forwards a repeated-shard-work event to the parent as counts only", async () => {
+    dispatch.repeated.length = 0;
+    dispatch.run.mockReset().mockImplementation(async () => {});
+    const { host, events, sent } = fakeHost();
+    const running = runCaptureChild(options(), host);
+    await sleep(20);
+    const report = dispatch.repeated.at(-1);
+    expect(report).toBeDefined();
+    report?.({ repeated: 3, attempt: 2, limit: 3 });
+    expect(sent).toEqual([{ type: "shard-repeated", repeated: 3, attempt: 2, limit: 3 }]);
+    events.emit("SIGTERM");
+    await running;
   });
 
   it("reports the error of a job that threw", async () => {
