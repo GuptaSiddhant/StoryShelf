@@ -312,15 +312,18 @@ export interface BuildCreateMetadata {
   labels?: { key: string; value: string }[];
 }
 
-/** Latest prior revision on a branch with a build, or null for first builds. */
+/**
+ * The revision affected capture compares against: the newest earlier build on the branch whose
+ * outcome reached the baselines, or null (a full capture) when there is none.
+ */
 async function resolveBaselineSha(
   db: DatabaseAdapter,
   projectId: string,
   branch: string,
   sha: string,
 ): Promise<string | null> {
-  const builds = await new BuildModel(db).list(projectId, { branch });
-  return builds.find((build) => build.gitSha !== sha)?.gitSha ?? null;
+  const build = await new BuildModel(db).newestComparableBuild(projectId, branch, sha);
+  return build?.gitSha ?? null;
 }
 
 /* oxlint-disable eslint/no-await-in-loop -- label attach is intentionally sequential */
