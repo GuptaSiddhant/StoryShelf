@@ -787,13 +787,17 @@ export async function finalizeBuild(
       },
     );
   }
-  const written = await builds.setStatus(ctx.build.id, status);
-  if (written.status === "cancelled") {
-    // A cancel landed after the check above: the status write was refused, so the run neither
-    // finishes the build nor drops baselines of the stories a cancelled (partial) run did not reach.
+  const { applied, build: written } = await builds.setStatusAtGeneration(
+    ctx.build.id,
+    status,
+    ctx.build.captureGeneration ?? 0,
+  );
+  if (!applied) {
+    // A cancel or a retry landed after the check above: the status write was refused, so the run
+    // neither finishes the build nor drops baselines of the stories a partial run did not reach.
     ctx.logger?.info(
-      { buildId: ctx.build.id },
-      "build was cancelled during finalize; orphans kept",
+      { buildId: ctx.build.id, status: written?.status },
+      "build was cancelled or retried during finalize; status and orphans kept",
     );
     return;
   }

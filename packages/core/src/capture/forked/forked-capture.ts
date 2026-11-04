@@ -64,6 +64,8 @@ export function createForkedCaptureHandler(options: ForkedCaptureOptions): Forke
       return forked.tripped;
     },
     accepts: (job) => forked.accepts(job),
+    // The check reads the database, so the parent makes it with the in-process handler.
+    superseded: async (job) => (await options.fallback.superseded?.(job)) === true,
     run: async (job, context) => {
       await forked.run(job, context);
     },

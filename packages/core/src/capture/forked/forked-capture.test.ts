@@ -401,6 +401,21 @@ describe("createForkedCaptureHandler", () => {
     });
   });
 
+  it("leaves the superseded-run check to the fallback", async () => {
+    const back: KindHandler = {
+      run: async () => {},
+      superseded: async (j) => j.buildId === "old",
+    };
+    const handler = createForkedCaptureHandler({ spawn: () => new FakeChild(), fallback: back });
+    expect(await handler.superseded?.(job("old"))).toBe(true);
+    expect(await handler.superseded?.(job("current"))).toBe(false);
+    const plain = createForkedCaptureHandler({
+      spawn: () => new FakeChild(),
+      fallback: { run: async () => {} },
+    });
+    expect(await plain.superseded?.(job("old"))).toBe(false);
+  });
+
   it("accepts what the fallback accepts", () => {
     const back: KindHandler = { run: async () => {}, accepts: (j) => j.buildId !== "bad" };
     const handler = createForkedCaptureHandler({ spawn: () => new FakeChild(), fallback: back });
