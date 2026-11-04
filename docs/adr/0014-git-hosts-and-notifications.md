@@ -243,8 +243,8 @@ pause is not a delivery failure), the System page, the project notification sett
 page show "Notifications are paused until a public URL is set; set `PUBLIC_BASE_URL` or confirm the
 detected origin", and one `warn` line is logged at boot and the first time a notification is
 skipped. A request dropped while paused is not replayed, with one exception: when an admin confirms
-the first origin on the System page, the state of every recent build still `pending`,
-`capturing`, `comparing` or `reviewing` is requested again (`requestOpenBuildStates`). A host that
+or replaces the origin on the System page, the state of every recent open build (`pending`,
+`capturing`, `comparing`, `reviewing`) is requested again (`requestOpenBuildStates`). A host that
 gets its origin through configuration (`PUBLIC_BASE_URL`, needs a restart) replays at boot instead:
 once adapters are ready, with notifiers wired and an origin resolved, `runBootTasks` requests the
 state of open builds (newest 25 per project) once with the same `requestOpenBuildStates`. Only git

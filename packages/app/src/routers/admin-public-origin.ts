@@ -50,20 +50,30 @@ async function handleReport(c: Context): Promise<Response> {
   }
   const reported = await reportedOrigin(c);
   const before = await publicOrigin.stored();
-  const wasResolved = (await publicOrigin.url()) !== undefined;
+  const resolvedBefore = await publicOrigin.url();
   const stored = await publicOrigin.report(reported, user?.id);
-  await resumeIfResolved(wasResolved);
+  await resumeIfChanged(resolvedBefore);
   return c.json(stored, before === null ? 201 : 200);
 }
 
 /**
- * Notifications were paused and an origin now resolves (an admin confirmed one; a mere report
- * resolves nothing): re-request the state of open builds.
+ * The origin that resolves is not the one that did (`before`): it appeared after notifications were
+ * paused, or an admin replaced it. Requests made while none resolved were dropped, and statuses
+ * already posted link to the old origin, so ask again for the state of open builds. A mere report
+ * resolves nothing and an unchanged origin changes no link, so neither asks. Chat, email and alerts
+ * are never replayed (ADR 0014, decision 11).
  */
-async function resumeIfResolved(wasResolved: boolean): Promise<void> {
-  if (!wasResolved && (await getStore().publicOrigin?.url()) !== undefined) {
-    requestOpenBuildStatesNow().catch(() => 0);
+async function resumeIfChanged(before: string | undefined): Promise<void> {
+  const { publicOrigin, logger } = getStore();
+  const now = await publicOrigin?.url();
+  if (now === undefined || now === before) {
+    return;
   }
+  logger.info(
+    { origin: now, replaced: before !== undefined },
+    "public origin changed; re-requesting the state of open builds",
+  );
+  requestOpenBuildStatesNow().catch(() => 0);
 }
 
 /** Store what an admin typed; the message says why not when it is no origin. */
@@ -74,9 +84,9 @@ async function storeTyped(c: Context): Promise<string> {
   const { publicOrigin, user } = getStore();
   const origin = (await c.req.formData()).get("origin");
   try {
-    const wasResolved = (await publicOrigin?.url()) !== undefined;
+    const resolvedBefore = await publicOrigin?.url();
     await publicOrigin?.set(typeof origin === "string" ? origin : "", user?.id);
-    await resumeIfResolved(wasResolved);
+    await resumeIfChanged(resolvedBefore);
     return "Public origin saved";
   } catch (error) {
     return error instanceof Error ? error.message : "Invalid origin";
