@@ -1,8 +1,8 @@
 /** Active-run tracking and best-effort cleanup helpers for Puppeteer. */
 
 import { RenderRuns, type RemoteLeaseOutcome } from "@storyshelf/core/adapter/capture-runner";
-import type { BrowserSession } from "./session.ts";
 import type { ActiveRun } from "./types.ts";
+import type { BrowserSession } from "./session.ts";
 
 /** Tracks in-flight renders, each by its own handle, so `cancel` aborts exactly the runs it names. */
 export const activeRuns = new RenderRuns<ActiveRun>();

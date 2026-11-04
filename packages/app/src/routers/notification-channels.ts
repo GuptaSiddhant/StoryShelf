@@ -117,7 +117,7 @@ const retryChannelRoute = createRoute({
     },
     409: {
       content: { "application/json": { schema: z.object({ message: z.string() }) } },
-      description: "Notifications are paused until a public URL is confirmed",
+      description: "The channel is disabled, or notifications are paused until a public URL is confirmed",
     },
     ...notFoundResponse,
     ...unauthorized,

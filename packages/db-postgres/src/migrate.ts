@@ -306,7 +306,8 @@ async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {
 async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, NOTIFICATION_LAST_ERROR_ALTER);
   await execIgnore(run, NOTIFICATION_LAST_ERROR_AT_ALTER);
-  await execIgnore(run, NOTIFICATION_LAST_DELIVERED_ALTER);
+  // IF NOT EXISTS makes it idempotent, so a real failure must surface rather than be ignored.
+  await run(NOTIFICATION_LAST_DELIVERED_ALTER);
 }
 
 async function migrateCommentsTable(run: MigrationRunner): Promise<void> {

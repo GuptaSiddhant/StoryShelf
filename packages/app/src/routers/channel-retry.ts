@@ -27,6 +27,9 @@ export async function retryChannelState(
   if (!NotificationChannelModel.isStateKind(getStore().notifiers, channel.provider)) {
     return { ok: false, status: 400, message: "Only git channels show a build's current state" };
   }
+  if (!channel.enabled) {
+    return { ok: false, status: 409, message: "The channel is disabled; enable it to retry" };
+  }
   if (await notificationsPaused()) {
     return { ok: false, status: 409, message: NOTIFICATIONS_PAUSED_TEXT };
   }

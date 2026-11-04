@@ -102,7 +102,7 @@ async function boot(options: { origin: boolean }) {
   if (options.origin) {
     await settleBootReplay(db, channels, [target.id, other.id], git.calls);
   }
-  return { app, channels, target, other, chat, git, sent };
+  return { app, db, channels, target, other, chat, git, sent };
 }
 
 /**
@@ -157,6 +157,15 @@ describe("retry a git channel's current state", () => {
     const res = await post(t.app, t.target.id, "admin");
     expect(res.status).toBe(409);
     expect(((await res.json()) as { message: string }).message).toContain("paused");
+    expect(t.git.calls).toEqual([]);
+  });
+
+  it("refuses a disabled git channel with 409 and asks for nothing", async () => {
+    const t = await boot({ origin: true });
+    await t.db.update(t.db.tables.notificationChannels, t.target.id, { enabled: false });
+    const res = await post(t.app, t.target.id, "admin");
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { message: string }).message).toContain("disabled");
     expect(t.git.calls).toEqual([]);
   });
 

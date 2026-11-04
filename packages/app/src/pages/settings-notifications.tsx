@@ -218,7 +218,7 @@ const ChannelRow: FC<{
       <ChannelHealth channel={channel} />
     </td>
     <td>
-      {isAdmin && channel.delivery === "state" ? (
+      {isAdmin && channel.delivery === "state" && channel.enabled ? (
         <RetryForm project={project} channel={channel} />
       ) : null}
       {isAdmin ? (
