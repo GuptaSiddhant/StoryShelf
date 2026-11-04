@@ -63,9 +63,10 @@ semantics.
   before the status and comment are written and before its outcome is recorded. Checkpoints are
   cooperative: a write or request already in flight is not recalled (an update already started
   completes, and a capture whose abort lands during its last attempt-log append can still request
-  build state once), and storage and provider calls keep their SDK timeouts. The gap between the
-  abort and the lease running out is what keeps those in-flight writes from meeting the
-  redelivery's. A phase that never reports is bounded only by the lease. There is no per-phase knob.
+  build state once), and storage and provider calls keep their SDK timeouts. Such a write or
+  request can complete after the lease expires and overlap a redelivery: an abort narrows that
+  window, it does not close it. A phase that never reports is bounded only by the lease. There is
+  no per-phase knob.
 - Its retry limit stated where the queue is built, not inferred from `testing.retries`.
 - Kinds that must be single-flight per key use `active_key` (a unique column, cleared in the write
   that ends the job), never a check before the insert. A request that arrives while the holder

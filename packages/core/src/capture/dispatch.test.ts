@@ -269,6 +269,27 @@ describe("createDispatchJob attempt history", () => {
     expect(buildState.request).toHaveBeenCalledTimes(1);
   });
 
+  it("announces nothing and opens no attempt for a run abandoned before it started", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const { project, build } = await seedBuild(db);
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const controller = new AbortController();
+    controller.abort(new Error("job deadline exceeded"));
+    const buildState = { request: vi.fn(async () => {}) };
+    const runJob = createDispatchJob({
+      ...depsFor(db, storage, fakeRunner(successRender())),
+      buildState,
+    });
+
+    await expect(
+      runJob({ buildId: build.id }, abortableLease({ touch: () => {} }, controller.signal)),
+    ).rejects.toBeInstanceOf(JobAbortedError);
+
+    expect(buildState.request).not.toHaveBeenCalled();
+    expect(await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id)).toEqual([]);
+  });
+
   it("records a failed attempt with the full error text", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

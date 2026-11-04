@@ -46,6 +46,8 @@ async function runBuildJob(
   if (!target) {
     return;
   }
+  // The target load may have outlived the attempt: announce nothing for an abandoned run.
+  lease?.check?.();
   await deps.buildState.request(job.buildId);
   const { attempt, recordLog } = await beginAttempt(
     deps,
