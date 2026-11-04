@@ -151,6 +151,11 @@ async function audit(page, base, mode, path) {
       impact: v.impact,
       nodes: v.nodes.length,
       target: v.nodes[0].target.join(" ").slice(0, 90),
+      // For a contrast finding, the colours and the ratio of the first node.
+      colors: (() => {
+        const data = v.nodes[0].any[0]?.data;
+        return data?.fgColor ? `${data.fgColor} on ${data.bgColor} = ${data.contrastRatio}` : "";
+      })(),
     }));
   });
   const overflow = await page.evaluate(measureOverflow);
@@ -190,7 +195,11 @@ function summarize(results) {
   for (const result of results) {
     if (result.error) add(`error: ${result.error}`, "", `${result.mode} ${result.path}`);
     for (const v of result.violations ?? []) {
-      add(`${v.impact} ${v.id} ${v.target}`, `${v.nodes} node(s)`, `${result.mode} ${result.path}`);
+      add(
+        `${v.impact} ${v.id} ${v.target}`,
+        `${v.nodes} node(s)${v.colors ? `, ${v.colors}` : ""}`,
+        `${result.mode} ${result.path}`,
+      );
     }
     if (result.overflow?.over > 0) {
       add(

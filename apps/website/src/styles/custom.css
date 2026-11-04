@@ -231,3 +231,13 @@ h1#_top,
   overflow-wrap: anywhere;
   white-space: normal;
 }
+
+/* --- Diagrams (astro-mermaid) ---------------------------------------------- */
+/*
+ * Mermaid's dark theme draws edge labels as #ccc on #585858, which is 4.43:1. It styles them with an
+ * id-scoped rule inside each diagram, so a lighter colour needs !important to win.
+ */
+:root[data-theme="dark"] .mermaid .edgeLabel,
+:root[data-theme="dark"] .mermaid .edgeLabel p {
+  color: #f4f4f5 !important;
+}
