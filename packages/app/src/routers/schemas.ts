@@ -239,6 +239,8 @@ export const commentSchema = z
     userId: z.string().nullable(),
     body: z.string(),
     parentId: z.string().nullable(),
+    /** The project members the body `@`-mentions, resolved when it was posted (never client input). */
+    mentions: z.array(z.object({ userId: z.string(), handle: z.string() })),
     resolved: z.boolean(),
     /** `change_request` asks the build's author to address the comment; resolve it when done. */
     kind: z.enum(COMMENT_KINDS),
@@ -440,6 +442,7 @@ export const notificationChannelSchema = z
     enabled: z.boolean(),
     lastError: z.string().nullable(),
     lastErrorAt: z.string().nullable(),
+    lastDeliveredAt: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -464,6 +467,7 @@ export const notificationSubscriptionSchema = z
     events: z.array(z.string()),
     via: z.array(z.string()),
     enabled: z.boolean(),
+    reviewRequests: z.boolean(),
   })
   .openapi("NotificationSubscription");
 
@@ -473,6 +477,8 @@ export const notificationSubscriptionPutSchema = z
     events: z.array(z.string().min(1)).optional(),
     via: z.array(z.string().min(1)).optional(),
     enabled: z.boolean().optional(),
+    /** `review:requested` on or off; left as stored when omitted. */
+    reviewRequests: z.boolean().optional(),
   })
   .openapi("NotificationSubscriptionPutInput");
 

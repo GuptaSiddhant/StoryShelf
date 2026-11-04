@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_enabled TINYINT(1) NOT NULL DEFAULT true,
   review_approvals INT NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INT,
+  component_owners TEXT,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 );
@@ -111,6 +112,8 @@ CREATE TABLE IF NOT EXISTS capture_jobs (
   owner TEXT,
   payload TEXT,
   cancel_requested_at DATETIME(3),
+  active_key VARCHAR(191),
+  rerun_requested_at DATETIME(3),
   error TEXT,
   started_at DATETIME(3),
   finished_at DATETIME(3),
@@ -253,6 +256,7 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   story_id TEXT,
+  mentions TEXT,
   kind VARCHAR(32) NOT NULL DEFAULT 'comment',
   resolved_at DATETIME(3) NULL,
   resolved_by VARCHAR(64) NULL,
@@ -392,6 +396,7 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   last_error TEXT,
   last_error_at DATETIME(3),
+  last_delivered_at DATETIME(3),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_notification_channels_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -404,6 +409,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   events TEXT,
   via TEXT,
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  review_requests BOOLEAN NOT NULL DEFAULT TRUE,
   created_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_notification_subscriptions_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_notification_subscriptions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

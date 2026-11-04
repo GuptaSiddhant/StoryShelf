@@ -63,9 +63,7 @@ async function storyIds() {
 }
 
 /** Open one story and collect what went wrong while it rendered. */
-async function check(browser, id) {
-  const page = await browser.newPage();
-  const errors = [];
+function listen(page, errors) {
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
     const { url } = message.location();
@@ -73,21 +71,34 @@ async function check(browser, id) {
       errors.push(`console: ${message.text().slice(0, 300)}${url ? ` (${url})` : ""}`);
     }
   });
+}
+
+/** Wait for the story to render, then add what is wrong with it (if anything) to `errors`. */
+async function inspect(page, id, errors) {
+  await page.goto(`${BASE}/iframe.html?viewMode=story&id=${id}`, { timeout: STORY_TIMEOUT_MS });
+  // Storybook marks the body once the story rendered (`sb-show-main`) or failed (`sb-show-errordisplay`).
+  await page.waitForFunction(
+    () => /sb-show-(?:main|errordisplay)/u.test(globalThis.document.body.className),
+    undefined,
+    { timeout: STORY_TIMEOUT_MS },
+  );
+  if (
+    await page.evaluate(() => globalThis.document.body.classList.contains("sb-show-errordisplay"))
+  ) {
+    errors.push(`storybook: ${await page.locator("#error-message").innerText()}`);
+  } else if ((await page.locator("#storybook-root").innerHTML()).trim() === "") {
+    // Storybook marks the body before it writes the story's HTML, so an empty string passes the wait above.
+    errors.push("smoke: the story rendered an empty canvas");
+  }
+  await page.waitForTimeout(200);
+}
+
+async function check(browser, id) {
+  const page = await browser.newPage();
+  const errors = [];
+  listen(page, errors);
   try {
-    await page.goto(`${BASE}/iframe.html?viewMode=story&id=${id}`, { timeout: STORY_TIMEOUT_MS });
-    // Storybook marks the body once the story rendered (`sb-show-main`) or failed (`sb-show-errordisplay`).
-    await page.waitForFunction(
-      () => /sb-show-(?:main|errordisplay)/u.test(document.body.className),
-      undefined,
-      { timeout: STORY_TIMEOUT_MS },
-    );
-    if (await page.evaluate(() => document.body.classList.contains("sb-show-errordisplay"))) {
-      errors.push(`storybook: ${await page.locator("#error-message").innerText()}`);
-    } else if ((await page.locator("#storybook-root").innerHTML()).trim() === "") {
-      // Storybook marks the body before it writes the story's HTML, so an empty string passes the wait above.
-      errors.push("smoke: the story rendered an empty canvas");
-    }
-    await page.waitForTimeout(200);
+    await inspect(page, id, errors);
   } catch (error) {
     errors.push(`smoke: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
@@ -122,20 +133,23 @@ function report(total, failures) {
   console.log(`${total - failures.length}/${total} stories rendered in the dev server`);
 }
 
+async function runAll(ids) {
+  const channel = process.env.STORYBOOK_SMOKE_BROWSER_CHANNEL;
+  const browser = await chromium.launch(channel ? { channel } : {});
+  try {
+    const failures = await checkAll(browser, ids);
+    report(ids.length, failures);
+    return failures.length === 0 && ids.length > 0 ? 0 : 1;
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const server = startServer();
   try {
     await waitForServer(server);
-    const ids = await storyIds();
-    const channel = process.env.STORYBOOK_SMOKE_BROWSER_CHANNEL;
-    const browser = await chromium.launch(channel ? { channel } : {});
-    try {
-      const failures = await checkAll(browser, ids);
-      report(ids.length, failures);
-      return failures.length === 0 && ids.length > 0 ? 0 : 1;
-    } finally {
-      await browser.close();
-    }
+    return await runAll(await storyIds());
   } finally {
     server.kill();
   }

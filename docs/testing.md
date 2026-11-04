@@ -206,6 +206,16 @@ upgrade test drops columns before rerunning migrations; it is skipped unless
 `MYSQL_SCHEMA_MUTATION_TEST=1` is set. Set that flag only for a disposable database, never a
 shared cloud database. The regular live suite still tests setup, CRUD and queue behavior.
 
+The review-schema upgrade (#269) is tested on every dialect from fixture databases built from the
+old DDL (`src/test-fixtures/pre-review.sql` and `pre-449.sql` in each `db-*` package): SQLite and
+Postgres (PGlite) run hermetically, and MySQL has a hermetic fake-server test plus
+`migrate-review.live.test.ts`, which needs the same flag and a user that may `CREATE DATABASE`
+(it upgrades the fixtures in a scratch database it drops afterwards). Postgres has the same live
+file, gated on `LIVE_CLOUD=1`, `DATABASE_URL` and `POSTGRES_SCHEMA_MUTATION_TEST=1` (a role that
+may `CREATE DATABASE`; set the flag for a disposable server only). The MySQL live file also runs the
+review lifecycle on a real server: one claimant wins a review cycle, a reopening counts once, a
+build's verdicts go with the build and a user's with the user, and an anonymous verdict stays.
+
 The MySQL job also runs the shared `databaseContractSuite` (`packages/db-mysql/src/contract.test.ts`),
 as SQLite and Postgres do, in its own database. That file is skipped unless `MYSQL_URL` is set, so
 `nub run test` stays hermetic. To run it yourself, against a disposable database:

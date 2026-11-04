@@ -466,6 +466,51 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("adds the single-flight key and its unique index to a volume created before them", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-jobkey-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        DROP INDEX capture_jobs_active_key_idx;
+        ALTER TABLE capture_jobs DROP COLUMN active_key;
+        ALTER TABLE capture_jobs DROP COLUMN rerun_requested_at;
+        INSERT INTO capture_jobs (id, entry, job_id, kind, status, created_at, updated_at)
+          VALUES ('j1', 'job', 'j1', 'notify', 'queued', 't', 't'),
+                 ('j2', 'job', 'j2', 'notify', 'queued', 't', 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      await closeDb(db);
+      const check = new DatabaseSync(path);
+      const rows = check
+        .prepare("SELECT id, active_key, rerun_requested_at FROM capture_jobs ORDER BY id")
+        .all();
+      expect(
+        rows.map((row) => ({
+          id: row["id"],
+          active_key: row["active_key"],
+          rerun_requested_at: row["rerun_requested_at"],
+        })),
+      ).toEqual([
+        { id: "j1", active_key: null, rerun_requested_at: null },
+        { id: "j2", active_key: null, rerun_requested_at: null },
+      ]);
+      // Rows without a key coexist; two rows with the same key do not.
+      check.exec("UPDATE capture_jobs SET active_key = 'notify:c:b' WHERE id = 'j1'");
+      expect(() =>
+        check.exec("UPDATE capture_jobs SET active_key = 'notify:c:b' WHERE id = 'j2'"),
+      ).toThrow(/UNIQUE/u);
+      check.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("gives a build in flight the capture job that was running when the column was added", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-capture-job-"));
     const path = join(dir, "legacy.db");
@@ -549,6 +594,58 @@ describe("createSqliteDatabase", () => {
       const failing = createSqliteDatabase(path);
       await expect(initDb(failing)).rejects.toThrow(/locked/u);
       await closeDb(failing);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("adds comments.mentions to a volume created before it, keeping existing comments", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-mentions-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        ALTER TABLE comments DROP COLUMN mentions;
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO builds (id, project_id, git_sha, git_branch, created_at, updated_at) VALUES ('b', 'p', 'sha', 'main', 't', 't');
+        INSERT INTO comments (id, project_id, build_id, body, created_at, updated_at) VALUES ('c', 'p', 'b', 'older comment', 't', 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      const row = await db.get(schema.comments, "c");
+      expect(row?.["body"]).toBe("older comment");
+      expect(row?.["mentions"]).toBeNull();
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("adds subscriptions.review_requests to an older volume with review requests on", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-review-requests-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        ALTER TABLE notification_subscriptions DROP COLUMN review_requests;
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO users (id, email, name, created_at) VALUES ('u', 'u@example.com', 'U', 't');
+        INSERT INTO notification_subscriptions (id, project_id, user_id, enabled, created_at) VALUES ('s', 'p', 'u', 0, 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      const row = await db.get(schema.notificationSubscriptions, "s");
+      expect(row?.["enabled"]).toBe(false);
+      expect(row?.["reviewRequests"]).toBe(true);
+      await closeDb(db);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -14,6 +14,7 @@ import { attemptRowId, isTerminalJob } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { isoAt } from "./clock.ts";
 import { toDatabaseJob } from "./codec.ts";
+import { finishJob, notifyEnded, startSuccessor } from "./single-flight.ts";
 import type { QueueRuntime } from "./types.ts";
 
 /** Error recorded on a job whose last allowed attempt lost its lease. */
@@ -32,14 +33,13 @@ export async function exhaust(
   stale: CaptureJobRow | null,
   made: number,
 ): Promise<void> {
-  const now = isoAt(rt);
   if (stale !== null && stale.attempt <= job.maxAttempts && (await isDone(rt, stale.id))) {
-    await rt.model.finishJob(job.jobId, "done", now);
+    await finishJob(rt, job, "done");
     return;
   }
   if (rt.onExhausted === undefined) {
     await expire(rt, stale);
-    await rt.model.finishJob(job.jobId, "failed", now, LEASE_EXHAUSTED_ERROR);
+    await finishJob(rt, job, "failed", LEASE_EXHAUSTED_ERROR);
     rt.logger?.warn({ jobId: job.jobId, attempts: job.attempt }, "job failed: lease exhausted");
     return;
   }
@@ -160,6 +160,31 @@ async function settle(
     const outcome = current.cancelRequestedAt === null ? status : "cancelled";
     // Conditional: a `done` that lands after the read above is not overwritten.
     await rt.model.finishOpenJob(jobId, outcome, isoAt(rt), LEASE_EXHAUSTED_ERROR);
+    await successorAfter(rt, current, outcome);
   }
   await rt.model.finishAttempt(own, "done", isoAt(rt));
+  await endedAfter(rt, jobId);
+}
+
+/**
+ * A job that failed here gives a request that came in while it ran its successor, as any failed job
+ * does. Only when this write was the one that ended it (a late `done` finished it its own way), and
+ * never after a cancel.
+ */
+async function successorAfter(
+  rt: QueueRuntime,
+  row: CaptureJobRow,
+  outcome: "failed" | "cancelled",
+): Promise<void> {
+  if (outcome === "failed" && (await rt.model.get(row.jobId))?.status === "failed") {
+    await startSuccessor(rt, row);
+  }
+}
+
+/** The host hears of the end once the hook run's own row is written too, and only if the job did end. */
+async function endedAfter(rt: QueueRuntime, jobId: string): Promise<void> {
+  const row = await rt.model.get(jobId);
+  if (row !== null && (row.status === "failed" || row.status === "done")) {
+    await notifyEnded(rt, row);
+  }
 }

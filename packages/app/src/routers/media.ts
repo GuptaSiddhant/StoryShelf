@@ -23,6 +23,9 @@ function imageResponse(buffer: Buffer, cacheControl = "private, max-age=3600"): 
   });
 }
 
+/** A render fetched with a member's own connection: the browser must not keep it past the session. */
+const RENDER_MEMBER = "private, no-store";
+
 /** Design renders are addressed by file version (`?v=`): immutable once the version matches the row. */
 const RENDER_IMMUTABLE = "private, max-age=31536000, immutable";
 
@@ -66,7 +69,8 @@ export function registerMedia(app: ShelfRouter): void {
       notFound("No design render");
     }
     const versioned = node?.renderVersion && c.req.query("v") === node.renderVersion;
-    return imageResponse(png, versioned ? RENDER_IMMUTABLE : undefined);
+    const cacheControl = node?.viewerId ? RENDER_MEMBER : versioned ? RENDER_IMMUTABLE : undefined;
+    return imageResponse(png, cacheControl);
   });
 
   app.get("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/baseline", async (c) => {

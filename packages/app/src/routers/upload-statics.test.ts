@@ -305,7 +305,7 @@ describe("upload inline statics", () => {
     const { slug, id: projectId } = await setupProject(app);
     const { buildId, status } = await uploadZip(app, slug, storybookZip());
     expect(status).toBe(422);
-    expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
+    expect((await new BuildModel(db).get(buildId))?.status).toBe("failed");
     expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/manifest.json`)).toBe(false);
   });
@@ -404,7 +404,7 @@ describe("upload inline statics", () => {
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
   });
 
-  it("rejects an invalid inline zip without queuing capture, and allows a corrected upload", async () => {
+  it("fails the build when an inline zip is rejected, and refuses a corrected zip on it with 409", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({
@@ -422,14 +422,19 @@ describe("upload inline statics", () => {
     expect(await queuedCaptures(db)).not.toContain(buildId);
     expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
-    expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
+    expect((await new BuildModel(db).get(buildId))?.status).toBe("failed");
 
     const corrected = await app.request(`/api/v1/projects/${slug}/builds/${buildId}/zip`, {
       method: "PUT",
       headers: { "content-type": "application/zip" },
       body: new Uint8Array(storybookZip()),
     });
-    expect(corrected.status).toBe(202);
-    expect(await queuedCaptures(db)).toContain(buildId);
+    expect(corrected.status).toBe(409);
+    expect(await queuedCaptures(db)).not.toContain(buildId);
+    expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
+
+    const fresh = await uploadZip(app, slug, storybookZip());
+    expect(fresh.status).toBe(202);
+    expect(fresh.buildId).not.toBe(buildId);
   });
 });

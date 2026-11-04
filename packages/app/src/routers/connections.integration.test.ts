@@ -296,6 +296,22 @@ describe("member renders", () => {
     );
   });
 
+  it("tells the browser not to keep a member's own render, versioned or not", async () => {
+    const own = await withRender("ada");
+    const versioned = await own.request("/api/v1/projects/app/design/renders/node1?v=9");
+    const plain = await own.request("/api/v1/projects/app/design/renders/node1");
+    expect(versioned.headers.get("cache-control")).toBe("private, no-store");
+    expect(plain.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("keeps the caching of a project-wide render", async () => {
+    const app = await withRender("");
+    const versioned = await app.request("/api/v1/projects/app/design/renders/node1?v=9");
+    const plain = await app.request("/api/v1/projects/app/design/renders/node1");
+    expect(versioned.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    expect(plain.headers.get("cache-control")).toBe("private, max-age=3600");
+  });
+
   it("serves project-wide renders to any member", async () => {
     const app = await withRender("");
     expect((await app.request("/api/v1/projects/app/design/renders/node1?v=9")).status).toBe(200);

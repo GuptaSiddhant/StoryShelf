@@ -108,4 +108,14 @@ describe("createBetterSqlite3Database", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("refuses an upgrade over a build_reviews table made outside StoryShelf, naming its column", async () => {
+    const client = new Database(":memory:");
+    client.exec(
+      "DROP TABLE IF EXISTS build_reviews; CREATE TABLE build_reviews (id TEXT PRIMARY KEY, verdict TEXT)",
+    );
+    const db = createBetterSqlite3Database({ client });
+    await expect(initDb(db)).rejects.toThrow("table build_reviews has no column build_id");
+    client.close();
+  });
 });

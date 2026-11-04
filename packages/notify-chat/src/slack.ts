@@ -36,6 +36,7 @@ export function getMetadata(): MessageNotifierProvider["metadata"] {
     description: "Chat messages via Slack incoming webhooks",
     kind: "slack-webhook",
     category: "notifier",
+    audience: "room",
     logo: "slack",
     schema: slackWebhookConfigSchema,
   };

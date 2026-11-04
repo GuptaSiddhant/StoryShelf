@@ -8,6 +8,7 @@
  */
 import { DDL } from "./ddl.ts";
 import { FOREIGN_KEYS, type ForeignKeyMigration } from "./foreign-keys.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 
 /** Minimal row-query surface a migration runner needs. */
 export type MigrationRunner = (sql: string) => Promise<unknown[]>;
@@ -48,6 +49,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   { table: "projects", column: "review_approvals", definition: "INT NOT NULL DEFAULT 1" },
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
+  { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
@@ -94,6 +96,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
+  {
+    table: "notification_subscriptions",
+    column: "review_requests",
+    definition: "BOOLEAN NOT NULL DEFAULT TRUE",
+  },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
   {
@@ -102,6 +109,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'manual'",
   },
   { table: "comments", column: "story_id", definition: "TEXT" },
+  { table: "comments", column: "mentions", definition: "TEXT" },
   { table: "comments", column: "kind", definition: "VARCHAR(32) NOT NULL DEFAULT 'comment'" },
   { table: "comments", column: "resolved_at", definition: "DATETIME(3) NULL" },
   { table: "comments", column: "resolved_by", definition: "VARCHAR(64) NULL" },
@@ -114,9 +122,13 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'oidc'",
   },
   { table: "users", column: "disabled", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  // Single-flight jobs (ADR 0040); the unique index on active_key is in IDENTITY_INDEXES.
+  { table: "capture_jobs", column: "active_key", definition: "VARCHAR(191)" },
+  { table: "capture_jobs", column: "rerun_requested_at", definition: "DATETIME(3)" },
   { table: "design_nodes", column: "notified_version", definition: "TEXT" },
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
+  { table: "notification_channels", column: "last_delivered_at", definition: "DATETIME(3)" },
 ];
 
 /** A run in flight when `builds.capture_job_id` was added owns the build it was started for. */
@@ -134,10 +146,16 @@ const IDENTITY_INDEXES = [
     name: "baselines_project_story_mode_browser_branch_idx",
     sql: "CREATE UNIQUE INDEX baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
   },
+  {
+    table: "capture_jobs",
+    name: "capture_jobs_active_key_idx",
+    sql: "CREATE UNIQUE INDEX capture_jobs_active_key_idx ON capture_jobs (active_key)",
+  },
 ];
 
 /** Run the full migration set through any row-query runner. */
 export async function runMigrations(run: MigrationRunner): Promise<void> {
+  await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);
   await run(BUILD_CAPTURE_JOB_BACKFILL);

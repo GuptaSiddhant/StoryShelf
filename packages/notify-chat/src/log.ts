@@ -37,6 +37,7 @@ export function getMetadata(): MessageNotifierProvider["metadata"] {
     description: "Chat notifications to the server log (tests and dev)",
     kind: "log",
     category: "notifier",
+    audience: "room",
     schema: logConfigSchema,
   };
 }

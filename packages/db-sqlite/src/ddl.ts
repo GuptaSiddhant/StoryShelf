@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_enabled INTEGER NOT NULL DEFAULT 1,
   review_approvals INTEGER NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INTEGER,
+  component_owners TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -122,6 +123,8 @@ CREATE TABLE IF NOT EXISTS capture_jobs (
   owner TEXT,
   payload TEXT,
   cancel_requested_at TEXT,
+  active_key TEXT,
+  rerun_requested_at TEXT,
   error TEXT,
   started_at TEXT,
   finished_at TEXT,
@@ -229,6 +232,7 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   story_id TEXT,
+  mentions TEXT,
   kind TEXT NOT NULL DEFAULT 'comment',
   resolved_at TEXT,
   resolved_by TEXT
@@ -349,6 +353,7 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   enabled INTEGER NOT NULL DEFAULT 1,
   last_error TEXT,
   last_error_at TEXT,
+  last_delivered_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -360,6 +365,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   events TEXT,
   via TEXT,
   enabled INTEGER NOT NULL DEFAULT 1,
+  review_requests INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS notification_subscriptions_project_user_idx ON notification_subscriptions (project_id, user_id);
@@ -555,6 +561,8 @@ export const IDENTITY_STATEMENTS: string[] = [
   "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
   "CREATE INDEX IF NOT EXISTS snapshots_project_import_path_idx ON snapshots (project_id, story_import_path)",
   "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)",
+  // Single-flight job kinds (ADR 0040): at most one non-terminal job per active_key; NULLs never collide.
+  "CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx ON capture_jobs (active_key)",
   // Pre-adapter Figma tables, replaced by design_nodes / design_credentials (no data is carried over).
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",

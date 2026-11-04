@@ -1,3 +1,4 @@
+import { NotificationSubscriptionModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
@@ -156,6 +157,35 @@ describe("profile page", () => {
     expect(removed.status).not.toBe(400);
     const off = await app.request("/profile", { headers: session });
     expect(await off.text()).not.toContain("Email on");
+  });
+
+  it("keeps the subscription, switched off, when email is disabled from the profile page", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded);
+    const projects = await seeded.db.list(seeded.db.tables.projects, { limit: 1 });
+    const projectId = (projects[0] as { id: string }).id;
+    const userId = (await seeded.db.list(seeded.db.tables.users, { limit: 1 }))[0]?.[
+      "id"
+    ] as string;
+    const model = new NotificationSubscriptionModel(seeded.db);
+    await model.upsert(projectId, userId, { events: ["build:approved"], via: ["email"] });
+
+    const disable = new FormData();
+    disable.set("slug", "demo");
+    await postForm("/profile/notifications", disable, app);
+    expect(await model.getFor(projectId, userId)).toMatchObject({
+      enabled: false,
+      events: '["build:approved"]',
+    });
+
+    const enable = new FormData();
+    enable.set("slug", "demo");
+    enable.set("enabled", "1");
+    await postForm("/profile/notifications", enable, app);
+    expect(await model.getFor(projectId, userId)).toMatchObject({
+      enabled: true,
+      events: '["build:approved"]',
+    });
   });
 
   it("rejects notification toggles for foreign projects", async () => {

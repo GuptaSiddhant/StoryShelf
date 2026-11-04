@@ -33,6 +33,7 @@ const channels: SettingsNotificationChannel[] = [
     enabled: true,
     lastError: null,
     lastErrorAt: null,
+    lastDeliveredAt: "2026-01-15T08:00:00.000Z",
   },
   {
     id: "01JD000000000000000000CHN002",
@@ -44,6 +45,7 @@ const channels: SettingsNotificationChannel[] = [
     enabled: true,
     lastError: "SMTP 550: mailbox unavailable",
     lastErrorAt: "2026-01-15T07:30:00.000Z",
+    lastDeliveredAt: null,
   },
   {
     id: "01JD000000000000000000CHN003",
@@ -55,6 +57,7 @@ const channels: SettingsNotificationChannel[] = [
     enabled: true,
     lastError: null,
     lastErrorAt: null,
+    lastDeliveredAt: null,
   },
 ];
 
@@ -62,9 +65,15 @@ const subscribed: SettingsMySubscription = {
   events: ["build:reviewing", "build:approved", "comment:created"],
   via: ["email"],
   enabled: true,
+  reviewRequests: true,
 };
 
-const optedOut: SettingsMySubscription = { events: [], via: [], enabled: false };
+const optedOut: SettingsMySubscription = {
+  events: [],
+  via: [],
+  enabled: false,
+  reviewRequests: true,
+};
 
 /** The project settings page on its Notifications tab: only the notification data differs per story. */
 const settingsPage = (
