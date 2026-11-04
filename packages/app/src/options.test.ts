@@ -2,6 +2,7 @@ import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { createShelfApp } from "./index.tsx";
 
 const logger = pino({ level: "silent" });
@@ -13,6 +14,18 @@ function runner(): CaptureRunner {
     cancel: async () => {},
   } as unknown as CaptureRunner;
 }
+
+const notifier = (name: string, kind: string) =>
+  ({
+    metadata: {
+      name,
+      version: "0.0.0",
+      kind,
+      category: "notifier",
+      schema: z.object({}).loose(),
+    },
+    create: () => ({ metadata: { name, version: "0.0.0", kind, category: "notifier" } }),
+  }) as never;
 
 describe("createShelfApp testing, compare and notifications options", () => {
   it("boots hosting-only with no testing options at all", () => {
@@ -63,5 +76,21 @@ describe("createShelfApp testing, compare and notifications options", () => {
         /Invalid ShelfConfig/u,
       );
     }
+  });
+
+  it("refuses two notifiers with the same kind, naming both, so no channel is answered by the wrong provider", () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const wire = (notifiers: unknown[]) => () =>
+      createShelfApp({
+        database: db,
+        storage,
+        logger,
+        notifications: { notifiers: notifiers as never },
+      });
+    expect(wire([notifier("Chat log", "log"), notifier("Git log", "log")])).toThrow(
+      /notifiers\[1\]: kind "log" is already used by "Chat log"/u,
+    );
+    expect(wire([notifier("Chat log", "log"), notifier("Git log", "git-log")])).not.toThrow();
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { makeFakeDesign } from "../test-helpers/fake-design.ts";
 import { validateAdapter, validateAdapterSources, validateAuth } from "./validate.ts";
 
@@ -180,6 +181,32 @@ describe("validateAdapterSources", () => {
     expect(failures[1]?.error).toContain("design[1]: design provider must be an object");
   });
 
+  it("fails the later of two notifiers that declare the same kind, naming the first", () => {
+    const failures = validateAdapterSources({
+      database: database() as never,
+      storage: storage() as never,
+      notifiers: [
+        validNotifier("Slack", "slack"),
+        validNotifier("Other chat", "log"),
+        validNotifier("Git log", "log"),
+      ],
+    });
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({ category: "notifier", kind: "log", name: "Git log" });
+    expect(failures[0]?.error).toContain(
+      'notifiers[2]: kind "log" is already used by "Other chat"',
+    );
+  });
+
+  it("accepts distinct notifier kinds and reads no kind from an invalid entry", () => {
+    const failures = validateAdapterSources({
+      database: database() as never,
+      storage: storage() as never,
+      notifiers: [validNotifier("A", "a"), validNotifier("B", "b")],
+    });
+    expect(failures).toEqual([]);
+  });
+
   it("validates notifier providers and email senders", () => {
     const failures = validateAdapterSources({
       database: database() as never,
@@ -248,3 +275,10 @@ describe("validateAuth", () => {
     expect(validateAuth(broken).join(";")).toContain("loginMethods() threw");
   });
 });
+
+function validNotifier(name: string, kind: string): never {
+  return {
+    metadata: { name, version: "1", kind, category: "notifier", schema: z.object({}).loose() },
+    create: () => ({}),
+  } as never;
+}
