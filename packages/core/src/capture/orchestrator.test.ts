@@ -228,6 +228,48 @@ describe("executeCaptureJob", () => {
     expect(await scratchExists(project.id, build.id)).toBe(false);
   });
 
+  it("moves no baseline and keeps the build cancelled when a cancel lands while stories render", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const builds = new BuildModel(db, tables(db));
+    const build = await builds.create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const render = vi.fn(async () => {
+      // The user cancels while the runner is busy; its captures still come back.
+      await builds.setStatus(build.id, "cancelled");
+      return {
+        captures: [
+          {
+            story: {
+              id: STORY_ID,
+              title: "Components/Button",
+              name: "Primary",
+              importPath: "./Button.stories.tsx",
+              type: "story" as const,
+            },
+            viewportName: "desktop",
+            screenshot: pngBytes(),
+          },
+        ],
+        failures: [],
+      };
+    });
+    const { runner } = fakeRunner({ render });
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    expect((await db.get(db.tables.builds, build.id))?.status).toBe("cancelled");
+    expect(await db.list(db.tables.baselines)).toEqual([]);
+  });
+
   it("records the persisted content in content_refs, so retention knows who uses it", async () => {
     const { db, buildId, options } = await setupBrowsers({});
     await executeCaptureJob({ buildId }, options);
