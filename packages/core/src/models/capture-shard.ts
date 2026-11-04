@@ -45,7 +45,7 @@ export class CaptureShardModel {
 
   async plan(buildId: string): Promise<CaptureShard | null> {
     // One row by its fixed id, not the build's whole list: a retried shard reads it per report.
-    return await this.get(`${buildId}:plan`);
+    return (await this.#db.get(this.#table, `${buildId}:plan`)) as unknown as CaptureShard | null;
   }
 
   /** Forget every stage of a build: a new plan (retry, recovery) starts clean. */
