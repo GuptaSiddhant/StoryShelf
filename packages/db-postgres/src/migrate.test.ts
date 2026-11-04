@@ -127,6 +127,31 @@ describe("runMigrations: builds gain the review cycle columns", () => {
   }, 60_000);
 });
 
+describe("runMigrations: subscriptions gain review_requests", () => {
+  it("gives every existing subscription review requests on, and is idempotent", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO users (id, email, name, created_at)
+        VALUES ('u', 'u@example.com', 'U', now());
+      INSERT INTO notification_subscriptions (id, project_id, user_id, enabled, created_at)
+        VALUES ('s', 'p', 'u', false, now());
+      ALTER TABLE notification_subscriptions DROP COLUMN review_requests;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run);
+
+    const rows = await client.query<{ enabled: boolean; review_requests: boolean }>(
+      "SELECT enabled, review_requests FROM notification_subscriptions WHERE id = 's'",
+    );
+    expect(rows.rows).toEqual([{ enabled: false, review_requests: true }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: review, a11y, comment and notification columns", () => {
   it("back-fills every later column on older tables with the current defaults", async () => {
     const client = new PGlite();
@@ -143,6 +168,7 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
       ALTER TABLE snapshots DROP COLUMN duration_ms;
       ALTER TABLE snapshots DROP COLUMN a11y_violations;
       ALTER TABLE comments DROP COLUMN story_id;
+      ALTER TABLE comments DROP COLUMN mentions;
       ALTER TABLE comments DROP COLUMN kind;
       ALTER TABLE comments DROP COLUMN resolved_at;
       ALTER TABLE comments DROP COLUMN resolved_by;
@@ -173,12 +199,13 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
     const columns = await client.query<{ table_name: string; column_name: string }>(`
       SELECT table_name, column_name FROM information_schema.columns
       WHERE (table_name = 'snapshots' AND column_name IN ('duration_ms', 'a11y_violations'))
-         OR (table_name = 'comments' AND column_name IN ('story_id', 'kind', 'resolved_at', 'resolved_by'))
+         OR (table_name = 'comments' AND column_name IN ('story_id', 'mentions', 'kind', 'resolved_at', 'resolved_by'))
          OR (table_name = 'notification_channels' AND column_name IN ('last_error', 'last_error_at'))
       ORDER BY table_name, column_name
     `);
     expect(columns.rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([
       "comments.kind",
+      "comments.mentions",
       "comments.resolved_at",
       "comments.resolved_by",
       "comments.story_id",

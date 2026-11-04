@@ -39,6 +39,35 @@ describe("safe retention capability", () => {
     expect(await db.get(db.tables.builds, "old")).not.toBeNull();
     expect(objects.has("p/builds/old/storybook/index.html")).toBe(true);
   });
+  it("retains an idle pending build while testing keeps purge closed", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, {
+      id: "p",
+      name: "P",
+      slug: "p",
+      gitDefaultBranch: "main",
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await db.insert(db.tables.builds, {
+      id: "waiting",
+      projectId: "p",
+      gitSha: "a",
+      gitBranch: "feature/x",
+      status: "pending",
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const app = createShelfApp({ database: db, storage, testing: { runner: stubRunner() } });
+    const response = await app.request("/api/v1/admin/purge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ttlDays: 1 }),
+    });
+    expect(response.status).toBe(503);
+    expect(await db.get(db.tables.builds, "waiting")).not.toBeNull();
+  });
   it("keeps the existing purge path available in hosting-only mode", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

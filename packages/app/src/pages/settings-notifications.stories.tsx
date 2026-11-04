@@ -62,9 +62,15 @@ const subscribed: SettingsMySubscription = {
   events: ["build:reviewing", "build:approved", "comment:created"],
   via: ["email"],
   enabled: true,
+  reviewRequests: true,
 };
 
-const optedOut: SettingsMySubscription = { events: [], via: [], enabled: false };
+const optedOut: SettingsMySubscription = {
+  events: [],
+  via: [],
+  enabled: false,
+  reviewRequests: true,
+};
 
 /** The project settings page on its Notifications tab: only the notification data differs per story. */
 const settingsPage = (

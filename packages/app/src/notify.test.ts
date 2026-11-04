@@ -7,7 +7,7 @@ import {
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import { notifyProject, notifySystem } from "./notify.ts";
+import { notifyAssignedWith, notifyProject, notifySystem } from "./notify.ts";
 import { runWithStore, type Store } from "./store.ts";
 
 const SECRET = "test-server-secret-32-chars-long!!";
@@ -34,6 +34,7 @@ function recordingProvider(kind: string, sent: unknown[]): NotifierProvider {
     version: "0.0.0",
     kind,
     category: "notifier" as const,
+    audience: (kind === "email" ? "person" : "room") as "person" | "room",
     schema: {} as never,
   };
   return {
@@ -114,6 +115,27 @@ async function recipients(
   return emailed.map((item) => item.channel.config.to).toSorted();
 }
 
+/** Emails sent for one assigned owner, as recipient addresses. */
+async function assignedEmails(
+  db: ReturnType<typeof makeDatabase>["db"],
+  userId: string,
+  providers: string[] = ["email"],
+): Promise<{ to: string; text: string }[]> {
+  const sent: { channel: { config: { to: string } }; text?: string }[] = [];
+  const store = storeFor(
+    db,
+    providers.map((kind) => recordingProvider(kind, sent)),
+  );
+  await notifyAssignedWith(
+    store,
+    { id: "p1", slug: "test-project" },
+    userId,
+    { buildId: "b1", assignedBecause: "You were asked to review this because you own Button." },
+    "/builds/b1",
+  );
+  return sent.map((item) => ({ to: item.channel.config.to, text: JSON.stringify(item) }));
+}
+
 describe("notifyProject", () => {
   it("delivers project events to stored channels", async () => {
     const { db } = makeDatabase();
@@ -158,6 +180,7 @@ describe("notifyProject", () => {
       version: "0.0.0",
       kind: "log",
       category: "notifier" as const,
+      audience: "room" as const,
       schema: {} as never,
     };
     const flaky: NotifierProvider = {
@@ -200,6 +223,35 @@ describe("notifyProject", () => {
       await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {});
     });
     expect(git.calls).toHaveLength(0);
+  });
+
+  it("delivers a project event over a subscription's personal kinds only", async () => {
+    const { db } = makeDatabase();
+    await seedProject(db);
+    await db.insert(db.tables.users, {
+      id: "u1",
+      email: "ada@example.com",
+      name: "Ada",
+      avatarUrl: null,
+      role: "member",
+      lastLoginAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      passwordHash: null,
+      displayNameOverride: null,
+      authProvider: "local",
+      disabled: false,
+    });
+    await new NotificationSubscriptionModel(db).upsert("p1", "u1", { via: ["email", "log"] });
+    const emailed: unknown[] = [];
+    const logged: unknown[] = [];
+    await runWithStore(
+      storeFor(db, [recordingProvider("log", logged), recordingProvider("email", emailed)]),
+      async () => {
+        await notifyProject({ id: "p1", slug: "test-project" }, "build:reviewing", {});
+      },
+    );
+    expect(emailed).toHaveLength(1);
+    expect(logged).toHaveLength(0);
   });
 
   it("emails opted-in subscribers only when an email provider is wired", async () => {
@@ -245,6 +297,20 @@ describe("notifyProject", () => {
       ]);
     });
 
+    it("sends no default review request through an email provider that is not declared personal", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const emailed: unknown[] = [];
+      const undeclared = recordingProvider("email", emailed);
+      const metadata = { ...undeclared.metadata } as Record<string, unknown>;
+      delete metadata["audience"];
+      const provider = { ...undeclared, metadata } as never as NotifierProvider;
+      await runWithStore(storeFor(db, [provider]), async () => {
+        await notifyProject({ id: "p1", slug: "test-project" }, "review:requested", {});
+      });
+      expect(emailed).toEqual([]);
+    });
+
     it("lets a reviewer opt out by turning their subscription off or narrowing its topics", async () => {
       const { db } = makeDatabase();
       await seedUsers(db);
@@ -252,6 +318,36 @@ describe("notifyProject", () => {
       await subscriptions.upsert("p1", "appr1", { enabled: false });
       await subscriptions.upsert("p1", "appr2", { events: ["build:approved"] });
       expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
+    });
+
+    it("lets a reviewer turn review requests off alone, keeping their other topics", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "appr1", { via: ["email"] });
+      await subscriptions.setReviewRequests("p1", "appr1", false);
+      await subscriptions.setReviewRequests("p1", "appr2", false);
+      expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
+      expect(await recipients(db, "review:verdict")).toEqual(["appr1@example.com"]);
+    });
+
+    it("keeps a reviewer who switched their email off silent, and brings the default back with the review switch", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "appr1", { via: ["email"] });
+      await subscriptions.setEnabled("p1", "appr1", false);
+      expect(await recipients(db, "review:requested")).toEqual([
+        "admin1@example.com",
+        "appr2@example.com",
+      ]);
+      await subscriptions.setReviewRequests("p1", "appr2", false);
+      expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
+      await subscriptions.setReviewRequests("p1", "appr2", true);
+      expect(await recipients(db, "review:requested")).toEqual([
+        "admin1@example.com",
+        "appr2@example.com",
+      ]);
     });
 
     it("sends nothing to a disabled reviewer, a site admin who is no member, or an instance without email", async () => {
@@ -292,6 +388,101 @@ describe("notifyProject", () => {
         "appr2@example.com",
       ]);
       expect(await recipients(db, "review:verdict")).toEqual(["appr1@example.com"]);
+    });
+  });
+
+  describe("review:requested for assigned component owners (#465)", () => {
+    it("sends the owner one message, even a developer who is no default reviewer", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const sent = await assignedEmails(db, "dev1");
+      expect(sent.map((item) => item.to)).toEqual(["dev1@example.com"]);
+      expect(sent[0]?.text).toContain("you own Button");
+    });
+
+    it("overrides an opt-out: a disabled subscription or a topic list without the event", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "appr1", { enabled: false });
+      await subscriptions.upsert("p1", "appr2", { events: ["build:approved"], via: ["email"] });
+      expect((await assignedEmails(db, "appr1")).map((item) => item.to)).toEqual([
+        "appr1@example.com",
+      ]);
+      expect((await assignedEmails(db, "appr2")).map((item) => item.to)).toEqual([
+        "appr2@example.com",
+      ]);
+    });
+
+    it("overrides the review-requests switch: opted out but assigned still gets it once", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "appr1", { via: ["email"], reviewRequests: false });
+      await subscriptions.upsert("p1", "appr2", { via: ["email"], reviewRequests: false });
+      const emailed: { channel: { config: { to: string } } }[] = [];
+      const store = storeFor(db, [recordingProvider("email", emailed)]);
+      const project = { id: "p1", slug: "test-project" };
+      // appr1 is assigned; appr2 opted out the same way and is not. The switch silences only the
+      // default recipients' send: the assigned owner's send is a different path.
+      await runWithStore(store, async () => {
+        await notifyProject(project, "review:requested", { buildId: "b1" }, "/builds/b1", {
+          skipUsers: new Set(["appr1"]),
+        });
+      });
+      await notifyAssignedWith(store, project, "appr1", { buildId: "b1" }, "/builds/b1");
+      expect(emailed.map((item) => item.channel.config.to).toSorted()).toEqual([
+        "admin1@example.com",
+        "appr1@example.com",
+      ]);
+    });
+
+    it("falls back to email when the subscription lists only a state channel", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      await new NotificationSubscriptionModel(db).upsert("p1", "appr1", { via: ["github"] });
+      const sent: { channel: { config: { to: string } } }[] = [];
+      const git = recordingProvider("github", sent);
+      (git.metadata as { delivery?: string }).delivery = "state";
+      const store = storeFor(db, [recordingProvider("email", sent), git]);
+      await notifyAssignedWith(
+        store,
+        { id: "p1", slug: "test-project" },
+        "appr1",
+        { buildId: "b1" },
+        "/builds/b1",
+      );
+      expect(sent.map((item) => item.channel.config.to)).toEqual(["appr1@example.com"]);
+    });
+
+    it("sends nothing without an email provider or for a disabled account", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      expect(await assignedEmails(db, "appr1", ["log"])).toEqual([]);
+      await db.update(db.tables.users, "appr2", { disabled: true });
+      expect(await assignedEmails(db, "appr2")).toEqual([]);
+    });
+
+    it("is the only message an assigned reviewer gets once the regular fan-out skips them", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      await new NotificationSubscriptionModel(db).upsert("p1", "appr1", { via: ["email"] });
+      const emailed: { channel: { config: { to: string } } }[] = [];
+      const store = storeFor(db, [recordingProvider("email", emailed)]);
+      const project = { id: "p1", slug: "test-project" };
+      const skipUsers = new Set(["appr1", "appr2"]);
+      await runWithStore(store, async () => {
+        await notifyProject(project, "review:requested", { buildId: "b1" }, "/builds/b1", {
+          skipUsers,
+        });
+      });
+      await notifyAssignedWith(store, project, "appr1", { buildId: "b1" }, "/builds/b1");
+      await notifyAssignedWith(store, project, "appr2", { buildId: "b1" }, "/builds/b1");
+      expect(emailed.map((item) => item.channel.config.to).toSorted()).toEqual([
+        "admin1@example.com",
+        "appr1@example.com",
+        "appr2@example.com",
+      ]);
     });
   });
 
