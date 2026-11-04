@@ -300,12 +300,19 @@ describe("the verdict form while publishing", () => {
   });
 });
 
-/** A runner that waits for `release`, then reports its one story as failed to render. */
-function failingRunner(release: Promise<null>): CaptureRunner {
-  return {
+/**
+ * A runner that tells the test it has started rendering (`entered`), waits for `release`, then
+ * reports its one story as failed to render (`reported` says it did).
+ */
+function failingRunner(release: Promise<null>) {
+  const entered = Promise.withResolvers<null>();
+  const state = { reported: false };
+  const runner: CaptureRunner = {
     metadata: { name: "failing", version: "0.0.0", kind: "stub", category: "capture-runner" },
     render: async () => {
+      entered.resolve(null);
       await release;
+      state.reported = true;
       return {
         captures: [],
         failures: [{ storyId: "button--primary", viewportName: "default", error: "render failed" }],
@@ -315,6 +322,7 @@ function failingRunner(release: Promise<null>): CaptureRunner {
       await Promise.resolve();
     },
   };
+  return { runner, entered: entered.promise, state };
 }
 
 /** A build with one story, created and uploaded as a zip, so the capture runs. */
@@ -360,14 +368,17 @@ describe.each(CHANNELS)("a sign-off on a failed build through the %s (testing on
 
   it("given during the capture, does not turn failed snapshots into a pass", async () => {
     const release = Promise.withResolvers<null>();
-    const booted = await boot({ testing: true, runner: failingRunner(release.promise) });
+    const failing = failingRunner(release.promise);
+    const booted = await boot({ testing: true, runner: failing.runner });
     try {
       const id = await uploadStories(booted);
-      await vi.waitFor(async () => expect(await statusOf(booted, id)).toBe("capturing"));
+      // The capture is inside the runner, so a failure from here on is the render failure.
+      await failing.entered;
       const given = await give(booted, channel, id, { user: "alice" });
       expect(given.status).toBeLessThan(400);
       release.resolve(null);
       await vi.waitFor(async () => expect(await statusOf(booted, id)).toBe("failed"));
+      expect(failing.state.reported).toBe(true);
       expect(await new BuildReviewModel(booted.db).listByBuild(id)).toHaveLength(1);
     } finally {
       release.resolve(null);
