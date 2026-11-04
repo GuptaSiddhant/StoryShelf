@@ -58,8 +58,15 @@ beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-review-ui-"));
 });
 afterEach(async () => {
-  await Promise.all(running.splice(0).map(async (stop) => await stop()));
+  const stopped = await Promise.allSettled(running.splice(0).map(async (stop) => await stop()));
   await rm(scratchDir, { recursive: true, force: true });
+  // Every app was given its chance to stop and the directory is gone; now report what failed.
+  const failures = stopped.flatMap((result) =>
+    result.status === "rejected" ? [result.reason] : [],
+  );
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "an app did not stop cleanly");
+  }
 });
 
 type Stories = Record<string, { title: string; importPath: string; name?: string }>;
