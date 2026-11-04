@@ -60,8 +60,9 @@ describe("gitHubNotifier in checks mode", () => {
     });
     expect(calls.map((call) => call.url)).toEqual([
       "https://api.github.com/app/installations/2/access_tokens",
-      "https://api.github.com/repos/acme/widgets/commits/abc/check-runs?filter=latest&per_page=100&check_name=storyshelf%2Ftesting",
+      "https://api.github.com/repos/acme/widgets/commits/abc/check-runs?filter=all&per_page=100&check_name=storyshelf%2Ftesting",
       "https://api.github.com/repos/acme/widgets/check-runs",
+      "https://api.github.com/repos/acme/widgets/commits/abc/check-runs?filter=all&per_page=100&check_name=storyshelf%2Ftesting",
     ]);
     expect(calls[2]?.init.headers).toMatchObject({ authorization: "Bearer ghs_inst" });
     expect(bodyOf(calls[2])).toMatchObject({ status: "queued", head_sha: "abc" });
@@ -83,7 +84,10 @@ describe("gitHubNotifier in checks mode", () => {
       state: "failure",
       url: "u",
     });
-    expect(bodyOf(calls.at(-1))).toMatchObject({ status: "completed", conclusion: "neutral" });
+    const write = calls.find(
+      (call) => call.init.method === "POST" && call.url.endsWith("/check-runs"),
+    );
+    expect(bodyOf(write)).toMatchObject({ status: "completed", conclusion: "neutral" });
   });
 
   it("keeps the pull-request comment, with the installation token", async () => {
