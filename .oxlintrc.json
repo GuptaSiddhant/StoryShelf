@@ -202,8 +202,6 @@
         "packages/app/src/routers/ui.ts",
         "packages/app/src/shell/document.tsx",
         "packages/app/src/ui/styles.ts",
-        "packages/core/src/utils/encrypt.ts",
-        "packages/core/src/utils/ulid.ts",
         "packages/runner-playwright/src/capture-runner.ts",
         "packages/app/src/capture-setup.ts",
         "packages/cli/src/commands/server/init/codegen.ts",
