@@ -111,7 +111,12 @@ export class Retention {
       { projectId: project.id, ...claimed, removedJobs, removedPending: pending },
       "build retention purge complete",
     );
-    return { removedBuilds: claimed.removedBuilds, removedFiles: claimed.removedFiles };
+    return {
+      removedBuilds: claimed.removedBuilds,
+      removedFiles: claimed.removedFiles,
+      protectedBuilds: claimed.protectedBuilds,
+      resumedBuilds: claimed.resumedBuilds,
+    };
   }
 
   /**
@@ -254,6 +259,10 @@ export interface PurgeOptions {
 export interface PurgeResult {
   removedBuilds: number;
   removedFiles: number;
+  /** With the lifecycle capability: candidates a baseline or investigation still protects. */
+  protectedBuilds?: number;
+  /** With the lifecycle capability: removed builds an earlier, unfinished run had claimed. */
+  resumedBuilds?: number;
 }
 
 /** Counts of stale branches and baselines removed. */

@@ -14,16 +14,39 @@ export interface BranchGcTimer {
   stop(): void;
 }
 
+/** What one sweep needs; `warned` keeps the "no capability" notice to once per timer. */
+interface SweepContext {
+  db: DatabaseAdapter;
+  storage: StorageAdapter;
+  logger: Logger;
+  /** Branch baseline TTL; null: branch GC is off. */
+  branchTtlDays: number | null;
+  /** Build purge TTL; undefined: scheduled build purge is off (the default). */
+  purgeTtlDays: number | undefined;
+  testing: boolean;
+  /** Resolves with the adapter setup result; a sweep waits for it and runs only when it succeeded. */
+  ready: () => Promise<{ ok: boolean }>;
+  /** Set by `stop()`: a sweep that was waiting for setup must not start after shutdown began. */
+  stopped: boolean;
+  warned: boolean;
+}
+
 /**
- * Start a daily sweep that removes baselines for branches that have not
- * been updated within `branchTtlDays`. Returns a timer handle or `null`
- * when GC is disabled (`branchTtlDays: null` or non-positive interval).
+ * Start the daily retention sweep: it removes baselines of branches not updated within
+ * `branchTtlDays` and, only when `purgeTtlDays` is set explicitly (there is no default, so an
+ * upgrade never starts deleting builds), builds older than `purgeTtlDays`. Both need the database's
+ * lifecycle capability in a testing deployment (ADR 0039), and the scheduled build purge needs it
+ * everywhere: it runs only the capability's deletion path. Returns a timer handle or `null` when
+ * there is nothing to schedule (`branchTtlDays: null` and no `purgeTtlDays`, or a non-positive
+ * interval).
  *
  * @param db - Database adapter to list projects
- * @param storage - Storage adapter for baseline cleanup
- * @param config - Shelf config supplying `branchTtlDays` and `branchGcIntervalMs`
+ * @param storage - Storage adapter for baseline and build cleanup
+ * @param config - Shelf config supplying `branchTtlDays`, `purgeTtlDays` and `branchGcIntervalMs`
  * @param logger - Structured logger for sweep diagnostics
- * @returns Timer handle with `stop()`, or `null` if GC is disabled
+ * @param testing - Whether the deployment has testing enabled
+ * @param ready - Adapter setup result; every sweep waits for it and is skipped if setup failed
+ * @returns Timer handle with `stop()`, or `null` if nothing is scheduled
  */
 export function startBranchGcTimer(
   db: DatabaseAdapter,
@@ -31,69 +54,133 @@ export function startBranchGcTimer(
   config: ShelfConfig,
   logger: Logger,
   testing = false,
+  ready: () => Promise<{ ok: boolean }> = async () => await Promise.resolve({ ok: true }),
 ): BranchGcTimer | null {
-  const ttlDays = config.branchTtlDays ?? DEFAULT_BRANCH_TTL_DAYS;
-  if (ttlDays === null) {
-    return null;
-  }
+  const branchTtlDays =
+    config.branchTtlDays === undefined ? DEFAULT_BRANCH_TTL_DAYS : config.branchTtlDays;
   const intervalMs = config.branchGcIntervalMs ?? DEFAULT_BRANCH_GC_INTERVAL_MS;
-  if (intervalMs <= 0) {
+  if ((branchTtlDays === null && config.purgeTtlDays === undefined) || intervalMs <= 0) {
     return null;
   }
-  const run = createBranchGcRunner(db, storage, logger, ttlDays, testing);
-  return scheduleBranchGc(run, intervalMs);
+  const context: SweepContext = {
+    db,
+    storage,
+    logger,
+    branchTtlDays,
+    purgeTtlDays: config.purgeTtlDays,
+    testing,
+    ready,
+    stopped: false,
+    warned: false,
+  };
+  return scheduleBranchGc(createSweepRunner(context), intervalMs, () => {
+    context.stopped = true;
+  });
 }
 
 // oxlint-disable-next-line typescript/promise-function-async
-function createBranchGcRunner(
-  db: DatabaseAdapter,
-  storage: StorageAdapter,
-  logger: Logger,
-  ttlDays: number,
-  testing: boolean,
-): () => Promise<void> {
-  // oxlint-disable-next-line eslint/max-statements -- the sweep and its error boundary are kept together
+function createSweepRunner(context: SweepContext): () => Promise<void> {
   return async (): Promise<void> => {
     try {
-      // Baseline removal must be coordinated with references before testing deployments can GC.
-      // Keep independent AI-data cleanup running even while branch GC is disabled.
-      if (testing) {
-        await purgeAiData(db, new Date(), logger);
-        return;
-      }
-      const projects = await new ProjectModel(db).list();
-      const retention = new Retention(
-        db,
-        storage,
-        {
-          builds: db.tables.builds,
-          buildLabels: db.tables.buildLabels,
-          baselines: db.tables.baselines,
-        },
-        logger,
-      );
-      const results = await Promise.all(
-        projects.map((project) => retention.purgeStaleBranches(project, ttlDays)),
-      );
-      const totalBranches = results.reduce(
-        (sum: number, r: { removedBranches: number }) => sum + r.removedBranches,
-        0,
-      );
-      const totalBaselines = results.reduce(
-        (sum: number, r: { removedBaselines: number }) => sum + r.removedBaselines,
-        0,
-      );
-      await purgeAiData(db, new Date(), logger);
-      if (totalBranches > 0 || totalBaselines > 0) {
-        logger.info({ totalBranches, totalBaselines }, "branch GC daily sweep complete");
-      }
+      // The database is not usable, and its retention capability not known, until setup is done.
+      if (!(await context.ready()).ok || context.stopped) return;
+      await sweep(context);
     } catch (error) {
-      logger.error({ err: error }, "branch GC sweep failed");
+      context.logger.error({ err: error }, "retention sweep failed");
     }
   };
 }
 
-function scheduleBranchGc(run: () => Promise<void>, intervalMs: number): BranchGcTimer {
+async function sweep(context: SweepContext): Promise<void> {
+  const { db, branchTtlDays, purgeTtlDays, testing } = context;
+  // Baseline removal must be coordinated with references: a testing deployment GCs branches only
+  // when its database has the lifecycle capability. Independent AI-data cleanup always runs, and
+  // each stage fails on its own: a build-purge error must not stop the others.
+  // While retention is paused (a baseline's source build cannot be pinned) the unfenced path would
+  // delete baseline rows without releasing their references, so branch GC waits for the fix too.
+  if (branchTtlDays !== null && !db.retentionPause && (!testing || db.buildReferenceLifecycle)) {
+    await stage(context, "branch GC", async () => {
+      await sweepBranches(context, branchTtlDays);
+    });
+  }
+  if (purgeTtlDays !== undefined) {
+    await stage(context, "build purge", async () => {
+      await sweepBuilds(context, purgeTtlDays);
+    });
+  }
+  await stage(context, "AI data cleanup", async () => {
+    await purgeAiData(db, new Date(), context.logger);
+  });
+}
+
+/** Run one stage of the sweep; a failure is logged and leaves the next stage to run. */
+async function stage(context: SweepContext, name: string, run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    context.logger.error({ err: error, stage: name }, "retention sweep stage failed");
+  }
+}
+
+function retentionFor(context: SweepContext): Retention {
+  const { db, storage, logger } = context;
+  return new Retention(
+    db,
+    storage,
+    {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      baselines: db.tables.baselines,
+    },
+    logger,
+  );
+}
+
+async function sweepBranches(context: SweepContext, ttlDays: number): Promise<void> {
+  const retention = retentionFor(context);
+  const projects = await new ProjectModel(context.db).list();
+  const results = await Promise.all(
+    projects.map((project) => retention.purgeStaleBranches(project, ttlDays)),
+  );
+  const totalBranches = results.reduce((sum, result) => sum + result.removedBranches, 0);
+  const totalBaselines = results.reduce((sum, result) => sum + result.removedBaselines, 0);
+  if (totalBranches > 0 || totalBaselines > 0) {
+    context.logger.info({ totalBranches, totalBaselines }, "branch GC daily sweep complete");
+  }
+}
+
+/** Scheduled build purge: the lifecycle capability's deletion path only; without it, nothing is deleted. */
+async function sweepBuilds(context: SweepContext, ttlDays: number): Promise<void> {
+  if (!context.db.buildReferenceLifecycle) {
+    warnNoCapability(context, ttlDays);
+    return;
+  }
+  const retention = retentionFor(context);
+  const projects = await new ProjectModel(context.db).list();
+  const results = await Promise.all(
+    projects.map((project) => retention.purge(project, { ttlDays, keepLatestPerBranch: true })),
+  );
+  const removedBuilds = results.reduce((sum, result) => sum + result.removedBuilds, 0);
+  if (removedBuilds > 0) {
+    context.logger.info({ removedBuilds, ttlDays }, "scheduled build purge complete");
+  }
+}
+
+/** Say once per timer that the scheduled purge cannot run on this database. */
+function warnNoCapability(context: SweepContext, ttlDays: number): void {
+  if (context.warned) return;
+  context.warned = true;
+  context.logger.warn(
+    { purgeTtlDays: ttlDays },
+    "scheduled build purge is off: this database has no safe build retention (see the System page); run a manual purge where it is supported",
+  );
+}
+
+function scheduleBranchGc(
+  run: () => Promise<void>,
+  intervalMs: number,
+  onStop: () => void,
+): BranchGcTimer {
   const firstDelay = Math.min(3_600_000, intervalMs);
   // oxlint-disable-next-line typescript/no-misused-promises, typescript/strict-void-return -- run catches failures; returning it allows deterministic completion in tests
   const timeout = setTimeout(() => run(), firstDelay);
@@ -105,6 +192,7 @@ function scheduleBranchGc(run: () => Promise<void>, intervalMs: number): BranchG
 
   return {
     stop: () => {
+      onStop();
       clearTimeout(timeout);
       clearInterval(interval);
     },

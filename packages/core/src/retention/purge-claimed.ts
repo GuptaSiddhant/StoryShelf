@@ -1,5 +1,9 @@
 /** Purge for a database with the lifecycle capability: claim each candidate, then finish the deletions. */
-import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
+import type {
+  BuildReferenceLifecycle,
+  DatabaseAdapter,
+  DeletingBuild,
+} from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
 import { deleteClaimedBuild, type DeletionStep } from "./build-deletion.ts";
@@ -19,6 +23,8 @@ export interface ClaimedPurgeResult {
   removedFiles: number;
   /** Candidates a baseline or investigation still protects. */
   protectedBuilds: number;
+  /** Builds finished by this run that an earlier run had already claimed (`deleting` before it). */
+  resumedBuilds: number;
 }
 
 /**
@@ -31,20 +37,45 @@ export async function purgeClaimedBuilds(
   projectId: string,
   buildIds: readonly string[],
 ): Promise<ClaimedPurgeResult> {
+  const earlier = new Set(
+    (await deps.lifecycle.listDeleting(projectId)).map((build) => build.buildId),
+  );
   const protectedBuilds = await claimAll(deps, projectId, buildIds);
-  let removedBuilds = 0;
-  let removedFiles = 0;
+  const finished = await finishAll(deps, projectId, earlier);
+  return { ...finished, protectedBuilds };
+}
+
+/** Finish every `deleting` build; `earlier` are the ones already claimed before this run. */
+async function finishAll(
+  deps: ClaimedPurgeDeps,
+  projectId: string,
+  earlier: ReadonlySet<string>,
+): Promise<Omit<ClaimedPurgeResult, "protectedBuilds">> {
+  const total = { removedBuilds: 0, removedFiles: 0, resumedBuilds: 0 };
   for (const build of await deps.lifecycle.listDeleting(projectId)) {
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- one build at a time: SQLite serializes the writes
-      const result = await deleteClaimedBuild(deps, build);
-      if (result.outcome === "deleted") removedBuilds += 1;
-      removedFiles += result.files;
-    } catch (error) {
-      deps.logger?.warn({ err: error, projectId, buildId: build.buildId }, "build deletion failed");
+    // oxlint-disable-next-line no-await-in-loop -- one build at a time: SQLite serializes the writes
+    const result = await finishOne(deps, projectId, build);
+    if (result?.outcome === "deleted") {
+      total.removedBuilds += 1;
+      if (earlier.has(build.buildId)) total.resumedBuilds += 1;
     }
+    total.removedFiles += result?.files ?? 0;
   }
-  return { removedBuilds, removedFiles, protectedBuilds };
+  return total;
+}
+
+/** One build's deletion; a failure is logged, leaves the build `deleting`, and yields null. */
+async function finishOne(
+  deps: ClaimedPurgeDeps,
+  projectId: string,
+  build: DeletingBuild,
+): Promise<Awaited<ReturnType<typeof deleteClaimedBuild>> | null> {
+  try {
+    return await deleteClaimedBuild(deps, build);
+  } catch (error) {
+    deps.logger?.warn({ err: error, projectId, buildId: build.buildId }, "build deletion failed");
+    return null;
+  }
 }
 
 /** Claim each candidate; returns how many were protected. */
