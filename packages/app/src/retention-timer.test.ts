@@ -108,11 +108,16 @@ describe("background retention", () => {
 
   describe("scheduled build purge (opt-in)", () => {
     it("purges builds older than purgeTtlDays through the capability, keeping each branch's latest", async () => {
-      const { timer, run, purge } = await arm({ capability: true, config: { purgeTtlDays: 14 } });
+      const { db, timer, run, purge } = await arm({
+        capability: true,
+        config: { purgeTtlDays: 14 },
+      });
       await run();
+      // The capability read at the start of the pass is the one handed to the deletion.
       expect(purge).toHaveBeenCalledWith(expect.objectContaining({ id: "p" }), {
         ttlDays: 14,
         keepLatestPerBranch: true,
+        lifecycle: db.buildReferenceLifecycle,
       });
       timer?.stop();
     });

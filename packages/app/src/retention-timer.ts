@@ -151,14 +151,18 @@ async function sweepBranches(context: SweepContext, ttlDays: number): Promise<vo
 
 /** Scheduled build purge: the lifecycle capability's deletion path only; without it, nothing is deleted. */
 async function sweepBuilds(context: SweepContext, ttlDays: number): Promise<void> {
-  if (!context.db.buildReferenceLifecycle) {
+  // Read once for the whole pass and handed to every deletion (ADR 0039).
+  const lifecycle = context.db.buildReferenceLifecycle;
+  if (!lifecycle) {
     warnNoCapability(context, ttlDays);
     return;
   }
   const retention = retentionFor(context);
   const projects = await new ProjectModel(context.db).list();
   const results = await Promise.all(
-    projects.map((project) => retention.purge(project, { ttlDays, keepLatestPerBranch: true })),
+    projects.map((project) =>
+      retention.purge(project, { ttlDays, keepLatestPerBranch: true, lifecycle }),
+    ),
   );
   const removedBuilds = results.reduce((sum, result) => sum + result.removedBuilds, 0);
   if (removedBuilds > 0) {

@@ -120,6 +120,9 @@ by preset, so it cannot by itself carry this guarantee.
   purges builds only when `purgeTtlDays` is set explicitly (no default, so an upgrade never starts
   deleting builds), runs only this capability's path, and does nothing without it; hosts map
   `PURGE_TTL_DAYS`, core reads no environment.
+  A purge pass (the route, the timer) reads the capability once when it starts and hands that one
+  capability to every deletion of the pass (`PurgeOptions.lifecycle`); it never re-reads it, so one
+  cleared mid-pass cannot make the pass unfenced (#602).
 
 ### 4. Provenance is immutable and never guessed
 

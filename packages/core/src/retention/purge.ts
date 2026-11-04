@@ -67,9 +67,11 @@ export class Retention {
   }
 
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
+    // Resolved once, before anything is awaited: a capability that is cleared while the candidates
+    // are selected (a setup rerun) must not turn this pass into an unfenced one (ADR 0039).
+    const lifecycle = options.lifecycle ?? this.db.buildReferenceLifecycle;
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const { buildIds, pending } = await this.selectBuilds(project, options, cutoff);
-    const lifecycle = this.db.buildReferenceLifecycle;
     if (lifecycle) return await this.purgeClaimed(project, lifecycle, buildIds, pending, cutoff);
     const results = await Promise.all(
       buildIds.map(async (buildId) => ({
@@ -253,6 +255,11 @@ export class Retention {
 export interface PurgeOptions {
   ttlDays: number;
   keepLatestPerBranch: boolean;
+  /**
+   * The capability the caller resolved at the start of its pass, shared by every project of that
+   * pass. Without it the purge reads the database's capability when it starts, and never again.
+   */
+  lifecycle?: BuildReferenceLifecycle | undefined;
 }
 
 /** Counts of builds and files removed by a retention purge. */
