@@ -57,6 +57,34 @@ describe("safe retention capability", () => {
     expect(text).toContain("B1");
     expect(text).toContain("S1");
   });
+  it("refuses to purge a hosting-only database whose retention is paused, with or without testing", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    Object.assign(db, {
+      retentionPause: { baselineId: "B1", buildId: "S1", problem: "tombstoned" },
+    });
+    const app = createShelfApp({ database: db, storage });
+    const response = await app.request("/api/v1/admin/purge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain("retention is paused");
+  });
+  it("reports zero protected and resumed builds when the capability is on and there is no project", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    Object.assign(db, { buildReferenceLifecycle: {} });
+    const app = createShelfApp({ database: db, storage, testing: { runner: stubRunner() } });
+    const response = await app.request("/api/v1/admin/purge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ removedBuilds: 0, protected: 0, resumed: 0 });
+  });
   it("keeps the existing purge path available in hosting-only mode", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

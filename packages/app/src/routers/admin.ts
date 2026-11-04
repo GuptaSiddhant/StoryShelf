@@ -78,11 +78,8 @@ export function registerAdmin(app: ShelfRouter): void {
 
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin(c);
-    // Without atomic reference admission and tombstones, deletion in a testing deployment can
-    // race a baseline promotion. Do not expose unsafe purge (ADR 0039).
-    if (getStore().testing && !getStore().db.buildReferenceLifecycle) {
-      return c.json({ message: unavailableMessage(getStore().db.retentionPause) }, 503);
-    }
+    const refusal = purgeRefusal();
+    if (refusal) return c.json({ message: refusal }, 503);
     const body = c.req.valid("json");
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
     const builds = await purgeBuilds(ttlDays);
@@ -108,6 +105,18 @@ export function registerAdmin(app: ShelfRouter): void {
       200,
     );
   });
+}
+
+/**
+ * Why purge is refused, if it is. Without atomic reference admission and tombstones, deletion in a
+ * testing deployment can race a baseline promotion (ADR 0039). A database that withheld the
+ * capability for a data problem refuses too, with or without `testing`: the unfenced path would
+ * delete builds a baseline still names.
+ */
+function purgeRefusal(): string | undefined {
+  const { testing, db } = getStore();
+  if (db.buildReferenceLifecycle || !(testing || db.retentionPause)) return undefined;
+  return unavailableMessage(db.retentionPause);
 }
 
 /** Why a testing deployment refuses to purge: no capability, and whether the database paused it. */
@@ -144,7 +153,8 @@ async function purgeBuilds(ttlDays: number): Promise<PurgeTotals> {
   );
   const sum = (pick: (result: (typeof results)[number]) => number | undefined): number =>
     results.reduce((total, result) => total + (pick(result) ?? 0), 0);
-  const claimed = results.some((result) => result.protectedBuilds !== undefined);
+  // With the capability the totals exist even when there is no project (zeros).
+  const claimed = Boolean(getStore().db.buildReferenceLifecycle);
   return {
     removedBuilds: sum((result) => result.removedBuilds),
     ...(claimed

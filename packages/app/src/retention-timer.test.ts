@@ -167,6 +167,17 @@ describe("background retention", () => {
       timer?.stop();
     });
 
+    it("skips branch GC while retention is paused, even without testing", async () => {
+      const { db, timer, run } = await arm({ capability: false, config: {} });
+      Object.assign(db, {
+        retentionPause: { baselineId: "B", buildId: "S", problem: "tombstoned" },
+      });
+      const branches = vi.spyOn(Retention.prototype, "purgeStaleBranches");
+      await run();
+      expect(branches).not.toHaveBeenCalled();
+      timer?.stop();
+    });
+
     it("schedules nothing when both are off", async () => {
       const { db } = makeDatabase();
       const { storage } = makeStorage();

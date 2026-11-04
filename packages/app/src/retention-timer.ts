@@ -83,7 +83,9 @@ async function sweep(context: SweepContext): Promise<void> {
   // Baseline removal must be coordinated with references: a testing deployment GCs branches only
   // when its database has the lifecycle capability. Independent AI-data cleanup always runs, and
   // each stage fails on its own: a build-purge error must not stop the others.
-  if (branchTtlDays !== null && (!testing || db.buildReferenceLifecycle)) {
+  // While retention is paused (a baseline's source build cannot be pinned) the unfenced path would
+  // delete baseline rows without releasing their references, so branch GC waits for the fix too.
+  if (branchTtlDays !== null && !db.retentionPause && (!testing || db.buildReferenceLifecycle)) {
     await stage(context, "branch GC", async () => {
       await sweepBranches(context, branchTtlDays);
     });
