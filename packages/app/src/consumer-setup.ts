@@ -68,7 +68,7 @@ export function combineConsumers(consumers: CaptureConsumer[]): CaptureConsumer 
 export function recordShardRepeated(
   event: Parameters<NonNullable<ConsumerMetrics["shardRepeated"]>>[0],
 ): void {
-  captureMetrics().shardRepeatedStories.add(event.repeated);
+  captureMetrics().shardRepeatedSnapshots.add(event.repeated);
 }
 
 /** Job counts and durations on the capture instruments, told apart by `job.kind`. */

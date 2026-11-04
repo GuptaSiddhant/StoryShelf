@@ -3,4 +3,4 @@
 "@storyshelf/app": patch
 ---
 
-Count stories a shard renders again after a redelivery as the `storyshelf.capture.shard.repeated_stories` OpenTelemetry counter; it is a no-op without an SDK.
+Count the snapshots a shard captures again after a redelivery as the `storyshelf.capture.shard.repeated_snapshots` OpenTelemetry counter; it is a no-op without an SDK.

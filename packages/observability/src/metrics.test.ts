@@ -8,7 +8,7 @@ describe("instruments", () => {
     expect(captureMetrics().jobDuration).toBeDefined();
     expect(captureMetrics().jobsCompleted).toBeDefined();
     expect(captureMetrics().jobsFailed).toBeDefined();
-    expect(captureMetrics().shardRepeatedStories).toBeDefined();
+    expect(captureMetrics().shardRepeatedSnapshots).toBeDefined();
   });
 
   it("memoizes db and storage instruments", () => {
@@ -18,7 +18,7 @@ describe("instruments", () => {
     expect(storageMetrics().operationDuration).toBeDefined();
   });
 
-  it("names the repeated-stories counter exactly", async () => {
+  it("names the repeated-snapshots counter exactly", async () => {
     vi.resetModules();
     const created: string[] = [];
     const meter = {
@@ -32,6 +32,6 @@ describe("instruments", () => {
     const fresh = await import("./metrics.ts");
     fresh.captureMetrics();
     vi.restoreAllMocks();
-    expect(created).toContain("storyshelf.capture.shard.repeated_stories");
+    expect(created).toContain("storyshelf.capture.shard.repeated_snapshots");
   });
 });

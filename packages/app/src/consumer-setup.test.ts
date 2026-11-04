@@ -67,7 +67,7 @@ describe("jobMetrics", () => {
   });
 
   it("counts repeated shard work on the capture instruments without throwing", () => {
-    const add = vi.spyOn(captureMetrics().shardRepeatedStories, "add");
+    const add = vi.spyOn(captureMetrics().shardRepeatedSnapshots, "add");
     jobMetrics().shardRepeated?.({ repeated: 3, attempt: 2, limit: 3 });
     expect(add).toHaveBeenCalledWith(3);
     add.mockRestore();
