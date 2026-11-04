@@ -209,8 +209,10 @@ function unprobedSetupFailures(
   const unprobed = (settled?.failures ?? []).filter(
     (failure) => !probed.has(`${failure.category}/${failure.kind}`),
   );
+  // One entry per adapter: two providers that share a category and kind (invalid configs without
+  // a kind) are told apart by name.
   const byAdapter = new Map(
-    unprobed.map((failure) => [`${failure.category}/${failure.kind}`, failure]),
+    unprobed.map((failure) => [`${failure.category}/${failure.kind}/${failure.name}`, failure]),
   );
   return [...byAdapter.values()].map((failure) => ({
     category: failure.category,

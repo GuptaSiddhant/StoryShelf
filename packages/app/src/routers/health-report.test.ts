@@ -91,6 +91,29 @@ describe("collectHealthReport", () => {
       expect(report.adapters.filter((adapter) => adapter.category === "ai")).toHaveLength(1);
     });
 
+    it("keeps two adapters that share a category and kind apart by name", async () => {
+      const report = await collectHealthReport(
+        sources(),
+        {
+          ok: false,
+          failures: [
+            { category: "notifier", kind: "unknown", name: "notifiers[0]", error: "no kind" },
+            {
+              category: "notifier",
+              kind: "unknown",
+              name: "notifiers[1]",
+              error: "no kind either",
+            },
+          ],
+        },
+        Date.now(),
+        "0.0.0",
+      );
+      expect(
+        report.adapters.filter((adapter) => adapter.kind === "unknown").map((a) => a.name),
+      ).toEqual(["notifiers[0]", "notifiers[1]"]);
+    });
+
     it("adds nothing for a successful setup, and nothing twice for a probed adapter", async () => {
       const ok = await collectHealthReport(
         sources(),
