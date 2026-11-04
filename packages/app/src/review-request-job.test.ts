@@ -5,6 +5,7 @@ import {
   CaptureJobModel,
   MemberModel,
   NotificationChannelModel,
+  NotificationSubscriptionModel,
   ProjectModel,
 } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
@@ -340,6 +341,21 @@ describe("review-request jobs", () => {
     });
     await drain(fx);
     expect((await models.get(git.id))?.lastError).toBe("earlier failure");
+  });
+
+  it("sends nothing queued for a person whose project access was removed", async () => {
+    const fx = await setup();
+    await new NotificationSubscriptionModel(fx.db).upsert(fx.project.id, "appr1", {
+      via: ["email"],
+    });
+    await fx.enqueue({
+      projectId: fx.project.id,
+      eventId: `${fx.build.id}:0`,
+      target: { ...person("default"), route: "subscription" },
+    });
+    await new MemberModel(fx.db).remove(fx.project.id, "appr1");
+    await drain(fx);
+    expect(fx.sent).toEqual([]);
   });
 
   it("sends nothing to a person disabled after the job was queued", async () => {

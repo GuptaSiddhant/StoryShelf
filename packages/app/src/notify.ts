@@ -27,7 +27,7 @@ import {
   UserModel,
   type PublicOriginResolver,
 } from "@storyshelf/core/models";
-import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
+import type { NotificationSubscriptionRow, User } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { COMMENT_MENTIONED, matchesEvent } from "@storyshelf/core/utils";
 import { credentialKeys } from "./credential-keys.ts";
@@ -194,6 +194,8 @@ interface DeliveryKinds {
   personal: ReadonlySet<string>;
   /** Called for a subscription kind that is wired but not personal, so it can be logged. */
   skipped: (subscriptionId: string, kind: string) => void;
+  /** Called for a person dropped because they have no access to the project (debug log, no address). */
+  denied: (projectId: string, userId: string) => void;
 }
 
 /** Subscription kinds already logged as skipped, so each is reported once per process. */
@@ -208,6 +210,9 @@ function deliveryKindsOf(deps: Pick<NotifyDeps, "notifiers" | "logger">): Delive
         .filter((candidate) => candidate.metadata.audience === "person")
         .map((candidate) => candidate.metadata.kind),
     ),
+    denied: (projectId, userId) => {
+      deps.logger.debug({ projectId, userId, reason: "no-access" }, "notification target dropped");
+    },
     skipped: (subscriptionId, kind) => {
       const key = `${subscriptionId}:${kind}`;
       if (!reportedSkips.has(key)) {
@@ -222,6 +227,25 @@ function deliveryKindsOf(deps: Pick<NotifyDeps, "notifiers" | "logger">): Delive
 }
 
 /**
+ * Whether `user` may read the project: the rule the routers use (`effectiveRole`), so site admins
+ * and site-wide viewers keep working without a membership row. A subscription outlives the
+ * membership (it keeps the person's preferences for when they are added back), so every personal
+ * target is checked here, at delivery time, never when the subscription was made.
+ */
+async function hasAccess(
+  db: DatabaseAdapter,
+  user: Pick<User, "id" | "role">,
+  projectId: string,
+  kinds: Pick<DeliveryKinds, "denied">,
+): Promise<boolean> {
+  const role = await new MemberModel(db).effectiveRole(user.role, projectId, user.id);
+  if (role === null) {
+    kinds.denied(projectId, user.id);
+  }
+  return role !== null;
+}
+
+/**
  * Per-subscriber targets for one subscription: its personal kinds only. A kind that posts to a
  * room (or is not wired) is skipped, the former with one warning, and the rest still deliver.
  */
@@ -232,7 +256,7 @@ async function targetsForSub(
   route: ReviewRoute = "subscription",
 ): Promise<Addressed[]> {
   const user = await new UserModel(db).get(sub.userId);
-  if (!user || user.disabled) {
+  if (!user || user.disabled || !(await hasAccess(db, user, sub.projectId, kinds))) {
     return [];
   }
   const via = NotificationSubscriptionModel.viaOf(sub);
@@ -286,7 +310,7 @@ async function defaultTargets(
       !skipUsers.has(member.userId),
   );
   const targets = await Promise.all(
-    members.map(async (member) => await emailTarget(db, projectId, member.userId)),
+    members.map(async (member) => await emailTarget(db, projectId, member.userId, kinds)),
   );
   return targets.flat();
 }
@@ -296,10 +320,11 @@ async function emailTarget(
   db: DatabaseAdapter,
   projectId: string,
   userId: string,
+  kinds: Pick<DeliveryKinds, "denied">,
   route: ReviewRoute = "default",
 ): Promise<Addressed[]> {
   const user = await new UserModel(db).get(userId);
-  return !user || user.disabled
+  return !user || user.disabled || !(await hasAccess(db, user, projectId, kinds))
     ? []
     : [
         {
@@ -490,7 +515,7 @@ async function mentionTargets(
   if (own !== undefined && !NotificationSubscriptionModel.isReviewOptOutOnly(own)) {
     return own.enabled ? await targetsForSub(db, own, kinds) : [];
   }
-  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId) : [];
+  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId, kinds) : [];
 }
 
 /**
@@ -513,7 +538,9 @@ async function assignedTargets(
   if (chosen.length > 0) {
     return chosen;
   }
-  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId, "assigned") : [];
+  return kinds.personal.has("email")
+    ? await emailTarget(db, projectId, userId, kinds, "assigned")
+    : [];
 }
 
 /**
