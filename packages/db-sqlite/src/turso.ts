@@ -64,7 +64,7 @@ export function createTursoDatabase(options: TursoDatabaseOptions): DatabaseAdap
     tables: schema,
     migrate: async () => {
       await assertReviewSchema(async (table) =>
-        parseTableInfo((await client.execute(`PRAGMA table_info(${table})`)).rows as unknown[]),
+        parseTableInfo((await client.execute(`PRAGMA table_info(${table})`)).rows),
       );
       await runMigrations(client);
     },

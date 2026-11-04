@@ -17,10 +17,8 @@ function rowColumn(row: unknown): [string, string] | undefined {
     return [String(row[1]).toLowerCase(), String(row[2] ?? "").toUpperCase()];
   }
   if (typeof row === "object" && row !== null) {
-    const { name, type } = row as { name?: unknown; type?: unknown };
-    return name === undefined
-      ? undefined
-      : [String(name).toLowerCase(), String(type ?? "").toUpperCase()];
+    const { name, type } = row as { name?: string; type?: string };
+    return typeof name === "string" ? [name.toLowerCase(), (type ?? "").toUpperCase()] : undefined;
   }
   return undefined;
 }

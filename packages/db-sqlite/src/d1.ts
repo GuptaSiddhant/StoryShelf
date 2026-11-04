@@ -139,7 +139,7 @@ async function ensureColumns(client: D1Database, ddl: string): Promise<void> {
 async function inspectRows(client: D1Database, table: string): Promise<unknown[] | undefined> {
   try {
     const result = await client.prepare(`PRAGMA table_info(${table})`).bind().all();
-    return result.results as unknown[];
+    return result.results;
   } catch {
     return undefined;
   }
