@@ -81,21 +81,25 @@ describe("component links with a dot segment", () => {
     },
   );
 
-  it("keeps the file in every tab link of a page opened through the query form", async () => {
-    const app = await seed("../ui/Button.stories.tsx");
-    const html = await (await open(app, urls.component("app", "../ui/Button.stories.tsx"))).text();
-    const encoded = encodeURIComponent("../ui/Button.stories.tsx");
-    const tabLinks = [...html.matchAll(/href="(\?tab=[^"]*)"/gu)].map((match) => match[1] ?? "");
-    expect(tabLinks.length).toBeGreaterThan(1);
-    for (const link of tabLinks) {
-      expect(link).toContain(`&amp;path=${encoded}`);
-    }
-    const history = await open(
-      app,
-      `/projects/app/components/${tabLinks[1] ?? ""}`.replace("&amp;", "&"),
-    );
-    expect(history.status).toBe(200);
-  });
+  it.each(["overview", "stories", "history"])(
+    "keeps the file in every relative link of the %s tab opened through the query form",
+    async (tab) => {
+      const importPath = "../ui/Button.stories.tsx";
+      const app = await seed(importPath);
+      const base = urls.component("app", importPath, { tab });
+      const html = await (await open(app, base)).text();
+      const encoded = encodeURIComponent(importPath);
+      const links = [...html.matchAll(/href="(\?[^"#]*)[^"]*"/gu)].map((match) =>
+        (match[1] ?? "").replaceAll("&amp;", "&"),
+      );
+      expect(links.length).toBeGreaterThan(0);
+      for (const link of links) {
+        expect(link).toContain(`path=${encoded}`);
+        // oxlint-disable-next-line no-await-in-loop -- a handful of requests, in order
+        expect((await app.request(`/projects/app/components/${link}`)).status).toBe(200);
+      }
+    },
+  );
 
   it("keeps the query form together with a tab", async () => {
     const app = await seed("../ui/Button.stories.tsx");
