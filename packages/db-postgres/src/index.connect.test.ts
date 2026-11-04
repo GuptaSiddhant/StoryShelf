@@ -8,14 +8,14 @@ const postgresMock = vi.hoisted(() =>
   })),
 );
 vi.mock("postgres", () => ({ default: postgresMock }));
-vi.mock("drizzle-orm/postgres-js", () => ({
-  drizzle: vi.fn(() => ({})),
-}));
+const drizzleMock = vi.hoisted(() => vi.fn((_client: unknown, _config: unknown) => ({})));
+vi.mock("drizzle-orm/postgres-js", () => ({ drizzle: drizzleMock }));
 
 import { createPostgresDatabase } from "./index.ts";
 
 beforeEach(() => {
   postgresMock.mockClear();
+  drizzleMock.mockClear();
 });
 
 describe("createPostgresDatabase from a connection string", () => {
@@ -47,6 +47,7 @@ describe("createPostgresDatabase from a connection string", () => {
     const client = { unsafe: vi.fn(), end: vi.fn() } as never;
     createPostgresDatabase({ client, url: "postgres://ignored/db" });
     expect(postgresMock).not.toHaveBeenCalled();
+    expect(drizzleMock).toHaveBeenCalledWith(client, expect.any(Object));
   });
 
   it("refuses an empty connection string without a client", () => {
