@@ -276,16 +276,21 @@ export function schemesOf(protocol: RemoteProtocol): string {
 
 /**
  * Remove what identifies the connection from text surfaced to operators: the endpoint (it can carry
- * a key in its path or query), its host and path, its query values, every header value and every
- * value inside the lease (non-strings are stringified).
+ * a key in its path or query), its host and path, its query values, every header value (and the
+ * credential after a scheme such as `Bearer`) and every value inside the lease (non-strings are
+ * stringified).
  */
 export function scrubConnection(
   text: string,
   connection: RemoteConnection & { lease?: unknown },
 ): string {
+  const headerValues = Object.values(connection.headers ?? {});
   const secrets = [
     connection.endpoint,
-    ...Object.values(connection.headers ?? {}),
+    ...headerValues,
+    // A scheme and its credential (`Bearer abc`, `Basic dXNlcg==`): an error can quote the bare
+    // credential without the scheme, so it goes on its own as well.
+    ...headerValues.flatMap((value) => credentialOf(value)),
     ...leaseSecrets(connection.lease),
   ];
   try {
@@ -310,6 +315,13 @@ export function scrubConnection(
     scrubbed = scrubbed.replaceAll(secret, "[redacted]");
   }
   return scrubbed;
+}
+
+/** The credential after the scheme of an `Authorization`-style value, or nothing when it has none. */
+function credentialOf(value: string): string[] {
+  const parts = value.trim().split(/\s+/u);
+  const credential = parts.length > 1 ? parts.at(-1) : undefined;
+  return credential === undefined ? [] : [credential];
 }
 
 /** Every value of a lease, as text: a string whole, anything else stringified, objects walked. */

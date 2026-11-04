@@ -77,7 +77,7 @@ import { resolveRuntime, type ServerRuntime } from "./runtime.ts";
 function throwOnInvalidAdapters(options: ShelfOptions): void {
   const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length > 0) {
-    throw new AdapterLifecycleError("setup", invalid);
+    throw new AdapterLifecycleError("setup", invalid, true);
   }
 }
 

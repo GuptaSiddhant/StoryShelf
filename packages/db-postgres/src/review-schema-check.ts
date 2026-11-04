@@ -1,5 +1,5 @@
 /**
- * Refuse an upgrade that cannot adopt a review table or column made outside StoryShelf, with an
+ * Refuse an upgrade that cannot adopt a review or accessibility table or column made outside StoryShelf, with an
  * error that names the table and column instead of a raw driver message.
  */
 import type { MigrationRunner } from "./migrate.ts";
@@ -13,6 +13,9 @@ const TYPED_COLUMNS = [
   { table: "projects", column: "review_approvals", type: "integer" },
   { table: "builds", column: "review_cycle", type: "integer" },
   { table: "builds", column: "review_requested_cycle", type: "integer" },
+  // Accessibility columns (informational; a hand-made column of another type would break the upgrade).
+  { table: "projects", column: "run_a11y", type: "boolean" },
+  { table: "snapshots", column: "a11y_violations", type: "text" },
 ];
 
 interface ColumnRow {
@@ -26,12 +29,14 @@ const COLUMNS_QUERY = `
   WHERE table_schema = current_schema()
     AND (table_name = 'build_reviews'
       OR (table_name = 'projects' AND column_name IN ('review_enabled', 'review_approvals'))
-      OR (table_name = 'builds' AND column_name IN ('review_cycle', 'review_requested_cycle')))
+      OR (table_name = 'builds' AND column_name IN ('review_cycle', 'review_requested_cycle'))
+      OR (table_name = 'projects' AND column_name = 'run_a11y')
+      OR (table_name = 'snapshots' AND column_name = 'a11y_violations'))
 `;
 
 function conflict(what: string): Error {
   return new Error(
-    `Cannot upgrade the review schema: ${what}. It was not created by StoryShelf; rename or drop it (keep a backup) and start again.`,
+    `Cannot upgrade the schema: ${what}. It was not created by StoryShelf; rename or drop it (keep a backup) and start again.`,
   );
 }
 

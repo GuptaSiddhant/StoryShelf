@@ -1,6 +1,6 @@
 /** Disposable, content-addressed gzip variants of authorized published files. */
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import { publishedGzipPath } from "@storyshelf/core/utils";
+import { contentKey, publishedGzipPath } from "@storyshelf/core/utils";
 import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 import { gunzip, gzip } from "node:zlib";
@@ -121,7 +121,7 @@ function schedule(storage: StorageAdapter, state: State, hash: string, original:
 
 async function generate(storage: StorageAdapter, hash: string, original: Buffer): Promise<void> {
   if (createHash("sha256").update(original).digest("hex") !== hash) return;
-  const source = `content/${hash}`;
+  const source = contentKey(hash);
   if (!(await storage.exists(source))) return;
   const compressed = await compress(original);
   if (compressed.length >= original.length || !(await storage.exists(source))) return;

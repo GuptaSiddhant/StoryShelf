@@ -201,6 +201,16 @@ describe("library routes", () => {
     );
   });
 
+  it("says axe did not run, with the reason, and counts no finding for it", async () => {
+    const down = await seededLibraryApp(indexWithoutDocs, {
+      a11yViolations: JSON.stringify(["axe unavailable: Execution context was destroyed"]),
+    });
+    const body = await (await down.request("/projects/test-project/library")).text();
+    expect(body).toContain("axe did not run");
+    expect(body).toContain("Execution context was destroyed");
+    expect(body).not.toContain("a11y 1");
+  });
+
   it("omits the Docs link when the build statics are missing", async () => {
     const app = await seededLibraryApp(null);
     const response = await app.request("/projects/test-project/library");

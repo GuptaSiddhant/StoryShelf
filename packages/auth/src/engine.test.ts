@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { baseAuthTables } from "./auth-tables.ts";
 import { ENGINE_PROVIDER_ID, createShelfAuth, type ShelfAuth } from "./engine.ts";
 import { githubPreset } from "./presets/index.ts";
@@ -162,6 +162,26 @@ function recordingSender(sent: { to: string; subject: string }[]): {
       metadata,
       send: async (message: { to: string; subject: string }): Promise<void> => {
         sent.push({ to: message.to, subject: message.subject });
+      },
+    },
+  };
+}
+
+/** A sender that keeps the text of each mail, to read the link out of it. */
+function textSender(bodies: { to: string; text: string }[]): {
+  sender: Parameters<typeof createShelfAuth>[0]["emailSender"];
+} {
+  const metadata = {
+    name: "text",
+    version: "0.0.0",
+    kind: "test",
+    category: "notifier" as const,
+  };
+  return {
+    sender: {
+      metadata,
+      send: async (message: { to: string; text?: string }): Promise<void> => {
+        bodies.push({ to: message.to, text: message.text ?? "" });
       },
     },
   };
@@ -647,5 +667,52 @@ describe("auth email sender", () => {
     const reset = await post(shelf, "/request-password-reset", { email: "carol@example.com" });
     expect(reset.status).toBe(200);
     expect(sent).toEqual([{ to: "carol@example.com", subject: "Reset your StoryShelf password" }]);
+  });
+
+  it("builds the invite link from the configured base URL alone, trailing slashes trimmed", async () => {
+    const bodies: { to: string; text: string }[] = [];
+    const { sender } = textSender(bodies);
+    const { shelf } = await testEngine(false, false, false, false, {
+      emailSender: sender,
+      baseURL: "https://shelf.acme.io//",
+    });
+    const issued = await shelf.adapter.issueInvite({
+      email: "ada@example.com",
+      name: "Ada",
+      role: "member",
+    });
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    const link = /https?:\/\/\S+/u.exec(bodies[0]?.text ?? "")?.[0];
+    const url = new URL(link ?? "about:blank");
+    expect(url.origin).toBe("https://shelf.acme.io");
+    expect(url.pathname).toBe(`/auth/invites/${issued.inviteId}`);
+    expect(url.searchParams.get("token")).toBe(issued.token);
+  });
+
+  it("builds the password-reset link on the configured base URL, whatever host the request names", async () => {
+    const bodies: { to: string; text: string }[] = [];
+    const { sender } = textSender(bodies);
+    const { shelf } = await testEngine(false, false, false, false, {
+      emailSender: sender,
+      baseURL: "https://shelf.acme.io",
+    });
+    await inviteUser(shelf, "carol@example.com", "Carol");
+    bodies.length = 0;
+    const reset = await shelf.auth.handler(
+      new Request("http://attacker.example/api/auth/request-password-reset", {
+        method: "POST",
+        headers: { ...json, host: "attacker.example" },
+        body: JSON.stringify({ email: "carol@example.com" }),
+      }),
+    );
+    expect(reset.status).toBeLessThan(500);
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    const link = /https?:\/\/[^\s]+/u.exec(bodies[0]?.text ?? "")?.[0] ?? "";
+    expect(new URL(link).origin).toBe("https://shelf.acme.io");
+    expect(bodies[0]?.text).not.toContain("attacker.example");
   });
 });

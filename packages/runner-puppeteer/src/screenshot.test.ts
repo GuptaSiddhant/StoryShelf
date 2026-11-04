@@ -1,6 +1,7 @@
 import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { inPagePlay } from "./play.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createBrowserSession } from "./session.ts";
@@ -85,6 +86,39 @@ describe("waiting for the story to be ready", () => {
       screenshot: Buffer.from([1]),
     });
     expect(evaluated).toContain(inPagePaint);
+  });
+
+  it("waits the configured delay before the play function runs", async () => {
+    const order: string[] = [];
+    const { promise: delayDone, resolve: finishDelay } = Promise.withResolvers<null>();
+    const real = globalThis.setTimeout;
+    // Only the story's 300 ms delay is held; every other timer runs as usual.
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+      callback: TimerHandler,
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (timeout !== 300) return real(callback, timeout, ...args);
+      order.push("delay 300");
+      delayDone.then(() => (callback as (...rest: unknown[]) => void)(...args)).catch(() => {});
+      return 0;
+    }) as typeof setTimeout);
+    const { ctx, page } = harness(settled, { executePlay: true });
+    const evaluate = page.evaluate;
+    page.evaluate = async (fn: unknown, arg?: unknown): Promise<unknown> => {
+      if (fn === inPagePlay) order.push("play");
+      return await evaluate(fn, arg);
+    };
+    const capturing = captureScreenshot(ctx, story(300), viewport);
+    await vi.waitFor(() => {
+      expect(order).toEqual(["delay 300"]);
+    });
+    // The delay is held open: once every pending microtask has run, play has still not started.
+    await new Promise((resolve) => real(resolve, 0));
+    expect(order).toEqual(["delay 300"]);
+    finishDelay(null);
+    await capturing;
+    expect(order).toEqual(["delay 300", "play"]);
   });
 
   it("still honours an explicit delay after the signal", async () => {
