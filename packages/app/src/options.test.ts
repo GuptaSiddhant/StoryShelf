@@ -89,7 +89,7 @@ describe("createShelfApp testing, compare and notifications options", () => {
         notifications: { notifiers: notifiers as never },
       });
     expect(wire([notifier("Chat log", "log"), notifier("Git log", "log")])).toThrow(
-      /notifiers\[1\]: kind "log" is already used by "Chat log"/u,
+      /notifiers\[1\] \("Git log"\): kind "log" is already used by "Chat log"/u,
     );
     expect(wire([notifier("Chat log", "log"), notifier("Git log", "git-log")])).not.toThrow();
   });

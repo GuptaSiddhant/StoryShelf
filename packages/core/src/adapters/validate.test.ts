@@ -194,7 +194,7 @@ describe("validateAdapterSources", () => {
     expect(failures).toHaveLength(1);
     expect(failures[0]).toMatchObject({ category: "notifier", kind: "log", name: "Git log" });
     expect(failures[0]?.error).toContain(
-      'notifiers[2]: kind "log" is already used by "Other chat"',
+      'notifiers[2] ("Git log"): kind "log" is already used by "Other chat"',
     );
   });
 

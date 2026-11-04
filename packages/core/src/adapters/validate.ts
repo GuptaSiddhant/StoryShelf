@@ -347,7 +347,7 @@ function claimNotifierKind(
     category: "notifier",
     kind,
     name,
-    error: `notifiers[${String(index)}]: kind "${kind}" is already used by "${owner}"; a notifier kind must be unique`,
+    error: `notifiers[${String(index)}] ("${name}"): kind "${kind}" is already used by "${owner}"; a notifier kind must be unique`,
   };
 }
 
