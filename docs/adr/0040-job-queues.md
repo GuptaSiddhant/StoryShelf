@@ -54,15 +54,18 @@ semantics.
   cancelled and the consumer's slot is freed; the job is not settled, so its lease runs out and the
   normal exhausted or redelivery path takes over. A capture whose last attempt hit the bound ends
   its build `failed` (through that path), never `cancelled`, and its attempt log records
-  `job deadline exceeded (<n>s)`. The abandoned invocation stops at its next checkpoint and writes
-  nothing more, because a redelivery may already be running the same job: every attempt-log line and
-  progress report of a capture throws `JobAbortedError` (it is never swallowed or recorded as a
-  story failure, and no status or build state is posted); publish checks the signal before each
-  file it extracts or persists, before recording content uses and before the manifest, and leaves
-  the shared scratch directory to the redelivery; a notify delivery checks it before the status is
-  written and records no outcome. A request already on the wire is not recalled, and storage and
-  provider calls keep their SDK timeouts. A phase that never reports is bounded only by the lease.
-  There is no per-phase knob.
+  `job deadline exceeded (<n>s)`. The abandoned invocation stops at its next checkpoint instead of
+  carrying on next to a redelivery that may already be running the same job: every attempt-log line
+  and progress report of a capture throws `JobAbortedError` (never swallowed or recorded as a story
+  failure), and a run that fails this way posts no status or build state of its own; publish checks
+  the signal before each file it extracts or persists, before recording content uses and before the
+  manifest, and leaves the shared scratch directory to the redelivery; a notify delivery checks it
+  before the status and comment are written and before its outcome is recorded. Checkpoints are
+  cooperative: a write or request already in flight is not recalled (an update already started
+  completes, and a capture whose abort lands during its last attempt-log append can still request
+  build state once), and storage and provider calls keep their SDK timeouts. The gap between the
+  abort and the lease running out is what keeps those in-flight writes from meeting the
+  redelivery's. A phase that never reports is bounded only by the lease. There is no per-phase knob.
 - Its retry limit stated where the queue is built, not inferred from `testing.retries`.
 - Kinds that must be single-flight per key use `active_key` (a unique column, cleared in the write
   that ends the job), never a check before the insert. A request that arrives while the holder
