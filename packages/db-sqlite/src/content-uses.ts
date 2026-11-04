@@ -4,7 +4,8 @@ import { inTransaction } from "./lifecycle-transaction.ts";
 /**
  * Record the build's use of each hash. A hash a collector claimed refuses the whole call, so a use
  * and the collection of the same blob end in exactly one outcome: the refused hashes are returned
- * and nothing is written.
+ * and nothing is written. A build that is gone or being deleted records nothing either (every hash
+ * is refused): its content was or is being released, so a late use would pin the blobs for good.
  */
 export async function recordContentUses(
   path: string,
@@ -13,6 +14,12 @@ export async function recordContentUses(
   hashes: readonly string[],
 ): Promise<string[]> {
   return await inTransaction(path, async (db) => {
+    const build = db
+      .prepare("SELECT retention_state FROM builds WHERE id = ? AND project_id = ?")
+      .get(buildId, projectId) as unknown as [string] | undefined;
+    if (build?.[0] !== "available") {
+      return await Promise.resolve([...new Set(hashes)]);
+    }
     const claimed = db.prepare(
       "SELECT 1 FROM content_uses WHERE content_hash = ? AND collecting_at IS NOT NULL LIMIT 1",
     );

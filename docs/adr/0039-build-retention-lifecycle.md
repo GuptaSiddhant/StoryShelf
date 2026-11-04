@@ -63,9 +63,12 @@ by preset, so it cannot by itself carry this guarantee.
   counts once. The caller then checks that each blob still exists: a recorded use cannot be
   claimed, so a collector that finished between the caller's own check and the record is caught. A
   counter read and updated through the generic adapter path would race across processes and cannot
-  be addressed by hash; the former `content_refs` table never held rows on a real adapter and is
-  dropped, with nothing to backfill: a blob without a use row is protected by the manifest guard
-  until its builds go. A build's release marks all its rows released (kept for the grace period).
+  be addressed by hash; the former `content_refs` table held per-hash counters on real SQLite
+  deployments (the upload route wrote them) and is dropped. That is safe: a blob without a use row
+  is never claimed and is protected by the manifest guard while its builds are live. Counters
+  cannot be turned into per-build uses, so pre-upgrade shared blobs leak until a backfill records
+  uses from the live builds' manifests (a follow-up). A build that is gone or being deleted records
+  no use (the capability refuses it), so a late publish cannot pin blobs for good. A build's release marks all its rows released (kept for the grace period).
   A collector **claims** a blob in the capability's domain (`claimContent`: every use released,
   the grace passed, no live manifest names it) under a per-pass token. A claim is durable and
   leased (30 minutes): it stays with its collector, so two collectors never delete one blob, and a
@@ -141,13 +144,13 @@ by preset, so it cannot by itself carry this guarantee.
 
 All writers use the fenced capability when it is present:
 
-| Path                                                      | Mutation                                                                                                                                                                          |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `approveSnapshot` (`app/src/routers/builds.handlers.ts`)  | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`)                                                                       |
-| `core/src/capture/pipeline.ts`                            | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict        |
-| `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                      |
-| `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                      |
-| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                     |
+| Path                                                      | Mutation                                                                                                                                                                                                     |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `approveSnapshot` (`app/src/routers/builds.handlers.ts`)  | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`)                                                                                                  |
+| `core/src/capture/pipeline.ts`                            | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict                                   |
+| `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                                                 |
+| `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                                                 |
+| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                                                |
 | `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; invoked once at every SQLite boot, before the capability is exposed (#536) |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check

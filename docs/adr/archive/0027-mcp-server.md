@@ -22,11 +22,11 @@ AI agents (Claude Code, Cursor, CI bots) review UI changes best when they can re
 
 ## Alternatives considered
 
-| Option | Why not |
-|---|---|
-| Stdio bin only | Excludes remote/hosted agents; HTTP is a thin addition on the same tool layer |
+| Option                                     | Why not                                                                                                                                        |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stdio bin only                             | Excludes remote/hosted agents; HTTP is a thin addition on the same tool layer                                                                  |
 | Embedded `/mcp` route in `@storyshelf/app` | Couples the MCP SDK and releases to the server, enlarges every deployment's surface, risks bypassing REST role checks, poor fit for serverless |
-| Expose approve/reject | An agent approving visual diffs defeats review; can be added later behind an explicit opt-in flag |
+| Expose approve/reject                      | An agent approving visual diffs defeats review; can be added later behind an explicit opt-in flag                                              |
 
 ## Consequences
 

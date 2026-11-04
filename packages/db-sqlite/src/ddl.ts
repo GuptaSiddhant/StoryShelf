@@ -586,7 +586,7 @@ export const IDENTITY_STATEMENTS: string[] = [
   // Pre-adapter Figma tables, replaced by design_nodes / design_credentials (no data is carried over).
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",
-  // Replaced by content_uses (ADR 0039); the table never held rows on a real adapter.
+  // Replaced by content_uses (ADR 0039); its per-hash counters cannot become per-build uses.
   "DROP TABLE IF EXISTS content_refs",
 ];
 

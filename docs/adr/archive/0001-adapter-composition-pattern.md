@@ -18,11 +18,11 @@ Continue the adapter composition pattern. The router factory accepts a bag of ad
 interface ShelfOptions {
   database: DatabaseAdapter;
   storage: StorageAdapter;
-  capture?: CaptureRunner;    // server-side Playwright capture (see ADR 0003)
+  capture?: CaptureRunner; // server-side Playwright capture (see ADR 0003)
   auth?: AuthAdapter;
-  status?: StatusAdapter;     // GitHub/GitLab PR status checks
+  status?: StatusAdapter; // GitHub/GitLab PR status checks
   logger?: LoggerAdapter;
-  ui?: UIConfig;             // brand identity: name, logo, favicon, theme tokens (fixed UI, not an adapter)
+  ui?: UIConfig; // brand identity: name, logo, favicon, theme tokens (fixed UI, not an adapter)
   config?: ShelfConfig;
 }
 ```
@@ -34,12 +34,14 @@ Each adapter is a plain TypeScript interface. Provider packages export factories
 ## Consequences
 
 **Positive:**
+
 - Core application code never imports concrete implementations
 - Easy to test with in-memory/mock adapters
 - New backends can be added without touching core
 - Users can swap SQLite for PostgreSQL by changing one adapter
 
 **Negative:**
+
 - One more layer of indirection
 - Adapter interfaces must be designed carefully upfront (changing them is breaking)
 
@@ -53,13 +55,16 @@ StoryBooker coupled adapters to `AsyncLocalStorage` -- models called `getStore()
 // StoryBooker (old pattern)
 class BuildsModel {
   constructor() {
-    const store = getStore();  // throws if no AsyncLocalStorage context
+    const store = getStore(); // throws if no AsyncLocalStorage context
     this.db = store.database;
   }
 }
 
 // StoryShelf (new pattern)
 class BuildsModel {
-  constructor(private db: DatabaseAdapter, private storage: StorageAdapter) {}
+  constructor(
+    private db: DatabaseAdapter,
+    private storage: StorageAdapter,
+  ) {}
 }
 ```

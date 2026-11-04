@@ -216,6 +216,7 @@ describe("resumable build deletion on SQLite", () => {
       expect(removed).toBe(0);
       expect(fixture.objects.has(`content/${SHARED}`)).toBe(true);
       // The claim was given back, so the blob admits new uses again.
+      await publish(fixture.db, fixture.storage, "late", { "index.html": "shared" });
       expect(await fixture.lifecycle.recordContentUses("p", "late", [SHARED])).toEqual([]);
     });
   });
@@ -374,6 +375,28 @@ describe("content uses", () => {
       expect(await fixture.lifecycle.recordContentUses("p", "two", [hash])).toEqual([]);
 
       expect(fixture.uses(hash)).toEqual({ active: 2, rows: 2 });
+    });
+  });
+
+  it("records nothing for a build that is being deleted, so a late publish cannot pin blobs", async () => {
+    await withFixture(async (fixture) => {
+      const hash = hashOf("late publish");
+      await claimed(fixture, "one");
+
+      expect(await fixture.lifecycle.recordContentUses("p", "one", [hash, hash])).toEqual([hash]);
+      expect(fixture.uses(hash)).toEqual({ active: 0, rows: 0 });
+    });
+  });
+
+  it("records nothing for a build that is gone or belongs to another project", async () => {
+    await withFixture(async (fixture) => {
+      const hash = hashOf("orphan");
+      await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
+
+      expect(await fixture.lifecycle.recordContentUses("p", "one", [hash])).toEqual([hash]);
+      expect(await fixture.lifecycle.recordContentUses("other", "two", [hash])).toEqual([hash]);
+      expect(await fixture.lifecycle.recordContentUses("p", "missing", [hash])).toEqual([hash]);
+      expect(fixture.uses(hash)).toEqual({ active: 0, rows: 0 });
     });
   });
 

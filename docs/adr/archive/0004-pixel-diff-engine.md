@@ -14,12 +14,12 @@ Use `pixelmatch` (by Mapbox) for pixel comparison and `pngjs` for PNG manipulati
 
 ### Why pixelmatch
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **pixelmatch** | Battle-tested (used by Playwright internally), fast, supports anti-aliasing detection, configurable threshold | Pixel-based only (no AI/structural comparison) |
-| resemble.js | Higher-level API, includes color difference metrics | Slower, less precise at pixel level |
-| Applitools Visual AI | Fewest false positives | Proprietary, SaaS-only, not self-hostable |
-| SSIM | Perceptual quality metric | Computationally expensive, not suited for CI speed |
+| Option               | Pros                                                                                                          | Cons                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| **pixelmatch**       | Battle-tested (used by Playwright internally), fast, supports anti-aliasing detection, configurable threshold | Pixel-based only (no AI/structural comparison)     |
+| resemble.js          | Higher-level API, includes color difference metrics                                                           | Slower, less precise at pixel level                |
+| Applitools Visual AI | Fewest false positives                                                                                        | Proprietary, SaaS-only, not self-hostable          |
+| SSIM                 | Perceptual quality metric                                                                                     | Computationally expensive, not suited for CI speed |
 
 ### Diff configuration
 
@@ -30,6 +30,7 @@ The `DiffOptions` and `DiffResult` types live in `docs/architecture.md` (Pixel D
 ### Diff overlay image
 
 The diff image is generated as an overlay:
+
 - Unchanged pixels: 50% opacity (grayed out)
 - Changed pixels: highlighted in red (`[255, 0, 0]`)
 - This creates a visual "heat map" showing exactly what changed
@@ -61,11 +62,13 @@ npx @storyshelf/cli upload --max-diff-ratio 0.02 --pixel-threshold 0.15
 ## Consequences
 
 **Positive:**
+
 - Same diff algorithm Playwright uses -- consistent with developer expectations
 - Fast enough for CI (thousands of screenshots in seconds)
 - Configurable thresholds reduce false positives
 - No external service dependency
 
 **Negative:**
+
 - Pixel-based comparison can produce false positives on anti-aliased text, sub-pixel rendering, or animation remnants
 - Mitigated by: deterministic rendering (ADR 0003), animation disabling, threshold tuning

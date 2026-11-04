@@ -33,11 +33,13 @@ Exactly one package lists `ai` — **pinned exactly (`7.0.133`, no range)**; bum
 ```ts
 createAi({
   profiles: {
-    default:  { defaultModel: ollama("qwen2.5:14b") },
-    thorough: { defaultModel: openai("gpt-4o-mini"),
-                models: { vision: anthropic("claude-sonnet-4-5") } },
+    default: { defaultModel: ollama("qwen2.5:14b") },
+    thorough: {
+      defaultModel: openai("gpt-4o-mini"),
+      models: { vision: anthropic("claude-sonnet-4-5") },
+    },
   },
-  defaultProfile: "default",  // optional: "default" key if present, else first key
+  defaultProfile: "default", // optional: "default" key if present, else first key
   budget: { dailyTokens: 2_000_000, visionWeight: 5, perProjectCallsPerHour: 50 }, // optional
 });
 ```
@@ -74,13 +76,13 @@ Build insights are cached in a new `insights` table, purged with their build. **
 
 Routes follow the existing `/api/v1/projects/{slug}/…` convention (slug, not id). New `routers/insights.ts` (+ `insights.handlers.ts` for the guards), `app.openapi` routes with `schemas.ts` entries so insights land in `openapi.json` (website docs + type-safe CLI/MCP clients). No DELETE — rows die with builds via retention purge. No SSE in v1 — cache-hit-200 else 202 + poll matches the upload→202→queue async pattern.
 
-| Method | Route | Roles | Behavior |
-|---|---|---|---|
-| `GET` | `/projects/{slug}/builds/{buildId}/insights/latest` | `VIEW_ROLES` (all four) | Cached triage; `404 never-generated` with creation hint; while a run exists the response carries `status` (`pending`/`running`/`failed`/`done`) and, on `failed`, a bounded error code |
-| `GET` | `/projects/{slug}/builds/{buildId}/insights` | `VIEW_ROLES` | Bounded history list (`?limit`) |
-| `POST` | `/projects/{slug}/builds/{buildId}/insights` | `["approver", "admin"]` | `{ task?, force?, profile? }` → `inputHash` hit returns 200 unbilled (`force` bypasses the cache and is billed); else budget pre-check (429 + `Retry-After`) → 202 with `Location`. **`profile` is honoured for site admins only**; for everyone else the project's `ai_profile` is used, so an approver cannot route data to a profile the site admin did not choose for that project |
-| `GET` | `/projects/{slug}/insights/health?window=30d` | `VIEW_ROLES` | Cached digest; `404` + refresh hint |
-| `POST` | `/projects/{slug}/insights/health` | `["approver", "admin"]` | `{ window? }` → 202 on-demand run (no scheduler in v1) |
+| Method | Route                                               | Roles                   | Behavior                                                                                                                                                                                                                                                                                                                                                                               |
+| ------ | --------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/projects/{slug}/builds/{buildId}/insights/latest` | `VIEW_ROLES` (all four) | Cached triage; `404 never-generated` with creation hint; while a run exists the response carries `status` (`pending`/`running`/`failed`/`done`) and, on `failed`, a bounded error code                                                                                                                                                                                                 |
+| `GET`  | `/projects/{slug}/builds/{buildId}/insights`        | `VIEW_ROLES`            | Bounded history list (`?limit`)                                                                                                                                                                                                                                                                                                                                                        |
+| `POST` | `/projects/{slug}/builds/{buildId}/insights`        | `["approver", "admin"]` | `{ task?, force?, profile? }` → `inputHash` hit returns 200 unbilled (`force` bypasses the cache and is billed); else budget pre-check (429 + `Retry-After`) → 202 with `Location`. **`profile` is honoured for site admins only**; for everyone else the project's `ai_profile` is used, so an approver cannot route data to a profile the site admin did not choose for that project |
+| `GET`  | `/projects/{slug}/insights/health?window=30d`       | `VIEW_ROLES`            | Cached digest; `404` + refresh hint                                                                                                                                                                                                                                                                                                                                                    |
+| `POST` | `/projects/{slug}/insights/health`                  | `["approver", "admin"]` | `{ window? }` → 202 on-demand run (no scheduler in v1)                                                                                                                                                                                                                                                                                                                                 |
 
 Roles are **exact-match lists, not hierarchy** (`requireRole`/`assertRole` use `includes` — there is no "developer+"; regenerate uses the existing `APPROVER_ROLES` (approver + admin), per the ADR 0010 approver/developer split: regeneration spends shared budget and shapes review, so it sits with the merge-green-light role while developers read only; loosening later is one line). The router reuses the existing `VIEW_ROLES` constant (exported from `builds.handlers.ts`; no third copy) and `requireRole`/`assertRole` from `helpers.ts`. Session and Bearer paths share the existing `helpers.ts` resolution (legacy ownerless tokens ⇒ viewer: reads yes, regenerate 403; cross-project tokens ⇒ scoped 404; site admin bypass unchanged). Guard order: `ai` not configured ⇒ `501 ai-disabled`; `ai_profile IS NULL` ⇒ `409 ai-disabled-for-project`; role; budget; isolated in-memory rate-limit bucket (same pattern as the `auth:`/`engine:` buckets) as a coarse per-instance abuse guard only; the authoritative hourly/daily limits (`perProjectCallsPerHour`, `dailyTokens`) are **counted from the usage rows in the database**, so they hold across instances. Fallbacks are envelope fields (`profileRequested`/`profileEffective`/`warnings[]`, `visionSkipped`, `usage.estimated`), never prose.
 
@@ -122,26 +124,28 @@ Story names, play/a11y logs, comments and branch names are attacker-influenced a
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|-------------|--------------|
-| Bundle `@ai-sdk/*` in our deps | Version churn + key ownership in the wrong place; deployer-supplied instances remove both |
-| TanStack AI | Client-oriented, immature provider ecosystem for server structured-output + multimodal |
-| Raw `httpJson` to provider REST | Re-owns envelopes, tool-calling, multimodal parts, provider drift |
-| SDK in `core` | Violates domain-only barrel + no-cycle rule |
-| `insights` key / `insights_enabled` / `ai_allow_images` / JSON column | Subsumed: `ai` property, `ai_profile` tri-state, profiles-as-privacy-boundary, flat columns for three dialects |
-| `AiAdapter` in the adapter registry (`AdapterCategory "ai"`) | One instance, no interchangeable implementations; a singleton like `Auth` avoids registry/metadata/snapshot churn |
-| `createProfile`/`createProfiles` helpers | Unjustified surface; generics + in-factory validation cover it (same lesson as the auth-adapter collapse) |
-| Per-profile budgets / per-project model picks | Chargeback without billing; enforce globally, observe per-profile, refine on dashboard evidence |
-| Auto-approve from verdicts | Breaks human-gate invariant (ADR 0010 roles, ADR 0017 no-waive) |
+| Alternative                                                           | Why rejected                                                                                                      |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Bundle `@ai-sdk/*` in our deps                                        | Version churn + key ownership in the wrong place; deployer-supplied instances remove both                         |
+| TanStack AI                                                           | Client-oriented, immature provider ecosystem for server structured-output + multimodal                            |
+| Raw `httpJson` to provider REST                                       | Re-owns envelopes, tool-calling, multimodal parts, provider drift                                                 |
+| SDK in `core`                                                         | Violates domain-only barrel + no-cycle rule                                                                       |
+| `insights` key / `insights_enabled` / `ai_allow_images` / JSON column | Subsumed: `ai` property, `ai_profile` tri-state, profiles-as-privacy-boundary, flat columns for three dialects    |
+| `AiAdapter` in the adapter registry (`AdapterCategory "ai"`)          | One instance, no interchangeable implementations; a singleton like `Auth` avoids registry/metadata/snapshot churn |
+| `createProfile`/`createProfiles` helpers                              | Unjustified surface; generics + in-factory validation cover it (same lesson as the auth-adapter collapse)         |
+| Per-profile budgets / per-project model picks                         | Chargeback without billing; enforce globally, observe per-profile, refine on dashboard evidence                   |
+| Auto-approve from verdicts                                            | Breaks human-gate invariant (ADR 0010 roles, ADR 0017 no-waive)                                                   |
 
 ## Consequences
 
 **Positive:**
+
 - Smallest valid deployment is one line (`profiles: { default: { defaultModel } }`); every refinement (vision model, second profile, caps) is additive, never a rewrite; misconfiguration fails at compile time where types reach, at creation otherwise, and degrades with markers at runtime — never silently.
 - Self-hosted differentiator preserved: local default, data stays in VPC, unlimited agent iteration with no per-snapshot tax.
 - Feature #2+ (summaries, fix suggestions) adds consumers and task keys only — no contract, schema, or package changes.
 
 **Negative:**
+
 - New runtime deps (`ai` core, `@ai-sdk/otel`) to track for npm/JSR publish (LICENSE/README/deno.json checklist).
 - Peer-major alignment between our pinned `ai` core and user-installed `@ai-sdk/*` must be documented; the startup check compares `specificationVersion` (§3).
 - `insights` table joins retention/purge surface (build-linked rows with builds, health rows by time).
