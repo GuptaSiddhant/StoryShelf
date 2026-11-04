@@ -11,11 +11,22 @@ function resolveSecret(secret?: string): string {
   return secret ?? FALLBACK_SECRET;
 }
 
+/** First part of a token. It names the format and carries nothing of the session (see below). */
+const TOKEN_TAG = "csrf";
+
+/**
+ * `csrf:<timestamp>:<signature>`. The session id is signed but never put in the token: the token is
+ * rendered into pages (meta tag, hidden fields) that scripts can read, and the id is the raw value
+ * of the HttpOnly session cookie. `verifyToken` recomputes the signature from the request's own
+ * session, and reads only the last two parts, so tokens issued before this format still verify.
+ */
 function generateToken(secret: string, sessionId: string): string {
   const timestamp = Date.now().toString(36);
-  const payload = `${sessionId}:${timestamp}`;
-  const signature = createHash("sha256").update(`${secret}:${payload}`).digest("hex").slice(0, 16);
-  return `${payload}:${signature}`;
+  const signature = createHash("sha256")
+    .update(`${secret}:${sessionId}:${timestamp}`)
+    .digest("hex")
+    .slice(0, 16);
+  return `${TOKEN_TAG}:${timestamp}:${signature}`;
 }
 
 function verifyToken(secret: string, token: string, sessionId: string): boolean {
