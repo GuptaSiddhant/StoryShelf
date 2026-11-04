@@ -34,6 +34,7 @@ function recordingProvider(kind: string, sent: unknown[]): NotifierProvider {
     version: "0.0.0",
     kind,
     category: "notifier" as const,
+    audience: (kind === "email" ? "person" : "room") as "person" | "room",
     schema: {} as never,
   };
   return {
@@ -179,6 +180,7 @@ describe("notifyProject", () => {
       version: "0.0.0",
       kind: "log",
       category: "notifier" as const,
+      audience: "room" as const,
       schema: {} as never,
     };
     const flaky: NotifierProvider = {
@@ -223,6 +225,35 @@ describe("notifyProject", () => {
     expect(git.calls).toHaveLength(0);
   });
 
+  it("delivers a project event over a subscription's personal kinds only", async () => {
+    const { db } = makeDatabase();
+    await seedProject(db);
+    await db.insert(db.tables.users, {
+      id: "u1",
+      email: "ada@example.com",
+      name: "Ada",
+      avatarUrl: null,
+      role: "member",
+      lastLoginAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      passwordHash: null,
+      displayNameOverride: null,
+      authProvider: "local",
+      disabled: false,
+    });
+    await new NotificationSubscriptionModel(db).upsert("p1", "u1", { via: ["email", "log"] });
+    const emailed: unknown[] = [];
+    const logged: unknown[] = [];
+    await runWithStore(
+      storeFor(db, [recordingProvider("log", logged), recordingProvider("email", emailed)]),
+      async () => {
+        await notifyProject({ id: "p1", slug: "test-project" }, "build:reviewing", {});
+      },
+    );
+    expect(emailed).toHaveLength(1);
+    expect(logged).toHaveLength(0);
+  });
+
   it("emails opted-in subscribers only when an email provider is wired", async () => {
     const { db } = makeDatabase();
     await seedProject(db);
@@ -264,6 +295,20 @@ describe("notifyProject", () => {
         "appr1@example.com",
         "appr2@example.com",
       ]);
+    });
+
+    it("sends no default review request through an email provider that is not declared personal", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const emailed: unknown[] = [];
+      const undeclared = recordingProvider("email", emailed);
+      const metadata = { ...undeclared.metadata } as Record<string, unknown>;
+      delete metadata["audience"];
+      const provider = { ...undeclared, metadata } as never as NotifierProvider;
+      await runWithStore(storeFor(db, [provider]), async () => {
+        await notifyProject({ id: "p1", slug: "test-project" }, "review:requested", {});
+      });
+      expect(emailed).toEqual([]);
     });
 
     it("lets a reviewer opt out by turning their subscription off or narrowing its topics", async () => {

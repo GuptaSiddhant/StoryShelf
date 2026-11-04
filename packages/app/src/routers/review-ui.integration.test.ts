@@ -82,22 +82,27 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const sent: string[] = [];
-  const metadata = {
-    name: "log",
-    version: "0.0.0",
-    kind: "log",
-    category: "notifier" as const,
-    schema: z.object({}).loose(),
-  };
-  const log: NotifierProvider = {
-    metadata,
-    create: () => ({
+  // The project's room (`log`) and a personal transport (`dm`, which a future direct-message
+  // provider would declare itself), both recording the subjects they are asked to send.
+  const providerOf = (kind: string, audience: "person" | "room"): NotifierProvider => {
+    const metadata = {
+      name: kind,
+      version: "0.0.0",
+      kind,
+      category: "notifier" as const,
+      audience,
+      schema: z.object({}).loose(),
+    };
+    return {
       metadata,
-      // oxlint-disable-next-line eslint/require-await -- send is async by contract
-      send: async (input: unknown) => {
-        sent.push((input as { formatted: { subject: string } }).formatted.subject);
-      },
-    }),
+      create: () => ({
+        metadata,
+        // oxlint-disable-next-line eslint/require-await -- send is async by contract
+        send: async (input: unknown) => {
+          sent.push((input as { formatted: { subject: string } }).formatted.subject);
+        },
+      }),
+    };
   };
   await db.insert(db.tables.projects, {
     id: "p1",
@@ -132,7 +137,7 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
     auth,
     ...(options.testing === true ? { testing: { runner: stubRunner() } } : {}),
     config: { secret: "s", scratchDir, publicBaseUrl: "https://shelf.example" },
-    notifications: { notifiers: [log] },
+    notifications: { notifiers: [providerOf("log", "room"), providerOf("dm", "person")] },
     logger: pino({ level: "silent" }),
   });
   await app.lifecycle.setup();
@@ -866,7 +871,7 @@ describe("review events", () => {
         const id = await publish(booted, "feature/x");
         await withChannel(booted);
         await new NotificationSubscriptionModel(booted.db).upsert("p1", "alice", {
-          via: ["log"],
+          via: ["dm"],
           events: ["comment:created"],
         });
         const seen = await deliveries(booted, []);
@@ -887,7 +892,7 @@ describe("review events", () => {
       it("highlights a self-mention but does not notify the author", async () => {
         const booted = await boot();
         const id = await publish(booted, "feature/x");
-        await new NotificationSubscriptionModel(booted.db).upsert("p1", "dev", { via: ["log"] });
+        await new NotificationSubscriptionModel(booted.db).upsert("p1", "dev", { via: ["dm"] });
         await postComment(booted, id, { body: "note to self @dev" });
         expect(await mentionsOf(booted, id)).toEqual([["dev"]]);
         await vi.waitFor(() => expect(events(booted)).toContain("comment:created"));

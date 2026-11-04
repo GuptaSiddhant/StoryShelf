@@ -18,6 +18,11 @@ const CHANNEL = {
 };
 
 describe("createEmailNotifier", () => {
+  it("declares that it addresses one person, so subscriptions may use it", () => {
+    const notifier = createEmailNotifier({ send: async () => {} } as never);
+    expect(notifier.metadata.audience).toBe("person");
+  });
+
   it("maps formatted output onto the shared transport", async () => {
     const sent: unknown[] = [];
     const provider = createEmailNotifier({
