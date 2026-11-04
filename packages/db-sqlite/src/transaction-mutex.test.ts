@@ -385,6 +385,31 @@ describe.each(drivers)("transact on %s", (_name, make) => {
     expect(await db.get(schema.siteSettings, "fine")).not.toBeNull();
   });
 
+  it("keeps a later setup out of an open transaction", async () => {
+    const db = await open(make());
+    const transact = await transactOf(db);
+    const opened = Promise.withResolvers<null>();
+    const release = Promise.withResolvers<null>();
+    const holder = transact(async (tx) => {
+      await tx.insert(schema.siteSettings, setting("a"));
+      opened.resolve(null);
+      await release.promise;
+      throw new Error("abort");
+    });
+    await opened.promise;
+    let setupDone = false;
+    const again = db.lifecycle?.setup({ config: {}, logger: silentLogger }).then(() => {
+      setupDone = true;
+    });
+    await settleTicks();
+    expect(setupDone).toBe(false);
+    release.resolve(null);
+    await expect(holder).rejects.toThrow("abort");
+    await again;
+    expect(setupDone).toBe(true);
+    expect(await db.get(schema.siteSettings, "a")).toBeNull();
+  });
+
   it("serves every plain method, health and teardown, one after another with transactions", async () => {
     const db = await open(make());
     const transact = await transactOf(db);
