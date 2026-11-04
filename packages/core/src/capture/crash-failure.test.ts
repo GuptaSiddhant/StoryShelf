@@ -261,13 +261,59 @@ describe("failCrashedCapture", () => {
     });
 
     it("leaves a newer run's attempt alone when the hook arrives after a retry", async () => {
-      const { w, crashed, openAttempts } = await lastShardCrashed();
+      const { w, crashed, attempts } = await lastShardCrashed();
       await w.builds.setStatus(w.build.id, "approved");
-      // A retry cleared the plan's rows; its new plan and attempt belong to the newer run.
-      await new CaptureShardModel(w.db).clearBuild(w.build.id);
+      // A retry replaced the plan: its rows were cleared and a new plan, with its own attempt, written.
+      const shards = new CaptureShardModel(w.db);
+      const newer = await attempts.startAttempt(w.project.id, w.build.id);
+      await shards.clearBuild(w.build.id);
+      await shards.createPlan(
+        w.project.id,
+        w.build.id,
+        { attemptId: newer.id, payload: "{}", result: "{}" },
+        [{ payload: "{}" }],
+      );
 
       expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
-      expect(await openAttempts()).toHaveLength(1);
+      const rows = await attempts.listByBuild(w.build.id);
+      expect(rows.find((row) => row.id === newer.id)?.status).toBe("queued");
+    });
+    it("closes only the old run's attempt when a retry replaces the plan mid-cleanup", async () => {
+      const { w, crashed, attempts } = await lastShardCrashed();
+      const shards = new CaptureShardModel(w.db);
+      const [older] = await attempts.listByBuild(w.build.id);
+      await w.builds.setStatus(w.build.id, "failed"); // an earlier pass already finalized the build
+      const original = CaptureShardModel.prototype.get;
+      let reads = 0;
+      // The retry lands right after the cleanup's third shard read: the guard in `failShard`, the
+      // one inside `fail`, then the check in `closeEndedAttempt` (before or after its plan read).
+      const get = vi.spyOn(CaptureShardModel.prototype, "get").mockImplementation(async function (
+        this: CaptureShardModel,
+        id: string,
+      ) {
+        const row = await original.call(this, id);
+        reads += 1;
+        if (reads === 3) {
+          const newer = await attempts.startAttempt(w.project.id, w.build.id);
+          await shards.clearBuild(w.build.id);
+          await shards.createPlan(
+            w.project.id,
+            w.build.id,
+            { attemptId: newer.id, payload: "{}", result: "{}" },
+            [{ payload: "{}" }],
+          );
+        }
+        return row;
+      });
+
+      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times");
+      get.mockRestore();
+
+      expect(outcome).toBe("finalized");
+      const rows = await attempts.listByBuild(w.build.id);
+      expect(rows.find((row) => row.id === older?.id)?.status).toBe("failed");
+      const newer = rows.find((row) => row.id !== older?.id);
+      expect(newer?.status).toBe("queued");
     });
   });
 

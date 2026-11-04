@@ -153,8 +153,10 @@ async function closeEndedAttempt(
   target: { buildId: string; shardId: string },
   error: string,
 ): Promise<CrashFailureOutcome> {
-  const plan = (await shards.get(target.shardId)) ? await shards.plan(target.buildId) : null;
-  if (!plan?.attemptId) {
+  // The plan first: a retry writes its new plan only after clearing the old rows, so a shard that
+  // is still there after this read belongs to the plan that was read.
+  const plan = await shards.plan(target.buildId);
+  if (!plan?.attemptId || !(await shards.get(target.shardId))) {
     return "skipped";
   }
   const attempts = new CaptureAttemptModel(deps.db, deps.tables);
