@@ -2,6 +2,7 @@ import type { StoryObj } from "@storybook/html-vite";
 import { Fragment } from "hono/jsx";
 import { HtmlEscapedCallbackPhase, resolveCallback } from "hono/utils/html";
 import { Style } from "../src/ui/css.ts";
+import { type PreviewState, previewState } from "./preview-state.ts";
 import { loadReviewClient } from "./review-client.ts";
 import { type StageState, stageState } from "./stage-state.ts";
 
@@ -75,6 +76,8 @@ export interface JsxStoryOptions {
   open?: boolean;
   /** Show a comparison stage in this mode, zoom or flip side (default: split, fit). */
   stage?: StageState;
+  /** Show a signed preview's notes in a state its script reaches (default: healthy). */
+  preview?: PreviewState;
   /**
    * Load the shell's own client script for this story only, so the comparison controls work. Every
    * other story stays a fixed state (and a capturable baseline).
@@ -96,9 +99,12 @@ export function jsxStory(factory: () => unknown, options: JsxStoryOptions = {}):
   const story: StoryObj = {
     loaders: [
       async () => ({
-        html: stageState(
-          finish(await withFrozenClock(async () => await renderJsx(factory()))),
-          options.stage,
+        html: previewState(
+          stageState(
+            finish(await withFrozenClock(async () => await renderJsx(factory()))),
+            options.stage,
+          ),
+          options.preview,
         ),
       }),
     ],

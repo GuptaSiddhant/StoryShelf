@@ -80,6 +80,26 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
     }
   });
 
+  it("keeps a stored run_a11y = false through another migration", async () => {
+    const offId = `a11y-off-${randomUUID()}`;
+    const now = new Date().toISOString();
+    await liveDb().insert(schema.projects, {
+      id: offId,
+      name: "A11y off",
+      slug: offId,
+      runA11y: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    try {
+      await liveDb().lifecycle?.setup({ config: {}, logger: silentLogger });
+      const project = (await liveDb().get(schema.projects, offId)) as Project | null;
+      expect(project?.runA11y).toBe(false);
+    } finally {
+      await liveDb().remove(schema.projects, offId);
+    }
+  });
+
   it.skipIf(process.env["MYSQL_SCHEMA_MUTATION_TEST"] !== "1")(
     "back-fills later columns on an existing schema",
     async () => {

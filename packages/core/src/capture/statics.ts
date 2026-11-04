@@ -4,7 +4,7 @@ import { join, relative, resolve } from "node:path";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { mapLimit } from "../utils/map-limit.ts";
-import { storybookDir, storybookZipPath } from "../utils/paths.ts";
+import { contentKey, storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { recordContentUses } from "./content-uses.ts";
 import { extractZipStream } from "./publish/extract.ts";
 import {
@@ -98,8 +98,8 @@ export async function persistStorybookStatics(
     const hash = createHash("sha256").update(buffer).digest("hex");
     manifest[rel] = hash;
     // Only write if not already exists (dedup)
-    if (!(await storage.exists(`content/${hash}`))) {
-      await storage.write(`content/${hash}`, buffer);
+    if (!(await storage.exists(contentKey(hash)))) {
+      await storage.write(contentKey(hash), buffer);
     }
     // Also write to legacy per-build path for backward compat (can be removed after migration)
     await storage.write(`${destinationPrefix}/${rel}`, buffer);

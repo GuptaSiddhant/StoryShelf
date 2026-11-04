@@ -33,7 +33,7 @@ export const gitHubNotifier: StateNotifierProvider = {
     const writer: StateWriter = {
       status: async (input) => {
         await (cfg.mode === "checks"
-          ? postCheckRun(await repo(), input)
+          ? postCheckRun({ ...(await repo()), appId: cfg.appId }, input)
           : postCommitStatus(await repo(), input));
       },
       comment: async (input) => await upsertPrComment(await repo(), { ...input, logger }),

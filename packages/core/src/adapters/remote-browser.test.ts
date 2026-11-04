@@ -251,6 +251,19 @@ describe("hasSchemeFor", () => {
 });
 
 describe("scrubConnection", () => {
+  it("removes the bare credential of a Bearer or Basic header, not only the whole header value", () => {
+    const connection = {
+      endpoint: "wss://farm.example/",
+      headers: { authorization: "Bearer sekret-token", "x-basic": "Basic dXNlcjpwYXNz" },
+    };
+    const scrubbed = scrubConnection(
+      "rejected sekret-token (and dXNlcjpwYXNz) for Bearer sekret-token",
+      connection,
+    );
+    expect(scrubbed).not.toContain("sekret-token");
+    expect(scrubbed).not.toContain("dXNlcjpwYXNz");
+  });
+
   const connection = {
     endpoint: "wss://user:pw-1234@farm.example/ws?caps=%7B%22key%22%3A%22abcd1234%22%7D&k=tok-5678",
     headers: { authorization: "Bearer hdr-token-9" },

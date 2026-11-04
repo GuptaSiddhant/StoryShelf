@@ -94,9 +94,27 @@ export function storybookDir(projectId: string, buildId: string): string {
   return `${projectId}/builds/${buildId}/storybook`;
 }
 
+/** The only shape of a content hash: the lowercase SHA-256 hex digest the CLI and the server compute. */
+export const CONTENT_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+
+/** Whether `hash` is a lowercase SHA-256 hex digest. */
+export function isContentHash(hash: string): boolean {
+  return CONTENT_HASH_PATTERN.test(hash);
+}
+
+/**
+ * Storage key of a shared published-Storybook blob. The one place that builds `content/…`: a hash
+ * from a client, a manifest or a row is checked here as well as at the API boundary, so a value like
+ * `../<project>/…` can never name another project's files. The value is not echoed in the error.
+ */
+export function contentKey(hash: string): string {
+  if (!isContentHash(hash)) throw new Error("Invalid content hash");
+  return `content/${hash}`;
+}
+
 /** Disposable gzip representation of a content-addressed published file. */
 export function publishedGzipPath(hash: string): string {
-  if (!/^[a-f0-9]{64}$/u.test(hash)) throw new Error("Invalid published content hash");
+  if (!isContentHash(hash)) throw new Error("Invalid published content hash");
   return `derived/published-gzip/${hash}.gz`;
 }
 

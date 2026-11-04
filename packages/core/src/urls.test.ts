@@ -80,7 +80,16 @@ describe("snapshot url", () => {
 
 describe("label and branch encoding", () => {
   const urls = createUrlBuilder("https://shelf.example.com");
-  const values = ["feat/new thing", "release/1.0#rc?x", "100%", "plain"];
+  const values = [
+    "feat/new thing",
+    "release/1.0#rc?x",
+    "100%",
+    "plain",
+    "ünï/日本",
+    "a%2Fb",
+    "a&b=c;d",
+    "quote\"s/and'apos",
+  ];
 
   it.each(values)("round-trips the label value %s through the path", (value) => {
     for (const url of [
@@ -98,6 +107,44 @@ describe("label and branch encoding", () => {
           .join("/"),
       ).toBe(value);
     }
+  });
+});
+
+describe("component, label key and snapshot encoding", () => {
+  const urls = createUrlBuilder("https://shelf.example.com/shelf/");
+  const paths = ["src/Button copy.stories.tsx", "src/100%/a#b?.tsx", "src/ünï/日本.tsx", "a%2Fb/c"];
+
+  it.each(paths)("round-trips the import path %s through the component page", (importPath) => {
+    const parsed = new URL(urls.component("app", importPath));
+    expect(parsed.search).toBe("");
+    expect(parsed.hash).toBe("");
+    const tail = parsed.pathname.split("/components/")[1] ?? "";
+    expect(tail.split("/").map((part) => decodeURIComponent(part))).toEqual(importPath.split("/"));
+  });
+
+  it("drops only a leading ./ from an import path, and keeps the path prefix of the origin", () => {
+    expect(urls.component("app", "./src/A.tsx")).toBe(
+      "https://shelf.example.com/shelf/projects/app/components/src/A.tsx",
+    );
+    expect(urls.component("app", "src/A.tsx")).toBe(urls.component("app", "./././src/A.tsx"));
+  });
+
+  it("encodes a label key as one segment, so a slash in it cannot add one", () => {
+    const parsed = new URL(urls.label("app", "team/area", "x"));
+    expect(parsed.pathname).toBe("/shelf/projects/app/labels/team%2Farea/x");
+    expect(new URL(urls.storybookLabel("app", "a#b", "x")).hash).toBe("");
+  });
+
+  it("encodes a double encoding once: %2F stays %252F, never a path separator", () => {
+    expect(urls.label("app", "k", "a%2Fb")).toBe(
+      "https://shelf.example.com/shelf/projects/app/labels/k/a%252Fb",
+    );
+  });
+
+  it.each(["a b&c=d#e", "100%", "ünï/日本", "x?y=1"])("reads snapshot id %s back", (id) => {
+    const parsed = new URL(urls.snapshot("app", "B1", id));
+    expect(parsed.searchParams.get("snapshot")).toBe(id);
+    expect([...parsed.searchParams.keys()]).toEqual(["snapshot"]);
   });
 });
 

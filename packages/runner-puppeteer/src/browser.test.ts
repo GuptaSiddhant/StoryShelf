@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { finishing, outcomeOf } from "./browser.ts";
+import { finishing, messageOf, outcomeOf } from "./browser.ts";
 
 describe("outcomeOf", () => {
   it("lets a cancel win over a failure, and a failure over a finish", () => {
@@ -21,5 +21,22 @@ describe("finishing", () => {
     const finish = vi.fn(async () => await Promise.resolve());
     await expect(finishing(async () => await Promise.resolve(7), finish)).resolves.toBe(7);
     expect(finish).toHaveBeenCalledWith(false, undefined);
+  });
+});
+
+describe("messageOf", () => {
+  it("gives an Error's message exactly", () => {
+    expect(messageOf(new Error("boom", { cause: new Error("inner") }))).toBe("boom");
+  });
+
+  it("says what a non-Error value says instead of [object Object]", () => {
+    expect(messageOf({ type: "error", error: new Error("ECONNREFUSED") })).toBe("ECONNREFUSED");
+    expect(messageOf("plain")).toBe("plain");
+    expect(messageOf(null)).toBe("unknown error");
+    expect(messageOf({})).toBe("unknown error");
+  });
+
+  it("redacts secrets in a value that is not an Error", () => {
+    expect(messageOf({ message: "refused, api_key=supersecret" })).not.toContain("supersecret");
   });
 });
