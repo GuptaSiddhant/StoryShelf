@@ -955,10 +955,11 @@ describe("sharded capture", () => {
       w.jobOptions,
     );
 
-    // Two stage marks (running, extracted), then one per screenshot taken and one per snapshot.
+    // Two stage marks (running, extracted), then one per screenshot taken and one per snapshot,
+    // and a last one before the build would be finalized.
     const captured = (await w.snapshots()).length;
     expect(captured).toBeGreaterThan(0);
-    expect(ticks).toBe(2 + captured * 2);
+    expect(ticks).toBe(3 + captured * 2);
   });
 
   it("cancels only its own render when a shard's render budget runs out", async () => {

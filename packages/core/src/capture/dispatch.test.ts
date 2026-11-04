@@ -290,6 +290,31 @@ describe("createDispatchJob attempt history", () => {
     expect(await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id)).toEqual([]);
   });
 
+  it("opens no attempt when the deadline passes while the first build state is being requested", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const { project, build } = await seedBuild(db);
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const controller = new AbortController();
+    const buildState = {
+      request: vi.fn(async () => {
+        await Promise.resolve();
+        controller.abort(new Error("job deadline exceeded"));
+      }),
+    };
+    const runJob = createDispatchJob({
+      ...depsFor(db, storage, fakeRunner(successRender())),
+      buildState,
+    });
+
+    await expect(
+      runJob({ buildId: build.id }, abortableLease({ touch: () => {} }, controller.signal)),
+    ).rejects.toBeInstanceOf(JobAbortedError);
+
+    expect(buildState.request).toHaveBeenCalledTimes(1);
+    expect(await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id)).toEqual([]);
+  });
+
   it("records a failed attempt with the full error text", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
@@ -445,6 +470,25 @@ describe("createDispatchJob sharding", () => {
     const rows = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
     expect(rows[0]?.status).toBe("failed");
     expect((await new BuildModel(db, tables(db)).get(build.id))?.status).toBe("failed");
+  });
+
+  it("stops an abandoned redelivery of a finished shard before it can finalize the build", async () => {
+    const { db, build, queued, runJob } = await planBuild(false);
+    await inOrder(queued.slice(0, -1), runJob);
+    const last = queued.at(-1) as { buildId: string; shard: string };
+    // An earlier run finished this shard but died before it reduced the build.
+    await db.update(db.tables.captureShards, last.shard, { status: "done", result: null });
+    const controller = new AbortController();
+    controller.abort(new Error("job deadline exceeded"));
+
+    await expect(
+      runJob(last, abortableLease({ touch: () => {} }, controller.signal)),
+    ).rejects.toBeInstanceOf(JobAbortedError);
+
+    expect((await new BuildModel(db, tables(db)).get(build.id))?.status).toBe("capturing");
+    // The same redelivery, not abandoned, finalizes the build.
+    await runJob(last);
+    expect((await new BuildModel(db, tables(db)).get(build.id))?.status).not.toBe("capturing");
   });
 
   it("touches the job lease while a shard renders and persists", async () => {

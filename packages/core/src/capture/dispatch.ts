@@ -46,16 +46,7 @@ async function runBuildJob(
   if (!target) {
     return;
   }
-  // The target load may have outlived the attempt: announce nothing for an abandoned run.
-  lease?.check?.();
-  await deps.buildState.request(job.buildId);
-  const { attempt, recordLog } = await beginAttempt(
-    deps,
-    target.project,
-    target.build,
-    job.reqId,
-    lease,
-  );
+  const { attempt, recordLog } = await announceAndBegin(deps, target, job, lease);
   const ctx: JobContext = {
     deps,
     build: target.build,
@@ -68,6 +59,23 @@ async function runBuildJob(
     return;
   }
   await runAndReport(ctx, job);
+}
+
+/**
+ * Show the build as pending, then open the run's attempt. The lease is checked after the target
+ * load and again after the request: either may have outlived the attempt, and an abandoned run
+ * must announce nothing and open no attempt row next to the redelivery's.
+ */
+async function announceAndBegin(
+  deps: DispatchDeps,
+  target: { build: Build; project: Project },
+  job: CaptureDispatchJob,
+  lease?: JobLease,
+): Promise<{ attempt: CaptureAttempt; recordLog: AttemptLogRecorder }> {
+  lease?.check?.();
+  await deps.buildState.request(job.buildId);
+  lease?.check?.();
+  return await beginAttempt(deps, target.project, target.build, job.reqId, lease);
 }
 
 /** Table handles required by dispatch. */
