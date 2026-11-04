@@ -79,6 +79,9 @@ function usesUrlsAtRuntime(source: string): boolean {
   return RUNTIME_URLS_REFERENCES.some((pattern) => pattern.test(source));
 }
 
+/** A JSX `style` attribute in any spelling: `style="..."`, `style='...'`, `style={...}`, with spaces. */
+const INLINE_STYLE = /\bstyle\s*=\s*["'{`]/gu;
+
 function countMatches(source: string, pattern: RegExp): number {
   return source.match(pattern)?.length ?? 0;
 }
@@ -177,11 +180,25 @@ describe("ui-building-blocks contract", () => {
     expect(over).toEqual([]);
   });
 
+  it("recognises every spelling of a JSX inline style", () => {
+    const spellings = [
+      '<i style="width:1px" />',
+      "<i style='width:1px' />",
+      "<i style={{ a: 1 }} />",
+    ];
+    const spaced = ['<i style = "width:1px" />', "<i style\n={`width:1px`} />"];
+    for (const source of [...spellings, ...spaced]) {
+      expect(countMatches(source, INLINE_STYLE), source).toBe(1);
+    }
+    // The word in prose, or as part of another name, is not a style attribute.
+    expect(countMatches("// the style rules; unstyled = {}; restyle={1}", INLINE_STYLE)).toBe(0);
+  });
+
   it("has no inline styles in src/ui/", async () => {
-    // `style="..."`, `style='...'` and `style={...}`; css.ts only mentions the word in prose.
+    // css.ts only mentions the word in prose.
     const over = (await uiSources())
       .filter(({ file }) => file !== "consistency.test.ts")
-      .map(({ file, source }) => ({ file, count: countMatches(source, /\bstyle=["'{]/gu) }))
+      .map(({ file, source }) => ({ file, count: countMatches(source, INLINE_STYLE) }))
       .filter(({ count }) => count > 0);
     expect(over).toEqual([]);
   });

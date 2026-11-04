@@ -18,16 +18,27 @@ async function render(value: number, max: number): Promise<string> {
   return await (await app.request("/")).text();
 }
 
+/** The width declared by the rule of the class the fill `<span>` carries, not by any rule in the sheet. */
+function fillWidth(html: string): string | undefined {
+  // A generated class name is `ss-<label>-<hash>`: letters, digits and hyphens only.
+  const fillClass = /<span class="([\w-]+)"/u.exec(html)?.[1];
+  if (!fillClass) return undefined;
+  const declarations = new RegExp(String.raw`\.${fillClass}\s*\{([^}]*)\}`, "u").exec(html)?.[1];
+  return /width:\s*(\d+%)/u.exec(declarations ?? "")?.[1];
+}
+
 describe("Progress", () => {
   it("sets the fill width through a class, never an inline style", async () => {
     const html = await render(18, 40);
     expect(html).not.toContain("style=");
-    expect(html).toMatch(/width:\s*45%/u);
+    expect(fillWidth(html)).toBe("45%");
     expect(html).toContain('aria-valuenow="18"');
   });
 
   it("clamps the fill to 0 to 100 percent", async () => {
-    expect(await render(5, 0)).toMatch(/width:\s*0%/u);
-    expect(await render(99, 40)).toMatch(/width:\s*100%/u);
+    expect(fillWidth(await render(5, 0))).toBe("0%");
+    expect(fillWidth(await render(0, 40))).toBe("0%");
+    expect(fillWidth(await render(40, 40))).toBe("100%");
+    expect(fillWidth(await render(99, 40))).toBe("100%");
   });
 });
