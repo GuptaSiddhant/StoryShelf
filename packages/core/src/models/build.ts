@@ -173,6 +173,23 @@ export class BuildModel {
   }
 
   /**
+   * The newest build on `branch` whose outcome reached the baselines, other than one of commit
+   * `excludeSha`: the comparison point of affected capture, which inherits every story it does not
+   * render from the baselines. Only an `approved` build counts today; a build still being reviewed,
+   * cancelled, failed or rejected is passed over, because its changes were never accepted and
+   * inheriting past it would show them as unchanged. A planned `skipped` build (resolved to its
+   * source) joins this rule here, so affected capture and skipping cannot drift apart.
+   */
+  async newestComparableBuild(
+    projectId: string,
+    branch: string,
+    excludeSha: string,
+  ): Promise<Build | null> {
+    const approved = await this.list(projectId, { branch, status: "approved" });
+    return approved.find((build) => build.gitSha !== excludeSha) ?? null;
+  }
+
+  /**
    * Patch a build. A `cancelled` build is terminal (ADR 0006): a patch that carries another status
    * is refused, the row is returned as it is, so a capture that ends after a cancel cannot move
    * the build. Only {@link BuildModel.resetStatus} leaves `cancelled`.

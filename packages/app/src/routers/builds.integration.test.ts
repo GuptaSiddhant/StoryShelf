@@ -330,11 +330,54 @@ describe("affected capture", () => {
     expect(created.testing).toBe(true);
   });
 
-  it("returns the prior revision as baseline for the next build", async () => {
-    const { app } = await setupApp();
-    await createAffectedBuild(app, "sha-1");
+  it("returns the prior approved revision as baseline for the next build", async () => {
+    const { app, db } = await setupApp();
+    const first = await createAffectedBuild(app, "sha-1");
+    await new BuildModel(db).update(first.build.id, { status: "approved" });
     const second = await createAffectedBuild(app, "sha-2");
     expect(second.baselineSha).toBe("sha-1");
+  });
+
+  /** Create a build on `main` that ends in `status`, created at a fixed, increasing time. */
+  async function earlier(
+    ctx: Awaited<ReturnType<typeof setupApp>>,
+    gitSha: string,
+    status: Build["status"],
+    day: number,
+  ): Promise<void> {
+    const created = await createAffectedBuild(ctx.app, gitSha);
+    const stamp = `2026-02-0${String(day)}T00:00:00.000Z`;
+    await ctx.db.update(ctx.db.tables.builds, created.build.id, { createdAt: stamp });
+    await new BuildModel(ctx.db).update(created.build.id, { status });
+  }
+
+  describe("the baseline is a build whose outcome reached the baselines (#757)", () => {
+    it.each(["reviewing", "cancelled", "failed", "rejected", "pending", "capturing"] as const)(
+      "passes over a %s build for the newest approved one before it",
+      async (status) => {
+        const ctx = await setupApp();
+        await earlier(ctx, "sha-approved", "approved", 1);
+        await earlier(ctx, "sha-other", status, 2);
+        expect((await createAffectedBuild(ctx.app, "sha-next")).baselineSha).toBe("sha-approved");
+      },
+    );
+
+    it.each(["reviewing", "cancelled", "failed", "rejected"] as const)(
+      "falls back to a full capture when the only earlier build is %s",
+      async (status) => {
+        const ctx = await setupApp();
+        await earlier(ctx, "sha-other", status, 1);
+        expect((await createAffectedBuild(ctx.app, "sha-next")).baselineSha).toBeNull();
+      },
+    );
+
+    it("uses the newest approved build, and never the build's own sha", async () => {
+      const ctx = await setupApp();
+      await earlier(ctx, "sha-old", "approved", 1);
+      await earlier(ctx, "sha-new", "approved", 2);
+      await earlier(ctx, "sha-next", "approved", 3);
+      expect((await createAffectedBuild(ctx.app, "sha-next")).baselineSha).toBe("sha-new");
+    });
   });
 
   it("records the affected computation for capture", async () => {
