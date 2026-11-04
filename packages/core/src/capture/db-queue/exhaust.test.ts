@@ -12,8 +12,12 @@ import { createWakeSignal } from "./wake.ts";
 
 type Hook = NonNullable<QueueRuntime["onExhausted"]>;
 
-function runtime(): { rt: QueueRuntime; clock: { now: number } } {
+function runtime(options: { transactions?: boolean } = {}): {
+  rt: QueueRuntime;
+  clock: { now: number };
+} {
   const { db } = makeDatabase();
+  if (options.transactions === false) delete db.transact;
   const clock = { now: Date.parse("2026-01-01T00:00:00.000Z") };
   const rt: QueueRuntime = {
     model: new CaptureJobModel(db),
@@ -443,6 +447,24 @@ describe("exhausted single-flight jobs", () => {
     expect(await rt.model.get("j1")).toMatchObject({ status: "failed", activeKey: null });
     expect(await rt.model.nextCandidate(["capture"], iso(clock.now))).toBeNull();
   });
+
+  it.each([true, false])(
+    "hands an exhausting job's request one successor and wakes the poller (transactions: %s)",
+    async (transactions) => {
+      const { rt, clock } = runtime({ transactions });
+      rt.onExhausted = vi.fn<Hook>(async () => {});
+      const notify = vi.spyOn(rt.wake, "notify");
+      await startKeyed(rt, clock);
+      await rt.model.requestRerun("j1", iso(clock.now));
+      clock.now += 1001;
+      await claimNext(rt);
+      const successors = (await rt.model.listForBuild("b1")).filter((row) => row.jobId !== "j1");
+      expect(await rt.model.get("j1")).toMatchObject({ status: "failed", activeKey: null });
+      expect(successors).toHaveLength(1);
+      expect(successors[0]).toMatchObject({ activeKey: "capture:b1" });
+      expect(notify).toHaveBeenCalled();
+    },
+  );
 
   it("without a hook, fails the job and gives a waiting request its successor", async () => {
     const { rt, clock } = runtime();

@@ -105,6 +105,7 @@ describe("a single-flight job ends and hands its key over in one transaction", (
 
     expect(ended).toEqual({ applied: true, successor: null });
     expect(await others(rt)).toEqual([]);
+    expect((await rt.model.get("j1"))?.rerunRequestedAt).toBeTruthy();
   });
 
   it("rolls the end back when the successor cannot be inserted, so the request is not lost", async () => {
