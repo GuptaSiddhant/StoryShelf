@@ -3,8 +3,8 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import { Alert } from "../ui/components.tsx";
 
 const WHY: Record<RetentionPause["problem"], string> = {
-  tombstoned: "is being deleted",
-  "other-project": "belongs to another project",
+  tombstoned: "which is being deleted",
+  "other-project": "which belongs to another project",
 };
 
 /**
@@ -17,9 +17,10 @@ export function RetentionPausedNotice(props: {
   const { pause } = props;
   return pause ? (
     <Alert tone="warning" title="Retention is paused">
-      Retention is paused: baseline <code>{pause.baselineId}</code> has an invalid source build{" "}
-      <code>{pause.buildId}</code> (it {WHY[pause.problem]}). No build is purged meanwhile. Remove
-      or repoint that baseline, then restart the server; retention turns on at the next boot.
+      Baseline <code>{pause.baselineId}</code> points at build <code>{pause.buildId}</code>,{" "}
+      {WHY[pause.problem]}, so StoryShelf cannot tell which builds are safe to purge. No build is
+      purged until you remove or repoint that baseline and restart the server; retention then turns
+      on at the next boot.
     </Alert>
   ) : null;
 }

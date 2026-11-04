@@ -19,6 +19,7 @@ import {
   SectionTitle,
   Stat,
   Table,
+  VStack,
 } from "../ui/components.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
@@ -57,12 +58,19 @@ export interface AdminSystemData {
 /** What the deployment has paused and why: notifications (no public URL) and build retention. */
 function PausedNotices(props: {
   data: AdminSystemData;
-}): HtmlEscapedString | Promise<HtmlEscapedString> {
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { notificationsPaused, retentionPause } = props.data;
+  if (!notificationsPaused && !retentionPause) {
+    return null;
+  }
+  // A stack keeps the alerts apart; the margin keeps the last one off the card below.
   return (
-    <>
-      <NotificationsPausedNotice paused={props.data.notificationsPaused} />
-      <RetentionPausedNotice pause={props.data.retentionPause} />
-    </>
+    <div class="mb-1">
+      <VStack>
+        <NotificationsPausedNotice paused={notificationsPaused} />
+        <RetentionPausedNotice pause={retentionPause} />
+      </VStack>
+    </div>
   );
 }
 

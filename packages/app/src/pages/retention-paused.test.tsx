@@ -20,12 +20,15 @@ describe("RetentionPausedNotice", () => {
     expect(html).toContain("Retention is paused");
     expect(html).toContain("<code>B1</code>");
     expect(html).toContain("<code>S1</code>");
-    expect(html).toContain("is being deleted");
+    expect(html).toContain("which is being deleted");
     expect(html).toContain("restart");
+    // The title is not repeated in the body, and the body leads with the cause.
+    expect(html.match(/Retention is paused/gu)).toHaveLength(1);
+    expect(html).toContain("cannot tell which builds are safe to purge");
   });
 
   it("explains a source that belongs to another project", async () => {
     const html = await render({ baselineId: "B1", buildId: "S1", problem: "other-project" });
-    expect(html).toContain("belongs to another project");
+    expect(html).toContain("which belongs to another project");
   });
 });

@@ -77,3 +77,20 @@ export const RetentionPaused = pageStory(() =>
     }),
   ),
 );
+
+export const RetentionPausedOtherProject = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      retentionPause: { baselineId: "01JBASELINE", buildId: "01JSOURCE", problem: "other-project" },
+    }),
+  ),
+);
+
+export const RetentionAndNotificationsPaused = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      notificationsPaused: true,
+      retentionPause: { baselineId: "01JBASELINE", buildId: "01JSOURCE", problem: "tombstoned" },
+    }),
+  ),
+);
