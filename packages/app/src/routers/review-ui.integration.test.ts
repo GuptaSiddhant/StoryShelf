@@ -1,6 +1,7 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   BuildModel,
+  BuildReviewModel,
   CommentModel,
   MemberModel,
   NotificationSubscriptionModel,
@@ -264,6 +265,115 @@ describe("the review gate", () => {
     expect(html).not.toContain("Approve build");
     expect(html).not.toContain("Changes in this build");
     expect(html).not.toContain("Add build comment");
+    await booted.stop();
+  });
+
+  describe("on the form routes of a project with review off", () => {
+    const FORM_ROUTES = ["/builds/b1/reviews", "/builds/b1/comments"];
+    const formBody = new URLSearchParams({ verdict: "approved", body: "x" }).toString();
+    const formHeaders = { "content-type": "application/x-www-form-urlencoded" };
+
+    it("runs the CSRF check, sign-in and the role check before it says review is off", async () => {
+      const booted = await boot({ project: { reviewEnabled: false } });
+      const probe = async (path: string): Promise<void> => {
+        const url = `/projects/gate${path}`;
+        const post = async (headers: Record<string, string>) =>
+          await booted.app.request(url, {
+            method: "POST",
+            headers: { ...formHeaders, ...headers },
+            body: formBody,
+          });
+        const noSession = await post({});
+        expect(noSession.status, `no session or token ${path}`).toBe(403);
+        const anonymous = await post({ "x-csrf-token": getCsrfToken("s", "default") });
+        expect(anonymous.status, `anonymous ${path}`).toBe(302);
+        expect(anonymous.headers.get("location"), `anonymous ${path}`).toContain("/login");
+        const noToken = await post({ cookie: "storyshelf_session=alice" });
+        expect(noToken.status, `no CSRF token ${path}`).toBe(403);
+        const outsider = await post({
+          cookie: "storyshelf_session=outsider",
+          "x-csrf-token": getCsrfToken("s", "outsider"),
+        });
+        expect(outsider.status, `outsider ${path}`).toBe(403);
+        expect(await outsider.text()).not.toContain(REVIEW_DISABLED_MESSAGE);
+      };
+      await Promise.all(FORM_ROUTES.map(async (path) => await probe(path)));
+      await booted.stop();
+    });
+
+    it("answers a project member with the plain 404 and nothing about the project", async () => {
+      const booted = await boot({ project: { reviewEnabled: false } });
+      const id = await publish(booted, "feature/x");
+      const response = await booted.page("alice", `/builds/${id}/reviews`, {
+        method: "POST",
+        headers: formHeaders,
+        body: formBody,
+      });
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe(REVIEW_DISABLED_MESSAGE);
+      expect((await new BuildModel(booted.db).get(id))?.status).toBe("approved");
+      await booted.stop();
+    });
+
+    it("keeps the review switch form reachable, so an admin can turn review back on", async () => {
+      const booted = await boot({ project: { reviewEnabled: false } });
+      const blocked = await booted.page("alice", "/builds/b1/reviews", {
+        method: "POST",
+        headers: formHeaders,
+        body: formBody,
+      });
+      expect(blocked.status).toBe(404);
+      const saved = await booted.page(
+        "admin",
+        "/settings/review",
+        form({ reviewEnabled: "true", reviewApprovals: "1" }),
+      );
+      expect(saved.status).toBe(204);
+      const project = (await (await booted.api("admin", "")).json()) as { reviewEnabled: boolean };
+      expect(project.reviewEnabled).toBe(true);
+      await booted.stop();
+    });
+  });
+
+  it("answers the verdict form as it answers the JSON API: same refusals, same stored review", async () => {
+    const booted = await boot();
+    const viaForm = await publish(booted, "feature/form");
+    const viaApi = await publish(booted, "feature/api", BUTTON, "a".repeat(40));
+    const asForm = async (user: string, id: string, fields: Record<string, string>) =>
+      (await booted.page(user, `/builds/${id}/reviews`, form(fields))).status;
+    const asApi = async (user: string, id: string, body: Record<string, string>) =>
+      (
+        await booted.api(user, `/builds/${id}/reviews`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        })
+      ).status;
+    const builds = new BuildModel(booted.db);
+    const reviews = new BuildReviewModel(booted.db);
+    const untouched = async () =>
+      await Promise.all(
+        [viaForm, viaApi].map(async (id) => ({
+          status: (await builds.get(id))?.status,
+          reviews: await reviews.listByBuild(id),
+        })),
+      );
+    const before = await untouched();
+
+    // A developer may not give a verdict; an unknown verdict is a bad request. Both change nothing.
+    expect(await asForm("dev", viaForm, { verdict: "approved" })).toBe(403);
+    expect(await asApi("dev", viaApi, { verdict: "approved" })).toBe(403);
+    expect(await asForm("alice", viaForm, { verdict: "maybe" })).toBe(400);
+    expect(await asApi("alice", viaApi, { verdict: "maybe" })).toBe(400);
+    expect(await untouched()).toEqual(before);
+
+    expect(await asForm("alice", viaForm, { verdict: "approved", body: "ok" })).toBe(204);
+    expect(await asApi("alice", viaApi, { verdict: "approved", body: "ok" })).toBe(201);
+    for (const id of [viaForm, viaApi]) {
+      // eslint-disable-next-line no-await-in-loop -- two builds
+      expect((await builds.get(id))?.status).toBe("approved");
+      // eslint-disable-next-line no-await-in-loop -- two builds
+      expect(await reviews.listByBuild(id)).toMatchObject([{ verdict: "approved", body: "ok" }]);
+    }
     await booted.stop();
   });
 });

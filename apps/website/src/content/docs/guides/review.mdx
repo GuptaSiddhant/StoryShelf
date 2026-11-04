@@ -130,9 +130,9 @@ A build that failed or that a user cancelled (status `cancelled`, [Builds](/conc
 
 ### The changeset
 
-Without screenshots the build page says what changed from the Storybook catalog: for each component (a story file) the build's `build_components` hash is compared with the **baseline build**, the latest accepted build of the same branch before it, falling back to the latest accepted build of the default branch. The list shows components **added**, **removed** and **changed** (a changed hash means the component's stories differ: stories added, removed or renamed), the count of unchanged ones, and links to the published story and the component page. `GET /api/v1/projects/:slug/builds/:id/changeset` returns the same data as JSON.
+Without screenshots the build page says what changed from the Storybook catalog: for each component (a story file) the build's `build_components` hash is compared with the **baseline build**, the latest accepted build of the same branch before it, falling back to the latest accepted build of the default branch. The list shows components **added**, **removed** and **changed** (a changed hash means the **story-index metadata changed**: a story was added, removed or renamed, or its type or title changed), the count of unchanged ones, and links to the published story and the component page. `GET /api/v1/projects/:slug/builds/:id/changeset` returns the same data as JSON.
 
-This is a coarser signal than pixels and is shown as such: a changed hash means the definition changed, not that the story looks different. The index a Storybook publishes carries no story arguments or source, so a story whose arguments change but whose id, name and title do not is not listed. A first build with nothing accepted before it lists every component as added.
+This is a coarser signal than pixels and is shown as such: a changed hash means the story-index metadata changed, not that the story looks different. The index a Storybook publishes carries no story arguments or source, so a story whose arguments or source change alone, while its id, name, type, title and story file (`importPath`) stay the same, is not listed. Moving the story file changes its component, so the affected components are listed as added, removed or changed. A first build with nothing accepted before it lists every component as added.
 
 ### Story comments
 

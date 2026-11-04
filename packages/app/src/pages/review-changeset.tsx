@@ -34,7 +34,8 @@ export function ChangesetCard(props: { data: ReviewSectionData }): Rendered {
         {baseline
           ? `Compared with the accepted build ${baseline.gitSha.slice(0, 7)} on ${baseline.gitBranch}.`
           : "No accepted build to compare with: every component counts as new."}{" "}
-        A changed component has different stories, not necessarily a different look.
+        A changed component has different story-index metadata (stories added, removed or renamed),
+        not necessarily a different look. Changes to args or source alone do not show here.
       </Meta>
       {total === 0 ? (
         <EmptyState
