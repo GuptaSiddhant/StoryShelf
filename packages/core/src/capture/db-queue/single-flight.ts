@@ -5,10 +5,12 @@
  * A request for a key that is already held is never lost and never doubled:
  *
  * - the holder is `queued`: it reads the current state when it runs, so the request is covered;
- * - the holder is `running`: it may have read the state before this change, so a marker is set on
- *   it, and when it ends a successor job runs one more pass;
+ * - the holder is `running` (or `exhausting`, its lease lost and its hook running): it may have
+ *   read the state before this change, so a marker is set on it, and when it ends a successor job
+ *   runs one more pass;
  * - the holder ended meanwhile: the key is free, so the request becomes a job of its own.
  */
+import { isTerminalJob } from "../../models/capture-job.ts";
 import type { CaptureJobRow, CaptureJobStatus } from "../../schema/capture-job.ts";
 import { ulid } from "../../utils/ulid.ts";
 import { isoAt } from "./clock.ts";
@@ -61,7 +63,7 @@ async function insertKeyed(rt: QueueRuntime, job: KeyedJob): Promise<string> {
   throw new Error(`could not enqueue a job for ${job.activeKey}: its holder kept ending`);
 }
 
-/** Whether the holder of the key will see the request; marks a running holder for one more pass. */
+/** Whether the holder of the key will see the request; marks an unfinished holder for one more pass. */
 async function covered(rt: QueueRuntime, holder: CaptureJobRow): Promise<boolean> {
   if (holder.status === "queued") {
     rt.logger?.debug(
@@ -71,7 +73,7 @@ async function covered(rt: QueueRuntime, holder: CaptureJobRow): Promise<boolean
     return true;
   }
   const now = await rt.model.requestRerun(holder.jobId, isoAt(rt));
-  const open = now !== null && (now.status === "running" || now.status === "queued");
+  const open = now !== null && !isTerminalJob(now);
   if (open) {
     rt.logger?.debug({ jobId: holder.jobId, kind: holder.kind }, "rerun requested on running job");
   }
@@ -83,6 +85,11 @@ async function covered(rt: QueueRuntime, holder: CaptureJobRow): Promise<boolean
  * job takes the key at once, so the state change that came in during the pass still gets one. A
  * cancelled job asks for no successor: that is the end the user chose.
  *
+ * With transactions the end and the handover are one commit (see `CaptureJobModel.endJob`), so
+ * a crash cannot lose the request. Without them the job ends first and the successor is started in
+ * a second step ({@link startSuccessor}); a crash between the two loses the request, and that gap
+ * is the price of a database with no transactions.
+ *
  * `row` is the job row as read before the write; the key is gone from the row once it ends.
  */
 export async function finishJob(
@@ -91,9 +98,24 @@ export async function finishJob(
   status: Extract<CaptureJobStatus, "done" | "failed">,
   error: string | null = null,
 ): Promise<void> {
-  await rt.model.finishJob(row.jobId, status, isoAt(rt), error);
-  await startSuccessor(rt, row);
+  const ended = await rt.model.endJob(row.jobId, { status, error }, isoAt(rt));
+  if (ended === null) {
+    await rt.model.finishJob(row.jobId, status, isoAt(rt), error);
+    await startSuccessor(rt, row);
+  } else {
+    announceSuccessor(rt, ended.successor);
+  }
   await notifyEnded(rt, row);
+}
+
+/** A successor queued inside the end's transaction: say so and wake the poll. */
+export function announceSuccessor(rt: QueueRuntime, successor: CaptureJobRow | null): void {
+  if (successor === null) return;
+  rt.logger?.info(
+    { jobId: successor.jobId, kind: successor.kind, buildId: successor.buildId },
+    "job queued",
+  );
+  rt.wake.notify();
 }
 
 /** Tell the host a job ended (`onEnded`); its failure is logged and goes no further. */
