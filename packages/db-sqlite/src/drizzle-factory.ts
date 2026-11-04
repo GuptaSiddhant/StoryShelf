@@ -55,7 +55,7 @@ const PLAIN_METHODS = ["insert", "update", "updateWhere", "get", "remove", "list
  * (and is never rolled back with one), and an error at once from inside a callback, where it
  * should have used `tx`. `health` takes a statement turn and `teardown` waits its turn, then closes.
  */
-export function isolatePlainStatements(
+function isolatePlainStatements(
   adapter: DatabaseAdapter,
   mutex: TransactionMutex,
 ): DatabaseAdapter {

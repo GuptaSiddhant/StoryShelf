@@ -410,6 +410,38 @@ describe.each(drivers)("transact on %s", (_name, make) => {
     expect(await db.get(schema.siteSettings, "a")).toBeNull();
   });
 
+  it("keeps health and teardown behind an open transaction, which can still use its connection", async () => {
+    const db = await open(make());
+    const transact = await transactOf(db);
+    const opened = Promise.withResolvers<null>();
+    const release = Promise.withResolvers<null>();
+    const done: string[] = [];
+    const holder = transact(async (tx) => {
+      await tx.insert(schema.siteSettings, setting("a"));
+      opened.resolve(null);
+      await release.promise;
+      // The connection is still open: neither lifecycle call ran, closed it or reset it.
+      expect(await tx.get(schema.siteSettings, "a")).not.toBeNull();
+    });
+    await opened.promise;
+    const health = db.lifecycle?.health().then((result) => {
+      done.push("health");
+      return result;
+    });
+    const teardown = db.lifecycle?.teardown().then(() => {
+      done.push("teardown");
+    });
+    await settleTicks();
+    expect(done).toEqual([]);
+
+    release.resolve(null);
+    await holder;
+    expect(await health).toEqual({ ok: true });
+    await teardown;
+    expect(done).toEqual(["health", "teardown"]);
+    expect(await db.lifecycle?.health()).toMatchObject({ ok: false });
+  });
+
   it("serves every plain method, health and teardown, one after another with transactions", async () => {
     const db = await open(make());
     const transact = await transactOf(db);
