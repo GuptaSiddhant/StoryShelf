@@ -16,7 +16,7 @@ function pageWith(preview?: Preview) {
 const ENTRIES = { "a--b": { parameters: { storyshelf: { delay: 5 } } } };
 
 afterEach(() => {
-  vi.useRealTimers();
+  vi.restoreAllMocks();
   Reflect.deleteProperty(globalThis, "__STORYBOOK_PREVIEW__");
 });
 
@@ -51,7 +51,15 @@ describe("runtimeParametersForStory", () => {
   });
 
   it("gives up waiting after 15 s and extracts anyway, so the run reads no parameters", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // Hold the preview's 15 s timer instead of waiting for it, and fire it by hand.
+    const timers: { callback: () => void; delay: unknown }[] = [];
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+      callback: () => void,
+      delay: unknown,
+    ) => {
+      timers.push({ callback, delay });
+      return 0;
+    }) as never);
     let extractCalled = false;
     const preview: Preview = {
       ready: async () => await new Promise(() => {}),
@@ -63,7 +71,8 @@ describe("runtimeParametersForStory", () => {
     const state = createRuntimeParamsState();
     const pending = runtimeParametersForStory(state, pageWith(preview), "a--b");
     expect(extractCalled).toBe(false);
-    await vi.advanceTimersByTimeAsync(15_000);
+    expect(timers.map((timer) => timer.delay)).toEqual([15_000]);
+    timers[0]?.callback();
     expect(await pending).toBeUndefined();
     expect(extractCalled).toBe(true);
     expect(state.extractFailed).toBe(true);
