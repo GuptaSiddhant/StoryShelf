@@ -93,6 +93,15 @@ describe("content-addressed dedup", () => {
     recordContentUses.mockResolvedValueOnce(["abc"]);
     expect((await manifest()).status).toBe(409);
     expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(false);
+
+    // A blob collected between the client's check and the record: 409 as well, no manifest.
+    const gone = await app.request("/api/v1/projects/proj/builds/b1/manifest", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ files: [{ rel: "c.js", hash: "gone", size: 1 }] }),
+    });
+    expect(gone.status).toBe(409);
+    expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(false);
   });
 
   it("manifest stores and serving via manifest uses immutable cache for buildId", async () => {

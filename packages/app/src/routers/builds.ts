@@ -42,6 +42,7 @@ async function recordUses(
   try {
     await recordContentUses(
       getStore().db,
+      getStore().storage,
       { projectId, buildId },
       files.map((file) => file.hash),
     );

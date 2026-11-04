@@ -105,7 +105,7 @@ export async function persistStorybookStatics(
     await storage.write(`${destinationPrefix}/${rel}`, buffer);
   });
   // The uses are recorded once per hash, before the manifest that names them makes the build serve.
-  await recordContentUses(db, { projectId, buildId }, Object.values(manifest));
+  await recordContentUses(db, storage, { projectId, buildId }, Object.values(manifest));
   await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }
 

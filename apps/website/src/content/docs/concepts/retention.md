@@ -24,7 +24,7 @@ timeline
 | What                                                           | Retention key                                     | Survives?                                  |
 | -------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------ |
 | Build metadata, screenshots, diff overlays                     | `purgeTtlDays` (default 30)                       | No — deleted together in one transaction   |
-| Storybook `content/<hash>` (shared, one `content_uses` row per build) | 7-day grace after the last build releases it | Yes — shared, collected after grace unless a live build's manifest names it |
+| Storybook `content/<hash>` (shared, one `content_uses` row per build) | 7-day grace after the last build releases it | Yes — shared, collected after grace unless a live build's manifest names it (only where the database supports the build lifecycle; otherwise never collected) |
 | Branch baselines (`baselines/{branch}/**`)                     | `branchTtlDays` (default 30, `null` = disabled)   | Until branch GC                            |
 | Default-branch baselines (`baselines/main/**`)                 | Never                                             | Yes                                        |
 | Builds bearing `persistent` label (git tags → `v1.2.3`)        | Never                                             | Yes, and their snapshots as baselines      |
