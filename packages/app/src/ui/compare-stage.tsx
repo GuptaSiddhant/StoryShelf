@@ -35,6 +35,20 @@ const stageRoot = css`
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
+  .stage__pane:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /*
+   * Swipe and onion stack the panes in one cell, and the current pane is clipped (swipe) or faded
+   * (onion), which clips or fades its own outline away. The ring goes on the grid, which neither touches.
+   */
+  &[data-view="swipe"] .stage__grid:has(.stage__pane:focus-visible),
+  &[data-view="onion"] .stage__grid:has(.stage__pane:focus-visible) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
   .stage__label {
     position: sticky;
     top: 0;
@@ -220,9 +234,19 @@ interface PaneProps {
   meta?: string;
 }
 
+/**
+ * One image pane. It scrolls when the image is larger than the pane (zoomed in, or a tall screenshot),
+ * so with an image it takes keyboard focus and a name, and the arrow keys pan it.
+ */
 const Pane: FC<PaneProps> = ({ kind, label, src, alt, empty, meta }) => {
   return (
-    <div class="stage__pane" data-pane={kind}>
+    <div
+      class="stage__pane"
+      data-pane={kind}
+      tabindex={src ? 0 : undefined}
+      role={src ? "group" : undefined}
+      aria-label={src ? `${label} screenshot` : undefined}
+    >
       <div class="stage__label">
         <span>{label}</span>
         {meta ? <span>{meta}</span> : null}
