@@ -68,17 +68,18 @@ describe("OpenAPI spec", () => {
     expect(doc.paths["/api/v1/projects/{slug}/baselines/import"]).toHaveProperty("post");
   });
 
-  it("serves exactly the pinned OpenAPI document", async () => {
-    // Pins every key, value and key order, so moving schemas between modules cannot change what
-    // the API publishes. Whitespace is not compared: the file is kept in the repo's formatting.
+  it("serves exactly the pinned OpenAPI document, byte for byte", async () => {
+    // Pins every key, value and key order of what the API sends, so moving schemas between modules
+    // cannot change what it publishes. The file is kept in the repo's formatting (the commit hook
+    // requires it), so it is compared as the compact text the endpoint serves.
     // After a deliberate API change, regenerate it:
     //   nub ./scripts/generate-openapi.ts --out src/routers/openapi.snapshot.json && nub run fmt
     const pinned: unknown = JSON.parse(
       readFileSync(new URL("openapi.snapshot.json", import.meta.url), "utf8"),
     );
-    const spec: unknown = await (await app().request("/api/v1/openapi.json")).json();
-    expect(spec).toEqual(pinned);
-    expect(JSON.stringify(spec)).toBe(JSON.stringify(pinned));
+    const served = await (await app().request("/api/v1/openapi.json")).text();
+    expect(JSON.parse(served)).toEqual(pinned);
+    expect(served).toBe(JSON.stringify(pinned));
   });
 
   it("tags and summarises every operation so the API reference can group and label them", async () => {
