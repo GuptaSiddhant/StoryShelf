@@ -52,11 +52,21 @@ semantics.
 - A wall-clock bound: `testing.maxJobSeconds` (default 7200) applies to every kind. Past it
   `keepJobLease` stops renewing, the `AbortSignal` in the handler's context fires, the run is
   cancelled and the consumer's slot is freed; the job is not settled, so its lease runs out and the
-  normal exhausted or redelivery path takes over. A capture ends its build `failed`, never
-  `cancelled`, and its attempt log records `job deadline exceeded (<n>s)`. Publish stops at its next
-  progress report (after extraction and after persisting); storage adapters keep their SDK
-  timeouts. A phase that never reports is bounded only by the lease: work already running is
-  not interrupted. There is no per-phase knob.
+  normal exhausted or redelivery path takes over. A capture whose last attempt hit the bound ends
+  its build `failed` (through that path), never `cancelled`, and its attempt log records
+  `job deadline exceeded (<n>s)`. The abandoned invocation stops at its next checkpoint instead of
+  carrying on next to a redelivery that may already be running the same job: every attempt-log line
+  and progress report of a capture throws `JobAbortedError` (never swallowed or recorded as a story
+  failure), and a run that fails this way posts no status or build state of its own; publish checks
+  the signal before each file it extracts or persists, before recording content uses and before the
+  manifest, and leaves the shared scratch directory to the redelivery; a notify delivery checks it
+  before the status and comment are written and before its outcome is recorded. Checkpoints are
+  cooperative: a write or request already in flight is not recalled (an update already started
+  completes, and a capture whose abort lands during its last attempt-log append can still request
+  build state once), and storage and provider calls keep their SDK timeouts. Such a write or
+  request can complete after the lease expires and overlap a redelivery: an abort narrows that
+  window, it does not close it. A phase that never reports is bounded only by the lease. There is
+  no per-phase knob.
 - Its retry limit stated where the queue is built, not inferred from `testing.retries`.
 - Kinds that must be single-flight per key use `active_key` (a unique column, cleared in the write
   that ends the job), never a check before the insert. A request that arrives while the holder

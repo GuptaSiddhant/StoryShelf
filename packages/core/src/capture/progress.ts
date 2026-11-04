@@ -27,6 +27,7 @@ export function leaseProgress(
   }
   let last = Number.NEGATIVE_INFINITY;
   return () => {
+    lease.check?.();
     const at = now();
     if (at - last >= everyMs) {
       last = at;

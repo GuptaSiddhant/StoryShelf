@@ -135,9 +135,11 @@ export class NotificationChannelModel {
   /**
    * Record the outcome of a delivery attempt. A failure keeps the sanitized error with its time and
    * leaves `lastDeliveredAt` as it was; a success stamps `lastDeliveredAt` and clears the error.
+   * An aborted `signal` (the attempt's deadline passed) stops it before the write.
    */
-  async recordOutcome(id: string, error?: string): Promise<void> {
+  async recordOutcome(id: string, error?: string, signal?: AbortSignal): Promise<void> {
     const row = await this.get(id);
+    signal?.throwIfAborted();
     if (!row) {
       return;
     }
