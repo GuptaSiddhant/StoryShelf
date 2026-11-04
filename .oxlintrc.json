@@ -202,9 +202,7 @@
         "packages/app/src/routers/ui.ts",
         "packages/app/src/shell/document.tsx",
         "packages/app/src/ui/styles.ts",
-        "packages/app/src/capture-setup.ts",
-        "packages/cli/src/commands/server/docker.ts",
-        "packages/cli/src/commands/shared/detect-adapters.ts"
+        "packages/app/src/capture-setup.ts"
       ],
       "rules": {
         "max-lines-per-function": "allow",
