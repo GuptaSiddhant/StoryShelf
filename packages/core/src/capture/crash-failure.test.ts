@@ -249,6 +249,17 @@ describe("failCrashedCapture", () => {
       expect(await w.status()).toBe("failed");
       expect((await w.builds.get(w.build.id))?.updatedAt).toBe(finalizedAt);
       expect(reduceBuild).not.toHaveBeenCalled();
+
+      // The counts equal what an uninterrupted pass records for the same plan and shards.
+      const reference = await lastShardCrashed();
+      await failCrashedCapture(reference.w.deps, reference.crashed, "exited 3 times");
+      const [normal] = await reference.attempts.listByBuild(reference.w.build.id);
+      expect(normal?.storyCount).toBeGreaterThan(0);
+      expect(normal?.failedCount).toBeGreaterThan(0);
+      expect(closed).toMatchObject({
+        storyCount: normal?.storyCount,
+        failedCount: normal?.failedCount,
+      });
     });
 
     it("skips when the first pass closed everything", async () => {

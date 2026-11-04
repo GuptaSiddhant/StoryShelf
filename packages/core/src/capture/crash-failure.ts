@@ -8,9 +8,10 @@ import { CaptureAttemptModel } from "../models/capture-attempt.ts";
 import { CaptureShardModel } from "../models/capture-shard.ts";
 import { ProjectModel } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
+import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
 import type { DispatchDeps } from "./dispatch.ts";
-import { reduceBuild, type FinalSummary } from "./shards/reduce.ts";
+import { finalizedCounts, reduceBuild, type FinalSummary } from "./shards/reduce.ts";
 
 /** What {@link failCrashedCapture} did. */
 export type CrashFailureOutcome =
@@ -159,18 +160,33 @@ async function closeEndedAttempt(
   if (!plan?.attemptId || !(await shards.get(target.shardId))) {
     return "skipped";
   }
-  const attempts = new CaptureAttemptModel(deps.db, deps.tables);
-  const open = (await attempts.listByBuild(target.buildId)).find(
-    (attempt) =>
-      attempt.id === plan.attemptId &&
-      (attempt.status === "queued" || attempt.status === "running"),
-  );
+  const open = await openAttemptOf(deps, target.buildId, plan.attemptId);
   if (!open) {
     return "skipped"; // nothing was left to close: the first pass finished
   }
-  await attempts.markFinished(open.id, "failed", error);
+  // The counts the first pass would have recorded, rebuilt (not by reducing the ended build again).
+  const counts = await finalizedCounts(shards, target.buildId);
+  await new CaptureAttemptModel(deps.db, deps.tables).markFinished(
+    open.id,
+    "failed",
+    error,
+    counts,
+  );
   await deps.buildState.request(target.buildId);
   return "finalized";
+}
+
+/** The build's attempt `attemptId`, when it is still queued or running. */
+async function openAttemptOf(
+  deps: DispatchDeps,
+  buildId: string,
+  attemptId: string,
+): Promise<CaptureAttempt | undefined> {
+  const attempts = await new CaptureAttemptModel(deps.db, deps.tables).listByBuild(buildId);
+  return attempts.find(
+    (attempt) =>
+      attempt.id === attemptId && (attempt.status === "queued" || attempt.status === "running"),
+  );
 }
 
 /** The crashed shard was the last one: close the plan's attempt and report the build's end. */
