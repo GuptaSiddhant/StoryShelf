@@ -31,4 +31,4 @@ See `docs/testing.md`. Unit, adapter-contract, and integration tests run on ever
 
 ## Website, Docs & Examples
 
-See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts guides plus an auto-generated API reference from the Hono OpenAPI spec. `fixtures/storybook-8` is the deterministic capture fixture; `examples/fly-app` deploys StoryShelf to fly.io as a public demo.
+See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts guides plus an auto-generated API reference from the Hono OpenAPI spec. `fixtures/storybook-8` is the deterministic capture fixture; `apps/fly-app` deploys StoryShelf to fly.io as a public demo.

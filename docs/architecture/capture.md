@@ -4,7 +4,7 @@
 
 ## Capture Pipeline (Server-Side Render)
 
-The CLI does **not** run Playwright. It builds Storybook (or reuses an existing build), zips the static output, and uploads it. The server renders stories in its own pinned Playwright environment. This keeps rendering deterministic (server controls the browser version) without cloning the repository on the server.
+The CLI does **not** run Playwright. It builds Storybook (or reuses an existing build), zips the static output, and uploads it. The server renders stories in its own pinned Playwright environment (the local runner, `runner-playwright`; `runner-puppeteer` is an alternative runner, and a project can also render on remote browser targets, below). This keeps rendering deterministic (server controls the browser version) without cloning the repository on the server.
 
 ```
 CI machine / local dev                  StoryShelf server
@@ -31,7 +31,7 @@ Two-tier, both ungated by init: `GET /api/v1/health` is open liveness (`{ status
 
 ### Capture Renderer (pure adapter)
 
-Capture adapters are **pure renderers** (ADR 0004). They render screenshots from an already-extracted Storybook directory and return PNG buffers; they never touch the database, storage, or build status. A `CaptureRunner` implementation renders and returns:
+Capture adapters are **pure renderers** (ADR 0004). They render screenshots from an already-extracted Storybook directory and return PNG buffers; they never touch the database, storage, or build status. A `CaptureRunner` implementation renders and returns the following (abbreviated: the full interface is `CaptureRunner` in `core/src/adapters/capture-runner.ts`, and `render` also takes `shardIndex`, `executePlay`, `playTimeoutMs`, `runA11y`, `target`, `storybookUrl` and `adapter`; the runner also offers `targets` and the optional `extractParameters` and `runTests`; `RenderedSnapshot` also carries `viewport`, `browser`, `durationMs` and `a11y`):
 
 ```typescript
 interface RenderedSnapshot {

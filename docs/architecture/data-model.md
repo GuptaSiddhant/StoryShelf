@@ -4,7 +4,7 @@
 
 ## Entity Model
 
-All IDs are ULIDs. All timestamps are ISO-8601.
+Entity IDs are ULIDs, except attempt rows in `capture_jobs` (`<job_id>:<attempt>`; `attemptRowId` in `core/src/models/capture-job.ts`); `story_id` columns hold Storybook's own story id (`components-button--primary`), not a ULID. All timestamps are ISO-8601.
 
 ```sql
 projects (

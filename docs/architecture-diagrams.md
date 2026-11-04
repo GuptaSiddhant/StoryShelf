@@ -312,7 +312,7 @@ sequenceDiagram
     Orc->>Orc: scratchDir cleanup
 ```
 
-**Performance note:** v1 re-renders every story ([Deliberately Deferred (v2)](./archive/architecture-deferred-v2.md#deliberately-deferred-v2) deferred TurboSnap); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `STORYSHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`ShelfConfig.captureConcurrency`).
+**Performance note:** a build renders only the stories its diff affects and inherits the rest from their baselines where one exists (a story or viewport with no baseline renders; `affectedOnly`, default true, `splitStory` in `core/src/capture/affected.ts`; any uncertainty or `--full` renders everything, see [affected capture](./archive/architecture-deferred-v2.md#deliberately-deferred-v2)); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `STORYSHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`testing.concurrency`, `ShelfTestingOptions` in `core/src/config.ts`).
 
 ---
 
