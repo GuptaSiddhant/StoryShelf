@@ -73,6 +73,7 @@ const projects = defineTable("projects", {
   reviewEnabled: "review_enabled",
   reviewApprovals: "review_approvals",
   storybookUrlTtlSeconds: "storybook_url_ttl_seconds",
+  componentOwners: "component_owners",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

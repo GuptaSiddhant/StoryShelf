@@ -8,6 +8,7 @@ import {
   type BuildChangeset,
 } from "@storyshelf/core/models";
 import type { Build, Comment, Project } from "@storyshelf/core/schema";
+import { assignedReviewersOf, type AssignedReviewer } from "../review-assignment.ts";
 import { getStore } from "../store.ts";
 import { reviewStateOf, type ReviewState } from "./build-reviews.handlers.ts";
 import { isBuildAuthor } from "./comment-triage.ts";
@@ -34,6 +35,8 @@ export interface ReviewSectionData extends ReviewCapabilities {
   comments: Comment[];
   /** Display names of the users behind verdicts and comments, by user id. */
   names: ReadonlyMap<string, string>;
+  /** Members the project's component owners assign to this build (#465); empty when none match. */
+  assigned: AssignedReviewer[];
   /** Change requests of the build, on the build, a story or a snapshot (ADR 0013), newest first. */
   changeRequests: Comment[];
   /** Label of each snapshot a change request is anchored to ("Button / Primary"), by snapshot id. */
@@ -80,6 +83,11 @@ export async function loadReviewSection(
     reviewCapabilities(project),
     publishingOrPending(build),
   ]);
+  // A default-branch build is never put up for review, so nobody is assigned to it.
+  const assigned =
+    build.gitBranch === project.gitDefaultBranch
+      ? []
+      : await assignedReviewersOf(db, project, build, changeset.changeset).catch(() => []);
   const shown = comments.filter((comment) => comment.snapshotId === null);
   const changeRequests = comments
     .filter((comment) => comment.kind === "change_request")
@@ -93,8 +101,10 @@ export async function loadReviewSection(
     comments: shown,
     names: await namesOf([
       ...state.latest.map((review) => review.userId),
+      ...assigned.map((reviewer) => reviewer.userId),
       ...[...shown, ...changeRequests].flatMap((item) => [item.userId, item.resolvedBy]),
     ]),
+    assigned,
     changeRequests,
     snapshotLabels: await snapshotLabelsOf(changeRequests),
     canTriage: capabilities.canComment || isBuildAuthor(build),

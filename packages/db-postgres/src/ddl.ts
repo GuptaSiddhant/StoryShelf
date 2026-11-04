@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_enabled BOOLEAN NOT NULL DEFAULT true,
   review_approvals INTEGER NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INTEGER,
+  component_owners TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

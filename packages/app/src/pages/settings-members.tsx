@@ -1,3 +1,4 @@
+import { readOwnerRules } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -14,6 +15,7 @@ import {
   Table,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
+import { ComponentOwnersCard, type OwnersFormState } from "./settings-component-owners.tsx";
 
 /** Project member row as rendered in the members settings tab. */
 export interface SettingsMember {
@@ -30,7 +32,7 @@ export function renderSettingsMembers(
   members: SettingsMember[],
   groupMappings: ProjectGroupMapping[],
   isAdmin: boolean,
-  formState?: { globalError?: string },
+  formState?: { globalError?: string } & OwnersFormState,
 ): unknown {
   return (
     <div class="grid max-w-form">
@@ -123,6 +125,15 @@ export function renderSettingsMembers(
           </form>
         </Card>
       ) : null}
+
+      <div class="mt-1">
+        <ComponentOwnersCard
+          project={project}
+          rules={readOwnerRules(project.componentOwners)}
+          isAdmin={isAdmin}
+          formState={formState}
+        />
+      </div>
 
       <div class="mt-1">
         <Card>
