@@ -1,4 +1,4 @@
-// oxlint-disable no-console unicorn/no-process-exit no-await-in-loop
+// oxlint-disable no-console unicorn/no-process-exit no-await-in-loop max-statements no-undef unicorn/consistent-function-scoping no-promise-executor-return
 /**
  * Phone-width and accessibility sweep of the built docs site (`dist/`, run `nub run build` first).
  *
@@ -107,7 +107,11 @@ function measureOverflow() {
   const over = document.documentElement.scrollWidth - width;
   if (over <= 0) return { over: 0, culprits: [] };
   const clipped = (element) => {
-    for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+    for (
+      let node = element.parentElement;
+      node && node !== document.body;
+      node = node.parentElement
+    ) {
       if (getComputedStyle(node).overflowX !== "visible") return true;
     }
     return false;
@@ -164,7 +168,10 @@ async function audit(page, base, mode, path) {
 
 async function runMode(browser, base, mode, paths) {
   const context = await browser.newContext({ viewport: mode.viewport, reducedMotion: "reduce" });
-  await context.addInitScript((theme) => localStorage.setItem("starlight-theme", theme), mode.theme);
+  await context.addInitScript(
+    (theme) => localStorage.setItem("starlight-theme", theme),
+    mode.theme,
+  );
   const page = await context.newPage();
   const results = [];
   for (const path of paths) {
@@ -217,7 +224,9 @@ const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}`;
 const channel = process.env["A11Y_BROWSER_CHANNEL"];
 const browser = await chromium.launch(channel ? { channel } : {});
-const results = (await Promise.all(MODES.map((mode) => runMode(browser, base, mode, paths)))).flat();
+const results = (
+  await Promise.all(MODES.map((mode) => runMode(browser, base, mode, paths)))
+).flat();
 await browser.close();
 server.close();
 
@@ -227,7 +236,9 @@ for (const [key, group] of [...groups].toSorted((a, b) => b[1].where.size - a[1]
   const blocking = /^(serious|critical|SIDEWAYS|error)/u.test(key);
   if (blocking) failed += 1;
   const sample = [...group.where].slice(0, 2).join("; ");
-  console.log(`${blocking ? "FAIL" : "note"} ${key} [${group.detail}] x${group.where.size}: ${sample}`);
+  console.log(
+    `${blocking ? "FAIL" : "note"} ${key} [${group.detail}] x${group.where.size}: ${sample}`,
+  );
 }
 console.log(
   `${paths.length} pages x ${MODES.length} modes${ALL ? " (every page)" : ""}: ${failed} blocking finding(s), ${groups.size - failed} note(s)`,
