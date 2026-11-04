@@ -11,11 +11,17 @@ import { createShelfApp } from "../index.tsx";
 /** A rejected inline zip ends the build failed, so its git checks resolve instead of staying pending. */
 const SECRET = "test-secret";
 let scratchDir = "";
+/** Every app a test booted, torn down before the scratch dir goes so a failed assertion cannot leave a consumer running. */
+const apps: ReturnType<typeof createShelfApp>[] = [];
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-rejected-zip-"));
 });
 afterEach(async () => {
-  await rm(scratchDir, { recursive: true, force: true });
+  try {
+    await Promise.allSettled(apps.splice(0).map(async (app) => await app.lifecycle.teardown()));
+  } finally {
+    await rm(scratchDir, { recursive: true, force: true });
+  }
 });
 
 describe("a rejected inline zip", () => {
@@ -30,6 +36,7 @@ describe("a rejected inline zip", () => {
       notifications: { notifiers: [git.provider] },
       config: { secret: SECRET, scratchDir, publicBaseUrl: "https://shelf.example" },
     });
+    apps.push(app);
     const created = await app.request("/api/v1/projects", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -60,6 +67,5 @@ describe("a rejected inline zip", () => {
       const last = git.calls.at(-1);
       expect(last?.state).toBe("failure");
     });
-    await app.lifecycle.teardown();
   });
 });
