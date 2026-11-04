@@ -1,5 +1,5 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
-import type { Meta } from "@storybook/html-vite";
+import type { Meta, StoryObj } from "@storybook/html-vite";
 import { pageStory } from "../../.storybook/page.tsx";
 import type { RenderedContent } from "../shell/document.tsx";
 import { project } from "../stories-fixtures/dataset.ts";
@@ -126,3 +126,16 @@ export const EmailOff = pageStory(() =>
     isAdmin: true,
   }),
 );
+
+/** The Channels table on a 375px phone: the page must not scroll sideways, the table scrolls in its own region. */
+export const OnAPhone: StoryObj = {
+  ...pageStory(() =>
+    settingsPage({
+      notificationChannels: channels,
+      notifyProviders: providers,
+      mySubscription: subscribed,
+      isAdmin: true,
+    }),
+  ),
+  globals: { viewport: { value: "phone", isRotated: false } },
+};
