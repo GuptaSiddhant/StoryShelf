@@ -1,11 +1,15 @@
 import { Retention } from "@storyshelf/core/retention";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 import { stubRunner } from "../test-runner.ts";
 
 const NOW = "2025-01-01T00:00:00.000Z";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("safe retention capability", () => {
   it("refuses build purge in testing mode when atomic lifecycle support is unavailable", async () => {
@@ -122,7 +126,6 @@ describe("safe retention capability", () => {
       });
       expect(response.status).toBe(200);
       expect(branches.mock.calls.length > 0).toBe(removes);
-      vi.restoreAllMocks();
     },
   );
   it("keeps the existing purge path available in hosting-only mode", async () => {

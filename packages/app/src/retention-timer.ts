@@ -26,6 +26,8 @@ interface SweepContext {
   testing: boolean;
   /** Resolves with the adapter setup result; a sweep waits for it and runs only when it succeeded. */
   ready: () => Promise<{ ok: boolean }>;
+  /** Set by `stop()`: a sweep that was waiting for setup must not start after shutdown began. */
+  stopped: boolean;
   warned: boolean;
 }
 
@@ -68,9 +70,12 @@ export function startBranchGcTimer(
     purgeTtlDays: config.purgeTtlDays,
     testing,
     ready,
+    stopped: false,
     warned: false,
   };
-  return scheduleBranchGc(createSweepRunner(context), intervalMs);
+  return scheduleBranchGc(createSweepRunner(context), intervalMs, () => {
+    context.stopped = true;
+  });
 }
 
 // oxlint-disable-next-line typescript/promise-function-async
@@ -78,7 +83,7 @@ function createSweepRunner(context: SweepContext): () => Promise<void> {
   return async (): Promise<void> => {
     try {
       // The database is not usable, and its retention capability not known, until setup is done.
-      if (!(await context.ready()).ok) return;
+      if (!(await context.ready()).ok || context.stopped) return;
       await sweep(context);
     } catch (error) {
       context.logger.error({ err: error }, "retention sweep failed");
@@ -171,7 +176,11 @@ function warnNoCapability(context: SweepContext, ttlDays: number): void {
   );
 }
 
-function scheduleBranchGc(run: () => Promise<void>, intervalMs: number): BranchGcTimer {
+function scheduleBranchGc(
+  run: () => Promise<void>,
+  intervalMs: number,
+  onStop: () => void,
+): BranchGcTimer {
   const firstDelay = Math.min(3_600_000, intervalMs);
   // oxlint-disable-next-line typescript/no-misused-promises, typescript/strict-void-return -- run catches failures; returning it allows deterministic completion in tests
   const timeout = setTimeout(() => run(), firstDelay);
@@ -183,6 +192,7 @@ function scheduleBranchGc(run: () => Promise<void>, intervalMs: number): BranchG
 
   return {
     stop: () => {
+      onStop();
       clearTimeout(timeout);
       clearInterval(interval);
     },

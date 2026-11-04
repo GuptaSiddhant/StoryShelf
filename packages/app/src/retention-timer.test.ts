@@ -197,6 +197,21 @@ describe("background retention", () => {
       timer?.stop();
     });
 
+    it("does not sweep after stop() when setup finishes during shutdown", async () => {
+      const setup = Promise.withResolvers<{ ok: boolean }>();
+      const { timer, run } = await arm({
+        capability: false,
+        config: {},
+        ready: async () => await setup.promise,
+      });
+      const branches = vi.spyOn(Retention.prototype, "purgeStaleBranches");
+      const sweep = run();
+      timer?.stop();
+      setup.resolve({ ok: true });
+      await sweep;
+      expect(branches).not.toHaveBeenCalled();
+    });
+
     it("sweeps once adapter setup has succeeded", async () => {
       const { timer, run } = await arm({
         capability: false,

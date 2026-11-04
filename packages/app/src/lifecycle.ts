@@ -250,6 +250,24 @@ function invalidSources(options: ShelfOptions, cell: LifecycleCell): AdapterSetu
   cell.settled = result;
   return result;
 }
+/**
+ * Run the adapter setups again. The run is published on the cell before it is awaited: readers
+ * (the retention timer among them) must never see the previous run's result while a new setup is
+ * still preparing the adapters.
+ */
+async function rerunSetup(
+  options: ShelfOptions,
+  ctx: AdapterSetupContext,
+  logger: Logger,
+  cell: LifecycleCell,
+): Promise<AdapterSetupResult> {
+  const running = runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger);
+  cell.ready = running;
+  const result = await running;
+  cell.settled = result;
+  return result;
+}
+
 /** Build the `app.lifecycle` namespace closing over one settlement cell. */
 function createLifecycle(
   options: ShelfOptions,
@@ -268,9 +286,7 @@ function createLifecycle(
       if (blocked) {
         throw new AdapterLifecycleError("setup", blocked.failures);
       }
-      const result = await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger);
-      cell.ready = Promise.resolve(result);
-      cell.settled = result;
+      const result = await rerunSetup(options, ctx, logger, cell);
       if (!result.ok) {
         throw new AdapterLifecycleError("setup", result.failures);
       }
