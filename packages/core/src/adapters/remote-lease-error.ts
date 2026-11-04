@@ -2,6 +2,7 @@
 import { isRetryableConnectError } from "../utils/connect-retry.ts";
 import { errorText } from "../utils/error-text.ts";
 import { redactUrlForLog } from "../utils/http.ts";
+import { redactSecrets } from "../utils/redact.ts";
 
 /** What a connect failure means for the retry loop and for the target. */
 export interface RemoteConnectErrorOptions {
@@ -65,9 +66,13 @@ const AUTH_HEADER_IN_TEXT = /\b(?<header>authorization\W{0,3}(?:bearer|basic))\s
 const AUTH_VALUE_IN_TEXT =
   /\b(?<scheme>bearer|basic)\s+(?:(?=[\w.~+/=-]{8,})|(?=[\w.~+/=-]*[\d=+/]))[\w.~+/=-]+/giu;
 
-/** A URL in provider text as its origin, and a Bearer/Basic header value as nothing. */
+/**
+ * Provider text without its secrets. The shared `key=value` patterns run first, while a word such as
+ * `password:` still sits next to its value; then a URL is cut to its origin and a Bearer/Basic value
+ * is replaced.
+ */
 function withoutSecrets(text: string): string {
-  return text
+  return redactSecrets(text)
     .replaceAll(URL_IN_TEXT, (url) => redactUrlForLog(url))
     .replaceAll(AUTH_HEADER_IN_TEXT, "$<header> [redacted]")
     .replaceAll(AUTH_VALUE_IN_TEXT, "$<scheme> [redacted]");

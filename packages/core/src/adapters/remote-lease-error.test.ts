@@ -98,6 +98,13 @@ describe("connectErrorOf", () => {
     );
   });
 
+  it("redacts a key/value secret even right after a Basic or Bearer word", () => {
+    const basic = connectErrorOf(new Error("rejected: Basic password: hunter2 for farm"));
+    expect(basic.message).not.toContain("hunter2");
+    const bearer = connectErrorOf(new Error("rejected: Bearer token: abc123xyz for farm"));
+    expect(bearer.message).not.toContain("abc123xyz");
+  });
+
   it("leaves ordinary words after Bearer or Basic alone", () => {
     expect(connectErrorOf(new Error("Basic auth is off")).message).toBe(
       "acquire failed: Basic auth is off",
