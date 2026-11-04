@@ -17,6 +17,7 @@ async function arm(options: {
   capability: boolean;
   config: Record<string, unknown>;
   testing?: boolean;
+  ready?: () => Promise<{ ok: boolean }>;
 }) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -45,6 +46,7 @@ async function arm(options: {
     { branchGcIntervalMs: 120_000, ...options.config } as ShelfConfig,
     logger,
     options.testing ?? false,
+    options.ready,
   );
   const scheduled = schedule.mock.calls.find((args) => args[1] === 120_000)?.[0];
   const run = async (): Promise<void> => {
@@ -175,6 +177,35 @@ describe("background retention", () => {
       const branches = vi.spyOn(Retention.prototype, "purgeStaleBranches");
       await run();
       expect(branches).not.toHaveBeenCalled();
+      timer?.stop();
+    });
+
+    it("waits for adapter setup before any sweep, and skips them when setup failed", async () => {
+      const setup = Promise.withResolvers<{ ok: boolean }>();
+      const { timer, run } = await arm({
+        capability: false,
+        config: {},
+        ready: async () => await setup.promise,
+      });
+      const branches = vi.spyOn(Retention.prototype, "purgeStaleBranches");
+      const sweep = run();
+      await Promise.resolve();
+      expect(branches).not.toHaveBeenCalled();
+      setup.resolve({ ok: false });
+      await sweep;
+      expect(branches).not.toHaveBeenCalled();
+      timer?.stop();
+    });
+
+    it("sweeps once adapter setup has succeeded", async () => {
+      const { timer, run } = await arm({
+        capability: false,
+        config: {},
+        ready: async () => await Promise.resolve({ ok: true }),
+      });
+      const branches = vi.spyOn(Retention.prototype, "purgeStaleBranches");
+      await run();
+      expect(branches).toHaveBeenCalled();
       timer?.stop();
     });
 

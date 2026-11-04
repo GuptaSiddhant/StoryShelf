@@ -168,7 +168,9 @@ async function purgeBuilds(ttlDays: number): Promise<PurgeTotals> {
 
 // oxlint-disable-next-line typescript/promise-function-async
 async function purgeBranches(): Promise<{ removedBranches: number; removedBaselines: number }> {
-  const branchTtl = getStore().config.branchTtlDays ?? 30;
+  // `null` turns branch GC off; only an unset value takes the default.
+  const { branchTtlDays } = getStore().config;
+  const branchTtl = branchTtlDays === undefined ? 30 : branchTtlDays;
   if (branchTtl === null) {
     return { removedBranches: 0, removedBaselines: 0 };
   }

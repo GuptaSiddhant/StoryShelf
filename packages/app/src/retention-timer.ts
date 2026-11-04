@@ -24,6 +24,8 @@ interface SweepContext {
   /** Build purge TTL; undefined: scheduled build purge is off (the default). */
   purgeTtlDays: number | undefined;
   testing: boolean;
+  /** Resolves with the adapter setup result; a sweep waits for it and runs only when it succeeded. */
+  ready: () => Promise<{ ok: boolean }>;
   warned: boolean;
 }
 
@@ -40,6 +42,8 @@ interface SweepContext {
  * @param storage - Storage adapter for baseline and build cleanup
  * @param config - Shelf config supplying `branchTtlDays`, `purgeTtlDays` and `branchGcIntervalMs`
  * @param logger - Structured logger for sweep diagnostics
+ * @param testing - Whether the deployment has testing enabled
+ * @param ready - Adapter setup result; every sweep waits for it and is skipped if setup failed
  * @returns Timer handle with `stop()`, or `null` if nothing is scheduled
  */
 export function startBranchGcTimer(
@@ -48,6 +52,7 @@ export function startBranchGcTimer(
   config: ShelfConfig,
   logger: Logger,
   testing = false,
+  ready: () => Promise<{ ok: boolean }> = async () => await Promise.resolve({ ok: true }),
 ): BranchGcTimer | null {
   const branchTtlDays =
     config.branchTtlDays === undefined ? DEFAULT_BRANCH_TTL_DAYS : config.branchTtlDays;
@@ -62,6 +67,7 @@ export function startBranchGcTimer(
     branchTtlDays,
     purgeTtlDays: config.purgeTtlDays,
     testing,
+    ready,
     warned: false,
   };
   return scheduleBranchGc(createSweepRunner(context), intervalMs);
@@ -71,6 +77,8 @@ export function startBranchGcTimer(
 function createSweepRunner(context: SweepContext): () => Promise<void> {
   return async (): Promise<void> => {
     try {
+      // The database is not usable, and its retention capability not known, until setup is done.
+      if (!(await context.ready()).ok) return;
       await sweep(context);
     } catch (error) {
       context.logger.error({ err: error }, "retention sweep failed");

@@ -164,7 +164,7 @@ export function attachLifecycle(
   options.ai?.setLogger?.(runtime.logger.child({ component: "ai" }));
   logAuthMode(options, runtime.logger);
   kickSetup(options, setupCtx, runtime.logger, cell);
-  const timer = startBranchGcInterval(options, runtime);
+  const timer = startBranchGcInterval(options, runtime, cell);
   Object.assign(app, {
     lifecycle: createLifecycle(options, setupCtx, runtime.logger, cell, timer),
   });
@@ -173,6 +173,7 @@ export function attachLifecycle(
 function startBranchGcInterval(
   options: ShelfOptions,
   runtime: ServerRuntime,
+  cell: LifecycleCell,
 ): { stop(): void } | null {
   return startBranchGcTimer(
     options.database,
@@ -180,6 +181,7 @@ function startBranchGcInterval(
     runtime.config,
     runtime.logger,
     Boolean(options.testing),
+    async () => await cell.ready,
   );
 }
 
