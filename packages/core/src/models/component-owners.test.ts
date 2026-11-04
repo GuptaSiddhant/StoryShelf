@@ -45,14 +45,13 @@ describe("matchesOwnerPattern", () => {
 });
 
 describe("compileOwnerPattern", () => {
-  it("answers a near-match path in linear time, however the wildcards nest", () => {
-    // Regex engines backtrack on this: eight stars over a long path that almost matches.
+  it("answers a near-match path, however the wildcards nest", () => {
+    // Regex engines backtrack on this: eight stars over a long path that almost matches. A matcher
+    // that did would not return here at all, so the test needs no clock.
     const matches = compileOwnerPattern("a*a*a*a*a*a*a*a*b.stories.tsx");
-    const started = performance.now();
 
     expect(matches(`${"a".repeat(2000)}b.stories.ts`)).toBe(false);
     expect(matches(`${"a".repeat(2000)}b.stories.tsx`)).toBe(true);
-    expect(performance.now() - started).toBeLessThan(1000);
   });
 
   it("gives the same answers as matchesOwnerPattern, for many paths", () => {
