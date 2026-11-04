@@ -95,15 +95,18 @@ async function startReserved(
   input: InsightStartInput,
   reservation: string | null,
 ): Promise<{ row: InsightRow; run: boolean }> {
+  let held = reservation;
   let started: { row: InsightRow; run: boolean } | null = null;
   try {
     started = await new InsightModel(deps.db).start(input);
-    if (reservation !== null) {
-      await settleReservation(new AiUsageModel(deps.db), reservation, started);
+    // An in-flight row seen earlier may have ended before `start`: that run still needs admission.
+    held ??= started.run ? await guardBudget(deps, input, null) : null;
+    if (held !== null) {
+      await settleReservation(new AiUsageModel(deps.db), held, started);
     }
     return started;
   } catch (error) {
-    await undoStart(deps, reservation, started);
+    await undoStart(deps, held, started);
     throw error;
   }
 }

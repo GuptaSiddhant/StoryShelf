@@ -1,5 +1,11 @@
 import { AiError, type Ai } from "@storyshelf/core/ai";
-import { AiBudgetAlertModel, AiUsageModel, BuildModel } from "@storyshelf/core/models";
+import {
+  AiBudgetAlertModel,
+  AiUsageModel,
+  BuildModel,
+  InsightModel,
+} from "@storyshelf/core/models";
+import type { InsightRow } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
 import { pino } from "pino";
@@ -244,6 +250,25 @@ describe("insights generation", () => {
       await app.request(`${path(buildId)}/latest`, { headers: cookie("admin") })
     ).json()) as Record<string, unknown>;
     expect(latest).toMatchObject({ status: "failed", errorCode: "interrupted" });
+  });
+
+  it("reserves a call when the in-flight insight it saw ends before the run starts", async () => {
+    const { db, storage, buildId } = await seed();
+    const app = appWith(db, storage, fakeAi());
+    const peek = vi
+      .spyOn(InsightModel.prototype, "peek")
+      .mockResolvedValueOnce({ status: "running" } as InsightRow);
+    const res = await app.request(path(buildId), {
+      method: "POST",
+      headers: cookie("admin"),
+      body: "{}",
+    });
+    peek.mockRestore();
+    expect(res.status).toBe(202);
+    await settleInsightJobs();
+    const rows = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.insightId).not.toBeNull();
   });
 
   it("enforces the DB-counted daily budget with Retry-After and fires each threshold once", async () => {
