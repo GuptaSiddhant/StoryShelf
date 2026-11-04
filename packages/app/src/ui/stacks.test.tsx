@@ -44,6 +44,16 @@ describe("HStack/VStack", () => {
     expect(css).toContain("gap:0.75rem");
   });
 
+  it("keeps a VStack column from growing to its widest child", async () => {
+    const html = await renderShell(
+      <VStack>
+        <span>a</span>
+      </VStack>,
+    );
+    // An auto column is as wide as its widest child (a table, a nowrap line), so a phone scrolls sideways.
+    expect(collectedCss(html)).toContain("grid-template-columns:minmax(0,1fr)");
+  });
+
   it("maps justify, align, and wrap props to declarations", async () => {
     const html = await renderShell(
       <HStack justify="between" align="start" wrap={false} gap="lg">
