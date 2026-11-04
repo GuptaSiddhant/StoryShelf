@@ -282,6 +282,43 @@ describe("storyshelf protect (GitHub rulesets)", () => {
     },
   );
 
+  it("updates a later ruleset that targets only this branch instead of creating one", async () => {
+    const wide = { ...statusRule(["ci/build"]), ruleset_id: 7 };
+    const narrow = { ...statusRule(["ci/build"]), ruleset_id: 8 };
+    const recorded = host({
+      [`GET ${RULES}`]: [200, [wide, narrow]],
+      [`GET ${RULESETS}/7`]: [
+        200,
+        { id: 7, name: "Wide", conditions: { ref_name: { include: ["~ALL"] } }, rules: [wide] },
+      ],
+      [`GET ${RULESETS}/8`]: [
+        200,
+        {
+          id: 8,
+          name: "Main only",
+          conditions: { ref_name: { include: ["refs/heads/main"] } },
+          rules: [narrow],
+        },
+      ],
+      [`PUT ${RULESETS}/8`]: [200, {}],
+    });
+    await runProtect({ ...GH, apply: true, fetch: recorded.fetch });
+    expect(
+      writes(recorded.calls).map((call) => `${call.method} ${new URL(call.url).pathname}`),
+    ).toEqual([`PUT ${RULESETS}/8`]);
+    expect(out).toContain('Added required checks to the ruleset "Main only"');
+  });
+
+  it("fails with a host error when a ruleset answers something that is not an object", async () => {
+    const recorded = host({
+      [`GET ${RULES}`]: [200, [statusRule(["ci/build"])]],
+      [`GET ${RULESETS}/7`]: [200, null],
+    });
+    await expect(runProtect({ ...GH, apply: true, fetch: recorded.fetch })).rejects.toThrow(
+      "not an object",
+    );
+  });
+
   it("fails with a host error when the rules API answers something that is not a list", async () => {
     const recorded = host({ [`GET ${RULES}`]: [200, { message: "odd" }] });
     await expect(runProtect({ ...GH, fetch: recorded.fetch })).rejects.toThrow("other than a list");
