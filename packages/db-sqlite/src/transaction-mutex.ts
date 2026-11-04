@@ -16,14 +16,23 @@ export interface TransactionMutex {
 
 /** A mutex for one adapter; each adapter instance owns its own. */
 export function createTransactionMutex(): TransactionMutex {
-  const inside = new AsyncLocalStorage<true>();
+  // Work started inside a body keeps this store after the body ends, so what marks a nested call
+  // is the transaction still being open, not the store being present.
+  const inside = new AsyncLocalStorage<{ open: boolean }>();
   let tail: Promise<unknown> = Promise.resolve();
   return {
     run: async <R>(body: () => Promise<R>): Promise<R> => {
-      if (inside.getStore() === true) {
+      if (inside.getStore()?.open === true) {
         throw new Error("transact was called inside a transaction of the same database; use `tx`");
       }
-      const turn = tail.then(async () => await inside.run(true, body));
+      const turn = tail.then(async () => {
+        const scope = { open: true };
+        try {
+          return await inside.run(scope, body);
+        } finally {
+          scope.open = false;
+        }
+      });
       // The next transaction waits for this one to end either way, never for its error.
       tail = turn.catch(() => {});
       return await turn;

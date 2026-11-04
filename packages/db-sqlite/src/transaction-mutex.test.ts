@@ -27,20 +27,26 @@ describe("createTransactionMutex", () => {
   it("runs bodies one at a time, in the order they asked", async () => {
     const mutex = createTransactionMutex();
     const log: string[] = [];
-    const body = (name: string, ms: number) => async () => {
+    const gate = Promise.withResolvers<null>();
+    const body = (name: string, hold?: Promise<null>) => async () => {
       log.push(`${name}:start`);
-      await new Promise((resolve) => setTimeout(resolve, ms));
+      await hold;
       log.push(`${name}:end`);
       return name;
     };
 
-    const results = await Promise.all([
-      mutex.run(body("a", 20)),
-      mutex.run(body("b", 1)),
-      mutex.run(body("c", 1)),
+    const all = Promise.all([
+      mutex.run(body("a", gate.promise)),
+      mutex.run(body("b")),
+      mutex.run(body("c")),
     ]);
+    // `a` holds the mutex at the gate: `b` and `c` have not started.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(log).toEqual(["a:start"]);
+    gate.resolve(null);
 
-    expect(results).toEqual(["a", "b", "c"]);
+    expect(await all).toEqual(["a", "b", "c"]);
     expect(log).toEqual(["a:start", "a:end", "b:start", "b:end", "c:start", "c:end"]);
   });
 
@@ -60,6 +66,24 @@ describe("createTransactionMutex", () => {
       mutex.run(async () => await mutex.run(async () => await Promise.resolve(1))),
     ).rejects.toThrow("inside a transaction");
     await expect(mutex.run(async () => await Promise.resolve(2))).resolves.toBe(2);
+  });
+
+  it("lets work started inside a body run later, once the body has ended", async () => {
+    const mutex = createTransactionMutex();
+    const gate = Promise.withResolvers<null>();
+    let later: Promise<string> = Promise.resolve("never started");
+    await mutex.run(async () => {
+      // Started inside the body, so it inherits the body's async context.
+      later = (async () => {
+        await gate.promise;
+        return await mutex.run(async () => await Promise.resolve("queued"));
+      })();
+      return await Promise.resolve();
+    });
+
+    gate.resolve(null);
+
+    await expect(later).resolves.toBe("queued");
   });
 
   it("gives each mutex its own queue", async () => {
