@@ -154,6 +154,15 @@ function failingAfterFirst() {
   };
 }
 
+/** The first fetch succeeds; later ones answer with something the client cannot use. */
+function unusableAfterFirst(response: unknown) {
+  let calls = 0;
+  return () => {
+    calls += 1;
+    return calls === 1 ? ok("/_s/new") : Promise.resolve(response);
+  };
+}
+
 describe("signed preview frame", () => {
   const PAGE = `<div data-preview-wrap>
     <div data-preview-embed data-preview-path="/iframe.html?id=a" data-preview-refresh-url="/tok" data-preview-refresh-seconds="2400">
@@ -309,15 +318,6 @@ describe("signed preview frame", () => {
     expect(page.part("reload")?.hasAttribute("disabled")).toBe(false);
     expect(page.part("reload")?.textContent).toBe("Reload preview");
   });
-
-  /** The first fetch succeeds; later ones answer with something the client cannot use. */
-  function unusableAfterFirst(response: unknown) {
-    let calls = 0;
-    return () => {
-      calls += 1;
-      return calls === 1 ? ok("/_s/new") : Promise.resolve(response);
-    };
-  }
 
   describe.each([
     ["a response without a base", { ok: true, json: () => Promise.resolve({}) }],
