@@ -13,8 +13,16 @@ import {
 } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
+import { requestOpenBuildStatesNow } from "../git-status.ts";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
+
+// The replay entrypoint is spied on (it still runs), so a test can ask whether it was called
+// without waiting for what it would do.
+vi.mock("../git-status.ts", async (original) => {
+  const real = await original<typeof import("../git-status.ts")>();
+  return { ...real, requestOpenBuildStatesNow: vi.fn(real.requestOpenBuildStatesNow) };
+});
 
 const silent = createShelfLogger({ level: "silent" });
 const ORIGIN = "https://shelf.example.com";
@@ -293,12 +301,19 @@ describe("notifications without a public origin", () => {
     await vi.waitFor(() => {
       expect(git.calls.length).toBeGreaterThan(0);
     });
-    git.calls.length = 0;
+    vi.mocked(requestOpenBuildStatesNow).mockClear();
     await form(app, "/admin/public-origin", token, ORIGIN);
-    await new Promise((resolve) => {
-      setTimeout(resolve, 50);
-    });
-    expect(git.calls).toHaveLength(0);
+    expect(requestOpenBuildStatesNow).not.toHaveBeenCalled();
+  });
+
+  it("asks once for a replacement, and not for a report", async () => {
+    const { app, token } = await openBuildApp();
+    await form(app, "/admin/public-origin", token, ORIGIN);
+    vi.mocked(requestOpenBuildStatesNow).mockClear();
+    await report(app, token, { origin: ORIGIN });
+    expect(requestOpenBuildStatesNow).not.toHaveBeenCalled();
+    await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
+    expect(requestOpenBuildStatesNow).toHaveBeenCalledTimes(1);
   });
 
   it("logs a change once, naming the new origin and whether it replaced one", async () => {
