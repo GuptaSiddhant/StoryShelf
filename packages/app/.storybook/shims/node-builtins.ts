@@ -45,6 +45,7 @@ export const setImmediate = fn("timers/promises.setImmediate");
 // node:os
 export const totalmem = (): number => 0;
 export const availableParallelism = (): number => 1;
+export const tmpdir = fn("os.tmpdir");
 
 // node:stream: present so modules that extend or reference them still load; never constructed.
 export function Readable(): void {}
