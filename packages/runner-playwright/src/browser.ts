@@ -5,6 +5,7 @@ import {
   type HeldConnection,
   type RemoteLeaseOutcome,
 } from "@storyshelf/core/adapter/capture-runner";
+import { errorText } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import type { ActiveRun } from "./types.ts";
 
@@ -81,5 +82,5 @@ export async function safeCloseServer(server: { close(): Promise<void> }): Promi
 
 /** Normalize any thrown value to a string. */
 export function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return error instanceof Error ? error.message : errorText(error);
 }

@@ -52,4 +52,10 @@ describe("connectErrorOf", () => {
     });
     expect(connectErrorOf(null).scope).toBe("target");
   });
+
+  it("keeps what an event object says instead of [object Object]", () => {
+    const wrapped = connectErrorOf({ type: "error", error: new Error("connect ECONNREFUSED") });
+    expect(wrapped.message).toBe("acquire failed: connect ECONNREFUSED");
+    expect(connectErrorOf({}).message).toBe("acquire failed: unknown error");
+  });
 });

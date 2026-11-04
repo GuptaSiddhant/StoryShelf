@@ -133,3 +133,14 @@ it("classifies only named Playwright timeouts in an eligible phase", async () =>
     }),
   ).rejects.toBe(other);
 });
+
+describe("TransientCaptureError", () => {
+  it("keeps the message of an Error cause and reads any other cause by what it says", () => {
+    expect(new TransientCaptureError("navigation", new Error("timed out")).message).toBe(
+      "timed out",
+    );
+    const event = new TransientCaptureError("crash", { type: "error", message: "page crashed" });
+    expect(event.message).toBe("page crashed");
+    expect(new TransientCaptureError("screenshot", {}).message).toBe("unknown error");
+  });
+});
