@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareRules, requiredByRules, RULESET_NAME } from "./protect-github-rules.ts";
+import { compareRules, requiredByRules, rulesetName } from "./protect-github-rules.ts";
 
 const ctx = { repo: "acme/widgets", fetchImpl: fetch, headers: {} };
 const target = { branch: "main", checks: ["storyshelf/testing"] };
@@ -35,6 +35,7 @@ describe("compareRules", () => {
   });
 
   it("names the ruleset it would create", () => {
-    expect(RULESET_NAME).toBe("StoryShelf merge gate");
+    expect(rulesetName("main")).toBe("StoryShelf merge gate (main)");
+    expect(rulesetName("release/1")).not.toBe(rulesetName("main"));
   });
 });

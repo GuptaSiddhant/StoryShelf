@@ -31,13 +31,31 @@ export interface RulesCtx {
   headers: Record<string, string>;
 }
 
-/** The name of the ruleset created when none applies. */
-export const RULESET_NAME = "StoryShelf merge gate";
+/** The name of the ruleset created when none applies (one per branch: names are unique per repository). */
+export function rulesetName(branch: string): string {
+  return `StoryShelf merge gate (${branch})`;
+}
 
-/** The active rules that apply to the branch, from every ruleset (repository and organization). */
+/** Rules listed per page, and the pages read before giving up. */
+const RULES_PER_PAGE = 100;
+const RULES_PAGES = 10;
+
+/** The active rules that apply to the branch, from every ruleset (repository and organization), page by page. */
 export async function appliedRules(ctx: RulesCtx, branch: string): Promise<BranchRule[]> {
-  const url = `${API}/repos/${ctx.repo}/rules/branches/${encodeURIComponent(branch)}`;
-  return await hostJson<BranchRule[]>(ctx.fetchImpl, url, { headers: ctx.headers });
+  const base = `${API}/repos/${ctx.repo}/rules/branches/${encodeURIComponent(branch)}`;
+  return await rulesPage(ctx, { base, page: 1, seen: [] });
+}
+
+async function rulesPage(
+  ctx: RulesCtx,
+  at: { base: string; page: number; seen: BranchRule[] },
+): Promise<BranchRule[]> {
+  const url = `${at.base}?per_page=${String(RULES_PER_PAGE)}&page=${String(at.page)}`;
+  const rules = await hostJson<BranchRule[]>(ctx.fetchImpl, url, { headers: ctx.headers });
+  const seen = [...at.seen, ...rules];
+  return rules.length < RULES_PER_PAGE || at.page >= RULES_PAGES
+    ? seen
+    : await rulesPage(ctx, { base: at.base, page: at.page + 1, seen });
 }
 
 /** Check names that rulesets already require on the branch. */
@@ -118,7 +136,7 @@ export async function createRuleset(ctx: RulesCtx, target: ProtectionTarget): Pr
     method: "POST",
     headers: ctx.headers,
     json: {
-      name: RULESET_NAME,
+      name: rulesetName(target.branch),
       target: "branch",
       enforcement: "active",
       conditions: { ref_name: { include: [`refs/heads/${target.branch}`], exclude: [] } },
@@ -133,5 +151,5 @@ export async function createRuleset(ctx: RulesCtx, target: ProtectionTarget): Pr
       ],
     },
   });
-  return `Created the ruleset "${RULESET_NAME}" on ${target.branch} requiring ${target.checks.join(", ")}.`;
+  return `Created the ruleset "${rulesetName(target.branch)}" on ${target.branch} requiring ${target.checks.join(", ")}.`;
 }

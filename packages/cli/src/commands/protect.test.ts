@@ -270,7 +270,7 @@ describe("storyshelf protect (GitHub rulesets)", () => {
       {
         method: "POST",
         body: {
-          name: "StoryShelf merge gate",
+          name: "StoryShelf merge gate (main)",
           target: "branch",
           enforcement: "active",
           conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
@@ -283,7 +283,26 @@ describe("storyshelf protect (GitHub rulesets)", () => {
         },
       },
     ]);
-    expect(out).toContain('Created the ruleset "StoryShelf merge gate" on main');
+    expect(out).toContain('Created the ruleset "StoryShelf merge gate (main)" on main');
+  });
+
+  it("reads every page of applied rules, so a status-check rule on a later page is found", async () => {
+    const filler = Array.from({ length: 100 }, () => ({ type: "deletion", ruleset_id: 3 }));
+    const recorded = host({
+      [`GET ${RULES}`]: [200, filler],
+    });
+    const paged = async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      );
+      if (url.pathname === RULES && url.searchParams.get("page") === "2") {
+        return Response.json([statusRule(["storyshelf/testing"])]);
+      }
+      return await recorded.fetch(input, init);
+    };
+    await runProtect({ ...GH, fetch: paged as never });
+    expect(out).toContain("OK: a ruleset on main already requires storyshelf/testing");
+    expect(recorded.calls.every((call) => call.url.includes("per_page=100"))).toBe(true);
   });
 
   it("is satisfied by classic protection when the rulesets do not require the check", async () => {
