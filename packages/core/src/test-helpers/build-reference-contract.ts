@@ -303,6 +303,29 @@ export function buildReferenceContractSuite(
         expect(await first.claimContent(PASS_A, LATER, EARLIER)).toEqual([]);
       });
     });
+    it("lets a record take over an abandoned claim, and fences the stalled collector out", async () => {
+      await withFixture(async ({ first, second, owner, buildIds }) => {
+        const project = owner.projectId;
+        const hash = "d".repeat(64);
+        await first.recordContentUses(project, buildIds[0], [hash]);
+        await first.claimDeletion(project, buildIds[0]);
+        await first.releaseBuildContent(project, buildIds[0], [hash]);
+        expect(await first.claimContent(PASS_A, LATER, EARLIER)).toEqual([hash]);
+
+        // A claim inside the lease still refuses, with or without a cutoff.
+        expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([hash]);
+        expect(await second.recordContentUses(project, buildIds[1], [hash], EARLIER)).toEqual([
+          hash,
+        ]);
+        expect(await first.holdsContentClaim(hash, PASS_A)).toBe(true);
+
+        // One taken before the cutoff is abandoned: the record clears it and goes ahead ...
+        expect(await second.recordContentUses(project, buildIds[1], [hash], LATER)).toEqual([]);
+        // ... so the stalled collector's check fails and it deletes nothing.
+        expect(await first.holdsContentClaim(hash, PASS_A)).toBe(false);
+        expect(await first.claimContent(PASS_B, LATER, EARLIER)).toEqual([]);
+      });
+    });
     it("rejects a duplicate owner in a multi-owner update", async () => {
       await withFixture(async ({ first, owner, buildIds }) => {
         const change = { owner, expectedGeneration: 0, buildIds: [buildIds[0]] };

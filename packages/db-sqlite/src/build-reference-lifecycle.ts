@@ -46,8 +46,8 @@ export function createBuildReferenceLifecycle(
       await markStorageDeleted(path, projectId, buildId),
     completeDeletion: async (projectId, buildId, removeRows) =>
       await completeDeletion(path, projectId, buildId, removeRows),
-    recordContentUses: async (projectId, buildId, hashes) =>
-      await recordContentUses(path, projectId, buildId, hashes),
+    recordContentUses: async (projectId, buildId, hashes, staleBefore) =>
+      await recordContentUses(path, projectId, buildId, hashes, staleBefore),
     claimContent: async (token, idleBefore, staleBefore) =>
       await claimContent(path, token, idleBefore, staleBefore),
     holdsContentClaim: async (hash, token) => await holdsContentClaim(path, hash, token),

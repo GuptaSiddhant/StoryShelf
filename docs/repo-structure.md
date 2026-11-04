@@ -24,7 +24,7 @@ Rationale: tsdown targets distributable ESM libraries (dts, per-entry outputs); 
 
 ## Export mechanism (not `tsdown-entry`)
 
-There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ source: ./src/..., default: ./dist/... }` (plus `publishConfig.exports` rewritten to dist-only on publish). `nub.jsonc → conditions: ["source"]` and `tsconfig.base.json → customConditions: ["source"]` resolve workspace imports to `.ts`/`.tsx` source in dev, editor, and `tsc`.
+There is no `tsdown-entry` key. Each library `package.json` `exports` map carries `{ source: ./src/..., default: ./dist/... }`, plus a dist-only `publishConfig.exports`. The release publishes with `npm publish`, which does not apply `publishConfig.exports`, so the published manifest still carries the `source` conditions (#393). `storyshelf` (cli) and `@storyshelf/mcp` have plain `dist` exports and no `source` condition. `nub.jsonc → conditions: ["source"]` and `tsconfig.base.json → customConditions: ["source"]` resolve workspace imports to `.ts`/`.tsx` source in dev, editor, and `tsc`.
 
 ## Public import surface
 

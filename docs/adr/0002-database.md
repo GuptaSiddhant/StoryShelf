@@ -17,7 +17,7 @@ and per-project table creation.
 ## Decision
 
 1. **One schema, many drivers.** A single Drizzle schema, mirroring the entity model in
-   `docs/architecture.md`, backs every database package. Packages differ in driver and connection
+   `docs/architecture/data-model*.md`, backs every database package. Packages differ in driver and connection
    factory, not in schema or queries. The `DatabaseAdapter` interface does not change between them,
    and exposes typed table handles through `tables` so that code outside the database packages never
    imports a dialect-specific table type.

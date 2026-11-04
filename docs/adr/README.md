@@ -1,9 +1,9 @@
 # Architecture Decision Records
 
-One ADR per concern, each stating the current decisions. `docs/architecture.md` remains the spec for
+One ADR per concern, each stating the current decisions. `docs/architecture/` remains the spec for
 entities and interfaces; ADRs record the decisions and the reasons. Keep an ADR a decision record:
 target 250 lines, hard cap 320 (enforced by `nub run docs:check`). Move interface and implementation
-detail to `docs/architecture.md`.
+detail to `docs/architecture/`.
 
 ## Numbering and references
 

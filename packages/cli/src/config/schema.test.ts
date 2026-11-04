@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadStorybookConfig, schemaReference, writeStorybookConfig } from "./config.ts";
+import { loadStorybookConfig, writeStorybookConfig } from "./load.ts";
+import { schemaReference } from "./schema.ts";
 
 let dir: string;
 
@@ -35,7 +36,7 @@ async function loadSchema(): Promise<{
   properties: Record<string, { type?: unknown }>;
   additionalProperties: unknown;
 }> {
-  const schemaPath = fileURLToPath(new URL("../schema/storyshelf-config.json", import.meta.url));
+  const schemaPath = fileURLToPath(new URL("../../schema/storyshelf-config.json", import.meta.url));
   const raw = await readFile(schemaPath, "utf8");
   return JSON.parse(raw) as {
     required: unknown;

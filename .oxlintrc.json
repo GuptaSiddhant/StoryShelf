@@ -202,17 +202,12 @@
         "packages/app/src/routers/ui.ts",
         "packages/app/src/shell/document.tsx",
         "packages/app/src/ui/styles.ts",
-        "packages/core/src/utils/encrypt.ts",
-        "packages/core/src/utils/ulid.ts",
         "packages/app/src/capture-setup.ts",
         "packages/cli/src/commands/server/init/codegen.ts",
-        "packages/cli/src/commands/server/init/next-steps.ts",
         "packages/cli/src/commands/server/init/package-json.ts",
         "packages/cli/src/commands/server/init/prompts.ts",
-        "packages/cli/src/commands/server/init/writers.ts",
         "packages/cli/src/commands/server/docker.ts",
-        "packages/cli/src/commands/shared/detect-adapters.ts",
-        "packages/runner-puppeteer/src/capture-runner.ts"
+        "packages/cli/src/commands/shared/detect-adapters.ts"
       ],
       "rules": {
         "max-lines-per-function": "allow",
