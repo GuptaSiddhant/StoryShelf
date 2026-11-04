@@ -16,9 +16,9 @@ import {
   generateAwsVariables,
   generateAwsVersions,
   generateAwsVpc,
-  TERRAFORM_REQUIRED_VERSION,
   type AwsTerraformOptions,
 } from "./terraform-aws.ts";
+import { TERRAFORM_REQUIRED_VERSION } from "./terraform-common.ts";
 
 const options: AwsTerraformOptions = {
   project: "acme-shelf",
