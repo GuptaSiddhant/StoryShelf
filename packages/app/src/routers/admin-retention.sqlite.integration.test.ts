@@ -25,6 +25,7 @@ async function withDeployment(
   const dir = mkdtempSync(join(tmpdir(), "storyshelf-admin-retention-"));
   const path = join(dir, "shelf.sqlite");
   const db = createSqliteDatabase(path);
+  let app: ReturnType<typeof createShelfApp> | undefined;
   try {
     await db.lifecycle?.setup({ config: {}, logger: createShelfLogger({ level: "silent" }) });
     const { storage, objects } = makeStorage();
@@ -75,20 +76,23 @@ async function withDeployment(
     const lifecycle = db.buildReferenceLifecycle;
     const owner = { type: "baseline" as const, projectId: "p", id: "base" };
     await lifecycle?.replaceFencedReferences(owner, 0, ["pinned"], async () => null);
-    const app = createShelfApp({
+    app = createShelfApp({
       database: db,
       storage,
       testing: { runner: stubRunner() },
       logger: createShelfLogger({ level: "silent" }),
     });
+    const shelf = app;
     const request = async (): Promise<Response> =>
-      await app.request("/api/v1/admin/purge", {
+      await shelf.request("/api/v1/admin/purge", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ttlDays: 1 }),
       });
     await run({ request, db, objects, path });
   } finally {
+    // The app's timer and job consumer stop before the database they use is closed.
+    await app?.lifecycle.teardown();
     await db.lifecycle?.teardown();
     rmSync(dir, { recursive: true, force: true });
   }
