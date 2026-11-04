@@ -155,6 +155,23 @@ export class BuildModel {
     return rows[0] ?? null;
   }
 
+  /** The newest approved build of commit `sha` on `branch`: the build affected capture compared against. */
+  async comparisonBuild(projectId: string, branch: string, sha: string): Promise<Build | null> {
+    const approved = await this.list(projectId, { branch, status: "approved" });
+    return approved.find((build) => build.gitSha === sha) ?? null;
+  }
+
+  /** When each of the given builds was created, by id (a build that is gone is left out). */
+  async createdAtOf(ids: readonly string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) {
+      return new Map();
+    }
+    const rows = (await this.db.list(this.tables.builds, {
+      where: inArray(col(this.tables.builds, "id"), [...ids]),
+    })) as unknown as Build[];
+    return new Map(rows.map((row) => [row.id, row.createdAt]));
+  }
+
   /**
    * The newest build on `branch` whose outcome reached the baselines, other than one of commit
    * `excludeSha`: the comparison point of affected capture, which inherits every story it does not
