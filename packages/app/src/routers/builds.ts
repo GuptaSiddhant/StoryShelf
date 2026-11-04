@@ -1,7 +1,12 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel, PackageUsageModel } from "@storyshelf/core/models";
-import { storybookZipPath } from "@storyshelf/core/utils";
+import {
+  CONTENT_HASH_PATTERN,
+  contentKey,
+  isContentHash,
+  storybookZipPath,
+} from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -153,7 +158,7 @@ export function registerBuilds(app: ShelfRouter): void {
     const { hashes } = c.req.valid("json");
     const needed: string[] = [];
     for (const hash of hashes) {
-      if (!(await getStore().storage.exists(`content/${hash}`))) {
+      if (!(await getStore().storage.exists(contentKey(hash)))) {
         needed.push(hash);
       }
     }
@@ -168,20 +173,24 @@ export function registerBuilds(app: ShelfRouter): void {
     const contentType = c.req.header("content-type") ?? "";
     if (contentType.includes("multipart/")) {
       const form = await c.req.formData();
+      // Every key is checked before anything is written, so a bad one leaves no partial upload.
+      for (const [key, value] of form.entries()) {
+        if (value instanceof File) refuseInvalidHash(key);
+      }
       for (const [key, value] of form.entries()) {
         if (value instanceof File) {
           const hash = key;
           const buffer = Buffer.from(await value.arrayBuffer());
-          await getStore().storage.write(`content/${hash}`, buffer);
+          await getStore().storage.write(contentKey(hash), buffer);
           await upsertContentRef(hash);
         }
       }
     } else {
       // Single content upload via PUT with hash header
       const hash = c.req.header("x-content-hash") ?? "";
-      if (!hash) throw new HTTPException(400, { message: "Missing X-Content-Hash" });
+      refuseInvalidHash(hash);
       const buffer = Buffer.from(await c.req.arrayBuffer());
-      await getStore().storage.write(`content/${hash}`, buffer);
+      await getStore().storage.write(contentKey(hash), buffer);
     }
     return c.json({ ok: true });
   });
@@ -365,7 +374,15 @@ const uploadZipRoute = createRoute({
   },
 });
 
-const dedupHashesSchema = z.object({ hashes: z.array(z.string()) });
+/** Answer 400 for a hash that is not a SHA-256 hex digest; the value is never logged or echoed. */
+function refuseInvalidHash(hash: string): void {
+  if (isContentHash(hash)) return;
+  getStore().logger.warn({ reason: "invalid content hash" }, "content upload refused");
+  throw new HTTPException(400, { message: "Invalid content hash" });
+}
+
+const contentHashSchema = z.string().regex(CONTENT_HASH_PATTERN, "Invalid content hash");
+const dedupHashesSchema = z.object({ hashes: z.array(contentHashSchema) });
 const dedupNeededSchema = z.object({ needed: z.array(z.string()) });
 const dedupRoute = createRoute({
   method: "post",
@@ -407,7 +424,7 @@ const contentUploadRoute = createRoute({
   },
 });
 
-const manifestFileSchema = z.object({ rel: z.string(), hash: z.string(), size: z.number() });
+const manifestFileSchema = z.object({ rel: z.string(), hash: contentHashSchema, size: z.number() });
 const manifestRoute = createRoute({
   method: "post",
   tags: ["Builds"],

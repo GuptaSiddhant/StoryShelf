@@ -3,17 +3,20 @@ import { makeStorage } from "../../test-helpers/fake-adapters.ts";
 import { storybookDir } from "../../utils/paths.ts";
 import { readPublishedFile, readPublishedFileInfo } from "./read.ts";
 
+/** A well-formed content hash (64 lowercase hex digits). */
+const HASH = "1".repeat(64);
+
 describe("readPublishedFile", () => {
   it("reads through the manifest to the content-addressed file", async () => {
     const { storage, objects } = makeStorage();
-    objects.set(`${storybookDir("p", "b")}/manifest.json`, Buffer.from('{"index.json":"h1"}'));
-    objects.set("content/h1", Buffer.from("from content"));
+    objects.set(`${storybookDir("p", "b")}/manifest.json`, Buffer.from(`{"index.json":"${HASH}"}`));
+    objects.set(`content/${HASH}`, Buffer.from("from content"));
     expect((await readPublishedFile(storage, "p", "b", "index.json"))?.toString()).toBe(
       "from content",
     );
     expect(await readPublishedFileInfo(storage, "p", "b", "index.json")).toEqual({
       bytes: Buffer.from("from content"),
-      contentHash: "h1",
+      contentHash: HASH,
     });
   });
 
