@@ -65,10 +65,26 @@ async function setup(options: { files?: Record<string, string>; maxEntries?: num
 }
 
 describe("createPublishHandler", () => {
-  it("records the published content in content_refs", async () => {
-    const { db, run } = await setup();
+  it("records the build's use of each distinct published blob", async () => {
+    const { db, build, run } = await setup();
+    const recordContentUses = vi.fn(async () => await Promise.resolve([] as string[]));
+    Object.assign(db, { buildReferenceLifecycle: { recordContentUses } });
     await run();
-    expect((await db.list(db.tables.contentRefs)).length).toBe(2);
+    expect(recordContentUses).toHaveBeenCalledTimes(1);
+    const [, buildId, hashes] = recordContentUses.mock.calls[0] as unknown as [
+      string,
+      string,
+      string[],
+    ];
+    expect(buildId).toBe(build.id);
+    expect(hashes).toHaveLength(2);
+  });
+
+  it("fails the publish for a retry when a collector claimed one of the blobs", async () => {
+    const { db, run } = await setup();
+    const recordContentUses = vi.fn(async () => await Promise.resolve(["h1"]));
+    Object.assign(db, { buildReferenceLifecycle: { recordContentUses } });
+    await expect(run()).rejects.toThrow(/being collected/u);
   });
 
   it("accepts only jobs that name a build", async () => {

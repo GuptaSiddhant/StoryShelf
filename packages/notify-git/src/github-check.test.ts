@@ -53,6 +53,10 @@ const asListed = (items: ReturnType<typeof annotations>) =>
     message: item.message,
     raw_details: item.url,
   }));
+const OLDER = "01JBZ0000000000000000000AA";
+const NEWER = "01JBZ0000000000000000000BB";
+const buildLink = (id: string) => `https://shelf.example/projects/web/builds/${id}`;
+const shown = (id: string) => [{ ...RUN, details_url: buildLink(id) }];
 const RUN = { id: 9, external_id: "storyshelf:storyshelf/testing" };
 
 afterEach(() => {
@@ -143,7 +147,7 @@ describe("postCheckRun", () => {
       "https://api.github.com/repos/acme/widgets/check-runs/9",
     ]);
     expect(writes.every((call) => bodyOf(call)["conclusion"] === "success")).toBe(true);
-    expect(writes[0]?.url.endsWith("/9")).toBe(true);
+    expect(writes[0]?.url.endsWith("/12")).toBe(true);
   });
 
   it("lists again after a create and brings a run another delivery created to the same state", async () => {
@@ -213,14 +217,14 @@ describe("postCheckRun", () => {
     expect(calls[10]?.init.method).toBe("POST");
   });
 
-  it("finds only runs of this name and id, and orders them oldest first", async () => {
+  it("finds only runs of this name and id, and orders them newest first", async () => {
     const calls = github([
       { id: 30, external_id: "storyshelf:storyshelf/testing" },
       { id: 4, external_id: "someone-else" },
       { id: 20, external_id: "storyshelf:storyshelf/testing" },
     ]);
     await postCheckRun(repo, input);
-    expect(calls.slice(1).map((call) => call.url.split("/").at(-1))).toEqual(["20", "30"]);
+    expect(calls.slice(1).map((call) => call.url.split("/").at(-1))).toEqual(["30", "20"]);
   });
 
   it("puts the hash on the last write of a long post only, so a cut-short post leaves none", async () => {
@@ -245,10 +249,11 @@ describe("postCheckRun", () => {
       { id: 9, external_id: "storyshelf:storyshelf/testing" },
     ]);
     await postCheckRun(repo, { ...input, annotations: annotations(2) });
-    const [own, mirror] = calls.slice(1).toSorted((a, b) => a.url.length - b.url.length);
-    expect(own?.url.endsWith("/9")).toBe(true);
+    const own = calls.find((call) => call.url.endsWith("/12"));
+    const mirror = calls.find((call) => call.url.endsWith("/9"));
+    expect(own?.url.endsWith("/12")).toBe(true);
     expect(summaryOfCall(own)).toContain("storyshelf:findings=");
-    expect(mirror?.url.endsWith("/12")).toBe(true);
+    expect(mirror?.url.endsWith("/9")).toBe(true);
     expect(summaryOfCall(mirror)).not.toContain("storyshelf:findings=");
     expect(summaryOfCall(mirror)).toContain("Current findings (2):");
   });
@@ -284,5 +289,39 @@ describe("postCheckRun", () => {
         : Response.json({ check_runs: [] }),
     );
     await expect(postCheckRun(repo, input)).rejects.toThrow();
+  });
+
+  describe("a delivery for another build", () => {
+    it("leaves a run that shows a newer build untouched, and writes nothing", async () => {
+      const calls = github(shown(NEWER));
+      await postCheckRun(repo, { ...input, url: buildLink(OLDER), state: "failure" });
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.init.method === undefined || calls[0]?.init.method === "GET").toBe(true);
+    });
+
+    it("updates a run that shows an older or the same build", async () => {
+      const older = github(shown(OLDER));
+      await postCheckRun(repo, { ...input, url: buildLink(NEWER), state: "success" });
+      expect(older.at(-1)?.init.method).toBe("PATCH");
+      vi.unstubAllGlobals();
+      const same = github(shown(NEWER));
+      await postCheckRun(repo, { ...input, url: buildLink(NEWER), state: "success" });
+      expect(same.at(-1)?.init.method).toBe("PATCH");
+    });
+
+    it("updates as before when a link names no readable build", async () => {
+      const calls = github([{ ...RUN, details_url: buildLink(NEWER) }]);
+      await postCheckRun(repo, { ...input, url: "https://shelf.example/projects/web/builds/B1" });
+      expect(calls.at(-1)?.init.method).toBe("PATCH");
+    });
+
+    it("skips when any duplicate shows a newer build", async () => {
+      const calls = github([
+        { ...RUN, id: 8, details_url: buildLink(OLDER) },
+        { ...RUN, id: 9, details_url: buildLink(NEWER) },
+      ]);
+      await postCheckRun(repo, { ...input, url: buildLink(OLDER) });
+      expect(calls).toHaveLength(1);
+    });
   });
 });

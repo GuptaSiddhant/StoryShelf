@@ -1,4 +1,3 @@
-/** Connecting to a remote browser: retried when the service is unreachable or full, a clear error when it is not. */
 import {
   connectLeased,
   scrubConnection,
@@ -7,6 +6,8 @@ import {
   type RemoteTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
+/** Connecting to a remote browser: retried when the service is unreachable or full, a clear error when it is not. */
+import { errorText } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
 import type { BrowserAcquisition } from "./session.ts";
@@ -47,13 +48,24 @@ async function connectOnce(connection: RemoteConnection, timeoutMs: number): Pro
   });
 }
 
-/** What failed, in one line, with the endpoint and credentials removed. */
-function reasonOf(error: unknown, connection: RemoteConnection & { lease?: unknown }): string {
-  const text = error instanceof Error ? error.message : String(error);
+/** How much of an error is read, and how much of its first line is kept, once the connection's secrets are out. */
+const SCAN_LENGTH = 4000;
+const REASON_LENGTH = 500;
+
+/** What failed, in one bounded line with the credentials removed. */
+export function reasonOf(
+  error: unknown,
+  connection: RemoteConnection & { lease?: unknown },
+): string {
+  // The connection's secrets go first, whole, then the pattern redaction, then the cut.
+  const text = errorText(error, {
+    maxLength: SCAN_LENGTH,
+    scrub: (shown) => scrubConnection(shown, connection),
+  });
   const line =
     text
       .split("\n")
       .find((candidate) => candidate.trim() !== "")
       ?.trim() ?? "the connection failed";
-  return scrubConnection(line, connection);
+  return line.slice(0, REASON_LENGTH);
 }

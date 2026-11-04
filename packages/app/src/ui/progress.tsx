@@ -26,6 +26,18 @@ const trackDone = css`
   }
 `;
 
+/**
+ * The fill width for each whole percent, 0 to 100. A fixed set of static classes, so no computed
+ * value is ever written into the markup (no inline style); a percent only selects one of them.
+ */
+const fills: Array<Promise<string>> = Array.from(
+  { length: 101 },
+  (_unused, percent) => css`
+    /* progress-fill */
+    width: ${percent}%;
+  `,
+);
+
 /** Determinate progress bar; turns green when `value` reaches `max`. */
 export const Progress: FC<{ value: number; max: number; label: string }> = ({
   value,
@@ -42,7 +54,7 @@ export const Progress: FC<{ value: number; max: number; label: string }> = ({
       aria-valuemax={max}
       aria-valuenow={Math.min(value, max)}
     >
-      <span style={`width:${percent}%`} />
+      <span class={fills[percent]} />
     </div>
   );
 };

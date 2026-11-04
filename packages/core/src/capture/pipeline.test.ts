@@ -1,6 +1,8 @@
 import { PNG } from "pngjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CaptureTarget, RenderedSnapshot } from "../adapters/capture-runner.ts";
+import { BaselineModel } from "../models/baseline.ts";
+import { BuildModel } from "../models/build.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
@@ -9,7 +11,7 @@ import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { parseComparisonReference } from "./comparison-reference.ts";
-import { persistCapture, type CaptureContext } from "./pipeline.ts";
+import { finalizeBuild, persistCapture, type CaptureContext } from "./pipeline.ts";
 
 const DEFAULT_VIEWPORT: Viewport = { name: "mobile", width: 320, height: 480 };
 
@@ -674,5 +676,31 @@ describe("persistCapture", () => {
     expect(row?.viewportName).toBe("tablet");
     expect(row?.viewportWidth).toBe(834);
     expect(row?.viewportHeight).toBe(1112);
+  });
+});
+
+describe("finalizeBuild", () => {
+  it("keeps the build cancelled and drops no baselines when a cancel lands during finalize", async () => {
+    const { ctx } = await makeContext({ captures: [] });
+    await seedBaseline(ctx);
+    const builds = new BuildModel(ctx.db, ctx.tables);
+    // The first check sees a live build; the cancel arrives while the counts are rolled up.
+    const updateCounts = BuildModel.prototype.updateCounts;
+    const spy = vi.spyOn(BuildModel.prototype, "updateCounts").mockImplementation(async function (
+      this: BuildModel,
+      id: string,
+    ) {
+      await this.setStatus(id, "cancelled");
+      return await updateCounts.call(this, id);
+    });
+    const removeOrphans = vi.spyOn(BaselineModel.prototype, "removeOrphans");
+
+    await finalizeBuild(ctx, new Set(["other-story"]), new Set());
+
+    spy.mockRestore();
+    expect(removeOrphans).not.toHaveBeenCalled();
+    removeOrphans.mockRestore();
+    expect((await builds.get(ctx.build.id))?.status).toBe("cancelled");
+    expect(await ctx.db.list(ctx.db.tables.baselines)).toHaveLength(1);
   });
 });

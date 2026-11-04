@@ -1,9 +1,11 @@
+import { errorText } from "@storyshelf/core/utils";
+
 /** A narrowly classified page failure that may be retried on a fresh context. */
 export class TransientCaptureError extends Error {
   readonly phase: "navigation" | "screenshot" | "crash";
 
   constructor(phase: "navigation" | "screenshot" | "crash", cause: unknown) {
-    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    super(cause instanceof Error ? cause.message : errorText(cause), { cause });
     this.name = "TransientCaptureError";
     this.phase = phase;
   }

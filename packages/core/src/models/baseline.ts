@@ -15,12 +15,20 @@ import { ulid } from "../utils/ulid.ts";
 import { approveInTransaction, type AtomicBaselineApproval } from "./baseline-approval.ts";
 import { upsertAtomicBaseline } from "./baseline-atomic.ts";
 import { BaselineWriteConflict } from "./baseline-conflict.ts";
+import { assertBuildLive, assertBuildLiveInTx, type CapturingBuild } from "./baseline-promotion.ts";
 import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
 
 /** Extra identity/metadata for {@link BaselineModel.upsert}. */
 export interface BaselineUpsertOptions {
   approval?: AtomicBaselineApproval;
+  /**
+   * The build whose capture promotes this baseline. The write is refused with
+   * `BaselinePromotionRefused` (`baseline-conflict.ts`) when that build is `cancelled` or a retry has moved it to
+   * another capture generation. With the reference lifecycle the check runs inside the same
+   * transaction as the write; without it, immediately before the write.
+   */
+  capturingBuild?: CapturingBuild;
   /** Engine the baseline belongs to (default chromium). */
   browser?: string;
   /** Resolved mode definition as JSON (display only). */
@@ -237,6 +245,10 @@ export class BaselineModel {
 
     const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
     const lifecycle = this.db.buildReferenceLifecycle;
+    if (!lifecycle && options.capturingBuild) {
+      // No transaction to fence in: the narrowest window is a check right before the write.
+      await assertBuildLive(this.db, options.capturingBuild);
+    }
     if (lifecycle) {
       const approval = options.approval;
       const baseline = await upsertAtomicBaseline(
@@ -258,9 +270,14 @@ export class BaselineModel {
           infraHash,
           fingerprint: options.fingerprint,
           mode: options.mode,
-          beforeWrite: approval
-            ? async (tx): Promise<void> => await approveInTransaction(tx, this.db.tables, approval)
-            : undefined,
+          beforeWrite: async (tx): Promise<void> => {
+            if (options.capturingBuild) {
+              await assertBuildLiveInTx(tx, this.db.tables.builds, options.capturingBuild);
+            }
+            if (approval) {
+              await approveInTransaction(tx, this.db.tables, approval);
+            }
+          },
         },
       );
       if (this.webhookTables) {

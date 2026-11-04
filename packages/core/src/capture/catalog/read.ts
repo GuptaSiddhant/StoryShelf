@@ -1,7 +1,7 @@
 /** Reading a published build's files from storage. */
 import { posix } from "node:path";
 import type { StorageAdapter } from "../../adapters/storage.ts";
-import { storybookDir } from "../../utils/paths.ts";
+import { contentKey, storybookDir } from "../../utils/paths.ts";
 
 /**
  * A file of a build's published Storybook by its path inside the build, or null when it is gone.
@@ -48,7 +48,7 @@ async function readViaManifest(
     >;
     const hash = manifest[rel];
     if (!hash) return null;
-    const path = `content/${hash}`;
+    const path = contentKey(hash);
     return (await storage.exists(path))
       ? { bytes: await storage.read(path), contentHash: hash }
       : null;

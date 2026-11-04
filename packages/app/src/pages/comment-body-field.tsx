@@ -6,7 +6,7 @@
  */
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { MentionSuggestion } from "../mentions.ts";
-import { Button, HStack, Meta, TextareaField, VStack } from "../ui/components.tsx";
+import { Meta, Option, OptionList, TextareaField, VStack } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -87,13 +87,10 @@ export function MentionSuggestions(props: {
   return (
     <VStack>
       <Meta>Mention a member</Meta>
-      <HStack gap="sm" wrap>
+      <OptionList label="Mention a member">
         {suggestions.map((suggestion): Rendered => (
-          <Button
+          <Option
             key={suggestion.userId}
-            variant="ghost"
-            size="sm"
-            type="button"
             hx-post={mentionUrls(slug, buildId).complete}
             hx-include={`#${fieldId}`}
             hx-vals={JSON.stringify({ kind, pick: suggestion.userId })}
@@ -101,9 +98,9 @@ export function MentionSuggestions(props: {
             hx-swap="outerHTML"
           >
             @{suggestion.handle} <span class="muted">{suggestion.name}</span>
-          </Button>
+          </Option>
         ))}
-      </HStack>
+      </OptionList>
     </VStack>
   );
 }

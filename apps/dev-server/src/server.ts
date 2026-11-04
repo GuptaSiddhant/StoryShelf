@@ -32,6 +32,18 @@ const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
 
+// Scheduled build purge is opt-in (ADR 0039): `PURGE_TTL_DAYS` turns it on; unset leaves it off, so
+// an upgrade never starts deleting builds. A value that is not a positive whole number stops the boot.
+function purgeTtlDaysFromEnv(): number | undefined {
+  const raw = env["PURGE_TTL_DAYS"];
+  if (raw === undefined || raw === "") return undefined;
+  if (!/^[1-9]\d*$/u.test(raw)) {
+    throw new Error("PURGE_TTL_DAYS must be a positive whole number of days");
+  }
+  return Number(raw);
+}
+const purgeTtlDays = purgeTtlDaysFromEnv();
+
 function buildAuthUi(): Record<string, string> | undefined {
   const pairs: Array<[string, string | undefined]> = [
     ["title", env["SS_AUTH_TITLE"]],
@@ -130,6 +142,7 @@ const app = createShelfApp({
     adminToken,
     publicBaseUrl,
     scratchDir: dataDir,
+    ...(purgeTtlDays === undefined ? {} : { purgeTtlDays }),
     serverTiming: true,
   },
 });

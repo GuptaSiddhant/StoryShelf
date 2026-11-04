@@ -309,13 +309,13 @@ function shardRunner(failing: boolean, hold: Hold = {}): CaptureRunner {
   );
 }
 
-async function planBuild(failShard: boolean, hold: Hold = {}) {
+async function planBuild(failShard: boolean, hold: Hold = {}, extra: Partial<DispatchDeps> = {}) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const { project, build } = await seedBuild(db);
   await storage.write(storybookZipPath(project.id, build.id), zipOfStories(6));
   const queued: { buildId: string; shard: string }[] = [];
-  const deps = depsFor(db, storage, shardRunner(failShard, hold));
+  const deps = { ...depsFor(db, storage, shardRunner(failShard, hold)), ...extra };
   deps.jobOptions.shardSize = 1;
   deps.jobOptions.enqueue = async (job) => {
     await Promise.resolve();
@@ -364,6 +364,21 @@ describe("createDispatchJob sharding", () => {
     expect(
       (await new CaptureShardModel(db).renderShards(build.id)).every((s) => s.status === "done"),
     ).toBe(true);
+  });
+
+  it("tells the metrics hook which delivery re-captured what an earlier one stored", async () => {
+    const onShardRepeated = vi.fn();
+    const { db, queued, runJob } = await planBuild(false, {}, { maxRetries: 2, onShardRepeated });
+    const first = queued[0] as { buildId: string; shard: string };
+    await runJob({ ...first, attempts: 0 });
+    expect(onShardRepeated).not.toHaveBeenCalled();
+
+    // An interrupted run: the shard is back to pending with its snapshots still stored.
+    await db.update(db.tables.captureShards, first.shard, { status: "pending", result: null });
+    await runJob({ ...first, attempts: 1 });
+
+    // One prior failed delivery means this is the second of the three the queue allows.
+    expect(onShardRepeated).toHaveBeenCalledExactlyOnceWith({ repeated: 1, attempt: 2, limit: 3 });
   });
 
   it("fails the attempt when a shard's last try fails", async () => {

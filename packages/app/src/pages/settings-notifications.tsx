@@ -208,13 +208,14 @@ const HealthStatus: FC<{ channel: SettingsNotificationChannel }> = ({ channel })
   return (
     <>
       <Badge tone="danger">failing</Badge>
-      <Meta as="span">
-        Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
-        <span class="truncate max-w-cell" title={channel.lastError}>
-          {" "}
-          {channel.lastError}
-        </span>
-      </Meta>
+      <span class="truncate max-w-cell">
+        <Meta as="span">
+          Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
+        </Meta>
+      </span>
+      <span class="truncate max-w-cell" title={channel.lastError}>
+        <Meta as="span">{channel.lastError}</Meta>
+      </span>
     </>
   );
 };
