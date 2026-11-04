@@ -220,6 +220,7 @@ describe("storyshelf protect (GitHub rulesets)", () => {
         {
           id: 7,
           name: "Main",
+          conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
           rules: [
             { type: "deletion" },
             {
@@ -257,6 +258,33 @@ describe("storyshelf protect (GitHub rulesets)", () => {
     ]);
     expect(out).toContain('Added required checks to the ruleset "Main": storyshelf/testing.');
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it.each([["~DEFAULT_BRANCH"], ["~ALL"], ["refs/heads/*"], ["refs/heads/main", "refs/heads/dev"]])(
+    "does not widen a ruleset that targets more than this branch (%s): it adds its own",
+    async (...include) => {
+      const recorded = host({
+        [`GET ${RULES}`]: [200, [statusRule(["ci/build"])]],
+        [`GET ${RULESETS}/7`]: [
+          200,
+          {
+            id: 7,
+            name: "Wide",
+            conditions: { ref_name: { include, exclude: [] } },
+            rules: [statusRule(["ci/build"])],
+          },
+        ],
+        [`POST ${RULESETS}`]: [201, {}],
+      });
+      await runProtect({ ...GH, apply: true, fetch: recorded.fetch });
+      expect(writes(recorded.calls).map((call) => call.method)).toEqual(["POST"]);
+      expect(out).toContain('Created the ruleset "StoryShelf merge gate (main)"');
+    },
+  );
+
+  it("fails with a host error when the rules API answers something that is not a list", async () => {
+    const recorded = host({ [`GET ${RULES}`]: [200, { message: "odd" }] });
+    await expect(runProtect({ ...GH, fetch: recorded.fetch })).rejects.toThrow("other than a list");
   });
 
   it("creates its own ruleset when rulesets apply but none has a status-check rule here", async () => {

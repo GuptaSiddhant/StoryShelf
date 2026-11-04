@@ -1,5 +1,6 @@
 /** GitHub rulesets: the required status checks that apply to a branch (REST API, admin token). */
 import {
+  HostError,
   hostJson,
   type Fetch,
   type ProtectionResult,
@@ -21,6 +22,7 @@ interface BranchRule {
 interface Ruleset {
   id: number;
   name: string;
+  conditions?: { ref_name?: { include?: string[]; exclude?: string[] } } | null;
   rules?: { type: string; parameters?: Record<string, unknown> }[];
 }
 
@@ -52,6 +54,9 @@ async function rulesPage(
 ): Promise<BranchRule[]> {
   const url = `${at.base}?per_page=${String(RULES_PER_PAGE)}&page=${String(at.page)}`;
   const rules = await hostJson<BranchRule[]>(ctx.fetchImpl, url, { headers: ctx.headers });
+  if (!Array.isArray(rules)) {
+    throw new HostError(502, "the rules API answered something other than a list of rules");
+  }
   const seen = [...at.seen, ...rules];
   return rules.length < RULES_PER_PAGE || at.page >= RULES_PAGES
     ? seen
@@ -108,11 +113,22 @@ async function addToRulesets(
   }
   const url = `${API}/repos/${ctx.repo}/rulesets/${String(own.ruleset_id)}`;
   const ruleset = await hostJson<Ruleset>(ctx.fetchImpl, url, { headers: ctx.headers });
+  if (!targetsOnly(ruleset, what.target.branch)) {
+    // A broader ruleset (all branches, the default branch, a pattern) would put the check on
+    // other branches too and block their merges: leave it alone and add a ruleset of our own.
+    return await createRuleset(ctx, what.target);
+  }
   const rules = (ruleset.rules ?? []).map((rule) =>
     rule.type === "required_status_checks" ? withChecks(rule, what.missing) : rule,
   );
   await hostJson(ctx.fetchImpl, url, { method: "PUT", headers: ctx.headers, json: { rules } });
   return `Added required checks to the ruleset "${ruleset.name}": ${what.missing.join(", ")}.`;
+}
+
+/** Whether the ruleset names exactly this branch (and nothing else), so adding a check stays local. */
+function targetsOnly(ruleset: Ruleset, branch: string): boolean {
+  const include = ruleset.conditions?.ref_name?.include ?? [];
+  return include.length === 1 && include[0] === `refs/heads/${branch}`;
 }
 
 /** The rule with the checks appended; its other parameters stay. */
