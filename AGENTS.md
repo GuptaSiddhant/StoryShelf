@@ -28,6 +28,7 @@ nub run hook:install      # enable .githooks: fmt/lint staged files + convention
 nub run serve             # dev server from TS source, :3000, DATA_DIR=.dev-data, hot restart
 nub run fmt | lint | test # turbo across the workspace
 nub run docs:check        # ADR numbering, references, links, line cap
+nub run lint:files        # oxfmt --check + oxlint on every tracked file the commit hook checks (CI runs it)
 nubx turbo verify --force                              # build + lint + test, whole repo
 nubx turbo verify --filter='@storyshelf/core' --force  # one package + deps
 bash scripts/smoke.sh     # boot dev server, assert health/API/HTML

@@ -132,6 +132,12 @@ jobs:
       - name: Check ADR references and size
         run: nub run docs:check
 
+      - name: Lint and format-check every tracked file (what the commit hook checks)
+        # `verify` lints each package's own globs; this also covers `scripts/` and any file outside them.
+        run: |
+          node --test scripts/check-files.test.mjs
+          nub run lint:files
+
       - name: Verify (build + Storybook + lint + test)
         # `verify` builds the app's Storybook once (build-storybook), so a broken story fails the PR.
         # The website has its own job (below), so it runs in parallel and only when it changed.
