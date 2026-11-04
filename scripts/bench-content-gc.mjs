@@ -12,8 +12,8 @@
  * that no manifest names. That is the worst case: the scan only stops early once no candidate is
  * left, so it reads every manifest. The lifecycle is a stub, so the numbers are the scan's.
  *
- * `--latency <ms>` adds that delay to every storage read, to stand in for a remote store (S3, GCS,
- * Azure); local disk is the floor. Prints one JSON line per run (pass time) and one for memory.
+ * `--latency <ms>` adds that delay to every storage `exists` and `read`, to stand in for a remote
+ * store (S3, GCS, Azure; a manifest costs one of each); local disk is the floor. Prints one JSON line per run (pass time) and one for memory.
  * Needs the built `dist/` of core, db-sqlite and storage-local (`nubx turbo build`). Not wired
  * into CI: run it by hand to re-measure after a change to `retention/content-gc.ts`.
  */
@@ -117,19 +117,23 @@ try {
     finishContentCollection: async () => {},
   };
 
-  let reads = 0;
+  let requests = 0;
   let inFlight = 0;
   let peakInFlight = 0;
   if (LATENCY_MS > 0) {
-    const read = storage.read.bind(storage);
-    storage.read = async (key) => {
-      reads += 1;
-      inFlight += 1;
-      peakInFlight = Math.max(peakInFlight, inFlight);
-      await new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
-      inFlight -= 1;
-      return await read(key);
-    };
+    // A remote store answers `exists` (a HEAD) and `read` (a GET) in a round trip each, and a
+    // manifest costs one of each: both are delayed, so a pass pays two requests per build.
+    for (const method of ["exists", "read"]) {
+      const real = storage[method].bind(storage);
+      storage[method] = async (key) => {
+        requests += 1;
+        inFlight += 1;
+        peakInFlight = Math.max(peakInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
+        inFlight -= 1;
+        return await real(key);
+      };
+    }
   }
 
   const rssStart = process.memoryUsage().rss;
@@ -159,7 +163,7 @@ try {
       rssStartMB: Math.round(rssStart / 1e6),
       rssPeakMB: Math.round(Math.max(rssPeak, process.memoryUsage().rss) / 1e6),
       heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1e6),
-      ...(LATENCY_MS > 0 ? { slowReads: reads, peakInFlight } : {}),
+      ...(LATENCY_MS > 0 ? { slowRequests: requests, peakInFlight } : {}),
     }),
   );
 } finally {
