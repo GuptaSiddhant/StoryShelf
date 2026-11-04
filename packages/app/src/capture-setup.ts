@@ -162,6 +162,7 @@ function alerting(
 ): CaptureHandler {
   return {
     accepts: (job) => inner.accepts?.(job) !== false,
+    superseded: async (job) => (await inner.superseded?.(job)) === true,
     run: async (job, context) => {
       try {
         await inner.run(job, context);
