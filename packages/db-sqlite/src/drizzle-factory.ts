@@ -73,8 +73,8 @@ async function runManualTransaction<R>(
 function buildLifecycle(options: DrizzleAdapterOptions): NonNullable<DatabaseAdapter["lifecycle"]> {
   let closed = false;
   return {
-    setup: async () => {
-      await options.migrate();
+    setup: async (context) => {
+      await options.migrate({ logger: context.logger });
     },
     teardown: async () => {
       if (closed) {
