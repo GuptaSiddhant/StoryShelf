@@ -339,6 +339,24 @@ describe("notifyProject", () => {
       ]);
     });
 
+    it("falls back to email when the subscription lists only a state channel", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      await new NotificationSubscriptionModel(db).upsert("p1", "appr1", { via: ["github"] });
+      const sent: { channel: { config: { to: string } } }[] = [];
+      const git = recordingProvider("github", sent);
+      (git.metadata as { delivery?: string }).delivery = "state";
+      const store = storeFor(db, [recordingProvider("email", sent), git]);
+      await notifyAssignedWith(
+        store,
+        { id: "p1", slug: "test-project" },
+        "appr1",
+        { buildId: "b1" },
+        "/builds/b1",
+      );
+      expect(sent.map((item) => item.channel.config.to)).toEqual(["appr1@example.com"]);
+    });
+
     it("sends nothing without an email provider or for a disabled account", async () => {
       const { db } = makeDatabase();
       await seedUsers(db);

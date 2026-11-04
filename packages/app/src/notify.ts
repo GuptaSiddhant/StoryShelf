@@ -331,11 +331,17 @@ async function assignedTargets(
   projectId: string,
   userId: string,
   wired: ReadonlySet<string>,
+  notifiers: readonly NotifierProvider[],
 ): Promise<NotificationChannel[]> {
   const own = (await new NotificationSubscriptionModel(db).list(projectId)).find(
     (row) => row.userId === userId,
   );
-  const chosen = own?.enabled ? await targetsForSub(db, own, wired) : [];
+  // A state channel (git) cannot carry a request to a person, so it never counts as a target.
+  const chosen = own?.enabled
+    ? (await targetsForSub(db, own, wired)).filter(
+        (channel) => !NotificationChannelModel.isStateKind(notifiers, channel.provider),
+      )
+    : [];
   if (chosen.length > 0) {
     return chosen;
   }
@@ -362,7 +368,7 @@ export async function notifyAssignedWith(
     return;
   }
   const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
-  const targets = await assignedTargets(deps.db, project.id, userId, wired);
+  const targets = await assignedTargets(deps.db, project.id, userId, wired, deps.notifiers);
   const reviewUrl = reviewUrlFor(origin, project.slug, reviewSuffix);
   await deliver(deps, project, { event, data, reviewUrl }, targets);
 }
