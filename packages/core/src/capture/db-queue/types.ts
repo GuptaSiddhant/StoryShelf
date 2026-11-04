@@ -57,6 +57,8 @@ export const DEFAULT_RETRIES = 2;
 
 /** A job of any kind, as `enqueueJob` takes it. */
 export interface QueueJobInput {
+  /** The job id, when the caller needs it before the row exists (a capture job is stamped first). */
+  id?: string;
   kind: CaptureJobKind;
   /** Build the job works on; notify jobs may have none. */
   buildId?: string | null;

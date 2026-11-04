@@ -327,23 +327,23 @@ export class BuildModel {
   }
 
   /**
-   * Record `jobId` as the capture job whose run owns the build (called once its job row exists),
-   * only while the build is still at `generation`, the value the enqueue read before inserting the
-   * job: one conditional write, so a stale enqueue never overwrites a newer run. `stale` means a
-   * retry superseded this run (the caller cancels its job); `ignored` is a cancelled or missing
-   * build, left alone.
+   * Claim the build for capture job `jobId` and start its run: one conditional write that records
+   * the owner and advances the run generation from `generation` (the value the enqueue read). Of two
+   * enqueues that read the same generation only one applies; the other comes back `stale` and must
+   * not insert its job. `stamped` carries the new generation, which the job's payload holds so its
+   * worker can tell a superseded run. `ignored` is a cancelled or missing build, left alone.
    */
   async stampCaptureJob(
     id: string,
     jobId: string,
     generation: number,
-  ): Promise<"stamped" | "stale" | "ignored"> {
+  ): Promise<{ result: "stamped"; generation: number } | { result: "stale" | "ignored" }> {
     const stamp = nextStamp();
     const columns = this.tables.builds;
     const row = (await this.db.updateWhere(
       columns,
       id,
-      { captureJobId: jobId, updatedAt: stamp },
+      { captureJobId: jobId, captureGeneration: generation + 1, updatedAt: stamp },
       // `and` of two conditions is never undefined.
       and(
         ne(col(columns, "status"), "cancelled"),
@@ -351,12 +351,42 @@ export class BuildModel {
       ) as SQL,
     )) as unknown as Build | null;
     if (row === null) {
-      return "ignored";
+      return { result: "ignored" };
     }
     if (row.captureJobId === jobId && instantOf(row.updatedAt) === instantOf(stamp)) {
-      return "stamped";
+      return { result: "stamped", generation: generation + 1 };
     }
-    return (row.captureGeneration ?? 0) === generation ? "ignored" : "stale";
+    return { result: (row.captureGeneration ?? 0) === generation ? "ignored" : "stale" };
+  }
+
+  /**
+   * Set the build's status only while it is still at run `generation` and not cancelled: one
+   * conditional write, so a worker of a superseded run (a retry started a newer one) writes nothing.
+   * Resolves to whether it applied and the row as it stands.
+   */
+  async setStatusAtGeneration(
+    id: string,
+    status: BuildStatus,
+    generation: number,
+  ): Promise<{ applied: boolean; build: Build | null }> {
+    const stamp = nextStamp();
+    const columns = this.tables.builds;
+    const build = (await this.db.updateWhere(
+      columns,
+      id,
+      { status, updatedAt: stamp },
+      and(
+        ne(col(columns, "status"), "cancelled"),
+        eq(col(columns, "captureGeneration"), generation),
+      ) as SQL,
+    )) as unknown as Build | null;
+    // A refused write returns the row another writer left, whose stamp can equal ours in the same
+    // millisecond: it only counts as ours if it also holds the status and generation we wrote.
+    const applied =
+      build?.status === status &&
+      (build.captureGeneration ?? 0) === generation &&
+      instantOf(build.updatedAt) === instantOf(stamp);
+    return { applied, build };
   }
 
   /**

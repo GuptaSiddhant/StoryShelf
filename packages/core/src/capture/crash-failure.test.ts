@@ -409,7 +409,7 @@ describe("failCrashedCapture", () => {
     await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     // J1 exhausted; the build is retried and queued again as J2 before J1's hook runs.
     await w.builds.resetStatus(w.build.id, "pending");
-    await w.builds.stampCaptureJob(w.build.id, "J2", 1);
+    await w.builds.stampCaptureJob(w.build.id, "J2", 2);
     await w.builds.setStatus(w.build.id, "capturing");
 
     const outcome = await failCrashedCapture(

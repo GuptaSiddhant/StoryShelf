@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BuildModel } from "../../models/build.ts";
 import { ProjectModel } from "../../models/project.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
+import { decodePayload } from "./codec.ts";
 import { createDatabaseCaptureQueue } from "./index.ts";
 
 function queue() {
@@ -41,7 +42,7 @@ describe("database queue operations", () => {
     const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
     const builds = new BuildModel(db);
     const build = await builds.create(project.id, { gitSha: "abc", gitBranch: "main" });
-    // Hold the first enqueue between inserting its job row and stamping the build.
+    // Hold the first enqueue between claiming the build and inserting its job row.
     const reached = gate();
     const release = gate();
     let held = false;
@@ -69,8 +70,29 @@ describe("database queue operations", () => {
 
     expect((await builds.get(build.id))?.captureJobId).toBe(newer);
     const entries = await q.recent(10);
-    expect(entries.filter((entry) => entry.status === "cancelled")).toHaveLength(1);
-    expect(entries.filter((entry) => entry.status === "queued")).toHaveLength(1);
+    // The overtaken enqueue's job is queued, but it belongs to an older generation than the build:
+    // its worker ends it before running (see capture-handler's `superseded`).
+    expect(entries).toHaveLength(2);
+    const rows = await db.list(db.tables.captureJobs);
+    const generations = rows.map((row) => decodePayload(row.payload).data?.["generation"]);
+    expect(generations).toContain(1);
+    expect(generations).toContain(3);
+    expect((await builds.get(build.id))?.captureGeneration).toBe(3);
+  });
+
+  it("lets only one of two concurrent enqueues of a build claim it", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
+    const builds = new BuildModel(db);
+    const build = await builds.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    const q = createDatabaseCaptureQueue(db, { kinds: ["capture"] });
+
+    await Promise.all([q.enqueue({ buildId: build.id }), q.enqueue({ buildId: build.id })]);
+
+    const jobs = await db.list(db.tables.captureJobs);
+    expect(jobs).toHaveLength(1);
+    expect((await builds.get(build.id))?.captureJobId).toBe(jobs[0]?.jobId);
+    expect((await builds.get(build.id))?.captureGeneration).toBe(1);
   });
 
   it("stores request id, trace and shard on the job row", async () => {

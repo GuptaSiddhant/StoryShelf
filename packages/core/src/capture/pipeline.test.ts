@@ -42,6 +42,7 @@ const mockBuild: Build = {
   message: null,
   public: false,
   status: "capturing",
+  captureGeneration: 0,
   snapshotCount: 0,
   changedCount: 0,
   approvedCount: 0,
@@ -680,6 +681,29 @@ describe("persistCapture", () => {
 });
 
 describe("finalizeBuild", () => {
+  it("writes nothing when a retry starts a newer run while an old worker finalizes", async () => {
+    const { ctx } = await makeContext({ captures: [] });
+    await seedBaseline(ctx);
+    const builds = new BuildModel(ctx.db, ctx.tables);
+    const updateCounts = BuildModel.prototype.updateCounts;
+    const spy = vi.spyOn(BuildModel.prototype, "updateCounts").mockImplementation(async function (
+      this: BuildModel,
+      id: string,
+    ) {
+      await this.resetStatus(id, "pending");
+      return await updateCounts.call(this, id);
+    });
+    const removeOrphans = vi.spyOn(BaselineModel.prototype, "removeOrphans");
+
+    await finalizeBuild(ctx, new Set(["other-story"]), new Set());
+
+    spy.mockRestore();
+    expect(removeOrphans).not.toHaveBeenCalled();
+    removeOrphans.mockRestore();
+    expect((await builds.get(ctx.build.id))?.status).toBe("pending");
+    expect(await ctx.db.list(ctx.db.tables.baselines)).toHaveLength(1);
+  });
+
   it("keeps the build cancelled and drops no baselines when a cancel lands during finalize", async () => {
     const { ctx } = await makeContext({ captures: [] });
     await seedBaseline(ctx);
