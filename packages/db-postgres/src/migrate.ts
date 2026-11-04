@@ -240,10 +240,12 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, BUILD_AFFECTED_PATHS_ALTER);
   await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
   await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
-  await execIgnore(run, BUILD_REVIEW_CYCLE_ALTER);
-  await execIgnore(run, BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
-  await execIgnore(run, BUILD_CAPTURE_JOB_ALTER);
-  await execIgnore(run, BUILD_CAPTURE_GENERATION_ALTER);
+  // Idempotent (IF NOT EXISTS), and the review gate and the capture fence read these columns: a
+  // real failure must stop the boot, not leave a column missing.
+  await run(BUILD_REVIEW_CYCLE_ALTER);
+  await run(BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
+  await run(BUILD_CAPTURE_JOB_ALTER);
+  await run(BUILD_CAPTURE_GENERATION_ALTER);
 }
 
 /** Run the full migration set through any row-query runner. */

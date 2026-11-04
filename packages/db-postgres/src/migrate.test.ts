@@ -449,6 +449,27 @@ describe("runMigrations: builds.capture_job_id", () => {
   }, 60_000);
 });
 
+describe("runMigrations: a failing build-column ALTER stops the boot", () => {
+  it.each(["review_cycle", "review_requested_cycle", "capture_job_id", "capture_generation"])(
+    "does not swallow a failure adding builds.%s",
+    async (column) => {
+      const client = new PGlite();
+      const inner = runnerFor(client);
+      const failing = async (sql: string): Promise<unknown[]> => {
+        if (sql.startsWith(`ALTER TABLE builds ADD COLUMN IF NOT EXISTS ${column} `)) {
+          throw new Error(`permission denied for table builds (${column})`);
+        }
+        return await inner(sql);
+      };
+      await expect(runMigrations(failing)).rejects.toThrow(
+        `permission denied for table builds (${column})`,
+      );
+      await client.close();
+    },
+    60_000,
+  );
+});
+
 describe("runMigrations: builds.capture_generation", () => {
   it("adds the run generation at 0 to existing builds, and again without harm", async () => {
     const client = new PGlite();
