@@ -101,7 +101,7 @@ storyshelf upload --stats-file ./stats/preview-stats.json
 ## What you see in the UI
 
 - The build page shows an `affected capture` badge (or `full capture` when opted out) plus `N rendered, M inherited` counts, and an **Inherited** stat next to the other counts. The numbers are the ones stored on the build (`snapshotCount`, `inheritedCount`), also served by the API.
-- The project's **Builds** page shows **Inherited from baseline**: the average, over the project's last 20 builds that hold snapshots, of each build's `inheritedCount / snapshotCount`. It is computed from the stored counts only, so it reads no snapshots. A high number means affected capture is skipping most of your Storybook; a number near zero means most changes reach most stories (a shared import, for example), and [the trace](#tuning-the-trace) is worth a look.
+- The project's **Builds** page shows **Average inherited share per build**; [what it averages and what it does not measure](#the-inherited-share). A high number means affected capture is skipping most of your Storybook; a number near zero means most changes reach most stories (a shared import, for example), and [the trace](#tuning-the-trace) is worth a look.
 - Inherited snapshots carry an `inherited` badge and `unchanged` status — they need no review.
 - Capture attempt logs include an `affected capture partitioned` line with `{ rendered, inherited, total }`.
 
