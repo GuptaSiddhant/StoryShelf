@@ -4,7 +4,7 @@ Guidance for AI agents (and humans) working in the StoryShelf monorepo.
 
 StoryShelf is a self-hosted visual-testing platform for Storybook (a Chromatic alternative): upload
 a built Storybook, render stories server-side with Playwright/Puppeteer, pixel-diff against per-branch
-baselines, then review and approve. `docs/architecture.md` is the current-state spec;
+baselines, then review and approve. `docs/architecture/` is the current-state spec;
 `docs/repo-structure.md` is the spatial index; `docs/adr/` records decisions.
 
 ## Toolchain
@@ -73,7 +73,7 @@ rather than pushing and waiting.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
 - `fixtures/storybook-{8,9,10}` — Storybook 8.6 / 9 / 10 (pnpm, built on demand).
-- `docs/` — `architecture.md`, `repo-structure.md`, `testing.md`, `adr/`.
+- `docs/` — `architecture/`, `repo-structure.md`, `testing.md`, `adr/`.
 
 Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public docs site
 (`apps/website`). They have different build, test and directory conventions.
@@ -249,7 +249,7 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   canary (`docs/testing.md`).
 - **ADRs.** Current ADRs are 0001-0018 plus 0037+; archived ADRs are 0001-0036 under `archive/`.
   A bare `ADR NNNN` means a current ADR. Do not edit `archive/`; new ADRs start at 0037. ADRs are
-  decision records (target 250 lines, hard cap 320); `docs/architecture.md` owns entities/interfaces.
+  decision records (target 250 lines, hard cap 320); `docs/architecture/` owns entities/interfaces.
   Run `nub run docs:check` after touching an ADR or a reference.
 - **Temp files:** use repo-local `.tmp/` (gitignored), not `/tmp`; local server data lives in
   `.dev-data/` (gitignored).
