@@ -39,7 +39,8 @@ export interface AiUsageRow {
   outputTokens: number;
   estimated: boolean;
   images: number;
-  status: "ok" | "failed";
+  /** `pending` is a reserved call whose provider answer has not arrived yet (zero tokens). */
+  status: "ok" | "failed" | "pending";
   createdAt: string;
 }
 

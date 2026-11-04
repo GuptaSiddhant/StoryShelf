@@ -15,7 +15,7 @@
  *   node scripts/changeset-check.mjs [--labels a,b] [--head-ref <branch>] [--base <ref>]
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   checkChangeset,
@@ -77,11 +77,41 @@ function readBase(base, path) {
   }
 }
 
+/** A manifest's name when it is published, `undefined` when it is private, `null` when it cannot be read or has no name. */
+function publishedName(text) {
+  try {
+    const manifest = JSON.parse(text);
+    return manifest.private === true ? undefined : (manifest.name ?? null);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The published packages: `packages/<dir>/package.json` paths and names (a package is published
+ * unless private). A manifest that cannot be read is kept with a null name, so `releaseProblems`
+ * reports it instead of the check passing over it.
+ */
+function publishedPackages() {
+  return readdirSync(join(root, "packages"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `packages/${entry.name}/package.json`)
+    .map((path) => ({ path, text: readHead(path) }))
+    .filter(({ text }) => text !== null)
+    .map(({ path, text }) => ({ path, name: publishedName(text) }))
+    .filter(({ name }) => name !== undefined);
+}
+
 const labels = (option("--labels") ?? "").split(",").filter(Boolean);
 const base = option("--base") ?? "HEAD^1";
 const headRef = option("--head-ref");
 const { changed, added, entries } = diff(base);
-const malformed = malformedChangesets(added, (path) => readFileSync(join(root, path), "utf8"));
+const published = publishedPackages();
+const malformed = malformedChangesets(
+  added,
+  (path) => readFileSync(join(root, path), "utf8"),
+  published.map(({ name }) => name).filter((name) => name !== null),
+);
 if (malformed.length > 0) {
   console.error(`::error title=Malformed changeset::${malformed.join("; ")}`);
   process.exit(1);
@@ -93,6 +123,7 @@ if (releaseVersion !== null) {
     entries,
     readBase: (path) => readBase(base, path),
     readHead,
+    published: published.map(({ path }) => path),
   });
   if (problems.length > 0) {
     console.error(

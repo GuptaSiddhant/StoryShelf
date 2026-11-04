@@ -335,13 +335,15 @@ capture_jobs (
   owner               text,                    -- instance holding an attempt
   payload             text,                    -- JSON: reqId, traceparent, kind-specific data
   cancel_requested_at text,                    -- cancel flag, never cleared
+  active_key          text,                    -- single-flight job kinds: unique while the job is not terminal; cleared when it ends; never on attempt rows
+  rerun_requested_at  text,                    -- running job: a request for its key arrived, so a successor job runs one more pass
   error               text,
   started_at          text,
   finished_at         text,
   created_at          text NOT NULL,
   updated_at          text NOT NULL
 );
--- capture_jobs_poll_idx (kind, visible_at, status): the poll probe; plus (job_id), (build_id), (entry, created_at)
+-- capture_jobs_poll_idx (kind, visible_at, status): the poll probe; plus (job_id), (build_id), (entry, created_at); unique (active_key): at most one non-terminal job per key (ADR 0040), NULLs never collide
 
 -- Site-wide key-value settings the app learns while running (ADR 0007, decision 6). Key 'public_origin'
 -- holds JSON {origin, confirmed}: the origin a site admin's browser reported (confirmed: false until an admin confirms it), written only by a
@@ -736,7 +738,7 @@ With `testing` off (ADR 0013, decision 3) the verdicts in `build_reviews` decide
 
 **The review UI.** The build page (`pages/build-detail.tsx`) renders `VerdictCard` (standing, approvals against the requirement, each reviewer's latest verdict, approve and reject for approvers and admins; a "Waiting for the Storybook to publish" notice in place of the form while `publishingOf` is `pending`), `ChangesetCard` and `CommentsCard` from `loadReviewSection` when review is on; with `testing` off the verdict card and the changeset are the page's main content, with `testing` on the changeset sits above the snapshots and the verdict and comments below. The changeset (`core/src/models/changeset.ts`) is `computeChangeset` over the build's `build_components` rows and the rows of its baseline build (`findChangesetBaseline`: the latest accepted build of the branch created before it, else of the default branch): components added, removed and changed by hash (the hash covers story id, name, type and title), plus the count of unchanged ones; `GET …/builds/:buildId/changeset` returns it. Story comments show under the previewed story of the component page (the build it shows) and in the snapshot review thread of that story. Browser forms post `application/x-www-form-urlencoded`, which the JSON API refuses, so the comment, resolve and verdict forms post to page routes in `routers/review-forms.ts` (class `review`, CSRF-guarded) that call the API handlers. The review switch and approvals are edited in the General settings tab (`POST /projects/:slug/settings/review`, project admins; class `hosting` so review can be turned back on); turning review off runs the switch-off pass (`acceptPendingWithoutWork`, `core/src/models/review-switch-off.ts`): the project's `pending` builds with no capture attempts and no snapshots become `approved`, with no approval event.
 
-**Events.** `review:requested` (the `afterPublish` hook in `publish-setup.ts`, for a published build left `pending` without `testing`; recipients are the channels and webhooks plus the project's approvers and admins by email unless they opted out: `defaultTargets` in `notify.ts`, an `enabled = false` subscription or a topic list without the event opts out), `comment:created` (every comment, `data.scope` build, story or snapshot; `review:comment` is only a filter alias, for webhooks, channels and subscriptions, matching the build and story scopes; see `matchesEvent` in core) and `review:verdict` (every verdict) are raised by `announceReview` (`app/src/review-events.ts`): signed webhooks plus the notification fan-out. No comment raises two events.
+**Events.** `review:requested` (the `afterPublish` hook in `publish-setup.ts`, for a published build left `pending` without `testing`; recipients are the channels and webhooks plus the project's approvers and admins by email unless they opted out: `defaultTargets` in `notify.ts`, an `enabled = false` subscription, `review_requests = false` or a topic list without the event opts out; unticking "Email me" keeps the row switched off instead of deleting it, which would restore the default), `comment:created` (every comment, `data.scope` build, story or snapshot; `review:comment` is only a filter alias, for webhooks, channels and subscriptions, matching the build and story scopes; see `matchesEvent` in core) and `review:verdict` (every verdict) are raised by `announceReview` (`app/src/review-events.ts`): signed webhooks plus the notification fan-out. No comment raises two events.
 
 ### PR Status Checks & Merge Gate
 
@@ -808,7 +810,7 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 
 ### What is purged
 
-- **Builds in a terminal state** (`approved`/`rejected`/`failed`/`cancelled`) older than `purgeTtlDays` (default 30 days).
+- **Builds in a terminal state** (`approved`/`rejected`/`failed`/`cancelled`) older than `purgeTtlDays` (no default: the daily purge is opt-in; a manual purge without `ttlDays` uses `purgeTtlDays` when it is set, else 30).
 - **Old builds of a branch**: retain the most recent build per branch (it is the branch's "current" state and powers the PR status link); purge older ones past TTL.
 - Builds stuck in `capturing`/`comparing`/`reviewing` are **not** purged (a `reviewing` build must not vanish before review).
 - **`pending` builds** (waiting for a review verdict, ADR 0013 decision 9; `core/src/retention/pending.ts`): purged once their last activity (the build's `updated_at`, its newest comment, its newest `build_reviews` row) is older than `purgeTtlDays`. A pending build replaced by a newer one on its branch with no attempts, comments or verdicts is "superseded" and leaves at the same window; the latest-per-branch rule does not shield pending builds, and persistent ones are kept. No new status.
@@ -822,9 +824,9 @@ When a story is renamed or removed from Storybook, its baseline is never touched
 
 ### Trigger
 
-- **Scheduled**: one in-server timer, branch GC (`branchTtlDays` 30 + `branchGcIntervalMs` 24h daily interval clock via `retention-timer.ts`, staggered 1h). Build purge is not scheduled; run it manually.
-- **With `testing` enabled** (until #374 activates lifecycle-aware retention), branch GC is skipped (`retention-timer.ts`) and `POST /api/v1/admin/purge` answers `503` (`routers/admin.ts`); builds are retained. Hosting-only deployments are unaffected.
-- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin; now runs both build purge and branch GC and returns `{removedBuilds,removedBranches,removedBaselines}`).
+- **Scheduled**: one in-server timer (`retention-timer.ts`, `branchGcIntervalMs` 24h interval clock, staggered 1h) runs branch GC (`branchTtlDays`, default 30) and, **only when `purgeTtlDays` is set explicitly** (no default, so an upgrade never starts deleting builds), the build purge with keep-latest-per-branch. The scheduled build purge runs only the `buildReferenceLifecycle` path (builds, released content, content GC) and does nothing without it, with one warning. Hosts map the setting: `apps/fly-app` and `apps/dev-server` read `PURGE_TTL_DAYS`; core reads no environment variable.
+- **With `testing` enabled**, build purge and branch GC run only on a database with the `buildReferenceLifecycle` capability (ADR 0039): SQLite on a file, prepared at boot. Without it (Postgres and MySQL until #375/#376, or SQLite with retention paused by a baseline whose source build cannot be pinned, shown on the System page), branch GC is skipped (`retention-timer.ts`) and `POST /api/v1/admin/purge` answers `503` (`routers/admin.ts`); builds are retained. Hosting-only deployments are unaffected.
+- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin; runs both build purge and branch GC and returns `{removedBuilds,removedBranches,removedBaselines}`, plus `protected` (builds a baseline or investigation still pins) and `resumed` (builds an earlier unfinished run had claimed) when the database has the capability).
 
 ## Published Storybook
 
@@ -1220,7 +1222,6 @@ services:
       - PURGE_TTL_DAYS=30
       - BRANCH_TTL_DAYS=30
       - BRANCH_GC_INTERVAL_MS=86400000
-      - PURGE_INTERVAL_MINUTES=60
       # Published Storybook subdomains (optional — omit for path-based URLs only)
       # - PUBLISHED_BASE_DOMAIN=stories.example.com   # requires wildcard DNS + TLS
       # Auth (optional — omit for no auth; see /guides/auth/)

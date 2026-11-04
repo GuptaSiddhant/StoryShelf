@@ -110,6 +110,23 @@ async function failFinalize(
   };
 }
 
+/**
+ * The counts a finalized build reported (what {@link reduceBuild} put in its summary), rebuilt from
+ * the plan and the shards' outcomes, for a retry that must close the attempt without finalizing the
+ * build again.
+ */
+export async function finalizedCounts(
+  shards: CaptureShardModel,
+  buildId: string,
+): Promise<{ storyCount: number; failedCount: number }> {
+  const planResult = planResultOf(await shards.plan(buildId));
+  const rows = await shards.renderShards(buildId);
+  return {
+    storyCount: planResult.storyIds?.length ?? 0,
+    failedCount: collectSets(rows, planResult).failed.size,
+  };
+}
+
 function planResultOf(plan: CaptureShard | null): Partial<PlanResult> {
   return JSON.parse(plan?.result ?? "{}") as Partial<PlanResult>;
 }

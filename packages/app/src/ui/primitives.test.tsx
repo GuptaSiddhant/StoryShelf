@@ -96,6 +96,15 @@ describe("Badge and Alert", () => {
     expect(html).toContain("#i-x-circle");
     expect(html).toContain("Nope");
   });
+
+  it("takes role=status for a polite message, and role=none to leave the attribute off", async () => {
+    const polite = await render(<Alert role="status">Heads up</Alert>);
+    expect(polite).toContain('role="status"');
+    expect(polite).not.toContain('role="alert"');
+    const owned = await render(<Alert role="none">Inside a live region</Alert>);
+    expect(owned).not.toContain("role=");
+    expect(owned).toContain("Inside a live region");
+  });
 });
 
 describe("Avatar", () => {
@@ -176,7 +185,7 @@ describe("Dropdown", () => {
 describe("Table, Thumbnail, Kbd", () => {
   it("wraps native table markup in the table surface", async () => {
     const html = await render(
-      <Table dense>
+      <Table dense label="Rows">
         <table>
           <tbody>
             <tr>
@@ -188,6 +197,17 @@ describe("Table, Thumbnail, Kbd", () => {
     );
     expect(html).toContain("ss-table-dense-");
     expect(html).toContain("<td>x</td>");
+  });
+
+  it("is a focusable region named by its label", async () => {
+    const html = await render(
+      <Table label="API tokens">
+        <table />
+      </Table>,
+    );
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="API tokens"');
+    expect(html).toContain('tabindex="0"');
   });
 
   it("lazy-loads the image or falls back to a placeholder", async () => {
@@ -273,6 +293,30 @@ describe("CompareStage", () => {
   });
 });
 
+describe("CompareStage panes", () => {
+  it("makes a pane with an image a named, keyboard-focusable group, and leaves an empty pane alone", async () => {
+    const html = await render(
+      <CompareStage
+        baselineSrc="/b.png"
+        currentSrc="/c.png"
+        diffSrc={null}
+        subject="Button / Primary"
+        diffEmpty="No diff yet"
+      />,
+    );
+    expect(html).toContain('aria-label="Baseline screenshot"');
+    expect(html).toContain('aria-label="Current screenshot"');
+    expect(html).toMatch(
+      /<div class="stage__pane" data-pane="baseline" tabindex="0" role="group"/u,
+    );
+    // Swipe clips and onion fades the current pane, and its outline with it: the ring is drawn on the grid.
+    expect(html).toMatch(/\[data-view="swipe"\] \.stage__grid:has\(\.stage__pane:focus-visible\)/u);
+    // The diff pane has no image here: nothing to scroll, so no tab stop and no name.
+    expect(html).toMatch(/<div class="stage__pane" data-pane="diff">/u);
+    expect(html).not.toContain("Diff screenshot");
+  });
+});
+
 describe("RelativeTime", () => {
   it("renders a machine-readable <time> with the exact timestamp on hover", async () => {
     const html = await render(<RelativeTime value="2020-01-02T03:04:05.000Z" />);
@@ -293,6 +337,11 @@ describe("CodeBlock and FilterInput", () => {
     expect(html).toContain("<code>npx storyshelf upload</code>");
     expect(html).toContain('data-copy="npx storyshelf upload"');
     expect(html).toContain("#i-copy");
+  });
+
+  it("makes a scrolling snippet keyboard-focusable", async () => {
+    const html = await render(<CodeBlock code="npx storyshelf upload" />);
+    expect(html).toContain('<pre tabindex="0">');
   });
 
   it("renders a labeled search input the shell script can find", async () => {

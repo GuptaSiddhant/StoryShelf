@@ -83,6 +83,7 @@ export class BuildModel {
       changedFiles: serializePaths(input.changedFiles),
       affectedImportPaths: serializePaths(input.affectedImportPaths),
       status: "pending",
+      captureGeneration: 0,
       createdAt: now,
       updatedAt: now,
     })) as unknown as Build;
@@ -247,24 +248,115 @@ export class BuildModel {
 
   /**
    * Put a finished build back to `status` for a retry. The one write that leaves `cancelled`
-   * (a user chose it), so it skips the terminal guard of {@link BuildModel.update}.
+   * (a user chose it), so it skips the terminal guard of {@link BuildModel.update}. It clears the
+   * owning run and advances the run generation in one conditional write (compare-and-set on the
+   * generation it read), so an enqueue that read the old generation can no longer stamp its job.
    */
   async resetStatus(id: string, status: BuildStatus): Promise<Build> {
-    // No run owns the build now: a late crash hook of the run that ended must not touch the next.
-    return await this.update(id, { status, captureJobId: null }, { reset: true });
+    for (let attempt = 0; attempt < RESET_ATTEMPTS; attempt += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- each retry needs the generation the loser lost to
+      const reset = await this.resetOnce(id, status);
+      if (reset !== null) {
+        return reset;
+      }
+    }
+    throw new Error("Build reset lost the race repeatedly");
+  }
+
+  /** One compare-and-set reset; null when another writer advanced the generation first. */
+  private async resetOnce(id: string, status: BuildStatus): Promise<Build | null> {
+    const current = await this.get(id);
+    if (current === null) {
+      throw new Error("Build not found");
+    }
+    const stamp = nextStamp();
+    const generation = current.captureGeneration ?? 0;
+    const { values, where } = this.resetWrite(current, status, stamp);
+    const row = (await this.db.updateWhere(
+      this.tables.builds,
+      id,
+      values as never,
+      where,
+    )) as unknown as Build | null;
+    // Only our own write carries our stamp (see `failIfOwnedBy`).
+    if (
+      row?.captureGeneration !== generation + 1 ||
+      instantOf(row.updatedAt) !== instantOf(stamp)
+    ) {
+      return null;
+    }
+    return row;
   }
 
   /**
-   * Record `jobId` as the capture job whose run owns the build (called once its job row exists).
-   * A cancelled or missing build is left alone.
+   * The reset write and its condition. Always a compare-and-set on the run generation read. A
+   * verdict build going back to `pending` also starts the next review cycle, as
+   * {@link BuildModel.update} does for any such write, guarded by the cycle just read.
    */
-  async stampCaptureJob(id: string, jobId: string): Promise<void> {
-    await this.db.updateWhere(
-      this.tables.builds,
+  private resetWrite(
+    current: Build,
+    status: BuildStatus,
+    stamp: string,
+  ): { values: Record<string, unknown>; where: SQL } {
+    const { builds } = this.tables;
+    const generation = current.captureGeneration ?? 0;
+    const base = {
+      status,
+      captureJobId: null,
+      captureGeneration: generation + 1,
+      updatedAt: stamp,
+    };
+    const sameGeneration = eq(col(builds, "captureGeneration"), generation);
+    if (status !== "pending" || !REVIEWED.has(current.status)) {
+      // Also the status just read: a verdict that lands before this write is not overwritten, and
+      // the retry reads it and reopens its review cycle instead.
+      return {
+        values: base,
+        where: allOf(sameGeneration, eq(col(builds, "status"), current.status)),
+      };
+    }
+    const cycle = current.reviewCycle ?? 0;
+    return {
+      values: { ...base, reviewCycle: cycle + 1 },
+      where: allOf(
+        sameGeneration,
+        inArray(col(builds, "status"), [...REVIEWED]),
+        eq(col(builds, "reviewCycle"), cycle),
+      ),
+    };
+  }
+
+  /**
+   * Record `jobId` as the capture job whose run owns the build (called once its job row exists),
+   * only while the build is still at `generation`, the value the enqueue read before inserting the
+   * job: one conditional write, so a stale enqueue never overwrites a newer run. `stale` means a
+   * retry superseded this run (the caller cancels its job); `ignored` is a cancelled or missing
+   * build, left alone.
+   */
+  async stampCaptureJob(
+    id: string,
+    jobId: string,
+    generation: number,
+  ): Promise<"stamped" | "stale" | "ignored"> {
+    const stamp = nextStamp();
+    const columns = this.tables.builds;
+    const row = (await this.db.updateWhere(
+      columns,
       id,
-      { captureJobId: jobId, updatedAt: new Date().toISOString() },
-      ne(col(this.tables.builds, "status"), "cancelled"),
-    );
+      { captureJobId: jobId, updatedAt: stamp },
+      // `and` of two conditions is never undefined.
+      and(
+        ne(col(columns, "status"), "cancelled"),
+        eq(col(columns, "captureGeneration"), generation),
+      ) as SQL,
+    )) as unknown as Build | null;
+    if (row === null) {
+      return "ignored";
+    }
+    if (row.captureJobId === jobId && instantOf(row.updatedAt) === instantOf(stamp)) {
+      return "stamped";
+    }
+    return (row.captureGeneration ?? 0) === generation ? "ignored" : "stale";
   }
 
   /**
@@ -296,6 +388,27 @@ export class BuildModel {
       current?.status === "failed" &&
       current.captureJobId === jobId &&
       instantOf(current.updatedAt) === instantOf(stamp);
+    return { applied, build: current };
+  }
+
+  /**
+   * Fail the build only while it is still `pending`: one conditional write, so a cancel, a verdict
+   * or a retry that landed since the caller read the row is never overwritten. Resolves to whether
+   * this write applied, and the row as it stands (null when the build is gone).
+   */
+  async failIfPending(id: string): Promise<{ applied: boolean; build: Build | null }> {
+    const stamp = nextStamp();
+    const columns = this.tables.builds;
+    const current = (await this.db.updateWhere(
+      columns,
+      id,
+      { status: "failed", updatedAt: stamp },
+      eq(col(columns, "status"), "pending"),
+    )) as unknown as Build | null;
+    // `updateWhere` returns the row either way; only our own write carries our stamp (compared as
+    // instants, as `failIfOwnedBy` does).
+    const applied =
+      current?.status === "failed" && instantOf(current.updatedAt) === instantOf(stamp);
     return { applied, build: current };
   }
 
@@ -432,6 +545,9 @@ export interface BuildListFilter {
   limit?: number;
 }
 
+/** How many times a reset re-reads the generation after losing a race to another reset. */
+const RESET_ATTEMPTS = 5;
+
 /** The instant a stored timestamp names, in epoch ms, whichever string form the driver returns. */
 function instantOf(value: string): number {
   const direct = Date.parse(value);
@@ -446,4 +562,9 @@ function instantOf(value: string): number {
 function nextStamp(): string {
   lastStamp = Math.max(Date.now(), lastStamp + 1);
   return new Date(lastStamp).toISOString();
+}
+
+/** `and` of conditions, which is never undefined when it is given at least one. */
+function allOf(first: SQL, ...rest: SQL[]): SQL {
+  return and(first, ...rest) ?? first;
 }

@@ -4,6 +4,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { storybookDir } from "@storyshelf/core/utils";
+import type { Context } from "hono";
 import { posix } from "node:path";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
@@ -23,6 +24,37 @@ async function staticsReady(projectId: string, buildId: string): Promise<boolean
   return await getStore().storage.exists(
     posix.join(storybookDir(projectId, buildId), "iframe.html"),
   );
+}
+
+/** Whether a short-link id names one build (a 26-character ULID) rather than a project slug. */
+function isBuildId(id: string): boolean {
+  return id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
+}
+
+/**
+ * The build a short link opens: the build itself for a ULID, whatever its status; for a project
+ * slug the latest approved build on the default branch (never a feature branch or an unreviewed
+ * build). Null when nothing matches.
+ */
+async function resolveShortLink(id: string): Promise<{ project: Project; build: Build } | null> {
+  const { db } = getStore();
+  if (isBuildId(id)) {
+    const build = await new BuildModel(db).get(id);
+    const project = build ? await new ProjectModel(db).get(build.projectId) : null;
+    return build && project ? { project, build } : null;
+  }
+  const project = await new ProjectModel(db).getBySlug(id);
+  const build = project ? await new BuildModel(db).latestApprovedDefault(project) : null;
+  return project && build ? { project, build } : null;
+}
+
+/**
+ * The answer for a short link that names nothing: the plain 404. A private build or project
+ * answers the same to a caller with no role (see `hiddenFrom`), so a link never confirms that a
+ * private id exists (#497).
+ */
+function unreachable(c: Context): Response | Promise<Response> {
+  return c.notFound();
 }
 
 /** Register the published Storybook resolver and static-asset routes. */
@@ -60,22 +92,12 @@ export function registerStorybook(app: ShelfRouter): void {
 
   app.get("/_/:id/*", async (c) => {
     const id = c.req.param("id");
-    const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
+    const isUlid26 = isBuildId(id);
     const rest = publishedRelativePath(c.req.path, `/_/${id}/`);
     if (rest === null) return c.notFound();
-    let project: Project | null = null;
-    let build: Build | null = null;
-    if (isUlid26) {
-      build = await new BuildModel(getStore().db).get(id);
-      if (!build) return c.notFound();
-      project = await new ProjectModel(getStore().db).get(build.projectId);
-      if (!project) return c.notFound();
-    } else {
-      project = await new ProjectModel(getStore().db).getBySlug(id);
-      if (!project) return c.notFound();
-      build = await new BuildModel(getStore().db).latestApprovedDefault(project);
-      if (!build) return c.notFound();
-    }
+    const target = await resolveShortLink(id);
+    if (!target) return unreachable(c);
+    const { project, build } = target;
     const access = await publishedAccess(build, project);
     if (!access) {
       // A caller with no role gets what a build that does not exist gets (#497).

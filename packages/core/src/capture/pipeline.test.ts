@@ -1,6 +1,9 @@
 import { PNG } from "pngjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CaptureTarget, RenderedSnapshot } from "../adapters/capture-runner.ts";
+import { BaselineModel } from "../models/baseline.ts";
+import { BuildModel } from "../models/build.ts";
+import { SnapshotModel } from "../models/snapshot.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
@@ -8,7 +11,7 @@ import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { parseComparisonReference } from "./comparison-reference.ts";
-import { persistCapture, type CaptureContext } from "./pipeline.ts";
+import { finalizeBuild, persistCapture, type CaptureContext } from "./pipeline.ts";
 
 const DEFAULT_VIEWPORT: Viewport = { name: "mobile", width: 320, height: 480 };
 
@@ -588,6 +591,43 @@ describe("persistCapture", () => {
     expect(rows[0]?.sourceBuildId).toBe("original-build");
   });
 
+  it("gives an inherited snapshot its baseline's findings, marked as from the baseline", async () => {
+    const { ctx } = await makeContext({ captures: [] });
+    await seedBaseline(ctx);
+    await ctx.db.insert(ctx.db.tables.builds, {
+      ...mockBuild,
+      id: "original-build",
+      gitSha: "abcdef0123456",
+    });
+    const source = await new SnapshotModel(ctx.db, ctx.tables).create("p1", "original-build", {
+      storyId: "a",
+      storyName: "a",
+      storyTitle: "Components/Button",
+      viewportName: DEFAULT_VIEWPORT.name,
+      viewportWidth: DEFAULT_VIEWPORT.width,
+      viewportHeight: DEFAULT_VIEWPORT.height,
+      screenshotPath: "/baselines/bl1.png",
+      a11yViolations: JSON.stringify(["image-alt (critical): Images need alt [img] 1 node"]),
+    });
+    await ctx.db.update(ctx.db.tables.baselines, "bl1", {
+      snapshotId: source.id,
+      sourceBuildId: "original-build",
+    });
+    const baseline = (await ctx.db.get(ctx.db.tables.baselines, "bl1")) as unknown as Baseline;
+
+    await persistCapture({
+      ...ctx,
+      inherited: [{ story: storyOf("a"), viewport: DEFAULT_VIEWPORT, baseline }],
+    });
+
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    const inherited = rows.find((row) => row.inherited);
+    expect(JSON.parse(inherited?.a11yViolations ?? "null")).toEqual([
+      "from baseline abcdef0",
+      "image-alt (critical): Images need alt [img] 1 node",
+    ]);
+  });
+
   it("mixes rendered and inherited snapshots in one build", async () => {
     const { ctx } = await makeContext({
       captures: [captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],
@@ -636,5 +676,31 @@ describe("persistCapture", () => {
     expect(row?.viewportName).toBe("tablet");
     expect(row?.viewportWidth).toBe(834);
     expect(row?.viewportHeight).toBe(1112);
+  });
+});
+
+describe("finalizeBuild", () => {
+  it("keeps the build cancelled and drops no baselines when a cancel lands during finalize", async () => {
+    const { ctx } = await makeContext({ captures: [] });
+    await seedBaseline(ctx);
+    const builds = new BuildModel(ctx.db, ctx.tables);
+    // The first check sees a live build; the cancel arrives while the counts are rolled up.
+    const updateCounts = BuildModel.prototype.updateCounts;
+    const spy = vi.spyOn(BuildModel.prototype, "updateCounts").mockImplementation(async function (
+      this: BuildModel,
+      id: string,
+    ) {
+      await this.setStatus(id, "cancelled");
+      return await updateCounts.call(this, id);
+    });
+    const removeOrphans = vi.spyOn(BaselineModel.prototype, "removeOrphans");
+
+    await finalizeBuild(ctx, new Set(["other-story"]), new Set());
+
+    spy.mockRestore();
+    expect(removeOrphans).not.toHaveBeenCalled();
+    removeOrphans.mockRestore();
+    expect((await builds.get(ctx.build.id))?.status).toBe("cancelled");
+    expect(await ctx.db.list(ctx.db.tables.baselines)).toHaveLength(1);
   });
 });

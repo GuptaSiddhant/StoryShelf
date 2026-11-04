@@ -245,11 +245,19 @@ function filterPart(): string {
  * Click-to-load story previews: move the inert frame out of its template (nothing runs before). A
  * frame under a signed URL first asks for a fresh root, so a page left open for hours does not mount
  * an expired token; it keeps the rendered one when that request fails. Afterwards the root is renewed
- * every `data-preview-refresh-seconds`; a failed renewal is retried a few times a minute apart.
+ * every `data-preview-refresh-seconds`; a failed renewal is retried a few times a minute apart, and
+ * once the last retry failed the page shows a notice with a button to reload the preview now.
  */
 function previewPart(): string {
   return `
     document.addEventListener('click',function(e){
+      var reload=e.target instanceof Element ? e.target.closest('[data-preview-reload]') : null;
+      if(reload){
+        var box=reload.closest('[data-preview-wrap]');
+        var target=box ? box.querySelector('[data-preview-embed]') : null;
+        if(target) reloadPreview(target);
+        return;
+      }
       var btn=e.target instanceof Element ? e.target.closest('[data-preview-load]') : null;
       var host=btn ? btn.closest('[data-preview-embed]') : null;
       var tpl=host ? host.querySelector('template[data-preview-template]') : null;
@@ -291,16 +299,62 @@ function previewRefreshPart(): string {
         var frame=host.querySelector('iframe');
         if(!host.isConnected||!frame) return;
         fetchPreviewBase(host).then(function(base){
-          if(base) frame.src=base+path;
-          else throw new Error('preview-token');
+          if(!base) throw new Error('preview-token');
+          frame.src=base+path;
+          showPreviewFailure(host,false);
         }).catch(function(){
           if(tries<MAX_RETRIES) setTimeout(function(){ renew(tries+1); },RETRY_MS);
+          else showPreviewFailure(host,true);
         });
       }
       var timer=setInterval(function(){
         if(!host.isConnected||!host.querySelector('iframe')){ clearInterval(timer); return; }
         renew(0);
       },seconds*1000);
+    }`;
+}
+
+/** The notice a signed preview shows after its last failed renewal, and its reload button. */
+function previewNoticePart(): string {
+  return `
+    function previewNotes(host){
+      var wrap=host.closest('[data-preview-wrap]');
+      if(!wrap) return null;
+      return {
+        notice: wrap.querySelector('[data-preview-notice]'),
+        disclosure: wrap.querySelector('[data-preview-disclosure]'),
+        button: wrap.querySelector('[data-preview-reload]'),
+        again: wrap.querySelector('[data-preview-again]')
+      };
+    }
+    function showPreviewFailure(host,failed){
+      var notes=previewNotes(host);
+      if(!notes||!notes.notice||!notes.disclosure) return;
+      notes.notice.hidden=!failed;
+      notes.disclosure.hidden=failed;
+      if(!failed&&notes.again) notes.again.hidden=true;
+    }
+    function reloadPreview(host){
+      var notes=previewNotes(host);
+      var frame=host.querySelector('iframe');
+      var path=host.getAttribute('data-preview-path');
+      if(!notes||!notes.button||!notes.notice||!frame||!path) return;
+      var label=notes.button.textContent;
+      notes.button.disabled=true;
+      notes.button.textContent='Reloading\u2026';
+      notes.notice.setAttribute('aria-busy','true');
+      fetchPreviewBase(host).then(function(base){
+        if(!base) throw new Error('preview-token');
+        frame.src=base+path;
+        showPreviewFailure(host,false);
+        frame.focus();
+      }).catch(function(){
+        if(notes.again) notes.again.hidden=false;
+      }).then(function(){
+        notes.button.disabled=false;
+        notes.button.textContent=label;
+        notes.notice.removeAttribute('aria-busy');
+      });
     }`;
 }
 
@@ -325,6 +379,17 @@ function focusPart(): string {
         var focusable=target.querySelector('[autofocus], input, select, textarea, button');
         if(focusable) try{ focusable.focus(); }catch(_){}
       }
+    });
+    // A text box swapped in with its text filled (the comment box after an @mention is chosen) is
+    // focused by htmx, but a browser puts its caret at the start: move it to the end.
+    document.addEventListener('htmx:afterSettle',function(){
+      var box=document.activeElement;
+      if(box&&box.tagName==='TEXTAREA'&&box.hasAttribute('autofocus')&&box.setSelectionRange){
+        var end=box.value.length;
+        box.setSelectionRange(end,end);
+        // Once: later swaps (the next suggestions) must not move the caret while they edit.
+        box.removeAttribute('autofocus');
+      }
     });`;
 }
 
@@ -342,6 +407,7 @@ export function clientScript(): string {
     filterPart(),
     previewPart(),
     previewRefreshPart(),
+    previewNoticePart(),
     loadingPart(),
     focusPart(),
     reviewScript(),

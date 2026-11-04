@@ -10,7 +10,7 @@ describe("BuildModel.failIfOwnedBy on Postgres", () => {
     const builds = new BuildModel(db);
     const build = await builds.create(project.id, { gitSha: "sha", gitBranch: "main" });
     await builds.setStatus(build.id, "capturing");
-    await builds.stampCaptureJob(build.id, "J1");
+    await builds.stampCaptureJob(build.id, "J1", 0);
 
     const stale = await builds.failIfOwnedBy(build.id, "J-other");
     const own = await builds.failIfOwnedBy(build.id, "J1");

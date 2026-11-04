@@ -17,3 +17,8 @@ export const Snippets = jsxStory(() => (
     />
   </VStack>
 ));
+
+/** A command wider than its box scrolls sideways and takes keyboard focus, so a keyboard can scroll it. */
+export const LongCommand = jsxStory(() => (
+  <CodeBlock code="npx storyshelf upload --url https://storyshelf.example.com --slug design-system --build-dir ./storybook-static --branch main --token $STORYSHELF_UPLOAD_TOKEN --message 'Update the design tokens and the button focus ring'" />
+));

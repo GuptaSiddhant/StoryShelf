@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_enabled BOOLEAN NOT NULL DEFAULT true,
   review_approvals INTEGER NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INTEGER,
+  component_owners TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -48,6 +49,7 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_files TEXT,
   affected_import_paths TEXT,
   test_results TEXT,
+  capture_generation INTEGER NOT NULL DEFAULT 0,
   review_cycle INTEGER NOT NULL DEFAULT 0,
   review_requested_cycle INTEGER,
   capture_job_id TEXT,
@@ -106,6 +108,8 @@ CREATE TABLE IF NOT EXISTS capture_jobs (
   owner TEXT,
   payload TEXT,
   cancel_requested_at TIMESTAMPTZ,
+  active_key TEXT,
+  rerun_requested_at TIMESTAMPTZ,
   error TEXT,
   started_at TIMESTAMPTZ,
   finished_at TIMESTAMPTZ,
@@ -239,6 +243,7 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   story_id TEXT,
+  mentions TEXT,
   kind TEXT NOT NULL DEFAULT 'comment',
   resolved_at TIMESTAMPTZ,
   resolved_by TEXT
@@ -359,6 +364,7 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   last_error TEXT,
   last_error_at TIMESTAMPTZ,
+  last_delivered_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -370,6 +376,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   events TEXT,
   via TEXT,
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  review_requests BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS notification_subscriptions_project_user_idx ON notification_subscriptions (project_id, user_id);
@@ -443,12 +450,17 @@ CREATE TABLE IF NOT EXISTS project_group_mappings (
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS project_group_mappings_project_group_idx ON project_group_mappings (project_id, group_name);
-CREATE TABLE IF NOT EXISTS content_refs (
-  hash TEXT PRIMARY KEY,
-  ref_count INTEGER NOT NULL DEFAULT 1,
-  last_seen_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL
+CREATE TABLE IF NOT EXISTS content_uses (
+  build_id TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  released_at TIMESTAMPTZ,
+  collecting_at TIMESTAMPTZ,
+  claim_token TEXT,
+  PRIMARY KEY (build_id, content_hash)
 );
+CREATE INDEX IF NOT EXISTS content_uses_hash_idx ON content_uses (content_hash);
 CREATE TABLE IF NOT EXISTS "user" (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

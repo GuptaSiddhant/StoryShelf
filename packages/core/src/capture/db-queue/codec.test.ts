@@ -16,6 +16,8 @@ const row: CaptureJobRow = {
   owner: null,
   payload: null,
   cancelRequestedAt: null,
+  activeKey: null,
+  rerunRequestedAt: null,
   error: null,
   startedAt: null,
   finishedAt: null,

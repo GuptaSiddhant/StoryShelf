@@ -77,6 +77,35 @@ describe("checkA11y", () => {
     );
   });
 
+  it("runs axe with its defaults and puts a note first when the parameter cannot be read", async () => {
+    const { page, evaluate } = fakePage(
+      { params: undefined, dropped: 0, unserializable: "refers to itself (cyclic)" },
+      undefined,
+      [SLIM],
+    );
+    const warn = vi.fn();
+    await expect(checkA11y(page, { warn } as never, "button--primary")).resolves.toEqual([
+      "a11y parameters not serializable: refers to itself (cyclic)",
+      "image-alt (critical): Images must have alternative text [img] 2 nodes",
+    ]);
+    expect(evaluate).toHaveBeenCalledTimes(3);
+    expect(warn).toHaveBeenCalledWith(
+      { storyId: "button--primary", reason: "refers to itself (cyclic)" },
+      expect.stringContaining("could not be read"),
+    );
+  });
+
+  it("keeps the note when axe then finds nothing", async () => {
+    const { page } = fakePage(
+      { params: undefined, dropped: 0, unserializable: "nested more than 32 levels deep" },
+      undefined,
+      [],
+    );
+    await expect(checkA11y(page)).resolves.toEqual([
+      "a11y parameters not serializable: nested more than 32 levels deep",
+    ]);
+  });
+
   it("reports one visible annotation when injection fails", async () => {
     const { page } = fakePage(undefined, new Error("Execution context was destroyed"));
     await expect(checkA11y(page)).resolves.toEqual([

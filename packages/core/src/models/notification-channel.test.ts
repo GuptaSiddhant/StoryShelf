@@ -123,6 +123,21 @@ describe("NotificationChannelModel", () => {
     expect(cleared?.lastErrorAt).toBeNull();
   });
 
+  it("stamps the last delivery on success and leaves it alone on failure", async () => {
+    const { db } = makeDatabase();
+    const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });
+    expect(created.lastDeliveredAt).toBeNull();
+
+    await model(db).recordOutcome(created.id);
+    const delivered = (await model(db).get(created.id))?.lastDeliveredAt;
+    expect(delivered).toEqual(expect.any(String));
+
+    await model(db).recordOutcome(created.id, "HTTP 502");
+    const failed = await model(db).get(created.id);
+    expect(failed?.lastDeliveredAt).toBe(delivered);
+    expect(failed?.lastError).toBe("HTTP 502");
+  });
+
   it("skips the write when a clean channel reports success", async () => {
     const { db } = makeDatabase();
     const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });

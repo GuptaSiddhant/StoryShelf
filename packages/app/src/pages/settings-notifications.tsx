@@ -1,4 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
+import { NOTIFICATION_EVENTS } from "@storyshelf/core/utils";
 import type { FC } from "hono/jsx";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
@@ -6,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  HStack,
   CheckField,
   Field,
   FormActions,
@@ -18,20 +20,6 @@ import {
 } from "../ui/components.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
-
-/** Notification topic catalog (mirrors the webhook event names). */
-export const NOTIFICATION_TOPICS: { event: string; label: string }[] = [
-  { event: "build:created", label: "Build created" },
-  { event: "build:reviewing", label: "Build needs review" },
-  { event: "build:approved", label: "Build approved" },
-  { event: "build:rejected", label: "Build rejected" },
-  { event: "build:pending", label: "Build sent back to pending" },
-  { event: "build:failed", label: "Build failed" },
-  { event: "build:cancelled", label: "Build cancelled" },
-  { event: "baseline:created", label: "Baseline created" },
-  { event: "baseline:updated", label: "Baseline updated" },
-  { event: "comment:created", label: "Comment posted" },
-];
 
 /** A wired provider as offered by the create forms. */
 export interface SettingsNotifyProvider {
@@ -53,6 +41,8 @@ export interface SettingsNotificationChannel {
   /** Last delivery error, null while the channel delivers cleanly. */
   lastError: string | null;
   lastErrorAt: string | null;
+  /** When a delivery last succeeded, null if none has. */
+  lastDeliveredAt: string | null;
 }
 
 /** The viewer's own subscription for this project (null when opted out). */
@@ -60,6 +50,8 @@ export interface SettingsMySubscription {
   events: string[];
   via: string[];
   enabled: boolean;
+  /** Whether `review:requested` reaches them (on unless they turned it off). */
+  reviewRequests: boolean;
 }
 
 /** Form state for the notifications tab (field errors, global error). */
@@ -70,10 +62,44 @@ export interface NotificationsFormState {
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */
 
+/** The one topic the "Send me review requests" switch controls, so it has no checkbox of its own. */
+export const REVIEW_REQUESTED_EVENT = "review:requested";
+
+/** The topics the card lists: every subscribable event but the one the review switch owns. */
+export const LISTED_TOPICS = NOTIFICATION_EVENTS.filter(
+  (entry) => entry.event !== REVIEW_REQUESTED_EVENT,
+);
+
 /** Whether a topic checkbox renders checked (empty allowlist means all). */
 function topicChecked(events: string[], event: string): boolean {
   return events.length === 0 || events.includes(event);
 }
+
+/**
+ * Whether the review-request switch shows on: the stored switch, and (for a subscription saved
+ * before the switch owned the topic) a topic list that still admits it.
+ */
+function reviewRequestsOn(subscription: SettingsMySubscription | null): boolean {
+  if (subscription === null) {
+    return true;
+  }
+  const { events, reviewRequests } = subscription;
+  return reviewRequests && (events.length === 0 || events.includes(REVIEW_REQUESTED_EVENT));
+}
+
+/** One checkbox per listed topic (an empty allowlist means all are ticked). */
+const TopicChecks: FC<{ events: string[] }> = ({ events }) => (
+  <>
+    {LISTED_TOPICS.map((topic) => (
+      <CheckField
+        label={topic.label}
+        name="events"
+        value={topic.event}
+        checked={topicChecked(events, topic.event)}
+      />
+    ))}
+  </>
+);
 
 /** The viewer's own preferences card (visible to every member). */
 const MyNotificationsCard: FC<{
@@ -81,10 +107,14 @@ const MyNotificationsCard: FC<{
   mySubscription: SettingsMySubscription | null;
 }> = ({ project, mySubscription }) => {
   const events = mySubscription?.events ?? [];
+  const emailOff = mySubscription !== null && !mySubscription.enabled;
   return (
     <Card>
       <SectionTitle>My notifications for this project</SectionTitle>
-      <Meta>Opt in to email alerts for this project. Leave everything off to stay silent.</Meta>
+      <Meta>
+        Approvers and admins get review requests by email by default; turn off Send me review
+        requests to stop them. The options below add other email alerts for this project.
+      </Meta>
       <form
         method="post"
         action={`/projects/${project.slug}/settings/notifications/me`}
@@ -97,17 +127,25 @@ const MyNotificationsCard: FC<{
           name="enabled"
           checked={mySubscription?.enabled ?? false}
         />
-        {NOTIFICATION_TOPICS.map((topic) => (
-          <CheckField
-            label={topic.label}
-            name="events"
-            value={topic.event}
-            checked={topicChecked(events, topic.event)}
-          />
-        ))}
+        <CheckField
+          label="Send me review requests"
+          name="reviewRequests"
+          checked={reviewRequestsOn(mySubscription)}
+          hint={
+            emailOff
+              ? "Email me is off, so no review requests reach you until you turn it on."
+              : "Emails you when a build waits for a verdict. It changes nothing else below."
+          }
+        />
+        <TopicChecks events={events} />
         <p>
-          <Meta as="span">No boxes ticked means all topics.</Meta>
+          <Meta as="span">Ticking every box, or none, means all topics, including new ones.</Meta>
         </p>
+        {project.reviewEnabled === false ? null : (
+          <p>
+            <Meta as="span">Reviews assigned to you as a component owner are always sent.</Meta>
+          </p>
+        )}
         <FormActions>
           <Button variant="primary" type="submit" icon="check">
             Save my preferences
@@ -145,29 +183,108 @@ function reactsTo(channel: SettingsNotificationChannel): string {
   return channel.events.length === 0 ? "all events" : channel.events.join(", ");
 }
 
-/** Delivery health: failing with the last error and time, or ok. */
-const ChannelHealth: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) =>
-  channel.lastError === null ? (
-    <Badge tone="success">ok</Badge>
-  ) : (
-    <VStack>
-      <Badge tone="danger">failing</Badge>
-      <Meta as="span">
-        <span class="truncate max-w-cell" title={channel.lastError}>
-          {channel.lastError}
-        </span>
-        {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
-      </Meta>
-    </VStack>
-  );
+/** When a channel last delivered, or that it never has. */
+const LastDelivered: FC<{ at: string | null }> = ({ at }) => (
+  <Meta as="span">
+    {at === null ? (
+      "Never delivered"
+    ) : (
+      <>
+        Last delivered <RelativeTime value={at} />
+      </>
+    )}
+  </Meta>
+);
 
-/** One channel table row; the delete action renders for admins only. */
+/** The health badge: failing with its time and error, ok, or no delivery yet. */
+const HealthStatus: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => {
+  if (channel.lastError === null) {
+    return channel.lastDeliveredAt === null ? (
+      <Badge tone="neutral">no delivery yet</Badge>
+    ) : (
+      <Badge tone="success">ok</Badge>
+    );
+  }
+  return (
+    <>
+      <Badge tone="danger">failing</Badge>
+      <span class="truncate max-w-cell">
+        <Meta as="span">
+          Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
+        </Meta>
+      </span>
+      <span class="truncate max-w-cell" title={channel.lastError}>
+        <Meta as="span">{channel.lastError}</Meta>
+      </span>
+    </>
+  );
+};
+
+/** Delivery health, and when the channel last delivered. */
+const ChannelHealth: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => (
+  <VStack>
+    <HealthStatus channel={channel} />
+    <LastDelivered at={channel.lastDeliveredAt} />
+  </VStack>
+);
+
+/** Git channels only, admins only: ask again for the open builds' state on this channel. Disabled while notifications are paused. */
+const RetryForm: FC<{
+  project: Project;
+  channel: SettingsNotificationChannel;
+  paused: boolean;
+}> = ({ project, channel, paused }) => (
+  <form
+    method="post"
+    action={`/projects/${project.slug}/settings/notifications/${channel.id}/retry`}
+    hx-post={`/projects/${project.slug}/settings/notifications/${channel.id}/retry`}
+    hx-target="body"
+    hx-disabled-elt="find button"
+  >
+    {csrfField()}
+    <HStack>
+      <Button
+        variant="secondary"
+        size="sm"
+        type="submit"
+        disabled={paused}
+        aria-label={`Retry current state of ${targetOf(channel)}`}
+        aria-describedby={paused ? "notifications-paused" : undefined}
+      >
+        Retry current state
+      </Button>
+      {paused ? <Meta as="span">Paused: no confirmed public origin</Meta> : null}
+    </HStack>
+  </form>
+);
+
+/** The channel's delete action (admins only). */
+const DeleteForm: FC<{ project: Project; channel: SettingsNotificationChannel }> = ({
+  project,
+  channel,
+}) => (
+  <form
+    method="post"
+    action={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
+    hx-post={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
+    hx-target="body"
+    hx-confirm="Remove this channel?"
+  >
+    {csrfField()}
+    <Button variant="ghost" size="sm" type="submit">
+      Delete
+    </Button>
+  </form>
+);
+
+/** One channel table row; Retry and Delete (admins only) sit side by side under the delivery content. */
 const ChannelRow: FC<{
   project: Project;
   channel: SettingsNotificationChannel;
   isAdmin: boolean;
-}> = ({ project, channel, isAdmin }) => (
-  <tr key={channel.id}>
+  paused: boolean;
+}> = ({ project, channel, isAdmin, paused }) => (
+  <tr key={channel.id} id={`channel-${channel.id}`} tabIndex={-1}>
     <td>
       <Badge tone="neutral">{channel.provider}</Badge>
     </td>
@@ -178,23 +295,17 @@ const ChannelRow: FC<{
       <Meta as="span">{reactsTo(channel)}</Meta>
     </td>
     <td>
-      <ChannelHealth channel={channel} />
-    </td>
-    <td>
-      {isAdmin ? (
-        <form
-          method="post"
-          action={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
-          hx-post={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
-          hx-target="body"
-          hx-confirm="Remove this channel?"
-        >
-          {csrfField()}
-          <Button variant="ghost" size="sm" type="submit">
-            Delete
-          </Button>
-        </form>
-      ) : null}
+      <VStack>
+        <ChannelHealth channel={channel} />
+        {isAdmin ? (
+          <HStack>
+            {channel.delivery === "state" && channel.enabled ? (
+              <RetryForm project={project} channel={channel} paused={paused} />
+            ) : null}
+            <DeleteForm project={project} channel={channel} />
+          </HStack>
+        ) : null}
+      </VStack>
     </td>
   </tr>
 );
@@ -204,7 +315,8 @@ const ChannelsCard: FC<{
   project: Project;
   channels: SettingsNotificationChannel[];
   isAdmin: boolean;
-}> = ({ project, channels, isAdmin }) => (
+  paused: boolean;
+}> = ({ project, channels, isAdmin, paused }) => (
   <Card>
     <SectionTitle>Channels</SectionTitle>
     <Meta>
@@ -213,7 +325,13 @@ const ChannelsCard: FC<{
       only in memory at delivery time. Git channels follow the build state, not a topic list, and
       their delivery is best-effort: a failure shows here, and the next build state retries it.
     </Meta>
-    <Table>
+    {isAdmin && channels.some((channel) => channel.delivery === "state") ? (
+      <Meta>
+        Retry re-sends the current state of this project's open builds to one git channel. It never
+        replays chat, email or webhooks.
+      </Meta>
+    ) : null}
+    <Table label="Channels">
       <table>
         <thead>
           <tr>
@@ -221,14 +339,11 @@ const ChannelsCard: FC<{
             <th>Target</th>
             <th>Reacts to</th>
             <th>Delivery</th>
-            <th>
-              <span class="visually-hidden">Actions</span>
-            </th>
           </tr>
         </thead>
         <tbody>
           {channels.map((channel) => (
-            <ChannelRow project={project} channel={channel} isAdmin={isAdmin} />
+            <ChannelRow project={project} channel={channel} isAdmin={isAdmin} paused={paused} />
           ))}
         </tbody>
       </table>
@@ -307,7 +422,12 @@ export function renderSettingsNotifications(
       <NotificationsPausedNotice paused={paused} />
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <MyNotificationsCard project={project} mySubscription={mySubscription} />
-      <ChannelsCard project={project} channels={channels} isAdmin={isAdmin} />
+      <ChannelsCard
+        project={project}
+        channels={channels}
+        isAdmin={isAdmin}
+        paused={paused === true}
+      />
       {isAdmin && messageProviders.length > 0 ? (
         <CreateChannelCard project={project} providers={messageProviders} formState={formState} />
       ) : null}

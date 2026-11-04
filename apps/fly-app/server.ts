@@ -78,6 +78,18 @@ function buildUi(): UIConfig | undefined {
 }
 const ui = buildUi();
 
+// Scheduled build purge is opt-in (ADR 0039): `PURGE_TTL_DAYS` turns it on; unset leaves it off, so
+// an upgrade never starts deleting builds. A value that is not a positive whole number stops the boot.
+function purgeTtlDaysFromEnv(): number | undefined {
+  const raw = env["PURGE_TTL_DAYS"];
+  if (raw === undefined || raw === "") return undefined;
+  if (!/^[1-9]\d*$/u.test(raw)) {
+    throw new Error("PURGE_TTL_DAYS must be a positive whole number of days");
+  }
+  return Number(raw);
+}
+const purgeTtlDays = purgeTtlDaysFromEnv();
+
 mkdirSync(dataDir, { recursive: true });
 
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
@@ -146,6 +158,7 @@ const app = createShelfApp({
     adminToken,
     publicBaseUrl,
     scratchDir: dataDir,
+    ...(purgeTtlDays === undefined ? {} : { purgeTtlDays }),
     // Emit Server-Timing response headers (total + db/storage roll-ups).
     serverTiming: true,
   },

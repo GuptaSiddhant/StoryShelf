@@ -23,6 +23,10 @@ flowchart LR
 4. **Record.** The CLI posts `{ baselineSha, changedFiles, affectedImportPaths }` to `POST …/builds/:id/affected` before uploading the bundle, so the computation is auditable on the build row.
 5. **Partition.** The orchestrator splits discovered stories into render vs inherit sets, renders only the affected ones, and creates `unchanged` snapshots for the rest that reuse the baseline screenshot (`inherited: true`). Counts include inherited snapshots; `changedCount` excludes them. The build stores how many it inherited as `inheritedCount`.
 
+## The inherited share
+
+The builds page shows **Average inherited share per build** for a project with `testing` on: for each of the project's newest 20 builds that hold snapshots, the share of its snapshots that was inherited rather than captured (`inheritedCount / snapshotCount`), averaged over those builds with every build weighing the same, whatever its status. It says how much capture the baselines saved you from re-doing. It is a count of snapshots, not a measure of time or cost: an inherited snapshot costs nothing to produce, but the stories you do render differ widely in how long they take, so the percentage is no estimate of the time or compute saved. The card is hidden until a build has snapshots.
+
 ## Storybook in a monorepo package
 
 Git reports changed files relative to the repository root, while the bundler's module ids and the story index are relative to the Storybook project. When Storybook lives in a package (`packages/app`, an Nx or Turborepo workspace), StoryShelf resolves both to absolute paths before comparing them, so a change to `packages/app/src/ui/kbd.tsx` finds the stories that import `./src/ui/kbd.tsx`. A change in a sibling workspace package (`packages/core/src/x.ts`, which the stats call `../core/src/x.ts`) finds its importers the same way.
@@ -97,7 +101,7 @@ storyshelf upload --stats-file ./stats/preview-stats.json
 ## What you see in the UI
 
 - The build page shows an `affected capture` badge (or `full capture` when opted out) plus `N rendered, M inherited` counts, and an **Inherited** stat next to the other counts. The numbers are the ones stored on the build (`snapshotCount`, `inheritedCount`), also served by the API.
-- The project's **Builds** page shows **Inherited from baseline**: the average, over the project's last 20 builds that hold snapshots, of each build's `inheritedCount / snapshotCount`. It is computed from the stored counts only, so it reads no snapshots. A high number means affected capture is skipping most of your Storybook; a number near zero means most changes reach most stories (a shared import, for example), and [the trace](#tuning-the-trace) is worth a look.
+- The project's **Builds** page shows **Average inherited share per build**; [what it averages and what it does not measure](#the-inherited-share). A high number means affected capture is skipping most of your Storybook; a number near zero means most changes reach most stories (a shared import, for example), and [the trace](#tuning-the-trace) is worth a look.
 - Inherited snapshots carry an `inherited` badge and `unchanged` status — they need no review.
 - Capture attempt logs include an `affected capture partitioned` line with `{ rendered, inherited, total }`.
 

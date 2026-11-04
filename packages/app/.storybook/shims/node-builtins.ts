@@ -20,7 +20,12 @@ const fn =
   (..._args: unknown[]): never =>
     unavailable(name);
 
-export const join = fn("path.join");
+/**
+ * Safe stand-ins: core computes its scratch directory (`join(tmpdir(), "storyshelf")`) when
+ * `options.ts` loads, so the dev server, which does not tree-shake, calls both on every page that
+ * imports core's config. Nothing reads the path in a story.
+ */
+export const join = (...parts: string[]): string => parts.join("/").replaceAll(/\/+/gu, "/");
 export const resolve = fn("path.resolve");
 export const relative = fn("path.relative");
 export const normalize = fn("path.normalize");
@@ -45,6 +50,7 @@ export const setImmediate = fn("timers/promises.setImmediate");
 // node:os
 export const totalmem = (): number => 0;
 export const availableParallelism = (): number => 1;
+export const tmpdir = (): string => "/tmp";
 
 // node:stream: present so modules that extend or reference them still load; never constructed.
 export function Readable(): void {}

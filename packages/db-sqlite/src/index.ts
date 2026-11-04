@@ -5,7 +5,14 @@ import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import {
+  activateRetention,
+  attachRetention,
+  type RetentionActivation,
+} from "./retention-activation.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
+import { parseTableInfo, type TableColumns } from "./table-info.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -22,8 +29,9 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   sqlite.exec("PRAGMA busy_timeout = 5000");
   const callback = createCallback(sqlite);
   const db = drizzle(callback, { schema });
+  const retention: RetentionActivation = {};
 
-  return createDrizzleAdapter(db, {
+  const adapter = createDrizzleAdapter(db, {
     metadata: {
       name: "SQLite",
       version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
@@ -32,8 +40,10 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       category: "database",
     },
     tables: schema,
-    migrate: () => {
+    migrate: async () => {
+      await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
       runMigrations(sqlite);
+      await activateRetention(path, retention);
     },
     close: () => {
       sqlite.close();
@@ -42,6 +52,7 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       sqlite.prepare("SELECT 1").get();
     },
   });
+  return attachRetention(adapter, retention);
 }
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
@@ -156,16 +167,26 @@ function runMigrations(sqlite: DatabaseSync): void {
   sqlite.exec(DDL);
   ensureColumns(sqlite, DDL);
   applyIdentityStatements(sqlite);
-  try {
-    sqlite.exec(WEBHOOK_SECRET_DROP);
-  } catch {
-    // already migrated — ignore
-  }
+  dropWebhookSecret(sqlite);
   migrateBuildsGitShaIndex(sqlite);
   try {
     migrateCommentsTable(sqlite);
   } catch {
     execIgnore(sqlite, "PRAGMA foreign_keys = ON");
+  }
+}
+
+/** The columns of a table, from `PRAGMA table_info` (rows are arrays: the adapter opens with `returnArrays`). */
+function tableInfo(sqlite: DatabaseSync, table: string): TableColumns {
+  return parseTableInfo(sqlite.prepare(`PRAGMA table_info(${table})`).all());
+}
+
+/** Drop the retired `webhooks.secret` column; a database that no longer has it is already migrated. */
+function dropWebhookSecret(sqlite: DatabaseSync): void {
+  try {
+    sqlite.exec(WEBHOOK_SECRET_DROP);
+  } catch {
+    // already migrated — ignore
   }
 }
 

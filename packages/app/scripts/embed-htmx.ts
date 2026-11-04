@@ -35,4 +35,4 @@ export const htmxSource = String.raw\`${source}\`;
 `;
 const target = new URL("../src/assets/htmx.ts", import.meta.url);
 await writeFile(target, output);
-console.log(`wrote ${target.pathname} (htmx ${version}, ${source.length} bytes)`);
+process.stdout.write(`wrote ${target.pathname} (htmx ${version}, ${source.length} bytes)\n`);

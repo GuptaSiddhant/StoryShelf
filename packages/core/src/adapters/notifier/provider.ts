@@ -18,7 +18,16 @@ export interface NotifierMetadata extends AdapterMetadata {
   readonly schema: z.ZodType;
   /** Delivery kind; absent means `message` (chat, email). */
   readonly delivery?: NotifierDelivery;
+  /**
+   * Who a message goes to: `person` addresses one member (email, a future direct message), `room`
+   * posts where many read (Slack, Teams). Absent is not `person`. A per-user subscription may
+   * only deliver over `person` kinds; a room belongs to a project channel.
+   */
+  readonly audience?: NotifierAudience;
 }
+
+/** Who a notifier kind delivers to. */
+export type NotifierAudience = "person" | "room";
 
 /** Metadata of a `message` provider (Slack, Teams, email). */
 export interface MessageNotifierMetadata extends NotifierMetadata {

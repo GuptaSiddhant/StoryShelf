@@ -53,6 +53,14 @@ Tick **Request a change** when you comment to mark the comment as a **change req
 
 Comments persist until the build is purged (see [Retention](/concepts/retention/)). The UI's diff overlay (baseline | current | diff) is the heat map: red = changed pixels, thresholds from `pixel_threshold` / `max_diff_ratio` or per-story `diffThreshold`.
 
+### Mentions
+
+Write `@` and the start of a member's name in a comment box and the box suggests the project's members; choosing one fills in their handle. A **handle** is the part of a member's email before the `@`, or their display name, matched without regard to case (`@alex.doe`, `@Alex Doe`). A mention resolves **only against this project's members**: `@someone` who is not a member (or who belongs to another project) stays plain text, and so does a name two members share, because guessing would notify the wrong person. An email address (`ops@example.com`) is not a mention.
+
+The resolved members are stored with the comment as user ids (`mentions` in the API, `[{ userId, handle }]`, set by the server and never read from the request), so a mention is shown highlighted with the member's **current** name even after they rename themselves. A mention that named no member stays plain.
+
+Each mentioned member gets one `comment:mentioned` [notification](/guides/notifications/#mentions), unless they wrote the comment themselves. It goes to that member only: by email by default when email is configured, or through the channels of their own subscription when they have an enabled one (a disabled subscription opts out). It never goes to a project channel or a webhook. A member who is subscribed to `comment:created` and mentioned gets the mention and **not** the comment: one message.
+
 A project can turn comments and verdicts off with its [review switch](#the-review-switch); they are then hidden, not deleted.
 
 ## Review without screenshots
@@ -76,9 +84,10 @@ With review off every review route answers **404** for that project, evaluated o
 
 ### Reviewers
 
-The `approver` and `admin` roles are the reviewers; there is no separate reviewer role, no per-build assignment and no "request review from" step. Every approver and admin of the project reviews every build that waits.
+The `approver` and `admin` roles are the reviewers; there is no separate reviewer role and no "request review from" step. Every approver and admin of the project reviews every build that waits; [component owners](#reviewers) are asked by name on top of that.
 
-- **Being asked.** When a published build waits for a verdict, a `review:requested` event goes to the project's approvers and admins. Unlike other [notification topics](/guides/notifications/), which are opt-in, this one is on by default for those roles: a reviewer with no subscription receives it by email (when an email transport is wired), and turns it off by saving their notification preferences for the project with **Email me** unticked, or with a topic list that leaves it out. Channels and webhooks receive it like any other event.
+- **Being asked.** When a published build waits for a verdict, a `review:requested` event goes to the project's approvers and admins. Unlike other [notification topics](/guides/notifications/), which are opt-in, this one is on by default for those roles: a reviewer with no subscription receives it by email (when an email transport is wired), and turns it off with **Send me review requests** unticked in their notification preferences for the project (nothing else changes), with **Email me** unticked, or with a topic list that leaves it out. Channels and webhooks receive it like any other event.
+- **Component owners.** A project admin can name who owns which components on the project's **Members** tab: one rule per line, a story-file glob then the member ids that own it (`src/components/forms/**  user_01H  user_02J`; `#` starts a comment). Every id must be a member, or nothing is saved. When a build waits, the owners of the components it added or changed (from [the changeset](#the-changeset)) are its **assigned reviewers**: each gets one `review:requested` that says why they were asked, even if they turned the default email or **Send me review requests** off, and the build's review card lists them with their standing (`Waiting`, `Approved` or `Rejected`). A story file can match several rules and takes all their owners. Assignment is advisory: the approvals a build needs, the verdict rules and the statuses do not change, and anyone who can approve may still approve. With no matching owner the approvers and admins are asked as above. Webhooks and channels receive the same event as before.
 - **Commenting.** `developer` and above comment; `viewer` reads only. Unresolved comments and open [change requests](#change-requests) never block a verdict.
 - **A new build needs a new approval.** Verdicts belong to the build, as snapshot approvals do. The build under review is the latest on its branch; earlier pending builds fall away under [retention](#builds-nobody-finishes).
 
@@ -92,7 +101,7 @@ A build's page is the review workspace for a project without `testing`, and with
 
 ### Accessibility results
 
-With `testing` on and the project's accessibility checks on (`runA11y`, the default), the axe findings of each capture are stored on its snapshot (`a11yViolations`, a JSON array of one line per violation: rule id, impact, help, a short selector, node count). The snapshot review page lists them in a warning note above the comparison, the filmstrip entry shows `a11y N` with the browser it was found on, and the component page lists them on each snapshot card. axe runs on the project's primary browser target only (the first one in its list), so the findings carry that browser's name wherever they are shown, and the other browsers of the same story show the same note. They are information for the reviewer: a violation never changes a snapshot's or a build's status and never blocks a merge. If axe could not run on a capture (the page crashed, the script could not load), the snapshot stores `axe unavailable: <reason>`. That is not a finding: it is left out of every count and shown instead as a neutral note, _axe did not run_, with the reason on the snapshot, and the build page and review header say how many snapshots it affects. The build page shows the total as **Accessibility findings** (and the review page header as `a11y N`), and the filmstrip filter _A11y_ lists the snapshots that carry findings. See [the runners](/packages/runner-playwright/#accessibility-checks-axe) for what is scanned.
+With `testing` on and the project's accessibility checks on (`runA11y`, the default), the axe findings of each capture are stored on its snapshot (`a11yViolations`, a JSON array of one line per violation: rule id, impact, help, a short selector, node count). The snapshot review page lists them in a warning note above the comparison, the filmstrip entry shows `a11y N` with the browser it was found on, and the component page lists them on each snapshot card. axe runs on the project's primary browser target only (the first one in its list), so the findings carry that browser's name wherever they are shown, and the other browsers of the same story show the same note. They are information for the reviewer: a violation never changes a snapshot's or a build's status and never blocks a merge. If axe could not run on a capture (the page crashed, the script could not load), the snapshot stores `axe unavailable: <reason>`. That is not a finding: it is left out of every count and shown instead as a neutral note, _axe did not run_, with the reason on the snapshot, and the build page and review header say how many snapshots it affects. The build page shows the total as **Accessibility findings** (and the review page header as `a11y N`), and the filmstrip filter _A11y_ lists the snapshots that carry findings. A snapshot inherited from its baseline was not scanned again: it shows the findings recorded on the baseline's capture behind a `from baseline <sha>` note, labelled that way on the review page, the filmstrip and the cards, and the build total counts only findings measured on the build itself (the inherited ones are reported on their own). If a story's `parameters.a11y` cannot be read as plain data (a cyclic or very deeply nested value), axe runs with its defaults and the snapshot stores `a11y parameters not serializable: <reason>`, shown as a note and never as a finding. A `Date` in the parameters is read as its ISO string, a `Set` as an array and a `Map` as an array of pairs. See [the runners](/packages/runner-playwright/#accessibility-checks-axe) for what is scanned.
 
 ### Verdicts
 
@@ -121,9 +130,9 @@ A build that failed or that a user cancelled (status `cancelled`, [Builds](/conc
 
 ### The changeset
 
-Without screenshots the build page says what changed from the Storybook catalog: for each component (a story file) the build's `build_components` hash is compared with the **baseline build**, the latest accepted build of the same branch before it, falling back to the latest accepted build of the default branch. The list shows components **added**, **removed** and **changed** (a changed hash means the component's stories differ: stories added, removed or renamed), the count of unchanged ones, and links to the published story and the component page. `GET /api/v1/projects/:slug/builds/:id/changeset` returns the same data as JSON.
+Without screenshots the build page says what changed from the Storybook catalog: for each component (a story file) the build's `build_components` hash is compared with the **baseline build**, the latest accepted build of the same branch before it, falling back to the latest accepted build of the default branch. The list shows components **added**, **removed** and **changed** (a changed hash means the **story-index metadata changed**: a story was added, removed or renamed, or its type or title changed), the count of unchanged ones, and links to the published story and the component page. `GET /api/v1/projects/:slug/builds/:id/changeset` returns the same data as JSON.
 
-This is a coarser signal than pixels and is shown as such: a changed hash means the definition changed, not that the story looks different. The index a Storybook publishes carries no story arguments or source, so a story whose arguments change but whose id, name and title do not is not listed. A first build with nothing accepted before it lists every component as added.
+This is a coarser signal than pixels and is shown as such: a changed hash means the story-index metadata changed, not that the story looks different. The index a Storybook publishes carries no story arguments or source, so a story whose arguments or source change alone, while its id, name, type, title and story file (`importPath`) stay the same, is not listed. Moving the story file changes its component, so the affected components are listed as added, removed or changed. A first build with nothing accepted before it lists every component as added.
 
 ### Story comments
 
@@ -135,14 +144,15 @@ The build's git channels show `<prefix>/review` (`pending`, then `success` or `f
 
 ### Events
 
-Review raises three [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
+Review raises these [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
 
-| Event              | When                                                                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins.                                  |
-| `comment:created`  | Any comment is posted. `data.scope` is `build`, `story` or `snapshot`; `data.eventId` is the comment id.                                   |
-| `review:comment`   | A filter alias, never sent: in a webhook, notification channel or subscription it matches a `comment:created` of scope `build` or `story`. |
-| `review:verdict`   | A reviewer approves or rejects a build.                                                                                                    |
+| Event               | When                                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `review:requested`  | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins.                                  |
+| `comment:created`   | Any comment is posted. `data.scope` is `build`, `story` or `snapshot`; `data.eventId` is the comment id.                                   |
+| `comment:mentioned` | A comment `@`-mentions a project member. A [notification](/guides/notifications/#mentions) to that member only; never a webhook.           |
+| `review:comment`    | A filter alias, never sent: in a webhook, notification channel or subscription it matches a `comment:created` of scope `build` or `story`. |
+| `review:verdict`    | A reviewer approves or rejects a build.                                                                                                    |
 
 ### Builds nobody finishes
 

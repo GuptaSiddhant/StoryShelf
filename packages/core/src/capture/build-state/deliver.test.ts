@@ -1,9 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { BuildReviewModel } from "../../models/build-review.ts";
+import { CaptureJobModel } from "../../models/capture-job.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
 import { storybookDir } from "../../utils/paths.ts";
 import { deliverBuildState, stateTargets } from "./deliver.ts";
 import { statusLog, world } from "./test-world.ts";
+
+const storybook = (w: Awaited<ReturnType<typeof world>>) => statusLog(w.git).at(-1);
+const deliver = async (w: Awaited<ReturnType<typeof world>>) =>
+  await deliverBuildState(
+    { ...w.deps, flags: () => ({ testing: true, review: false }) },
+    {
+      buildId: w.build.id,
+      channelId: w.channelId,
+    },
+  );
+const publishJob = async (w: Awaited<ReturnType<typeof world>>) =>
+  await new CaptureJobModel(w.db).create(
+    { id: "pub1", kind: "publish", buildId: w.build.id, maxAttempts: 3 },
+    "2026-01-01T00:00:00.000Z",
+  );
 
 describe("deliverBuildState", () => {
   it("shows a build that was never captured: pending statuses and the comment", async () => {
@@ -103,11 +119,44 @@ describe("deliverBuildState", () => {
       { ...w.deps, flags: () => ({ testing: false, review: false }) },
       { buildId: w.build.id, channelId: w.channelId },
     );
+    // Accepted without a published Storybook (testing off): not a wait, so not `pending` forever.
     expect(statusLog(w.git)).toEqual([
       ["storyshelf/review", "success"],
-      ["storyshelf/storybook", "pending"],
+      ["storyshelf/storybook", "failure"],
     ]);
     expect(w.git.calls[0]?.target).toMatchObject({ description: "Review is off" });
+    expect(w.git.calls[1]?.target).toMatchObject({
+      description: "Storybook content unavailable, see build page",
+    });
+  });
+
+  describe("a reviewed build whose Storybook manifest is not there", () => {
+    it("waits while a publish job is open (a capture can finish before publishing does)", async () => {
+      const w = await world();
+      await w.builds.setStatus(w.build.id, "approved");
+      await publishJob(w);
+      await deliver(w);
+      expect(storybook(w)).toEqual(["storyshelf/storybook", "pending"]);
+    });
+
+    it.each(["done", "failed", "cancelled"] as const)(
+      "is unavailable once the publish job has ended %s with no manifest",
+      async (outcome) => {
+        const w = await world();
+        await w.builds.setStatus(w.build.id, "approved");
+        await publishJob(w);
+        await new CaptureJobModel(w.db).finishJob("pub1", outcome, "2026-01-01T00:01:00.000Z");
+        await deliver(w);
+        expect(storybook(w)).toEqual(["storyshelf/storybook", "failure"]);
+      },
+    );
+
+    it("is unavailable when no publish job ever existed (inline publish, then lost content)", async () => {
+      const w = await world();
+      await w.builds.setStatus(w.build.id, "reviewing");
+      await deliver(w);
+      expect(storybook(w)).toEqual(["storyshelf/storybook", "failure"]);
+    });
   });
 
   it("writes nothing for a local identity", async () => {

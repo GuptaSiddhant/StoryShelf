@@ -1,6 +1,6 @@
 /** The catalog's tabs of the component page: its stories with a click-to-load preview, and its builds. */
 import type { CatalogEntry } from "@storyshelf/core/capture";
-import { createUrlBuilder } from "@storyshelf/core/urls";
+import { createUrlBuilder, hasDotSegment } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { CatalogHistoryRow } from "../routers/component-catalog.handlers.ts";
 import { isSignedPreviewBase, PREVIEW_TOKEN_REFRESH } from "../routers/preview-base.ts";
@@ -51,7 +51,7 @@ export function StoriesTab(props: { data: ComponentPageData }): Rendered {
         />
       ) : null}
       <Card padded={false}>
-        <Table>
+        <Table label="Stories in this build">
           <table>
             <thead>
               <tr>
@@ -142,7 +142,7 @@ function EntryRow(props: {
               variant="ghost"
               size="sm"
               icon="image"
-              href={`?tab=stories&story=${encodeURIComponent(entry.id)}${buildParam(data)}#preview`}
+              href={`?tab=stories&story=${encodeURIComponent(entry.id)}${buildParam(data)}${pathParam(data)}#preview`}
             >
               Preview
             </Button>
@@ -178,7 +178,7 @@ export function ComponentBuilds(props: { data: ComponentPageData }): Rendered {
   return (
     <Card>
       <SectionTitle>Published builds</SectionTitle>
-      <Table>
+      <Table label="Published builds">
         <table>
           <thead>
             <tr>
@@ -217,7 +217,7 @@ function PublishedBuildRow(props: { data: ComponentPageData; row: CatalogHistory
         <ChangeCell row={row} />
       </td>
       <td>
-        <Button variant="ghost" size="sm" href={showBuildHref(row.build.id)}>
+        <Button variant="ghost" size="sm" href={showBuildHref(row.build.id, data)}>
           Show
         </Button>
       </td>
@@ -269,9 +269,20 @@ export function buildParam(data: Pick<ComponentPageData, "selection">): string {
   return data.selection ? `&build=${encodeURIComponent(data.selection.build.id)}` : "";
 }
 
+/**
+ * `&path=<import path>` when the page was opened through the query form (the path has a `.` or
+ * `..` segment and cannot sit in the URL path), so a relative `?tab=` link keeps the file.
+ */
+export function pathParam(data: Pick<ComponentPageData, "importPath">): string {
+  return hasDotSegment(data.importPath) ? `&path=${encodeURIComponent(data.importPath)}` : "";
+}
+
 /** The History link that shows one build of the file (stays on the History tab). */
-export function showBuildHref(buildId: string): string {
-  return `?tab=history&build=${encodeURIComponent(buildId)}`;
+export function showBuildHref(
+  buildId: string,
+  data: Pick<ComponentPageData, "importPath">,
+): string {
+  return `?tab=history&build=${encodeURIComponent(buildId)}${pathParam(data)}`;
 }
 
 /** Marks the row of the build the page shows. */

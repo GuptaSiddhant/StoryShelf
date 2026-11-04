@@ -15,6 +15,7 @@ import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
 import { redactSecrets } from "../utils/redact.ts";
 import type { BuildStatePublisher } from "./build-state/types.ts";
+import type { ShardRepeatedEvent } from "./consumer/metrics.ts";
 import type { JobLease } from "./job-lease.ts";
 import { executeCaptureJob, type CaptureJobOptions, type CaptureSummary } from "./orchestrator.ts";
 import { leaseProgress, type CaptureProgress } from "./progress.ts";
@@ -79,6 +80,8 @@ export interface DispatchDeps {
   logger: Logger;
   /** Redeliveries the queue allows a failing job; a shard's last try is its final word. */
   maxRetries?: number | undefined;
+  /** Told when a shard re-captures work an earlier attempt had stored; must not throw. */
+  onShardRepeated?: ((event: ShardRepeatedEvent) => void) | undefined;
 }
 
 /** A queued capture job. */
@@ -270,6 +273,12 @@ async function runShardJob(
       reqId: job.reqId,
       final,
       progress: leaseProgress(lease),
+      // `attempts` counts the deliveries that already failed; the queue allows `maxRetries` more.
+      delivery: {
+        attempt: (job.attempts ?? 0) + 1,
+        limit: (deps.maxRetries ?? 0) + 1,
+        onRepeated: deps.onShardRepeated,
+      },
       onFinalized: async (summary, error) => {
         await closeShardedBuild(deps, job.buildId, summary, error);
       },

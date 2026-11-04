@@ -264,4 +264,16 @@ describe("createTursoDatabase", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("refuses an upgrade over a build_reviews table made outside StoryShelf, naming its column", async () => {
+    const { dir, db, client } = createTempTurso();
+    try {
+      await client.executeMultiple(
+        "DROP TABLE IF EXISTS build_reviews; CREATE TABLE build_reviews (id TEXT PRIMARY KEY, verdict TEXT)",
+      );
+      await expect(initDb(db)).rejects.toThrow("table build_reviews has no column build_id");
+    } finally {
+      await cleanupTurso(dir, db, client);
+    }
+  });
 });

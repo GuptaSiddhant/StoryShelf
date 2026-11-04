@@ -1,5 +1,5 @@
 /** Rows of the database queue (`capture_jobs`): job rows, per-attempt claim rows, and their views. */
-import { and, asc, desc, eq, inArray, lt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte } from "drizzle-orm";
 import type { Column, SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type {
@@ -26,6 +26,8 @@ export interface NewCaptureJob {
   payload?: string | null;
   /** When the job may first be claimed; defaults to `now`. */
   visibleAt?: string;
+  /** Single-flight key: at most one non-terminal job may hold it (a unique column). */
+  activeKey?: string | null;
 }
 
 /** The claim an instance makes on a job: attempt `attempt`, held by `owner` until `leaseUntil`. */
@@ -39,6 +41,9 @@ export interface AttemptClaim {
 /** Job statuses that end a job: nothing claims it again. */
 export const TERMINAL_JOB_STATUSES: readonly CaptureJobStatus[] = ["done", "failed", "cancelled"];
 
+/** Inserts {@link CaptureJobModel.createKeyed} tries while the key keeps changing hands. */
+const KEYED_INSERT_TRIES = 3;
+
 /** Statuses of rows the poll may claim: a queued job, or a running attempt whose lease ran out. */
 const CANDIDATE_STATUSES = ["queued", "running"];
 
@@ -46,9 +51,10 @@ const CANDIDATE_STATUSES = ["queued", "running"];
 const ACTIVE_STATUSES = [...CANDIDATE_STATUSES, "exhausting"];
 
 /**
- * Data operations of the database queue. Every write is an unconditional update by id or an
- * insert; the only atomic primitive is the unique-key insert of an attempt row ({@link claim}),
- * which is what fences concurrent claimers on every supported database.
+ * Data operations of the database queue. Writes are unconditional updates by id or inserts; the
+ * atomic primitives are the unique-key insert of an attempt row ({@link claim}), which fences
+ * concurrent claimers, and the unique `active_key` of a single-flight job ({@link createKeyed}),
+ * which fences concurrent enqueues, on every supported database.
  */
 export class CaptureJobModel {
   readonly #db: DatabaseAdapter;
@@ -68,6 +74,76 @@ export class CaptureJobModel {
   /** Insert a queued job row. */
   async create(input: NewCaptureJob, now: string): Promise<CaptureJobRow> {
     return (await this.#db.insert(this.#table, jobRow(input, now))) as unknown as CaptureJobRow;
+  }
+
+  /**
+   * Insert a queued job that holds `activeKey`, or report the job that already holds it. The
+   * database decides: a second insert for the same key hits the unique index, and the row that
+   * holds it is read back (a failure with no holder behind it is a real one and is rethrown, as
+   * in {@link claim}). The holder can end between the failed insert and the read; the key is then
+   * free again, so the insert is tried again, a few times at most.
+   */
+  async createKeyed(
+    input: NewCaptureJob & { activeKey: string },
+    now: string,
+  ): Promise<{ created: CaptureJobRow } | { holder: CaptureJobRow }> {
+    let failure: unknown;
+    for (let attempt = 0; attempt < KEYED_INSERT_TRIES; attempt += 1) {
+      try {
+        // oxlint-disable-next-line no-await-in-loop -- each try depends on the last one's outcome
+        return { created: await this.create(input, now) };
+      } catch (error) {
+        failure = error;
+        // oxlint-disable-next-line no-await-in-loop -- read back what the failed insert collided with
+        const holder = await this.holderOf(input.activeKey);
+        if (holder !== null) {
+          return { holder };
+        }
+      }
+    }
+    throw failure;
+  }
+
+  /** The non-terminal job row that holds `activeKey`, or null. */
+  async holderOf(activeKey: string): Promise<CaptureJobRow | null> {
+    const rows = (await this.#db.list(this.#table, {
+      where: eq(this.#c.activeKey, activeKey),
+      limit: 1,
+    })) as unknown as CaptureJobRow[];
+    return rows[0] ?? null;
+  }
+
+  /**
+   * A request arrived for the key of the running job `jobId`: record that one more pass is owed.
+   * One conditional write, applied only while the job is `running`. Returns the row as it stands,
+   * so the caller can tell whether the request is now covered (`running` with the marker set, or
+   * `queued`) or the job ended and the request must become a new job.
+   */
+  async requestRerun(jobId: string, now: string): Promise<CaptureJobRow | null> {
+    return (await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      { rerunRequestedAt: now, updatedAt: now },
+      allOf(eq(this.#c.status, "running"), isNull(this.#c.rerunRequestedAt)),
+    )) as unknown as CaptureJobRow | null;
+  }
+
+  /**
+   * Take the rerun request of the ended job `jobId`: one conditional write clears the marker, and
+   * only the writer whose write cleared it gets `true`, so of several settlers reaching the same
+   * ended job exactly one starts the successor. The writer is told apart by the unique `stamp` it
+   * leaves in `updatedAt`; a refused write leaves the winner's stamp there. `after` is the
+   * `updatedAt` the caller read, which the stamp must pass.
+   */
+  async takeRerun(jobId: string, after: string): Promise<boolean> {
+    const stamp = uniqueStamp(after);
+    const row = (await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      { rerunRequestedAt: null, updatedAt: stamp },
+      isNotNull(this.#c.rerunRequestedAt),
+    )) as unknown as CaptureJobRow | null;
+    return row?.rerunRequestedAt === null && sameInstant(row.updatedAt, stamp);
   }
 
   /**
@@ -111,10 +187,12 @@ export class CaptureJobModel {
 
   /** The claim won: the job row records the running attempt and leaves the poll's index range. */
   async markRunning(jobId: string, attempt: number, now: string): Promise<void> {
+    // The attempt about to run reads the current state, so it covers any rerun asked for before it.
     await this.#db.update(this.#table, jobId, {
       status: "running",
       attempt,
       visibleAt: null,
+      rerunRequestedAt: null,
       startedAt: now,
       updatedAt: now,
     });
@@ -186,7 +264,7 @@ export class CaptureJobModel {
       jobId,
       { status: "exhausting", attempt, visibleAt: null, error, updatedAt: now },
       // A superseded run (a lower number) writes nothing.
-      both(inArray(this.#c.status, ACTIVE_STATUSES), lt(this.#c.attempt, attempt)),
+      allOf(inArray(this.#c.status, ACTIVE_STATUSES), lt(this.#c.attempt, attempt)),
     )) as unknown as CaptureJobRow | null;
     // `updateWhere` returns the row either way; only our write leaves it exhausting at our run.
     return row?.status === "exhausting" && row.attempt === attempt;
@@ -199,7 +277,9 @@ export class CaptureJobModel {
     now: string,
     error: string | null = null,
   ): Promise<void> {
-    const patch = { status, visibleAt: null, finishedAt: now, updatedAt: now };
+    // Ending the job frees its `activeKey` in the same write; until then (while `exhausting`
+    // included) the key stays held, so no second job for it can start.
+    const patch = { status, visibleAt: null, activeKey: null, finishedAt: now, updatedAt: now };
     await this.#db.updateWhere(
       this.#table,
       jobId,
@@ -208,14 +288,17 @@ export class CaptureJobModel {
     );
   }
 
-  /** End a job row for good. */
+  /**
+   * End a job row for good. The same statement frees its `activeKey`, so a later request for the
+   * key creates a new job; there is no moment where the job is over but still holds the key.
+   */
   async finishJob(
     jobId: string,
     status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">,
     now: string,
     error: string | null = null,
   ): Promise<void> {
-    const patch = { status, visibleAt: null, finishedAt: now, updatedAt: now };
+    const patch = { status, visibleAt: null, activeKey: null, finishedAt: now, updatedAt: now };
     await this.#db.update(this.#table, jobId, error === null ? patch : { ...patch, error });
   }
 
@@ -245,6 +328,13 @@ export class CaptureJobModel {
       where: and(eq(this.#c.buildId, buildId), jobEntries(this.#c)),
     })) as unknown as CaptureJobRow[];
     return rows.toSorted(byCreation);
+  }
+
+  /** Whether the build has an unfinished job of `kind` (queued, running or exhausting). */
+  async hasOpenJob(buildId: string, kind: CaptureJobKind): Promise<boolean> {
+    return (await this.listForBuild(buildId)).some(
+      (row) => row.kind === kind && ACTIVE_STATUSES.includes(row.status),
+    );
   }
 
   /** The build's own (non-shard) job of `kinds` most recently queued, or null. */
@@ -363,6 +453,8 @@ interface JobColumns {
   jobId: Column;
   kind: Column;
   buildId: Column;
+  activeKey: Column;
+  rerunRequestedAt: Column;
   status: Column;
   attempt: Column;
   visibleAt: Column;
@@ -376,6 +468,8 @@ function jobColumns(table: Table): JobColumns {
     jobId: col(table, "jobId"),
     kind: col(table, "kind"),
     buildId: col(table, "buildId"),
+    activeKey: col(table, "activeKey"),
+    rerunRequestedAt: col(table, "rerunRequestedAt"),
     status: col(table, "status"),
     attempt: col(table, "attempt"),
     visibleAt: col(table, "visibleAt"),
@@ -383,9 +477,34 @@ function jobColumns(table: Table): JobColumns {
   };
 }
 
-/** `first AND second`; drizzle's `and` is only undefined for an empty list, so `first` is a formality. */
-function both(first: SQL, second: SQL): SQL {
-  return and(first, second) ?? first;
+/** `and(...)` of conditions that are all present (drizzle types its result as possibly undefined). */
+/** The last stamp handed out; only ever moves forward. */
+let lastStamp = 0;
+
+/** An ISO timestamp no other call in this process returns twice, and later than `after`. */
+function uniqueStamp(after: string): string {
+  const seen = Date.parse(after);
+  lastStamp = Math.max(Date.now(), lastStamp + 1, Number.isNaN(seen) ? 0 : seen + 1);
+  return new Date(lastStamp).toISOString();
+}
+
+const TIMESTAMP_TEXT =
+  /^(?<day>\d{4}-\d\d-\d\d)[T ](?<time>\d\d:\d\d:\d\d(?:\.\d+)?)(?<zone>Z|[+-]\d\d(?::?\d\d)?)?$/u;
+
+/** Whether two timestamp texts (ISO, or a driver's `YYYY-MM-DD HH:MM:SS.mmm+00`) are one instant. */
+function sameInstant(left: string, right: string): boolean {
+  const instants = [left, right].map((text) => {
+    const found = TIMESTAMP_TEXT.exec(text)?.groups;
+    if (!found) return Number.NaN;
+    const zone = found["zone"] ?? "Z";
+    const offset = /^[+-]\d\d$/u.test(zone) ? `${zone}:00` : zone;
+    return Date.parse(`${found["day"]}T${found["time"]}${offset}`);
+  });
+  return !Number.isNaN(instants[0]) && instants[0] === instants[1];
+}
+
+function allOf(first: SQL, ...rest: SQL[]): SQL {
+  return and(first, ...rest) ?? first;
 }
 
 function kindFilter(c: JobColumns, kinds: readonly CaptureJobKind[]): SQL {
@@ -413,6 +532,7 @@ function jobRow(input: NewCaptureJob, now: string): CaptureJobRow {
     status: "queued",
     visibleAt: input.visibleAt ?? now,
     payload: input.payload ?? null,
+    activeKey: input.activeKey ?? null,
   };
 }
 
@@ -447,6 +567,8 @@ function blankRow(now: string): BlankRow {
     owner: null,
     payload: null,
     cancelRequestedAt: null,
+    activeKey: null,
+    rerunRequestedAt: null,
     error: null,
     startedAt: null,
     finishedAt: null,

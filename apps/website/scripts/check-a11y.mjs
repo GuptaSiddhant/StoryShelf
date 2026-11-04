@@ -47,7 +47,9 @@ function serve() {
       res.writeHead(404).end("not found");
     }
   });
-  return new Promise((resolve) => server.listen(0, () => resolve(server)));
+  return new Promise((resolve) => {
+    server.listen(0, () => resolve(server));
+  });
 }
 
 async function audit(browser, base, mode, path) {
@@ -66,7 +68,7 @@ async function audit(browser, base, mode, path) {
   await page
     .waitForFunction(
       () =>
-        [...document.querySelectorAll("pre")].every(
+        [...globalThis.document.querySelectorAll("pre")].every(
           (block) => block.scrollWidth <= block.clientWidth || block.hasAttribute("tabindex"),
         ),
       undefined,
@@ -75,7 +77,9 @@ async function audit(browser, base, mode, path) {
     .catch(() => {});
   await page.evaluate(axeSource);
   const { violations } = await page.evaluate(() =>
-    globalThis.axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] }),
+    globalThis.axe.run(globalThis.document, {
+      runOnly: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+    }),
   );
   await context.close();
   return violations.map(

@@ -17,7 +17,7 @@ export function CaptureTargetsCard(props: {
         What the capture runner offers, default first. A project can only pick a target that is
         ready; a declared engine that is not installed is listed with the reason.
       </Meta>
-      <Table>
+      <Table label="Capture browsers">
         <table>
           <thead>
             <tr>

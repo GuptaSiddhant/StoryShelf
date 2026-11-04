@@ -273,10 +273,9 @@ describe("a private project's published Storybook", () => {
       // oxlint-disable-next-line eslint/no-await-in-loop -- same
       const unknown = await getAs(app, path("ghost", UNKNOWN_BUILD_ID), cookie, accept);
       expect(hidden, where).toEqual(unknown);
-      // The auth gate answers an anonymous short link, for any id, before the route runs.
-      const byGate = cookie === undefined && where.startsWith("/_/");
-      // A bare short link (`/_/<id>`) redirects to the trailing-slash form for any id.
-      const redirects = byGate || /^\/_\/[^/]+$/u.test(where);
+      // A bare short link (`/_/<id>`) redirects to the trailing-slash form for any id; the checks
+      // (and the 404) belong to the trailing-slash route, for every caller (#497, #681).
+      const redirects = /^\/_\/[^/]+$/u.test(where);
       expect(hidden["status"], where).toBe(redirects ? 302 : 404);
       expect(hidden["location"] === undefined, where).toBe(!redirects);
     }

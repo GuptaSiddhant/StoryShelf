@@ -70,21 +70,32 @@ function fillParamsMap(
   }
 }
 
+/** How long to wait for the preview to finish starting before reading it anyway. */
+const PREVIEW_READY_MS = 15_000;
+
 async function readExtractedParameters(
   page: RuntimeParamsPage,
 ): Promise<Record<string, ExtractedEntry> | null> {
-  const map = (await page.evaluate(() => {
+  const map = (await page.evaluate(async (readyMs: number) => {
     const win = globalThis as unknown as {
-      __STORYBOOK_PREVIEW__?: { extract?: () => unknown };
+      __STORYBOOK_PREVIEW__?: { extract?: () => unknown; ready?: () => unknown };
     };
     // oxlint-disable-next-line typescript/dot-notation -- __STORYBOOK_PREVIEW__ is a Storybook global
     const preview = win["__STORYBOOK_PREVIEW__"];
     if (!preview || typeof preview.extract !== "function") return null;
-    const extracted = preview.extract();
+    // `extract()` rejects (SB_PREVIEW_API_0005) until the preview has loaded its story index; the
+    // preview's own `ready()` settles when it has, so wait for that rather than race it.
+    if (typeof preview.ready === "function") {
+      const timeout = new Promise<void>((resolve) => {
+        setTimeout(resolve, readyMs);
+      });
+      await Promise.race([preview.ready(), timeout]);
+    }
+    const extracted = await preview.extract();
     return extracted && typeof extracted === "object"
       ? (extracted as Record<string, ExtractedEntry>)
       : null;
-  })) as Record<string, ExtractedEntry> | null;
+  }, PREVIEW_READY_MS)) as Record<string, ExtractedEntry> | null;
   return hasEntries(map) ? map : null;
 }
 

@@ -96,6 +96,9 @@ function HeaderTitle({
             a11y {a11y.findings} (does not block)
           </Badge>
         ) : null}
+        {a11y.fromBaseline > 0 ? (
+          <Badge tone="neutral">a11y {a11y.fromBaseline} from baseline (not measured here)</Badge>
+        ) : null}
         {a11y.unavailable > 0 ? (
           <Badge tone="neutral">{a11yUnavailableNote(a11y.unavailable)}</Badge>
         ) : null}

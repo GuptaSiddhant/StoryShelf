@@ -5,7 +5,7 @@ description: GitHub and GitLab notification providers for StoryShelf — commit 
 
 import { PackageManagers } from "starlight-package-managers";
 
-`@storyshelf/notify-git` makes GitHub or GitLab show the current state of a build: a **commit status** you can require in branch protection, and a single **pull-request or merge-request comment** that is rewritten as the build changes. It is a `state` notifier family member, the sibling of [`@storyshelf/notify-chat`](/packages/notify-chat/) and [`@storyshelf/notify-email`](/packages/notify-email/), and it has no runtime dependencies: every call goes through `@storyshelf/core/utils` (`httpJson`), which adds a timeout and retries with `Retry-After`.
+`@storyshelf/notify-git` makes GitHub or GitLab show the current state of a build: a **commit status** you can require in branch protection, and a single **pull-request or merge-request comment** that is rewritten as the build changes. It is a `state` notifier family member, the sibling of [`@storyshelf/notify-chat`](/packages/notify-chat/) and [`@storyshelf/notify-email`](/packages/notify-email/), and it uses no git-provider SDK (it depends only on `@storyshelf/core` and `zod`): every call goes through `@storyshelf/core/utils` (`httpJson`), which adds a timeout and retries with `Retry-After`.
 
 ## Install
 
