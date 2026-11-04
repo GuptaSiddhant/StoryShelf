@@ -10,7 +10,7 @@ import { readFile } from "node:fs/promises";
 import { devNull, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detectGitDefaultBranch,
   detectGitRepository,
@@ -33,6 +33,10 @@ let dir = "";
 /** The user's and the system's git config files: pointed at the null device so they define nothing. */
 const GIT_CONFIG_FILES = ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"] as const;
 const savedGitEnv = new Map<string, string | undefined>();
+/** The `GIT_*` variables this process started with, which every restore must leave as they were. */
+const OUTER_GIT_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => key.startsWith("GIT_")),
+);
 
 /**
  * Clear every inherited `GIT_*` variable, so a git hook, a worktree or a `GIT_CONFIG_COUNT` override
@@ -41,7 +45,9 @@ const savedGitEnv = new Map<string, string | undefined>();
  */
 function isolateGitEnv(ceiling: string): void {
   for (const name of Object.keys(process.env).filter((key) => key.startsWith("GIT_"))) {
-    savedGitEnv.set(name, process.env[name]);
+    if (!savedGitEnv.has(name)) {
+      savedGitEnv.set(name, process.env[name]);
+    }
     Reflect.deleteProperty(process.env, name);
   }
   for (const name of GIT_CONFIG_FILES) {
@@ -60,7 +66,6 @@ function restoreGitEnv(): void {
       process.env[name] = value;
     }
   }
-  savedGitEnv.clear();
 }
 
 beforeEach(() => {
@@ -69,8 +74,16 @@ beforeEach(() => {
   isolateGitEnv(dirname(dir));
 });
 
+afterAll(() => {
+  const now = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => key.startsWith("GIT_")),
+  );
+  expect(now).toEqual(OUTER_GIT_ENV);
+});
+
 afterEach(() => {
   restoreGitEnv();
+  savedGitEnv.clear();
   vi.unstubAllEnvs();
   rmSync(dir, { recursive: true, force: true });
 });
@@ -247,13 +260,10 @@ describe("git detection", () => {
     expect(detectGitRepository(dir)).toBeNull();
   });
 
-  it("restores an inherited git ceiling after the fixture's own", () => {
-    restoreGitEnv();
-    vi.stubEnv("GIT_CEILING_DIRECTORIES", "/inherited");
-    isolateGitEnv(dirname(dir));
+  it("replaces the inherited git ceiling during the fixture and restores it afterwards", () => {
     expect(process.env["GIT_CEILING_DIRECTORIES"]).toBe(dirname(dir));
     restoreGitEnv();
-    expect(process.env["GIT_CEILING_DIRECTORIES"]).toBe("/inherited");
+    expect(process.env["GIT_CEILING_DIRECTORIES"]).toBe(OUTER_GIT_ENV["GIT_CEILING_DIRECTORIES"]);
   });
 
   it.each([
