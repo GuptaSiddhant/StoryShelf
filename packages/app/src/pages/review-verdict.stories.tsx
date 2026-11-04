@@ -39,6 +39,7 @@ function card(
   latest: BuildReview[],
   assigned: ReviewSectionData["assigned"],
   status: Build["status"] = build.status,
+  overrides: Partial<ReviewSectionData> = {},
 ): ReviewSectionData {
   return {
     project,
@@ -59,6 +60,7 @@ function card(
     publishing: "success",
     canComment: true,
     canVerdict: true,
+    ...overrides,
   };
 }
 
@@ -89,8 +91,22 @@ export const AssignedMixed = jsxStory(() => (
   />
 ));
 
-/** A cancelled build is terminal: the reviewer can still see it, but gets no verdict controls. */
-export const CancelledBuild = jsxStory(() => <VerdictCard data={card([], [], "cancelled")} />);
+/** A cancelled build has nothing to review: one line, and a retry for a viewer who may retry (capture on). */
+export const CancelledBuild = jsxStory(() => (
+  <VerdictCard data={card([], [], "cancelled", { testing: true })} />
+));
 
-/** A failed capture has nothing to review either. */
-export const FailedBuild = jsxStory(() => <VerdictCard data={card([], [], "failed")} />);
+/** The same, for a viewer who may not retry (a reader below developer): the line alone. */
+export const CancelledBuildNoRetry = jsxStory(() => (
+  <VerdictCard
+    data={card([], [], "cancelled", { testing: true, canComment: false, canVerdict: false })}
+  />
+));
+
+/** A failed capture has nothing to review: one line, and the retry. */
+export const FailedBuild = jsxStory(() => (
+  <VerdictCard data={card([], [], "failed", { testing: true })} />
+));
+
+/** A failed build on an instance that only hosts Storybooks (no capture): the line, no retry to offer. */
+export const FailedBuildHostingOnly = jsxStory(() => <VerdictCard data={card([], [], "failed")} />);
