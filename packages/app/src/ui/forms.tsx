@@ -93,6 +93,23 @@ const fieldTextareaError = css`
   line-height: var(--leading-normal);
 `;
 
+/** For fields that hold patterns or code (globs, config): the mono face, a little smaller. */
+const fieldTextareaMono = css`
+  /* field-textarea-mono */
+  ${fieldTextarea}
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  tab-size: 2;
+`;
+
+const fieldTextareaMonoError = css`
+  /* field-textarea-mono-error */
+  ${fieldTextareaError}
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  tab-size: 2;
+`;
+
 const fieldHint = css`
   /* field-hint */
   margin: 0;
@@ -299,6 +316,12 @@ export const CheckField: FC<{
   );
 };
 
+/** The textarea class for a face (plain or mono) and a state (ok or error). */
+const TEXTAREA_CLASS = {
+  plain: { ok: fieldTextarea, error: fieldTextareaError },
+  mono: { ok: fieldTextareaMono, error: fieldTextareaMonoError },
+} as const;
+
 /** Labeled textarea with error and hint states. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const TextareaField: FC<{
@@ -312,7 +335,20 @@ export const TextareaField: FC<{
   required?: boolean;
   hint?: string;
   error?: string;
-}> = ({ label, name, id, value, placeholder, rows = 3, required, hint, error }) => {
+  /** For patterns or code: the mono face, and no spell-checking (it is not prose). */
+  monospace?: boolean;
+}> = ({
+  label,
+  name,
+  id,
+  value,
+  placeholder,
+  rows = 3,
+  required,
+  hint,
+  error,
+  monospace = false,
+}) => {
   const domId = id ?? name;
   return (
     <div class={fieldWrap}>
@@ -320,7 +356,8 @@ export const TextareaField: FC<{
         {label}
       </label>
       <textarea
-        class={error ? fieldTextareaError : fieldTextarea}
+        class={TEXTAREA_CLASS[monospace ? "mono" : "plain"][error ? "error" : "ok"]}
+        spellcheck={monospace ? false : undefined}
         id={domId}
         name={name}
         placeholder={placeholder}
