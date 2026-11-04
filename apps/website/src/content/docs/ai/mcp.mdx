@@ -19,7 +19,9 @@ It is a thin client over the [REST API](/guides/api/): it uses your existing tok
   </Card>
   <Card title="Comment" icon="comment">
     Add a comment to a build, a story or a snapshot, reply, and resolve threads. Needs a token with
-    the developer role or above. A project with review off has no comments.
+    the developer role or above. A project with review off has no comments: the comment tools answer
+    "review is off for this project" (the tool asks the project, so a wrong build id still reads as
+    not found).
   </Card>
   <Card title="Never approve" icon="approve-check">
     There is no approve, reject, build-verdict, retry or generate tool. A human signs off in
