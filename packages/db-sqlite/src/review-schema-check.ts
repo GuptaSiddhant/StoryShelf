@@ -16,6 +16,16 @@ const INTEGER_COLUMNS = [
   ["projects", "run_a11y"],
 ] as const;
 
+/** SQLite's own rule (datatype3): a declared type containing `INT` has integer affinity (`TINYINT`, `BIGINT`, ...). */
+function hasIntegerAffinity(type: string): boolean {
+  return type.includes("INT");
+}
+
+/** SQLite's own rule: a declared type containing `CHAR`, `CLOB` or `TEXT` has text affinity (`VARCHAR`, ...). */
+function hasTextAffinity(type: string): boolean {
+  return ["CHAR", "CLOB", "TEXT"].some((part) => type.includes(part));
+}
+
 function conflict(what: string): Error {
   return new Error(
     `Cannot upgrade the schema: ${what}. It was not created by StoryShelf; rename or drop it (keep a backup) and start again.`,
@@ -36,7 +46,7 @@ export function assertReviewColumns(tables: ReadonlyMap<string, TableColumns>): 
   }
   for (const [table, column] of INTEGER_COLUMNS) {
     const type = tables.get(table)?.get(column);
-    if (type !== undefined && !type.startsWith("INT")) {
+    if (type !== undefined && !hasIntegerAffinity(type)) {
       throw conflict(`column ${table}.${column} has type ${type}, expected INTEGER`);
     }
   }
@@ -46,7 +56,7 @@ export function assertReviewColumns(tables: ReadonlyMap<string, TableColumns>): 
 /** `snapshots.a11y_violations` holds the stored axe findings as TEXT. */
 function assertFindingsColumn(tables: ReadonlyMap<string, TableColumns>): void {
   const violations = tables.get("snapshots")?.get("a11y_violations");
-  if (violations !== undefined && violations !== "TEXT") {
+  if (violations !== undefined && !hasTextAffinity(violations)) {
     throw conflict(`column snapshots.a11y_violations has type ${violations}, expected TEXT`);
   }
 }

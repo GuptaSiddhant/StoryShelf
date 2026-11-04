@@ -92,6 +92,14 @@ describe("assertReviewSchema", () => {
     );
   });
 
+  it("accepts a hand-made column with the right SQLite affinity", async () => {
+    const read = readerFor(
+      "CREATE TABLE projects (id TEXT, run_a11y TINYINT NOT NULL DEFAULT 1, review_approvals BIGINT)",
+      "CREATE TABLE snapshots (id TEXT, a11y_violations VARCHAR(4000))",
+    );
+    await expect(assertReviewSchema(read)).resolves.toBeUndefined();
+  });
+
   it("names the stored findings column when it has another type", async () => {
     const read = readerFor("CREATE TABLE snapshots (id TEXT, a11y_violations INTEGER)");
     await expect(assertReviewSchema(read)).rejects.toThrow(
