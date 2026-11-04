@@ -41,6 +41,11 @@ function setup() {
     releaseBuildContent: async () => "not-deleting",
     markStorageDeleted: async () => "not-deleting",
     completeDeletion: async () => "not-deleting",
+    recordContentUses: async () => [],
+    claimContent: async () => [],
+    holdsContentClaim: async () => false,
+    abandonContentClaim: async () => {},
+    finishContentCollection: async () => {},
   };
   const tables = { baselines: db.tables.baselines, snapshots: db.tables.snapshots };
   return { db, lifecycle, tables };

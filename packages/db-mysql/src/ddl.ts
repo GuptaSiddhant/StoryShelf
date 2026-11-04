@@ -486,12 +486,17 @@ CREATE TABLE IF NOT EXISTS project_group_mappings (
   CONSTRAINT fk_project_group_mappings_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX project_group_mappings_project_group_idx ON project_group_mappings (project_id, group_name);
-CREATE TABLE IF NOT EXISTS content_refs (
-  hash VARCHAR(128) PRIMARY KEY,
-  ref_count INTEGER NOT NULL DEFAULT 1,
-  last_seen_at DATETIME(3) NOT NULL,
-  created_at DATETIME(3) NOT NULL
+CREATE TABLE IF NOT EXISTS content_uses (
+  build_id VARCHAR(64) NOT NULL,
+  content_hash VARCHAR(128) NOT NULL,
+  project_id VARCHAR(64) NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  released_at DATETIME(3) NULL,
+  collecting_at DATETIME(3) NULL,
+  claim_token VARCHAR(64) NULL,
+  PRIMARY KEY (build_id, content_hash)
 );
+CREATE INDEX content_uses_hash_idx ON content_uses (content_hash);
 CREATE TABLE IF NOT EXISTS \`user\` (
   id VARCHAR(64) PRIMARY KEY,
   name TEXT NOT NULL,

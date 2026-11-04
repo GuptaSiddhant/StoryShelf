@@ -443,12 +443,17 @@ CREATE TABLE IF NOT EXISTS project_group_mappings (
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS project_group_mappings_project_group_idx ON project_group_mappings (project_id, group_name);
-CREATE TABLE IF NOT EXISTS content_refs (
-  hash TEXT PRIMARY KEY,
-  ref_count INTEGER NOT NULL DEFAULT 1,
-  last_seen_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL
+CREATE TABLE IF NOT EXISTS content_uses (
+  build_id TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  released_at TIMESTAMPTZ,
+  collecting_at TIMESTAMPTZ,
+  claim_token TEXT,
+  PRIMARY KEY (build_id, content_hash)
 );
+CREATE INDEX IF NOT EXISTS content_uses_hash_idx ON content_uses (content_hash);
 CREATE TABLE IF NOT EXISTS "user" (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

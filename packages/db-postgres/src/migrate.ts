@@ -58,6 +58,8 @@ const DESIGN_LINKS_UNIQUE_INDEX =
 const LEGACY_DESIGN_DROPS = [
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",
+  // Replaced by content_uses (ADR 0039); the table never held rows on a real adapter.
+  "DROP TABLE IF EXISTS content_refs",
 ];
 const BASELINE_FINGERPRINT_ALTER =
   "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS fingerprint TEXT";

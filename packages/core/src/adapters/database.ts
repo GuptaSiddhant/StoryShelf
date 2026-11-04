@@ -51,7 +51,7 @@ export interface Tables {
   userInviteTokens: Table;
   projectMembers: Table;
   projectGroupMappings: Table;
-  contentRefs: Table;
+  contentUses: Table;
 }
 
 /** Table keys every DatabaseAdapter must expose (contract + validation share this). */
@@ -190,8 +190,8 @@ export interface BuildReferenceLifecycle {
   listDeleting(projectId: string): Promise<DeletingBuild[]>;
   /**
    * Step 1 of a claimed build's cleanup. In one transaction, record a release for each distinct
-   * hash and decrement its `content_refs` count (never below zero, keeping the row for the grace
-   * period); a hash already recorded for the build is skipped, so a retry never decrements twice.
+   * hash and mark the build's `content_uses` row of it released (the row stays for the grace
+   * period); a hash already recorded for the build is skipped, so a retry releases nothing twice.
    * Marks the step done. Only a `deleting` build of the project qualifies.
    */
   releaseBuildContent(
@@ -211,6 +211,38 @@ export interface BuildReferenceLifecycle {
     buildId: string,
     removeRows: (tx: TxStore) => Promise<T>,
   ): Promise<{ result: T } | "not-deleting" | "out-of-order">;
+  /**
+   * Record that the build uses each hash of its stored content (`content_uses`): one row per
+   * (build, hash), however many paths name it, so a repeat is a no-op. Returns the hashes it
+   * refused because a collector has claimed them; none of the refused hashes is recorded, and the
+   * caller must store the content again and retry. Same concurrency domain as {@link claimContent}.
+   */
+  recordContentUses(
+    projectId: string,
+    buildId: string,
+    hashes: readonly string[],
+  ): Promise<string[]>;
+  /**
+   * Claim for deletion, under the pass's `token` (a fresh id per collector pass), every hash whose
+   * uses are all released, the latest release older than `idleBefore` (an ISO instant), and no
+   * collector holds yet. Also takes over, to resume, the hashes whose claim is older than
+   * `staleBefore` (a crashed collector's): they are re-stamped with the new token, which fences the
+   * old collector out of {@link holdsContentClaim}, {@link abandonContentClaim} and
+   * {@link finishContentCollection}. A fresh claim is returned to its claimer only, so two
+   * collectors never delete one blob. A claimed hash admits no new use. Resolves to the claimed
+   * hashes.
+   */
+  claimContent(token: string, idleBefore: string, staleBefore: string): Promise<string[]>;
+  /**
+   * Whether the hash is still claimed by this token with no unreleased use. A collector asks right
+   * before it deletes the blob and skips the delete when this is false, which narrows the window a
+   * taken-over collector could delete in to the time between this check and the delete itself.
+   */
+  holdsContentClaim(hash: string, token: string): Promise<boolean>;
+  /** Give a claim back (a live build still serves the blob); only its holder can; uses stay released. */
+  abandonContentClaim(hash: string, token: string): Promise<void>;
+  /** The blob of a claimed hash is deleted: drop its `content_uses` rows, if the token still holds it. */
+  finishContentCollection(hash: string, token: string): Promise<void>;
 }
 
 /** Database-specific metadata: the family plus what the backing platform can carry. */
