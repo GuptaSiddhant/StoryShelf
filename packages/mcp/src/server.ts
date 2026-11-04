@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { toolsFor, type InstanceCapabilities } from "./capabilities.ts";
 import { toToolError, type ApiClient } from "./client.ts";
+import { explainFailure } from "./review-off.ts";
 import { ALL_TOOLS } from "./tools/index.ts";
 
 /** What a server assumes of an instance that was not asked: nothing is hidden. */
@@ -51,10 +52,8 @@ function registerTools(
           const data = await tool.run(client, args);
           return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
         } catch (error) {
-          return {
-            isError: true,
-            content: [{ type: "text" as const, text: toToolError(error).message }],
-          };
+          const explained = await explainFailure(client, tool, args, toToolError(error));
+          return { isError: true, content: [{ type: "text" as const, text: explained.message }] };
         }
       },
     );

@@ -12,6 +12,14 @@ export interface ApiClient {
 /** Error whose message is safe to show an agent (no secrets, actionable). */
 export class ToolError extends Error {
   override name = "ToolError";
+
+  /** The HTTP status the API answered with, when the failure came from one. */
+  readonly status: number | undefined;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
 }
 
 /** Build an {@link ApiClient} that sends the configured Bearer token on every call. */
@@ -64,7 +72,7 @@ export function toToolError(error: unknown): ToolError {
   if (error instanceof ToolError) return error;
   if (error instanceof HttpError) {
     const hint = STATUS_HINTS[error.status] ?? `request failed (${error.status})`;
-    return new ToolError(`StoryShelf API: ${hint}`);
+    return new ToolError(`StoryShelf API: ${hint}`, error.status);
   }
   return new ToolError(
     `StoryShelf API unreachable: ${error instanceof Error ? error.message : String(error)}`,
