@@ -5,10 +5,17 @@ import type { CaptureJobKind, CaptureJobRow } from "../../schema/capture-job.ts"
 import { ulid } from "../../utils/ulid.ts";
 import { isoAt } from "./clock.ts";
 import { encodePayload, toQueueEntry } from "./codec.ts";
+import { enqueueKeyed } from "./single-flight.ts";
 import type { QueueJobInput, QueueRuntime } from "./types.ts";
 
-/** Insert a queued job row and wake this instance's poller; resolves to the job id. */
+/**
+ * Insert a queued job row and wake this instance's poller; resolves to the job id. A job with an
+ * `activeKey` goes through {@link enqueueKeyed}: it may be coalesced into the job that holds the key.
+ */
 export async function enqueueJob(rt: QueueRuntime, job: QueueJobInput): Promise<string> {
+  if (job.activeKey !== undefined) {
+    return await enqueueKeyed(rt, { ...job, activeKey: job.activeKey });
+  }
   const id = ulid();
   const now = isoAt(rt);
   await rt.model.create(
@@ -36,12 +43,26 @@ function viewKinds(rt: QueueRuntime): readonly CaptureJobKind[] {
   return shown.length > 0 ? shown : rt.kinds;
 }
 
-/** `CaptureQueue.enqueue`: a capture job for a build or one of its shards. */
+/**
+ * `CaptureQueue.enqueue`: a capture job for a build or one of its shards. The build's own run reads
+ * the run generation before inserting its job and stamps ownership only while it is unchanged, so
+ * an enqueue overtaken by a retry cannot take the build back: its job is cancelled instead.
+ */
 export async function enqueueCapture(rt: QueueRuntime, job: CaptureJob): Promise<void> {
+  if (job.shard !== undefined) {
+    await enqueueJob(rt, { ...job, kind: "capture" });
+    return;
+  }
+  const generation = (await rt.builds.get(job.buildId))?.captureGeneration ?? 0;
   const jobId = await enqueueJob(rt, { ...job, kind: "capture" });
-  if (job.shard === undefined) {
-    // The build's own run (not a shard of it) owns the build until it is reset.
-    await rt.builds.stampCaptureJob(job.buildId, jobId);
+  const stamped = await rt.builds.stampCaptureJob(job.buildId, jobId, generation);
+  if (stamped === "stale") {
+    // A retry reset the build while this job was being inserted: the job belongs to a superseded run.
+    rt.logger?.warn(
+      { buildId: job.buildId, jobId, generation },
+      "capture job superseded; cancelling",
+    );
+    await cancelJobs(rt, jobId);
   }
 }
 

@@ -305,9 +305,87 @@ describe("upload inline statics", () => {
     const { slug, id: projectId } = await setupProject(app);
     const { buildId, status } = await uploadZip(app, slug, storybookZip());
     expect(status).toBe(422);
-    expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
+    expect((await new BuildModel(db).get(buildId))?.status).toBe("failed");
     expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/manifest.json`)).toBe(false);
+  });
+
+  it("rejects an inline zip over maxUnzippedBytes with 422, like any other cap", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      config: { scratchDir, maxUnzippedBytes: 8 },
+    });
+    const { slug } = await setupProject(app);
+    const { status, body } = await uploadZip(app, slug, storybookZip());
+    expect(status).toBe(422);
+    expect(body).not.toBe("");
+  });
+
+  it("answers an oversize transport with 413, apart from a rejected archive's 422", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      config: { scratchDir, maxUploadBytes: 64 },
+    });
+    const { slug } = await setupProject(app);
+    const big = await uploadZip(app, slug, storybookZip());
+    expect(big.status).toBe(413);
+    const garbage = Buffer.from("not a zip");
+    const small = await uploadZip(app, slug, garbage, String(garbage.length));
+    expect(small.status).toBe(422);
+  });
+
+  it.each([
+    ["corrupt", { maxInlineUnzipSize: 1024 * 1024 }, () => Buffer.from("definitely-not-a-zip")],
+    ["over a cap", { maxInlineUnzipSize: 1024 * 1024, maxZipEntries: 1 }, () => storybookZip()],
+  ])(
+    "leaves no storage, content references or scratch files behind after a %s inline zip",
+    async (_name, config, makeZip) => {
+      const { db } = makeDatabase();
+      const { storage, objects } = makeStorage();
+      const app = createShelfApp({
+        database: db,
+        storage,
+        logger: silentLogger,
+        config: { scratchDir, ...config },
+      });
+      const { slug, id: projectId } = await setupProject(app);
+      const zip = makeZip();
+      const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
+      expect(status).toBe(422);
+      expect([...objects.keys()].filter((key) => key.includes(buildId))).toEqual([]);
+      expect([...objects.keys()].filter((key) => key.startsWith("content/"))).toEqual([]);
+      expect(await db.list(db.tables.contentRefs)).toEqual([]);
+      const scratch = await readdir(join(scratchDir, SCRATCH_DIRNAME, projectId, buildId)).catch(
+        () => null,
+      );
+      expect(scratch).toBeNull();
+    },
+  );
+
+  it("never extracts inline when maxInlineUnzipSize is 0: the upload becomes a publish job", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      config: { scratchDir, maxInlineUnzipSize: 0 },
+    });
+    const { slug, id: projectId } = await setupProject(app);
+    const zip = storybookZip();
+    const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
+    expect(status).toBe(202);
+    const jobs = await new CaptureJobModel(db).listForBuild(buildId);
+    expect(jobs.map((job) => job.kind)).toEqual(["publish"]);
+    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
   });
 
   it("defaults the scratch dir for inline extraction when none is configured", async () => {
@@ -326,7 +404,7 @@ describe("upload inline statics", () => {
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
   });
 
-  it("rejects an invalid inline zip without queuing capture, and allows a corrected upload", async () => {
+  it("fails the build when an inline zip is rejected, and refuses a corrected zip on it with 409", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({
@@ -344,14 +422,19 @@ describe("upload inline statics", () => {
     expect(await queuedCaptures(db)).not.toContain(buildId);
     expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
-    expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
+    expect((await new BuildModel(db).get(buildId))?.status).toBe("failed");
 
     const corrected = await app.request(`/api/v1/projects/${slug}/builds/${buildId}/zip`, {
       method: "PUT",
       headers: { "content-type": "application/zip" },
       body: new Uint8Array(storybookZip()),
     });
-    expect(corrected.status).toBe(202);
-    expect(await queuedCaptures(db)).toContain(buildId);
+    expect(corrected.status).toBe(409);
+    expect(await queuedCaptures(db)).not.toContain(buildId);
+    expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
+
+    const fresh = await uploadZip(app, slug, storybookZip());
+    expect(fresh.status).toBe(202);
+    expect(fresh.buildId).not.toBe(buildId);
   });
 });

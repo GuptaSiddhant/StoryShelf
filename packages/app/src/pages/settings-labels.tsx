@@ -31,7 +31,7 @@ export function renderSettingsLabels(
           Labels attach typed values to builds (e.g. pr=123, jira=ABC-123). Values link out via the
           template.
         </Meta>
-        <Table>
+        <Table label="Label types">
           <table>
             <thead>
               <tr>

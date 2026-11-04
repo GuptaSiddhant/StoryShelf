@@ -6,6 +6,7 @@
  * migration path instead of drifting per preset.
  */
 import { DDL } from "./ddl.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 
 /** Minimal row-query surface a migration runner needs. */
 export type MigrationRunner = (sql: string) => Promise<unknown[]>;
@@ -30,6 +31,8 @@ const PROJECT_REVIEW_APPROVALS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS review_approvals INTEGER NOT NULL DEFAULT 1";
 const PROJECT_STORYBOOK_URL_TTL_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS storybook_url_ttl_seconds INTEGER";
+const PROJECT_COMPONENT_OWNERS_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS component_owners TEXT";
 const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const SNAPSHOT_INHERITED_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
@@ -81,6 +84,8 @@ const BUILD_CAPTURE_JOB_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS cap
 /** A run in flight when the column was added owns the build it was started for (idempotent). */
 const BUILD_CAPTURE_JOB_BACKFILL =
   "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
+const BUILD_CAPTURE_GENERATION_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS capture_generation INTEGER NOT NULL DEFAULT 0";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
@@ -97,6 +102,17 @@ const MEMBER_SOURCE_ALTER =
  * Auth columns the SQLite `users` table always had. Without them the Drizzle model cannot store
  * `disabled` (an admin disabling a user fails) or the auth provider and display-name override.
  */
+/**
+ * Single-flight jobs (ADR 0040): `capture_jobs.active_key` is unique while a job is non-terminal.
+ * Not swallowed like the other follow-ups: without the index two notify jobs for one key could run
+ * at once, so a failure must stop the boot. Every statement is idempotent.
+ */
+const CAPTURE_JOB_SINGLE_FLIGHT = [
+  "ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS active_key TEXT",
+  "ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS rerun_requested_at TIMESTAMPTZ",
+  "CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx ON capture_jobs (active_key)",
+];
+
 const USER_AUTH_ALTERS = [
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT",
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name_override TEXT",
@@ -104,6 +120,9 @@ const USER_AUTH_ALTERS = [
   "ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false",
 ];
 const COMMENT_STORY_ID_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS story_id TEXT";
+const SUBSCRIPTION_REVIEW_REQUESTS_ALTER =
+  "ALTER TABLE notification_subscriptions ADD COLUMN IF NOT EXISTS review_requests BOOLEAN NOT NULL DEFAULT TRUE";
+const COMMENT_MENTIONS_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS mentions TEXT";
 const COMMENT_KIND_ALTER =
   "ALTER TABLE comments ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'comment'";
 const COMMENT_RESOLVED_AT_ALTER =
@@ -113,6 +132,8 @@ const NOTIFICATION_LAST_ERROR_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error TEXT";
 const NOTIFICATION_LAST_ERROR_AT_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMPTZ";
+const NOTIFICATION_LAST_DELIVERED_ALTER =
+  "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_delivered_at TIMESTAMPTZ";
 /**
  * Re-runs share `(project_id, git_sha)` by design (ULID build ids), so the
  * lookup index must not be unique. Existing databases created it UNIQUE —
@@ -211,6 +232,7 @@ async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> 
   await execIgnore(run, PROJECT_REVIEW_ENABLED_ALTER);
   await execIgnore(run, PROJECT_REVIEW_APPROVALS_ALTER);
   await execIgnore(run, PROJECT_STORYBOOK_URL_TTL_ALTER);
+  await execIgnore(run, PROJECT_COMPONENT_OWNERS_ALTER);
 }
 
 async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
@@ -220,16 +242,21 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, BUILD_AFFECTED_PATHS_ALTER);
   await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
   await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
-  await execIgnore(run, BUILD_REVIEW_CYCLE_ALTER);
-  await execIgnore(run, BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
-  await execIgnore(run, BUILD_CAPTURE_JOB_ALTER);
+  // Idempotent (IF NOT EXISTS), and the review gate and the capture fence read these columns: a
+  // real failure must stop the boot, not leave a column missing.
+  await run(BUILD_REVIEW_CYCLE_ALTER);
+  await run(BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
+  await run(BUILD_CAPTURE_JOB_ALTER);
+  await run(BUILD_CAPTURE_GENERATION_ALTER);
 }
 
 /** Run the full migration set through any row-query runner. */
 export async function runMigrations(run: MigrationRunner): Promise<void> {
+  await assertReviewSchema(run);
   await run(DDL);
   await migrateCoreColumns(run);
   await migrateUserAuthColumns(run);
+  await migrateCaptureJobSingleFlight(run);
   await migrateProjectExtras(run);
   // Not swallowed: an unfenced build would let a late crash hook fail a newer run.
   await run(BUILD_CAPTURE_JOB_BACKFILL);
@@ -247,6 +274,13 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
 async function migrateUserAuthColumns(run: MigrationRunner): Promise<void> {
   for (const statement of USER_AUTH_ALTERS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered, and a failure must stop the boot
+    await run(statement);
+  }
+}
+
+async function migrateCaptureJobSingleFlight(run: MigrationRunner): Promise<void> {
+  for (const statement of CAPTURE_JOB_SINGLE_FLIGHT) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered (columns, then the index), and a failure must stop the boot
     await run(statement);
   }
 }
@@ -287,13 +321,22 @@ async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {
 async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, NOTIFICATION_LAST_ERROR_ALTER);
   await execIgnore(run, NOTIFICATION_LAST_ERROR_AT_ALTER);
+  // IF NOT EXISTS makes it idempotent, so a real failure must surface rather than be ignored.
+  await run(NOTIFICATION_LAST_DELIVERED_ALTER);
 }
 
-async function migrateCommentsTable(run: MigrationRunner): Promise<void> {
+/** The columns the comments table gained after it first shipped. */
+async function migrateCommentColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, COMMENT_STORY_ID_ALTER);
+  await execIgnore(run, COMMENT_MENTIONS_ALTER);
+  await execIgnore(run, SUBSCRIPTION_REVIEW_REQUESTS_ALTER);
   await execIgnore(run, COMMENT_KIND_ALTER);
   await execIgnore(run, COMMENT_RESOLVED_AT_ALTER);
   await execIgnore(run, COMMENT_RESOLVED_BY_ALTER);
+}
+
+async function migrateCommentsTable(run: MigrationRunner): Promise<void> {
+  await migrateCommentColumns(run);
   try {
     const rows = (await run(
       "SELECT is_nullable FROM information_schema.columns WHERE table_name='comments' AND column_name='user_id'",

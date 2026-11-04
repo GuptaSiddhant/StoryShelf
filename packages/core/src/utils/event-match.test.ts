@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { COMMENT_CREATED, matchesEvent, REVIEW_COMMENT_ALIAS } from "./event-match.ts";
+import {
+  COMMENT_CREATED,
+  matchesEvent,
+  NOTIFICATION_EVENTS,
+  REVIEW_COMMENT_ALIAS,
+} from "./event-match.ts";
 
 const scoped = (scope: string): Record<string, unknown> => ({ scope, buildId: "b1" });
 
@@ -29,5 +34,16 @@ describe("matchesEvent", () => {
   it("does not make the alias match other events or other names", () => {
     expect(matchesEvent([REVIEW_COMMENT_ALIAS], "review:verdict", scoped("build"))).toBe(false);
     expect(matchesEvent(["build:created"], COMMENT_CREATED, scoped("build"))).toBe(false);
+  });
+});
+
+describe("NOTIFICATION_EVENTS", () => {
+  it("lists each subscribable event once, with the review topics and without the alias", () => {
+    const names = NOTIFICATION_EVENTS.map((entry) => entry.event);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(expect.arrayContaining(["review:requested", "review:verdict"]));
+    expect(names).not.toContain(REVIEW_COMMENT_ALIAS);
+    expect(names).not.toContain("comment:mentioned");
+    expect(NOTIFICATION_EVENTS.every((entry) => entry.label.length > 0)).toBe(true);
   });
 });

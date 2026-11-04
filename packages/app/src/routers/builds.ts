@@ -127,6 +127,11 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
+    if (build.status === "failed") {
+      throw new HTTPException(409, {
+        message: `Build ${build.id} failed; run storyshelf upload again to create a new build`,
+      });
+    }
     const maxBytes = getStore().config.maxUploadBytes ?? DEFAULT_MAX_UPLOAD_BYTES;
     const zipBytes = await storeUploadStream(
       getStore().storage,
@@ -315,7 +320,12 @@ const uploadZipRoute = createRoute({
     },
     422: {
       content: { "text/plain": { schema: z.string() } },
-      description: "The inline zip is invalid, unsafe, or exceeds the extraction limits",
+      description:
+        "The inline zip is invalid, unsafe, or exceeds the extraction limits. The build ends `failed`; upload again to create a new build.",
+    },
+    409: {
+      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      description: "The build already failed (for example a rejected zip); create a new build",
     },
     413: {
       content: {

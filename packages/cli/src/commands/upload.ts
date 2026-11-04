@@ -400,7 +400,7 @@ async function uploadBuild(
       error.message +=
         `\nThe server rejected the Storybook archive. Check its contents and the server's ` +
         `maxZipEntries and maxUnzippedBytes limits, then run storyshelf upload again. ` +
-        `That creates a new build; to reuse build ${created.build.id}, PUT a corrected ZIP to ${created.uploadUrl}.`;
+        `That creates a new build; build ${created.build.id} failed and takes no further upload.`;
       throw error;
     }
     if (!isOverInlineLimit(error)) {

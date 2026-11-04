@@ -13,6 +13,7 @@ export const notificationChannels = sqliteTable("notification_channels", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   lastError: text("last_error"),
   lastErrorAt: text("last_error_at"),
+  lastDeliveredAt: text("last_delivered_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -29,6 +30,7 @@ export const notificationSubscriptions = sqliteTable("notification_subscriptions
   events: text("events"),
   via: text("via"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  reviewRequests: integer("review_requests", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull(),
 });
 
@@ -43,6 +45,7 @@ export interface NotificationChannel {
   enabled: boolean;
   lastError: string | null;
   lastErrorAt: string | null;
+  lastDeliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,5 +58,6 @@ export interface NotificationSubscription {
   events: string | null;
   via: string | null;
   enabled: boolean;
+  reviewRequests: boolean;
   createdAt: string;
 }

@@ -57,6 +57,14 @@ export interface CaptureJobRow {
   payload: string | null;
   /** Set once cancel was asked for; the holder turns it into `runner.cancel`. */
   cancelRequestedAt: string | null;
+  /**
+   * Job row of a single-flight kind: the key at most one non-terminal job may hold (unique), e.g.
+   * `notify:<channelId>:<buildId>`; cleared in the write that ends the job. Null otherwise, and
+   * always null on attempt rows.
+   */
+  activeKey: string | null;
+  /** Running job row: a request arrived for its key while it ran, so one more pass is owed. */
+  rerunRequestedAt: string | null;
   /** Job row: the last attempt's error. Attempt row: its own. */
   error: string | null;
   startedAt: string | null;

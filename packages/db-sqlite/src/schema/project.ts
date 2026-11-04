@@ -25,6 +25,7 @@ export const projects = sqliteTable("projects", {
   reviewEnabled: integer("review_enabled", { mode: "boolean" }).notNull().default(true),
   reviewApprovals: integer("review_approvals").notNull().default(1),
   storybookUrlTtlSeconds: integer("storybook_url_ttl_seconds"),
+  componentOwners: text("component_owners"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -54,6 +55,7 @@ export interface Project {
   reviewEnabled: boolean;
   reviewApprovals: number;
   storybookUrlTtlSeconds: number | null;
+  componentOwners: string | null;
   createdAt: string;
   updatedAt: string;
 }

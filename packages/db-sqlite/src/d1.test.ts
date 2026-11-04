@@ -122,4 +122,26 @@ describe("createD1Database", () => {
     // Binding still usable after adapter teardown.
     await client.exec("SELECT 1");
   });
+
+  it("refuses an upgrade over a build_reviews table made outside StoryShelf, naming its column", async () => {
+    const binding = createStubBinding();
+    await binding.exec(
+      "DROP TABLE IF EXISTS build_reviews; CREATE TABLE build_reviews (id TEXT PRIMARY KEY, verdict TEXT)",
+    );
+    await expect(initDb(createD1Database({ client: binding }))).rejects.toThrow(
+      "table build_reviews has no column build_id",
+    );
+  });
+
+  it("lets a binding that refuses PRAGMA through, as the column inspection does", async () => {
+    const binding = createStubBinding();
+    const prepare = binding.prepare.bind(binding);
+    binding.prepare = (sql: string) => {
+      if (sql.startsWith("PRAGMA table_info")) {
+        throw new Error("PRAGMA is not served");
+      }
+      return prepare(sql);
+    };
+    await expect(initDb(createD1Database({ client: binding }))).resolves.toBeUndefined();
+  });
 });

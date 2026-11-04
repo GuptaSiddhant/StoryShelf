@@ -84,8 +84,16 @@ function demoAi() {
     summary:
       "The primary Button gained new spacing and colour tokens, which matches the commit. Card and Input also changed, which the commit does not mention.",
     items: [
-      { snapshotKey: "Components/Button/Primary@desktop", note: "Padding and fill match the new tokens.", severity: "info" },
-      { snapshotKey: "Components/Input/Error@desktop", note: "Error border colour changed without a matching source change.", severity: "medium" },
+      {
+        snapshotKey: "Components/Button/Primary@desktop",
+        note: "Padding and fill match the new tokens.",
+        severity: "info",
+      },
+      {
+        snapshotKey: "Components/Input/Error@desktop",
+        note: "Error border colour changed without a matching source change.",
+        severity: "medium",
+      },
     ],
     confidence: "medium",
   };
@@ -95,8 +103,16 @@ function demoAi() {
       "Review load is steady, but Components/Input/Error changed in four of the last twelve builds, which suggests an unstable story or a shared token.",
     score: 78,
     trends: [
-      { label: "Review backlog", note: "Median of 3 snapshots per build, flat over the window.", direction: "flat" },
-      { label: "Churny stories", note: "Input/Error and Card/Default change most often.", direction: "up" },
+      {
+        label: "Review backlog",
+        note: "Median of 3 snapshots per build, flat over the window.",
+        direction: "flat",
+      },
+      {
+        label: "Churny stories",
+        note: "Input/Error and Card/Default change most often.",
+        direction: "up",
+      },
     ],
     confidence: "medium",
   };

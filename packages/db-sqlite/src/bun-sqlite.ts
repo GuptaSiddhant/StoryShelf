@@ -12,7 +12,9 @@ import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
+import { parseTableInfo } from "./table-info.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -60,7 +62,11 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
       category: "database",
     },
     tables: schema,
-    migrate: () => {
+    migrate: async () => {
+      await assertReviewSchema(
+        async (table) =>
+          await Promise.resolve(parseTableInfo(client.query(`PRAGMA table_info(${table})`).all())),
+      );
       runMigrations(client);
     },
     close: () => {

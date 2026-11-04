@@ -78,7 +78,7 @@ export function renderSettingsLinks(
           publishes it. Review pages then show where a story uses it, with links to the upstream
           component.
         </Meta>
-        <Table>
+        <Table label="Linked packages">
           <table>
             <thead>
               <tr>

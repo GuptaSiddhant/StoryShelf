@@ -3,9 +3,8 @@
 // before every build and dev server start so it never drifts from the source.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = import.meta.dirname;
 const source = join(here, "..", "..", "..", "CHANGELOG.md");
 const target = join(here, "..", "src", "content", "docs", "changelog.md");
 
@@ -21,4 +20,4 @@ ${body}`;
 
 mkdirSync(dirname(target), { recursive: true });
 writeFileSync(target, page);
-console.log("changelog.md synced from CHANGELOG.md");
+process.stdout.write("changelog.md synced from CHANGELOG.md\n");

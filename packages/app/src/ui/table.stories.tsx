@@ -39,14 +39,20 @@ const body = (
   </table>
 );
 
-export const Default = jsxStory(() => <Table>{body}</Table>);
+export const Default = jsxStory(() => <Table label="Components">{body}</Table>);
 
-export const Dense = jsxStory(() => <Table dense>{body}</Table>);
+export const Dense = jsxStory(() => (
+  <Table dense label="Components">
+    {body}
+  </Table>
+));
 
 export const Both = jsxStory(() => (
   <VStack gap="lg">
-    <Table>{body}</Table>
-    <Table dense>{body}</Table>
+    <Table label="Components">{body}</Table>
+    <Table dense label="Components, dense">
+      {body}
+    </Table>
   </VStack>
 ));
 

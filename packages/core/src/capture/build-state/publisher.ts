@@ -30,7 +30,7 @@ export function createBuildStatePublisher(
   const { deps } = options;
   const pause = { logged: false };
   return {
-    request: async (buildId) => {
+    request: async (buildId, only) => {
       try {
         const origin = await deps.publicOrigin();
         if (!origin) {
@@ -38,7 +38,7 @@ export function createBuildStatePublisher(
           return;
         }
         pause.logged = false;
-        await requestAll(options, { buildId, origin });
+        await requestAll(options, { buildId, origin, channelId: only?.channelId });
       } catch (error) {
         deps.logger.warn({ err: error, buildId }, "failed to request the build state");
       }
@@ -57,15 +57,17 @@ function logPaused(deps: BuildStateDeps, pause: { logged: boolean }, buildId: st
 /** Ask every state channel of the build's project to show it. */
 async function requestAll(
   options: BuildStatePublisherOptions,
-  where: { buildId: string; origin: string },
+  where: { buildId: string; origin: string; channelId?: string | undefined },
 ): Promise<void> {
   const { deps } = options;
-  const { buildId, origin } = where;
+  const { buildId, origin, channelId } = where;
   const loaded = await loadBuild(deps, buildId);
   if (loaded === null) {
     return;
   }
-  const targets = await stateTargets(deps, loaded.project.id);
+  const targets = (await stateTargets(deps, loaded.project.id)).filter(
+    (target) => channelId === undefined || target.channel.id === channelId,
+  );
   await Promise.allSettled(
     targets.map(async (target) => {
       await requestOne(options, { buildId, loaded, target, origin });

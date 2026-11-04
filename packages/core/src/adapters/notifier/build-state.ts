@@ -16,8 +16,12 @@ export const MAX_ANNOTATIONS = 200;
 /** Names of the statuses below a channel's prefix. */
 export type StatusName = "testing" | "review" | "storybook";
 
-/** How publishing the build's Storybook stands. */
-export type PublishingState = "pending" | "success" | "failure";
+/**
+ * How publishing the build's Storybook stands. `unavailable` is a build that was accepted or
+ * reviewed without a Storybook to show (purged or lost content): not a wait, so no permanent
+ * `pending` check, and the operator is pointed at the build page.
+ */
+export type PublishingState = "pending" | "success" | "failure" | "unavailable";
 
 /** What decides which statuses exist (ADR 0014, decision 5). */
 export interface BuildStateFlags {
@@ -290,6 +294,9 @@ function reviewOutcome(build: BuildStateBuild, approvals: BuildStateInput["appro
   }
 }
 
+/** What the `storybook` status and the build page say when the published content is missing. */
+export const STORYBOOK_UNAVAILABLE = "Storybook content unavailable, see build page";
+
 /** Informational: never a gate, linking to the published Storybook once there is one. */
 function storybookStatus(publishing: PublishingState, prefix: string, links: Links): DesiredStatus {
   const base = { name: "storybook", context: `${prefix}/storybook`, informational: true } as const;
@@ -308,6 +315,9 @@ function storybookStatus(publishing: PublishingState, prefix: string, links: Lin
       description: "Storybook could not be published",
       url: links.build,
     };
+  }
+  if (publishing === "unavailable") {
+    return { ...base, state: "failure", description: STORYBOOK_UNAVAILABLE, url: links.build };
   }
   return { ...base, state: "pending", description: "Publishing Storybook", url: links.build };
 }

@@ -58,6 +58,11 @@ function withClientScript(html: string): string {
   return html.replace("</body>", () => `<script>${clientScript()}</script></body>`);
 }
 
+/** The same story in the preview's 375px phone viewport (`viewport.options.phone` in `preview.ts`). */
+export function onAPhone(story: StoryObj): StoryObj {
+  return { ...story, globals: { viewport: { value: "phone", isRotated: false } } };
+}
+
 /**
  * A page story: the real `renderXPage()` output (its shell, chrome and styles) in a full-size
  * frame, so layout and the 375/768/1280 viewports behave as in the app. Interactivity is off

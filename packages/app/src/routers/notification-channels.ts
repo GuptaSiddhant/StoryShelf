@@ -2,8 +2,10 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import type { NotificationChannelRow } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { retryChannelState } from "./channel-retry.ts";
 import { notFound, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import {
   notFound as notFoundResponse,
@@ -25,6 +27,7 @@ function toPublic(row: NotificationChannelRow): {
   enabled: boolean;
   lastError: string | null;
   lastErrorAt: string | null;
+  lastDeliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
 } {
@@ -36,8 +39,9 @@ function toPublic(row: NotificationChannelRow): {
     hasSecret: row.secretEncrypted !== null,
     events: NotificationChannelModel.eventsOf(row),
     enabled: row.enabled,
-    lastError: row.lastError,
+    lastError: row.lastError === null ? null : sanitizeErrorText(row.lastError, 500),
     lastErrorAt: row.lastErrorAt,
+    lastDeliveredAt: row.lastDeliveredAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -93,7 +97,40 @@ const deleteChannelRoute = createRoute({
   },
 });
 
-/** Register the project notification-channel list, create, and delete endpoints. */
+const retryChannelRoute = createRoute({
+  method: "post",
+  tags: ["Notifications"],
+  summary: "Retry a git channel's current state",
+  description:
+    "Asks again for the state of the project's open builds on this git channel only. " +
+    "Nothing is sent to chat, email or webhooks. Answers 409 while no public URL is confirmed, " +
+    "and 503 when the open builds could not be looked up.",
+  path: "/api/v1/projects/{slug}/notification-channels/{channelId}/retry",
+  request: { params: z.object({ slug: z.string(), channelId: z.string() }) },
+  responses: {
+    202: {
+      content: { "application/json": { schema: z.object({ asked: z.number().int() }) } },
+      description: "Builds asked again",
+    },
+    400: {
+      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      description: "Not a git channel",
+    },
+    409: {
+      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      description:
+        "The channel is disabled, or notifications are paused until a public URL is confirmed",
+    },
+    503: {
+      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      description: "The open builds could not be looked up; try again",
+    },
+    ...notFoundResponse,
+    ...unauthorized,
+  },
+});
+
+/** Register the project notification-channel list, create, retry and delete endpoints. */
 export function registerNotificationChannels(app: ShelfRouter): void {
   app.openapi(listChannelsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
@@ -115,6 +152,22 @@ export function registerNotificationChannels(app: ShelfRouter): void {
     }
     const row = await notificationChannelModel().create({ projectId: project.id, ...body });
     return c.json(toPublic(row), 201);
+  });
+
+  app.openapi(retryChannelRoute, async (c) => {
+    const { slug, channelId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
+    const result = await retryChannelState(project, channelId);
+    if (!result.ok && result.status === 404) {
+      notFound(result.message);
+    }
+    if (result.ok) {
+      return c.json({ asked: result.asked }, 202);
+    }
+    if (result.status === 503) {
+      return c.json({ message: result.message }, 503);
+    }
+    return c.json({ message: result.message }, result.status === 409 ? 409 : 400);
   });
 
   app.openapi(deleteChannelRoute, async (c) => {

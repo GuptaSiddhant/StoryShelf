@@ -54,6 +54,7 @@ export function getMetadata(): MessageNotifierProvider["metadata"] {
     description: "Email notifications over a shared SMTP/HTTP transport",
     kind: "email",
     category: "notifier",
+    audience: "person",
     schema: emailChannelConfigSchema,
   };
 }

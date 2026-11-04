@@ -24,6 +24,7 @@ describe("redactSecrets", () => {
   it("redacts provider key prefixes", () => {
     expect(redactSecrets("key AKIAIOSFODNN7EXAMPLE leaked")).toBe("key [redacted] leaked");
     expect(redactSecrets("pat ghp_abcDEF123 leaked")).toBe("pat [redacted] leaked");
+    expect(redactSecrets("pat glpat-aB3_x-9Yz leaked")).toBe("pat [redacted] leaked");
   });
 
   it("redacts an Anthropic API key embedded in an error", () => {

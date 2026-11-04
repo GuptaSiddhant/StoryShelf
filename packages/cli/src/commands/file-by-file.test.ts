@@ -121,7 +121,7 @@ describe("upload over the inline limit", () => {
     await expect(runUpload(options())).rejects.toMatchObject({
       status: 422,
       message: expect.stringMatching(
-        /Zip holds more than 10 entries[\s\S]*maxZipEntries[\s\S]*build b1[\s\S]*\/builds\/b1\/zip/u,
+        /Zip holds more than 10 entries[\s\S]*maxZipEntries[\s\S]*build b1 failed/u,
       ),
     });
     expect(seen.some((call) => call.path.endsWith("/dedup"))).toBe(false);

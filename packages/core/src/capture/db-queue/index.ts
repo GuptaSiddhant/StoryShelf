@@ -112,6 +112,9 @@ function withHooks(rt: QueueRuntime, options: DatabaseCaptureQueueOptions): Queu
   if (options.onAbandoned !== undefined) {
     rt.onAbandoned = options.onAbandoned;
   }
+  if (options.onEnded !== undefined) {
+    rt.onEnded = options.onEnded;
+  }
   return rt;
 }
 

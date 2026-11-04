@@ -103,8 +103,12 @@ describe("runMigrations: MySQL 8 compatibility", () => {
     expect(queries).toContain("ALTER TABLE projects ADD COLUMN storybook_url_ttl_seconds INT");
     expect(queries).toContain("ALTER TABLE builds ADD COLUMN review_cycle INT NOT NULL DEFAULT 0");
     expect(queries).toContain("ALTER TABLE builds ADD COLUMN review_requested_cycle INT NULL");
+    expect(queries).toContain(
+      "ALTER TABLE notification_subscriptions ADD COLUMN review_requests BOOLEAN NOT NULL DEFAULT TRUE",
+    );
     expect(queries).toContain("ALTER TABLE snapshots ADD COLUMN a11y_violations TEXT");
     expect(queries).toContain("ALTER TABLE comments ADD COLUMN story_id TEXT");
+    expect(queries).toContain("ALTER TABLE comments ADD COLUMN mentions TEXT");
     expect(queries).toContain(
       "ALTER TABLE comments ADD COLUMN kind VARCHAR(32) NOT NULL DEFAULT 'comment'",
     );
@@ -112,6 +116,9 @@ describe("runMigrations: MySQL 8 compatibility", () => {
     expect(queries).toContain("ALTER TABLE comments ADD COLUMN resolved_by VARCHAR(64) NULL");
     expect(queries).toContain(
       "ALTER TABLE notification_channels ADD COLUMN last_error_at DATETIME(3)",
+    );
+    expect(queries).toContain(
+      "ALTER TABLE notification_channels ADD COLUMN last_delivered_at DATETIME(3)",
     );
     expect(queries).toContain("ALTER TABLE comments MODIFY COLUMN user_id VARCHAR(64) NULL");
   });
@@ -127,6 +134,17 @@ describe("runMigrations: MySQL 8 compatibility", () => {
     expect(queries[backfill]).toContain("j.status IN ('queued', 'running')");
     expect(queries[backfill]).toContain(
       "WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')",
+    );
+  });
+});
+
+describe("runMigrations: builds.capture_generation", () => {
+  it("adds the run generation as a NOT NULL column defaulting to 0", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+
+    expect(queries).toContain(
+      "ALTER TABLE builds ADD COLUMN capture_generation INTEGER NOT NULL DEFAULT 0",
     );
   });
 });
@@ -225,6 +243,62 @@ describe("runMigrations: users auth columns", () => {
       );
       expect(alter, `ALTER for ${column}`).toBeDefined();
       const definition = (alter ?? "").slice(`ALTER TABLE users ADD COLUMN `.length);
+      expect(ddl, `DDL for ${column}`).toContain(`  ${definition}`);
+    }
+  });
+});
+
+function captureJobsDdl(): string {
+  const start = DDL.indexOf("CREATE TABLE IF NOT EXISTS capture_jobs (");
+  return DDL.slice(start, DDL.indexOf("\n);", start));
+}
+
+describe("runMigrations: capture_jobs single-flight key", () => {
+  const KEY_COLUMNS = ["active_key", "rerun_requested_at"];
+  const KEY_INDEX = "CREATE UNIQUE INDEX capture_jobs_active_key_idx ON capture_jobs (active_key)";
+
+  it("adds the key columns to an existing table, then its unique index", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+
+    const added = queries.filter((sql) => sql.startsWith("ALTER TABLE capture_jobs ADD COLUMN "));
+    expect(added.map((sql) => sql.split(" ")[5])).toEqual(KEY_COLUMNS);
+    // The index is on a column an old table only gains from the ALTER, so it must come after it.
+    expect(queries.filter((sql) => sql === KEY_INDEX)).toHaveLength(1);
+    expect(queries.indexOf(KEY_INDEX)).toBeGreaterThan(queries.indexOf(added[0] ?? ""));
+  });
+
+  it("leaves a table that already has the columns and the index alone", async () => {
+    const queries: string[] = [];
+    await runMigrations(async (sql) => {
+      queries.push(sql);
+      const asksAboutJobs =
+        sql.includes("table_name = 'capture_jobs'") &&
+        (sql.includes("information_schema.columns") ||
+          sql.includes("information_schema.statistics"));
+      if (asksAboutJobs) {
+        return [{ 1: 1 }];
+      }
+      return sql.includes("column_name = 'user_id'") && sql.includes("is_nullable")
+        ? [{ is_nullable: "NO" }]
+        : [];
+    });
+    expect(queries.some((sql) => sql.startsWith("ALTER TABLE capture_jobs ADD COLUMN "))).toBe(
+      false,
+    );
+    expect(queries).not.toContain(KEY_INDEX);
+  });
+
+  it("keeps the new-install DDL and the upgrade ALTER definitions identical", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+    const ddl = captureJobsDdl();
+    for (const column of KEY_COLUMNS) {
+      const alter = queries.find((sql) =>
+        sql.startsWith(`ALTER TABLE capture_jobs ADD COLUMN ${column} `),
+      );
+      expect(alter, `ALTER for ${column}`).toBeDefined();
+      const definition = (alter ?? "").slice("ALTER TABLE capture_jobs ADD COLUMN ".length);
       expect(ddl, `DDL for ${column}`).toContain(`  ${definition}`);
     }
   });

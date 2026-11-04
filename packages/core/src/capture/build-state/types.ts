@@ -44,5 +44,6 @@ export type SkipReason = "no-build" | "no-channel" | "disabled" | "no-provider" 
  * request that triggered it must not fail because a git host did.
  */
 export interface BuildStatePublisher {
-  request(buildId: string): Promise<void>;
+  /** With `channelId`, only that channel is asked (an operator retry); else every git channel of the project. */
+  request(buildId: string, only?: { channelId?: string }): Promise<void>;
 }

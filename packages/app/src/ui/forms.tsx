@@ -333,6 +333,8 @@ export const TextareaField: FC<{
   placeholder?: string;
   rows?: number;
   required?: boolean;
+  /** Focus the box when it is swapped in (HTMX acts on `autofocus` of swapped content). */
+  autofocus?: boolean;
   hint?: string;
   error?: string;
   /** For patterns or code: the mono face, and no spell-checking (it is not prose). */
@@ -345,6 +347,7 @@ export const TextareaField: FC<{
   placeholder,
   rows = 3,
   required,
+  autofocus,
   hint,
   error,
   monospace = false,
@@ -363,6 +366,7 @@ export const TextareaField: FC<{
         placeholder={placeholder}
         rows={rows}
         required={required}
+        autofocus={autofocus}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={fieldDescribedBy(domId, error, hint)}
       >

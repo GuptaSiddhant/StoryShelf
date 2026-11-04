@@ -82,7 +82,7 @@ export async function renderLabelDetailPage(
           description={`No build currently bears the label ${key}: ${value}.`}
         />
       ) : (
-        <Table>
+        <Table label="Builds with this label">
           <table>
             <thead>
               <tr>
@@ -177,7 +177,7 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
           description="No label types are configured for this project."
         />
       ) : (
-        <Table>
+        <Table label="Label types">
           <table>
             <thead>
               <tr>

@@ -23,6 +23,7 @@ export const comments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
     storyId: text("story_id"),
+    mentions: text("mentions"),
     kind: text("kind").notNull().default("comment"),
     resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "string" }),
     resolvedBy: text("resolved_by"),
@@ -43,6 +44,7 @@ export interface Comment {
   createdAt: string;
   updatedAt: string;
   storyId: string | null;
+  mentions: string | null;
   kind: string;
   resolvedAt: string | null;
   resolvedBy: string | null;
