@@ -1,7 +1,9 @@
+import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 
@@ -64,12 +66,29 @@ async function seed() {
   return { db, storage };
 }
 
-function appWith(db: ReturnType<typeof makeDatabase>["db"], storage: unknown) {
+function notifier(kind: string, name: string, audience: "person" | "room"): NotifierProvider {
+  const metadata = {
+    name,
+    version: "0.0.0",
+    kind,
+    category: "notifier" as const,
+    audience,
+    schema: z.object({}).loose(),
+  };
+  return { metadata, create: () => ({ metadata, send: async () => {} }) };
+}
+
+function appWith(
+  db: ReturnType<typeof makeDatabase>["db"],
+  storage: unknown,
+  notifiers: NotifierProvider[] = [],
+) {
   return createShelfApp({
     database: db,
     storage: storage as never,
     auth: authFor(),
     logger: pino({ level: "silent" }),
+    ...(notifiers.length > 0 ? { notifications: { notifiers } } : {}),
   });
 }
 
@@ -97,6 +116,27 @@ describe("notification subscriptions", () => {
     expect(removed.status).toBe(204);
     const after = await app.request(mePath, { headers: memberCookie });
     expect(await after.json()).toBeNull();
+  });
+
+  it("refuses a room kind with a 422 naming it, and accepts personal and unwired kinds", async () => {
+    const { db, storage } = await seed();
+    const app = appWith(db, storage, [
+      notifier("email", "Email", "person"),
+      notifier("slack-webhook", "Slack", "room"),
+    ]);
+    const put = async (via: string[]) =>
+      await app.request(mePath, {
+        method: "PUT",
+        headers: { "content-type": "application/json", ...memberCookie },
+        body: JSON.stringify({ via }),
+      });
+    const refused = await put(["email", "slack-webhook"]);
+    expect(refused.status).toBe(422);
+    expect(await refused.text()).toContain(
+      "Slack (slack-webhook) posts to a room; add it as a project channel instead",
+    );
+    expect((await put(["email"])).status).toBe(200);
+    expect((await put(["not-wired"])).status).toBe(200);
   });
 
   it("isolates subscriptions per user", async () => {
