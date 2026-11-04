@@ -86,9 +86,15 @@ async function publishInline(build: Build): Promise<void> {
  * An inline zip that is invalid or breaks a cap ends the build `failed`: a retry is a new upload
  * (a new build), so a build left `pending` would never resolve, and a git check already queued for
  * it would stay pending. The validation message is the sanitized reason, sent with `build:failed`.
+ * Only a build still waiting for its upload (`pending`) fails: a cancelled one stays cancelled and
+ * never raises `build:failed`, and a build past that point (reviewing, approved) keeps its verdict,
+ * so a bad re-upload is just refused with the `422`.
  */
 async function rejectInlineZip(build: Build, reason: string): Promise<void> {
   await discardZip(build.projectId, build.id);
+  if (build.status !== "pending") {
+    return;
+  }
   const failed = await new BuildModel(getStore().db).setStatus(build.id, "failed");
   getStore().logger.warn({ buildId: build.id, reason }, "inline zip rejected; build failed");
   await announceBuildStatus(failed.id, "failed", { reason: sanitizeErrorText(reason, 300) });

@@ -1,4 +1,4 @@
-import { NotificationChannelModel } from "@storyshelf/core/models";
+import { BuildModel, NotificationChannelModel } from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -24,48 +24,67 @@ afterEach(async () => {
   }
 });
 
-describe("a rejected inline zip", () => {
-  it("shows a failure on the git channel, not a pending check", async () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const git = makeFakeStateNotifier("github", undefined, z.object({}).loose());
-    const app = createShelfApp({
-      database: db,
-      storage,
-      logger: pino({ level: "silent" }),
-      notifications: { notifiers: [git.provider] },
-      config: { secret: SECRET, scratchDir, publicBaseUrl: "https://shelf.example" },
-    });
-    apps.push(app);
-    const created = await app.request("/api/v1/projects", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Rejected" }),
-    });
-    const project = (await created.json()) as { slug: string; id: string };
-    await new NotificationChannelModel(db, undefined, SECRET).create({
-      projectId: project.id,
-      provider: "github",
-      config: {},
-      secret: "token",
-    });
-    const build = await app.request(`/api/v1/projects/${project.slug}/builds`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ gitSha: "abc123def456", gitBranch: "main" }),
-    });
-    const { uploadUrl } = (await build.json()) as { uploadUrl: string };
-
-    const upload = await app.request(uploadUrl, {
+/** An app with one git channel and a project; `upload` PUTs bytes to a fresh build's zip route. */
+async function boot() {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const git = makeFakeStateNotifier("github", undefined, z.object({}).loose());
+  const app = createShelfApp({
+    database: db,
+    storage,
+    logger: pino({ level: "silent" }),
+    notifications: { notifiers: [git.provider] },
+    config: { secret: SECRET, scratchDir, publicBaseUrl: "https://shelf.example" },
+  });
+  apps.push(app);
+  const created = await app.request("/api/v1/projects", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Rejected" }),
+  });
+  const project = (await created.json()) as { slug: string; id: string };
+  await new NotificationChannelModel(db, undefined, SECRET).create({
+    projectId: project.id,
+    provider: "github",
+    config: {},
+    secret: "token",
+  });
+  const build = await app.request(`/api/v1/projects/${project.slug}/builds`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ gitSha: "abc123def456", gitBranch: "main" }),
+  });
+  const { uploadUrl, build: row } = (await build.json()) as {
+    uploadUrl: string;
+    build: { id: string };
+  };
+  const upload = async (): Promise<Response> =>
+    await app.request(uploadUrl, {
       method: "PUT",
       headers: { "content-type": "application/zip" },
       body: new Uint8Array(Buffer.from("definitely-not-a-zip")),
     });
-    expect(upload.status).toBe(422);
+  return { db, git, buildId: row.id, upload };
+}
 
+describe("a rejected inline zip", () => {
+  it("shows a failure on the git channel, not a pending check", async () => {
+    const t = await boot();
+    expect((await t.upload()).status).toBe(422);
     await vi.waitFor(() => {
-      const last = git.calls.at(-1);
-      expect(last?.state).toBe("failure");
+      expect(t.git.calls.at(-1)?.state).toBe("failure");
     });
   });
+
+  it.each(["cancelled", "approved"] as const)(
+    "refuses with 422 but leaves a %s build as it is, and shows no failure on the git channel",
+    async (status) => {
+      const t = await boot();
+      await new BuildModel(t.db).setStatus(t.buildId, status);
+      t.git.calls.length = 0;
+      expect((await t.upload()).status).toBe(422);
+      expect((await new BuildModel(t.db).get(t.buildId))?.status).toBe(status);
+      expect(t.git.calls.some((call) => call.state === "failure")).toBe(false);
+    },
+  );
 });
