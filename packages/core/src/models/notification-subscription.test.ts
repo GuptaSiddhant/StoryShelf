@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { NotificationSubscriptionModel } from "./notification-subscription.ts";
 
@@ -146,5 +146,30 @@ describe("NotificationSubscriptionModel", () => {
     await model(db).upsert("p1", "u1", { events: ["build:approved"], via: ["email"] });
     expect(seen[0]).not.toHaveProperty("reviewRequests");
     expect((await model(db).getFor("p1", "u1"))!.reviewRequests).toBe(false);
+  });
+
+  it("keeps topics saved while the switch was reconciling, and still adds the review topic", async () => {
+    const { db } = makeDatabase();
+    const subs = model(db);
+    await subs.upsert("p1", "u1", {
+      events: ["build:approved"],
+      via: ["email"],
+      reviewRequests: false,
+    });
+    const real = subs.getFor.bind(subs);
+    // The first read is stale: a full save lands right after it.
+    const read = vi.spyOn(subs, "getFor").mockImplementationOnce(async (projectId, userId) => {
+      const stale = await real(projectId, userId);
+      await subs.upsert("p1", "u1", { events: ["build:failed"], via: ["email"] });
+      return stale;
+    });
+    await subs.setReviewRequests("p1", "u1", true);
+    read.mockRestore();
+    const row = await subs.getFor("p1", "u1");
+    expect(NotificationSubscriptionModel.eventsOf(row!)).toEqual([
+      "build:failed",
+      "review:requested",
+    ]);
+    expect(row?.reviewRequests).toBe(true);
   });
 });

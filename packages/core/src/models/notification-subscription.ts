@@ -126,10 +126,35 @@ export class NotificationSubscriptionModel {
       await this.remove(projectId, userId);
       return;
     }
-    await this.db.update(this.tables.notificationSubscriptions, existing.id, {
-      reviewRequests: on,
-      ...(on ? reconciledEvents(existing) : {}),
-    });
+    await this.writeReviewRequests(projectId, userId, existing, on);
+  }
+
+  /**
+   * Store the switch. Adding `review:requested` to a topic list rewrites that list, so it only
+   * lands if the list is still the one it was derived from; otherwise a concurrent save of new
+   * topics would be lost, and the whole step is redone from the fresh row.
+   */
+  private async writeReviewRequests(
+    projectId: string,
+    userId: string,
+    existing: NotificationSubscriptionRow,
+    on: boolean,
+  ): Promise<void> {
+    const table = this.tables.notificationSubscriptions;
+    const reconciled = on ? reconciledEvents(existing) : {};
+    if (reconciled.events === undefined || existing.events === null) {
+      await this.db.update(table, existing.id, { reviewRequests: on });
+      return;
+    }
+    const won = (await this.db.updateWhere(
+      table,
+      existing.id,
+      { reviewRequests: on, events: reconciled.events },
+      eq(col(table, "events"), existing.events),
+    )) as unknown as NotificationSubscriptionRow | null;
+    if (won?.events !== reconciled.events) {
+      await this.setReviewRequests(projectId, userId, on);
+    }
   }
 
   /** Remove a user's subscription (opt out). */

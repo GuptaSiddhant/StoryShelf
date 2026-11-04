@@ -299,6 +299,23 @@ describe("notifications settings tab", () => {
     expect(html).toMatch(/name="reviewRequests"[^>]*checked/u);
   });
 
+  it("keeps channels chosen elsewhere when the form saves, and adds email to a switched-off row", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, true);
+    const path = "/projects/notify-project/settings/notifications/me";
+    const subscriptions = new NotificationSubscriptionModel(seeded.db);
+    await subscriptions.upsert("p1", member.id, { via: ["email", "dm"] });
+    await postForm(path, { enabled: "on", reviewRequests: "on" }, app);
+    expect(
+      NotificationSubscriptionModel.viaOf((await subscriptions.getFor("p1", member.id))!),
+    ).toEqual(["email", "dm"]);
+    await subscriptions.upsert("p1", member.id, { via: ["dm"], enabled: false });
+    await postForm(path, { enabled: "on", reviewRequests: "on" }, app);
+    expect(
+      NotificationSubscriptionModel.viaOf((await subscriptions.getFor("p1", member.id))!),
+    ).toEqual(["dm", "email"]);
+  });
+
   it("lists every subscribable topic, review ones included, and the review switch", async () => {
     const seeded = await seed();
     const app = testApp(seeded, true);

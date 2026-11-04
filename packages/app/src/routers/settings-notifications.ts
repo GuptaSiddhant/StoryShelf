@@ -175,6 +175,21 @@ function topicsToStore(ticked: string[]): string[] | undefined {
 }
 
 /**
+ * The channels to store when "Email me" is on: those already chosen stay, and email is added when
+ * the row is new, switched off or has none (the form only offers email, so it must not drop
+ * channels set elsewhere, such as through the API).
+ */
+async function channelsToStore(
+  model: NotificationSubscriptionModel,
+  projectId: string,
+  userId: string,
+): Promise<string[]> {
+  const existing = await model.getFor(projectId, userId);
+  const kept = existing ? NotificationSubscriptionModel.viaOf(existing) : [];
+  return existing?.enabled === true && kept.length > 0 ? kept : [...new Set([...kept, "email"])];
+}
+
+/**
  * Persist the viewer's own preferences. "Email me" off keeps the row (switched off) rather than
  * deleting it, which would hand them back to the default recipients; the review-request switch
  * changes only its own column.
@@ -185,7 +200,7 @@ async function saveSubscription(project: Project, userId: string, form: FormData
   if (form.get("enabled") === "on") {
     await model.upsert(project.id, userId, {
       events: topicsToStore(parseChecks(form, "events")),
-      via: ["email"],
+      via: await channelsToStore(model, project.id, userId),
       reviewRequests,
     });
     return;
