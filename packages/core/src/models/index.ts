@@ -74,6 +74,7 @@ export {
 } from "./changeset.ts";
 export {
   assignOwners,
+  compileOwnerPattern,
   matchesOwnerPattern,
   ownerRulesText,
   parseOwnerRules,

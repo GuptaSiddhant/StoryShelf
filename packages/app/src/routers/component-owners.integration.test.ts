@@ -159,11 +159,15 @@ async function saveOwners(booted: Booted, id: string, owners: string): Promise<R
 }
 
 /** Publish a build on a feature branch, so it waits for review. */
-async function publish(booted: Booted, sha = "a".repeat(40)): Promise<string> {
+async function publish(
+  booted: Booted,
+  sha = "a".repeat(40),
+  branch = "feature/x",
+): Promise<string> {
   const created = await booted.call("dev", "/api/v1/projects/owners/builds", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ gitSha: sha, gitBranch: "feature/x" }),
+    body: JSON.stringify({ gitSha: sha, gitBranch: branch }),
   });
   const { build } = (await created.json()) as { build: { id: string } };
   const upload = await booted.call("dev", `/api/v1/projects/owners/builds/${build.id}/zip`, {
@@ -344,6 +348,16 @@ describe("the build page and the approval rules", () => {
     });
     const after = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
     expect(after).toContain("Approved");
+    await booted.stop();
+  });
+
+  it("shows no assigned row on a default-branch build, which is never put up for review", async () => {
+    const booted = await boot({
+      componentOwners: JSON.stringify([{ pattern: "src/forms/**", owners: ["alice"] }]),
+    });
+    const id = await publish(booted, "b".repeat(40), "main");
+    const html = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
+    expect(html).not.toContain("Assigned reviewers");
     await booted.stop();
   });
 

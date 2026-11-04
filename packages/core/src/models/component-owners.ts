@@ -34,11 +34,23 @@ export interface AssignedOwner {
 /** Regex-special characters escaped when a glob is translated. */
 const REGEX_SPECIALS = new Set(["+", "^", "$", "{", "}", "(", ")", "|", "[", "]", "\\", "."]);
 
+/**
+ * A single star stays within a folder; a double star crosses folders. A double star followed by a
+ * slash also matches no folder at all, so a pattern like `src/<double star>/Button.stories.tsx`
+ * matches `src/Button.stories.tsx`, and a leading one matches a file at the root.
+ */
+function starToken(pattern: string, index: number): { text: string; advance: number } {
+  if (pattern[index + 1] !== "*") {
+    return { text: "[^/]*", advance: 1 };
+  }
+  return pattern[index + 2] === "/" ? { text: "(?:.*/)?", advance: 3 } : { text: ".*", advance: 2 };
+}
+
 /** Translate the glob token at `index` into regex text and how far to advance. */
 function translateToken(pattern: string, index: number): { text: string; advance: number } {
   const char = pattern[index];
   if (char === "*") {
-    return pattern[index + 1] === "*" ? { text: ".*", advance: 2 } : { text: "[^/]*", advance: 1 };
+    return starToken(pattern, index);
   }
   if (char === "?") {
     return { text: "[^/]", advance: 1 };
@@ -58,8 +70,11 @@ function normalizePattern(pattern: string): string {
   return bare.endsWith("/") ? `${bare}**` : bare;
 }
 
-/** Whether a story file path matches a glob (`*` within a folder, `**` across folders, `?`). */
-export function matchesOwnerPattern(pattern: string, path: string): boolean {
+/**
+ * A matcher for one glob (`*` within a folder, `**` across folders, `?`), compiled once so it can
+ * be tried against many story files.
+ */
+export function compileOwnerPattern(pattern: string): (path: string) => boolean {
   const glob = normalizePattern(pattern);
   const parts: string[] = [];
   let index = 0;
@@ -68,7 +83,13 @@ export function matchesOwnerPattern(pattern: string, path: string): boolean {
     parts.push(token.text);
     index += token.advance;
   }
-  return new RegExp(`^${parts.join("")}$`, "u").test(path.replace(/^\.?\//u, ""));
+  const expression = new RegExp(`^${parts.join("")}$`, "u");
+  return (path) => expression.test(path.replace(/^\.?\//u, ""));
+}
+
+/** Whether a story file path matches a glob. */
+export function matchesOwnerPattern(pattern: string, path: string): boolean {
+  return compileOwnerPattern(pattern)(path);
 }
 
 /** The text of one line without its `#` comment, split into words. */
@@ -174,7 +195,8 @@ export function assignOwners(
 ): AssignedOwner[] {
   const found = new Map<string, Set<string>>();
   for (const rule of rules) {
-    const matched = paths.filter((path) => matchesOwnerPattern(rule.pattern, path));
+    const matches = compileOwnerPattern(rule.pattern);
+    const matched = paths.filter((path) => matches(path));
     for (const owner of rule.owners.filter((id) => matched.length > 0 && memberIds.has(id))) {
       const files = found.get(owner) ?? new Set<string>();
       for (const path of matched) {

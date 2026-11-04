@@ -83,7 +83,11 @@ export async function loadReviewSection(
     reviewCapabilities(project),
     publishingOrPending(build),
   ]);
-  const assigned = await assignedReviewersOf(db, project, build, changeset.changeset);
+  // A default-branch build is never put up for review, so nobody is assigned to it.
+  const assigned =
+    build.gitBranch === project.gitDefaultBranch
+      ? []
+      : await assignedReviewersOf(db, project, build, changeset.changeset);
   const shown = comments.filter((comment) => comment.snapshotId === null);
   const changeRequests = comments
     .filter((comment) => comment.kind === "change_request")

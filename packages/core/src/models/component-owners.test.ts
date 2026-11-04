@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assignOwners,
+  compileOwnerPattern,
   matchesOwnerPattern,
   ownerRulesText,
   parseOwnerRules,
@@ -24,8 +25,23 @@ describe("matchesOwnerPattern", () => {
     ["/src/forms/**", "src/forms/Input.stories.tsx", true],
     ["src/a.b/**", "src/aXb/c.tsx", false],
     ["src/forms/**", "./src/forms/Input.stories.tsx", true],
+    ["**/*.stories.tsx", "Button.stories.tsx", true],
+    ["src/**/Button.stories.tsx", "src/Button.stories.tsx", true],
+    ["src/**/Button.stories.tsx", "src/a/b/Button.stories.tsx", true],
+    ["src/**/Button.stories.tsx", "srcX/Button.stories.tsx", false],
+    ["src/**/Button.stories.tsx", "src/Card.stories.tsx", false],
   ])("%s on %s is %s", (pattern, path, expected) => {
     expect(matchesOwnerPattern(pattern, path)).toBe(expected);
+  });
+});
+
+describe("compileOwnerPattern", () => {
+  it("gives the same answers as matchesOwnerPattern, for many paths", () => {
+    const matches = compileOwnerPattern("src/forms/**");
+
+    expect(
+      ["src/forms/A.tsx", "src/charts/B.tsx", "./src/forms/C.tsx"].map((path) => matches(path)),
+    ).toEqual([true, false, true]);
   });
 });
 
