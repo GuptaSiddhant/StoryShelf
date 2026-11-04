@@ -12,6 +12,8 @@
 
 /** Marks the code running inside a transaction, so a nested `transact` can be told apart. */
 export interface NestingGuard {
+  /** Whether the runtime can tell a nested call from an independent one at all. */
+  detects: boolean;
   /** Run `body` as a transaction; `inside()` is true within it and anything it starts, until it ends. */
   enter<R>(body: () => Promise<R>): Promise<R>;
   /** Whether the caller runs inside a transaction that has not ended. */
@@ -23,18 +25,90 @@ export interface TransactionMutex {
   run<R>(body: () => Promise<R>): Promise<R>;
 }
 
+/**
+ * How long a transaction waits for its turn where nesting cannot be detected. A nested call there
+ * waits for the transaction it sits in, which waits for it; the limit turns that into an error for
+ * the nested call, which ends the outer transaction and frees the queue. It only counts the wait
+ * for the turn, never a transaction's own run time.
+ */
+export const UNGUARDED_WAIT_LIMIT_MS = 30_000;
+
+/** Options of {@link createTransactionMutex}. */
+export interface TransactionMutexOptions {
+  /** Wait limit in ms; defaults to {@link UNGUARDED_WAIT_LIMIT_MS} when the guard cannot detect, else none. */
+  waitLimitMs?: number;
+  /** Runs `fire` after `ms` and returns what cancels it (default the global timers); tests inject a manual one. */
+  schedule?: (fire: () => void, ms: number) => () => void;
+}
+
+const globalSchedule = (fire: () => void, ms: number): (() => void) => {
+  const timer = setTimeout(fire, ms);
+  return () => {
+    clearTimeout(timer);
+  };
+};
+
 /** A mutex for one adapter; each adapter instance owns its own. */
-export function createTransactionMutex(guard: NestingGuard): TransactionMutex {
+export function createTransactionMutex(
+  guard: NestingGuard,
+  options: TransactionMutexOptions = {},
+): TransactionMutex {
+  const limit = options.waitLimitMs ?? (guard.detects ? undefined : UNGUARDED_WAIT_LIMIT_MS);
   let tail: Promise<unknown> = Promise.resolve();
   return {
     run: async <R>(body: () => Promise<R>): Promise<R> => {
       if (guard.inside()) {
         throw new Error("transact was called inside a transaction of the same database; use `tx`");
       }
-      const turn = tail.then(async () => await guard.enter(body));
+      const turn = new Turn();
+      const done = tail.then(async () => {
+        turn.begin();
+        return await guard.enter(body);
+      });
       // The next transaction waits for this one to end either way, never for its error.
-      tail = turn.catch(() => {});
-      return await turn;
+      tail = done.catch(() => {});
+      return await (limit === undefined
+        ? done
+        : turn.within(done, limit, options.schedule ?? globalSchedule));
     },
   };
+}
+
+/** One caller's place in the queue: whether its turn has come, and a limit on how long to wait for it. */
+class Turn {
+  #started = false;
+  #abandoned = false;
+
+  /** The turn came: stop if the caller already gave up (the wait limit passed), else go on. */
+  begin(): void {
+    if (this.#abandoned) {
+      throw new Error("transaction gave up waiting for its turn");
+    }
+    this.#started = true;
+  }
+
+  /** `done`, or an error if the turn has not come within `limitMs`. */
+  async within<R>(
+    done: Promise<R>,
+    limitMs: number,
+    schedule: (fire: () => void, ms: number) => () => void,
+  ): Promise<R> {
+    let cancel: (() => void) | undefined;
+    const expired = new Promise<never>((_resolve, reject) => {
+      cancel = schedule(() => {
+        if (this.#started) return;
+        this.#abandoned = true;
+        reject(
+          new Error(
+            `transaction waited ${String(limitMs)} ms for the previous one to end; a transaction may have opened another on the same database, use \`tx\` instead`,
+          ),
+        );
+      }, limitMs);
+    });
+    try {
+      return await Promise.race([done, expired]);
+    } finally {
+      cancel?.();
+    }
+  }
 }

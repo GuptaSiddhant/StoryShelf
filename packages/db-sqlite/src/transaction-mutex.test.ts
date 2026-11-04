@@ -7,7 +7,7 @@ import { createBetterSqlite3Database } from "./better-sqlite3.ts";
 import { createSqliteDatabase } from "./index.ts";
 import { createNestingGuard } from "./nesting-guard.ts";
 import { schema } from "./schema/index.ts";
-import { createTransactionMutex } from "./transaction-mutex.ts";
+import { createTransactionMutex, type NestingGuard } from "./transaction-mutex.ts";
 
 const now = "2026-01-01T00:00:00.000Z";
 const silentLogger = createShelfLogger({ level: "silent" });
@@ -98,6 +98,100 @@ describe("createTransactionMutex", () => {
     await expect(second.run(async () => await Promise.resolve("free"))).resolves.toBe("free");
     gate.resolve(null);
     await held;
+  });
+});
+
+/** A runtime with no async context tracking: nothing tells a nested call from an independent one. */
+const blindGuard: NestingGuard = {
+  detects: false,
+  inside: () => false,
+  enter: async (body) => await body(),
+};
+
+/** A scheduler the test fires by hand, so no real time passes. */
+function manualScheduler() {
+  const pending = new Set<() => void>();
+  return {
+    schedule: (fire: () => void): (() => void) => {
+      pending.add(fire);
+      return () => {
+        pending.delete(fire);
+      };
+    },
+    /** Fire every timer that is still waiting, oldest first. */
+    fireAll: () => {
+      for (const fire of pending) {
+        pending.delete(fire);
+        fire();
+      }
+    },
+  };
+}
+
+const settle = async (): Promise<void> => {
+  for (let tick = 0; tick < 10; tick += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- let queued promise callbacks run
+    await Promise.resolve();
+  }
+};
+
+describe("createTransactionMutex where nesting cannot be detected", () => {
+  it("fails a nested run once the wait limit passes, which ends the outer transaction and frees the queue", async () => {
+    const clock = manualScheduler();
+    const mutex = createTransactionMutex(blindGuard, {
+      waitLimitMs: 1000,
+      schedule: clock.schedule,
+    });
+    const outer = mutex.run(async () => await mutex.run(async () => await Promise.resolve(1)));
+    outer.catch(() => {});
+    await settle();
+
+    clock.fireAll();
+
+    await expect(outer).rejects.toThrow("waited 1000 ms");
+    await expect(mutex.run(async () => await Promise.resolve("after"))).resolves.toBe("after");
+  });
+
+  it("never counts a transaction's own run time against it", async () => {
+    const clock = manualScheduler();
+    const mutex = createTransactionMutex(blindGuard, {
+      waitLimitMs: 1000,
+      schedule: clock.schedule,
+    });
+    const gate = Promise.withResolvers<string>();
+    const long = mutex.run(async () => await gate.promise);
+    await settle();
+
+    clock.fireAll();
+    gate.resolve("finished");
+
+    await expect(long).resolves.toBe("finished");
+  });
+
+  it("does not run a transaction that gave up waiting once its turn comes", async () => {
+    const clock = manualScheduler();
+    const mutex = createTransactionMutex(blindGuard, {
+      waitLimitMs: 1000,
+      schedule: clock.schedule,
+    });
+    const gate = Promise.withResolvers<null>();
+    let ran = false;
+    const first = mutex.run(async () => await gate.promise);
+    await settle();
+    const second = mutex.run(async () => {
+      ran = true;
+      return await Promise.resolve(2);
+    });
+    second.catch(() => {});
+    await settle();
+
+    clock.fireAll();
+    await expect(second).rejects.toThrow("waited 1000 ms");
+    gate.resolve(null);
+    await first;
+    await mutex.run(async () => await Promise.resolve(3));
+
+    expect(ran).toBe(false);
   });
 });
 
