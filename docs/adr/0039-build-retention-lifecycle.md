@@ -6,9 +6,10 @@ Accepted. Implementation is partial. This ADR amends ADR 0009 decision 4 (Retent
 deployments with `testing`; hosting-only retention is unchanged.
 
 Merged: source-build provenance (#345), frozen comparison references and fail-closed testing purge
-(#354), SQLite lifecycle primitives (#382) and fenced baseline writers (#389). Open: preparation of
-legacy references (#397), sealing unfenced methods (#372), resumable deletion and SQLite activation
-(#374), Postgres and MySQL capability (#375, #376) and investigations (#377 to #381).
+(#354), SQLite lifecycle primitives (#382), fenced baseline writers (#389), preparation of legacy
+references (#397) and sealing of the capability to fenced mutations (#372). Open: resumable deletion
+and SQLite activation (#374), Postgres and MySQL capability (#375, #376) and investigations
+(#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -57,14 +58,18 @@ by preset, so it cannot by itself carry this guarantee.
   cross-process contract. Exposing `transact` is not evidence of it.
 - The capability serializes admissions, reference changes and deletion claims across processes,
   locks touched builds in a stable order, checks project ownership and availability, and commits
-  reference changes together with their domain writes (`replaceReferences`,
-  `replaceManyReferences`).
+  reference changes together with their domain writes, through the fenced methods only. There is no
+  unfenced replace: an unfenced write could release a newer owner's pin.
 - **Generations fence owners.** Each owner has a durable generation; fenced mutations
   (`replaceFencedReferences`, `replaceManyFencedReferences`) compare and advance it, and a stale
   generation rejects the whole transaction. Generations survive release, so an old worker cannot
   release a newer owner's pin.
-- Each implementation is proven with real multi-connection contract tests (promotion against purge,
-  pin against purge), not mocked transactions.
+- Each implementation is proven with real multi-connection contract tests, not mocked transactions:
+  `buildReferenceContractSuite` (`packages/core/src/test-helpers/build-reference-contract.ts`)
+  covers promotion and pin against purge, a stale generation rejecting a whole multi-owner
+  transaction with its domain writes, release keeping the generation, admission to a deleting or
+  missing build, an admission racing a claim ending in exactly one outcome, and opposite-order
+  multi-build admission without deadlock. Postgres and MySQL (#375, #376) must run the same suite.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the

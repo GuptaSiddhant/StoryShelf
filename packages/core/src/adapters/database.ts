@@ -161,21 +161,6 @@ export interface BuildReferenceLifecycle {
     writeDomain: (tx: TxStore) => Promise<T>,
   ): Promise<{ result: T; generation: number }>;
   /**
-   * Atomically replace one owner's complete reference set and make its domain writes. Both old and
-   * new builds must be locked in stable order, checked for project ownership and availability,
-   * and committed with the domain mutation. Unknown or tombstoned builds reject admission.
-   */
-  replaceReferences<T>(
-    owner: BuildReferenceOwner,
-    buildIds: readonly string[],
-    writeDomain: (tx: TxStore) => Promise<T>,
-  ): Promise<T>;
-  /** Atomically replace several owners' reference sets and the shared domain writes. */
-  replaceManyReferences<T>(
-    changes: readonly BuildReferenceChange[],
-    writeDomain: (tx: TxStore) => Promise<T>,
-  ): Promise<T>;
-  /**
    * In the same concurrency domain as admissions, irreversibly tombstone a build only if no
    * protecting reference remains. Existing tombstones are resumable and never become available.
    * Storage deletion must happen after this operation commits, outside database locks.

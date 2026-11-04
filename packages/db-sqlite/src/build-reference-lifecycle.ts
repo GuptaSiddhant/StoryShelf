@@ -2,7 +2,6 @@
 import {
   BaselineSourceIntegrityError,
   ReferenceGenerationConflict,
-  type BuildReferenceChange,
   type BuildReferenceLifecycle,
   type BuildReferenceOwner,
   type FencedBuildReferenceChange,
@@ -28,10 +27,6 @@ export function createBuildReferenceLifecycle(
       await replaceManyFencedReferences(path, changes, writeDomain),
     replaceFencedReferences: async (owner, generation, ids, writeDomain) =>
       await replaceFencedReferences(path, owner, generation, ids, writeDomain),
-    replaceReferences: async (owner, buildIds, writeDomain) =>
-      await replaceManyReferences(path, [{ owner, buildIds }], writeDomain),
-    replaceManyReferences: async (changes, writeDomain) =>
-      await replaceManyReferences(path, changes, writeDomain),
     claimDeletion: async (projectId, buildId) =>
       await claimDeletion(path, projectId, buildId, onContention),
   };
@@ -307,31 +302,7 @@ function transactionStore(db: DatabaseSync): TxStore {
   });
 }
 
-async function replaceManyReferences<T>(
-  path: string,
-  changes: readonly BuildReferenceChange[],
-  writeDomain: (tx: TxStore) => Promise<T>,
-): Promise<T> {
-  const owners = changes.map((change) =>
-    JSON.stringify([change.owner.projectId, change.owner.type, change.owner.id]),
-  );
-  if (new Set(owners).size !== owners.length) throw new Error("Duplicate reference owner");
-  return await inTransaction(path, async (db) => {
-    const normalized = changes.map((change) => ({
-      owner: change.owner,
-      ids: [...new Set(change.buildIds)].toSorted(),
-    }));
-    for (const change of normalized) checkAvailable(db, change.owner.projectId, change.ids);
-    const result = await writeDomain(transactionStore(db));
-    for (const change of normalized) {
-      saveReferences(db, change.owner, change.ids);
-      advanceGeneration(db, change.owner);
-    }
-    return result;
-  });
-}
-
-/** Every mutation advances the fence, including legacy lifecycle entry points. */
+/** Every reference mutation advances the owner's fence. */
 function advanceGeneration(db: DatabaseSync, owner: BuildReferenceOwner): void {
   db.prepare(
     "INSERT INTO build_reference_generations (project_id, owner_type, owner_id, generation) VALUES (?, ?, ?, 1) ON CONFLICT (project_id, owner_type, owner_id) DO UPDATE SET generation = generation + 1",
