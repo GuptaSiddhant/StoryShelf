@@ -7,6 +7,7 @@ import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
+import { parseTableInfo, type TableColumns } from "./table-info.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -33,7 +34,8 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       category: "database",
     },
     tables: schema,
-    migrate: () => {
+    migrate: async () => {
+      await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
       runMigrations(sqlite);
     },
     close: () => {
@@ -154,7 +156,6 @@ function applyIdentityStatements(sqlite: DatabaseSync): void {
 
 function runMigrations(sqlite: DatabaseSync): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
-  assertReviewSchema(sqlite);
   sqlite.exec(DDL);
   ensureColumns(sqlite, DDL);
   applyIdentityStatements(sqlite);
@@ -165,6 +166,11 @@ function runMigrations(sqlite: DatabaseSync): void {
   } catch {
     execIgnore(sqlite, "PRAGMA foreign_keys = ON");
   }
+}
+
+/** The columns of a table, from `PRAGMA table_info` (rows are arrays: the adapter opens with `returnArrays`). */
+function tableInfo(sqlite: DatabaseSync, table: string): TableColumns {
+  return parseTableInfo(sqlite.prepare(`PRAGMA table_info(${table})`).all());
 }
 
 /** Drop the retired `webhooks.secret` column; a database that no longer has it is already migrated. */

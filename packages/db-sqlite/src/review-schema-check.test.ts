@@ -1,14 +1,16 @@
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { assertReviewSchema } from "./review-schema-check.ts";
+import { parseTableInfo, type TableInfoReader } from "./table-info.ts";
 
 /** An in-memory database opened as the adapter opens it (rows as arrays), with the given tables. */
-function database(...statements: string[]): DatabaseSync {
+function readerFor(...statements: string[]): TableInfoReader {
   const sqlite = new DatabaseSync(":memory:", { returnArrays: true });
   for (const statement of statements) {
     sqlite.exec(statement);
   }
-  return sqlite;
+  return async (table) =>
+    await Promise.resolve(parseTableInfo(sqlite.prepare(`PRAGMA table_info(${table})`).all()));
 }
 
 const SETTINGS = [
@@ -19,53 +21,56 @@ const REVIEWS =
   "CREATE TABLE build_reviews (id TEXT, build_id TEXT, user_id TEXT, verdict TEXT, body TEXT, created_at TEXT)";
 
 describe("assertReviewSchema", () => {
-  it("passes on a database with no review table or columns", () => {
-    expect(() => {
-      assertReviewSchema(
-        database("CREATE TABLE projects (id TEXT)", "CREATE TABLE builds (id TEXT)"),
-      );
-    }).not.toThrow();
+  it("passes on a database with no review table or columns", async () => {
+    const read = readerFor("CREATE TABLE projects (id TEXT)", "CREATE TABLE builds (id TEXT)");
+    await expect(assertReviewSchema(read)).resolves.toBeUndefined();
   });
 
-  it("passes on an empty database", () => {
-    expect(() => {
-      assertReviewSchema(database());
-    }).not.toThrow();
+  it("passes on an empty database", async () => {
+    await expect(assertReviewSchema(readerFor())).resolves.toBeUndefined();
   });
 
-  it("passes on a complete, matching schema", () => {
-    expect(() => {
-      assertReviewSchema(database(...SETTINGS, REVIEWS));
-    }).not.toThrow();
+  it("passes on a complete, matching schema", async () => {
+    await expect(assertReviewSchema(readerFor(...SETTINGS, REVIEWS))).resolves.toBeUndefined();
   });
 
-  it("names the table and the missing column of a build_reviews table without a required one", () => {
-    const sqlite = database(
+  it("names the table and the missing column of a build_reviews table without a required one", async () => {
+    const read = readerFor(
       ...SETTINGS,
       "CREATE TABLE build_reviews (id TEXT, user_id TEXT, verdict TEXT, body TEXT, created_at TEXT)",
     );
-    expect(() => {
-      assertReviewSchema(sqlite);
-    }).toThrow("table build_reviews has no column build_id");
+    await expect(assertReviewSchema(read)).rejects.toThrow(
+      "table build_reviews has no column build_id",
+    );
   });
 
-  it("also requires the reviewer and body columns", () => {
-    const sqlite = database(
+  it("also requires the reviewer and body columns", async () => {
+    const read = readerFor(
       ...SETTINGS,
       "CREATE TABLE build_reviews (id TEXT, build_id TEXT, verdict TEXT, created_at TEXT)",
     );
-    expect(() => {
-      assertReviewSchema(sqlite);
-    }).toThrow("table build_reviews has no column user_id");
+    await expect(assertReviewSchema(read)).rejects.toThrow(
+      "table build_reviews has no column user_id",
+    );
   });
 
-  it("names the table, column and types of a review column of another type", () => {
-    const sqlite = database(
+  it("names the table, column and types of a review column of another type", async () => {
+    const read = readerFor(
       "CREATE TABLE projects (id TEXT, review_approvals TEXT)",
       "CREATE TABLE builds (id TEXT)",
     );
-    expect(() => {
-      assertReviewSchema(sqlite);
-    }).toThrow("column projects.review_approvals has type TEXT, expected INTEGER");
+    await expect(assertReviewSchema(read)).rejects.toThrow(
+      "column projects.review_approvals has type TEXT, expected INTEGER",
+    );
+  });
+
+  it("reads all three tables, whatever order the reader answers in", async () => {
+    const asked: string[] = [];
+    const read: TableInfoReader = async (table) => {
+      asked.push(table);
+      return await Promise.resolve(new Map());
+    };
+    await assertReviewSchema(read);
+    expect(asked.toSorted()).toEqual(["build_reviews", "builds", "projects"]);
   });
 });

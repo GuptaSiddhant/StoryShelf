@@ -12,7 +12,9 @@ import { drizzle } from "drizzle-orm/d1";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
+import { parseTableInfo } from "./table-info.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -67,6 +69,10 @@ export function createD1Database(options: D1DatabaseOptions): DatabaseAdapter {
     },
     tables: schema,
     migrate: async () => {
+      // A binding that refuses PRAGMA has no columns to check, as in `ensureColumns`.
+      await assertReviewSchema(async (table) =>
+        parseTableInfo((await inspectRows(client, table)) ?? []),
+      );
       await runMigrations(client);
     },
     close: () => {
@@ -129,18 +135,23 @@ async function ensureColumns(client: D1Database, ddl: string): Promise<void> {
   }
 }
 
+/** The rows of `PRAGMA table_info`, or `undefined` when the binding cannot serve PRAGMA. */
+async function inspectRows(client: D1Database, table: string): Promise<unknown[] | undefined> {
+  try {
+    const result = await client.prepare(`PRAGMA table_info(${table})`).bind().all();
+    return result.results as unknown[];
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Read a table's columns via `PRAGMA table_info`. Returns `undefined` when
  * the binding cannot serve PRAGMA (callers then add columns blindly).
  */
 async function inspectColumns(client: D1Database, table: string): Promise<Set<string> | undefined> {
-  try {
-    const result = await client.prepare(`PRAGMA table_info(${table})`).bind().all();
-    const rows = result.results as { name: unknown }[];
-    return new Set(rows.map((row) => String(row.name)));
-  } catch {
-    return undefined;
-  }
+  const rows = (await inspectRows(client, table)) as { name: unknown }[] | undefined;
+  return rows === undefined ? undefined : new Set(rows.map((row) => String(row.name)));
 }
 
 async function migrateCommentsTable(client: D1Database): Promise<void> {
