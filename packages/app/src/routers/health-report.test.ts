@@ -60,6 +60,9 @@ describe("collectHealthReport", () => {
         hasLifecycle: false,
       });
       expect(entry?.detail).toContain("model spec v4");
+      // The provider key in the error text is redacted, not served to the site admin.
+      expect(entry?.detail).not.toContain("SECRETSECRETSECRET");
+      expect(entry?.detail).toContain("[redacted]");
       expect(report.status).toBe("degraded");
     });
 
