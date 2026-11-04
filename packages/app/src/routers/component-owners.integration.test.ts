@@ -51,8 +51,14 @@ let scratchDir = "";
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-owners-"));
 });
+/** Apps booted by the running test; stopped after it, also when an assertion failed. */
+const running: { stop: () => Promise<void> }[] = [];
 afterEach(async () => {
-  await rm(scratchDir, { recursive: true, force: true });
+  try {
+    await Promise.all(running.splice(0).map(async (app) => await app.stop()));
+  } finally {
+    await rm(scratchDir, { recursive: true, force: true });
+  }
 });
 
 const STORIES = {
@@ -144,7 +150,9 @@ async function boot(project: Record<string, unknown> = {}) {
         ...(init.headers as Record<string, string> | undefined),
       },
     });
-  return { app, db, mails, call, stop: async () => await app.lifecycle.teardown() };
+  const stop = async (): Promise<void> => await app.lifecycle.teardown();
+  running.push({ stop });
+  return { app, db, mails, call, stop };
 }
 
 type Booted = Awaited<ReturnType<typeof boot>>;
@@ -200,7 +208,6 @@ describe("the owners editor", () => {
     expect(page).toContain("Component owners");
     expect(page).toContain("Save owners");
     expect(page).toContain("./src/forms/**  dev  alice");
-    await booted.stop();
   });
 
   it("refuses a non-member and an empty rule line by line, saving nothing and keeping the text", async () => {
@@ -212,11 +219,10 @@ describe("the owners editor", () => {
     expect(refused.status).toBe(400);
     const html = await refused.text();
     expect(html).toContain("Couldn&#39;t save the owners");
-    expect(html).toContain("Line 2: `ghost` is not a member of this project.");
+    expect(html).toContain("Line 2: ghost is not a member of this project.");
     expect(html).toContain("Line 3: no owners listed.");
     expect(html).toContain("src/charts/** ghost");
     expect(await storedRules(booted)).toEqual([{ pattern: "keep/**", owners: ["bob"] }]);
-    await booted.stop();
   });
 
   it("clears the map when the text is emptied", async () => {
@@ -225,7 +231,6 @@ describe("the owners editor", () => {
     });
     expect((await saveOwners(booted, "boss", "  \n# nothing\n")).status).toBe(204);
     expect(await storedRules(booted)).toEqual([]);
-    await booted.stop();
   });
 
   it("answers 403 to everyone below admin, saving nothing, and shows them the rules read-only", async () => {
@@ -241,7 +246,6 @@ describe("the owners editor", () => {
     expect(html).toContain("Only project admins can change this.");
     expect(html).toContain("<code>a/**</code>");
     expect(html).not.toContain("Save owners");
-    await booted.stop();
   });
 
   it("answers 404 while review is off, and hides the card", async () => {
@@ -249,7 +253,6 @@ describe("the owners editor", () => {
     expect((await saveOwners(booted, "boss", "a/** bob")).status).toBe(404);
     const html = await (await booted.call("boss", "/projects/owners/settings/members")).text();
     expect(html).not.toContain("Component owners");
-    await booted.stop();
   });
 });
 
@@ -281,7 +284,27 @@ describe("the review request", () => {
     expect(mailsTo(booted, "bob")).toHaveLength(1);
     expect(mailsTo(booted, "bob")[0]?.text).not.toContain("you own");
     expect(mailsTo(booted, "view")).toEqual([]);
-    await booted.stop();
+  });
+
+  it("sends each owner one message per review cycle, however often publishing completes", async () => {
+    const booted = await boot({
+      componentOwners: JSON.stringify([{ pattern: "src/forms/**", owners: ["dev", "alice"] }]),
+    });
+    const id = await publish(booted);
+    await vi.waitFor(() => expect(mailsTo(booted, "dev")).toHaveLength(1));
+    // The same upload again ends publishing a second time for the same cycle.
+    const again = await booted.call("dev", `/api/v1/projects/owners/builds/${id}/zip`, {
+      method: "PUT",
+      headers: { "content-type": "application/zip" },
+      body: new Uint8Array(storybookZip()),
+    });
+    expect(again.status).toBe(202);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
+    expect(mailsTo(booted, "dev")).toHaveLength(1);
+    expect(mailsTo(booted, "alice")).toHaveLength(1);
+    expect(mailsTo(booted, "bob")).toHaveLength(1);
   });
 
   it("reaches an assigned owner who opted out of the default email", async () => {
@@ -292,7 +315,6 @@ describe("the review request", () => {
     await requested(booted);
     expect(mailsTo(booted, "bob")).toHaveLength(1);
     expect(mailsTo(booted, "bob")[0]?.text).toContain("you own Chart");
-    await booted.stop();
   });
 
   it("falls back to the default approvers when no changed component has an owner", async () => {
@@ -306,7 +328,6 @@ describe("the review request", () => {
       "boss@example.com",
     ]);
     expect(booted.mails.every((mail) => !mail.text.includes("you own"))).toBe(true);
-    await booted.stop();
   });
 
   it("leaves out an owner who is no longer a member", async () => {
@@ -316,7 +337,6 @@ describe("the review request", () => {
     await requested(booted);
     expect(mailsTo(booted, "dev")).toHaveLength(1);
     expect(booted.mails.some((mail) => mail.to.startsWith("gone"))).toBe(false);
-    await booted.stop();
   });
 });
 
@@ -348,7 +368,6 @@ describe("the build page and the approval rules", () => {
     });
     const after = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
     expect(after).toContain("Approved");
-    await booted.stop();
   });
 
   it("shows no assigned row on a default-branch build, which is never put up for review", async () => {
@@ -358,7 +377,6 @@ describe("the build page and the approval rules", () => {
     const id = await publish(booted, "b".repeat(40), "main");
     const html = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
     expect(html).not.toContain("Assigned reviewers");
-    await booted.stop();
   });
 
   it("shows no assigned row when nothing matched", async () => {
@@ -369,6 +387,5 @@ describe("the build page and the approval rules", () => {
     const html = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
     expect(html).not.toContain("Assigned reviewers");
     expect(html).not.toContain("Assigned from component owners");
-    await booted.stop();
   });
 });

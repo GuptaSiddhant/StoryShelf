@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   FormActions,
+  HStack,
   Meta,
   SectionTitle,
   Table,
@@ -44,11 +45,11 @@ const RulesTable: FC<{ rules: readonly OwnerRule[] }> = (props) => {
                 <code>{rule.pattern}</code>
               </td>
               <td>
-                {rule.owners.map((owner) => (
-                  <code key={owner} class="mr-1">
-                    {owner}
-                  </code>
-                ))}
+                <HStack gap="sm">
+                  {rule.owners.map((owner) => (
+                    <code key={owner}>{owner}</code>
+                  ))}
+                </HStack>
               </td>
             </tr>
           ))}
@@ -85,7 +86,7 @@ const OwnersForm: FC<{
       {csrfField()}
       {props.problems.length > 0 ? <ProblemsAlert problems={props.problems} /> : null}
       <TextareaField
-        label="Component owners"
+        label="Owner rules"
         name="owners"
         value={props.text}
         placeholder={PLACEHOLDER}
@@ -127,10 +128,10 @@ export const ComponentOwnersCard: FC<{
       ) : (
         <Meta>Only project admins can change this.</Meta>
       )}
-      {rules.length > 0 ? (
-        <RulesTable rules={rules} />
-      ) : (
+      {rules.length === 0 ? (
         <Meta>No component owners yet. Reviews go to the default approvers.</Meta>
+      ) : isAdmin ? null : (
+        <RulesTable rules={rules} />
       )}
     </Card>
   );

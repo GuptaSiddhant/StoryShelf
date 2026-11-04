@@ -3,6 +3,7 @@ import { BUILD_STATUSES } from "@storyshelf/core/types";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import {
+  Avatar,
   Badge,
   Button,
   Card,
@@ -68,23 +69,24 @@ function AssignedReviewers(props: { data: ReviewSectionData }): Rendered | null 
     return null;
   }
   return (
-    <VStack>
-      <strong>Assigned reviewers</strong>
-      <ul>
+    <VStack gap="md">
+      <SectionTitle level={3}>Assigned reviewers</SectionTitle>
+      <VStack>
         {data.assigned.map((reviewer): Rendered => {
           const verdict = data.state.latest.find((review) => review.userId === reviewer.userId);
+          const name = data.names.get(reviewer.userId) ?? reviewer.userId;
           return (
-            <li key={reviewer.userId}>
-              <HStack align="baseline" wrap={false}>
-                <strong>{data.names.get(reviewer.userId) ?? reviewer.userId}</strong>
-                <Badge tone={verdictTone(verdict?.verdict)}>{verdictWord(verdict?.verdict)}</Badge>
-                <Meta as="span">{reviewer.components.join(", ")}</Meta>
-              </HStack>
-            </li>
+            <HStack key={reviewer.userId}>
+              <Avatar name={name} size="sm" />
+              <strong>{name}</strong>
+              <Badge tone={verdictTone(verdict?.verdict)}>{verdictWord(verdict?.verdict)}</Badge>
+              <Meta as="span">{reviewer.components.join(", ")}</Meta>
+            </HStack>
           );
         })}
-      </ul>
+      </VStack>
       <Meta>Assigned from component owners. Anyone who can approve may still approve.</Meta>
+      {data.state.latest.length > 0 ? <SectionTitle level={3}>Verdicts</SectionTitle> : null}
     </VStack>
   );
 }

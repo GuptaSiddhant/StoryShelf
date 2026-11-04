@@ -87,7 +87,7 @@ export async function loadReviewSection(
   const assigned =
     build.gitBranch === project.gitDefaultBranch
       ? []
-      : await assignedReviewersOf(db, project, build, changeset.changeset);
+      : await assignedReviewersOf(db, project, build, changeset.changeset).catch(() => []);
   const shown = comments.filter((comment) => comment.snapshotId === null);
   const changeRequests = comments
     .filter((comment) => comment.kind === "change_request")

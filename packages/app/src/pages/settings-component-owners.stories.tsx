@@ -29,7 +29,7 @@ export const AdminInvalid = jsxStory(() => (
       ownerText:
         "src/components/forms/**  user_01HFORMS\nsrc/components/charts/**  user_9Z\nsrc/empty/**",
       ownerProblems: [
-        { line: 2, message: "`user_9Z` is not a member of this project." },
+        { line: 2, message: "user_9Z is not a member of this project." },
         { line: 3, message: "no owners listed." },
       ],
     }}

@@ -31,6 +31,14 @@ export interface AssignedOwner {
   paths: string[];
 }
 
+/**
+ * Bounds on one pattern. Patterns are matched on every build page view and every review request, so
+ * a pattern with many wildcards (which the matcher turns into nested backtracking) or a very long
+ * one is refused when saved rather than left to slow the server.
+ */
+export const MAX_PATTERN_LENGTH = 200;
+export const MAX_PATTERN_WILDCARDS = 8;
+
 /** Regex-special characters escaped when a glob is translated. */
 const REGEX_SPECIALS = new Set(["+", "^", "$", "{", "}", "(", ")", "|", "[", "]", "\\", "."]);
 
@@ -111,7 +119,7 @@ function problemsOf(
 ): OwnerProblem[] {
   return owners
     .filter((owner) => !members.has(owner))
-    .map((owner) => ({ line, message: `\`${owner}\` is not a member of this project.` }));
+    .map((owner) => ({ line, message: `${owner} is not a member of this project.` }));
 }
 
 /**
@@ -127,6 +135,17 @@ export function parseOwnerRules(text: string, memberIds: ReadonlySet<string>): P
   };
 }
 
+/** Why a pattern is refused (too long, too many wildcards), or null when it is fine. */
+function patternRefusal(pattern: string): string | null {
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    return `the pattern is longer than ${String(MAX_PATTERN_LENGTH)} characters.`;
+  }
+  const wildcards = pattern.split("").filter((char) => char === "*" || char === "?").length;
+  return wildcards > MAX_PATTERN_WILDCARDS
+    ? `the pattern has more than ${String(MAX_PATTERN_WILDCARDS)} wildcards.`
+    : null;
+}
+
 /** One line's rule (none for a blank or comment line) and what is wrong with it. */
 function parseLine(
   line: string,
@@ -138,8 +157,9 @@ function parseLine(
     return { problems: [] };
   }
   const owners = ownersOf(rest);
-  if (owners.length === 0) {
-    return { problems: [{ line: number, message: "no owners listed." }] };
+  const refusal = patternRefusal(pattern) ?? (owners.length === 0 ? "no owners listed." : null);
+  if (refusal !== null) {
+    return { problems: [{ line: number, message: refusal }] };
   }
   return { rule: { pattern, owners }, problems: problemsOf(number, owners, members) };
 }

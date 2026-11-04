@@ -72,13 +72,27 @@ describe("parseOwnerRules", () => {
   it("rejects an owner who is not a member, naming the line", () => {
     const { problems } = parseOwnerRules("a/** ana\nb/** ana user_9Z\n", members);
 
-    expect(problems).toEqual([{ line: 2, message: "`user_9Z` is not a member of this project." }]);
+    expect(problems).toEqual([{ line: 2, message: "user_9Z is not a member of this project." }]);
   });
 
   it("rejects a rule with no owners and reads CRLF line endings", () => {
     const { problems } = parseOwnerRules("a/** ana\r\nb/**\r\n", members);
 
     expect(problems).toEqual([{ line: 2, message: "no owners listed." }]);
+  });
+
+  it("refuses a pattern that is too long or has too many wildcards", () => {
+    const long = `${"a".repeat(201)}/** ana`;
+    const wild = `${"**/".repeat(5)}x ana`;
+    const fine = `${"**/".repeat(4)}x ana`;
+
+    expect(parseOwnerRules(long, members).problems).toEqual([
+      { line: 1, message: "the pattern is longer than 200 characters." },
+    ]);
+    expect(parseOwnerRules(wild, members).problems).toEqual([
+      { line: 1, message: "the pattern has more than 8 wildcards." },
+    ]);
+    expect(parseOwnerRules(fine, members)).toMatchObject({ problems: [] });
   });
 
   it("is empty for empty text", () => {
