@@ -78,7 +78,7 @@ export async function loadReviewSection(
     changesetOf(db, project, build),
     new CommentModel(db).listByBuild(build.id),
     reviewCapabilities(project),
-    publishingOrPending(build),
+    publishingOrPending(build, testing),
   ]);
   const shown = comments.filter((comment) => comment.snapshotId === null);
   const changeRequests = comments
@@ -117,11 +117,14 @@ async function snapshotLabelsOf(requests: readonly Comment[]): Promise<Map<strin
 }
 
 /** How publishing stands; a storage probe that fails reads as the storage-independent state. */
-async function publishingOrPending(build: Build): Promise<ReviewSectionData["publishing"]> {
+async function publishingOrPending(
+  build: Build,
+  testing: boolean,
+): Promise<ReviewSectionData["publishing"]> {
   try {
-    return await publishingOf(getStore().storage, build);
+    return await publishingOf(getStore().storage, build, { testing });
   } catch {
-    return await publishingOf(undefined, build);
+    return await publishingOf(undefined, build, { testing });
   }
 }
 

@@ -1,4 +1,5 @@
 /** The verdict card of the build page: where the build stands, the verdicts, and the reviewer's controls. */
+import { STORYBOOK_UNAVAILABLE } from "@storyshelf/core/adapter/notifier";
 import { BUILD_STATUSES } from "@storyshelf/core/types";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
@@ -62,6 +63,9 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
  */
 function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
   const { data } = props;
+  if (data.publishing === "unavailable") {
+    return <Meta>{unavailableText()}</Meta>;
+  }
   if (!data.canVerdict || data.build.status === "failed") {
     return null;
   }
@@ -74,6 +78,11 @@ function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
     );
   }
   return data.publishing === "success" ? <VerdictForm data={data} /> : null;
+}
+
+/** What the card says when the build's Storybook content is gone, with what an operator can do. */
+function unavailableText(): string {
+  return `${STORYBOOK_UNAVAILABLE}. Re-upload the build, or purge it.`;
 }
 
 /** The reviewer's controls: an optional note and the two verdicts; `disabled` while the build cannot take one yet. */

@@ -2,6 +2,7 @@
  * Build-level verdicts (ADR 0013, decision 3): giving one and reading where a build stands. The
  * routes are classed `review`, so `requireReview` answers 404 for a project with review off.
  */
+import { STORYBOOK_UNAVAILABLE } from "@storyshelf/core/adapter/notifier";
 import { publishingOf } from "@storyshelf/core/capture";
 import {
   BuildModel,
@@ -101,7 +102,13 @@ async function assertReviewable(
       message: `The build ${build.status === "failed" ? "failed" : "was cancelled"}; there is nothing to review`,
     });
   }
-  if ((await publishingOf(getStore().storage, build)) !== "success") {
+  const publishing = await publishingOf(getStore().storage, build, {
+    testing: getStore().testing,
+  });
+  if (publishing === "unavailable") {
+    throw new HTTPException(409, { message: `${STORYBOOK_UNAVAILABLE}; re-upload the build or purge it` });
+  }
+  if (publishing !== "success") {
     throw new HTTPException(409, {
       message: "The build is still publishing; give a verdict once its Storybook is published",
     });

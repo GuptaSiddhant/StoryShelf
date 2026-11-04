@@ -109,6 +109,10 @@ the statuses and the pull-request comment. Its details:
 - `storybook` is `success` once the build's published Storybook exists (its manifest is the marker,
   because it is written last), `failure` for a `failed` build that never published, and `pending`
   otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
+  With `testing` off, an accepted or rejected build without a manifest has lost its content: the
+  status is `failure`, `Storybook content unavailable, see build page` (the build page says to
+  re-upload or purge, and a verdict is refused), never a permanent `pending`. With `testing` on,
+  capture and publishing run side by side, so a reviewed build can precede its manifest: `pending`.
 - A build without a commit SHA, or with a synthetic local identity, shows nothing.
 - Links are always absolute: the function takes a URL builder over the resolved public origin, and
   no state is requested or delivered while none resolves (decision 11).

@@ -58,13 +58,14 @@ export async function writeTo(
 ): Promise<void> {
   const { build, project } = loaded;
   const { target, origin } = where;
+  const flags = deps.flags(project);
   const states = statusesForBuild({
     build,
     projectSlug: project.slug,
     prefix: channelPrefix(target.channel),
     urls: createUrlBuilder(origin, deps.config.publishedBaseDomain),
-    flags: deps.flags(project),
-    publishing: await publishingOf(deps.storage, build),
+    flags,
+    publishing: await publishingOf(deps.storage, build, { testing: flags.testing }),
     approvals: await approvalsOf(deps, build, project),
     changes: await changesOf(deps, build, project),
   });

@@ -103,11 +103,22 @@ describe("deliverBuildState", () => {
       { ...w.deps, flags: () => ({ testing: false, review: false }) },
       { buildId: w.build.id, channelId: w.channelId },
     );
+    // Accepted without a published Storybook (testing off): not a wait, so not `pending` forever.
     expect(statusLog(w.git)).toEqual([
       ["storyshelf/review", "success"],
-      ["storyshelf/storybook", "pending"],
+      ["storyshelf/storybook", "failure"],
     ]);
     expect(w.git.calls[0]?.target).toMatchObject({ description: "Review is off" });
+    expect(w.git.calls[1]?.target).toMatchObject({
+      description: "Storybook content unavailable, see build page",
+    });
+  });
+
+  it("keeps the Storybook status pending for an accepted build while a capture runs beside publishing", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "approved");
+    await deliverBuildState(w.deps, { buildId: w.build.id, channelId: w.channelId });
+    expect(statusLog(w.git).at(-1)).toEqual(["storyshelf/storybook", "pending"]);
   });
 
   it("writes nothing for a local identity", async () => {
