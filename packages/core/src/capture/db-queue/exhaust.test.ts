@@ -452,12 +452,16 @@ describe("exhausted single-flight jobs", () => {
     "hands an exhausting job's request one successor and wakes the poller (transactions: %s)",
     async (transactions) => {
       const { rt, clock } = runtime({ transactions });
-      rt.onExhausted = vi.fn<Hook>(async () => {});
+      // The request arrives while the exhausted-job hook runs, with the job in `exhausting`.
+      rt.onExhausted = vi.fn<Hook>(async () => {
+        expect(await rt.model.get("j1")).toMatchObject({ status: "exhausting" });
+        await rt.model.requestRerun("j1", iso(clock.now));
+      });
       const notify = vi.spyOn(rt.wake, "notify");
       await startKeyed(rt, clock);
-      await rt.model.requestRerun("j1", iso(clock.now));
       clock.now += 1001;
       await claimNext(rt);
+      expect(rt.onExhausted).toHaveBeenCalledOnce();
       const successors = (await rt.model.listForBuild("b1")).filter((row) => row.jobId !== "j1");
       expect(await rt.model.get("j1")).toMatchObject({ status: "failed", activeKey: null });
       expect(successors).toHaveLength(1);
