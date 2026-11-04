@@ -88,6 +88,13 @@ describe("a rejected inline zip", () => {
     });
   });
 
+  it("still answers 422 and keeps the build failed when the announcement throws", async () => {
+    const t = await boot();
+    vi.mocked(announceBuildStatus).mockRejectedValueOnce(new Error("notifier down"));
+    expect((await t.upload()).status).toBe(422);
+    expect((await new BuildModel(t.db).get(t.buildId))?.status).toBe("failed");
+  });
+
   it("announces no failure when a cancel lands after the build was read as pending", async () => {
     const t = await boot();
     await new BuildModel(t.db).setStatus(t.buildId, "cancelled");

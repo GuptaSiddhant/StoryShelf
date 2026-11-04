@@ -99,7 +99,12 @@ async function rejectInlineZip(build: Build, reason: string): Promise<void> {
     return;
   }
   getStore().logger.warn({ buildId: build.id, reason }, "inline zip rejected; build failed");
-  await announceBuildStatus(build.id, "failed", { reason: sanitizeErrorText(reason, 300) });
+  try {
+    await announceBuildStatus(build.id, "failed", { reason: sanitizeErrorText(reason, 300) });
+  } catch (error) {
+    // The build is already failed; a notifier or subscription error must not turn the 422 into a 500.
+    getStore().logger.warn({ err: error, buildId: build.id }, "inline zip rejection not announced");
+  }
 }
 
 async function failInlinePublish(build: Build, error: unknown): Promise<void> {
