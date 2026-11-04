@@ -93,7 +93,7 @@ describe("createCaptureConsumer over the database queue", () => {
   });
 
   it("binds a scoped child logger on the queue", () => {
-    const r = rig();
+    const r = rig({ kinds: ["capture"], handlers: { capture: async () => {} } });
     const spy = vi.spyOn(r.queue, "setLogger");
     r.consume();
     expect(spy).toHaveBeenCalledOnce();
@@ -358,6 +358,13 @@ describe("lease and cancel", () => {
     hold.open();
     await consumer.stop();
     await started;
+  });
+
+  it("refuses a maxJobSeconds that would abandon every job at once", () => {
+    const r = rig({ kinds: ["capture"], handlers: { capture: async () => {} } });
+    for (const maxJobSeconds of [0, -1, Number.NaN]) {
+      expect(() => r.consume({ config: { maxJobSeconds } })).toThrow(/maxJobSeconds/u);
+    }
   });
 
   it("abandons a job past maxJobSeconds: aborts its signal, cancels the run, records it, writes nothing", async () => {

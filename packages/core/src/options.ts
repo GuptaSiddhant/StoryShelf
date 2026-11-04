@@ -91,7 +91,7 @@ function assertLeaseSeconds(seconds: number | undefined): void {
 }
 
 /** A positive number of seconds; `0` would abandon every job at once. */
-function assertMaxJobSeconds(seconds: number | undefined): void {
+export function assertMaxJobSeconds(seconds: number | undefined): void {
   if (seconds !== undefined && (!Number.isFinite(seconds) || seconds <= 0)) {
     throw new Error(
       `testing.maxJobSeconds must be a positive number of seconds, got ${String(seconds)}`,

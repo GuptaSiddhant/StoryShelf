@@ -1,3 +1,5 @@
+import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
+import { createShelfLogger, type Logger } from "../../logger.ts";
 /**
  * The capture consumer (ADR 0006, decisions 4 and 11): consumes any `PollableCaptureQueue` (the
  * database queue, the IPC queue of a forked capture child) and runs a handler per
@@ -15,8 +17,7 @@
  * // on SIGTERM: await consumer.stop();
  * ```
  */
-import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
-import { createShelfLogger, type Logger } from "../../logger.ts";
+import { assertMaxJobSeconds } from "../../options.ts";
 import { recommendedBuildConcurrency } from "../../utils/resources.ts";
 import { startPollLoop, type PollLoop } from "../db-queue/poll-loop.ts";
 import { REAL_TIMERS } from "../db-queue/timers.ts";
@@ -151,6 +152,8 @@ function isDatabaseQueue(queue: PollableCaptureQueue): queue is DatabaseCaptureQ
 }
 
 function buildRuntime(options: CaptureConsumerOptions, logger: Logger): JobRuntime {
+  // A direct caller skips `resolveShelfOptions`; `0` or `NaN` would abandon every job at once.
+  assertMaxJobSeconds(options.config?.maxJobSeconds);
   return {
     queue: options.queue,
     handlers: registry(options, logger),
