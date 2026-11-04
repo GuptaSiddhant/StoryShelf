@@ -65,7 +65,12 @@ semantics.
   There is no per-phase knob.
 - Its retry limit stated where the queue is built, not inferred from `testing.retries`.
 - Kinds that must be single-flight per key use `active_key` (a unique column, cleared in the write
-  that ends the job), never a check before the insert.
+  that ends the job), never a check before the insert. A request that arrives while the holder
+  runs (or is `exhausting`) sets a marker on it, and the job's end and its successor are one
+  transaction (`CaptureJobModel.endJob`): a crash leaves the job unfinished, to be redelivered, or
+  the successor queued, never a lost request. A database without `transact`, or whose adapter
+  declares `metadata.transactions: "sequential"` (Neon over HTTP, whose `transact` cannot roll
+  back), keeps a two-step end and accepts that gap; booting `testing` on one logs a warning.
 
 ### 3. Precedence comes from separation and admission, not priorities (proposed rule)
 

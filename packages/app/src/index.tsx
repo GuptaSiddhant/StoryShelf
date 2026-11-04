@@ -5,7 +5,11 @@ import {
   adapterSourcesOf,
   validateBootAssembly,
 } from "@storyshelf/core/adapter/setup";
-import { assertServerless, resolveShelfOptions } from "@storyshelf/core/config";
+import {
+  assertServerless,
+  resolveShelfOptions,
+  sequentialTransactionsWarning,
+} from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
@@ -106,6 +110,10 @@ function warnOnServerless(options: ShelfOptions, logger: Logger): void {
   const warning = assertServerless(options.testing?.runner !== undefined);
   if (warning) {
     logger.warn(warning);
+  }
+  const sequential = sequentialTransactionsWarning(options);
+  if (sequential) {
+    logger.warn(sequential);
   }
 }
 
