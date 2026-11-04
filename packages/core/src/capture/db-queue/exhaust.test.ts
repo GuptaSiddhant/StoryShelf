@@ -428,8 +428,9 @@ describe("exhausted single-flight jobs", () => {
     await rt.model.requestRerun("j1", iso(clock.now));
     expect(await cancelJobs(rt, "b1")).toBe(true);
     clock.now += 1001;
-    await claimNext(rt);
+    expect(await claimNext(rt)).toBeNull();
     expect(await rt.model.get("j1")).toMatchObject({ status: "cancelled", activeKey: null });
+    expect(await rt.model.holderOf("capture:b1")).toBeNull();
     expect(await rt.model.nextCandidate(["capture"], iso(clock.now))).toBeNull();
   });
 
