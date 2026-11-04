@@ -1,6 +1,6 @@
 import type { Meta } from "@storybook/html-vite";
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
-import type { BuildReview } from "@storyshelf/core/schema";
+import type { Build, BuildReview } from "@storyshelf/core/schema";
 import { jsxStory } from "../../.storybook/render.tsx";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { BUILD_REVIEW, builds, project } from "../stories-fixtures/dataset.ts";
@@ -35,11 +35,15 @@ const NAMES = new Map([
 ]);
 
 /** The verdict card of a build under review, with the given verdicts and assigned reviewers. */
-function card(latest: BuildReview[], assigned: ReviewSectionData["assigned"]): ReviewSectionData {
+function card(
+  latest: BuildReview[],
+  assigned: ReviewSectionData["assigned"],
+  status: Build["status"] = build.status,
+): ReviewSectionData {
   return {
     project,
-    build,
-    state: { status: build.status, approvalsRequired: 1, approvals: 0, latest, history: latest },
+    build: { ...build, status },
+    state: { status, approvalsRequired: 1, approvals: 0, latest, history: latest },
     changeset: {
       baseline: null,
       changeset: { added: [], removed: [], changed: [], unchanged: 0 },
@@ -84,3 +88,9 @@ export const AssignedMixed = jsxStory(() => (
     )}
   />
 ));
+
+/** A cancelled build is terminal: the reviewer can still see it, but gets no verdict controls. */
+export const CancelledBuild = jsxStory(() => <VerdictCard data={card([], [], "cancelled")} />);
+
+/** A failed capture has nothing to review either. */
+export const FailedBuild = jsxStory(() => <VerdictCard data={card([], [], "failed")} />);

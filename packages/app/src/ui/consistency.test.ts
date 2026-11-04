@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
  *   storybook.tsx is a separate one-off outside the system).
  * - No direct family imports in `pages/` (facade + document shell +
  *   shared review styles + page-local `ui/css.ts` only).
- * - No inline `style="..."` in `pages/` at all (zero ceiling).
+ * - No inline `style="..."` in `pages/` or `src/ui/` at all (zero ceiling).
  * - `src/ui/` stays presentational: no store, routers, middleware, pages, core models or
  *   test-helpers (the app-coupled chrome lives in `src/shell/`).
  */
@@ -173,6 +173,15 @@ describe("ui-building-blocks contract", () => {
   it("has no inline styles in pages/", async () => {
     const over = (await pageSources())
       .map(({ file, source }) => ({ file, count: countMatches(source, /style="/gu) }))
+      .filter(({ count }) => count > 0);
+    expect(over).toEqual([]);
+  });
+
+  it("has no inline styles in src/ui/", async () => {
+    // `style="..."`, `style='...'` and `style={...}`; css.ts only mentions the word in prose.
+    const over = (await uiSources())
+      .filter(({ file }) => file !== "consistency.test.ts")
+      .map(({ file, source }) => ({ file, count: countMatches(source, /\bstyle=["'{]/gu) }))
       .filter(({ count }) => count > 0);
     expect(over).toEqual([]);
   });

@@ -117,7 +117,7 @@ function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
       </Alert>
     );
   }
-  if (!data.canVerdict || data.build.status === "failed") {
+  if (!data.canVerdict || takesNoVerdict(data.build.status)) {
     return null;
   }
   if (data.publishing === "pending") {
@@ -129,6 +129,14 @@ function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
     );
   }
   return data.publishing === "success" ? <VerdictForm data={data} /> : null;
+}
+
+/**
+ * Builds that never reach review: a failed capture and a cancelled build (`cancelled` is terminal,
+ * AGENTS.md) both leave the card without controls.
+ */
+function takesNoVerdict(status: string): boolean {
+  return status === "failed" || status === "cancelled";
 }
 
 /** What the card says when the build's Storybook content is gone (the git status keeps its own text). */
