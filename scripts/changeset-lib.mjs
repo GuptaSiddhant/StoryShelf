@@ -314,19 +314,24 @@ export function manifestPublished(...texts) {
 
 /**
  * The problems in the changesets a pull request adds, so a malformed file fails the pull request
- * and not the first run on `main` that reads it.
+ * and not the first run on `main` that reads it: bad front matter, the placeholder text, and (when
+ * `known` is given) a package that is not published here, which `version-packages.mjs` refuses.
  *
  * @param {string[]} added Paths the PR adds or modifies.
  * @param {(path: string) => string} read Reads a file from the PR's tree.
- * @returns {string[]} One message per malformed changeset.
+ * @param {Iterable<string>} [known] Names of the published packages; unknown names are not checked without it.
+ * @returns {string[]} One message per problem.
  */
-export function malformedChangesets(added, read) {
+export function malformedChangesets(added, read, known) {
   const problems = [];
   for (const path of added.filter((entry) => CHANGESET_FILE.test(entry))) {
     try {
       const parsed = parseChangeset(read(path), path);
       if (parsed.body === PLACEHOLDER_BODY) {
         problems.push(`${path}: replace the placeholder text with the CHANGELOG entry`);
+      }
+      if (known !== undefined) {
+        problems.push(...unknownReleases([parsed], known));
       }
     } catch (error) {
       problems.push(error.message);
@@ -400,19 +405,37 @@ function manifestProblem(path, version, base, head) {
 /**
  * What a release pull request (branch `release/v<version>`) may change: the `version` of package
  * manifests, `CHANGELOG.md`, and the changesets it consumes (deleted). Anything else is a problem,
- * so the branch name cannot be used to skip the changeset check.
+ * so the branch name cannot be used to skip the changeset check. Every published manifest must also
+ * be at `version`, changed or not, so a package left behind cannot ship a mixed release.
  *
  * @param {object} input The pull request.
  * @param {string} input.version The version the branch names.
  * @param {{ status: string, path: string }[]} input.entries Changed paths with their git status letter.
  * @param {(path: string) => string | null} input.readBase A file at the base (null when absent).
  * @param {(path: string) => string | null} input.readHead A file at the head (null when absent).
+ * @param {string[]} [input.published] Paths of the published packages' manifests at the head.
  * @returns {string[]} One message per problem (empty for a valid release pull request).
  */
-export function releaseProblems({ version, entries, readBase, readHead }) {
-  return entries
-    .map(({ status, path }) => entryProblem({ status, path, version, readBase, readHead }))
-    .filter((problem) => problem !== null);
+export function releaseProblems({ version, entries, readBase, readHead, published = [] }) {
+  const changed = new Set(entries.map(({ path }) => path));
+  return [
+    ...entries.map(({ status, path }) =>
+      entryProblem({ status, path, version, readBase, readHead }),
+    ),
+    ...published
+      .filter((path) => !changed.has(path))
+      .map((path) => staleManifestProblem(path, version, readHead(path))),
+  ].filter((problem) => problem !== null);
+}
+
+/** Why a published manifest the release did not touch is not at `version`, or null when it is. */
+function staleManifestProblem(path, version, head) {
+  try {
+    const current = JSON.parse(head ?? "").version;
+    return current === version ? null : `${path} is still at ${current}, not ${version}`;
+  } catch {
+    return `${path} cannot be read`;
+  }
 }
 
 /** Why one changed path is not part of a release, or null when it is. */
