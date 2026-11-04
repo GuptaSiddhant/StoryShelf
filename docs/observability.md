@@ -78,7 +78,7 @@ an upload's trace spans the HTTP request **and** the capture job.
 | `http.server.request.duration`                   | histogram      | `method`, `route`, `status` (via `@hono/otel`)         |
 | `capture.job.duration`                           | histogram (ms) | —                                                      |
 | `capture.jobs.completed` / `capture.jobs.failed` | counters       | —                                                      |
-| `storyshelf.capture.shard.repeated_stories`      | counter        | — (no build or project labels: cardinality)            |
+| `storyshelf.capture.shard.repeated_stories`      | counter        | none (no build or project labels: cardinality)         |
 | `db.operation.duration`                          | histogram (ms) | `db.operation`, `db.table`                             |
 | `storage.operation.duration`                     | histogram (ms) | `storage.operation` (paths excluded: cardinality)      |
 | `ai.summarize.duration` / `ai.summarize.tokens`  | histograms     | `ai.task`, `outcome` (model and profile stay on spans) |
