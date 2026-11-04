@@ -38,7 +38,7 @@ export function renderSettingsMembers(
       <Card>
         <SectionTitle>Members</SectionTitle>
         <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
-        <Table>
+        <Table label="Members">
           <table>
             <thead>
               <tr>
@@ -132,7 +132,7 @@ export function renderSettingsMembers(
             next login; removing a mapping revokes synced grants but never manual ones. Wildcards
             are not expanded.
           </Meta>
-          <Table>
+          <Table label="Identity-provider group mappings">
             <table>
               <thead>
                 <tr>

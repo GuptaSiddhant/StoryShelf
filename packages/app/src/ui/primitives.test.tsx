@@ -176,7 +176,7 @@ describe("Dropdown", () => {
 describe("Table, Thumbnail, Kbd", () => {
   it("wraps native table markup in the table surface", async () => {
     const html = await render(
-      <Table dense>
+      <Table dense label="Rows">
         <table>
           <tbody>
             <tr>
@@ -190,16 +190,15 @@ describe("Table, Thumbnail, Kbd", () => {
     expect(html).toContain("<td>x</td>");
   });
 
-  it("is focusable, and a landmark only when it is named", async () => {
-    const table = <table />;
-    const unnamed = await render(<Table>{table}</Table>);
-    const named = await render(<Table label="API tokens">{table}</Table>);
-    expect(unnamed).toContain('tabindex="0"');
-    expect(unnamed).not.toContain("role=");
-    expect(unnamed).not.toContain("aria-label");
-    expect(named).toContain('role="region"');
-    expect(named).toContain('aria-label="API tokens"');
-    expect(named).toContain('tabindex="0"');
+  it("is a focusable region named by its label", async () => {
+    const html = await render(
+      <Table label="API tokens">
+        <table />
+      </Table>,
+    );
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="API tokens"');
+    expect(html).toContain('tabindex="0"');
   });
 
   it("lazy-loads the image or falls back to a placeholder", async () => {

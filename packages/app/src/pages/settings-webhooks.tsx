@@ -43,7 +43,7 @@ export function renderSettingsWebhooks(
           Notify external services when builds are created, updated, approved or rejected. Payloads
           are POSTed as JSON and signed with the webhook secret.
         </Meta>
-        <Table>
+        <Table label="Webhooks">
           <table>
             <thead>
               <tr>

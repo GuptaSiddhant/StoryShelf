@@ -136,7 +136,7 @@ function AdapterTable(props: AdapterTableProps): HtmlEscapedString | Promise<Htm
     return <EmptyState description="No adapters wired." />;
   }
   return (
-    <Table>
+    <Table label="Adapters">
       <table>
         <thead>
           <tr>

@@ -59,7 +59,7 @@ function ChangesetTable(props: { data: ReviewSectionData }): Rendered {
         <Badge tone="danger">{changeset.removed.length} removed</Badge>
         <Meta as="span">{changeset.unchanged} unchanged</Meta>
       </HStack>
-      <Table>
+      <Table label="Components changed in this build">
         <table>
           <caption class="visually-hidden">Components that changed in this build</caption>
           <thead>

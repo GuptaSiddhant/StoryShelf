@@ -213,7 +213,7 @@ const ChannelsCard: FC<{
       only in memory at delivery time. Git channels follow the build state, not a topic list, and
       their delivery is best-effort: a failure shows here, and the next build state retries it.
     </Meta>
-    <Table>
+    <Table label="Channels">
       <table>
         <thead>
           <tr>

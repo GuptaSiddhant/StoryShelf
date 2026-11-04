@@ -65,23 +65,18 @@ const tableDense = css`
 /**
  * Scrollable bordered table surface. Pass native `<table>` markup as
  * children; the header, row hover, and spacing are styled here. The surface
- * is focusable so a keyboard can scroll it when the table overflows. Pass
- * `label` to name it: it then becomes a `region` landmark, so give each table
- * on a page its own name (two regions with the same name fail axe's
- * `landmark-unique`). Without a label it is focusable but no landmark.
+ * is a focusable, named `region` so a keyboard can scroll it when the table
+ * overflows and a screen reader says which table it is. `label` is required;
+ * give each table on a page its own name (two regions with the same name fail
+ * axe's `landmark-unique`).
  */
-export const Table: FC<{ dense?: boolean; label?: string; children?: unknown }> = ({
+export const Table: FC<{ dense?: boolean; label: string; children?: unknown }> = ({
   dense = false,
   label,
   children,
 }) => {
   return (
-    <div
-      class={dense ? tableDense : tableWrap}
-      role={label ? "region" : undefined}
-      aria-label={label}
-      tabindex={0}
-    >
+    <div class={dense ? tableDense : tableWrap} role="region" aria-label={label} tabindex={0}>
       {children}
     </div>
   );
