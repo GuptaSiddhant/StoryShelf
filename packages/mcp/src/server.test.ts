@@ -122,6 +122,11 @@ describe("StoryShelf MCP server", () => {
       text(await client.callTool({ name: "list_comments", arguments: { buildId: "b1" } })),
     );
     expect(get).toHaveBeenCalledWith("/projects/web/builds/b1/comments");
+    await client.callTool({
+      name: "list_comments",
+      arguments: { project: "other", buildId: "b1" },
+    });
+    expect(get).toHaveBeenCalledWith("/projects/other/builds/b1/comments");
     expect(out).toEqual(comments);
     expect(post).not.toHaveBeenCalled();
     const { tools } = await client.listTools();
