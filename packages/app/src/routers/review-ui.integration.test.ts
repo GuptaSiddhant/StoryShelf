@@ -151,6 +151,10 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
     notifications: { notifiers: [providerOf("log", "room"), providerOf("dm", "person")] },
     logger: pino({ level: "silent" }),
   });
+  // Registered before `setup()`: the app starts its timers when it is created, so a failed setup
+  // still has to reach `teardown()`.
+  const stop = async (): Promise<void> => await app.lifecycle.teardown();
+  running.push(stop);
   await app.lifecycle.setup();
   const request =
     (prefix: string) =>
@@ -171,8 +175,6 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
       ...init,
       headers: { "x-csrf-token": getCsrfToken("s", id), ...(init.headers as object) },
     });
-  const stop = async (): Promise<void> => await app.lifecycle.teardown();
-  running.push(stop);
   return { app, db, storage, api, page, sent, stop };
 }
 
