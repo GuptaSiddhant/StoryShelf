@@ -423,6 +423,31 @@ describe("content uses", () => {
     });
   });
 
+  it("lets a record take over a claim older than the cutoff, so the stalled collector deletes nothing", async () => {
+    await withFixture(async (fixture) => {
+      await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
+      const idleBefore = new Date(afterGrace()).toISOString();
+      expect(await fixture.lifecycle.claimContent("stalled", idleBefore, old)).toEqual([ONLY_ONE]);
+      const justNow = new Date(Date.now() - 60_000).toISOString();
+      const later = new Date(Date.now() + 60_000).toISOString();
+
+      // Inside the lease the claim still refuses.
+      expect(await fixture.lifecycle.recordContentUses("p", "two", [ONLY_ONE], justNow)).toEqual([
+        ONLY_ONE,
+      ]);
+      expect(await fixture.lifecycle.holdsContentClaim(ONLY_ONE, "stalled")).toBe(true);
+
+      // Past it, the record clears the claim and is recorded.
+      expect(await fixture.lifecycle.recordContentUses("p", "two", [ONLY_ONE], later)).toEqual([]);
+      expect(fixture.uses(ONLY_ONE)).toEqual({ active: 1, rows: 2 });
+
+      // The stalled collector's check fails just before its delete, so the blob stays.
+      expect(await fixture.lifecycle.holdsContentClaim(ONLY_ONE, "stalled")).toBe(false);
+      expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(0);
+      expect(fixture.objects.has(`content/${ONLY_ONE}`)).toBe(true);
+    });
+  });
+
   it("hands a blob to one collector only, and resumes a claim once it is stale", async () => {
     await withFixture(async (fixture) => {
       await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));

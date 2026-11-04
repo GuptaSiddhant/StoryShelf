@@ -216,11 +216,17 @@ export interface BuildReferenceLifecycle {
    * (build, hash), however many paths name it, so a repeat is a no-op. Returns the hashes it
    * refused because a collector has claimed them; none of the refused hashes is recorded, and the
    * caller must store the content again and retry. Same concurrency domain as {@link claimContent}.
+   *
+   * A claim taken before `staleBefore` (an ISO instant) belongs to a collector that stopped: the
+   * record clears it in the same transaction and goes ahead, and the old collector, whose
+   * {@link holdsContentClaim} check then fails, deletes nothing. Omitted, every claim refuses. A
+   * build that is gone or not `available` records nothing (all its hashes are returned).
    */
   recordContentUses(
     projectId: string,
     buildId: string,
     hashes: readonly string[],
+    staleBefore?: string,
   ): Promise<string[]>;
   /**
    * Claim for deletion, under the pass's `token` (a fresh id per collector pass), every hash whose

@@ -12,6 +12,26 @@ import {
 
 let dir: string;
 
+/** Variables a git hook or worktree exports; they would point git at that checkout instead of `dir`. */
+const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] as const;
+const savedGitEnv = new Map<string, string | undefined>();
+
+function isolateGitEnv(): void {
+  for (const name of GIT_REDIRECTS) {
+    savedGitEnv.set(name, process.env[name]);
+    Reflect.deleteProperty(process.env, name);
+  }
+}
+
+function restoreGitEnv(): void {
+  for (const [name, value] of savedGitEnv) {
+    if (value !== undefined) {
+      process.env[name] = value;
+    }
+  }
+  savedGitEnv.clear();
+}
+
 function writeMain(): void {
   mkdirSync(join(dir, ".storybook"), { recursive: true });
   writeFileSync(
@@ -25,10 +45,12 @@ beforeEach(() => {
   vi.stubEnv("npm_config_user_agent", "");
   // Keep git from finding a checkout above the temp directory (e.g. a tmpdir inside a worktree).
   vi.stubEnv("GIT_CEILING_DIRECTORIES", dirname(dir));
+  isolateGitEnv();
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  restoreGitEnv();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -83,10 +105,13 @@ describe("detectGitDefaultBranch", () => {
 
   it("falls back to the current branch when origin/HEAD is not set", () => {
     const git = (...args: string[]): void => {
-      execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", ...args], {
-        cwd: dir,
-        stdio: "ignore",
-      });
+      const config = [
+        "user.name=t",
+        "user.email=t@example.com",
+        "commit.gpgSign=false",
+        `core.hooksPath=${join(dir, "no-hooks")}`,
+      ].flatMap((setting) => ["-c", setting]);
+      execFileSync("git", [...config, ...args], { cwd: dir, stdio: "ignore" });
     };
     git("init", "-q", "-b", "trunk");
     git("commit", "-q", "--allow-empty", "-m", "init");

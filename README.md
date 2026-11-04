@@ -91,7 +91,7 @@ npm start                        # start the server
 
 - Each package ships a `README.md` covering its use case, install, API, and an example.
 - `apps/website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
-- `docs/architecture.md` is the full architecture spec; `docs/adr/` records design decisions (older ADRs and plans are under `docs/adr/archive/` and `docs/archive/`).
+- `docs/architecture/` is the full architecture spec; `docs/adr/` records design decisions (older ADRs and plans are under `docs/adr/archive/` and `docs/archive/`).
 
 ## Contributing
 

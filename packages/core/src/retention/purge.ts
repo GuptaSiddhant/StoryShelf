@@ -33,6 +33,13 @@ export {
   type BuildDeletionResult,
   type DeletionStep,
 } from "./build-deletion.ts";
+export {
+  CONTENT_BACKFILL_KEY,
+  CONTENT_BACKFILL_PAGE,
+  backfillContentUses,
+  type ContentBackfillDeps,
+  type ContentBackfillResult,
+} from "./content-backfill.ts";
 export { CONTENT_GRACE_MS, collectUnreferencedContent, type ContentGcDeps } from "./content-gc.ts";
 export {
   purgeClaimedBuilds,
