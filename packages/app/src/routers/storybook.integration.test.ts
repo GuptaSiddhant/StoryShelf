@@ -435,6 +435,14 @@ describe("short links for a signed-out visitor (auth on)", () => {
       db.tables.builds,
       mockBuild({ id: PRIVATE_ID, public: false, gitBranch: "feature/x" }),
     );
+    await db.insert(
+      db.tables.projects,
+      mockProject({ id: "p2", name: "Private", slug: "private-project" }),
+    );
+    await db.insert(
+      db.tables.builds,
+      mockBuild({ id: "private-main", projectId: "p2", public: false }),
+    );
     for (const id of [PUBLIC_ID, PRIVATE_ID]) {
       objects.set(`${storybookDir("p1", id)}/index.html`, Buffer.from(`<html>${id}</html>`));
       objects.set(`${storybookDir("p1", id)}/iframe.html`, Buffer.from("<html>preview</html>"));
@@ -458,20 +466,32 @@ describe("short links for a signed-out visitor (auth on)", () => {
 
   it("answers a private build and an unknown id with the same login redirect", async () => {
     const app = await signedOutApp();
-    const answers = await Promise.all(
-      [PRIVATE_ID, UNKNOWN_ID]
-        .flatMap((id) => [`/_/${id}`, `/_/${id}/`, `/_/${id}/iframe.js`])
-        .map(async (path) => {
-          const response = await app.request(path);
-          return [response.status, response.headers.get("location")];
-        }),
-    );
-    // `/_/<id>` redirects to `/_/<id>/` for a build that exists; the canonical form is what must
-    // not tell the two apart.
-    const canonical = answers.filter((_answer, index) => index % 3 !== 0);
-    expect(canonical).toEqual(Array.from({ length: 4 }, () => [302, "/auth/login"]));
-    expect(answers[0]).toEqual([302, `/_/${PRIVATE_ID}/`]);
-    expect(answers[3]).toEqual([302, "/auth/login"]);
+    const paths = [PRIVATE_ID, UNKNOWN_ID].flatMap((id) => [
+      `/_/${id}`,
+      `/_/${id}/`,
+      `/_/${id}/iframe.js`,
+    ]);
+    const responses = await Promise.all(paths.map(async (path) => await app.request(path)));
+    expect(
+      responses.map((response) => [response.status, response.headers.get("location")]),
+    ).toEqual(paths.map(() => [302, "/auth/login"]));
+  });
+
+  it("treats a project slug the same way: public opens, private and unknown look alike", async () => {
+    const app = await signedOutApp();
+    const open = await app.request("/_/test-project/");
+    expect(open.status).toBe(200);
+    expect((await app.request("/_/test-project")).headers.get("location")).toBe("/_/test-project/");
+    const paths = [
+      "/_/private-project",
+      "/_/private-project/",
+      "/_/no-such-project",
+      "/_/no-such-project/",
+    ];
+    const responses = await Promise.all(paths.map(async (path) => await app.request(path)));
+    expect(
+      responses.map((response) => [response.status, response.headers.get("location")]),
+    ).toEqual(paths.map(() => [302, "/auth/login"]));
   });
 
   it("does not open the gate for other paths under /_", async () => {

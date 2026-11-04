@@ -26,6 +26,28 @@ async function staticsReady(projectId: string, buildId: string): Promise<boolean
   );
 }
 
+/** Whether a short-link id names one build (a 26-character ULID) rather than a project slug. */
+function isBuildId(id: string): boolean {
+  return id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
+}
+
+/**
+ * The build a short link opens: the build itself for a ULID, whatever its status; for a project
+ * slug the latest approved build on the default branch (never a feature branch or an unreviewed
+ * build). Null when nothing matches.
+ */
+async function resolveShortLink(id: string): Promise<{ project: Project; build: Build } | null> {
+  const { db } = getStore();
+  if (isBuildId(id)) {
+    const build = await new BuildModel(db).get(id);
+    const project = build ? await new ProjectModel(db).get(build.projectId) : null;
+    return build && project ? { project, build } : null;
+  }
+  const project = await new ProjectModel(db).getBySlug(id);
+  const build = project ? await new BuildModel(db).latestApprovedDefault(project) : null;
+  return project && build ? { project, build } : null;
+}
+
 /**
  * The answer for a short link that names nothing the caller may open: a missing build or project
  * and a private one look the same, so the link never confirms that a private id exists. Without
@@ -63,31 +85,21 @@ export function registerStorybook(app: ShelfRouter): void {
   // (no fallback to feature-branch or unreviewed builds). No fall-through on ULID.
   app.get("/_/:id", async (c) => {
     const id = c.req.param("id");
-    const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
-    const found = isUlid26
-      ? await new BuildModel(getStore().db).get(id)
-      : await new ProjectModel(getStore().db).getBySlug(id);
-    return found ? c.redirect(`/_/${id}/`, 302) : unreachable(c);
+    const target = await resolveShortLink(id);
+    // The same access check as the canonical form, so an id the caller may not open answers like
+    // one that does not exist (no private id is confirmed by a redirect).
+    if (!target || !(await publishedAccess(target.build, target.project))) return unreachable(c);
+    return c.redirect(`/_/${id}/`, 302);
   });
 
   app.get("/_/:id/*", async (c) => {
     const id = c.req.param("id");
-    const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
+    const isUlid26 = isBuildId(id);
     const rest = publishedRelativePath(c.req.path, `/_/${id}/`);
     if (rest === null) return c.notFound();
-    let project: Project | null = null;
-    let build: Build | null = null;
-    if (isUlid26) {
-      build = await new BuildModel(getStore().db).get(id);
-      if (!build) return unreachable(c);
-      project = await new ProjectModel(getStore().db).get(build.projectId);
-      if (!project) return unreachable(c);
-    } else {
-      project = await new ProjectModel(getStore().db).getBySlug(id);
-      if (!project) return unreachable(c);
-      build = await new BuildModel(getStore().db).latestApprovedDefault(project);
-      if (!build) return unreachable(c);
-    }
+    const target = await resolveShortLink(id);
+    if (!target) return unreachable(c);
+    const { project, build } = target;
     const access = await publishedAccess(build, project);
     if (!access) return c.redirect("/auth/login", 302);
     if (rest === "" && !(await staticsReady(project.id, build.id))) {
