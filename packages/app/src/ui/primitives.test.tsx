@@ -284,6 +284,28 @@ describe("CompareStage", () => {
   });
 });
 
+describe("CompareStage panes", () => {
+  it("makes a pane with an image a named, keyboard-focusable group, and leaves an empty pane alone", async () => {
+    const html = await render(
+      <CompareStage
+        baselineSrc="/b.png"
+        currentSrc="/c.png"
+        diffSrc={null}
+        subject="Button / Primary"
+        diffEmpty="No diff yet"
+      />,
+    );
+    expect(html).toContain('aria-label="Baseline screenshot"');
+    expect(html).toContain('aria-label="Current screenshot"');
+    expect(html).toMatch(
+      /<div class="stage__pane" data-pane="baseline" tabindex="0" role="group"/u,
+    );
+    // The diff pane has no image here: nothing to scroll, so no tab stop and no name.
+    expect(html).toMatch(/<div class="stage__pane" data-pane="diff">/u);
+    expect(html).not.toContain("Diff screenshot");
+  });
+});
+
 describe("RelativeTime", () => {
   it("renders a machine-readable <time> with the exact timestamp on hover", async () => {
     const html = await render(<RelativeTime value="2020-01-02T03:04:05.000Z" />);

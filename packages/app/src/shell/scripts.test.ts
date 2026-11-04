@@ -68,6 +68,41 @@ describe("shell scripts", () => {
     }
   });
 
+  it("leaves the arrow keys to a focused image pane, so it can be panned; j and k still step snapshots", () => {
+    const dom = new JSDOM(
+      `<body><button data-snap-next>Next</button>
+        <div data-compare><div class="stage__pane" tabindex="0"><img alt="a" /></div></div></body>`,
+      { runScripts: "outside-only" },
+    );
+    const { window } = dom;
+    Object.assign(window, {
+      __storyshelfShell: {
+        readCookie: () => null,
+        writeCookie: () => {},
+        applyTheme: () => {},
+        applySidebar: () => {},
+      },
+    });
+    window.eval(clientScript());
+    const next = window.document.querySelector<HTMLElement>("[data-snap-next]");
+    const clicked = vi.fn();
+    next?.addEventListener("click", clicked);
+    const pane = window.document.querySelector<HTMLElement>(".stage__pane");
+    const press = (target: Element, key: string): boolean => {
+      const event = new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    // On a pane the arrow key is left to the browser (it scrolls); nothing is clicked.
+    expect(pane && press(pane, "ArrowRight")).toBe(false);
+    expect(clicked).not.toHaveBeenCalled();
+    // Elsewhere ArrowRight is the next-snapshot shortcut, and so is j on the pane.
+    expect(press(window.document.body, "ArrowRight")).toBe(true);
+    expect(clicked).toHaveBeenCalledTimes(1);
+    expect(pane && press(pane, "j")).toBe(true);
+    expect(clicked).toHaveBeenCalledTimes(2);
+  });
+
   it("adopts the response stylesheet on body swaps and swaps validation errors", () => {
     const source = clientScript();
     expect(source).toContain("storyshelf-css");
