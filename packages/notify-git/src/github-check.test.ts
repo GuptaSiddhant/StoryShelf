@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { findingsHash } from "./github-check-mapper.ts";
 import { postCheckRun } from "./github-check.ts";
 import { bodyOf, stubFetch } from "./test-fetch.ts";
 
@@ -20,15 +21,39 @@ const annotations = (count: number) =>
     level: "warning" as const,
   }));
 
-/** A recorded GitHub: `runs` is what the list endpoint returns; creates answer id 77. */
-function github(runs: unknown[] = []) {
+/**
+ * A recorded GitHub: `runs` is what the list endpoint returns (`afterCreate`, when given, from
+ * the second listing on); `listed` is what the annotations endpoint returns; creates answer id 77.
+ */
+function github(runs: unknown[] = [], extra: { listed?: unknown[]; afterCreate?: unknown[] } = {}) {
+  let lists = 0;
   return stubFetch((url, init) => {
     if (init.method === undefined || init.method === "GET") {
-      return Response.json({ check_runs: runs });
+      if (url.includes("/annotations")) {
+        return Response.json(extra.listed ?? []);
+      }
+      lists += 1;
+      return Response.json({
+        check_runs: lists > 1 && extra.afterCreate ? extra.afterCreate : runs,
+      });
     }
     return Response.json({ id: url.endsWith("/check-runs") ? 77 : 9 });
   });
 }
+
+const posted = (call: { init: RequestInit } | undefined) =>
+  ((bodyOf(call as never)["output"] ?? {}) as { annotations?: { title: string }[] }).annotations;
+const summaryOfCall = (call: { init: RequestInit } | undefined) =>
+  (bodyOf(call as never)["output"] as { summary: string }).summary;
+const asListed = (items: ReturnType<typeof annotations>) =>
+  items.map((item) => ({
+    path: item.path,
+    annotation_level: item.level,
+    title: item.title,
+    message: item.message,
+    raw_details: item.url,
+  }));
+const RUN = { id: 9, external_id: "storyshelf:storyshelf/testing" };
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -39,7 +64,7 @@ describe("postCheckRun", () => {
     const calls = github();
     await postCheckRun(repo, input);
     expect(calls[0]?.url).toBe(
-      "https://api.github.com/repos/acme/widgets/commits/abc123/check-runs?filter=latest&per_page=100&check_name=storyshelf%2Ftesting",
+      "https://api.github.com/repos/acme/widgets/commits/abc123/check-runs?filter=all&per_page=100&page=1&check_name=storyshelf%2Ftesting",
     );
     expect(calls[1]?.url).toBe("https://api.github.com/repos/acme/widgets/check-runs");
     expect(calls[1]?.init.method).toBe("POST");
@@ -84,8 +109,9 @@ describe("postCheckRun", () => {
   it("posts annotations 50 per request on the same run", async () => {
     const calls = github();
     await postCheckRun(repo, { ...input, annotations: annotations(120), omitted: 5 });
-    const writes = calls.slice(1);
+    const writes = calls.slice(1, 4);
     expect(writes.map((call) => call.init.method)).toEqual(["POST", "PATCH", "PATCH"]);
+    expect(calls[4]?.init.method ?? "GET").toBe("GET");
     expect(writes[1]?.url).toBe("https://api.github.com/repos/acme/widgets/check-runs/77");
     const sizes = writes.map(
       (call) => (bodyOf(call)["output"] as { annotations: unknown[] }).annotations.length,
@@ -99,22 +125,156 @@ describe("postCheckRun", () => {
     expect(first?.raw_details).toBe("https://shelf.example/projects/web/builds/B1/diff?snapshot=0");
   });
 
-  it("does not repeat annotations the run already has", async () => {
+  it("puts the hash of a build with no findings on the run", async () => {
+    const calls = github();
+    await postCheckRun(repo, { ...input, annotations: [] });
+    expect(summaryOfCall(calls[1])).toContain(`<!-- storyshelf:findings=${findingsHash([])} -->`);
+  });
+
+  it("updates every run with the id, so a duplicate never keeps an older state", async () => {
     const calls = github([
-      {
-        id: 9,
-        external_id: "storyshelf:storyshelf/testing",
-        output: { annotations_count: 50 },
-      },
+      { id: 12, external_id: "storyshelf:storyshelf/testing" },
+      { id: 9, external_id: "storyshelf:storyshelf/testing" },
     ]);
-    await postCheckRun(repo, { ...input, annotations: annotations(60) });
-    expect(calls).toHaveLength(2);
-    const output = bodyOf(calls[1])["output"] as { annotations: { title: string }[] };
-    expect(output.annotations.map((a) => a.title)).toEqual(
-      annotations(60)
-        .slice(50)
-        .map((a) => a.title),
+    await postCheckRun(repo, { ...input, state: "success", description: "Passed" });
+    const writes = calls.slice(1);
+    expect(writes.map((call) => call.url).toSorted()).toEqual([
+      "https://api.github.com/repos/acme/widgets/check-runs/12",
+      "https://api.github.com/repos/acme/widgets/check-runs/9",
+    ]);
+    expect(writes.every((call) => bodyOf(call)["conclusion"] === "success")).toBe(true);
+    expect(writes[0]?.url.endsWith("/9")).toBe(true);
+  });
+
+  it("lists again after a create and brings a run another delivery created to the same state", async () => {
+    const calls = github([], {
+      afterCreate: [
+        { id: 5, external_id: "storyshelf:storyshelf/testing" },
+        { id: 77, external_id: "storyshelf:storyshelf/testing" },
+      ],
+    });
+    await postCheckRun(repo, { ...input, state: "success", description: "Passed" });
+    expect(
+      calls.map((call) => `${call.init.method ?? "GET"} ${call.url.split("/").at(-1)}`),
+    ).toEqual([
+      expect.stringMatching(/^GET /u),
+      "POST check-runs",
+      expect.stringMatching(/^GET /u),
+      "PATCH 5",
+    ]);
+    expect(bodyOf(calls[3])).toMatchObject({ status: "completed", conclusion: "success" });
+    expect(bodyOf(calls[3])).not.toHaveProperty("head_sha");
+  });
+
+  it("asks only for the runs of the configured App when it is known", async () => {
+    const calls = github();
+    await postCheckRun({ ...repo, appId: "123" }, input);
+    expect(calls[0]?.url).toContain("&app_id=123");
+    vi.unstubAllGlobals();
+    const without = github();
+    await postCheckRun(repo, input);
+    expect(without[0]?.url).not.toContain("app_id");
+  });
+
+  it("reads the next page of runs, so a run past the first hundred is still found and updated", async () => {
+    const others = Array.from({ length: 100 }, (_, at) => ({
+      id: 1000 + at,
+      external_id: "someone-else",
+    }));
+    const calls = stubFetch((url, init) => {
+      if (init.method !== undefined && init.method !== "GET") {
+        return Response.json({ id: 9 });
+      }
+      return Response.json({
+        check_runs: url.includes("&page=1&") ? others : [{ id: 9, external_id: RUN.external_id }],
+      });
+    });
+    await postCheckRun(repo, { ...input, state: "success", description: "Passed" });
+    const lists = calls.filter((call) => call.url.includes("/check-runs?"));
+    expect(lists.map((call) => /[?&]page=(?<page>\d+)/u.exec(call.url)?.groups?.["page"])).toEqual([
+      "1",
+      "2",
+    ]);
+    const writes = calls.filter((call) => call.init.method === "PATCH");
+    expect(writes.map((call) => call.url.split("/").at(-1))).toEqual(["9"]);
+    expect(calls.some((call) => call.init.method === "POST")).toBe(false);
+  });
+
+  it("stops after ten pages of full runs", async () => {
+    const full = Array.from({ length: 100 }, (_, at) => ({ id: at, external_id: "someone-else" }));
+    const calls = stubFetch((_url, init) =>
+      init.method === undefined || init.method === "GET"
+        ? Response.json({ check_runs: full })
+        : Response.json({ id: 77 }),
     );
+    await postCheckRun(repo, input);
+    // Ten pages, then the create (the re-list after it reads ten pages again).
+    expect(calls.slice(0, 10).every((call) => call.url.includes("/check-runs?"))).toBe(true);
+    expect(calls[10]?.init.method).toBe("POST");
+  });
+
+  it("finds only runs of this name and id, and orders them oldest first", async () => {
+    const calls = github([
+      { id: 30, external_id: "storyshelf:storyshelf/testing" },
+      { id: 4, external_id: "someone-else" },
+      { id: 20, external_id: "storyshelf:storyshelf/testing" },
+    ]);
+    await postCheckRun(repo, input);
+    expect(calls.slice(1).map((call) => call.url.split("/").at(-1))).toEqual(["20", "30"]);
+  });
+
+  it("puts the hash on the last write of a long post only, so a cut-short post leaves none", async () => {
+    const calls = github();
+    await postCheckRun(repo, { ...input, annotations: annotations(120) });
+    const writes = calls.slice(1, 4);
+    const hashed = writes.map((call) => summaryOfCall(call).includes("storyshelf:findings="));
+    expect(hashed).toEqual([false, false, true]);
+  });
+
+  it("puts the hash on the only write of a short post", async () => {
+    const calls = github();
+    await postCheckRun(repo, { ...input, annotations: annotations(3) });
+    expect(summaryOfCall(calls[1])).toContain(
+      `storyshelf:findings=${findingsHash(annotations(3))}`,
+    );
+  });
+
+  it("mirrors the state to a duplicate without claiming the finding set", async () => {
+    const calls = github([
+      { id: 12, external_id: "storyshelf:storyshelf/testing" },
+      { id: 9, external_id: "storyshelf:storyshelf/testing" },
+    ]);
+    await postCheckRun(repo, { ...input, annotations: annotations(2) });
+    const [own, mirror] = calls.slice(1).toSorted((a, b) => a.url.length - b.url.length);
+    expect(own?.url.endsWith("/9")).toBe(true);
+    expect(summaryOfCall(own)).toContain("storyshelf:findings=");
+    expect(mirror?.url.endsWith("/12")).toBe(true);
+    expect(summaryOfCall(mirror)).not.toContain("storyshelf:findings=");
+    expect(summaryOfCall(mirror)).toContain("Current findings (2):");
+  });
+
+  it("updates a run without findings and leaves its annotations alone", async () => {
+    const calls = github([{ ...RUN, output: { annotations_count: 4 } }]);
+    await postCheckRun(repo, { ...input, state: "success", description: "Passed" });
+    expect(calls.map((call) => call.init.method ?? "GET")).toEqual(["GET", "PATCH"]);
+    expect(summaryOfCall(calls[1])).not.toContain("earlier annotation");
+    expect(posted(calls[1])).toBeUndefined();
+  });
+
+  it("posts only the findings a run lacks, in one update", async () => {
+    const before = annotations(3);
+    const after = [
+      before[0],
+      before[1],
+      { ...before[2], message: "now different" },
+    ] as typeof before;
+    const calls = github([{ ...RUN, output: { annotations_count: 3 } }], {
+      listed: asListed(before),
+    });
+    await postCheckRun(repo, { ...input, annotations: after });
+    expect(posted(calls[2])).toHaveLength(1);
+    expect(posted(calls[2])?.[0]).toMatchObject({ title: "t2", message: "now different" });
+    expect(summaryOfCall(calls[2])).toContain("1 earlier annotation belongs to findings");
   });
 
   it("rethrows a refused write so the job is retried", async () => {

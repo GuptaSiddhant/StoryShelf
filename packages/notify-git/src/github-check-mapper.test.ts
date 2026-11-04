@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   annotationBatches,
+  FINDINGS_LISTED,
+  findingKey,
+  findingsHash,
+  markedHash,
   checkRunBody,
   phaseOf,
   summaryOf,
@@ -97,13 +101,77 @@ describe("annotationBatches", () => {
     ]);
   });
 
-  it("skips what the run already shows", () => {
-    expect(annotationBatches(many, 110).map((batch) => batch.length)).toEqual([10]);
-    expect(annotationBatches(many, 120)).toEqual([]);
+  it("makes no batch for no findings", () => {
+    expect(annotationBatches([])).toEqual([]);
   });
 
   it("limits the title to 255 characters", () => {
     const batches = annotationBatches([{ ...annotation(1), title: "x".repeat(300) }]);
     expect(batches[0]?.[0]?.title).toHaveLength(255);
+  });
+});
+
+describe("findings in the summary", () => {
+  const findings = Array.from({ length: 3 }, (_, at) => annotation(at));
+
+  it("lists the current findings first, then the link, and ends with the hash of the set", () => {
+    const summary = summaryOf({ ...base, state: "pending", annotations: findings });
+    const lines = summary.split("\n\n");
+    expect(lines[0]).toBe(base.description);
+    expect(lines[1]).toBe("Current findings (3):\n- t0 (`a.tsx`)\n- t1 (`a.tsx`)\n- t2 (`a.tsx`)");
+    expect(lines[2]).toBe(`[Open the build](${base.url})`);
+    expect(markedHash(summary)).toBe(findingsHash(findings));
+  });
+
+  it("spells out only the first findings and counts the rest", () => {
+    const many = Array.from({ length: FINDINGS_LISTED + 4 }, (_, at) => annotation(at));
+    const summary = summaryOf({ ...base, state: "pending", annotations: many });
+    expect(summary).toContain(`Current findings (${String(many.length)}):`);
+    expect(summary).toContain("- and 4 more");
+    expect(summary).not.toContain(`- t${String(FINDINGS_LISTED)} (`);
+  });
+
+  it("says how many earlier annotations on the run are history", () => {
+    const one = summaryOf({ ...base, state: "pending", annotations: findings, resolved: 1 });
+    const two = summaryOf({ ...base, state: "pending", annotations: findings, resolved: 2 });
+    expect(one).toContain("1 earlier annotation belongs to findings");
+    expect(two).toContain("2 earlier annotations belong to findings");
+    expect(summaryOf({ ...base, state: "pending", annotations: findings })).not.toContain(
+      "earlier annotation",
+    );
+  });
+
+  it("carries a hash for a build with no findings yet, and none for a status without findings", () => {
+    const empty = summaryOf({ ...base, state: "pending", annotations: [] });
+    expect(empty).not.toContain("Current findings");
+    expect(markedHash(empty)).toBe(findingsHash([]));
+    expect(markedHash(summaryOf({ ...base, state: "pending" }))).toBeUndefined();
+  });
+
+  it("hashes the set, not the order, and tells a changed finding from an unchanged one", () => {
+    expect(findingsHash(findings.toReversed())).toBe(findingsHash(findings));
+    const changed = [findings[0], findings[1], { ...annotation(2), message: "other" }];
+    expect(findingsHash(changed as typeof findings)).not.toBe(findingsHash(findings));
+    expect(findingsHash([])).not.toBe(findingsHash(findings));
+  });
+
+  it("keys a finding by what the annotation shows, with the title cut as it is posted", () => {
+    const long = { ...annotation(1), title: "x".repeat(300) };
+    const posted = annotationBatches([long])[0]?.[0];
+    expect(posted).toBeDefined();
+    expect(
+      findingKey({
+        level: posted?.annotation_level ?? "",
+        path: posted?.path ?? "",
+        title: posted?.title ?? "",
+        message: posted?.message ?? "",
+        url: posted?.raw_details ?? "",
+      }),
+    ).toBe(findingKey(long));
+  });
+
+  it("reads no hash from a summary without one", () => {
+    expect(markedHash(null)).toBeUndefined();
+    expect(markedHash("plain text")).toBeUndefined();
   });
 });
