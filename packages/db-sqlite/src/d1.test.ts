@@ -114,6 +114,61 @@ describe("createD1Database", () => {
     expect(await db.get(schema.projects, "p2")).toBeNull();
   });
 
+  it("rebuilds a comments table that still requires a user in one batch, keeping its rows", async () => {
+    const client = createStubBinding();
+    await initDb(createD1Database({ client }));
+    await client.exec("PRAGMA foreign_keys = OFF");
+    await client.exec(`INSERT INTO users (id, name, email, created_at) VALUES ('u', 'U', 'u@x', '2026-01-01T00:00:00.000Z');
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+      INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES ('b', 'p', 's', 'main', 'pending', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+      DROP TABLE comments;
+      CREATE TABLE comments (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+        snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        parent_id TEXT,
+        resolved INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO comments (id, project_id, build_id, user_id, body, created_at, updated_at)
+        VALUES ('c1', 'p', 'b', 'u', 'kept', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');`);
+
+    await initDb(createD1Database({ client }));
+
+    const columns = (await client.prepare("PRAGMA table_info(comments)").bind().all()) as {
+      results: { name: string; notnull: number }[];
+    };
+    expect(columns.results.find((column) => column.name === "user_id")?.notnull).toBe(0);
+    expect(columns.results.map((column) => column.name)).toContain("story_id");
+    const rows = (await client.prepare("SELECT id FROM comments").bind().all()) as {
+      results: { id: string }[];
+    };
+    expect(rows.results.map((row) => row.id)).toEqual(["c1"]);
+  });
+
+  it("fails the boot on a statement that errors, and skips only the already-done ones", async () => {
+    const client = createStubBinding();
+    await initDb(createD1Database({ client }));
+    const failing = (error: Error): D1Database => ({
+      ...client,
+      exec: async (query: string) => {
+        if (query.startsWith("ALTER TABLE webhooks DROP COLUMN")) throw error;
+        return await client.exec(query);
+      },
+    });
+
+    await expect(
+      initDb(createD1Database({ client: failing(new Error("D1_ERROR: boom")) })),
+    ).rejects.toThrow("boom");
+    await expect(
+      initDb(createD1Database({ client: failing(new Error('no such column: "secret"')) })),
+    ).resolves.toBeUndefined();
+  });
+
   it("teardown is a no-op: the platform owns the binding", async () => {
     const client = createStubBinding();
     const db = createD1Database({ client });

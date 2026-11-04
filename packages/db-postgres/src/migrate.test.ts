@@ -512,3 +512,90 @@ describe("runMigrations: builds.capture_generation", () => {
     expect(rows.rows).toEqual([{ capture_generation: 0 }]);
   }, 60_000);
 });
+
+/** Every distinct statement a clean run issues, in order. */
+async function statementsOfARun(): Promise<string[]> {
+  const seen: string[] = [];
+  await runMigrations(async (sql) => {
+    seen.push(sql);
+    return await Promise.resolve([]);
+  });
+  return [...new Set(seen)];
+}
+
+/** A runner that fails the statement `target` with `error` and does nothing else. */
+const failing = (target: string, error: unknown) => async (sql: string) => {
+  if (sql === target) throw error;
+  return await Promise.resolve([] as unknown[]);
+};
+
+describe("runMigrations: a failing statement stops the boot", () => {
+  it("fails on any statement that errors, whichever column or index it adds", async () => {
+    const statements = await statementsOfARun();
+    expect(statements.length).toBeGreaterThan(80);
+
+    const outcomes = await Promise.all(
+      statements.map(
+        async (target) =>
+          await runMigrations(failing(target, new Error("boom"))).then(
+            () => `${target} did not fail the boot`,
+            () => "failed",
+          ),
+      ),
+    );
+
+    expect(outcomes.filter((outcome) => outcome !== "failed")).toEqual([]);
+  });
+
+  it("skips a unique index that existing duplicates prevent, and only for that error", async () => {
+    const statements = await statementsOfARun();
+    const uniqueIndexes = statements.filter(
+      (sql) =>
+        sql.startsWith("CREATE UNIQUE INDEX") && !sql.includes("capture_jobs_active_key_idx"),
+    );
+    expect(uniqueIndexes.length).toBeGreaterThanOrEqual(3);
+
+    for (const target of uniqueIndexes) {
+      // oxlint-disable-next-line no-await-in-loop -- one statement at a time
+      await expect(
+        runMigrations(failing(target, Object.assign(new Error("duplicate"), { code: "23505" }))),
+      ).resolves.toBeUndefined();
+      // oxlint-disable-next-line no-await-in-loop -- see above
+      await expect(
+        runMigrations(failing(target, Object.assign(new Error("denied"), { code: "42501" }))),
+      ).rejects.toThrow("denied");
+    }
+  });
+
+  it("never skips the single-flight index, even for a unique violation", async () => {
+    const index = (await statementsOfARun()).find((sql) =>
+      sql.includes("capture_jobs_active_key_idx ON"),
+    );
+
+    await expect(
+      runMigrations(failing(index ?? "", Object.assign(new Error("dup"), { code: "23505" }))),
+    ).rejects.toThrow("dup");
+  });
+
+  it("builds the design-link index when the rows allow it and leaves it out when they repeat", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      DROP INDEX design_links_project_import_path_idx;
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO design_links (id, project_id, import_path, url, created_at, updated_at)
+        VALUES ('d1', 'p', './A.tsx', 'u1', now(), now()), ('d2', 'p', './A.tsx', 'u2', now(), now());
+    `);
+
+    await expect(runMigrations(run)).resolves.toBeUndefined();
+
+    const indexes = await client.query<{ indexname: string }>(
+      "SELECT indexname FROM pg_indexes WHERE tablename = 'design_links'",
+    );
+    expect(indexes.rows.map((row) => row.indexname)).not.toContain(
+      "design_links_project_import_path_idx",
+    );
+    await client.close();
+  }, 60_000);
+});

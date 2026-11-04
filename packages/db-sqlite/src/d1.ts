@@ -10,8 +10,15 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/d1";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
+import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
+import {
+  execUnlessAsync,
+  isDuplicateColumn,
+  isMissingColumn,
+  toleratedFor,
+} from "./migration-errors.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
 import { parseTableInfo } from "./table-info.ts";
@@ -91,15 +98,23 @@ async function runMigrations(client: D1Database): Promise<void> {
   // multi-statement exec.
   for (const statement of splitStatements(DDL)) {
     // oxlint-disable-next-line no-await-in-loop -- ordered DDL, see above
-    await execIgnore(client, statement);
+    await client.exec(statement);
   }
   await ensureColumns(client, DDL);
   for (const statement of IDENTITY_STATEMENTS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
-    await execIgnore(client, statement);
+    await execUnlessAsync(
+      async (sql) => await client.exec(sql),
+      statement,
+      toleratedFor(statement),
+    );
   }
   await client.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
-  await execIgnore(client, WEBHOOK_SECRET_DROP);
+  await execUnlessAsync(
+    async (sql) => await client.exec(sql),
+    WEBHOOK_SECRET_DROP,
+    isMissingColumn,
+  );
   await migrateCommentsTable(client);
 }
 
@@ -109,14 +124,6 @@ function splitStatements(ddl: string): string[] {
     .split(/;\n/u)
     .map((statement) => statement.trim())
     .filter((statement) => statement !== "");
-}
-
-async function execIgnore(client: D1Database, sql: string): Promise<void> {
-  try {
-    await client.exec(sql);
-  } catch {
-    // idempotent — already migrated
-  }
 }
 
 /** Add any DDL column missing from a database created before it shipped. */
@@ -129,7 +136,11 @@ async function ensureColumns(client: D1Database, ddl: string): Promise<void> {
       const [name] = column.split(/\s+/u);
       if (name && (existing === undefined || !existing.has(name))) {
         // oxlint-disable-next-line no-await-in-loop -- ordered column backfill
-        await execIgnore(client, `ALTER TABLE ${table} ADD COLUMN ${column}`);
+        await execUnlessAsync(
+          async (sql) => await client.exec(sql),
+          `ALTER TABLE ${table} ADD COLUMN ${column}`,
+          isDuplicateColumn,
+        );
       }
     }
   }
@@ -155,39 +166,21 @@ async function inspectColumns(client: D1Database, table: string): Promise<Set<st
 }
 
 async function migrateCommentsTable(client: D1Database): Promise<void> {
-  try {
-    const row = (await client
-      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'")
-      .bind()
-      .first()) as { sql: string } | null;
-    if (!row?.sql.includes("user_id TEXT NOT NULL REFERENCES users")) {
-      return;
-    }
-    await recreateCommentsTable(client);
-  } catch {
-    await execIgnore(client, "PRAGMA foreign_keys = ON");
+  const row = (await client
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'")
+    .bind()
+    .first()) as { sql: string } | null;
+  if (!row?.sql.includes("user_id TEXT NOT NULL REFERENCES users")) {
+    return;
   }
+  await recreateCommentsTable(client);
 }
 
+/**
+ * Swap `comments` for a table whose `user_id` may be null. One `batch` is one transaction on D1, so
+ * a failure leaves the old table as it was. Nothing references `comments`, so foreign keys need not
+ * be switched off for the swap.
+ */
 async function recreateCommentsTable(client: D1Database): Promise<void> {
-  await client.exec("PRAGMA foreign_keys = OFF");
-  await client.exec(`
-    CREATE TABLE comments_new (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
-      snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
-      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-      body TEXT NOT NULL,
-      parent_id TEXT,
-      resolved INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
-  await client.exec("INSERT INTO comments_new SELECT * FROM comments");
-  await client.exec("DROP TABLE comments");
-  await client.exec("ALTER TABLE comments_new RENAME TO comments");
-  await client.exec("CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id)");
-  await client.exec("PRAGMA foreign_keys = ON");
+  await client.batch(commentsRebuildStatements().map((sql) => client.prepare(sql)));
 }

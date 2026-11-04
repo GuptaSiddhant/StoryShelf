@@ -191,6 +191,70 @@ describe("createTursoDatabase", () => {
     await cleanupTurso(dir, db, client);
   });
 
+  it("rebuilds a comments table that still requires a user in one batch, keeping its rows", async () => {
+    const { dir, db, client } = createTempTurso();
+    await initDb(db);
+    await client.execute("PRAGMA foreign_keys = OFF");
+    await client.executeMultiple(`INSERT INTO users (id, name, email, created_at) VALUES ('u', 'U', 'u@x', '2026-01-01T00:00:00.000Z');
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+      INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES ('b', 'p', 's', 'main', 'pending', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+      DROP TABLE comments;
+      CREATE TABLE comments (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+        snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        parent_id TEXT,
+        resolved INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO comments (id, project_id, build_id, user_id, body, created_at, updated_at)
+        VALUES ('c1', 'p', 'b', 'u', 'kept', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');`);
+
+    await initDb(createTursoDatabase({ client }));
+
+    const columns = (await client.execute("PRAGMA table_info(comments)")).rows as unknown as {
+      name: string;
+      notnull: number;
+    }[];
+    expect(columns.find((column) => column.name === "user_id")?.notnull).toBe(0);
+    expect(columns.map((column) => column.name)).toContain("story_id");
+    const rows = (await client.execute("SELECT id FROM comments")).rows as unknown as {
+      id: string;
+    }[];
+    expect(rows.map((row) => row.id)).toEqual(["c1"]);
+    await cleanupTurso(dir, db, client);
+  });
+
+  it("fails the boot on a statement that errors, and skips only the already-done ones", async () => {
+    const { dir, db, client } = createTempTurso();
+    await initDb(db);
+    const failing = (error: Error): TestClient =>
+      new Proxy(client, {
+        get(target, property) {
+          if (property === "execute") {
+            return async (statement: string) => {
+              if (statement.startsWith("ALTER TABLE webhooks DROP COLUMN")) throw error;
+              return await target.execute(statement);
+            };
+          }
+          const value: unknown = Reflect.get(target, property);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+
+    await expect(
+      initDb(createTursoDatabase({ client: failing(new Error("SQLite error: boom")) })),
+    ).rejects.toThrow("boom");
+    await expect(
+      initDb(createTursoDatabase({ client: failing(new Error('no such column: "secret"')) })),
+    ).resolves.toBeUndefined();
+    await cleanupTurso(dir, db, client);
+  });
+
   it("creates auth tables on fresh and stale volumes", async () => {
     const expected = ["user", "session", "account", "verification"] as const;
 

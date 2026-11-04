@@ -321,3 +321,49 @@ describe("runMigrations: capture_jobs single-flight key", () => {
     }
   });
 });
+
+/** A runner that fails the first statement starting with `prefix` (in DDL order), once. */
+function failingWith(prefix: string, error: Error): (sql: string) => Promise<unknown[]> {
+  const { run } = recordingRunner();
+  let failed = false;
+  return async (sql) => {
+    if (!failed && sql.startsWith(prefix)) {
+      failed = true;
+      throw error;
+    }
+    return await run(sql);
+  };
+}
+
+describe("runMigrations: only an already-exists error is ignored", () => {
+  it("tolerates a duplicate index name from a repeated DDL statement", async () => {
+    const duplicate = Object.assign(new Error("Duplicate key name"), {
+      code: "ER_DUP_KEYNAME",
+      errno: 1061,
+    });
+
+    await expect(runMigrations(failingWith("CREATE INDEX", duplicate))).resolves.toBeUndefined();
+  });
+
+  it("fails the boot on any other DDL error, such as a lock timeout", async () => {
+    const timeout = Object.assign(new Error("Lock wait timeout exceeded"), {
+      code: "ER_LOCK_WAIT_TIMEOUT",
+      errno: 1205,
+    });
+
+    await expect(runMigrations(failingWith("CREATE INDEX", timeout))).rejects.toThrow(
+      "Lock wait timeout",
+    );
+  });
+
+  it("fails the boot on an error that is not a duplicate column when adding a column", async () => {
+    const denied = Object.assign(new Error("ALTER command denied"), {
+      code: "ER_TABLEACCESS_DENIED_ERROR",
+      errno: 1142,
+    });
+
+    await expect(
+      runMigrations(failingWith("ALTER TABLE projects ADD COLUMN", denied)),
+    ).rejects.toThrow("ALTER command denied");
+  });
+});
