@@ -52,25 +52,36 @@ function channelIdOf(job: Pick<ConsumerJob, "data">): string {
  * attempt records the error on the channel and raises `onFailed`.
  */
 export function createNotifyHandler(options: NotifyHandlerOptions): KindHandler {
-  // Jobs told to stop (a cancel or a lost lease). A request already on the wire finishes (the HTTP
-  // helper bounds it); what stops is everything after it: no outcome recorded, no failure surfaced.
-  const stopped = new Set<string>();
+  // The running invocations of each job, each with its own stop flag. A cancel (or a lost lease)
+  // marks the ones running now; an attempt reclaimed later has a flag of its own and cannot clear
+  // an older one's. A request already on the wire finishes (the HTTP helper bounds it); what stops
+  // is everything after it: no outcome recorded, no failure surfaced.
+  const active = new Map<string, Set<StopToken>>();
   return {
     accepts: (job) => job.buildId.length > 0 && channelIdOf(job).length > 0,
     backoff: NOTIFY_BACKOFF,
     run: async (job, context) => {
-      stopped.delete(keyOf(job));
+      const token: StopToken = { stopped: false };
+      const key = keyOf(job);
+      active.set(key, (active.get(key) ?? new Set()).add(token));
       try {
-        await deliverOnce(options, job, { logger: context.logger, cancelled: stopped });
+        await deliverOnce(options, job, { logger: context.logger, token });
       } finally {
-        stopped.delete(keyOf(job));
+        const rest = active.get(key);
+        rest?.delete(token);
+        if (rest?.size === 0) active.delete(key);
       }
     },
     // oxlint-disable-next-line eslint/require-await -- the interface is async; marking is synchronous
     cancel: async (job) => {
-      stopped.add(keyOf(job));
+      for (const token of active.get(keyOf(job)) ?? []) token.stopped = true;
     },
   };
+}
+
+/** One invocation's stop flag. */
+interface StopToken {
+  stopped: boolean;
 }
 
 /** The key a job is tracked under while it runs: its row, else its channel and build. */
@@ -82,14 +93,16 @@ function keyOf(job: ConsumerJob): string {
 async function deliverOnce(
   options: NotifyHandlerOptions,
   job: ConsumerJob,
-  run: { logger: Logger; cancelled: ReadonlySet<string> },
+  run: { logger: Logger; token: StopToken },
 ): Promise<void> {
   const channelId = channelIdOf(job);
   try {
-    const result = await deliverBuildState(options.deps, { buildId: job.buildId, channelId }, () =>
-      run.cancelled.has(keyOf(job)),
+    const result = await deliverBuildState(
+      options.deps,
+      { buildId: job.buildId, channelId },
+      () => run.token.stopped,
     );
-    if (run.cancelled.has(keyOf(job))) {
+    if (run.token.stopped) {
       run.logger.info("notify job was cancelled; outcome not recorded");
       return;
     }
@@ -103,9 +116,9 @@ async function deliverOnce(
 async function failDelivery(
   options: NotifyHandlerOptions,
   job: ConsumerJob,
-  what: { run: { logger: Logger; cancelled: ReadonlySet<string> }; error: unknown },
+  what: { run: { logger: Logger; token: StopToken }; error: unknown },
 ): Promise<void> {
-  if (what.run.cancelled.has(keyOf(job))) {
+  if (what.run.token.stopped) {
     what.run.logger.info("notify job was cancelled; its failure is not surfaced");
     return;
   }

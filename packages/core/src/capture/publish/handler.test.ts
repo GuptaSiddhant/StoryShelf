@@ -179,6 +179,39 @@ describe("createPublishHandler", () => {
     expect(log.calls.some((c) => c.fields === "publish stopped by a cancel")).toBe(true);
   });
 
+  it("keeps a reclaimed attempt cancellable when the older run of the same job ends", async () => {
+    const { handler, storage, build, log } = await setup();
+    const older = new PassThrough();
+    const newer = new PassThrough();
+    const streams = [older, newer];
+    let opened = 0;
+    const bothOpen: Array<() => void> = [];
+    const gates = [0, 1].map(
+      async (index) => await new Promise<void>((resolve) => (bothOpen[index] = resolve)),
+    );
+    storage.readStream = async () => {
+      const at = opened;
+      opened += 1;
+      bothOpen[at]?.();
+      return await Promise.resolve(streams[at] as PassThrough);
+    };
+    const job = { buildId: build.id, jobId: "j3", attempt: 1, maxAttempts: 3 } as ConsumerJob;
+    const context = { logger: log.logger, touch: () => {} };
+
+    // The lease of the first run was lost, so the job was claimed again while it still runs.
+    const first = handler.run(job, context);
+    await gates[0];
+    const second = handler.run(job, { ...context });
+    await gates[1];
+    // The older run ends (a broken zip): it must not drop the newer run's controller.
+    older.end(Buffer.from("not a zip"));
+    await expect(first).rejects.toThrow();
+
+    await handler.cancel?.(job);
+    await expect(second).resolves.toBeUndefined();
+    expect(newer.destroyed).toBe(true);
+  });
+
   it("tolerates a cancel for a job that is not running", async () => {
     const { handler, build } = await setup();
     await expect(

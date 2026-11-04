@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { StateNotifierProvider } from "../../adapters/notifier/provider.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
+import { deferred } from "../../test-helpers/index.ts";
 import { rig } from "../consumer/test-fixtures.ts";
 import {
   createNotifyEnqueuer,
@@ -235,6 +236,46 @@ describe("the notify job", () => {
     expect(statusLog(w.git)).toEqual([]);
     expect(await lastError(w)).toBeFalsy();
     expect(logger.info).toHaveBeenCalledWith("notify job was cancelled; outcome not recorded");
+  });
+
+  it("keeps a cancel for an older invocation when the job is reclaimed and starts again", async () => {
+    const { w, handler } = await setup();
+    const job = {
+      buildId: w.build.id,
+      jobId: "n5",
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    // The first invocation waits while its origin is resolved; later ones do not.
+    const origin = w.deps.publicOrigin;
+    const gate = deferred();
+    const entered = deferred();
+    let calls = 0;
+    (w.deps as { publicOrigin: () => Promise<string | undefined> }).publicOrigin = async () => {
+      calls += 1;
+      if (calls === 1) {
+        entered.resolve();
+        await gate.promise;
+      }
+      return await origin();
+    };
+    const olderLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const newerLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+    const older = handler.run(job, { logger: olderLog, touch: () => {} } as never);
+    await entered.promise;
+    await handler.cancel?.(job);
+    // The job is claimed again (its lease was lost) and starts a second invocation.
+    await handler.run(job, { logger: newerLog, touch: () => {} } as never);
+    const writtenByNewer = statusLog(w.git).length;
+    expect(writtenByNewer).toBeGreaterThan(0);
+    gate.resolve();
+    await older;
+
+    // The older invocation stayed stopped: it wrote nothing more after the newer one's delivery.
+    expect(statusLog(w.git)).toHaveLength(writtenByNewer);
+    expect(olderLog.info).toHaveBeenCalledWith("notify job was cancelled; outcome not recorded");
   });
 
   it("writes when no cancel arrives, with the same setup", async () => {

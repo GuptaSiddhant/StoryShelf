@@ -51,7 +51,8 @@ export function createPublishHandler(options: PublishHandlerOptions): KindHandle
         }
         await publishOnce(options, job, { ...context, signal: controller.signal }, build.projectId);
       } finally {
-        running.delete(keyOf(job));
+        // Only this run's own controller: a reclaimed attempt may have registered a newer one.
+        if (running.get(keyOf(job)) === controller) running.delete(keyOf(job));
       }
     },
     // oxlint-disable-next-line eslint/require-await -- the interface is async; aborting is synchronous
