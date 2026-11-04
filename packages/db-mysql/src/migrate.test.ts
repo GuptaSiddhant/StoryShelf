@@ -17,6 +17,24 @@ function recordingRunner(): { queries: string[]; run: (sql: string) => Promise<u
   };
 }
 
+describe("runMigrations: an existing run_a11y", () => {
+  it("is left alone when the column is already there, so a stored false survives", async () => {
+    const queries: string[] = [];
+    await runMigrations(async (sql) => {
+      queries.push(sql);
+      if (sql.includes("column_name = 'user_id'") && sql.includes("is_nullable")) {
+        return [{ is_nullable: "NO" }];
+      }
+      // Every column the upgrade looks for already exists.
+      return sql.includes("information_schema.columns") && sql.includes("LIMIT 1") ? [{}] : [];
+    });
+    const touching = queries.filter(
+      (sql) => sql.includes("run_a11y") || sql.includes("a11y_violations"),
+    );
+    expect(touching.filter((sql) => /^(ALTER|UPDATE)/u.test(sql))).toEqual([]);
+  });
+});
+
 describe("runMigrations: MySQL 8 compatibility", () => {
   it("splits the DDL and avoids Postgres-only and MariaDB-only syntax", async () => {
     const { queries, run } = recordingRunner();
@@ -134,6 +152,17 @@ describe("runMigrations: MySQL 8 compatibility", () => {
     expect(queries[backfill]).toContain("j.status IN ('queued', 'running')");
     expect(queries[backfill]).toContain(
       "WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')",
+    );
+  });
+});
+
+describe("runMigrations: builds.capture_generation", () => {
+  it("adds the run generation as a NOT NULL column defaulting to 0", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+
+    expect(queries).toContain(
+      "ALTER TABLE builds ADD COLUMN capture_generation INTEGER NOT NULL DEFAULT 0",
     );
   });
 });

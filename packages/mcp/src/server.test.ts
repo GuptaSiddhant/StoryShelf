@@ -75,6 +75,18 @@ describe("StoryShelf MCP server", () => {
     expect(out.snapshots[0]).not.toHaveProperty("screenshotPath");
   });
 
+  it("returns whether accessibility checks run, and says so in the tool description", async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValue({ slug: "web", gitDefaultBranch: "main", runA11y: false });
+    const client = await connect(fakeClient({ get }));
+    const out = JSON.parse(text(await client.callTool({ name: "get_project", arguments: {} })));
+    expect(get).toHaveBeenCalledWith("/projects/web");
+    expect(out).toMatchObject({ runA11y: false });
+    const { tools } = await client.listTools();
+    expect(tools.find((tool) => tool.name === "get_project")?.description).toContain("runA11y");
+  });
+
   it("posts a comment", async () => {
     const post = vi.fn().mockResolvedValue({ id: "c1" });
     const client = await connect(fakeClient({ post }));

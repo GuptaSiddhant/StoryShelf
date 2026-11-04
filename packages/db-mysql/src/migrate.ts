@@ -96,6 +96,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
+  { table: "builds", column: "capture_generation", definition: "INTEGER NOT NULL DEFAULT 0" },
   {
     table: "notification_subscriptions",
     column: "review_requests",

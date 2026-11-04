@@ -30,6 +30,7 @@ export const builds = mysqlTable(
     changedFiles: text("changed_files"),
     affectedImportPaths: text("affected_import_paths"),
     testResults: text("test_results"),
+    captureGeneration: int("capture_generation").notNull().default(0),
     reviewCycle: int("review_cycle").notNull().default(0),
     reviewRequestedCycle: int("review_requested_cycle"),
     captureJobId: varchar("capture_job_id", { length: 26 }),
@@ -64,6 +65,7 @@ export interface Build {
   changedFiles: string | null;
   affectedImportPaths: string | null;
   testResults: string | null;
+  captureGeneration: number;
   reviewCycle: number;
   reviewRequestedCycle: number | null;
   captureJobId: string | null;

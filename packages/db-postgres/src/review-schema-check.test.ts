@@ -21,6 +21,11 @@ const settings: Row[] = [
   { table_name: "builds", column_name: "review_requested_cycle", data_type: "integer" },
 ];
 
+const accessibility: Row[] = [
+  { table_name: "projects", column_name: "run_a11y", data_type: "boolean" },
+  { table_name: "snapshots", column_name: "a11y_violations", data_type: "text" },
+];
+
 describe("assertReviewSchema", () => {
   it("passes on a database with no review table or columns", async () => {
     await expect(assertReviewSchema(runnerOf([]))).resolves.toBeUndefined();
@@ -31,7 +36,9 @@ describe("assertReviewSchema", () => {
   });
 
   it("passes on a complete, matching schema", async () => {
-    await expect(assertReviewSchema(runnerOf([...reviews, ...settings]))).resolves.toBeUndefined();
+    await expect(
+      assertReviewSchema(runnerOf([...reviews, ...settings, ...accessibility])),
+    ).resolves.toBeUndefined();
   });
 
   it("names the table and the missing column of a build_reviews table without a required one", async () => {
@@ -60,6 +67,26 @@ describe("assertReviewSchema", () => {
     wrong.push({ table_name: "projects", column_name: "review_approvals", data_type: "text" });
     await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
       "column projects.review_approvals has type text, expected integer",
+    );
+  });
+
+  it("passes on matching accessibility columns", async () => {
+    await expect(assertReviewSchema(runnerOf(accessibility))).resolves.toBeUndefined();
+  });
+
+  it("names the accessibility switch when it has another type", async () => {
+    const wrong: Row[] = [{ table_name: "projects", column_name: "run_a11y", data_type: "text" }];
+    await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
+      "Cannot upgrade the schema: column projects.run_a11y has type text, expected boolean",
+    );
+  });
+
+  it("names the stored findings column when it has another type", async () => {
+    const wrong: Row[] = [
+      { table_name: "snapshots", column_name: "a11y_violations", data_type: "integer" },
+    ];
+    await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
+      "column snapshots.a11y_violations has type integer, expected text",
     );
   });
 });

@@ -91,4 +91,55 @@ describe("CaptureLogModel", () => {
     expect(rows[0]?.fields).toBe(JSON.stringify({ durationMs: 3 }));
     expect(rows[1]?.level).toBe("error");
   });
+
+  describe("closeIfOpen", () => {
+    const counts = { storyCount: 7, failedCount: 2 };
+
+    it("closes a queued or running attempt in one write and reports the row", async () => {
+      const { db } = makeDatabase();
+      const model = new CaptureAttemptModel(db, attemptTables(db));
+      const queued = await model.startAttempt("p1", "b1");
+      const running = await model.markRunning((await model.startAttempt("p1", "b1")).id);
+
+      const closedQueued = await model.closeIfOpen(queued.id, "failed", "boom", counts);
+      const closedRunning = await model.closeIfOpen(running.id, "completed", undefined, counts);
+
+      expect(closedQueued).toMatchObject({ status: "failed", error: "boom", ...counts });
+      expect(closedQueued?.finishedAt).not.toBeNull();
+      expect(closedRunning).toMatchObject({ status: "completed", error: null });
+    });
+
+    it("never overwrites an attempt that is no longer open", async () => {
+      const { db } = makeDatabase();
+      const model = new CaptureAttemptModel(db, attemptTables(db));
+      const completed = await model.startAttempt("p1", "b1");
+      await model.markFinished(completed.id, "completed", undefined, counts);
+      const cancelled = await model.startAttempt("p1", "b1");
+      await model.markFinished(cancelled.id, "cancelled", "user");
+
+      expect(
+        await model.closeIfOpen(completed.id, "failed", "late", { storyCount: 0, failedCount: 0 }),
+      ).toBeNull();
+      expect(
+        await model.closeIfOpen(cancelled.id, "failed", "late", { storyCount: 0, failedCount: 0 }),
+      ).toBeNull();
+
+      const rows = await model.listByBuild("b1");
+      expect(rows.find((row) => row.id === completed.id)).toMatchObject({
+        status: "completed",
+        error: null,
+        ...counts,
+      });
+      expect(rows.find((row) => row.id === cancelled.id)).toMatchObject({
+        status: "cancelled",
+        error: "user",
+      });
+    });
+
+    it("answers null for an attempt that does not exist", async () => {
+      const { db } = makeDatabase();
+      const model = new CaptureAttemptModel(db, attemptTables(db));
+      expect(await model.closeIfOpen("missing", "failed", "x", counts)).toBeNull();
+    });
+  });
 });

@@ -61,9 +61,9 @@ that is already merged is captured like any other (there is no `isMerged` check)
 
 - **`@storyshelf/notify-email`** owns `nodemailer`, with `smtp`, `mailpit`, `log` and HTTP-API
   presets.
-- **`@storyshelf/notify-chat`** is zero-dependency, `fetch` only: `slack-webhook`,
+- **`@storyshelf/notify-chat`** uses `fetch` only and no vendor SDK: `slack-webhook`,
   `teams-workflow`, `log` (Mattermost and Discord can follow as renderers).
-- **`@storyshelf/notify-git`** is zero-dependency like `notify-chat` (calls go through `httpJson`): `github`, `gitlab`, and a `git-log` provider for tests and local runs (`log` is taken
+- **`@storyshelf/notify-git`** avoids a git-provider SDK like `notify-chat` (it depends only on core and `zod`; calls go through `httpJson`): `github`, `gitlab`, and a `git-log` provider for tests and local runs (`log` is taken
   by `notify-chat`, and provider kinds are unique across packages).
 
 They are packages, not part of `@storyshelf/core`, because core carries none of the provider code or
@@ -111,7 +111,7 @@ the statuses and the pull-request comment. Its details:
   otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
   A build past capture (`reviewing`, `approved`, `rejected`) with no manifest and no open `publish`
   job (queued, running or exhausting) has lost its content: `failure`, `Storybook content
-  unavailable, see build page` (informational, `neutral` on check runs; the page says to re-upload or
+unavailable, see build page` (informational, `neutral` on check runs; the page says to re-upload or
   purge). While such a job is open it stays `pending`, since capture can finish first. Every end of
   a publish job requests the state again once its row is written (the queue's `onEnded` hook).
 - A build without a commit SHA, or with a synthetic local identity, shows nothing.
@@ -243,8 +243,8 @@ pause is not a delivery failure), the System page, the project notification sett
 page show "Notifications are paused until a public URL is set; set `PUBLIC_BASE_URL` or confirm the
 detected origin", and one `warn` line is logged at boot and the first time a notification is
 skipped. A request dropped while paused is not replayed, with one exception: when an admin confirms
-the first origin on the System page, the state of every recent build still `pending`,
-`capturing`, `comparing` or `reviewing` is requested again (`requestOpenBuildStates`). A host that
+or replaces the origin on the System page, the state of every recent open build (`pending`,
+`capturing`, `comparing`, `reviewing`) is requested again (`requestOpenBuildStates`). A host that
 gets its origin through configuration (`PUBLIC_BASE_URL`, needs a restart) replays at boot instead:
 once adapters are ready, with notifiers wired and an origin resolved, `runBootTasks` requests the
 state of open builds (newest 25 per project) once with the same `requestOpenBuildStates`. Only git

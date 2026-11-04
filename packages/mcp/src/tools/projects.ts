@@ -20,7 +20,7 @@ export const getProject: ToolDef = {
   name: "get_project",
   title: "Get project",
   description:
-    "Get a project's settings: default branch, diff thresholds, browser, play-function setting.",
+    "Get a project's settings: default branch, diff thresholds, browser, play-function setting, and whether accessibility checks run (`runA11y`; axe findings are information only and never block a build).",
   readOnly: true,
   input: { project },
   run: async (client, args) =>
