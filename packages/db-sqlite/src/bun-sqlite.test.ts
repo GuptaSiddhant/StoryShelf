@@ -17,6 +17,30 @@ async function initDb(db: DatabaseAdapter): Promise<void> {
 }
 
 describe.skipIf(!HAS_BUN)("createBunSqliteDatabase (bun runtime)", () => {
+  it("commits many overlapping transactions, one at a time", async () => {
+    const { createBunSqliteDatabase } = await import("./bun-sqlite.ts");
+    const db = createBunSqliteDatabase({ path: ":memory:" });
+    await initDb(db);
+    const now = new Date().toISOString();
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 25 }, async (_unused, index) =>
+        db.transact?.(async (tx) => {
+          await tx.insert(schema.projects, {
+            id: `p${String(index)}`,
+            name: "Tx",
+            slug: `tx-${String(index)}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }),
+      ),
+    );
+
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+    expect(await db.count(schema.projects)).toBe(25);
+  });
+
   it("throws without path or client", async () => {
     const { createBunSqliteDatabase } = await import("./bun-sqlite.ts");
     expect(() => createBunSqliteDatabase({})).toThrow("provide `path`");
