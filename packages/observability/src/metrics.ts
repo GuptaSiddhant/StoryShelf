@@ -19,7 +19,7 @@ export interface CaptureInstruments {
   jobsCompleted: Counter;
   /** Failed jobs (`capture.job.status = failed`). */
   jobsFailed: Counter;
-  /** Snapshots a shard captured again after an earlier delivery had stored them. */
+  /** Snapshots an earlier delivery of a rerun shard had stored, removed before it renders again. */
   shardRepeatedSnapshots: Counter;
 }
 
