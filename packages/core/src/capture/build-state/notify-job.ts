@@ -5,6 +5,7 @@
  * at most one non-terminal job per pair (`activeKey`), so a queued job covers a newer request and a
  * request during a delivery earns one more pass.
  */
+import type { Logger } from "../../logger.ts";
 import { NotificationChannelModel } from "../../models/notification-channel.ts";
 import { sanitizeErrorText } from "../../utils/redact.ts";
 import { isFinalAttempt } from "../consumer/retry.ts";
@@ -51,27 +52,81 @@ function channelIdOf(job: Pick<ConsumerJob, "data">): string {
  * attempt records the error on the channel and raises `onFailed`.
  */
 export function createNotifyHandler(options: NotifyHandlerOptions): KindHandler {
-  const { deps } = options;
+  // Jobs told to stop (a cancel or a lost lease). A request already on the wire finishes (the HTTP
+  // helper bounds it); what stops is everything after it: no outcome recorded, no failure surfaced.
+  const stopped = new Set<string>();
   return {
     accepts: (job) => job.buildId.length > 0 && channelIdOf(job).length > 0,
     backoff: NOTIFY_BACKOFF,
     run: async (job, context) => {
-      const channelId = channelIdOf(job);
+      stopped.delete(keyOf(job));
       try {
-        const result = await deliverBuildState(deps, { buildId: job.buildId, channelId });
-        if (result === "delivered") {
-          await channelModel(deps).recordOutcome(channelId);
-        } else {
-          context.logger.info({ result }, "nothing to deliver");
-        }
-      } catch (error) {
-        if (isFinalAttempt(job)) {
-          await surfaceFailure(options, { channelId, buildId: job.buildId, error });
-        }
-        throw error;
+        await deliverOnce(options, job, { logger: context.logger, cancelled: stopped });
+      } finally {
+        stopped.delete(keyOf(job));
       }
     },
+    // oxlint-disable-next-line eslint/require-await -- the interface is async; marking is synchronous
+    cancel: async (job) => {
+      stopped.add(keyOf(job));
+    },
   };
+}
+
+/** The key a job is tracked under while it runs: its row, else its channel and build. */
+function keyOf(job: ConsumerJob): string {
+  return job.jobId ?? `${job.buildId}:${channelIdOf(job)}`;
+}
+
+/** One delivery attempt; a cancel (checked after the request) suppresses its outcome and failure. */
+async function deliverOnce(
+  options: NotifyHandlerOptions,
+  job: ConsumerJob,
+  run: { logger: Logger; cancelled: ReadonlySet<string> },
+): Promise<void> {
+  const channelId = channelIdOf(job);
+  try {
+    const result = await deliverBuildState(options.deps, { buildId: job.buildId, channelId });
+    if (run.cancelled.has(keyOf(job))) {
+      run.logger.info("notify job was cancelled; outcome not recorded");
+      return;
+    }
+    await recordResult(options, { channelId, result, logger: run.logger });
+  } catch (error) {
+    await failDelivery(options, job, { run, error });
+  }
+}
+
+/** A failed attempt: silent after a cancel, surfaced on the last attempt, else retried. */
+async function failDelivery(
+  options: NotifyHandlerOptions,
+  job: ConsumerJob,
+  what: { run: { logger: Logger; cancelled: ReadonlySet<string> }; error: unknown },
+): Promise<void> {
+  if (what.run.cancelled.has(keyOf(job))) {
+    what.run.logger.info("notify job was cancelled; its failure is not surfaced");
+    return;
+  }
+  if (isFinalAttempt(job)) {
+    await surfaceFailure(options, {
+      channelId: channelIdOf(job),
+      buildId: job.buildId,
+      error: what.error,
+    });
+  }
+  throw what.error;
+}
+
+/** A delivered state clears the channel's error; anything else is only logged. */
+async function recordResult(
+  options: NotifyHandlerOptions,
+  what: { channelId: string; result: string; logger: Logger },
+): Promise<void> {
+  if (what.result === "delivered") {
+    await channelModel(options.deps).recordOutcome(what.channelId);
+  } else {
+    what.logger.info({ result: what.result }, "nothing to deliver");
+  }
 }
 
 /**

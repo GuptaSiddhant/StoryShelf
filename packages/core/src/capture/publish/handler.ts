@@ -18,6 +18,11 @@ export interface PublishHandlerOptions {
   logger: Logger;
 }
 
+/** The key a running job is tracked under: its row, else its build. */
+function keyOf(job: ConsumerJob): string {
+  return job.jobId ?? job.buildId;
+}
+
 /** A `publish` job needs the build to publish. */
 function hasBuild(job: ConsumerJob): boolean {
   return typeof job.buildId === "string" && job.buildId.length > 0;
@@ -30,15 +35,28 @@ function hasBuild(job: ConsumerJob): boolean {
  * (same keys) and leaves an already accepted build alone.
  */
 export function createPublishHandler(options: PublishHandlerOptions): KindHandler {
+  // One abort controller per running job: `cancel` (a cancel or a lost lease) stops its extraction.
+  const running = new Map<string, AbortController>();
   return {
     accepts: hasBuild,
     run: async (job, context) => {
-      const build = await new BuildModel(options.db).get(job.buildId);
-      if (!build) {
-        context.logger.warn("build is gone; dropping publish job");
-        return;
+      // Registered first: a cancel that arrives while the build is being read still stops the run.
+      const controller = new AbortController();
+      running.set(keyOf(job), controller);
+      try {
+        const build = await new BuildModel(options.db).get(job.buildId);
+        if (!build) {
+          context.logger.warn("build is gone; dropping publish job");
+          return;
+        }
+        await publishOnce(options, job, { ...context, signal: controller.signal }, build.projectId);
+      } finally {
+        running.delete(keyOf(job));
       }
-      await publishOnce(options, job, context, build.projectId);
+    },
+    // oxlint-disable-next-line eslint/require-await -- the interface is async; aborting is synchronous
+    cancel: async (job) => {
+      running.get(keyOf(job))?.abort(new Error("publish cancelled"));
     },
   };
 }
@@ -46,26 +64,49 @@ export function createPublishHandler(options: PublishHandlerOptions): KindHandle
 async function publishOnce(
   options: PublishHandlerOptions,
   job: ConsumerJob,
-  context: { logger: Logger; touch: () => void },
+  context: { logger: Logger; touch: () => void; signal: AbortSignal },
   projectId: string,
 ): Promise<void> {
   const { completer, storage, scratchDir, limits, db } = options;
   try {
     await publishStoredZip(
-      { storage, scratchDir, limits, db, logger: context.logger, touch: context.touch },
+      {
+        storage,
+        scratchDir,
+        limits,
+        db,
+        logger: context.logger,
+        touch: context.touch,
+        signal: context.signal,
+      },
       { projectId, buildId: job.buildId },
     );
   } catch (error) {
-    const permanent = error instanceof ZipLimitError;
-    if (permanent || (job.attempt ?? 1) >= (job.maxAttempts ?? 1)) {
-      await completer.complete(job.buildId, { ok: false, error: messageOf(error) });
-    }
-    if (permanent) {
+    if (context.signal.aborted) {
+      // Cancelled (or the lease was lost): the consumer settles the job, and the build is not
+      // completed or failed by a run that was told to stop.
+      context.logger.info("publish stopped by a cancel");
       return;
     }
-    throw error;
+    await settleFailure(options.completer, job, error);
+    return;
   }
   await completer.complete(job.buildId, { ok: true });
+}
+
+/** A permanent failure (a cap) or the last attempt fails the build; anything else is retried. */
+async function settleFailure(
+  completer: PublishCompleter,
+  job: ConsumerJob,
+  error: unknown,
+): Promise<void> {
+  const permanent = error instanceof ZipLimitError;
+  if (permanent || (job.attempt ?? 1) >= (job.maxAttempts ?? 1)) {
+    await completer.complete(job.buildId, { ok: false, error: messageOf(error) });
+  }
+  if (!permanent) {
+    throw error;
+  }
 }
 
 function messageOf(error: unknown): string {

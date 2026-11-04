@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BuildModel } from "../../models/build.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
@@ -116,6 +117,39 @@ describe("createPublishHandler", () => {
     expect(await statusOf()).toBe("pending");
     await expect(run({ attempt: 3, maxAttempts: 3 })).rejects.toThrow();
     expect(await statusOf()).toBe("failed");
+  });
+
+  it("stops extracting when the job is cancelled: no manifest, the build is neither completed nor failed", async () => {
+    const { handler, storage, project, build, statusOf, log } = await setup();
+    // The zip stream never ends, like a read stuck on the network.
+    const stuck = new PassThrough();
+    let opened!: () => void;
+    const openedPromise = new Promise<void>((resolve) => {
+      opened = resolve;
+    });
+    storage.readStream = async () => {
+      opened();
+      return await Promise.resolve(stuck);
+    };
+    const job = { buildId: build.id, jobId: "j1", attempt: 1, maxAttempts: 3 } as ConsumerJob;
+    const running = handler.run(job, { logger: log.logger, touch: () => {} });
+    await openedPromise;
+    await handler.cancel?.(job);
+    await expect(running).resolves.toBeUndefined();
+    expect(stuck.destroyed).toBe(true);
+    expect(await storage.exists(`${storybookDir(project.id, build.id)}/manifest.json`)).toBe(false);
+    expect(await statusOf()).toBe("pending");
+    const left = await readdir(join(scratchDir, SCRATCH_DIRNAME, project.id, build.id)).catch(
+      () => null,
+    );
+    expect(left).toBeNull();
+  });
+
+  it("tolerates a cancel for a job that is not running", async () => {
+    const { handler, build } = await setup();
+    await expect(
+      handler.cancel?.({ buildId: build.id, jobId: "never" } as ConsumerJob),
+    ).resolves.toBeUndefined();
   });
 
   it("drops a job whose build is gone", async () => {

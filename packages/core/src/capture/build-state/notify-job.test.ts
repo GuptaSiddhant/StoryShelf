@@ -194,6 +194,41 @@ describe("the notify job", () => {
     await started;
   });
 
+  it("surfaces nothing for a delivery that fails after its job was cancelled", async () => {
+    const onFailed = vi.fn(async () => {});
+    const { w, handler } = await setup({ onFailed });
+    w.failure.message = "HTTP 401: Bad credentials";
+    const job = {
+      buildId: w.build.id,
+      jobId: "n1",
+      attempt: NOTIFY_MAX_ATTEMPTS,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    const context = { logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }, touch: () => {} };
+    const running = handler.run(job, context as never);
+    await handler.cancel?.(job);
+    await expect(running).resolves.toBeUndefined();
+    expect(onFailed).not.toHaveBeenCalled();
+    expect(await lastError(w)).toBeFalsy();
+  });
+
+  it("still surfaces the failure of a last attempt that was not cancelled", async () => {
+    const onFailed = vi.fn(async () => {});
+    const { w, handler } = await setup({ onFailed });
+    w.failure.message = "HTTP 401: Bad credentials";
+    const job = {
+      buildId: w.build.id,
+      jobId: "n2",
+      attempt: NOTIFY_MAX_ATTEMPTS,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    const context = { logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }, touch: () => {} };
+    await expect(handler.run(job, context as never)).rejects.toThrow("Bad credentials");
+    expect(onFailed).toHaveBeenCalledTimes(1);
+  });
+
   it("acks a job whose build or channel is gone", async () => {
     const { w, r, enqueue, notifyJobs } = await setup();
     await w.channels.remove(w.channelId);
