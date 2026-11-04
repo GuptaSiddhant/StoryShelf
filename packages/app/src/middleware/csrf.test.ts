@@ -46,7 +46,12 @@ describe("csrf", () => {
 
   it("binds the token to the __Secure- session cookie used over https", async () => {
     const secure = "__Secure-storyshelf_session";
-    const token = getCsrfToken("test-secret", "session-a");
+    // The token comes from a safe-method response for that cookie, so generation is covered too.
+    const page = await app("test-secret").request("/protected/page", {
+      headers: { cookie: `${secure}=session-a` },
+    });
+    const token = page.headers.get("x-csrf-token") ?? "";
+    expect(token).toBe(getCsrfToken("test-secret", "session-a"));
     expect(await send(`${secure}=session-a`, token)).toBe(200);
     // Another session's token is refused, and so is the anonymous one.
     expect(await send(`${secure}=session-b`, token)).toBe(403);
