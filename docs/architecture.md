@@ -306,7 +306,11 @@ user_invite_tokens (
   created_at          text NOT NULL
 );
 
--- Project-scoped authorization: a user's role on a specific project
+-- Project-scoped authorization: a user's role on a specific project. With sign-in on, a caller with no
+-- role at all, signed in or anonymous, gets 404 `Project not found` on every project-scoped route
+-- (`assertRole`, the `requireProjectVisible` page gate, `hiddenFrom` on the Storybook routes and the
+-- `/_/:id` short links), identical to an unknown slug; public builds stay readable and a signed `/_s/`
+-- URL keeps its read-only grant. 403 means a role that is too low.
 project_members (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -978,9 +982,9 @@ POST   /api/v1/admin/purge                          # manual retention purge
 
 # Auth (Better Auth engine, mounted at /api/auth/*; see https://www.better-auth.com/docs/integrations/hono)
 ALL    /api/auth/*                     # Better Auth handler (email+password, social, SSO, passkey, sessions)
-GET    /auth/login                     # descriptor-driven method list, or redirect for sole oauth/sso
-GET    /auth/engine/:providerId        # start one oauth/sso flow
-POST   /auth/engine/login              # local account login (email + password → engine)
+GET    /auth/login                     # descriptor-driven method list, or redirect for sole oauth/sso (?return_to=<same-site path>)
+GET    /auth/engine/:providerId        # start one oauth/sso flow (?return_to= is the callback path)
+POST   /auth/engine/login              # local account login (email + password → engine; `return_to` field)
 GET    /auth/invites/:inviteId         # set-password form for an invite link (?token=…)
 POST   /auth/invites/:inviteId         # accept invite, set credential, land on /profile
 POST   /auth/logout                    # destroy session (plus engine sign-out)

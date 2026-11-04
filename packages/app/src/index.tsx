@@ -26,8 +26,10 @@ import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import {
   authGate,
+  notFoundPage,
   csrf,
   createRateLimiter,
+  requireProjectVisible,
   requireReview,
   requireTesting,
   rateLimitKey,
@@ -192,8 +194,26 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("*", requireTesting(wiring.options.testing !== undefined));
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
+  mountAccessGates(app);
+}
+
+/**
+ * What the request is allowed to see, inside the request store: the not-found page (it needs to
+ * know who is asking) wraps the sign-in gate and the project gates, whose 404s it dresses.
+ */
+function mountAccessGates(app: ShelfRouter): void {
+  app.use("*", notFoundPage());
   app.use("*", authGate());
-  // Routes classified `review` answer 404 for a project with review off (ADR 0013, decision 10).
+  mountProjectGates(app);
+}
+
+/**
+ * Gates on what a project's routes tell a caller: pages answer 404 to a caller with no role on the
+ * project, as for an unknown slug (#497); routes classified `review` answer 404 for a project with
+ * review off (ADR 0013, decision 10).
+ */
+function mountProjectGates(app: ShelfRouter): void {
+  app.use("*", requireProjectVisible());
   app.use("*", requireReview());
 }
 

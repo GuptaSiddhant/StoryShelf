@@ -210,7 +210,7 @@ describe.each(CHANNELS)("resolving and reopening through the %s", (channel) => {
     });
   });
 
-  it("refuses a viewer and a non-member with 403, and changes nothing", async () => {
+  it("refuses a viewer with 403 and a caller with no role with 404, and changes nothing", async () => {
     const booted = await boot();
     const id = await createBuild(booted);
     const item = await makeRequest(booted, id);
@@ -223,7 +223,9 @@ describe.each(CHANNELS)("resolving and reopening through the %s", (channel) => {
           user,
           `/builds/${id}/comments/${item.id}/${verb}`,
         );
-        expect(refused.status, `${user} ${verb}`).toBe(403);
+        // A viewer sees the project but lacks the role; a caller with no role gets the answer for a
+        // project that does not exist (#497).
+        expect(refused.status, `${user} ${verb}`).toBe(user === "outsider" ? 404 : 403);
       }
     }
     expect((await new CommentModel(booted.db).get(item.id))?.resolved).toBe(false);
