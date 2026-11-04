@@ -39,6 +39,16 @@ const stageRoot = css`
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+  /*
+   * Swipe and onion stack the panes in one cell, and the current pane is clipped (swipe) or faded
+   * (onion), which clips or fades its own outline away. The ring goes on the grid, which neither touches.
+   */
+  &[data-view="swipe"] .stage__grid:has(.stage__pane:focus-visible),
+  &[data-view="onion"] .stage__grid:has(.stage__pane:focus-visible) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
   .stage__label {
     position: sticky;
     top: 0;

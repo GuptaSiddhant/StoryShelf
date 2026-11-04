@@ -300,6 +300,8 @@ describe("CompareStage panes", () => {
     expect(html).toMatch(
       /<div class="stage__pane" data-pane="baseline" tabindex="0" role="group"/u,
     );
+    // Swipe clips and onion fades the current pane, and its outline with it: the ring is drawn on the grid.
+    expect(html).toMatch(/\[data-view="swipe"\] \.stage__grid:has\(\.stage__pane:focus-visible\)/u);
     // The diff pane has no image here: nothing to scroll, so no tab stop and no name.
     expect(html).toMatch(/<div class="stage__pane" data-pane="diff">/u);
     expect(html).not.toContain("Diff screenshot");
