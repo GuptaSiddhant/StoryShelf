@@ -1,5 +1,5 @@
 /**
- * Refuse an upgrade that cannot adopt a review table or column made outside StoryShelf, with an
+ * Refuse an upgrade that cannot adopt a review or accessibility table or column made outside StoryShelf, with an
  * error that names the table and column instead of a raw driver message.
  */
 import type { TableColumns, TableInfoReader } from "./table-info.ts";
@@ -7,22 +7,23 @@ import type { TableColumns, TableInfoReader } from "./table-info.ts";
 /** Columns the review code needs in `build_reviews`. */
 const BUILD_REVIEW_COLUMNS = ["id", "build_id", "user_id", "verdict", "body", "created_at"];
 
-/** Integer columns the upgrade adds; one that exists with another type was made by hand. */
+/** Integer columns the upgrade adds (`run_a11y` is the accessibility switch); one that exists with another type was made by hand. */
 const INTEGER_COLUMNS = [
   ["projects", "review_enabled"],
   ["projects", "review_approvals"],
   ["builds", "review_cycle"],
   ["builds", "review_requested_cycle"],
+  ["projects", "run_a11y"],
 ] as const;
 
 function conflict(what: string): Error {
   return new Error(
-    `Cannot upgrade the review schema: ${what}. It was not created by StoryShelf; rename or drop it (keep a backup) and start again.`,
+    `Cannot upgrade the schema: ${what}. It was not created by StoryShelf; rename or drop it (keep a backup) and start again.`,
   );
 }
 
 /** The tables the check looks at. */
-const REVIEW_TABLES = ["projects", "builds", "build_reviews"];
+const REVIEW_TABLES = ["projects", "builds", "build_reviews", "snapshots"];
 
 /** Throw when `build_reviews` or a review column already exists in a shape the upgrade cannot use. */
 export function assertReviewColumns(tables: ReadonlyMap<string, TableColumns>): void {
@@ -38,6 +39,15 @@ export function assertReviewColumns(tables: ReadonlyMap<string, TableColumns>): 
     if (type !== undefined && !type.startsWith("INT")) {
       throw conflict(`column ${table}.${column} has type ${type}, expected INTEGER`);
     }
+  }
+  assertFindingsColumn(tables);
+}
+
+/** `snapshots.a11y_violations` holds the stored axe findings as TEXT. */
+function assertFindingsColumn(tables: ReadonlyMap<string, TableColumns>): void {
+  const violations = tables.get("snapshots")?.get("a11y_violations");
+  if (violations !== undefined && violations !== "TEXT") {
+    throw conflict(`column snapshots.a11y_violations has type ${violations}, expected TEXT`);
   }
 }
 

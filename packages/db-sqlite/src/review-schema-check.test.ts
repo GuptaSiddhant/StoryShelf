@@ -14,9 +14,10 @@ function readerFor(...statements: string[]): TableInfoReader {
 }
 
 const SETTINGS = [
-  "CREATE TABLE projects (id TEXT, review_enabled INTEGER NOT NULL DEFAULT 1, review_approvals INTEGER NOT NULL DEFAULT 1)",
+  "CREATE TABLE projects (id TEXT, review_enabled INTEGER NOT NULL DEFAULT 1, review_approvals INTEGER NOT NULL DEFAULT 1, run_a11y INTEGER NOT NULL DEFAULT 1)",
   "CREATE TABLE builds (id TEXT, review_cycle INTEGER NOT NULL DEFAULT 0, review_requested_cycle INTEGER)",
 ];
+const SNAPSHOTS = "CREATE TABLE snapshots (id TEXT, a11y_violations TEXT)";
 const REVIEWS =
   "CREATE TABLE build_reviews (id TEXT, build_id TEXT, user_id TEXT, verdict TEXT, body TEXT, created_at TEXT)";
 
@@ -31,7 +32,9 @@ describe("assertReviewSchema", () => {
   });
 
   it("passes on a complete, matching schema", async () => {
-    await expect(assertReviewSchema(readerFor(...SETTINGS, REVIEWS))).resolves.toBeUndefined();
+    await expect(
+      assertReviewSchema(readerFor(...SETTINGS, SNAPSHOTS, REVIEWS)),
+    ).resolves.toBeUndefined();
   });
 
   it("names the table and the missing column of a build_reviews table without a required one", async () => {
@@ -82,13 +85,27 @@ describe("assertReviewSchema", () => {
     );
   });
 
-  it("reads all three tables, whatever order the reader answers in", async () => {
+  it("names the accessibility switch when it has another type", async () => {
+    const read = readerFor("CREATE TABLE projects (id TEXT, run_a11y TEXT)");
+    await expect(assertReviewSchema(read)).rejects.toThrow(
+      "Cannot upgrade the schema: column projects.run_a11y has type TEXT, expected INTEGER",
+    );
+  });
+
+  it("names the stored findings column when it has another type", async () => {
+    const read = readerFor("CREATE TABLE snapshots (id TEXT, a11y_violations INTEGER)");
+    await expect(assertReviewSchema(read)).rejects.toThrow(
+      "column snapshots.a11y_violations has type INTEGER, expected TEXT",
+    );
+  });
+
+  it("reads all four tables, whatever order the reader answers in", async () => {
     const asked: string[] = [];
     const read: TableInfoReader = async (table) => {
       asked.push(table);
       return await Promise.resolve(new Map());
     };
     await assertReviewSchema(read);
-    expect(asked.toSorted()).toEqual(["build_reviews", "builds", "projects"]);
+    expect(asked.toSorted()).toEqual(["build_reviews", "builds", "projects", "snapshots"]);
   });
 });
