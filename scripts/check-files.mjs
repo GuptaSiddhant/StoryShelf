@@ -30,6 +30,9 @@ function trackedFiles() {
 /** Run one tool over `files`; true when it passed. */
 function run(tool, args, files) {
   const result = spawnSync(`node_modules/.bin/${tool}`, [...args, ...files], { stdio: "inherit" });
+  if (result.error) {
+    process.stderr.write(`error: could not run ${tool}: ${result.error.message}\n`);
+  }
   return result.status === 0;
 }
 
