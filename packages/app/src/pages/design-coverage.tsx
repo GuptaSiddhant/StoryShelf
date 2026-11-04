@@ -3,6 +3,7 @@ import type { DesignDrift } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
   Alert,
@@ -20,7 +21,6 @@ import {
   VStack,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
@@ -251,7 +251,7 @@ function UnlinkedSection(props: { data: DesignCoverageData }): Rendered {
         {unlinked.length === 0 ? (
           <EmptyState title="Every component has a design link" />
         ) : (
-          <Table>
+          <Table label="Components without a design link">
             <table>
               <thead>
                 <tr>
@@ -360,7 +360,7 @@ function DriftAlert(props: { data: DesignCoverageData }): Rendered {
 function DriftTable(props: { data: DesignCoverageData }): Rendered {
   const { data } = props;
   return (
-    <Table>
+    <Table label="Design drift">
       <table>
         <thead>
           <tr>

@@ -2,6 +2,7 @@ import { readOwnerRules } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Badge,
@@ -14,7 +15,6 @@ import {
   SelectField,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 import { ComponentOwnersCard, type OwnersFormState } from "./settings-component-owners.tsx";
 
 /** Project member row as rendered in the members settings tab. */
@@ -40,7 +40,7 @@ export function renderSettingsMembers(
       <Card>
         <SectionTitle>Members</SectionTitle>
         <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
-        <Table>
+        <Table label="Members">
           <table>
             <thead>
               <tr>
@@ -143,7 +143,7 @@ export function renderSettingsMembers(
             next login; removing a mapping revokes synced grants but never manual ones. Wildcards
             are not expanded.
           </Meta>
-          <Table>
+          <Table label="Identity-provider group mappings">
             <table>
               <thead>
                 <tr>

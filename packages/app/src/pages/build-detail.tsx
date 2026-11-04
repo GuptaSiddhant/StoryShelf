@@ -15,6 +15,7 @@ import {
   providerNameFor,
 } from "../routers/design.handlers.ts";
 import { loadReviewSection } from "../routers/review-section.handlers.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { catalogOf, getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
@@ -30,7 +31,6 @@ import {
   VStack,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import {
   snapshotCard,
   snapshotCardBody,

@@ -5,6 +5,7 @@ import type { Project } from "@storyshelf/core/schema";
 import { mentionSpans } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { mentionNamesOf } from "../mentions.ts";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Badge,
   Button,
@@ -15,7 +16,6 @@ import {
   SectionTitle,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 import {
   reviewComment,
   reviewCommentActions,

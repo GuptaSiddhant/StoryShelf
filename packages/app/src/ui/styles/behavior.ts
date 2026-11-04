@@ -23,10 +23,10 @@ function htmxCss(): string {
 
 function dataCss(): string {
   return `
-    .grid { display: grid; gap: 1rem; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
     .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    @media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: 1fr; } }`;
+    @media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: minmax(0, 1fr); } }`;
 }
 
 /** Truly global chrome rules (depend on ancestors outside any one subtree). */

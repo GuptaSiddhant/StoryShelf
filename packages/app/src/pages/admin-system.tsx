@@ -4,6 +4,8 @@ import type { CredentialProbe } from "@storyshelf/core/models";
 import type { CaptureHostSummary } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { HealthReport } from "../routers/health-report.ts";
+import { csrfField } from "../shell/csrf-field.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Alert,
   Badge,
@@ -17,8 +19,6 @@ import {
   Stat,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
@@ -136,7 +136,7 @@ function AdapterTable(props: AdapterTableProps): HtmlEscapedString | Promise<Htm
     return <EmptyState description="No adapters wired." />;
   }
   return (
-    <Table>
+    <Table label="Adapters">
       <table>
         <thead>
           <tr>

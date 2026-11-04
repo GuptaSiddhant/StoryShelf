@@ -43,7 +43,13 @@ export {
 } from "./capture-job.ts";
 export { CaptureShardModel, type CaptureShardTables } from "./capture-shard.ts";
 export { AiBudgetAlertModel, type AiBudgetAlertTables } from "./ai-budget-alert.ts";
-export { AiUsageModel, type AiUsageInput, type AiUsageTables } from "./ai-usage.ts";
+export {
+  AiUsageModel,
+  type AiCallWindow,
+  type AiUsageInput,
+  type AiUsageReservation,
+  type AiUsageTables,
+} from "./ai-usage.ts";
 export {
   InsightModel,
   type InsightResultInput,

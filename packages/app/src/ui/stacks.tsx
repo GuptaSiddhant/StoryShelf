@@ -55,6 +55,8 @@ function vstackClass(props: Required<Omit<VStackProps, "children">>): Promise<st
   return css`
     /* vstack */
     display: grid;
+    /* One column that cannot grow past the stack: an auto column is as wide as its widest child. */
+    grid-template-columns: minmax(0, 1fr);
     gap: ${vGaps[gap]};
     align-items: ${vAligns[align]};
   `;

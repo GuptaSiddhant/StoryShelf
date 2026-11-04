@@ -1035,7 +1035,8 @@ StoryShelf/
         routers/          # API + UI routes (incl. health, OpenAPI)
         routes/           # route classification table (hosting/testing/review/both) + completeness test
         pages/            # UI page components (server-rendered JSX)
-        ui/               # DocumentLayout, theme, components, styles
+        ui/               # presentational components, theme, styles (no app state)
+        shell/            # DocumentLayout, csrfField, sidebar/top bar, client scripts (app-coupled)
         middleware/       # request id/logging/gate/rate-limit/scope/auth
         store.ts          # AsyncLocalStorage request context
         assets/           # vendored HTMX (served locally, no CDN)
@@ -1171,13 +1172,13 @@ StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/c
 
 - **Layout:** a full-height icon **sidebar** (brand, project/developer/admin navigation; footer with the account, theme and collapse controls; collapses to a rail, drawer on phones) plus a slim neutral **top bar** (project picker and the page's ancestor breadcrumbs). The customer accent appears only in small places (brand mark, active nav, primary actions, derived tints). The content area is image-first.
 - **Pages** live in `app/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
-- **Layout & theming** live in `app/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
+- **Layout & theming:** the presentational components, styles and the `BrandTheme` of light/dark color tokens live in `app/src/ui/`; the `DocumentLayout` (head, vendored HTMX, styles) and the app chrome live in `app/src/shell/`, which may use app state.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
 - **Brand config** is passed as `ui: { name, logo, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code. The **favicon is not brandable**: the app always serves its own mark (`app/src/assets/mark.svg`, content-hashed under `/assets/`) so a StoryShelf tab is recognisable; `ui.favicon` is accepted for config compatibility but ignored. `ui.logo` defaults to the same mark.
 - **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the sidebar account menu links to the personal `/profile` page (editable display name, local password change, memberships).
 - **Public origin** (ADR 0007, decision 6): one resolver (`createPublicOriginResolver`, `core/src/models/public-origin.ts`) answers every absolute link built in the background (commit-status links, notification review links) and the OAuth callback URLs. It tries `config.publicBaseUrl` (`PUBLIC_BASE_URL`), then the platform's address from its environment (`detectPublicBaseUrl`, `core/src/utils/public-origin.ts`), then the origin a site admin confirmed (the System page posts `location.origin`; the first report is stored in `site_settings` as unconfirmed and is **not used** until an admin confirms it; confirm, replace or forget on the System page). The `Host` header is never used for background links; only authentication, through `PublicOriginResolver.authOrigin(requestOrigin)` (the `/.well-known/openid-configuration` helper and OAuth redirect URIs), falls back to the request's own address when nothing is confirmed. Without a resolved origin no notification is sent at all (ADR 0014, decision 11): git statuses and the pull-request comment are neither queued nor delivered, message notifications to chat, email and log channels are skipped, no channel is marked as errored, and the System page and notification settings say so. Webhooks (ids only) and auth mail are unaffected.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
-- **Review workspace:** a snapshot filmstrip with filters and progress, and a comparison stage with side-by-side, swipe, onion-skin, diff and flip modes plus zoom; a sticky action bar approves/rejects and auto-advances to the next open snapshot (keyboard: `j`/`k`, `a`/`r`, `1`–`5`, `f`, `t`, `?`). A small vanilla-JS layer (`app/src/ui/shell/*-script.ts`, idempotent across HTMX body swaps) covers the shell and review behaviour. The published-Storybook page is an `<iframe>` of Storybook's own static build.
+- **Review workspace:** a snapshot filmstrip with filters and progress, and a comparison stage with side-by-side, swipe, onion-skin, diff and flip modes plus zoom; a sticky action bar approves/rejects and auto-advances to the next open snapshot (keyboard: `j`/`k`, `a`/`r`, `1`–`5`, `f`, `t`, `?`). A small vanilla-JS layer (`app/src/shell/*-script.ts`, idempotent across HTMX body swaps) covers the shell and review behaviour. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
 ## Deployment
 

@@ -1,5 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Badge,
@@ -12,7 +13,6 @@ import {
   SelectField,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -78,7 +78,7 @@ export function renderSettingsLinks(
           publishes it. Review pages then show where a story uses it, with links to the upstream
           component.
         </Meta>
-        <Table>
+        <Table label="Linked packages">
           <table>
             <thead>
               <tr>

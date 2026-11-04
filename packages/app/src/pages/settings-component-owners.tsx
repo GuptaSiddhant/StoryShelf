@@ -2,6 +2,7 @@
 import { ownerRulesText, type OwnerProblem, type OwnerRule } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
@@ -13,7 +14,6 @@ import {
   Table,
   TextareaField,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 
 /** What the owners card shows beyond the saved rules: a refused submission, kept as typed. */
 export interface OwnersFormState {
@@ -30,7 +30,7 @@ const PLACEHOLDER = "src/components/forms/**  user_01H  user_02J";
 /** The saved rules as a read-only table (pattern and owners). */
 const RulesTable: FC<{ rules: readonly OwnerRule[] }> = (props) => {
   return (
-    <Table>
+    <Table label="Component owner rules">
       <table>
         <thead>
           <tr>

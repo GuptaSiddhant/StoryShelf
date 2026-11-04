@@ -26,6 +26,14 @@ describe("redactSecrets", () => {
     expect(redactSecrets("pat ghp_abcDEF123 leaked")).toBe("pat [redacted] leaked");
   });
 
+  it("redacts an Anthropic API key embedded in an error", () => {
+    const text = "401 from the provider for key sk-ant-api03-AbC_d-ef123SECRETSECRET (invalid)";
+    const redacted = redactSecrets(text);
+
+    expect(redacted).toBe("401 from the provider for key [redacted] (invalid)");
+    expect(redacted).not.toContain("SECRET");
+  });
+
   it("leaves clean text untouched", () => {
     expect(redactSecrets("db down")).toBe("db down");
   });

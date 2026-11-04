@@ -7,3 +7,12 @@ import { Buffer } from "./buffer.ts";
 if (Reflect.get(globalThis, "Buffer") === undefined) {
   Reflect.set(globalThis, "Buffer", Buffer);
 }
+
+/**
+ * `process.env` is read when a page asks core whether the host is serverless (the git channel form).
+ * The production build never reaches it, but the dev server does not tree-shake: an empty
+ * environment means "not serverless".
+ */
+if (Reflect.get(globalThis, "process") === undefined) {
+  Reflect.set(globalThis, "process", { env: {} });
+}

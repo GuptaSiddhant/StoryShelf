@@ -194,6 +194,37 @@ function overallStatus(reports: AdapterReportFull[]): HealthReport["status"] {
   return "ok";
 }
 
+/**
+ * Setup failures of adapters the report does not probe (AI, auth, images): each becomes its own
+ * failed entry, once, so a failed boot check is never reported as `ok`. A failure that belongs to a
+ * probed target is already on that target's entry and is skipped.
+ */
+function unprobedSetupFailures(
+  settled: AdapterSetupResult | null,
+  targets: readonly ProbeTarget[],
+): AdapterReportFull[] {
+  const probed = new Set(
+    targets.map((target) => `${target.metadata.category}/${target.metadata.kind}`),
+  );
+  const unprobed = (settled?.failures ?? []).filter(
+    (failure) => !probed.has(`${failure.category}/${failure.kind}`),
+  );
+  // One entry per adapter: two providers that share a category and kind (invalid configs without
+  // a kind) are told apart by name.
+  const byAdapter = new Map(
+    unprobed.map((failure) => [`${failure.category}/${failure.kind}/${failure.name}`, failure]),
+  );
+  return [...byAdapter.values()].map((failure) => ({
+    category: failure.category,
+    kind: failure.kind,
+    name: failure.name,
+    version: "-",
+    hasLifecycle: false,
+    state: "failed",
+    detail: sanitize(failure.error),
+  }));
+}
+
 /** Pseudo-adapter entry reporting whether stored credentials decrypt with the configured secret. */
 function credentialsEntry(probe: CredentialProbe): AdapterReportFull {
   const unreadable = probe.unreadable.length;
@@ -235,6 +266,7 @@ export async function collectHealthReport(
   const adapters = await Promise.all(
     targets.map(async (target) => await probeTarget(target, setupErrors, settled === null)),
   );
+  adapters.push(...unprobedSetupFailures(settled, targets));
   if (credentials) {
     adapters.push(credentialsEntry(credentials));
   }

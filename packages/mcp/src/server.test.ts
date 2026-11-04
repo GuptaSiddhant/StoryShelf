@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ToolError, createApiClient, type ApiClient } from "./client.ts";
+import { ToolError, type ApiClient } from "./client.ts";
 import { createStoryShelfMcpServer } from "./server.ts";
 
 function fakeClient(overrides: Partial<ApiClient> = {}): ApiClient {
@@ -135,27 +135,53 @@ describe("StoryShelf MCP server", () => {
     );
   });
 
-  it("tells the agent only that the build was not found when the project has review off", async () => {
-    // What the app sends for a `review` route of a project with review off, through the real client.
-    const fetchMock = vi
-      .fn()
-      .mockImplementation(async () =>
-        Response.json({ error: "Review is off for this project." }, { status: 404 }),
-      );
-    vi.stubGlobal("fetch", fetchMock);
-    const client = await connect(
-      createApiClient({ url: "https://s.example", token: "tok", slug: "web" }),
+  it("says review is off, not that the build was not found, when the project has review off", async () => {
+    const off = new ToolError(
+      "StoryShelf API: not found: check the project slug and build id",
+      404,
     );
+    const get = vi.fn().mockImplementation(async (path: string) => {
+      if (path === "/projects/web") {
+        return await Promise.resolve({ slug: "web", reviewEnabled: false });
+      }
+      throw off;
+    });
+    const post = vi.fn().mockRejectedValue(off);
+    const client = await connect(fakeClient({ get, post }));
     const calls = [
       { name: "list_comments", arguments: { buildId: "b1" } },
       { name: "add_comment", arguments: { buildId: "b1", body: "x" } },
+      { name: "resolve_comment", arguments: { buildId: "b1", commentId: "c1" } },
     ];
-    const results = await Promise.all(calls.map(async (call) => await client.callTool(call)));
-    for (const result of results) {
+    for (const result of await Promise.all(
+      calls.map(async (call) => await client.callTool(call)),
+    )) {
       expect(result.isError).toBe(true);
-      expect(text(result)).toBe("StoryShelf API: not found: check the project slug and build id");
+      expect(text(result)).toContain("review is off for this project");
     }
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("still says not found for a wrong build id when review is on, and for non-review tools", async () => {
+    const off = new ToolError(
+      "StoryShelf API: not found: check the project slug and build id",
+      404,
+    );
+    const get = vi.fn().mockImplementation(async (path: string) => {
+      if (path === "/projects/web") {
+        return await Promise.resolve({ slug: "web", reviewEnabled: true });
+      }
+      throw off;
+    });
+    const client = await connect(fakeClient({ get }));
+    const comments = await client.callTool({
+      name: "list_comments",
+      arguments: { buildId: "nope" },
+    });
+    expect(text(comments)).toContain("not found");
+    const build = await client.callTool({ name: "get_build", arguments: { buildId: "nope" } });
+    expect(text(build)).toContain("not found");
+    // get_build is not a review tool, so the project was not even asked about it.
+    expect(get.mock.calls.filter(([path]) => path === "/projects/web")).toHaveLength(1);
   });
 
   it("returns ToolError text as an error result", async () => {

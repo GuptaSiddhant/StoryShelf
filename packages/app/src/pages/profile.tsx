@@ -1,6 +1,8 @@
 import type { AuthUser } from "@storyshelf/core/types";
 import { safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
+import { csrfField } from "../shell/csrf-field.tsx";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Alert,
   Badge,
@@ -12,9 +14,7 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 import { css } from "../ui/css.ts";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { passkeyRegisterScript } from "./passkey-ceremony.ts";
 
@@ -98,7 +98,7 @@ type PasskeyState = SecurityState["passkeys"][number];
 /** Registered passkey rows with per-key remove actions. */
 const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
   return (
-    <Table dense>
+    <Table dense label="Passkeys">
       <table>
         <thead>
           <tr>
@@ -178,7 +178,7 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
   return (
     <Card>
       <PageHeader title="Devices" description="Where you are signed in" />
-      <Table dense>
+      <Table dense label="Devices">
         <table>
           <thead>
             <tr>
@@ -334,7 +334,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
         ) : (
-          <Table dense>
+          <Table dense label="Project memberships">
             <table>
               <thead>
                 <tr>
@@ -373,7 +373,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
         ) : (
-          <Table dense>
+          <Table dense label="Notification subscriptions">
             <table>
               <thead>
                 <tr>

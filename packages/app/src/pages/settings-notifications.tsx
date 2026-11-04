@@ -1,6 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import { NOTIFICATION_EVENTS } from "@storyshelf/core/utils";
 import type { FC } from "hono/jsx";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Badge,
@@ -16,7 +17,6 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
 
@@ -248,7 +248,7 @@ const ChannelsCard: FC<{
       only in memory at delivery time. Git channels follow the build state, not a topic list, and
       their delivery is best-effort: a failure shows here, and the next build state retries it.
     </Meta>
-    <Table>
+    <Table label="Channels">
       <table>
         <thead>
           <tr>

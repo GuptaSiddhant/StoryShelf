@@ -7,7 +7,10 @@ const HEALTH = { verdict: "healthy", summary: "h", score: 90, trends: [], confid
 /** Options for {@link fakeAi}. */
 export interface FakeOptions {
   dailyTokens?: number;
+  callsPerHour?: number;
   fail?: AiError;
+  /** Holds every provider call until it settles (to observe the run while it is in flight). */
+  gate?: Promise<unknown>;
 }
 
 export function fakeAi(options: FakeOptions = {}): Ai & { calls: AiSummarizeInput<unknown>[] } {
@@ -16,7 +19,7 @@ export function fakeAi(options: FakeOptions = {}): Ai & { calls: AiSummarizeInpu
     calls,
     summarize: async (input: AiSummarizeInput<unknown>) => {
       calls.push(input);
-      await Promise.resolve();
+      await (options.gate ?? Promise.resolve());
       if (options.fail) {
         throw options.fail;
       }
@@ -37,7 +40,7 @@ export function fakeAi(options: FakeOptions = {}): Ai & { calls: AiSummarizeInpu
     modelId: (profile) => `fake:${profile ?? "default"}`,
     budget: () => ({
       visionWeight: 5,
-      perProjectCallsPerHour: 50,
+      perProjectCallsPerHour: options.callsPerHour ?? 50,
       ...(options.dailyTokens === undefined ? {} : { dailyTokens: options.dailyTokens }),
     }),
     limits: () => ({}),

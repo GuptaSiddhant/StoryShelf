@@ -51,3 +51,38 @@ export const DesignDeleted = pageStory(() =>
     reviewData({ design: [{ ...figma, state: "deleted", renderUrl: null, name: null }] }),
   ),
 );
+
+/* The review stage in each comparison mode and zoom, as fixed states that can be captured. */
+
+/** Swipe between the baseline and the current screenshot. */
+export const ChangedSwipe = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { view: "swipe" },
+});
+
+/** Onion skin: the current screenshot over the baseline. */
+export const ChangedOnionSkin = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { view: "onion" },
+});
+
+/** Diff only: the changed pixels. */
+export const ChangedDiffOnly = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { view: "diff" },
+});
+
+/** Flip between the current screenshot and the baseline. */
+export const ChangedFlip = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { view: "flip" },
+});
+
+/** Zoomed to 200%: the images scroll inside their panes. */
+export const ChangedZoom200 = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { zoom: "200" },
+});
+
+/**
+ * The comparison controls work here: the shell's own client script runs in the page frame for
+ * this story only. Try the modes, the zoom levels, the sliders and the flip.
+ */
+export const Interactive = pageStory(() => renderBuildDiffPage(reviewData()), {
+  interactive: true,
+});

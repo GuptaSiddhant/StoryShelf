@@ -25,13 +25,20 @@ const codeWrap = css`
     line-height: var(--leading-normal);
     white-space: pre;
   }
+  & pre:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 `;
 
-/** Monospace command/snippet with a copy button (wired by the shell script). */
+/**
+ * Monospace command/snippet with a copy button (wired by the shell script). The snippet scrolls
+ * sideways when it is wider than its box, so it takes keyboard focus (`tabindex`) and a keyboard can scroll it.
+ */
 export const CodeBlock: FC<{ code: string; label?: string }> = ({ code, label = "Copy" }) => {
   return (
     <div class={codeWrap}>
-      <pre>
+      <pre tabindex={0}>
         <code>{code}</code>
       </pre>
       <Button variant="ghost" size="sm" icon="copy" data-copy={code} aria-label={label}>
