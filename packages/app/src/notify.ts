@@ -175,13 +175,17 @@ async function defaultTargets(
   projectId: string,
   rows: NotificationSubscriptionRow[],
   wired: ReadonlySet<string>,
+  skipUsers: ReadonlySet<string>,
 ): Promise<NotificationChannel[]> {
   if (!wired.has("email")) {
     return [];
   }
   const subscribed = new Set(rows.map((row) => row.userId));
   const members = (await new MemberModel(db).list(projectId)).filter(
-    (member) => REVIEWER_ROLES.has(member.role) && !subscribed.has(member.userId),
+    (member) =>
+      REVIEWER_ROLES.has(member.role) &&
+      !subscribed.has(member.userId) &&
+      !skipUsers.has(member.userId),
   );
   const targets = await Promise.all(
     members.map(async (member) => await emailTarget(db, projectId, member.userId)),
@@ -219,21 +223,23 @@ async function subscriberTargets(
   wired: ReadonlySet<string>,
   skipUsers: ReadonlySet<string>,
 ): Promise<NotificationChannel[]> {
-  const rows = (await new NotificationSubscriptionModel(db).list(projectId)).filter(
-    (row) => !skipUsers.has(row.userId),
-  );
+  const all = await new NotificationSubscriptionModel(db).list(projectId);
+  const rows = all.filter((row) => !skipUsers.has(row.userId));
   const nested = await Promise.all(
     matchingSubs(rows, event, data).map(async (sub) => await targetsForSub(db, sub, wired)),
   );
   const defaults = DEFAULT_ON_EVENTS.has(event)
-    ? await defaultTargets(db, projectId, rows, wired)
+    ? await defaultTargets(db, projectId, all, wired, skipUsers)
     : [];
   return [...nested.flat(), ...defaults];
 }
 
 /** Narrowing options of a project fan-out. */
 export interface NotifyOptions {
-  /** Users who already get this event another way (a mention): their subscriptions skip it. */
+  /**
+   * Users who already get this event another way (a mention, or an assignment from the component
+   * owners): their subscriptions and the default recipients skip it.
+   */
   skipUsers?: ReadonlySet<string>;
 }
 
@@ -312,6 +318,53 @@ async function mentionTargets(
     return own.enabled ? await targetsForSub(db, own, wired) : [];
   }
   return wired.has("email") ? await emailTarget(db, projectId, userId) : [];
+}
+
+/**
+ * Where a review request is delivered to a member assigned as a component owner (#465): their own
+ * subscription's channels when it is enabled, else a default email. Being assigned overrides an
+ * opt-out (a disabled subscription, or a topic list without `review:requested`), because someone
+ * asked for this person by name. Never a stored project channel: the request is for one person.
+ */
+async function assignedTargets(
+  db: DatabaseAdapter,
+  projectId: string,
+  userId: string,
+  wired: ReadonlySet<string>,
+): Promise<NotificationChannel[]> {
+  const own = (await new NotificationSubscriptionModel(db).list(projectId)).find(
+    (row) => row.userId === userId,
+  );
+  const chosen = own?.enabled ? await targetsForSub(db, own, wired) : [];
+  if (chosen.length > 0) {
+    return chosen;
+  }
+  return wired.has("email") ? await emailTarget(db, projectId, userId) : [];
+}
+
+/**
+ * Send a review request to one member assigned from the component owners. The regular fan-out
+ * skips them (see `NotifyOptions.skipUsers`), so they get exactly one message per cycle.
+ */
+export async function notifyAssignedWith(
+  deps: NotifyDeps,
+  project: Pick<Project, "id" | "slug">,
+  userId: string,
+  data: Record<string, unknown>,
+  reviewSuffix: string,
+): Promise<void> {
+  if (deps.notifiers.length === 0) {
+    return;
+  }
+  const event = "review:requested";
+  const origin = await originOrPause(deps, event);
+  if (origin === undefined) {
+    return;
+  }
+  const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
+  const targets = await assignedTargets(deps.db, project.id, userId, wired);
+  const reviewUrl = reviewUrlFor(origin, project.slug, reviewSuffix);
+  await deliver(deps, project, { event, data, reviewUrl }, targets);
 }
 
 /** Notify one project member that a comment mentions them. Best-effort, like every fan-out. */

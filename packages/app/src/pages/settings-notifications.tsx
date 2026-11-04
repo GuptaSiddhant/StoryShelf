@@ -108,6 +108,11 @@ const MyNotificationsCard: FC<{
         <p>
           <Meta as="span">No boxes ticked means all topics.</Meta>
         </p>
+        {project.reviewEnabled === false ? null : (
+          <p>
+            <Meta as="span">Reviews assigned to you as a component owner are always sent.</Meta>
+          </p>
+        )}
         <FormActions>
           <Button variant="primary" type="submit" icon="check">
             Save my preferences

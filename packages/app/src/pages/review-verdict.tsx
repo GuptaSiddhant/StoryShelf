@@ -35,6 +35,7 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
         </HStack>
       </HStack>
       <Meta>{summary(data)}</Meta>
+      <AssignedReviewers data={data} />
       <VStack>
         {data.state.latest.map((review): Rendered => (
           <HStack key={review.id} align="baseline" wrap={false}>
@@ -54,6 +55,50 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
       <VerdictControls data={data} />
     </Card>
   );
+}
+
+/**
+ * The members the component owners assigned to this build, each with where they stand. Display
+ * only: any approver may still approve, and the counts and rules do not read this. Nothing renders
+ * when no owner matched, since the default behaviour needs no explanation.
+ */
+function AssignedReviewers(props: { data: ReviewSectionData }): Rendered | null {
+  const { data } = props;
+  if (data.assigned.length === 0) {
+    return null;
+  }
+  return (
+    <VStack>
+      <strong>Assigned reviewers</strong>
+      <ul>
+        {data.assigned.map((reviewer): Rendered => {
+          const verdict = data.state.latest.find((review) => review.userId === reviewer.userId);
+          return (
+            <li key={reviewer.userId}>
+              <HStack align="baseline" wrap={false}>
+                <strong>{data.names.get(reviewer.userId) ?? reviewer.userId}</strong>
+                <Badge tone={verdictTone(verdict?.verdict)}>{verdictWord(verdict?.verdict)}</Badge>
+                <Meta as="span">{reviewer.components.join(", ")}</Meta>
+              </HStack>
+            </li>
+          );
+        })}
+      </ul>
+      <Meta>Assigned from component owners. Anyone who can approve may still approve.</Meta>
+    </VStack>
+  );
+}
+
+/** The word for an assigned reviewer's standing (never colour alone). */
+function verdictWord(verdict: string | undefined): string {
+  if (verdict === "approved") return "Approved";
+  return verdict === "rejected" ? "Rejected" : "Waiting";
+}
+
+/** The badge tone of an assigned reviewer's standing. */
+function verdictTone(verdict: string | undefined): "success" | "danger" | "neutral" {
+  if (verdict === "approved") return "success";
+  return verdict === "rejected" ? "danger" : "neutral";
 }
 
 /**

@@ -48,6 +48,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   { table: "projects", column: "review_approvals", definition: "INT NOT NULL DEFAULT 1" },
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
+  { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
