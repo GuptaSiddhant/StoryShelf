@@ -139,6 +139,10 @@ function testLifecycle(db: DatabaseAdapter, beforeWrite?: LifecycleHook): BuildR
       return { result: await run(write), generation: generation + 1 };
     },
     claimDeletion: async () => "missing",
+    listDeleting: async () => [],
+    releaseBuildContent: async () => "not-deleting",
+    markStorageDeleted: async () => "not-deleting",
+    completeDeletion: async () => "not-deleting",
   };
 }
 

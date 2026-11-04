@@ -7,9 +7,9 @@ deployments with `testing`; hosting-only retention is unchanged.
 
 Merged: source-build provenance (#345), frozen comparison references and fail-closed testing purge
 (#354), SQLite lifecycle primitives (#382), fenced baseline writers (#389), preparation of legacy
-references (#397) and sealing of the capability to fenced mutations (#372). Open: resumable deletion
-and SQLite activation (#374), Postgres and MySQL capability (#375, #376) and investigations
-(#377 to #381).
+references (#397), sealing of the capability to fenced mutations (#372) and resumable deletion with
+exactly-once content release (#374). Open: SQLite activation (#536), Postgres and MySQL capability
+(#375, #376) and investigations (#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -50,6 +50,15 @@ by preset, so it cannot by itself carry this guarantee.
   lease may expire; the tombstone does not. Build ids and storage prefixes are never reused.
 - Shared asset reference decrements are durable and exactly-once; an unrecorded decrement is never
   retried blindly. Content GC accounts for live manifests (ADR 0003).
+- **The deletion driver** (`packages/core/src/retention/build-deletion.ts`) finishes a claimed build
+  in three recorded steps: release its shared content, delete its storage objects (outside any
+  transaction), remove its rows (one transaction). The capability records each step
+  (`build_deletions`) and the release of each content hash once per build
+  (`build_content_releases`, unique on build and hash) in the same transaction as the `content_refs`
+  decrement, so a retry skips what is recorded. Steps must run in order; a second cleaner finds the
+  work done. Purge uses the driver only when the capability is present. Content GC removes a blob
+  only at count 0 after the grace period **and** when no live build's manifest names it, so a wrong
+  count can leak storage but never delete served content.
 
 ### 3. Lifecycle is an explicit database capability
 
@@ -73,7 +82,7 @@ by preset, so it cannot by itself carry this guarantee.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
-  reference-sensitive path. Presets are enabled one at a time: SQLite first (#374), then Postgres
+  reference-sensitive path. Presets are enabled one at a time: SQLite first (#536), then Postgres
   (#375) and MySQL (#376).
 
 ### 4. Provenance is immutable and never guessed
@@ -100,7 +109,7 @@ All writers use the fenced capability when it is present:
 | `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                      |
 | `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                      |
 | `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                     |
-| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; not invoked as production activation until #374 |
+| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; not invoked as production activation until #536 |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check
 followed by an independent write is forbidden.
@@ -137,7 +146,7 @@ belongs to another project stops the whole run with `BaselineSourceIntegrityErro
 
 **Negative**
 
-- Until #374 activates SQLite, deployments with `testing` do not purge builds or garbage-collect
+- Until #536 activates SQLite, deployments with `testing` do not purge builds or garbage-collect
   branches automatically; storage grows and operators must be told.
 - Postgres and MySQL need their own capability implementation and multi-connection tests before
   they regain automatic retention.
@@ -158,5 +167,5 @@ belongs to another project stops the whole run with `BaselineSourceIntegrityErro
 
 - Representative preparation time on large SQLite deployments; batching is designed only if a
   measured startup budget is exceeded (#397).
-- Whether the SQLite-first activation (#374) ships before or with Postgres support for multi-instance
+- Whether the SQLite-first activation (#536) ships before or with Postgres support for multi-instance
   deployments.

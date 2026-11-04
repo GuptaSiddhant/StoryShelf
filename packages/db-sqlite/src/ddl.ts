@@ -72,6 +72,20 @@ CREATE TABLE IF NOT EXISTS build_reference_generations (
   generation INTEGER NOT NULL CHECK (generation >= 0),
   PRIMARY KEY (project_id, owner_type, owner_id)
 );
+CREATE TABLE IF NOT EXISTS build_deletions (
+  build_id TEXT PRIMARY KEY REFERENCES builds(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  content_released_at TEXT,
+  storage_deleted_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS build_content_releases (
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  content_hash TEXT NOT NULL,
+  released_at TEXT NOT NULL,
+  PRIMARY KEY (build_id, content_hash)
+);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

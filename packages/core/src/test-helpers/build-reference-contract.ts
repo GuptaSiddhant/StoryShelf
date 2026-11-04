@@ -178,6 +178,46 @@ export function buildReferenceContractSuite(
         expect(await second.claimDeletion(owner.projectId, buildIds[1])).toBe("protected");
       });
     });
+    it("lists a claimed build with its recorded steps and lets a second connection resume it", async () => {
+      await withFixture(async ({ first, second, owner, buildIds }) => {
+        expect(await first.listDeleting(owner.projectId)).toEqual([]);
+        expect(await first.claimDeletion(owner.projectId, buildIds[0])).toBe("claimed");
+        const base = { projectId: owner.projectId, buildId: buildIds[0] };
+        expect(await second.listDeleting(owner.projectId)).toEqual([
+          { ...base, contentReleased: false, storageDeleted: false },
+        ]);
+        expect(await first.releaseBuildContent(owner.projectId, buildIds[0], [])).toBe("done");
+        expect(await second.listDeleting(owner.projectId)).toEqual([
+          { ...base, contentReleased: true, storageDeleted: false },
+        ]);
+      });
+    });
+    it("takes the cleanup steps in order, each once, and completes the rows step in one transaction", async () => {
+      await withFixture(async ({ first, second, owner, buildIds, marker }) => {
+        const project = owner.projectId;
+        expect(await first.releaseBuildContent(project, buildIds[0], [])).toBe("not-deleting");
+        await first.claimDeletion(project, buildIds[0]);
+        expect(await first.markStorageDeleted(project, buildIds[0])).toBe("out-of-order");
+        expect(await first.completeDeletion(project, buildIds[0], marker.write)).toBe(
+          "out-of-order",
+        );
+        expect(await marker.count()).toBe(0);
+
+        expect(await first.releaseBuildContent(project, buildIds[0], [])).toBe("done");
+        expect(await second.releaseBuildContent(project, buildIds[0], [])).toBe("already-done");
+        expect(await first.markStorageDeleted(project, buildIds[0])).toBe("done");
+        expect(await second.markStorageDeleted(project, buildIds[0])).toBe("already-done");
+
+        expect(await first.completeDeletion(project, buildIds[0], marker.write)).toEqual({
+          result: undefined,
+        });
+        expect(await marker.count()).toBe(1);
+        // A write that leaves the build in place keeps its recorded steps for the next run.
+        expect(await second.listDeleting(project)).toEqual([
+          { projectId: project, buildId: buildIds[0], contentReleased: true, storageDeleted: true },
+        ]);
+      });
+    });
     it("rejects a duplicate owner in a multi-owner update", async () => {
       await withFixture(async ({ first, owner, buildIds }) => {
         const change = { owner, expectedGeneration: 0, buildIds: [buildIds[0]] };

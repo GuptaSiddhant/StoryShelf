@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Logger } from "pino";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildComponentModel } from "../models/build-component.ts";
@@ -12,8 +12,10 @@ import { LabelModel, type LabelTables } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
+import { collectUnreferencedContent } from "./content-gc.ts";
 import { pendingCandidates } from "./pending.ts";
 import { sweepPublishedGzip } from "./published-gzip-sweep.ts";
+import { purgeClaimedBuilds } from "./purge-claimed.ts";
 import { sweepScreenshotContent } from "./screenshot-sweep.ts";
 
 export {
@@ -26,6 +28,18 @@ export {
 import { col } from "../models/columns.ts";
 import { publishedGzipPath } from "../utils/paths.ts";
 export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
+export {
+  deleteClaimedBuild,
+  type BuildDeletionDeps,
+  type BuildDeletionResult,
+  type DeletionStep,
+} from "./build-deletion.ts";
+export { CONTENT_GRACE_MS, collectUnreferencedContent, type ContentGcDeps } from "./content-gc.ts";
+export {
+  purgeClaimedBuilds,
+  type ClaimedPurgeDeps,
+  type ClaimedPurgeResult,
+} from "./purge-claimed.ts";
 
 /** Table handles for retention queries. */
 export interface RetentionTables {
@@ -56,6 +70,8 @@ export class Retention {
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const { buildIds, pending } = await this.selectBuilds(project, options, cutoff);
+    const lifecycle = this.db.buildReferenceLifecycle;
+    if (lifecycle) return await this.purgeClaimed(project, lifecycle, buildIds, pending, cutoff);
     const results = await Promise.all(
       buildIds.map(async (buildId) => ({
         files: await this.deleteBuildFiles(project.id, buildId),
@@ -71,6 +87,32 @@ export class Retention {
       "build retention purge complete",
     );
     return { removedBuilds, removedFiles };
+  }
+
+  /**
+   * Purge through the lifecycle capability: claim each candidate (a protected one stays), then
+   * finish the deletions with durable progress (ADR 0039). Content is collected once at the end.
+   */
+  private async purgeClaimed(
+    project: Project,
+    lifecycle: BuildReferenceLifecycle,
+    buildIds: readonly string[],
+    pending: number,
+    cutoff: string,
+  ): Promise<PurgeResult> {
+    const deps = { db: this.db, storage: this.storage, lifecycle, logger: this.logger };
+    const claimed = await purgeClaimedBuilds(deps, project.id, buildIds);
+    await collectUnreferencedContent(deps).catch((error: unknown) => {
+      this.logger?.warn({ err: error, projectId: project.id }, "content collection failed");
+    });
+    await sweepPublishedGzip(this.storage).catch(() => {});
+    await this.sweepScreenshots(project);
+    const removedJobs = await this.purgeFinishedJobs(cutoff);
+    this.logger?.info(
+      { projectId: project.id, ...claimed, removedJobs, removedPending: pending },
+      "build retention purge complete",
+    );
+    return { removedBuilds: claimed.removedBuilds, removedFiles: claimed.removedFiles };
   }
 
   /**

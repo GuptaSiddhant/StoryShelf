@@ -37,6 +37,10 @@ function setup() {
       generation: generation + 1,
     }),
     claimDeletion: async () => "missing",
+    listDeleting: async () => [],
+    releaseBuildContent: async () => "not-deleting",
+    markStorageDeleted: async () => "not-deleting",
+    completeDeletion: async () => "not-deleting",
   };
   const tables = { baselines: db.tables.baselines, snapshots: db.tables.snapshots };
   return { db, lifecycle, tables };
