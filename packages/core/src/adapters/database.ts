@@ -51,7 +51,7 @@ export interface Tables {
   userInviteTokens: Table;
   projectMembers: Table;
   projectGroupMappings: Table;
-  contentRefs: Table;
+  contentUses: Table;
 }
 
 /** Table keys every DatabaseAdapter must expose (contract + validation share this). */
@@ -190,8 +190,8 @@ export interface BuildReferenceLifecycle {
   listDeleting(projectId: string): Promise<DeletingBuild[]>;
   /**
    * Step 1 of a claimed build's cleanup. In one transaction, record a release for each distinct
-   * hash and decrement its `content_refs` count (never below zero, keeping the row for the grace
-   * period); a hash already recorded for the build is skipped, so a retry never decrements twice.
+   * hash and mark the build's `content_uses` row of it released (the row stays for the grace
+   * period); a hash already recorded for the build is skipped, so a retry releases nothing twice.
    * Marks the step done. Only a `deleting` build of the project qualifies.
    */
   releaseBuildContent(
@@ -211,6 +211,27 @@ export interface BuildReferenceLifecycle {
     buildId: string,
     removeRows: (tx: TxStore) => Promise<T>,
   ): Promise<{ result: T } | "not-deleting" | "out-of-order">;
+  /**
+   * Record that the build uses each hash of its stored content (`content_uses`): one row per
+   * (build, hash), however many paths name it, so a repeat is a no-op. Returns the hashes it
+   * refused because a collector has claimed them; none of the refused hashes is recorded, and the
+   * caller must store the content again and retry. Same concurrency domain as {@link claimContent}.
+   */
+  recordContentUses(
+    projectId: string,
+    buildId: string,
+    hashes: readonly string[],
+  ): Promise<string[]>;
+  /**
+   * Claim for deletion every hash whose uses are all released, the latest release older than
+   * `idleBefore` (an ISO instant), and no collector holds yet; returns those hashes plus the ones
+   * an earlier, unfinished pass claimed, so a crash resumes. A claimed hash admits no new use.
+   */
+  claimContent(idleBefore: string): Promise<string[]>;
+  /** Give a claim back (a live build still serves the blob); its uses stay released. */
+  abandonContentClaim(hash: string): Promise<void>;
+  /** The blob of a claimed hash is deleted: drop its `content_uses` rows. */
+  finishContentCollection(hash: string): Promise<void>;
 }
 
 /** Database-specific metadata: the family plus what the backing platform can carry. */

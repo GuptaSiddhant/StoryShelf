@@ -45,6 +45,7 @@ export async function releaseBuildContent(
     const now = new Date().toISOString();
     ensureRecord(db, projectId, buildId, now);
     for (const hash of new Set(hashes)) releaseOnce(db, buildId, hash, now);
+    releaseUses(db, buildId, now);
     db.prepare(
       "UPDATE build_deletions SET content_released_at = ?, updated_at = ? WHERE build_id = ?",
     ).run(now, now, buildId);
@@ -106,16 +107,19 @@ function ensureRecord(db: DatabaseSync, projectId: string, buildId: string, now:
   ).run(buildId, projectId, now, now);
 }
 
-/** Insert the release record, and decrement the count only if the record was new. */
+/** Insert the build's record of releasing the hash; the use rows are released in one pass after. */
 function releaseOnce(db: DatabaseSync, buildId: string, hash: string, now: string): void {
-  const inserted = db
-    .prepare(
-      "INSERT OR IGNORE INTO build_content_releases (build_id, content_hash, released_at) VALUES (?, ?, ?)",
-    )
-    .run(buildId, hash, now);
-  if (inserted.changes === 0) return;
-  // Keep the row at zero for the grace period (ADR 0003); never go negative.
   db.prepare(
-    "UPDATE content_refs SET ref_count = MAX(ref_count - 1, 0), last_seen_at = ? WHERE hash = ?",
-  ).run(now, hash);
+    "INSERT OR IGNORE INTO build_content_releases (build_id, content_hash, released_at) VALUES (?, ?, ?)",
+  ).run(buildId, hash, now);
+}
+
+/**
+ * Release every use the build holds, whatever its manifest lists (a build that failed before its
+ * manifest was written still recorded its uses); the blob stays for the grace period.
+ */
+function releaseUses(db: DatabaseSync, buildId: string, now: string): void {
+  db.prepare(
+    "UPDATE content_uses SET released_at = ? WHERE build_id = ? AND released_at IS NULL",
+  ).run(now, buildId);
 }

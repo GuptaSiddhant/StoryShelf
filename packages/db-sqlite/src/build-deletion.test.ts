@@ -1,6 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { ContentRefModel } from "@storyshelf/core/models";
 import {
   CONTENT_GRACE_MS,
   Retention,
@@ -35,7 +34,8 @@ interface Fixture {
   lifecycle: ReturnType<typeof createBuildReferenceLifecycle>;
   storage: ReturnType<typeof makeStorage>["storage"];
   objects: ReturnType<typeof makeStorage>["objects"];
-  refCount(hash: string): Promise<number | undefined>;
+  /** Rows of `content_uses` for the hash: how many are still unreleased, and how many exist. */
+  uses(hash: string): { active: number; rows: number };
 }
 
 /** A project with two published builds sharing one file, on a real SQLite file. */
@@ -57,16 +57,9 @@ async function withFixture(run: (fixture: Fixture) => Promise<void>): Promise<vo
     });
     const one = await publish(db, storage, "one", { "index.html": "shared", "one.js": "only one" });
     const two = await publish(db, storage, "two", { "index.html": "shared", "two.js": "only two" });
-    await seedRefs(db, [one, two]);
-    const refs = new ContentRefModel(db);
-    await run({
-      path,
-      db,
-      lifecycle,
-      storage,
-      objects,
-      refCount: async (hash) => (await refs.get(hash))?.refCount,
-    });
+    await lifecycle.recordContentUses("p", "one", one);
+    await lifecycle.recordContentUses("p", "two", two);
+    await run({ path, db, lifecycle, storage, objects, uses: (hash) => usesOf(path, hash) });
   } finally {
     await sqlite.lifecycle?.teardown();
     rmSync(dir, { recursive: true, force: true });
@@ -105,15 +98,17 @@ async function publish(
   return Object.values(manifest);
 }
 
-/** One reference per build and distinct hash, as the upload routes are meant to record them. */
-async function seedRefs(db: DatabaseAdapter, manifests: readonly string[][]): Promise<void> {
-  const counts = new Map<string, number>();
-  for (const hashes of manifests) {
-    for (const hash of new Set(hashes)) counts.set(hash, (counts.get(hash) ?? 0) + 1);
-  }
-  for (const [hash, refCount] of counts) {
-    // oxlint-disable-next-line no-await-in-loop -- a handful of fixture rows, inserted in order
-    await db.insert(schema.contentRefs, { hash, refCount, lastSeenAt: old, createdAt: old });
+function usesOf(path: string, hash: string): { active: number; rows: number } {
+  const raw = new DatabaseSync(path);
+  try {
+    const row = raw
+      .prepare(
+        "SELECT COUNT(*) AS rows, COALESCE(SUM(released_at IS NULL), 0) AS active FROM content_uses WHERE content_hash = ?",
+      )
+      .get(hash) as unknown as { rows: number; active: number };
+    return { active: row.active, rows: row.rows };
+  } finally {
+    raw.close();
   }
 }
 
@@ -143,7 +138,7 @@ const buildExists = async (fixture: Fixture, id: string): Promise<boolean> =>
 
 describe("resumable build deletion on SQLite", () => {
   for (const step of ["content", "storage", "rows"] as const) {
-    it(`resumes after a crash following the ${step} step, without a double decrement`, async () => {
+    it(`resumes after a crash following the ${step} step, releasing each use once`, async () => {
       await withFixture(async (fixture) => {
         const first = await claimed(fixture, "one");
         await expect(deleteClaimedBuild(deps(fixture, crashAfter(step)), first)).rejects.toThrow(
@@ -161,15 +156,15 @@ describe("resumable build deletion on SQLite", () => {
 
         expect(await buildExists(fixture, "one")).toBe(false);
         expect(await fixture.storage.list("p/builds/one/")).toEqual([]);
-        expect(await fixture.refCount(SHARED)).toBe(1);
-        expect(await fixture.refCount(ONLY_ONE)).toBe(0);
-        expect(await fixture.refCount(ONLY_TWO)).toBe(1);
+        expect(fixture.uses(SHARED)).toEqual({ active: 1, rows: 2 });
+        expect(fixture.uses(ONLY_ONE)).toEqual({ active: 0, rows: 1 });
+        expect(fixture.uses(ONLY_TWO)).toEqual({ active: 1, rows: 1 });
         expect(await fixture.lifecycle.listDeleting("p")).toEqual([]);
       });
     });
   }
 
-  it("lets two concurrent cleaners finish one build once, with correct counts", async () => {
+  it("lets two concurrent cleaners finish one build once, with each use released once", async () => {
     await withFixture(async (fixture) => {
       const build = await claimed(fixture, "one");
       const other = { ...fixture, lifecycle: createBuildReferenceLifecycle(fixture.path) };
@@ -183,8 +178,8 @@ describe("resumable build deletion on SQLite", () => {
         "deleted",
       ]);
       expect(await buildExists(fixture, "one")).toBe(false);
-      expect(await fixture.refCount(SHARED)).toBe(1);
-      expect(await fixture.refCount(ONLY_ONE)).toBe(0);
+      expect(fixture.uses(SHARED)).toEqual({ active: 1, rows: 2 });
+      expect(fixture.uses(ONLY_ONE)).toEqual({ active: 0, rows: 1 });
     });
   });
 
@@ -192,7 +187,7 @@ describe("resumable build deletion on SQLite", () => {
     await withFixture(async (fixture) => {
       await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
       expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(1);
-      // Only the file nothing else used goes; the shared one is still counted by build two.
+      // Only the file nothing else used goes; build two still uses the shared one.
       expect(fixture.objects.has(`content/${ONLY_ONE}`)).toBe(false);
       expect(fixture.objects.has(`content/${SHARED}`)).toBe(true);
 
@@ -201,15 +196,17 @@ describe("resumable build deletion on SQLite", () => {
       expect(fixture.objects.has(`content/${SHARED}`)).toBe(true);
       expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(2);
       expect(fixture.objects.has(`content/${SHARED}`)).toBe(false);
-      expect(await fixture.refCount(SHARED)).toBeUndefined();
+      expect(fixture.uses(SHARED)).toEqual({ active: 0, rows: 0 });
     });
   });
 
-  it("never collects a blob a live build's manifest still names, whatever the count says", async () => {
+  it("never collects a blob a live build's manifest still names, whatever the uses say", async () => {
     await withFixture(async (fixture) => {
-      // A count that drifted to 0 while build two still serves the file.
+      // Every use of the blob reads as released long ago while build two still serves the file.
       const raw = new DatabaseSync(fixture.path);
-      raw.prepare("UPDATE content_refs SET ref_count = 0 WHERE hash = ?").run(SHARED);
+      raw
+        .prepare("UPDATE content_uses SET released_at = ? WHERE content_hash = ?")
+        .run(old, SHARED);
       raw.close();
       const removed = await collectUnreferencedContent({
         ...deps(fixture),
@@ -218,10 +215,12 @@ describe("resumable build deletion on SQLite", () => {
 
       expect(removed).toBe(0);
       expect(fixture.objects.has(`content/${SHARED}`)).toBe(true);
+      // The claim was given back, so the blob admits new uses again.
+      expect(await fixture.lifecycle.recordContentUses("p", "late", [SHARED])).toEqual([]);
     });
   });
 
-  it("keeps the row of a blob whose storage delete failed, so the next pass retries it", async () => {
+  it("keeps the claim of a blob whose storage delete failed, so the next pass resumes it", async () => {
     await withFixture(async (fixture) => {
       await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
       const remove = fixture.storage.delete.bind(fixture.storage);
@@ -231,11 +230,16 @@ describe("resumable build deletion on SQLite", () => {
       };
 
       expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(0);
-      expect(await fixture.refCount(ONLY_ONE)).toBe(0);
+      expect(fixture.uses(ONLY_ONE).rows).toBe(1);
+      // Still claimed: no build can start using a blob that is on its way out.
+      expect(await fixture.lifecycle.recordContentUses("p", "late", [ONLY_ONE])).toEqual([
+        ONLY_ONE,
+      ]);
 
       fixture.storage.delete = remove;
-      expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(1);
-      expect(await fixture.refCount(ONLY_ONE)).toBeUndefined();
+      // Resumed even though the grace clock of this pass would not select it again.
+      expect(await collectUnreferencedContent(deps(fixture))).toBe(1);
+      expect(fixture.uses(ONLY_ONE).rows).toBe(0);
     });
   });
 
@@ -256,7 +260,7 @@ describe("resumable build deletion on SQLite", () => {
       expect(await buildExists(fixture, "one")).toBe(true);
       expect(await buildExists(fixture, "two")).toBe(false);
       expect(await fixture.storage.list("p/builds/two/")).toEqual([]);
-      expect(await fixture.refCount(SHARED)).toBe(1);
+      expect(fixture.uses(SHARED).active).toBe(1);
     });
   });
 
@@ -305,7 +309,7 @@ describe("recorded deletion steps", () => {
     });
   });
 
-  it("releases each distinct hash once, never below zero, and repeats as a no-op", async () => {
+  it("releases every use of the build once, and repeats as a no-op", async () => {
     await withFixture(async (fixture) => {
       await fixture.lifecycle.claimDeletion("p", "one");
       const hashes = [SHARED, SHARED, ONLY_ONE, hashOf("unknown")];
@@ -313,35 +317,21 @@ describe("recorded deletion steps", () => {
       expect(await fixture.lifecycle.releaseBuildContent("p", "one", hashes)).toBe("done");
       expect(await fixture.lifecycle.releaseBuildContent("p", "one", hashes)).toBe("already-done");
 
-      expect(await fixture.refCount(SHARED)).toBe(1);
-      expect(await fixture.refCount(ONLY_ONE)).toBe(0);
-      expect(await fixture.refCount(hashOf("unknown"))).toBeUndefined();
+      expect(fixture.uses(SHARED)).toEqual({ active: 1, rows: 2 });
+      expect(fixture.uses(ONLY_ONE)).toEqual({ active: 0, rows: 1 });
+      expect(fixture.uses(hashOf("unknown"))).toEqual({ active: 0, rows: 0 });
     });
   });
 
-  it("skips a hash whose release is already recorded for the build", async () => {
+  it("releases a use the manifest does not list, so a build that failed early frees its blobs", async () => {
     await withFixture(async (fixture) => {
+      await fixture.lifecycle.recordContentUses("p", "one", [hashOf("recorded only")]);
       await fixture.lifecycle.claimDeletion("p", "one");
-      // A release recorded by an earlier pass whose step marker was never written.
-      const raw = new DatabaseSync(fixture.path);
-      raw
-        .prepare(
-          "INSERT INTO build_deletions (build_id, project_id, created_at, updated_at) VALUES ('one', 'p', ?, ?)",
-        )
-        .run(old, old);
-      raw
-        .prepare(
-          "INSERT INTO build_content_releases (build_id, content_hash, released_at) VALUES ('one', ?, ?)",
-        )
-        .run(SHARED, old);
-      raw.close();
 
-      expect(await fixture.lifecycle.releaseBuildContent("p", "one", [SHARED, ONLY_ONE])).toBe(
-        "done",
-      );
+      await fixture.lifecycle.releaseBuildContent("p", "one", []);
 
-      expect(await fixture.refCount(SHARED)).toBe(2);
-      expect(await fixture.refCount(ONLY_ONE)).toBe(0);
+      expect(fixture.uses(hashOf("recorded only"))).toEqual({ active: 0, rows: 1 });
+      expect(fixture.uses(SHARED).active).toBe(1);
     });
   });
 
@@ -371,5 +361,55 @@ describe("rollbackQuietly", () => {
     const db = new DatabaseSync(":memory:");
     expect(() => rollbackQuietly(db)).not.toThrow();
     db.close();
+  });
+});
+
+describe("content uses", () => {
+  it("records one row per build and hash, however often and at however many paths", async () => {
+    await withFixture(async (fixture) => {
+      const hash = hashOf("fresh");
+      expect(await fixture.lifecycle.recordContentUses("p", "one", [hash, hash])).toEqual([]);
+      expect(await fixture.lifecycle.recordContentUses("p", "one", [hash])).toEqual([]);
+      expect(await fixture.lifecycle.recordContentUses("p", "two", [hash])).toEqual([]);
+
+      expect(fixture.uses(hash)).toEqual({ active: 2, rows: 2 });
+    });
+  });
+
+  it("ends a use racing a collection in exactly one outcome", async () => {
+    await withFixture(async (fixture) => {
+      await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
+      const idleBefore = new Date(afterGrace()).toISOString();
+
+      // The collector wins: the use is refused, nothing is written, and the content comes back.
+      expect(await fixture.lifecycle.claimContent(idleBefore)).toEqual([ONLY_ONE]);
+      expect(
+        await fixture.lifecycle.recordContentUses("p", "two", [ONLY_ONE, hashOf("x")]),
+      ).toEqual([ONLY_ONE]);
+      expect(fixture.uses(hashOf("x"))).toEqual({ active: 0, rows: 0 });
+      await fixture.lifecycle.finishContentCollection(ONLY_ONE);
+      expect(await fixture.lifecycle.recordContentUses("p", "two", [ONLY_ONE])).toEqual([]);
+
+      // The use wins: a blob with an unreleased use is not claimed.
+      expect(await fixture.lifecycle.claimContent(idleBefore)).toEqual([]);
+    });
+  });
+
+  it("claims through independent connections once, and resumes an unfinished claim", async () => {
+    await withFixture(async (fixture) => {
+      await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
+      const idleBefore = new Date(afterGrace()).toISOString();
+      const other = createBuildReferenceLifecycle(fixture.path);
+
+      const results = await Promise.all([
+        fixture.lifecycle.claimContent(idleBefore),
+        other.claimContent(idleBefore),
+      ]);
+
+      // Both see the claim (one made it, the other resumes it); the blob is collected once.
+      expect(results).toEqual([[ONLY_ONE], [ONLY_ONE]]);
+      await fixture.lifecycle.finishContentCollection(ONLY_ONE);
+      expect(await other.claimContent(idleBefore)).toEqual([]);
+    });
   });
 });

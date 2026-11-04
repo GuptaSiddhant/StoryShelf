@@ -6,6 +6,10 @@ import type {
   TxStore,
 } from "../adapters/database.ts";
 
+/** Cutoffs that put every release before / after them. */
+const LATER = "9999-12-31T00:00:00.000Z";
+const EARLIER = "2000-01-01T00:00:00.000Z";
+
 export interface BuildReferenceContractFixture {
   first: BuildReferenceLifecycle;
   second: BuildReferenceLifecycle;
@@ -216,6 +220,71 @@ export function buildReferenceContractSuite(
         expect(await second.listDeleting(project)).toEqual([
           { projectId: project, buildId: buildIds[0], contentReleased: true, storageDeleted: true },
         ]);
+      });
+    });
+    it("records one use per build and hash, releases them once, and claims a blob only when all are released", async () => {
+      await withFixture(async ({ first, second, owner, buildIds }) => {
+        const project = owner.projectId;
+        const hash = "a".repeat(64);
+        expect(await first.recordContentUses(project, buildIds[0], [hash, hash])).toEqual([]);
+        expect(await second.recordContentUses(project, buildIds[0], [hash])).toEqual([]);
+        expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([]);
+        // Two builds use it: nothing is idle, however late the cutoff.
+        expect(await first.claimContent(LATER)).toEqual([]);
+
+        await first.claimDeletion(project, buildIds[0]);
+        expect(await first.releaseBuildContent(project, buildIds[0], [hash])).toBe("done");
+        expect(await second.releaseBuildContent(project, buildIds[0], [hash])).toBe("already-done");
+        // Build two still uses it.
+        expect(await first.claimContent(LATER)).toEqual([]);
+
+        await first.claimDeletion(project, buildIds[1]);
+        await first.releaseBuildContent(project, buildIds[1], [hash]);
+        expect(await first.claimContent(EARLIER)).toEqual([]);
+        expect(await first.claimContent(LATER)).toEqual([hash]);
+      });
+    });
+    it("ends a use racing a collection in exactly one outcome", async () => {
+      await withFixture(async ({ first, second, owner, buildIds }) => {
+        const project = owner.projectId;
+        const hash = "b".repeat(64);
+        await first.recordContentUses(project, buildIds[0], [hash]);
+        await first.claimDeletion(project, buildIds[0]);
+        await first.releaseBuildContent(project, buildIds[0], [hash]);
+
+        const [claimed, refused] = await Promise.all([
+          first.claimContent(LATER),
+          second.recordContentUses(project, buildIds[1], [hash]),
+        ]);
+
+        if (claimed.includes(hash)) {
+          // The collector won: the use was refused, so the content must be stored again.
+          expect(refused).toEqual([hash]);
+          expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([hash]);
+          await first.finishContentCollection(hash);
+          expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([]);
+        } else {
+          // The use won: the blob has an unreleased use and is not claimed.
+          expect(refused).toEqual([]);
+          expect(await first.claimContent(LATER)).toEqual([]);
+        }
+      });
+    });
+    it("resumes a claim until it is finished, and lets an abandoned claim admit uses again", async () => {
+      await withFixture(async ({ first, second, owner, buildIds }) => {
+        const project = owner.projectId;
+        const hash = "c".repeat(64);
+        await first.recordContentUses(project, buildIds[0], [hash]);
+        await first.claimDeletion(project, buildIds[0]);
+        await first.releaseBuildContent(project, buildIds[0], [hash]);
+
+        expect(await first.claimContent(LATER)).toEqual([hash]);
+        // The claimer "crashed": another connection resumes it.
+        expect(await second.claimContent(EARLIER)).toEqual([hash]);
+        await second.abandonContentClaim(hash);
+        expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([]);
+        // Used again, so it is no longer idle.
+        expect(await first.claimContent(LATER)).toEqual([]);
       });
     });
     it("rejects a duplicate owner in a multi-owner update", async () => {

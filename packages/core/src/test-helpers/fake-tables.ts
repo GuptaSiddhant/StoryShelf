@@ -487,11 +487,13 @@ const notificationSubscriptions = defineTable("notification_subscriptions", {
   createdAt: "created_at",
 });
 
-const contentRefs = defineTable("content_refs", {
-  hash: "hash",
-  refCount: "ref_count",
-  lastSeenAt: "last_seen_at",
+const contentUses = defineTable("content_uses", {
+  projectId: "project_id",
+  buildId: "build_id",
+  contentHash: "content_hash",
   createdAt: "created_at",
+  releasedAt: "released_at",
+  collectingAt: "collecting_at",
 });
 
 /** Stub schema bundled into the `Tables` map every fake serves. */
@@ -527,5 +529,5 @@ export const fakeSchema: Tables = {
   aiBudgetAlerts,
   notificationChannels,
   notificationSubscriptions,
-  contentRefs,
+  contentUses,
 };

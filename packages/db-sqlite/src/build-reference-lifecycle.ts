@@ -16,6 +16,12 @@ import {
   markStorageDeleted,
   releaseBuildContent,
 } from "./build-deletion-steps.ts";
+import {
+  abandonContentClaim,
+  claimContent,
+  finishContentCollection,
+  recordContentUses,
+} from "./content-uses.ts";
 import { inTransaction, open, rollbackQuietly, transactionStore } from "./lifecycle-transaction.ts";
 import { schema } from "./schema/index.ts";
 
@@ -39,6 +45,15 @@ export function createBuildReferenceLifecycle(
       await markStorageDeleted(path, projectId, buildId),
     completeDeletion: async (projectId, buildId, removeRows) =>
       await completeDeletion(path, projectId, buildId, removeRows),
+    recordContentUses: async (projectId, buildId, hashes) =>
+      await recordContentUses(path, projectId, buildId, hashes),
+    claimContent: async (idleBefore) => await claimContent(path, idleBefore),
+    abandonContentClaim: async (hash) => {
+      await abandonContentClaim(path, hash);
+    },
+    finishContentCollection: async (hash) => {
+      await finishContentCollection(path, hash);
+    },
   };
 }
 

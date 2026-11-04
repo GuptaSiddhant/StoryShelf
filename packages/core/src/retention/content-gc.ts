@@ -1,37 +1,39 @@
 /**
- * Collect shared content nothing uses any more (ADR 0003 decision 2). A blob goes only when its
- * count is 0, the grace period has passed, and no live build's manifest names it, so a wrong
- * count can leak storage but never delete a file a live build serves.
+ * Collect shared content nothing uses any more (ADR 0039). A blob goes only when every build use of
+ * it was released and the grace period passed, a collector claimed it in the lifecycle capability's
+ * concurrency domain (so a new use racing the delete ends in exactly one outcome), and no live
+ * build's manifest names it. A wrong use record can leak storage but never delete a file a live
+ * build serves.
  */
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
-import { ContentRefModel } from "../models/content-ref.ts";
 import { publishedGzipPath } from "../utils/paths.ts";
 import { manifestHashes } from "./build-deletion.ts";
 
-/** How long a count of 0 must stand before its content is collected. */
+/** How long a blob must stand without a use before it is collected. */
 export const CONTENT_GRACE_MS = 7 * 86_400_000;
 
 /** What the collector needs. */
 export interface ContentGcDeps {
   db: DatabaseAdapter;
   storage: StorageAdapter;
+  lifecycle: BuildReferenceLifecycle;
   logger?: Logger;
   now?: () => number;
 }
 
-/** Collect unreferenced content; resolves to how many blobs were removed. */
+/** Collect unused content; resolves to how many blobs were removed. */
 export async function collectUnreferencedContent(deps: ContentGcDeps): Promise<number> {
   const cutoff = new Date((deps.now?.() ?? Date.now()) - CONTENT_GRACE_MS).toISOString();
-  const refs = new ContentRefModel(deps.db);
-  const candidates = new Set((await refs.listStale(cutoff)).map((ref) => ref.hash));
-  if (candidates.size === 0) return 0;
-  await dropLiveHashes(deps, candidates);
+  const claimed = await deps.lifecycle.claimContent(cutoff);
+  if (claimed.length === 0) return 0;
+  const free = new Set(claimed);
+  await dropLiveHashes(deps, free);
   let removed = 0;
-  for (const hash of candidates) {
+  for (const hash of claimed) {
     // oxlint-disable-next-line no-await-in-loop -- one blob at a time keeps a failure to that blob
-    if (await removeBlob(deps, refs, hash, cutoff)) removed += 1;
+    if (free.has(hash) ? await removeBlob(deps, hash) : await giveBack(deps, hash)) removed += 1;
   }
   return removed;
 }
@@ -53,22 +55,26 @@ async function dropLiveHashes(deps: ContentGcDeps, candidates: Set<string>): Pro
   }
 }
 
-/** Re-check the count, delete the blob, then its row; false when it is in use again. */
-async function removeBlob(
-  deps: ContentGcDeps,
-  refs: ContentRefModel,
-  hash: string,
-  cutoff: string,
-): Promise<boolean> {
-  const current = await refs.get(hash);
-  if (current === null || current.refCount > 0 || current.lastSeenAt >= cutoff) return false;
+/** A live build serves the blob: give the claim back and count nothing removed. */
+async function giveBack(deps: ContentGcDeps, hash: string): Promise<false> {
   try {
-    // The blob itself must go before its row: if this throws, the row stays and the next pass retries.
+    await deps.lifecycle.abandonContentClaim(hash);
+  } catch (error) {
+    deps.logger?.warn({ err: error, hash }, "content claim could not be given back");
+  }
+  return false;
+}
+
+/** Delete the blob, then end the claim; false when it failed, which leaves the claim to resume. */
+async function removeBlob(deps: ContentGcDeps, hash: string): Promise<boolean> {
+  try {
+    // The blob itself must go before the claim ends: if this throws, the claim stays and the next
+    // pass resumes it.
     await deps.storage.delete(`content/${hash}`);
     // Variants are disposable; never let their deletion affect authoritative data.
     if (/^[a-f0-9]{64}$/u.test(hash))
       await deps.storage.delete(publishedGzipPath(hash)).catch(() => {});
-    await refs.forget(hash);
+    await deps.lifecycle.finishContentCollection(hash);
     return true;
   } catch (error) {
     deps.logger?.warn({ err: error, hash }, "content collection failed");

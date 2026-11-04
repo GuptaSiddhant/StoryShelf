@@ -54,11 +54,23 @@ by preset, so it cannot by itself carry this guarantee.
   in three recorded steps: release its shared content, delete its storage objects (outside any
   transaction), remove its rows (one transaction). The capability records each step
   (`build_deletions`) and the release of each content hash once per build
-  (`build_content_releases`, unique on build and hash) in the same transaction as the `content_refs`
-  decrement, so a retry skips what is recorded. Steps must run in order; a second cleaner finds the
-  work done. Purge uses the driver only when the capability is present. Content GC removes a blob
-  only at count 0 after the grace period **and** when no live build's manifest names it, so a wrong
-  count can leak storage but never delete served content.
+  (`build_content_releases`, unique on build and hash) in the same transaction that releases the
+  build's `content_uses` rows, so a retry skips what is recorded. Steps must run in order; a second
+  cleaner finds the work done. Purge uses the driver only when the capability is present.
+- **Shared content is counted as uses, not as a counter.** `content_uses` has one row per (build,
+  hash), written idempotently by the capability (`recordContentUses`) after the blobs are stored and
+  before the manifest that names them, by both upload paths, so a hash used at two paths counts
+  once. A counter read and updated through the generic adapter path would race across processes and
+  cannot be addressed by hash; the former `content_refs` table never held rows on a real adapter
+  and is dropped, with nothing to backfill: a blob without a use row is protected by the manifest
+  guard until its builds go. A build's release marks all its rows released (kept for the grace
+  period). A collector **claims** a blob in the capability's domain (`claimContent`: every use
+  released, the grace passed, no live manifest names it): a claim is durable, so a crashed pass
+  resumes it, and a claimed hash refuses new uses, so a use racing the delete ends in exactly one
+  outcome: the claim fails because the use landed, or the use is refused and its caller stores the
+  content again and retries. A live manifest found after the claim gives the claim back. A wrong use
+  record can leak storage but never delete served content. Without the capability nothing is
+  recorded or collected.
 
 ### 3. Lifecycle is an explicit database capability
 
