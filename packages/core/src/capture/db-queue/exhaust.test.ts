@@ -421,6 +421,18 @@ describe("exhausted single-flight jobs", () => {
     expect(await rt.model.get(successor?.jobId ?? "")).toMatchObject({ activeKey: "capture:b1" });
   });
 
+  it("starts no successor for a request that arrived before the job was cancelled", async () => {
+    const { rt, clock } = runtime();
+    rt.onExhausted = vi.fn<Hook>(async () => {});
+    await startKeyed(rt, clock);
+    await rt.model.requestRerun("j1", iso(clock.now));
+    expect(await cancelJobs(rt, "b1")).toBe(true);
+    clock.now += 1001;
+    await claimNext(rt);
+    expect(await rt.model.get("j1")).toMatchObject({ status: "cancelled", activeKey: null });
+    expect(await rt.model.nextCandidate(["capture"], iso(clock.now))).toBeNull();
+  });
+
   it("starts no successor when the job was cancelled, and none when no request came", async () => {
     const { rt, clock } = runtime();
     rt.onExhausted = vi.fn<Hook>(async () => {});

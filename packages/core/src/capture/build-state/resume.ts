@@ -6,6 +6,7 @@
 import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import { BuildModel } from "../../models/build.ts";
 import { ProjectModel } from "../../models/project.ts";
+import type { Project } from "../../schema/project.ts";
 import type { BuildStatus } from "../../types.ts";
 import type { BuildStateDeps, BuildStatePublisher } from "./types.ts";
 
@@ -25,6 +26,19 @@ export interface OpenBuildScope {
 /** How a request for open builds ended: how many were asked, or that the lookup itself failed. */
 export type OpenBuildRequest = { ok: true; asked: number } | { ok: false };
 
+/** The projects a request covers: the scoped one (read directly), or every project. */
+async function projectsOf(
+  deps: Pick<BuildStateDeps, "db">,
+  projectId: string | undefined,
+): Promise<Project[]> {
+  const model = new ProjectModel(deps.db);
+  if (projectId === undefined) {
+    return await model.list();
+  }
+  const project = await model.get(projectId);
+  return project === null ? [] : [project];
+}
+
 /**
  * Ask `publisher` for the state of every open recent build (of `scope`, when given). Never rejects:
  * a failed lookup is logged once and answered `{ ok: false }`, so a caller that reports to a person
@@ -36,9 +50,7 @@ export async function tryRequestOpenBuildStates(
   scope: OpenBuildScope = {},
 ): Promise<OpenBuildRequest> {
   try {
-    const projects = (await new ProjectModel(deps.db).list()).filter(
-      (project) => scope.projectId === undefined || project.id === scope.projectId,
-    );
+    const projects = await projectsOf(deps, scope.projectId);
     const lists = await Promise.all(
       projects.map(async (project) => await openBuildIds(deps, project.id)),
     );
