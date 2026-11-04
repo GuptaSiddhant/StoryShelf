@@ -41,27 +41,32 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   const db = drizzle(callback, { schema });
   const retention: RetentionActivation = {};
 
-  const adapter = createDrizzleAdapter(db, {
-    metadata: {
-      name: "SQLite",
-      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
-      description: "SQLite database adapter (node:sqlite + Drizzle)",
-      kind: "sqlite",
-      category: "database",
+  const adapter = createDrizzleAdapter(
+    db,
+    {
+      metadata: {
+        name: "SQLite",
+        version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
+        description: "SQLite database adapter (node:sqlite + Drizzle)",
+        kind: "sqlite",
+        category: "database",
+      },
+      tables: schema,
+      migrate: async ({ logger }) => {
+        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
+        runMigrations(sqlite, logger);
+        await activateRetention(path, retention);
+      },
+      close: () => {
+        sqlite.close();
+      },
+      ping: () => {
+        sqlite.prepare("SELECT 1").get();
+      },
     },
-    tables: schema,
-    migrate: async ({ logger }) => {
-      await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
-      runMigrations(sqlite, logger);
-      await activateRetention(path, retention);
-    },
-    close: () => {
-      sqlite.close();
-    },
-    ping: () => {
-      sqlite.prepare("SELECT 1").get();
-    },
-  });
+    // One connection: plain statements take their turn behind an open transaction.
+    { isolateStatements: true },
+  );
   return attachRetention(adapter, retention);
 }
 
