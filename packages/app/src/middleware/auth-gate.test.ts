@@ -62,19 +62,19 @@ describe("the sign-in gate", () => {
   });
 
   it.each([
-    createUrlBuilder("").storybookLabel("app", "branch", "main"),
-    "/projects/app/storybook",
-    "/projects/app/storybook/build/b1/",
-  ])("still lets an anonymous visitor reach the published route %s", async (link) => {
-    const response = await (await anonymousApp()).request(link);
-    expect(response.headers.get("location")).not.toBe("/auth/login");
-  });
-
-  it("answers the published label route for a public build with its Storybook, not the login page", async () => {
-    const response = await (
-      await anonymousApp()
-    ).request(createUrlBuilder("").storybookLabel("app", "branch", "main"));
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/projects/app/storybook/build/b1/");
-  });
+    [
+      createUrlBuilder("").storybookLabel("app", "branch", "main"),
+      302,
+      "/projects/app/storybook/build/b1/",
+    ],
+    ["/projects/app/storybook", 302, "/projects/app/storybook/build/b1/"],
+    ["/projects/app/storybook/build/b1/", 200, null],
+  ])(
+    "serves the published route %s to an anonymous visitor (%i, redirect %s), not the login page",
+    async (link, status, location) => {
+      const response = await (await anonymousApp()).request(link);
+      expect(response.status).toBe(status);
+      expect(response.headers.get("location")).toBe(location);
+    },
+  );
 });
