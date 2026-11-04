@@ -20,7 +20,8 @@ export function RetentionPausedNotice(props: {
       Baseline <code>{pause.baselineId}</code> points at build <code>{pause.buildId}</code>,{" "}
       {WHY[pause.problem]}, so StoryShelf cannot tell which builds are safe to purge. No build is
       purged until you remove or repoint that baseline and restart the server; retention then turns
-      on at the next boot.
+      on at the next boot. Check this page again after restarting: another baseline may still need
+      fixing.
     </Alert>
   ) : null;
 }

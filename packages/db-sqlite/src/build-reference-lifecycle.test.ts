@@ -529,6 +529,39 @@ describe("SQLite reference lifecycle primitive", () => {
     });
   });
 
+  it("releases the pins of a baseline that lost its provenance or was deleted while retention was off", async () => {
+    await withDatabase(async (path) => {
+      const db = createSqliteDatabase(path);
+      try {
+        await db.insert(schema.baselines, {
+          ...baselineRow,
+          id: "cleared",
+          storyId: "s-cleared",
+          snapshotId: null,
+        });
+        await db.insert(schema.baselines, {
+          ...baselineRow,
+          id: "kept",
+          storyId: "s-kept",
+          sourceBuildId: "two",
+        });
+        const lifecycle = createBuildReferenceLifecycle(path);
+        await lifecycle.replaceFencedReferences(ownerOf("cleared"), 0, ["two"], async () => null);
+        await lifecycle.replaceFencedReferences(ownerOf("deleted"), 0, ["two"], async () => null);
+        await lifecycle.replaceFencedReferences(ownerOf("kept"), 0, ["two"], async () => null);
+
+        await prepareBaselineReferences(path);
+
+        expect(referenceRows(path, "cleared")).toBe(0);
+        expect(referenceRows(path, "deleted")).toBe(0);
+        expect(referenceRows(path, "kept")).toBe(1);
+        expect(await lifecycle.referenceGeneration(ownerOf("deleted"))).toBe(2);
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    });
+  });
+
   it("leaves a baseline of unproven provenance unknown and unpinned", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);

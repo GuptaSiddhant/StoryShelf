@@ -91,6 +91,7 @@ export async function prepareBaselineReferences(
         "SELECT id FROM baselines WHERE source_build_id IS NOT NULL OR snapshot_id IS NOT NULL ORDER BY id",
       )
       .all() as unknown as [string][];
+    releaseOrphanedPins(db);
     const outcomes: Prepared[] = [];
     for (const [id] of rows) {
       // oxlint-disable-next-line no-await-in-loop -- one baseline at a time: a failure must stop the rest before the rollback
@@ -99,6 +100,30 @@ export async function prepareBaselineReferences(
     await beforeCommit?.();
     return await Promise.resolve(tally(outcomes));
   });
+}
+
+/**
+ * Drop the pins of baseline owners that cannot justify one: the baseline row is gone, or it records
+ * neither a source build nor a snapshot. While retention was paused (or before it existed) the
+ * unfenced path could clear a baseline's provenance or delete the baseline without releasing its
+ * pin, and the loop below only visits baselines that still record a source, so such a pin would
+ * keep an unrelated build protected for good. A baseline that records a source is left to the loop.
+ */
+function releaseOrphanedPins(db: DatabaseSync): void {
+  const orphaned = db
+    .prepare(
+      `SELECT DISTINCT r.project_id, r.owner_id FROM build_references r
+       WHERE r.owner_type = 'baseline' AND NOT EXISTS (
+         SELECT 1 FROM baselines b WHERE b.id = r.owner_id
+           AND (b.source_build_id IS NOT NULL OR b.snapshot_id IS NOT NULL))`,
+    )
+    .all() as unknown as [string, string][];
+  for (const [projectId, id] of orphaned) {
+    db.prepare(
+      "DELETE FROM build_references WHERE project_id = ? AND owner_type = 'baseline' AND owner_id = ?",
+    ).run(projectId, id);
+    advanceGeneration(db, { type: "baseline", id, projectId });
+  }
 }
 
 function tally(outcomes: readonly Prepared[]): PreparationResult {

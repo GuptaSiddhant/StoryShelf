@@ -25,6 +25,7 @@ describe("RetentionPausedNotice", () => {
     // The title is not repeated in the body, and the body leads with the cause.
     expect(html.match(/Retention is paused/gu)).toHaveLength(1);
     expect(html).toContain("cannot tell which builds are safe to purge");
+    expect(html).toContain("another baseline may still need fixing");
   });
 
   it("explains a source that belongs to another project", async () => {

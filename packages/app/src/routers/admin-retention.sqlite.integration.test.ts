@@ -59,6 +59,19 @@ async function withDeployment(
       // oxlint-disable-next-line eslint/no-await-in-loop -- three builds, in order
       await db.buildReferenceLifecycle?.recordContentUses("p", id, hashes);
     }
+    // The baseline that pins it: preparation releases a pin whose baseline records no source.
+    await db.insert(db.tables.baselines, {
+      id: "base",
+      projectId: "p",
+      storyId: "story",
+      viewportName: "desktop",
+      branch: "main",
+      browser: "chromium",
+      screenshotPath: "shot",
+      sourceBuildId: "pinned",
+      createdAt: OLD,
+      updatedAt: OLD,
+    });
     const lifecycle = db.buildReferenceLifecycle;
     const owner = { type: "baseline" as const, projectId: "p", id: "base" };
     await lifecycle?.replaceFencedReferences(owner, 0, ["pinned"], async () => null);

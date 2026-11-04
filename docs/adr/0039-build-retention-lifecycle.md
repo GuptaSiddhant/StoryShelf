@@ -153,6 +153,9 @@ followed by an independent write is forbidden.
 `prepareBaselineReferences` pins only proven sources (#397). A recorded source whose build row is gone
 keeps its `source_build_id` and gets no pin (reported as `unavailable`). A source that is tombstoned or
 belongs to another project stops the whole run with `BaselineSourceIntegrityError` and rolls it back.
+It also releases the pins of baseline owners that cannot justify one (the baseline row is gone, or it
+records neither a source nor a snapshot): the unfenced path used while retention was off or paused
+could leave them, and they would keep an unrelated build protected.
 
 ### 6. Investigations (decision level)
 
