@@ -348,6 +348,13 @@ export interface ShelfTestingOptions {
    */
   leaseSeconds?: number;
   /**
+   * Longest one job (capture, publish or notify) may run, in seconds (default 7200). Past it the
+   * job's lease is no longer renewed and its work is aborted; the lease then runs out and the job
+   * is redelivered or, on its last attempt, failed (a capture build ends `failed`, never
+   * `cancelled`). A hung phase can no longer hold a job, and its slot, forever.
+   */
+  maxJobSeconds?: number;
+  /**
    * Module run in a forked capture child (it calls `runCaptureChild` from `@storyshelf/core/capture`).
    * The app consumes the queue and pushes each job to the child over IPC. Needs `runner`, which
    * serves as the in-process fallback.

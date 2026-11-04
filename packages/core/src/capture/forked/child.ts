@@ -210,6 +210,8 @@ class CaptureChild {
         touch: throttled(() => {
           this.#send({ type: "progress", runId });
         }),
+        // The parent holds the lease and the deadline; it stops this run through its cancel path.
+        signal: new AbortController().signal,
       });
       this.#send({ type: "done", runId });
     } catch (error) {

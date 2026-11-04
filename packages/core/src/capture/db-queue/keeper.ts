@@ -19,7 +19,7 @@ import { REAL_TIMERS, repeatEvery, type QueueTimers } from "./timers.ts";
 export const RENEW_THROTTLE_MS = 30_000;
 
 /** Why a held job must stop. */
-export type LeaseEnd = Exclude<LeaseRenewal, "ok">;
+export type LeaseEnd = Exclude<LeaseRenewal, "ok"> | "deadline";
 
 /** Options of {@link keepJobLease}. */
 export interface LeaseKeeperOptions {
@@ -32,6 +32,11 @@ export interface LeaseKeeperOptions {
   /** Timers of the state check (default the global timers). */
   timers?: QueueTimers;
   logger?: Logger;
+  /**
+   * Wall-clock bound of the job in ms. Past it the lease is no longer renewed, `signal` aborts and
+   * `ended` resolves `deadline`; the lease then runs out and the queue redelivers or exhausts the job.
+   */
+  maxJobMs?: number;
 }
 
 /** Handle on a held job's lease. */
@@ -40,6 +45,8 @@ export interface JobLeaseKeeper {
   touch(): void;
   /** Resolves once, when the job was cancelled or the lease lost; never while the job is ours. */
   readonly ended: Promise<LeaseEnd>;
+  /** Aborted when the job passes its deadline, so in-process work can stop. */
+  readonly signal: AbortSignal;
   /** Stop checking; idempotent. */
   stop(): void;
 }
@@ -60,6 +67,7 @@ export function keepJobLease(
 ): JobLeaseKeeper {
   const now = options.now ?? Date.now;
   const { promise, resolve } = Promise.withResolvers<LeaseEnd>();
+  const controller = new AbortController();
   const state: KeeperState = {
     lastRenewAt: now(),
     renewing: false,
@@ -72,10 +80,12 @@ export function keepJobLease(
   };
   const stopChecks = startChecks(queue, job, state, options);
   const stopBeat = startHeartbeat(queue, job, state, { ...options, now });
+  const stopDeadline = startDeadline(state, controller, options);
   const stop = (): void => {
     state.stopped = true;
     stopChecks();
     stopBeat();
+    stopDeadline();
   };
   promise.then(stop, stop);
   return {
@@ -83,7 +93,30 @@ export function keepJobLease(
       renewIfDue(queue, job, state, { ...options, now });
     },
     ended: promise,
+    signal: controller.signal,
     stop,
+  };
+}
+
+/** Arm the job's wall-clock bound; the returned function disarms it. */
+function startDeadline(
+  state: KeeperState,
+  controller: AbortController,
+  options: LeaseKeeperOptions,
+): () => void {
+  const { maxJobMs } = options;
+  if (maxJobMs === undefined) {
+    return () => {};
+  }
+  const timers = options.timers ?? REAL_TIMERS;
+  const handle = timers.setTimeout(() => {
+    if (!state.stopped) {
+      controller.abort(new Error("job deadline exceeded"));
+      state.settle("deadline");
+    }
+  }, maxJobMs);
+  return () => {
+    timers.clearTimeout(handle);
   };
 }
 

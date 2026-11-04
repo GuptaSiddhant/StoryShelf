@@ -57,8 +57,8 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
-      await runMigrations(async (sql) => (await pool.query(sql)).rows as unknown[]);
+    migrate: async ({ logger }) => {
+      await runMigrations(async (sql) => (await pool.query(sql)).rows as unknown[], logger);
     },
     close: async () => {
       if (owned) {

@@ -18,7 +18,11 @@ const job = (buildId: string, extra: Partial<ConsumerJob> = {}): ConsumerJob => 
   ...extra,
 });
 
-const context = (): JobRunContext => ({ logger: {} as never, touch: () => {} });
+const context = (): JobRunContext => ({
+  logger: {} as never,
+  touch: () => {},
+  signal: new AbortController().signal,
+});
 
 function real(overrides: Partial<ForkedCaptureOptions> = {}): {
   handler: ForkedCaptureHandler;

@@ -82,6 +82,16 @@ export class Retention {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const { buildIds, pending } = await this.selectBuilds(project, options, cutoff);
     if (lifecycle) return await this.purgeClaimed(project, lifecycle, buildIds, pending, cutoff);
+    return await this.purgeUnfenced(project, buildIds, pending, cutoff);
+  }
+
+  /** Purge without the lifecycle capability: delete each build's files, then its rows. */
+  private async purgeUnfenced(
+    project: Project,
+    buildIds: readonly string[],
+    pending: number,
+    cutoff: string,
+  ): Promise<PurgeResult> {
     const results = await Promise.all(
       buildIds.map(async (buildId) => ({
         files: await this.deleteBuildFiles(project.id, buildId),
@@ -237,15 +247,20 @@ export class Retention {
     return files.length;
   }
 
-  async purgeStaleBranches(project: Project, ttlDays: number): Promise<BranchGcResult> {
-    if (ttlDays <= 0) {
-      return { removedBranches: 0, removedBaselines: 0 };
-    }
+  /** The branches (never the default one) whose newest build is older than the window. */
+  private async staleBranches(project: Project, ttlDays: number): Promise<Set<string>> {
     const cutoff = new Date(Date.now() - ttlDays * 86_400_000).toISOString();
     const rows = (await this.db.list(this.tables.builds, {
       where: eq(col(this.tables.builds, "projectId"), project.id),
     })) as unknown as { gitBranch: string; updatedAt: string }[];
-    const stale = collectStaleBranches(rows, project.gitDefaultBranch, cutoff);
+    return collectStaleBranches(rows, project.gitDefaultBranch, cutoff);
+  }
+
+  async purgeStaleBranches(project: Project, ttlDays: number): Promise<BranchGcResult> {
+    if (ttlDays <= 0) {
+      return { removedBranches: 0, removedBaselines: 0 };
+    }
+    const stale = await this.staleBranches(project, ttlDays);
     if (stale.size === 0) {
       return { removedBranches: 0, removedBaselines: 0 };
     }

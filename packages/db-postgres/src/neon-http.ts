@@ -51,8 +51,8 @@ export function createNeonHttpDatabase(options: NeonHttpDatabaseOptions): Databa
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
-      await runMigrations(async (statement) => await sql.query(statement));
+    migrate: async ({ logger }) => {
+      await runMigrations(async (statement) => await sql.query(statement), logger);
     },
     close: () => {
       // no-op: fetch-based queries hold no connections (owned or not)

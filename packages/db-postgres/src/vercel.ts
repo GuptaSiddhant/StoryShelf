@@ -46,8 +46,8 @@ export function createVercelDatabase(options: VercelDatabaseOptions = {}): Datab
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
-      await runMigrations(async (statement) => (await client.query(statement)).rows);
+    migrate: async ({ logger }) => {
+      await runMigrations(async (statement) => (await client.query(statement)).rows, logger);
     },
     close: () => {
       // no-op: the platform owns the connection
