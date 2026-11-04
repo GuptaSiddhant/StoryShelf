@@ -15,6 +15,19 @@ export async function dayTokens(deps: InsightDeps, now = new Date()): Promise<nu
   return rows.reduce((sum, row) => sum + countedTokens(row, row.images, { visionWeight }), 0);
 }
 
+/** Today's tokens; when they cannot be read the reservation is given back, as nobody holds it yet. */
+async function usedToday(
+  deps: InsightDeps,
+  usage: AiUsageModel,
+  reservationId: string,
+  now: Date,
+): Promise<number> {
+  return await dayTokens(deps, now).catch(async (error: unknown) => {
+    await usage.release(reservationId).catch(() => null);
+    throw error;
+  });
+}
+
 /**
  * Reserve one of the project's calls before the model is called, or reject (429 + Retry-After)
  * when the hourly limit or the daily token cap is hit. The reservation is a `pending` usage row
@@ -36,7 +49,10 @@ export async function reserveBudget(
   if (row === null) {
     failWith(429, "ai-hourly-limit", 600);
   }
-  if (budget.dailyTokens !== undefined && (await dayTokens(deps, now)) >= budget.dailyTokens) {
+  if (
+    budget.dailyTokens !== undefined &&
+    (await usedToday(deps, usage, row.id, now)) >= budget.dailyTokens
+  ) {
     await usage.release(row.id);
     const midnight = new Date(`${utcDay(now)}T00:00:00.000Z`).getTime() + 86_400_000;
     failWith(429, "ai-daily-budget", Math.max(1, Math.ceil((midnight - now.getTime()) / 1000)));

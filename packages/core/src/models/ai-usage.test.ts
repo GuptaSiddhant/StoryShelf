@@ -88,6 +88,25 @@ describe("AiUsageModel", () => {
       expect(results.map((result) => result.status)).toEqual(["rejected", "fulfilled"]);
     });
 
+    it("removes its own row when the rank query fails, and the slot is free again", async () => {
+      const { db } = makeDatabase();
+      const model = new AiUsageModel(db);
+      const count = db.count.bind(db);
+      let failures = 0;
+      db.count = (async (...args: Parameters<typeof db.count>) => {
+        // The first count is the pre-check; the second is the rank query after the insert.
+        failures += 1;
+        if (failures === 2) {
+          throw new Error("db down");
+        }
+        return await count(...args);
+      }) as typeof db.count;
+      const window = { since: hourAgo(), max: 1 };
+      await expect(model.reserve(reservation, window)).rejects.toThrow("db down");
+      expect(await model.listSince("2000-01-01T00:00:00.000Z")).toEqual([]);
+      expect(await model.reserve(reservation, window)).not.toBeNull();
+    });
+
     it("counts earlier calls and other projects separately", async () => {
       const { db } = makeDatabase();
       const model = new AiUsageModel(db);

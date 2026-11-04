@@ -1,6 +1,6 @@
 import { AiUsageModel } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { recordUsage, reserveBudget } from "./budget.ts";
 import type { InsightDeps } from "./deps.ts";
 import { fakeAi } from "./test-support.ts";
@@ -51,6 +51,17 @@ describe("reserveBudget", () => {
     await expect(reserveBudget(deps, reservation)).rejects.toMatchObject({ status: 429 });
     const rows = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
     expect(rows).toHaveLength(1);
+  });
+
+  it("gives the reservation back when today's usage cannot be read", async () => {
+    const { db } = makeDatabase();
+    const deps = depsWith(db, { dailyTokens: 10 });
+    const read = vi
+      .spyOn(AiUsageModel.prototype, "listSince")
+      .mockRejectedValueOnce(new Error("db down"));
+    await expect(reserveBudget(deps, reservation)).rejects.toThrow("db down");
+    read.mockRestore();
+    expect(await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z")).toEqual([]);
   });
 });
 

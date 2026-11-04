@@ -95,14 +95,20 @@ export class AiUsageModel {
       status: "pending",
       createdAt: new Date().toISOString(),
     })) as unknown as AiUsageRow;
-    const rank = await this.db.count(
-      this.tables.aiUsage,
-      and(
-        eq(this.col("projectId"), input.projectId),
-        gte(this.col("createdAt"), window.since),
-        lte(this.col("id"), row.id),
-      ),
-    );
+    const rank = await this.db
+      .count(
+        this.tables.aiUsage,
+        and(
+          eq(this.col("projectId"), input.projectId),
+          gte(this.col("createdAt"), window.since),
+          lte(this.col("id"), row.id),
+        ),
+      )
+      .catch(async (error: unknown) => {
+        // Nobody holds this id yet, so a row left behind would use up a call for nothing.
+        await this.db.remove(this.tables.aiUsage, row.id).catch(() => null);
+        throw error;
+      });
     if (rank > window.max) {
       await this.db.remove(this.tables.aiUsage, row.id);
       return null;

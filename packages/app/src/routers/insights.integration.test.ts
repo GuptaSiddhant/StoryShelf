@@ -254,7 +254,38 @@ describe("insights generation", () => {
 
   it("reserves a call when the in-flight insight it saw ends before the run starts", async () => {
     const { db, storage, buildId } = await seed();
-    const app = appWith(db, storage, fakeAi());
+    const gate = Promise.withResolvers<null>();
+    const ai = fakeAi({ gate: gate.promise });
+    const app = appWith(db, storage, ai);
+    const peek = vi
+      .spyOn(InsightModel.prototype, "peek")
+      .mockResolvedValueOnce({ status: "running" } as InsightRow);
+    try {
+      const res = await app.request(path(buildId), {
+        method: "POST",
+        headers: cookie("admin"),
+        body: "{}",
+      });
+      expect(res.status).toBe(202);
+      await vi.waitFor(() => expect(ai.calls).toHaveLength(1));
+      // The reservation is made before the provider answers, not recorded after it.
+      const held = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+      expect(held).toMatchObject([{ status: "pending" }]);
+      expect(held[0]?.insightId).not.toBeNull();
+    } finally {
+      peek.mockRestore();
+      gate.resolve(null);
+      await settleInsightJobs();
+    }
+    expect(await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z")).toMatchObject([
+      { status: "ok" },
+    ]);
+  });
+
+  it("refuses that late run when the hourly calls are used up, and keeps no usage row", async () => {
+    const { db, storage, buildId } = await seed();
+    const ai = fakeAi({ callsPerHour: 0 });
+    const app = appWith(db, storage, ai);
     const peek = vi
       .spyOn(InsightModel.prototype, "peek")
       .mockResolvedValueOnce({ status: "running" } as InsightRow);
@@ -264,11 +295,9 @@ describe("insights generation", () => {
       body: "{}",
     });
     peek.mockRestore();
-    expect(res.status).toBe(202);
-    await settleInsightJobs();
-    const rows = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.insightId).not.toBeNull();
+    expect(res.status).toBe(429);
+    expect(ai.calls).toHaveLength(0);
+    expect(await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z")).toEqual([]);
   });
 
   it("holds the call as a pending reservation while the provider is still running", async () => {
@@ -276,18 +305,22 @@ describe("insights generation", () => {
     const gate = Promise.withResolvers<null>();
     const ai = fakeAi({ gate: gate.promise });
     const app = appWith(db, storage, ai);
-    const res = await app.request(path(buildId), {
-      method: "POST",
-      headers: cookie("admin"),
-      body: "{}",
-    });
-    expect(res.status).toBe(202);
-    await vi.waitFor(() => expect(ai.calls).toHaveLength(1));
-    const held = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
-    expect(held).toMatchObject([{ status: "pending" }]);
-    expect(held[0]?.insightId).not.toBeNull();
-    gate.resolve(null);
-    await settleInsightJobs();
+    try {
+      const res = await app.request(path(buildId), {
+        method: "POST",
+        headers: cookie("admin"),
+        body: "{}",
+      });
+      expect(res.status).toBe(202);
+      await vi.waitFor(() => expect(ai.calls).toHaveLength(1));
+      const held = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
+      expect(held).toMatchObject([{ status: "pending" }]);
+      expect(held[0]?.insightId).not.toBeNull();
+    } finally {
+      // A failed assertion must not leave the job blocked on the gate.
+      gate.resolve(null);
+      await settleInsightJobs();
+    }
     const done = await new AiUsageModel(db).listSince("2000-01-01T00:00:00.000Z");
     expect(done).toMatchObject([{ status: "ok" }]);
   });
