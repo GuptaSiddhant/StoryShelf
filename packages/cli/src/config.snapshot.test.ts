@@ -7,10 +7,10 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { devNull, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detectGitDefaultBranch,
   detectGitRepository,
@@ -30,35 +30,61 @@ import {
 
 let dir = "";
 
-/** Variables a git hook or worktree exports; they would point git at that checkout instead of `dir`. */
-const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] as const;
+/** The user's and the system's git config files: pointed at the null device so they define nothing. */
+const GIT_CONFIG_FILES = ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"] as const;
 const savedGitEnv = new Map<string, string | undefined>();
+/** The `GIT_*` variables this process started with, which every restore must leave as they were. */
+const OUTER_GIT_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => key.startsWith("GIT_")),
+);
 
-function isolateGitEnv(): void {
-  for (const name of GIT_REDIRECTS) {
-    savedGitEnv.set(name, process.env[name]);
+/**
+ * Clear every inherited `GIT_*` variable, so a git hook, a worktree or a `GIT_CONFIG_COUNT` override
+ * cannot point git at another checkout or define `remote.origin.url` for the fixture, and use no
+ * user or system git config.
+ */
+function isolateGitEnv(ceiling: string): void {
+  for (const name of Object.keys(process.env).filter((key) => key.startsWith("GIT_"))) {
+    if (!savedGitEnv.has(name)) {
+      savedGitEnv.set(name, process.env[name]);
+    }
     Reflect.deleteProperty(process.env, name);
   }
+  for (const name of GIT_CONFIG_FILES) {
+    process.env[name] = devNull;
+  }
+  // Keep git from finding a checkout above the fixture (e.g. a tmpdir inside a worktree).
+  process.env["GIT_CEILING_DIRECTORIES"] = ceiling;
 }
 
 function restoreGitEnv(): void {
+  for (const name of Object.keys(process.env).filter((key) => key.startsWith("GIT_"))) {
+    Reflect.deleteProperty(process.env, name);
+  }
   for (const [name, value] of savedGitEnv) {
     if (value !== undefined) {
       process.env[name] = value;
     }
   }
-  savedGitEnv.clear();
 }
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "storyshelf-cli-config-snapshot-"));
   vi.stubEnv("npm_config_user_agent", "");
-  isolateGitEnv();
+  isolateGitEnv(dirname(dir));
+});
+
+afterAll(() => {
+  const now = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => key.startsWith("GIT_")),
+  );
+  expect(now).toEqual(OUTER_GIT_ENV);
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   restoreGitEnv();
+  savedGitEnv.clear();
+  vi.unstubAllEnvs();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -225,6 +251,21 @@ function git(...args: string[]): void {
 }
 
 describe("git detection", () => {
+  it("ignores git config overrides inherited through GIT_CONFIG_COUNT", () => {
+    restoreGitEnv();
+    vi.stubEnv("GIT_CONFIG_COUNT", "1");
+    vi.stubEnv("GIT_CONFIG_KEY_0", "remote.origin.url");
+    vi.stubEnv("GIT_CONFIG_VALUE_0", "https://github.com/inherited/override.git");
+    isolateGitEnv(dirname(dir));
+    expect(detectGitRepository(dir)).toBeNull();
+  });
+
+  it("replaces the inherited git ceiling during the fixture and restores it afterwards", () => {
+    expect(process.env["GIT_CEILING_DIRECTORIES"]).toBe(dirname(dir));
+    restoreGitEnv();
+    expect(process.env["GIT_CEILING_DIRECTORIES"]).toBe(OUTER_GIT_ENV["GIT_CEILING_DIRECTORIES"]);
+  });
+
   it.each([
     "git@github.com:acme/shelf.git",
     "git@gitlab.example.com:group/sub.git",

@@ -255,6 +255,30 @@ describe("createTursoDatabase", () => {
     await cleanupTurso(dir, db, client);
   });
 
+  it("commits many overlapping transactions, one at a time", async () => {
+    const { dir, db, client } = createTempTurso();
+    await initDb(db);
+    const now = new Date().toISOString();
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 15 }, async (_unused, index) =>
+        db.transact?.(async (tx) => {
+          await tx.insert(schema.projects, {
+            id: `p${String(index)}`,
+            name: "Tx",
+            slug: `tx-${String(index)}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }),
+      ),
+    );
+
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+    expect(await db.count(schema.projects)).toBe(15);
+    await cleanupTurso(dir, db, client);
+  });
+
   it("creates auth tables on fresh and stale volumes", async () => {
     const expected = ["user", "session", "account", "verification"] as const;
 

@@ -169,6 +169,29 @@ describe("createD1Database", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("commits many overlapping transactions, one at a time", async () => {
+    const db = createD1Database({ client: createStubBinding() });
+    await initDb(db);
+    const now = new Date().toISOString();
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 15 }, async (_unused, index) =>
+        db.transact?.(async (tx) => {
+          await tx.insert(schema.projects, {
+            id: `p${String(index)}`,
+            name: "Tx",
+            slug: `tx-${String(index)}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }),
+      ),
+    );
+
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+    expect(await db.count(schema.projects)).toBe(15);
+  });
+
   it("teardown is a no-op: the platform owns the binding", async () => {
     const client = createStubBinding();
     const db = createD1Database({ client });
