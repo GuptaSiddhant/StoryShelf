@@ -22,11 +22,22 @@ const TOKEN_TAG = "csrf";
  */
 function generateToken(secret: string, sessionId: string): string {
   const timestamp = Date.now().toString(36);
-  const signature = createHash("sha256")
+  return `${TOKEN_TAG}:${timestamp}:${signatureOf(secret, sessionId, timestamp)}`;
+}
+
+/** The signature of a token minted for `sessionId` at the base-36 `timestamp`. */
+function signatureOf(secret: string, sessionId: string, timestamp: string): string {
+  return createHash("sha256")
     .update(`${secret}:${sessionId}:${timestamp}`)
     .digest("hex")
     .slice(0, 16);
-  return `${TOKEN_TAG}:${timestamp}:${signature}`;
+}
+
+/** Whether a token minted at the base-36 `payloadTimestamp` is under a day old and not from the future. */
+function isFresh(payloadTimestamp: string): boolean {
+  const age = Date.now() - Number.parseInt(payloadTimestamp, 36);
+  // Same-millisecond tokens are fresh (>= 0), not from the future.
+  return age >= 0 && age < 24 * 60 * 60 * 1000;
 }
 
 function verifyToken(secret: string, token: string, sessionId: string): boolean {
@@ -38,17 +49,11 @@ function verifyToken(secret: string, token: string, sessionId: string): boolean 
   if (!payloadTimestamp || !signature) {
     return false;
   }
-  const expectedSignature = createHash("sha256")
-    .update(`${secret}:${sessionId}:${payloadTimestamp}`)
-    .digest("hex")
-    .slice(0, 16);
+  const expectedSignature = signatureOf(secret, sessionId, payloadTimestamp);
   if (!timingSafeEqualString(signature, expectedSignature)) {
     return false;
   }
-  const timestamp = Number.parseInt(payloadTimestamp, 36);
-  const age = Date.now() - timestamp;
-  // Same-millisecond tokens are fresh (>= 0), not from the future.
-  return age >= 0 && age < 24 * 60 * 60 * 1000;
+  return isFresh(payloadTimestamp);
 }
 
 /**
