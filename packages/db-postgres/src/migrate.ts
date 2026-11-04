@@ -122,6 +122,8 @@ const NOTIFICATION_LAST_ERROR_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error TEXT";
 const NOTIFICATION_LAST_ERROR_AT_ALTER =
   "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMPTZ";
+const NOTIFICATION_LAST_DELIVERED_ALTER =
+  "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_delivered_at TIMESTAMPTZ";
 /**
  * Re-runs share `(project_id, git_sha)` by design (ULID build ids), so the
  * lookup index must not be unique. Existing databases created it UNIQUE —
@@ -304,6 +306,8 @@ async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {
 async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, NOTIFICATION_LAST_ERROR_ALTER);
   await execIgnore(run, NOTIFICATION_LAST_ERROR_AT_ALTER);
+  // IF NOT EXISTS makes it idempotent, so a real failure must surface rather than be ignored.
+  await run(NOTIFICATION_LAST_DELIVERED_ALTER);
 }
 
 async function migrateCommentsTable(run: MigrationRunner): Promise<void> {

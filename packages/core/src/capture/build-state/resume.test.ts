@@ -28,6 +28,23 @@ describe("requestOpenBuildStates", () => {
     expect(request.mock.calls.map(([id]) => id)).toEqual([w.build.id]);
   });
 
+  it("narrows to one project and one channel for an operator retry", async () => {
+    const w = await world();
+    const request = vi.fn(async (_id: string, _only?: { channelId?: string }) => {});
+    const asked = await requestOpenBuildStates(
+      w.deps,
+      { request },
+      { projectId: w.project.id, channelId: "chan-1" },
+    );
+    expect(asked).toBe(1);
+    expect(request.mock.calls).toEqual([[w.build.id, { channelId: "chan-1" }]]);
+    request.mockClear();
+    await expect(
+      requestOpenBuildStates(w.deps, { request }, { projectId: "other-project" }),
+    ).resolves.toBe(0);
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("never rejects", async () => {
     const w = await world();
     const request = vi.fn(async () => {

@@ -16,6 +16,7 @@ export interface NotificationChannelRow {
   lastError: string | null;
   /** ISO-8601 time of {@link lastError}. */
   lastErrorAt: string | null;
+  lastDeliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

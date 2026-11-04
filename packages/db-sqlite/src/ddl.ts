@@ -351,6 +351,7 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   enabled INTEGER NOT NULL DEFAULT 1,
   last_error TEXT,
   last_error_at TEXT,
+  last_delivered_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

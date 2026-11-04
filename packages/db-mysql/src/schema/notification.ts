@@ -14,6 +14,7 @@ export const notificationChannels = mysqlTable("notification_channels", {
   enabled: boolean("enabled").notNull().default(true),
   lastError: text("last_error"),
   lastErrorAt: datetime("last_error_at", { mode: "string", fsp: 3 }),
+  lastDeliveredAt: datetime("last_delivered_at", { mode: "string", fsp: 3 }),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
   updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
 });
@@ -44,6 +45,7 @@ export interface NotificationChannel {
   enabled: boolean;
   lastError: string | null;
   lastErrorAt: string | null;
+  lastDeliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
