@@ -96,7 +96,7 @@ export async function finishJob(
 }
 
 /**
- * After a job ended: if a request arrived while it ran, a successor takes its key at once. For a
+ * After a job ended: if a request arrived while it ran, a successor takes its key at once (once, however many settlers reach it). For a
  * job that ended a way other than {@link finishJob} (the exhausted-job path), after its own write.
  */
 export async function startSuccessor(rt: QueueRuntime, row: CaptureJobRow): Promise<void> {
@@ -105,7 +105,12 @@ export async function startSuccessor(rt: QueueRuntime, row: CaptureJobRow): Prom
   }
   // The marker can only be set while the job runs, and the write above ended that, so this read is final.
   const ended = await rt.model.get(row.jobId);
-  if ((ended?.rerunRequestedAt ?? null) === null) {
+  if (!ended?.rerunRequestedAt) {
+    return;
+  }
+  // Two settlers of the same ended job can both reach this point; only the one that clears the
+  // marker starts the successor (the key alone cannot stop a second once the first has ended).
+  if (!(await rt.model.takeRerun(row.jobId, ended.updatedAt))) {
     return;
   }
   await insertKeyed(rt, {
