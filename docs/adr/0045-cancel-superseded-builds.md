@@ -92,9 +92,9 @@ Two traps decide the design:
 ## Delivery
 
 1. Prerequisite: #757, comparing only against an approved build.
-2. Core: the two columns, a `BuildModel.supersede` helper that validates (decision 3) and cancels,
+2. Core (#759): the two columns, a `BuildModel.supersede` helper that validates (decision 3) and cancels,
    and the status mapping (decisions 1, 3, 5, 6).
-3. App: the in-flight endpoint, `supersedes` on both build-creation endpoints, and the settings
+3. App (#760): the in-flight endpoint, `supersedes` on both build-creation endpoints, and the settings
    field in the project API (decisions 2, 3).
-4. CLI: the ancestry check and `supersedes` (decision 2), plus the website docs on clone depth.
-5. UI: the settings toggle and the superseded build page (decision 8; Designer spec first).
+4. CLI (#761): the ancestry check and `supersedes` (decision 2), plus the website docs on clone depth.
+5. UI (#762): the settings toggle and the superseded build page (decision 8; Designer spec first).
