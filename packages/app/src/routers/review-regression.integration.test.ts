@@ -1,5 +1,11 @@
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
-import { BuildModel, BuildReviewModel, MemberModel, TokenModel } from "@storyshelf/core/models";
+import {
+  BuildModel,
+  BuildReviewModel,
+  CaptureAttemptModel,
+  MemberModel,
+  TokenModel,
+} from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sha256, storybookDir } from "@storyshelf/core/utils";
@@ -302,17 +308,15 @@ describe("the verdict form while publishing", () => {
 
 /**
  * A runner that tells the test it has started rendering (`entered`), waits for `release`, then
- * reports its one story as failed to render (`reported` says it did).
+ * reports its one story as failed to render.
  */
 function failingRunner(release: Promise<null>) {
   const entered = Promise.withResolvers<null>();
-  const state = { reported: false };
   const runner: CaptureRunner = {
     metadata: { name: "failing", version: "0.0.0", kind: "stub", category: "capture-runner" },
     render: async () => {
       entered.resolve(null);
       await release;
-      state.reported = true;
       return {
         captures: [],
         failures: [{ storyId: "button--primary", viewportName: "default", error: "render failed" }],
@@ -322,7 +326,7 @@ function failingRunner(release: Promise<null>) {
       await Promise.resolve();
     },
   };
-  return { runner, entered: entered.promise, state };
+  return { runner, entered: entered.promise };
 }
 
 /** A build with one story, created and uploaded as a zip, so the capture runs. */
@@ -378,7 +382,12 @@ describe.each(CHANNELS)("a sign-off on a failed build through the %s (testing on
       expect(given.status).toBeLessThan(400);
       release.resolve(null);
       await vi.waitFor(async () => expect(await statusOf(booted, id)).toBe("failed"));
-      expect(failing.state.reported).toBe(true);
+      // The failure reached the rollup: the attempt closed with one failed story and no error of
+      // its own (a capture that threw after the runner returned would also fail the build).
+      await vi.waitFor(async () => {
+        const attempts = await new CaptureAttemptModel(booted.db).listByBuild(id);
+        expect(attempts).toMatchObject([{ failedCount: 1, error: null }]);
+      });
       expect(await new BuildReviewModel(booted.db).listByBuild(id)).toHaveLength(1);
     } finally {
       release.resolve(null);
