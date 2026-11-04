@@ -191,7 +191,8 @@ describe("runUpload success", () => {
       const printed = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
       expect(printed).toContain("Invalid Storybook zip");
       expect(printed).toMatch(/maxZipEntries[\s\S]*maxUnzippedBytes/u);
-      expect(printed).toContain("/api/v1/projects/demo/builds/b1/zip");
+      expect(printed).toContain("build b1 failed and takes no further upload");
+      expect(printed).not.toContain("reuse");
     } finally {
       stderr.mockRestore();
       process.exitCode = savedExitCode;

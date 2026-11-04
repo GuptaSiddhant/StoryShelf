@@ -15,9 +15,10 @@ import {
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import { BuildModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
-import { storybookZipPath } from "@storyshelf/core/utils";
+import { sanitizeErrorText, storybookZipPath } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
 import { getStore } from "../store.ts";
+import { announceBuildStatus } from "./builds.handlers.ts";
 
 /** How an upload of `zipBytes` will be published, or a 413 when this host cannot publish it. */
 export function planUpload(zipBytes: number): "inline" | "job" {
@@ -74,11 +75,23 @@ async function publishInline(build: Build): Promise<void> {
     await publish?.completer.complete(build.id, { ok: true });
   } catch (error) {
     if (error instanceof ZipInvalidError || error instanceof ZipLimitError) {
-      await discardZip(build.projectId, build.id);
+      await rejectInlineZip(build, error.message);
       throw new HTTPException(422, { message: error.message });
     }
     await failInlinePublish(build, error);
   }
+}
+
+/**
+ * An inline zip that is invalid or breaks a cap ends the build `failed`: a retry is a new upload
+ * (a new build), so a build left `pending` would never resolve, and a git check already queued for
+ * it would stay pending. The validation message is the sanitized reason, sent with `build:failed`.
+ */
+async function rejectInlineZip(build: Build, reason: string): Promise<void> {
+  await discardZip(build.projectId, build.id);
+  const failed = await new BuildModel(getStore().db).setStatus(build.id, "failed");
+  getStore().logger.warn({ buildId: build.id, reason }, "inline zip rejected; build failed");
+  await announceBuildStatus(failed.id, "failed", { reason: sanitizeErrorText(reason, 300) });
 }
 
 async function failInlinePublish(build: Build, error: unknown): Promise<void> {
