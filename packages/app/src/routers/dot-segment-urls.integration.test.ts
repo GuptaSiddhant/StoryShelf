@@ -3,6 +3,7 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import { pino } from "pino";
 import { afterEach, describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 import { stubRunner } from "../test-runner.ts";
 
 /**
@@ -126,4 +127,39 @@ describe("label links with a dot segment", () => {
       expect(html).toContain(`release: ${value}`);
     },
   );
+});
+
+async function gated() {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const app = createShelfApp({
+    database: db,
+    storage,
+    auth: stubAuth(null),
+    logger: pino({ level: "silent" }),
+    config: { secret: "s" },
+    testing: { runner: stubRunner() },
+  });
+  apps.push(app);
+  return app;
+}
+
+describe("the auth gate and the query form", () => {
+  it.each([
+    "/projects/app/components/storybook?path=../ui/Button.stories.tsx",
+    "/projects/app/components/x/storybook/y?path=../ui/Button.stories.tsx",
+    "/projects/app/labels/release/storybook?value=..",
+  ])("sends an anonymous visitor to login for %s, whatever the path tail says", async (link) => {
+    const response = await (await gated()).request(link);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/auth/login");
+  });
+
+  it("still lets an anonymous visitor reach the published Storybook routes", async () => {
+    const app = await gated();
+    for (const link of ["/projects/app/storybook", "/projects/app/storybook/branch/main"]) {
+      // oxlint-disable-next-line no-await-in-loop -- sequential, tiny
+      expect((await app.request(link)).status).not.toBe(302);
+    }
+  });
 });
