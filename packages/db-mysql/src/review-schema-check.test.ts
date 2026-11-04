@@ -5,11 +5,15 @@ type Row = { table_name: string; column_name: string; data_type: string };
 
 const runnerOf = (rows: Row[]) => async (): Promise<unknown[]> => await Promise.resolve(rows);
 
-const reviews = ["id", "build_id", "verdict", "created_at"].map((column_name) => ({
-  table_name: "build_reviews",
-  column_name,
-  data_type: "text",
-}));
+const reviews: Row[] = [
+  { table_name: "build_reviews", column_name: "id", data_type: "varchar" },
+  { table_name: "build_reviews", column_name: "build_id", data_type: "varchar" },
+  { table_name: "build_reviews", column_name: "user_id", data_type: "varchar" },
+  { table_name: "build_reviews", column_name: "verdict", data_type: "text" },
+  { table_name: "build_reviews", column_name: "body", data_type: "text" },
+  { table_name: "build_reviews", column_name: "created_at", data_type: "datetime" },
+];
+
 const settings: Row[] = [
   { table_name: "projects", column_name: "review_enabled", data_type: "tinyint" },
   { table_name: "projects", column_name: "review_approvals", data_type: "int" },
@@ -34,6 +38,22 @@ describe("assertReviewSchema", () => {
     const partial = reviews.filter((row) => row.column_name !== "build_id");
     await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
       "table build_reviews has no column build_id",
+    );
+  });
+
+  it("also requires the reviewer and body columns", async () => {
+    const partial = reviews.filter((row) => row.column_name !== "body");
+    await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
+      "table build_reviews has no column body",
+    );
+  });
+
+  it("refuses a build_id that is not varchar, which MySQL cannot index", async () => {
+    const wrong = reviews.map((row) =>
+      row.column_name === "build_id" ? Object.assign({}, row, { data_type: "text" }) : row,
+    );
+    await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
+      "column build_reviews.build_id has type text, expected varchar",
     );
   });
 

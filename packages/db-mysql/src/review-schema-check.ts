@@ -5,14 +5,16 @@
 import type { MigrationRunner } from "./migrate.ts";
 
 /** Columns the review code needs in `build_reviews`. */
-const BUILD_REVIEW_COLUMNS = ["id", "build_id", "verdict", "created_at"];
+const BUILD_REVIEW_COLUMNS = ["id", "build_id", "user_id", "verdict", "body", "created_at"];
 
-/** Columns the upgrade adds, with the `information_schema` `data_type` each must have. */
+/** Columns the upgrade relies on, with the `information_schema` `data_type` each must have. */
 const TYPED_COLUMNS = [
   { table: "projects", column: "review_enabled", type: "tinyint" },
   { table: "projects", column: "review_approvals", type: "int" },
   { table: "builds", column: "review_cycle", type: "int" },
   { table: "builds", column: "review_requested_cycle", type: "int" },
+  // An index on a TEXT build_id is refused by MySQL, so a hand-made table must use varchar.
+  { table: "build_reviews", column: "build_id", type: "varchar" },
 ];
 
 interface ColumnRow {

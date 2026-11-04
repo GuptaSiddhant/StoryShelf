@@ -5,7 +5,7 @@
 import type { MigrationRunner } from "./migrate.ts";
 
 /** Columns the review code needs in `build_reviews`. */
-const BUILD_REVIEW_COLUMNS = ["id", "build_id", "verdict", "created_at"];
+const BUILD_REVIEW_COLUMNS = ["id", "build_id", "user_id", "verdict", "body", "created_at"];
 
 /** Columns the upgrade adds, with the `information_schema` type each must have. */
 const TYPED_COLUMNS = [

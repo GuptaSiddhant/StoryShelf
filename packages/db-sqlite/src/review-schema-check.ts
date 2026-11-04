@@ -5,7 +5,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 /** Columns the review code needs in `build_reviews`. */
-const BUILD_REVIEW_COLUMNS = ["id", "build_id", "verdict", "created_at"];
+const BUILD_REVIEW_COLUMNS = ["id", "build_id", "user_id", "verdict", "body", "created_at"];
 
 /** Integer columns the upgrade adds; one that exists with another type was made by hand. */
 const INTEGER_COLUMNS = [
