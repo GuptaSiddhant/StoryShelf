@@ -155,9 +155,12 @@ async function handleRetryChannel(c: Context): Promise<Response> {
   const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const result = await retryChannelState(project, c.req.param("channelId") ?? "");
   if (!result.ok) {
+    // The shell swaps only 400, 409 and 422 into the page (ADR 0012), so the form answers a failed
+    // lookup (503 on the JSON API) as 409 and the admin sees the message, not a generic toast.
+    const status = result.status === 503 ? 409 : result.status;
     return c.html(
       (await renderSettingsPage(c, "notifications", { globalError: result.message })) ?? "",
-      result.status,
+      status,
     );
   }
   flash(

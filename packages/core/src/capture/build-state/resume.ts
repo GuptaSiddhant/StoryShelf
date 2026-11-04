@@ -22,15 +22,19 @@ export interface OpenBuildScope {
   channelId?: string;
 }
 
+/** How a request for open builds ended: how many were asked, or that the lookup itself failed. */
+export type OpenBuildRequest = { ok: true; asked: number } | { ok: false };
+
 /**
- * Ask `publisher` for the state of every open recent build (of `scope`, when given); resolves to
- * how many builds were asked. Never rejects.
+ * Ask `publisher` for the state of every open recent build (of `scope`, when given). Never rejects:
+ * a failed lookup is logged once and answered `{ ok: false }`, so a caller that reports to a person
+ * (an operator retry) can tell it from "nothing is open".
  */
-export async function requestOpenBuildStates(
+export async function tryRequestOpenBuildStates(
   deps: Pick<BuildStateDeps, "db" | "logger">,
   publisher: BuildStatePublisher,
   scope: OpenBuildScope = {},
-): Promise<number> {
+): Promise<OpenBuildRequest> {
   try {
     const projects = (await new ProjectModel(deps.db).list()).filter(
       (project) => scope.projectId === undefined || project.id === scope.projectId,
@@ -47,11 +51,25 @@ export async function requestOpenBuildStates(
           : publisher.request(id, { channelId }));
       }),
     );
-    return ids.length;
+    return { ok: true, asked: ids.length };
   } catch (error) {
     deps.logger.warn({ err: error }, "failed to re-request the state of open builds");
-    return 0;
+    return { ok: false };
   }
+}
+
+/**
+ * Ask `publisher` for the state of every open recent build (of `scope`, when given); resolves to
+ * how many builds were asked, 0 when the lookup failed. Never rejects: the boot replay and an
+ * origin change must not fail because of it.
+ */
+export async function requestOpenBuildStates(
+  deps: Pick<BuildStateDeps, "db" | "logger">,
+  publisher: BuildStatePublisher,
+  scope: OpenBuildScope = {},
+): Promise<number> {
+  const result = await tryRequestOpenBuildStates(deps, publisher, scope);
+  return result.ok ? result.asked : 0;
 }
 
 /** The newest builds of a project that have not reached a verdict. */
