@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
+import type { LabelType } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -102,20 +103,28 @@ export function registerLabels(app: ShelfRouter): void {
   app.openapi(updateLabelRoute, async (c) => {
     const { slug, key } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const body = c.req.valid("json");
-    try {
-      const updated = await new LabelModel(getStore().db).updateType(project.id, key, body);
-      if (!updated) {
-        throw new HTTPException(404, { message: "Label type not found" });
-      }
-      return c.json(updated);
-    } catch (error) {
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(400, {
-        message: error instanceof Error ? error.message : "Cannot update label type",
-      });
-    }
+    return c.json(await updateLabelType(project.id, key, c.req.valid("json")));
   });
+}
+
+/** Update a label type; an unknown key is a 404 and a refused change a 400 (its own message). */
+async function updateLabelType(
+  projectId: string,
+  key: string,
+  body: Parameters<LabelModel["updateType"]>[2],
+): Promise<LabelType> {
+  try {
+    const updated = await new LabelModel(getStore().db).updateType(projectId, key, body);
+    if (!updated) {
+      throw new HTTPException(404, { message: "Label type not found" });
+    }
+    return updated;
+  } catch (error) {
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(400, {
+      message: error instanceof Error ? error.message : "Cannot update label type",
+    });
+  }
 }
