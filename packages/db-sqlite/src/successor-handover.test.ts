@@ -20,13 +20,18 @@ async function freshDatabase(): Promise<DatabaseAdapter> {
 
 /** A running single-flight job with one request waiting on it. */
 async function runningJobWithRequest(db: DatabaseAdapter) {
-  const queue = createDatabaseCaptureQueue(db, { kinds: ["capture"], leaseMs: 50 });
+  const clock = { ms: Date.now() };
+  const queue = createDatabaseCaptureQueue(db, {
+    kinds: ["capture"],
+    leaseMs: 50,
+    now: () => clock.ms,
+  });
   const id = await queue.enqueueJob({ kind: "capture", buildId: "b1", activeKey: KEY });
   const job = await queue.poll();
   if (job === null) throw new Error("the job was not claimed");
   // A request while the job runs is coalesced into a marker on it.
   expect(await queue.enqueueJob({ kind: "capture", buildId: "b1", activeKey: KEY })).toBe(id);
-  return { queue, id, job };
+  return { queue, id, job, clock };
 }
 
 const queuedFor = async (db: DatabaseAdapter, exceptId: string) =>
@@ -77,7 +82,7 @@ describe("the single-flight hand-over on node:sqlite", () => {
             }),
         ),
     };
-    const { queue, id, job } = await runningJobWithRequest(failing);
+    const { queue, id, job, clock } = await runningJobWithRequest(failing);
 
     await expect(queue.ack(job)).rejects.toThrow("insert refused");
 
@@ -90,7 +95,7 @@ describe("the single-flight hand-over on node:sqlite", () => {
 
     // The attempt's lease went with the failed end, not before it: once the lease runs out the
     // job is claimed again, still holding its key and its request.
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    clock.ms += 120;
     const redelivered = await queue.poll();
     expect(redelivered).toMatchObject({ jobId: id, attempt: 2 });
   });
