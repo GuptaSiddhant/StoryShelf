@@ -167,7 +167,8 @@ async function currentRequest(
 
 /**
  * The `assignedBecause` an assigned recipient's message carries (empty for anyone else), or null
- * when the recipient is now assigned and so gets the message from the assigned job, not this one.
+ * when the recipient no longer applies: assigned recipients who are no longer assigned, and
+ * others who are assigned now and so get the message from the assigned job, not this one.
  */
 async function assignmentFor(
   deps: NotifyDeps,
@@ -180,7 +181,8 @@ async function assignmentFor(
   const assigned = await assignedReviewersOf(deps.db, scope.project, scope.build);
   const reviewer = assigned.find((entry) => entry.userId === target.userId);
   if (target.route === "assigned") {
-    return reviewer ? { assignedBecause: assignmentReason(reviewer.components) } : {};
+    // No longer an assigned member (removed from the project, or the rules changed): not a recipient.
+    return reviewer ? { assignedBecause: assignmentReason(reviewer.components) } : null;
   }
   return reviewer === undefined ? {} : null;
 }

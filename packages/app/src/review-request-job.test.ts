@@ -292,6 +292,18 @@ describe("review-request jobs", () => {
     expect(JSON.stringify(fx.inputs)).toContain("because you own Button");
   });
 
+  it("sends nothing to an assigned reviewer who is no longer assigned", async () => {
+    const fx = await setup();
+    assigned.list = [];
+    await fx.enqueue({
+      projectId: fx.project.id,
+      eventId: `${fx.build.id}:0`,
+      target: person("assigned"),
+    });
+    await drain(fx);
+    expect(fx.sent).toEqual([]);
+  });
+
   it("sends nothing to a default recipient who has been assigned since", async () => {
     const fx = await setup();
     assigned.list = [{ userId: "appr1", components: ["Button"] }];
