@@ -139,3 +139,7 @@ Project 1--* ProjectMember *--1 User   (project-scoped roles)
 - **Reject:** mark the snapshot rejected, no baseline change.
 - **Access control:** a user's permissions on a project come from `project_members` (project-scoped role); `users.role = 'admin'` is a site-wide admin bypass (ADR 0011).
 - **Label:** a typed value (`pr=123`, `jira=ABC-123`) attached to a build. Types are project-defined (`label_types`) and carry external link templates; the latest build for a `(key, value)` is resolved by query over `build_labels` joined to `builds`.
+
+### Transactions on the built-in SQLite adapters
+
+`node:sqlite`, better-sqlite3 and `bun:sqlite` run on one connection, so a plain statement issued while a `transact` callback is awaiting would land inside that transaction and be rolled back with it. The adapter therefore queues plain statements and transactions in arrival order, one at a time (`transaction-mutex.ts`), and a plain call on the outer adapter from inside a callback throws ``a plain <method> was called on the database inside its own transaction; use `tx` ``. Turso and D1 also run their transactions one at a time, but their plain statements are not queued (a transaction has its own connection or handle); Postgres and MySQL use pooled connections and queue nothing.

@@ -175,7 +175,6 @@
         "packages/core/src/capture/pipeline.ts",
         "packages/app/src/middleware/csrf.ts",
         "packages/app/src/middleware/rate-limit.ts",
-        "packages/core/src/models/build.ts",
         "packages/app/src/pages/build-detail.tsx",
         "packages/app/src/pages/compute-jobs.tsx",
         "packages/app/src/pages/label-detail.tsx",
@@ -189,7 +188,6 @@
         "packages/app/src/pages/settings-tests.tsx",
         "packages/app/src/pages/settings-tokens.tsx",
         "packages/app/src/pages/settings-webhooks.tsx",
-        "packages/core/src/retention/purge.ts",
         "packages/app/src/routers/auth.ts",
         "packages/app/src/routers/media.ts",
         "packages/app/src/routers/builds.handlers.ts",
@@ -199,10 +197,8 @@
         "packages/app/src/routers/snapshots.ts",
         "packages/app/src/routers/storybook.ts",
         "packages/app/src/routers/ui.ts",
-        "packages/app/src/shell/document.tsx",
         "packages/app/src/ui/styles.ts",
-        "packages/app/src/capture-setup.ts",
-        "packages/cli/src/commands/server/init/codegen.ts"
+        "packages/app/src/capture-setup.ts"
       ],
       "rules": {
         "max-lines-per-function": "allow",

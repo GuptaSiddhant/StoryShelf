@@ -33,187 +33,164 @@ function mergeImports(lines: string[]): string[] {
 }
 
 function buildImports(answers: Answers): string[] {
-  const imports = [
+  return mergeImports([
     `import { serve } from "@hono/node-server";`,
     `import { createShelfApp } from "@storyshelf/app";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
     `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
-  ];
-  if (wantsObservability(answers)) {
-    imports.push(
-      `import { createShelfLogger } from "@storyshelf/core/logger";`,
-      `import { otelLogMixin } from "@storyshelf/observability";`,
-      `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
-    );
-  }
+    ...(wantsObservability(answers) ? OBSERVABILITY_IMPORTS : []),
+    ...authImports(answers),
+    ...(wantsGit(answers) ? [`import { gitNotifiers } from "@storyshelf/notify-git";`] : []),
+    ...(wantsDesign(answers) ? [DESIGN_IMPORT] : []),
+    ...(wantsNotifications(answers) ? notificationImports(answers) : []),
+  ]);
+}
 
+const OBSERVABILITY_IMPORTS = [
+  `import { createShelfLogger } from "@storyshelf/core/logger";`,
+  `import { otelLogMixin } from "@storyshelf/observability";`,
+  `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
+];
+
+const DESIGN_IMPORT = `import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";`;
+
+/** The auth imports: the password admin, or the OAuth preset of the deploy target (Cognito on AWS). */
+function authImports(answers: Answers): string[] {
   if (answers.auth === "password") {
-    imports.push(`import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";`);
+    return [`import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";`];
   }
   if (answers.auth === "oauth") {
-    imports.push(`import { createShelfAuth } from "@storyshelf/auth";`);
-    if (resolveDeployTarget(answers) === "aws") {
-      imports.push(`import { cognitoPreset } from "@storyshelf/auth";`);
-    } else {
-      imports.push(`import { keycloakPreset } from "@storyshelf/auth";`);
-    }
+    const preset = resolveDeployTarget(answers) === "aws" ? "cognitoPreset" : "keycloakPreset";
+    return [
+      `import { createShelfAuth } from "@storyshelf/auth";`,
+      `import { ${preset} } from "@storyshelf/auth";`,
+    ];
   }
-  if (wantsGit(answers)) {
-    imports.push(`import { gitNotifiers } from "@storyshelf/notify-git";`);
-  }
-  if (wantsDesign(answers)) {
-    imports.push(
-      `import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";`,
-    );
-  }
-  if (wantsNotifications(answers)) {
-    imports.push(
-      `import { chatNotifiers } from "@storyshelf/notify-chat";`,
-      `import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";`,
-    );
-    if (answers.auth !== "none") {
-      imports.push(`import { createAuthSystemHook } from "@storyshelf/app";`);
-    }
-  }
-  return mergeImports(imports);
+  return [];
+}
+
+function notificationImports(answers: Answers): string[] {
+  return [
+    `import { chatNotifiers } from "@storyshelf/notify-chat";`,
+    `import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";`,
+    ...(answers.auth === "none" ? [] : [`import { createAuthSystemHook } from "@storyshelf/app";`]),
+  ];
 }
 
 function buildAdapterLines(answers: Answers): string[] {
-  const lines = [
+  return [
     ...dbPrelude(answers.database),
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
     `const captureRunner = createPlaywrightCaptureRunner();`,
+    ...(wantsNotifications(answers) ? EMAIL_SENDER_LINES : []),
   ];
-  if (wantsNotifications(answers)) {
-    lines.push(
-      `// SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
-      `const emailSender = smtpPresetFromEnv(process.env);`,
-      `const emailNotifiers = emailSender`,
-      `  ? [createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })]`,
-      `  : [];`,
-    );
-  }
-  return lines;
 }
 
+const EMAIL_SENDER_LINES = [
+  `// SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
+  `const emailSender = smtpPresetFromEnv(process.env);`,
+  `const emailNotifiers = emailSender`,
+  `  ? [createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })]`,
+  `  : [];`,
+];
+
 function buildRouterLines(answers: Answers): string[] {
-  const lines = wantsObservability(answers)
-    ? [
-        `// Noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set.`,
-        `const observability = await initObservabilityFromEnv();`,
-        `const shelfLogger = createShelfLogger({ mixin: otelLogMixin });`,
-        ``,
-      ]
-    : [];
-  lines.push(
+  const notifiers = notifierSpreads(answers);
+  return [
+    ...(wantsObservability(answers) ? OBSERVABILITY_SETUP_LINES : []),
     `const app = createShelfApp({`,
     `  database,`,
     `  storage,`,
     `  testing: { runner: captureRunner },`,
-  );
-
-  const notifiers = notifierSpreads(answers);
-  if (notifiers.length > 0) {
-    lines.push(`  notifications: { notifiers: [${notifiers.join(", ")}] },`);
-  }
-
-  if (answers.auth === "password") {
-    lines.push(
-      `  auth: createShelfAuth({`,
-      `    db: database,`,
-      `    secret: process.env.SECRET!,`,
-      `    baseURL: process.env.PUBLIC_BASE_URL!,`,
-      ...(wantsNotifications(answers)
-        ? [
-            `    emailSender,`,
-            `    fromEmail: process.env.SMTP_FROM,`,
-            `    onAuthSystemEvent: createAuthSystemHook(),`,
-          ]
-        : []),
-      `  }).adapter,`,
-    );
-  }
-  if (answers.auth === "oauth" && resolveDeployTarget(answers) === "aws") {
-    lines.push(
-      `  auth: createShelfAuth({`,
-      `    db: database,`,
-      `    secret: process.env.SECRET!,`,
-      `    baseURL: process.env.PUBLIC_BASE_URL!,`,
-      ...(wantsNotifications(answers)
-        ? [
-            `    emailSender,`,
-            `    fromEmail: process.env.SMTP_FROM,`,
-            `    onAuthSystemEvent: createAuthSystemHook(),`,
-          ]
-        : []),
-      `    social: [`,
-      `      cognitoPreset({`,
-      `        domain: process.env.COGNITO_DOMAIN!,`,
-      `        region: process.env.COGNITO_REGION!,`,
-      `        userPoolId: process.env.COGNITO_USER_POOL_ID!,`,
-      `        clientId: process.env.OIDC_CLIENT_ID!,`,
-      `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
-      `      }),`,
-      `    ],`,
-      `  }).adapter,`,
-    );
-  }
-  if (answers.auth === "oauth" && resolveDeployTarget(answers) !== "aws") {
-    lines.push(
-      `  auth: createShelfAuth({`,
-      `    db: database,`,
-      `    secret: process.env.SECRET!,`,
-      `    baseURL: process.env.PUBLIC_BASE_URL!,`,
-      ...(wantsNotifications(answers)
-        ? [
-            `    emailSender,`,
-            `    fromEmail: process.env.SMTP_FROM,`,
-            `    onAuthSystemEvent: createAuthSystemHook(),`,
-          ]
-        : []),
-      `    oauth: [`,
-      `      keycloakPreset(process.env.OIDC_ISSUER!, {`,
-      `        clientId: process.env.OIDC_CLIENT_ID!,`,
-      `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
-      `      }),`,
-      `    ],`,
-      `  }).adapter,`,
-    );
-  }
-  if (wantsDesign(answers)) {
-    lines.push(`  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],`);
-  }
-
-  if (wantsObservability(answers)) {
-    lines.push(`  logger: shelfLogger,`, `  observability,`);
-  }
-  lines.push(
-    `  config: {`,
-    `    secret: process.env.SECRET,`,
-    `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
-    `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
-    `    scratchDir: dataDir,`,
-    `  },`,
-    `});`,
-    ``,
-    `await app.lifecycle.setup();`,
-  );
-
-  if (answers.auth === "password") {
-    lines.push(
-      ``,
-      `// Provision the env-driven local admin (AUTH_PASSWORD, at least 12 chars).`,
-      `await ensurePasswordAdmin(database, {`,
-      `  email: process.env.AUTH_EMAIL ?? "admin@example.com",`,
-      `  password: process.env.AUTH_PASSWORD!,`,
-      `});`,
-    );
-  }
-
-  return lines;
+    ...(notifiers.length > 0 ? [`  notifications: { notifiers: [${notifiers.join(", ")}] },`] : []),
+    ...authLines(answers),
+    ...(wantsDesign(answers)
+      ? [`  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],`]
+      : []),
+    ...(wantsObservability(answers) ? [`  logger: shelfLogger,`, `  observability,`] : []),
+    ...CONFIG_AND_SETUP_LINES,
+    ...(answers.auth === "password" ? PASSWORD_ADMIN_LINES : []),
+  ];
 }
+
+const OBSERVABILITY_SETUP_LINES = [
+  `// Noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set.`,
+  `const observability = await initObservabilityFromEnv();`,
+  `const shelfLogger = createShelfLogger({ mixin: otelLogMixin });`,
+  ``,
+];
+
+const CONFIG_AND_SETUP_LINES = [
+  `  config: {`,
+  `    secret: process.env.SECRET,`,
+  `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
+  `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
+  `    scratchDir: dataDir,`,
+  `  },`,
+  `});`,
+  ``,
+  `await app.lifecycle.setup();`,
+];
+
+const PASSWORD_ADMIN_LINES = [
+  ``,
+  `// Provision the env-driven local admin (AUTH_PASSWORD, at least 12 chars).`,
+  `await ensurePasswordAdmin(database, {`,
+  `  email: process.env.AUTH_EMAIL ?? "admin@example.com",`,
+  `  password: process.env.AUTH_PASSWORD!,`,
+  `});`,
+];
+
+const COGNITO_SOCIAL_LINES = [
+  `    social: [`,
+  `      cognitoPreset({`,
+  `        domain: process.env.COGNITO_DOMAIN!,`,
+  `        region: process.env.COGNITO_REGION!,`,
+  `        userPoolId: process.env.COGNITO_USER_POOL_ID!,`,
+  `        clientId: process.env.OIDC_CLIENT_ID!,`,
+  `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
+  `      }),`,
+  `    ],`,
+];
+
+const KEYCLOAK_OAUTH_LINES = [
+  `    oauth: [`,
+  `      keycloakPreset(process.env.OIDC_ISSUER!, {`,
+  `        clientId: process.env.OIDC_CLIENT_ID!,`,
+  `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
+  `      }),`,
+  `    ],`,
+];
+
+/** The `auth:` option: the local password admin, or OAuth with Cognito on AWS and Keycloak elsewhere. */
+function authLines(answers: Answers): string[] {
+  if (answers.auth === "none") {
+    return [];
+  }
+  const provider =
+    answers.auth === "password"
+      ? []
+      : resolveDeployTarget(answers) === "aws"
+        ? COGNITO_SOCIAL_LINES
+        : KEYCLOAK_OAUTH_LINES;
+  return [
+    `  auth: createShelfAuth({`,
+    `    db: database,`,
+    `    secret: process.env.SECRET!,`,
+    `    baseURL: process.env.PUBLIC_BASE_URL!,`,
+    ...(wantsNotifications(answers) ? AUTH_NOTIFICATION_LINES : []),
+    ...provider,
+    `  }).adapter,`,
+  ];
+}
+
+const AUTH_NOTIFICATION_LINES = [
+  `    emailSender,`,
+  `    fromEmail: process.env.SMTP_FROM,`,
+  `    onAuthSystemEvent: createAuthSystemHook(),`,
+];
 
 export function generateServer(answers: Answers): string {
   return [

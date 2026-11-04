@@ -9,6 +9,7 @@ import { repeatEvery, type QueueTimers } from "../db-queue/timers.ts";
 
 /** How a consumed job ended. */
 export type JobOutcome =
+  | "deadline"
   | "completed"
   | "retried"
   | "failed"

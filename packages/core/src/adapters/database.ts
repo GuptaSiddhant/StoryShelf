@@ -9,9 +9,18 @@
 import type { SQL } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
+import type { MigrationContext } from "./skipped-index.ts";
 
 /** A fenced reference write lost its generation race and should be retried. */
 export class ReferenceGenerationConflict extends Error {}
+
+export {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+  type MigrationContext,
+  type SkippedIndex,
+} from "./skipped-index.ts";
 
 export {
   BaselineSourceIntegrityError,
@@ -272,6 +281,13 @@ export interface DatabaseAdapterMetadata {
    * Unset means it can.
    */
   readonly supportsTesting?: boolean;
+  /**
+   * `"sequential"` when `transact` only runs its statements one after another and cannot roll back
+   * (Neon over HTTP). Code that relies on one transaction for crash safety, such as the queue's
+   * end-and-hand-over of a single-flight job, takes its ordered path instead. Unset means atomic,
+   * as `supportsTesting` reads.
+   */
+  readonly transactions?: "atomic" | "sequential";
 }
 
 /** Database abstraction over Drizzle tables, agnostic of dialect and driver. */
@@ -327,7 +343,7 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
 export interface DrizzleAdapterOptions {
   metadata: AdapterMetadata & DatabaseAdapterMetadata;
   tables: Tables;
-  migrate: () => Promise<void> | void;
+  migrate: (context: MigrationContext) => Promise<void> | void;
   close: () => Promise<void> | void;
   /** Cheap liveness probe (e.g. `SELECT 1`); omitted when the driver has none. */
   ping?: () => Promise<void> | void;
