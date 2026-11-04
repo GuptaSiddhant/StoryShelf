@@ -29,14 +29,18 @@ semantics.
 | Queue  | Kinds                                                                   | Retry limit                                                                     | Where                           |
 | ------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------- |
 | Main   | `capture` (when `testing.runner` is set), `publish` (long-running host) | `testing.retries` (default 2, three attempts)                                   | `queuesFor`, `databaseConsumer` |
-| Notify | `notify` (long-running host)                                            | `NOTIFY_MAX_ATTEMPTS` (5) minus one; handler retry delay 10 s doubling to 5 min | `queuesFor`, `notifyConsumer`   |
+| Notify | `notify`, `review-request` (long-running host)                          | `NOTIFY_MAX_ATTEMPTS` (5) minus one; handler retry delay 10 s doubling to 5 min | `queuesFor`, `notifyConsumer`   |
 
 - A host with no consumer (serverless) runs neither queue: build state is delivered inline without
   durability (`packages/app/src/build-state-setup.ts`), and publishing follows ADR 0006 decision 10.
 - `notify` has its own consumer so that a git status never waits behind captures that hold every
-  slot for minutes. Queue views list every polled kind except `notify`.
+  slot for minutes. Queue views list every polled kind except `notify` and `review-request`.
+- `review-request` is one job per recipient of a build's review request, so a refused delivery is
+  retried for that recipient alone. It holds references only (project, `eventId`, a channel id or a
+  person and provider) and re-resolves recipient, origin and review cycle when it runs. The key is
+  `eventId` + target; a serverless host keeps direct delivery.
 - **Cancel spans kinds.** Because all kinds share the table, `cancel(buildId)` on the database queue
-  cancels capture, publish and notify jobs of the build (`packages/app/src/job-canceller.ts`).
+  cancels capture, publish, notify and review-request jobs of the build (`packages/app/src/job-canceller.ts`).
 - Forked capture is unchanged: the parent consumes; the child never reads the queue.
 
 ### 2. What every job kind must provide
