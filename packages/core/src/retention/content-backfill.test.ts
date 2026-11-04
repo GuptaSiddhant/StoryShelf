@@ -87,12 +87,26 @@ describe("backfillContentUses", () => {
     expect(result).toMatchObject({ done: true, builds: 2, unreadable: 1 });
   });
 
-  it("counts the hashes the lifecycle refuses instead of failing", async () => {
+  it("records what a collector has not claimed, and repeats the page next run instead of saving it", async () => {
     const w = world();
     await w.build("b1", { "a.js": A, "b.js": B });
-    w.record.mockResolvedValueOnce([B]);
+    await w.build("b2", { "c.js": C });
+    w.record.mockImplementation(async (_project, _build, hashes) => {
+      const wanted = hashes as string[];
+      return await Promise.resolve(wanted.includes(B) ? [B] : []);
+    });
 
-    expect(await w.run()).toMatchObject({ uses: 1, refused: 1, done: true });
+    const first = await w.run();
+
+    expect(first).toMatchObject({ done: false, refused: 1, uses: 2 });
+    expect(w.record).toHaveBeenCalledWith("p1", "b1", [A]);
+    expect(await w.marker()).toBeNull();
+
+    w.record.mockReset();
+    w.record.mockResolvedValue([]);
+    expect(await w.run()).toMatchObject({ done: true, refused: 0 });
+    expect(w.record).toHaveBeenCalledWith("p1", "b1", [A, B]);
+    expect(await w.marker()).toBe(JSON.stringify({ done: true }));
   });
 
   it("resumes after the saved cursor and visits builds page by page", async () => {
@@ -106,7 +120,22 @@ describe("backfillContentUses", () => {
     expect(result.builds).toBe(1);
     expect(w.record).toHaveBeenCalledTimes(1);
     expect(w.record).toHaveBeenCalledWith("p1", "b2", [B]);
-    expect(CONTENT_BACKFILL_PAGE).toBeGreaterThan(0);
+  });
+
+  it("records every build across more than one page exactly once", async () => {
+    const w = world();
+    const total = CONTENT_BACKFILL_PAGE + 1;
+    for (let index = 0; index < total; index += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- builds are seeded in id order
+      await w.build(`b${String(index).padStart(4, "0")}`, { "a.js": A });
+    }
+
+    const result = await w.run();
+
+    expect(result).toMatchObject({ done: true, builds: total });
+    const ids = w.record.mock.calls.map((call) => call[1]);
+    expect(new Set(ids).size).toBe(total);
+    expect(ids).toHaveLength(total);
   });
 
   it("stops between pages when aborted and keeps its cursor, so the next boot resumes", async () => {

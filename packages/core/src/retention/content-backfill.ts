@@ -70,7 +70,11 @@ function emptyResult(): ContentBackfillResult {
   return { done: false, builds: 0, uses: 0, skippedHashes: 0, unreadable: 0, refused: 0 };
 }
 
-/** Page through the builds after `cursor`, saving progress after each; true once all were visited. */
+/**
+ * Page through the builds after `cursor`, saving progress after each; true once all were visited.
+ * A page with a hash a collector has claimed is not saved as visited: the run stops there and the
+ * next boot repeats that page (recording is idempotent), once the claim has ended.
+ */
 async function visitPages(
   deps: ContentBackfillDeps,
   settings: SiteSettingsModel,
@@ -80,29 +84,38 @@ async function visitPages(
   let cursor = start;
   while (!deps.signal?.aborted) {
     // oxlint-disable-next-line no-await-in-loop -- a page is recorded and saved before the next
-    const next = await visitPage(deps, settings, cursor, result);
-    if (next === null) return true;
-    cursor = next;
+    const page = await visitPage(deps, settings, cursor, result);
+    if (page.blocked) return false;
+    if (page.cursor === null) return true;
+    cursor = page.cursor;
   }
   return false;
 }
 
-/** One page: record it and save the cursor, or mark the backfill done when nothing is left (null). */
+/** What one page left: the cursor after it (null when no builds remain), or that it must be repeated. */
+interface PageOutcome {
+  cursor: string | null;
+  blocked: boolean;
+}
+
+/** One page: record it and save the cursor, or mark the backfill done when nothing is left. */
 async function visitPage(
   deps: ContentBackfillDeps,
   settings: SiteSettingsModel,
   cursor: string | undefined,
   result: ContentBackfillResult,
-): Promise<string | null> {
+): Promise<PageOutcome> {
   const page = await listPage(deps.db, cursor);
   const last = page.at(-1);
   if (last === undefined) {
     await settings.set(CONTENT_BACKFILL_KEY, JSON.stringify({ done: true }));
-    return null;
+    return { cursor: null, blocked: false };
   }
+  const refusedBefore = result.refused;
   await backfillPage(deps, page, result);
+  if (result.refused > refusedBefore) return { cursor: last.id, blocked: true };
   await settings.set(CONTENT_BACKFILL_KEY, JSON.stringify({ after: last.id }));
-  return last.id;
+  return { cursor: last.id, blocked: false };
 }
 
 /** The stored progress; anything unreadable starts over, which is safe because recording is idempotent. */
@@ -160,6 +173,11 @@ async function backfillBuild(
   await recordValid(deps, build, valid, result);
 }
 
+/**
+ * Record the build's hashes. The capability refuses a whole call when a collector has claimed any
+ * hash in it, so the others are recorded in a second call and the refused ones are counted: the
+ * page is then repeated on the next run instead of being saved as visited.
+ */
 async function recordValid(
   deps: ContentBackfillDeps,
   build: BuildRow,
@@ -167,7 +185,12 @@ async function recordValid(
   result: ContentBackfillResult,
 ): Promise<void> {
   if (valid.length === 0) return;
-  const refused = await deps.lifecycle.recordContentUses(build.projectId, build.id, valid);
+  const record = async (hashes: readonly string[]): Promise<string[]> =>
+    await deps.lifecycle.recordContentUses(build.projectId, build.id, hashes);
+  const refused = await record(valid);
   result.refused += refused.length;
-  result.uses += valid.length - refused.length;
+  const rest = valid.filter((hash) => !refused.includes(hash));
+  const again = refused.length > 0 && rest.length > 0 ? await record(rest) : [];
+  result.refused += again.length;
+  result.uses += refused.length === 0 ? valid.length : rest.length - again.length;
 }
