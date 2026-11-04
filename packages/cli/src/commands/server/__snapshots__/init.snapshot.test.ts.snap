@@ -1,0 +1,891 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`server init output > is unchanged for auth oauth 1`] = `
+{
+  "files": [
+    "package.json 602 60b3e140a2ba3dab0f8a4dbabb73436ab05d0cd5118e980cd6f1fce4f04220e9",
+    "src/index.ts 1558 1acf2d991a546048913d14678bf89223469d6ffd8a6ef08342b5734be5db4079",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for auth password 1`] = `
+{
+  "files": [
+    "package.json 602 60b3e140a2ba3dab0f8a4dbabb73436ab05d0cd5118e980cd6f1fce4f04220e9",
+    "src/index.ts 1598 d568bdadfa83c4f1580163c067894662b48b4c0d936b5d8b3afdda029554904d",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for aws full 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "package.json 985 a9583794222ce9f4542e35a419e539dec769b3096fbf8fe8866c17a005d95806",
+    "src/index.ts 1851 a7f56a0f92d08deecfbdbd9684a54827e002f46b2aadef455370dce4ce99c31c",
+    "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
+    "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
+    "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
+    "terraform/dns.tf 1879 57e77ea00724ea863c651c49a3997284f3649d7473e0c9459184f7f60fc68909",
+    "terraform/identity.tf 1213 4cb9a3f9e6db6205c6c0282a7a7c3ca77d37686f07e94bff146f1681b9befe91",
+    "terraform/network.tf 4290 213890530f8aed678507785611c5dbcc2a0861ceea2e5dfa17371d8a9be317fe",
+    "terraform/outputs.tf 586 ae2530ec0c6b199eece9e16049976eaaf39904f3695e2cd0cc35ed460adfab94",
+    "terraform/secrets.tf 1330 70b15b2d9ea3ca498d4725d7384ade8905309a30c6032e1845e94d0ebbfe83c2",
+    "terraform/storage.tf 1148 a7e79b5b49dd4928220ad33f378eecd5a3c54cbfbaa34145907b97ad0727af1c",
+    "terraform/terraform.tfvars.example 312 85ce7a55e1dfae761a8875521a434c0a3fafe4677eb679671c329c138394d6a4",
+    "terraform/variables.tf 843 1a7c333726bb9e867b84804097a06dc0da9fabb4a9d8eeb3ea5a54b3428ad97a",
+    "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created terraform/ (12 files)
+Created Dockerfile, .dockerignore, compose.yaml
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  terraform -chdir=terraform init
+  terraform -chdir=terraform plan -out=tfplan   # review before applying
+  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
+  # wire outputs into env (terraform output -json / npm run infra:outputs):
+  #   S3_BUCKET / AWS_REGION, DATABASE_URL, COGNITO_* credentials
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for aws minimal 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
+    "src/index.ts 1745 3766956929e3cade526d40b4341424e6b62b181a2ad16db0257436403941d3c0",
+    "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
+    "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
+    "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
+    "terraform/dns.tf 1879 57e77ea00724ea863c651c49a3997284f3649d7473e0c9459184f7f60fc68909",
+    "terraform/identity.tf 1213 4cb9a3f9e6db6205c6c0282a7a7c3ca77d37686f07e94bff146f1681b9befe91",
+    "terraform/network.tf 4290 213890530f8aed678507785611c5dbcc2a0861ceea2e5dfa17371d8a9be317fe",
+    "terraform/outputs.tf 586 ae2530ec0c6b199eece9e16049976eaaf39904f3695e2cd0cc35ed460adfab94",
+    "terraform/secrets.tf 1330 70b15b2d9ea3ca498d4725d7384ade8905309a30c6032e1845e94d0ebbfe83c2",
+    "terraform/storage.tf 1148 a7e79b5b49dd4928220ad33f378eecd5a3c54cbfbaa34145907b97ad0727af1c",
+    "terraform/terraform.tfvars.example 312 85ce7a55e1dfae761a8875521a434c0a3fafe4677eb679671c329c138394d6a4",
+    "terraform/variables.tf 843 1a7c333726bb9e867b84804097a06dc0da9fabb4a9d8eeb3ea5a54b3428ad97a",
+    "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created terraform/ (12 files)
+Created Dockerfile, .dockerignore, compose.yaml
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  terraform -chdir=terraform init
+  terraform -chdir=terraform plan -out=tfplan   # review before applying
+  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
+  # wire outputs into env (terraform output -json / npm run infra:outputs):
+  #   S3_BUCKET / AWS_REGION, DATABASE_URL, COGNITO_* credentials
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for azure full 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
+    "src/index.ts 1653 bbd6623e80ab6a65c000e1f778b733466900e010555a993607bbca2b0f3fb48a",
+    "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
+    "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
+    "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
+    "terraform/dns.tf 1248 2dc436b7e1ef3afb211fc22c529c11ed7d76043250ca6544c09798454f986961",
+    "terraform/identity.tf 601 75882c78c59a6653e8dbae4e8b117ecfb9a99b64f5935c4857f4f75024ef03bb",
+    "terraform/main.tf 487 7502b38fc54b0536ea784c00c5d3817faaf98383b6607b0e9e0102da5e186344",
+    "terraform/outputs.tf 918 a2cf72b2768eaddcb3e98ec3b6bca44ed2bbb35417404f402709477e5fc1c49b",
+    "terraform/secrets.tf 1337 eed50b518c20257bc33dd05304b902251cb79ad349d2c39cc4ce4b798ee5dea5",
+    "terraform/storage.tf 666 337a7743dcc0546fad3bcb8c52b5303ccc3cb6bb371fb23eff7e8af419685e26",
+    "terraform/terraform.tfvars.example 278 e9941daf32eb57f51201350e1f6b3b3528071eed9d8d3d9a0ed176a38b2a52d3",
+    "terraform/variables.tf 693 b1b6854bd4d2889535539d98a1668694b98391716011bc83414323fe5eb56c82",
+    "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created terraform/ (12 files)
+Created Dockerfile, .dockerignore, compose.yaml
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  az login
+  terraform -chdir=terraform init
+  terraform -chdir=terraform plan -out=tfplan   # review before applying
+  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
+  # wire outputs into env (terraform output -json / npm run infra:outputs):
+  #   AZURE_STORAGE_CONNECTION, DATABASE_URL, OIDC_* credentials
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for azure minimal 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
+    "src/index.ts 1653 bbd6623e80ab6a65c000e1f778b733466900e010555a993607bbca2b0f3fb48a",
+    "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
+    "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
+    "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
+    "terraform/dns.tf 1248 2dc436b7e1ef3afb211fc22c529c11ed7d76043250ca6544c09798454f986961",
+    "terraform/identity.tf 601 75882c78c59a6653e8dbae4e8b117ecfb9a99b64f5935c4857f4f75024ef03bb",
+    "terraform/main.tf 487 7502b38fc54b0536ea784c00c5d3817faaf98383b6607b0e9e0102da5e186344",
+    "terraform/outputs.tf 918 a2cf72b2768eaddcb3e98ec3b6bca44ed2bbb35417404f402709477e5fc1c49b",
+    "terraform/secrets.tf 1337 eed50b518c20257bc33dd05304b902251cb79ad349d2c39cc4ce4b798ee5dea5",
+    "terraform/storage.tf 666 337a7743dcc0546fad3bcb8c52b5303ccc3cb6bb371fb23eff7e8af419685e26",
+    "terraform/terraform.tfvars.example 278 e9941daf32eb57f51201350e1f6b3b3528071eed9d8d3d9a0ed176a38b2a52d3",
+    "terraform/variables.tf 693 b1b6854bd4d2889535539d98a1668694b98391716011bc83414323fe5eb56c82",
+    "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created terraform/ (12 files)
+Created Dockerfile, .dockerignore, compose.yaml
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  az login
+  terraform -chdir=terraform init
+  terraform -chdir=terraform plan -out=tfplan   # review before applying
+  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
+  # wire outputs into env (terraform output -json / npm run infra:outputs):
+  #   AZURE_STORAGE_CONNECTION, DATABASE_URL, OIDC_* credentials
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database better-sqlite3 1`] = `
+{
+  "files": [
+    "package.json 602 8cf82eaada0fb263126528259cc98e3d15de70efb61c0186361de230deea4f9b",
+    "src/index.ts 1215 4daab7c6b397b75bd8049ec5c4ce9be49d60675412d8644208a92a1c747492f1",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database bun-sqlite 1`] = `
+{
+  "files": [
+    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "src/index.ts 1203 0e1ac81afc772f32b8d1f7f29a87400a56990debdefa39b4446f15ca53efdca3",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database d1 1`] = `
+{
+  "files": [
+    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "src/index.ts 1339 4ac97bc084a961d73662c4ad2b6fce6de923550034e6e015357b3a14ab65f832",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database mysql 1`] = `
+{
+  "files": [
+    "package.json 592 57b9162eafcfa4898f1826e8f15de4b860704810cd00f0707eb82b061a3a2601",
+    "src/index.ts 1186 3a7bcc52db7b364ff21d814808aa3aedc6d21cf29c63223e2d852c5ee7e6b768",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database neon 1`] = `
+{
+  "files": [
+    "package.json 613 b0337a26c5b1bd3489f0a3e9fd4caadba84eb5577aa4336046c3c0705328a4b4",
+    "src/index.ts 1192 652d808ab341eaf740ef4dd82ca3082e11b6a5240d109828659e4d17dfb6af8f",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database neon-http 1`] = `
+{
+  "files": [
+    "package.json 613 b0337a26c5b1bd3489f0a3e9fd4caadba84eb5577aa4336046c3c0705328a4b4",
+    "src/index.ts 1205 5a6d8ac57ad794adf73e47dea3ddfb780785892ff1e0e6a3409849acb5d44698",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database pg 1`] = `
+{
+  "files": [
+    "package.json 591 20aac0ee0138bfad7023ab533fd8b683a5d0a517d1556ad013fb92e0255ba2a9",
+    "src/index.ts 1186 322ac2d25c33aa32137bc4f5f900403b8370f55c56955b3c48016a1126e383c9",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database pglite 1`] = `
+{
+  "files": [
+    "package.json 609 4bea65654d3f94c08f493689cd3989c67e1b1162e1b4b59ad9240e6545c56fa0",
+    "src/index.ts 1164 13058f975c149f7347230e60b37bd44653969250bdce5d843389824dd4bc4d50",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database planetscale 1`] = `
+{
+  "files": [
+    "package.json 608 a8da912b4d662495aa43262b5a2c4f28c3774031908c9dbcb99e1908306601fb",
+    "src/index.ts 1210 db29550a58afcea062e930b57a1fa87c49ea0ea002f7fd6757fb6502d02741db",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database postgres 1`] = `
+{
+  "files": [
+    "package.json 571 29be6efe38d016df0dce21cc39450d16905cfae489371f84ef80df98fb3ecae8",
+    "src/index.ts 1195 e2eae3f2d52328b0c40a0a1be8a6da7e00df0f4a4f1776bdf3cda26fb3ef4d28",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database sqlite 1`] = `
+{
+  "files": [
+    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database tidb 1`] = `
+{
+  "files": [
+    "package.json 607 e1760ad1e1b859fc4014a60bee67ea014442f7b215f094da93ed58c932c8d281",
+    "src/index.ts 1189 f51e304db4f919450461e25d57cedcfa970ce8586dbe3071b373a6bfbda68993",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database turso 1`] = `
+{
+  "files": [
+    "package.json 602 dfe838845f36dc3738b4748a4fa48b4d72f92d3749cbf72ac650101a66ab8bfa",
+    "src/index.ts 1240 930248aac2bfcc5ce355f7cb72d51c67130c382da3b56fd7e5fb37003f668087",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for database vercel 1`] = `
+{
+  "files": [
+    "package.json 606 865f1363ae1a272928ccf18f987dbc8e8502100b068b455104a02e9aa81c18e3",
+    "src/index.ts 1164 468c4fdc1dec69e978845e536ddb85dcb574f3f7bc9994b64c1f335867b03660",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for design 1`] = `
+{
+  "files": [
+    "package.json 610 a2db65ba1b652643946217c58a9e0f24c8825469db6be0b063e99f05f38c91b9",
+    "src/index.ts 1320 1351e66c9f9b2e862facc5f79fee389f74ffb242b554befab9c63204baf306fe",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for docker advanced adapters 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "package.json 747 952fc180079deca9fbd980cfe13a1326407e849186c56783649f8d38fa94b689",
+    "src/index.ts 1186 3a7bcc52db7b364ff21d814808aa3aedc6d21cf29c63223e2d852c5ee7e6b768",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created Dockerfile, .dockerignore
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm run docker:build   # builds the image
+  npm run docker:run     # runs it on :3000 (data in a named volume)
+",
+}
+`;
+
+exports[`server init output > is unchanged for docker single container 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "package.json 724 cb1904979c9b31421ee7878583671480cec542920d73744ee6f7c1c25dbedc1a",
+    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created Dockerfile, .dockerignore
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm run docker:build   # builds the image
+  npm run docker:run     # runs it on :3000 (data in a named volume)
+",
+}
+`;
+
+exports[`server init output > is unchanged for docker with postgres compose 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "package.json 748 50458104ffc240628488cd54781db547c985118dff1c5ca0602ff634e811aff9",
+    "src/index.ts 1195 e2eae3f2d52328b0c40a0a1be8a6da7e00df0f4a4f1776bdf3cda26fb3ef4d28",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created Dockerfile, .dockerignore, compose.yaml
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm run docker:up      # builds + starts the app
+  npm run docker:logs    # follow logs
+  npm run docker:down    # tear down
+",
+}
+`;
+
+exports[`server init output > is unchanged for everything on 1`] = `
+{
+  "files": [
+    "package.json 909 00f42216f93ad938bfb3c56dfa19c2fd48166cddf1308e0d47c188deafa2cc10",
+    "src/index.ts 2861 c0d98c02409d8cf9b2a27a35e0aebb7463c0cd881a96aac5fac929f54f1c56ed",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for gcp full 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
+    "src/index.ts 1599 c7f0427190e3dc8b5620666aa73284f3b2621ce01ff86a3fa329fa7e9bb34583",
+    "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
+    "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
+    "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
+    "terraform/dns.tf 1145 1c1fd9a3681b045f5ee5328d7408f1c2c0a126fe58b51c3ee3e19a97dc91bd4a",
+    "terraform/identity.tf 508 e58d0694a0b39491fbb4525fdd04c68db8de1190483f2f8e324da7c6cbf07353",
+    "terraform/main.tf 641 e8f076b3806740a09940320e7c5418e5337ebe092fdb98f5e3843ea5f4894670",
+    "terraform/outputs.tf 790 348ba1fb232ec49bfe60c26140e18d15e58624bcaaa44d0f2ad7f568f26e45e3",
+    "terraform/secrets.tf 1470 ba751c33e81bd5e0ffc7319b45e148cbd72e449bd0937de11cffc72272d96a7e",
+    "terraform/storage.tf 786 231407a3eca6f39124cd397ae9b93c0e420ac5cefca01aa04ef83218dd5c76ff",
+    "terraform/terraform.tfvars.example 323 7da5f64c5e3826ae47e9f7cbc803c8280a841bb1801b13377184e87a2b012c62",
+    "terraform/variables.tf 831 07be55482412023486810b54f8f52da751c8b836ac128bbe8b10a1a3323555f5",
+    "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created terraform/ (12 files)
+Created Dockerfile, .dockerignore, compose.yaml
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  gcloud auth login
+  terraform -chdir=terraform init
+  terraform -chdir=terraform plan -out=tfplan   # review before applying
+  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
+  # wire outputs into env (terraform output -json / npm run infra:outputs):
+  #   GCS_BUCKET + GOOGLE_CLOUD_PROJECT, DATABASE_URL, OIDC_* credentials
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for gcp minimal 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
+    "src/index.ts 1599 c7f0427190e3dc8b5620666aa73284f3b2621ce01ff86a3fa329fa7e9bb34583",
+    "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
+    "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
+    "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
+    "terraform/dns.tf 1145 1c1fd9a3681b045f5ee5328d7408f1c2c0a126fe58b51c3ee3e19a97dc91bd4a",
+    "terraform/identity.tf 508 e58d0694a0b39491fbb4525fdd04c68db8de1190483f2f8e324da7c6cbf07353",
+    "terraform/main.tf 641 e8f076b3806740a09940320e7c5418e5337ebe092fdb98f5e3843ea5f4894670",
+    "terraform/outputs.tf 790 348ba1fb232ec49bfe60c26140e18d15e58624bcaaa44d0f2ad7f568f26e45e3",
+    "terraform/secrets.tf 1470 ba751c33e81bd5e0ffc7319b45e148cbd72e449bd0937de11cffc72272d96a7e",
+    "terraform/storage.tf 786 231407a3eca6f39124cd397ae9b93c0e420ac5cefca01aa04ef83218dd5c76ff",
+    "terraform/terraform.tfvars.example 323 7da5f64c5e3826ae47e9f7cbc803c8280a841bb1801b13377184e87a2b012c62",
+    "terraform/variables.tf 831 07be55482412023486810b54f8f52da751c8b836ac128bbe8b10a1a3323555f5",
+    "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created terraform/ (12 files)
+Created Dockerfile, .dockerignore, compose.yaml
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  gcloud auth login
+  terraform -chdir=terraform init
+  terraform -chdir=terraform plan -out=tfplan   # review before applying
+  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
+  # wire outputs into env (terraform output -json / npm run infra:outputs):
+  #   GCS_BUCKET + GOOGLE_CLOUD_PROJECT, DATABASE_URL, OIDC_* credentials
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for git on 1`] = `
+{
+  "files": [
+    "package.json 608 220b2b4c145390136fd5adbc2ed6011cdbc8723169107ee9b58a94cad1ed8e51",
+    "src/index.ts 1282 74711a8d95884143d974b64b6d9de1f72de5c69a9a510352ee865090733b3d3e",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for legacy docker flag 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
+    "package.json 724 cb1904979c9b31421ee7878583671480cec542920d73744ee6f7c1c25dbedc1a",
+    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+Created Dockerfile, .dockerignore
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm run docker:build   # builds the image
+  npm run docker:run     # runs it on :3000 (data in a named volume)
+",
+}
+`;
+
+exports[`server init output > is unchanged for local with advanced adapters 1`] = `
+{
+  "files": [
+    "package.json 607 e1760ad1e1b859fc4014a60bee67ea014442f7b215f094da93ed58c932c8d281",
+    "src/index.ts 1189 f51e304db4f919450461e25d57cedcfa970ce8586dbe3071b373a6bfbda68993",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for notifications 1`] = `
+{
+  "files": [
+    "package.json 680 cb64dcb83e4790b745d6c4f4656e1add5c540b0f4268a9f3eb520f6ab9ca97c1",
+    "src/index.ts 1624 c1713691ee89ebc72e7ce137955ad566facc2b58eb335f077a9323477857cfac",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for notifications with oauth 1`] = `
+{
+  "files": [
+    "package.json 713 49ef71244cb225b2b59102868bfc215084ef35c6304d35b71e8f941858dc85d8",
+    "src/index.ts 2130 b52361279e86cf56bdf925f2279256e0bb9b5e00cefbea1cbecbf022d0377ccd",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for notifications with password auth 1`] = `
+{
+  "files": [
+    "package.json 713 49ef71244cb225b2b59102868bfc215084ef35c6304d35b71e8f941858dc85d8",
+    "src/index.ts 2170 0e1f4b2a5786e4bce50f1b26f111183a78fb5a02e9898fc43715ac9c241e8d43",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for observability 1`] = `
+{
+  "files": [
+    "package.json 644 3a105bb0479e928391d362c69e3e9b4bdb37eeb5019b1b133d6333672faff84a",
+    "src/index.ts 1582 eb10945da5377af69d8d5a8f5d12109605190a64e08d9c9ff3807afecf81fd3b",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for storage azure 1`] = `
+{
+  "files": [
+    "package.json 611 e224a556aa4439de652f02498d720e8f3b445a5a20aae791e813bb352be22fe7",
+    "src/index.ts 1252 55c0dcc7f6b1cee42929bc38815e7eb5f6f1048da3ac137ac74059532a66130b",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for storage gcs 1`] = `
+{
+  "files": [
+    "package.json 609 cf7dd0cbba67757021776230b2d2fd535197afbbef555414c08185e2cc986fbf",
+    "src/index.ts 1198 43298caf06392f88d844d347ad7d105e54a7c88bf0ad0c6db95263dacd71c321",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`server init output > is unchanged for storage s3 1`] = `
+{
+  "files": [
+    "package.json 608 0492e5b8eaeab1f08e0aeb43886ad71610e519135acf29b31519b625acd0419f",
+    "src/index.ts 1226 0409f7c07d1504dde3a74859838280a54d1d9dc7fe9a18f1783153abc904efce",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "Created src/index.ts
+Created package.json, tsconfig.json
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;

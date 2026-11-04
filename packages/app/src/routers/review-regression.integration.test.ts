@@ -428,5 +428,11 @@ describe.each(CHANNELS)("sign-offs through the %s (testing on)", (channel) => {
     expect((await give(booted, channel, id, { user: "alice" })).status).toBe(409);
     expect(await statusOf(booted, id)).toBe(status);
     expect(await booted.db.list(booted.db.tables.buildReviews)).toHaveLength(0);
+    // The build page says there is nothing to review, in words.
+    const html = await page(booted, "alice", `/builds/${id}`);
+    expect(html).toContain(
+      `Nothing to review: this build ${status === "failed" ? "failed" : "was cancelled"}.`,
+    );
+    expect(html).not.toContain("approval given");
   });
 });
