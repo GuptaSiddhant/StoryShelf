@@ -450,6 +450,7 @@ describe.each(drivers)("transact on %s", (_name, make) => {
     expect((await db.get(schema.siteSettings, "a"))?.["value"]).toBe("b");
     expect(await db.list(schema.siteSettings)).toHaveLength(1);
     expect(await db.count(schema.siteSettings)).toBe(1);
+    expect(await db.all?.(sql`SELECT id FROM site_settings`)).toHaveLength(1);
     expect(
       await db.updateWhere(schema.siteSettings, "a", { value: "c" }, sql`id = 'a'`),
     ).toMatchObject({ value: "c" });
