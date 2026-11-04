@@ -20,7 +20,7 @@ type Columns = Map<string, string>;
 /** `PRAGMA table_info` rows are `[cid, name, type, ...]` (the adapter opens with `returnArrays`). */
 function columnsOf(sqlite: DatabaseSync, table: string): Columns {
   const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as unknown as unknown[][];
-  return new Map(rows.map((row) => [String(row[1]), String(row[2]).toUpperCase()]));
+  return new Map(rows.map((row) => [String(row[1]).toLowerCase(), String(row[2]).toUpperCase()]));
 }
 
 function conflict(what: string): Error {

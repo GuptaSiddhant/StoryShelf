@@ -59,6 +59,26 @@ describe("assertReviewSchema", () => {
     }).toThrow("table build_reviews has no column user_id");
   });
 
+  it("requires the body column", () => {
+    const sqlite = database(
+      ...SETTINGS,
+      "CREATE TABLE build_reviews (id TEXT, build_id TEXT, user_id TEXT, verdict TEXT, created_at TEXT)",
+    );
+    expect(() => {
+      assertReviewSchema(sqlite);
+    }).toThrow("table build_reviews has no column body");
+  });
+
+  it("compares column names without regard to case, as SQLite does", () => {
+    const sqlite = database(
+      ...SETTINGS,
+      "CREATE TABLE build_reviews (ID TEXT, BUILD_ID TEXT, USER_ID TEXT, VERDICT TEXT, BODY TEXT, CREATED_AT TEXT)",
+    );
+    expect(() => {
+      assertReviewSchema(sqlite);
+    }).not.toThrow();
+  });
+
   it("names the table, column and types of a review column of another type", () => {
     const sqlite = database(
       "CREATE TABLE projects (id TEXT, review_approvals TEXT)",
