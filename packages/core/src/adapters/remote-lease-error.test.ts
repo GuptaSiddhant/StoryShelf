@@ -77,6 +77,27 @@ describe("connectErrorOf", () => {
     );
   });
 
+  it("cuts a URL whose query value is quoted, so the quoted value goes with it", () => {
+    const wrapped = connectErrorOf(
+      new Error("connect to wss://farm.example.com/?token='secret123' failed"),
+    );
+    expect(wrapped.message).not.toContain("secret123");
+    expect(wrapped.message).toContain("wss://farm.example.com");
+  });
+
+  it("redacts a short credential named by an Authorization header, and one with digits or symbols", () => {
+    // `a:b` encodes to `YTpi`.
+    expect(connectErrorOf(new Error("sent Authorization: Basic YTpi")).message).toBe(
+      "acquire failed: sent Authorization: Basic [redacted]",
+    );
+    expect(connectErrorOf(new Error("sent authorization=Bearer ab")).message).toBe(
+      "acquire failed: sent authorization=Bearer [redacted]",
+    );
+    expect(connectErrorOf(new Error("got Bearer 1234 back")).message).toBe(
+      "acquire failed: got Bearer [redacted] back",
+    );
+  });
+
   it("leaves ordinary words after Bearer or Basic alone", () => {
     expect(connectErrorOf(new Error("Basic auth is off")).message).toBe(
       "acquire failed: Basic auth is off",

@@ -54,14 +54,23 @@ export function classify(error: unknown): { retry: boolean; unavailable: boolean
 
 /** Longest provider text kept in a connect error. */
 const PROVIDER_TEXT_MAX = 300;
-const URL_IN_TEXT = /\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/giu;
-const AUTH_VALUE_IN_TEXT = /\b(Bearer|Basic)\s+[\w.~+/=-]{8,}/giu;
+/** A URL runs to the next space or angle bracket, quotes included: a quoted query value is part of it. */
+const URL_IN_TEXT = /\b[a-z][a-z0-9+.-]*:\/\/[^\s<>]+/giu;
+/** The value of an `Authorization` header, whatever its length: the header names it as a credential. */
+const AUTH_HEADER_IN_TEXT = /\b(?<header>authorization\W{0,3}(?:bearer|basic))\s+[^\s,;]+/giu;
+/**
+ * A Bearer/Basic value with no header around it: only when it looks like a credential (eight or more
+ * characters, or any digit, `=`, `+` or `/`), so prose such as "Basic auth is off" is left alone.
+ */
+const AUTH_VALUE_IN_TEXT =
+  /\b(?<scheme>bearer|basic)\s+(?:(?=[\w.~+/=-]{8,})|(?=[\w.~+/=-]*[\d=+/]))[\w.~+/=-]+/giu;
 
 /** A URL in provider text as its origin, and a Bearer/Basic header value as nothing. */
 function withoutSecrets(text: string): string {
   return text
     .replaceAll(URL_IN_TEXT, (url) => redactUrlForLog(url))
-    .replaceAll(AUTH_VALUE_IN_TEXT, "$1 [redacted]");
+    .replaceAll(AUTH_HEADER_IN_TEXT, "$<header> [redacted]")
+    .replaceAll(AUTH_VALUE_IN_TEXT, "$<scheme> [redacted]");
 }
 
 /**
