@@ -32,7 +32,7 @@ export interface NotificationEvent {
  */
 export const NOTIFICATION_EVENTS: readonly NotificationEvent[] = [
   { event: "build:created", label: "Build created" },
-  { event: "build:reviewing", label: "Build needs review" },
+  { event: "build:reviewing", label: "Build is ready for review" },
   { event: "build:approved", label: "Build approved" },
   { event: "build:rejected", label: "Build rejected" },
   { event: "build:pending", label: "Build sent back to pending" },

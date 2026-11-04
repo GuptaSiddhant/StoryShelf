@@ -48,7 +48,7 @@ Git delivery is **durable**, unlike messages: each state change is a `notify` jo
 ## Manage your subscriptions
 
 - **Global**: `/profile#notifications` — one row per membership: email on/off plus topic checkboxes.
-- **In context**: project **Settings → Notifications → My notifications for this project** edits the same row. **Send me review requests** is the `reviewRequests` field (default `true`): turning it off stops `review:requested` and leaves your other topics and channels alone. The topic checkboxes list every subscribable event; ticking all of them, or none, stores "all topics" (`events` null), so events added later still reach you. Unticking **Email me** switches the row off (`enabled: false`) and keeps its topics. `DELETE …/notifications/me` removes the row and returns you to the defaults.
+- **In context**: project **Settings → Notifications → My notifications for this project** edits the same row. **Send me review requests** is the `reviewRequests` field (default `true`): turning it off stops `review:requested` and leaves your other topics and channels alone. The topic checkboxes list every subscribable event except `review:requested`, which only that switch controls; ticking all of them, or none, stores "all topics" (`events` null), so events added later still reach you, and a partial list is saved with `review:requested` included. Unticking **Email me** switches the row off (`enabled: false`) and keeps its topics. `DELETE …/notifications/me` removes the row and returns you to the defaults.
 
 User preferences require auth; with auth disabled only admin channels operate.
 

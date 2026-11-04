@@ -59,10 +59,44 @@ export interface NotificationsFormState {
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */
 
+/** The one topic the "Send me review requests" switch controls, so it has no checkbox of its own. */
+export const REVIEW_REQUESTED_EVENT = "review:requested";
+
+/** The topics the card lists: every subscribable event but the one the review switch owns. */
+export const LISTED_TOPICS = NOTIFICATION_EVENTS.filter(
+  (entry) => entry.event !== REVIEW_REQUESTED_EVENT,
+);
+
 /** Whether a topic checkbox renders checked (empty allowlist means all). */
 function topicChecked(events: string[], event: string): boolean {
   return events.length === 0 || events.includes(event);
 }
+
+/**
+ * Whether the review-request switch shows on: the stored switch, and (for a subscription saved
+ * before the switch owned the topic) a topic list that still admits it.
+ */
+function reviewRequestsOn(subscription: SettingsMySubscription | null): boolean {
+  if (subscription === null) {
+    return true;
+  }
+  const { events, reviewRequests } = subscription;
+  return reviewRequests && (events.length === 0 || events.includes(REVIEW_REQUESTED_EVENT));
+}
+
+/** One checkbox per listed topic (an empty allowlist means all are ticked). */
+const TopicChecks: FC<{ events: string[] }> = ({ events }) => (
+  <>
+    {LISTED_TOPICS.map((topic) => (
+      <CheckField
+        label={topic.label}
+        name="events"
+        value={topic.event}
+        checked={topicChecked(events, topic.event)}
+      />
+    ))}
+  </>
+);
 
 /** The viewer's own preferences card (visible to every member). */
 const MyNotificationsCard: FC<{
@@ -70,10 +104,14 @@ const MyNotificationsCard: FC<{
   mySubscription: SettingsMySubscription | null;
 }> = ({ project, mySubscription }) => {
   const events = mySubscription?.events ?? [];
+  const emailOff = mySubscription !== null && !mySubscription.enabled;
   return (
     <Card>
       <SectionTitle>My notifications for this project</SectionTitle>
-      <Meta>Opt in to email alerts for this project. Leave everything off to stay silent.</Meta>
+      <Meta>
+        Approvers and admins get review requests by email by default; turn off Send me review
+        requests to stop them. The options below add other email alerts for this project.
+      </Meta>
       <form
         method="post"
         action={`/projects/${project.slug}/settings/notifications/me`}
@@ -89,22 +127,14 @@ const MyNotificationsCard: FC<{
         <CheckField
           label="Send me review requests"
           name="reviewRequests"
-          checked={mySubscription?.reviewRequests ?? true}
+          checked={reviewRequestsOn(mySubscription)}
+          hint={
+            emailOff
+              ? "Email me is off, so no review requests reach you until you turn it on."
+              : "Emails you when a build waits for a verdict. It changes nothing else below."
+          }
         />
-        <p>
-          <Meta as="span">
-            Approvers and admins get an email when a build needs a review, unless this is off. It
-            changes nothing else below.
-          </Meta>
-        </p>
-        {NOTIFICATION_EVENTS.map((topic) => (
-          <CheckField
-            label={topic.label}
-            name="events"
-            value={topic.event}
-            checked={topicChecked(events, topic.event)}
-          />
-        ))}
+        <TopicChecks events={events} />
         <p>
           <Meta as="span">Ticking every box, or none, means all topics, including new ones.</Meta>
         </p>

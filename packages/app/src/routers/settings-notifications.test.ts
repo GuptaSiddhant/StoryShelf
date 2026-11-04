@@ -1,11 +1,11 @@
 import { NotificationChannelModel, NotificationSubscriptionModel } from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
-import { NOTIFICATION_EVENTS } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
+import { LISTED_TOPICS } from "../pages/settings-notifications.tsx";
 import { stubAuth } from "../stub-auth.ts";
 
 const secret = "test-secret";
@@ -217,14 +217,17 @@ describe("notifications settings tab", () => {
     const subscriptions = new NotificationSubscriptionModel(seeded.db);
     const all = new URLSearchParams();
     all.set("enabled", "on");
-    for (const entry of NOTIFICATION_EVENTS) {
+    for (const entry of LISTED_TOPICS) {
       all.append("events", entry.event);
     }
     await postForm(path, all, app);
     expect((await subscriptions.getFor("p1", member.id))?.events).toBeNull();
 
+    // A partial list also carries review:requested, which only the review switch controls.
     await postForm(path, { enabled: "on", events: "build:approved" }, app);
-    expect((await subscriptions.getFor("p1", member.id))?.events).toBe('["build:approved"]');
+    expect((await subscriptions.getFor("p1", member.id))?.events).toBe(
+      '["build:approved","review:requested"]',
+    );
 
     await postForm(path, { enabled: "on" }, app);
     expect((await subscriptions.getFor("p1", member.id))?.events).toBeNull();
@@ -241,7 +244,7 @@ describe("notifications settings tab", () => {
     const off = await subscriptions.getFor("p1", member.id);
     expect(off).toMatchObject({
       enabled: false,
-      events: '["build:approved"]',
+      events: '["build:approved","review:requested"]',
       reviewRequests: true,
     });
 
@@ -266,7 +269,7 @@ describe("notifications settings tab", () => {
     await postForm(path, { enabled: "on", events: "build:approved" }, app);
     expect(await subscriptions.getFor("p1", member.id)).toMatchObject({
       enabled: true,
-      events: '["build:approved"]',
+      events: '["build:approved","review:requested"]',
       via: '["email"]',
       reviewRequests: false,
     });
@@ -279,11 +282,31 @@ describe("notifications settings tab", () => {
       headers: { cookie: "storyshelf_session=ok" },
     });
     const html = await page.text();
-    for (const entry of NOTIFICATION_EVENTS) {
+    for (const entry of LISTED_TOPICS) {
       expect(html).toContain(`value="${entry.event}"`);
     }
     expect(html).toContain('value="review:verdict"');
+    // One control per event: the review switch owns review:requested, which has no checkbox.
+    expect(html).not.toContain('value="review:requested"');
     expect(html).toContain("Send me review requests");
+    expect(html).toContain("review requests by email by default");
+    expect(html).not.toContain("Leave everything off to stay silent");
+  });
+
+  it("explains the switch when email is off, and shows it off for a list that leaves it out", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, true);
+    const path = "/projects/notify-project/settings/notifications";
+    const page = async () =>
+      await (await app.request(path, { headers: { cookie: "storyshelf_session=ok" } })).text();
+    expect(await page()).toContain("Emails you when a build waits for a verdict");
+
+    const subscriptions = new NotificationSubscriptionModel(seeded.db);
+    await subscriptions.upsert("p1", member.id, { via: ["email"], enabled: false });
+    expect(await page()).toContain("Email me is off, so no review requests reach you");
+
+    await subscriptions.upsert("p1", member.id, { via: ["email"], events: ["build:approved"] });
+    expect(await page()).toMatch(/name="reviewRequests"(?![^>]*checked)/u);
   });
 
   it("creates a git channel with the token as its secret and no event filter", async () => {

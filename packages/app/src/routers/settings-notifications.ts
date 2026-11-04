@@ -1,8 +1,8 @@
 import { NotificationChannelModel, NotificationSubscriptionModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
-import { NOTIFICATION_EVENTS } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { LISTED_TOPICS, REVIEW_REQUESTED_EVENT } from "../pages/settings-notifications.tsx";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
@@ -164,13 +164,14 @@ async function handleSaveMine(c: Context): Promise<Response> {
 }
 
 /**
- * The topics to store: `undefined` (all) when none or every topic is ticked, else the ticked
- * ones. Ticking everything must not freeze today's list, or an event added later would be missed.
+ * The topics to store: `undefined` (all) when none or every listed topic is ticked, else the
+ * ticked ones plus `review:requested`, which the review switch alone controls (it has no
+ * checkbox, so a partial list must not leave it out). Ticking everything must not freeze today's
+ * list, or an event added later would be missed.
  */
 function topicsToStore(ticked: string[]): string[] | undefined {
-  const all =
-    ticked.length === 0 || NOTIFICATION_EVENTS.every((entry) => ticked.includes(entry.event));
-  return all ? undefined : ticked;
+  const all = ticked.length === 0 || LISTED_TOPICS.every((entry) => ticked.includes(entry.event));
+  return all ? undefined : [...ticked, REVIEW_REQUESTED_EVENT];
 }
 
 /**
