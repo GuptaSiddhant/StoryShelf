@@ -161,25 +161,33 @@ const LastDelivered: FC<{ at: string | null }> = ({ at }) => (
   </Meta>
 );
 
-/** Delivery health: failing (time, then the error), ok, or no delivery yet; and when it last delivered. */
-const ChannelHealth: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => (
-  <VStack>
-    {channel.lastError !== null ? (
-      <>
-        <Badge tone="danger">failing</Badge>
-        <Meta as="span">
-          Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
-          <span class="truncate max-w-cell" title={channel.lastError}>
-            {" "}
-            {channel.lastError}
-          </span>
-        </Meta>
-      </>
-    ) : channel.lastDeliveredAt === null ? (
+/** The health badge: failing with its time and error, ok, or no delivery yet. */
+const HealthStatus: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => {
+  if (channel.lastError === null) {
+    return channel.lastDeliveredAt === null ? (
       <Badge tone="neutral">no delivery yet</Badge>
     ) : (
       <Badge tone="success">ok</Badge>
-    )}
+    );
+  }
+  return (
+    <>
+      <Badge tone="danger">failing</Badge>
+      <Meta as="span">
+        Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
+        <span class="truncate max-w-cell" title={channel.lastError}>
+          {" "}
+          {channel.lastError}
+        </span>
+      </Meta>
+    </>
+  );
+};
+
+/** Delivery health, and when the channel last delivered. */
+const ChannelHealth: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => (
+  <VStack>
+    <HealthStatus channel={channel} />
     <LastDelivered at={channel.lastDeliveredAt} />
   </VStack>
 );
