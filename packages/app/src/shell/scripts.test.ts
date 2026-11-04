@@ -375,9 +375,8 @@ describe("signed preview frame", () => {
     await tick();
     stale.reject(new Error("down"));
     await tick();
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      page.timers.findLast((timer) => timer.kind === "timeout")?.fn();
-    }
+    // The stale failure schedules no retry at all (the catch-side guard), so nothing can come back.
+    expect(page.timers.findLast((timer) => timer.kind === "timeout")).toBeUndefined();
     await tick();
     expect(page.part("notice")?.hidden).toBe(true);
     expect(page.part("disclosure")?.hidden).toBe(false);
