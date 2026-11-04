@@ -11,6 +11,7 @@ import {
   makeFakeStateNotifier,
   makeStorage,
 } from "@storyshelf/core/test-helpers";
+import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
@@ -215,6 +216,33 @@ describe("public origin on the System page", () => {
   });
 });
 
+/** An admin app with a git channel and one open build; resolves to what the tests drive. */
+async function openBuildApp(logger: typeof silent = silent) {
+  const git = makeFakeStateNotifier();
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const app = createShelfApp({
+    database: db,
+    storage,
+    logger,
+    config: { secret: "origin-test-secret" },
+    auth: stubAuth({ id: "u1", email: "a@b.c", name: "A", role: "admin" }),
+    notifications: { notifiers: [git.provider] },
+  });
+  await app.lifecycle.setup();
+  const project = await createTestProject(db, db.tables);
+  const build = await createTestBuild(db, db.tables, project.id);
+  await new NotificationChannelModel(db, undefined, "origin-test-secret").create({
+    projectId: project.id,
+    provider: "fake-git",
+    config: {},
+    secret: "token",
+  });
+  const token = await csrfFrom(app);
+  const urlOf = (origin: string) => `${origin}/projects/${project.slug}/builds/${build.id}`;
+  return { app, git, token, urlOf };
+}
+
 describe("notifications without a public origin", () => {
   const paused = "Notifications are paused until a public URL is set";
 
@@ -236,34 +264,61 @@ describe("notifications without a public origin", () => {
   });
 
   it("asks again for the state of open builds once an admin confirms an origin", async () => {
-    const git = makeFakeStateNotifier();
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const app = createShelfApp({
-      database: db,
-      storage,
-      logger: silent,
-      config: { secret: "origin-test-secret" },
-      auth: stubAuth({ id: "u1", email: "a@b.c", name: "A", role: "admin" }),
-      notifications: { notifiers: [git.provider] },
-    });
-    await app.lifecycle.setup();
-    const project = await createTestProject(db, db.tables);
-    const build = await createTestBuild(db, db.tables, project.id);
-    await new NotificationChannelModel(db, undefined, "origin-test-secret").create({
-      projectId: project.id,
-      provider: "fake-git",
-      config: {},
-      secret: "token",
-    });
-    const { requestBuildState } = await import("../git-status.ts");
-    expect(requestBuildState).toBeTypeOf("function");
-    const token = await csrfFrom(app);
+    const { app, git, token, urlOf } = await openBuildApp();
     await form(app, "/admin/public-origin", token, ORIGIN);
     await vi.waitFor(() => {
       expect(git.calls.length).toBeGreaterThan(0);
     });
-    expect(git.calls[0]?.url).toBe(`${ORIGIN}/projects/${project.slug}/builds/${build.id}`);
+    expect(git.calls[0]?.url).toBe(urlOf(ORIGIN));
+  });
+
+  it("asks again when an admin replaces the confirmed origin, so posted links follow it", async () => {
+    const { app, git, token, urlOf } = await openBuildApp();
+    await form(app, "/admin/public-origin", token, ORIGIN);
+    await vi.waitFor(() => {
+      expect(git.calls.length).toBeGreaterThan(0);
+    });
+    git.calls.length = 0;
+    const replacement = "https://shelf.acme.io";
+    await form(app, "/admin/public-origin", token, replacement);
+    await vi.waitFor(() => {
+      expect(git.calls.length).toBeGreaterThan(0);
+    });
+    expect(git.calls.every((call) => call.url === urlOf(replacement))).toBe(true);
+  });
+
+  it("asks nothing when the same origin is saved again", async () => {
+    const { app, git, token } = await openBuildApp();
+    await form(app, "/admin/public-origin", token, ORIGIN);
+    await vi.waitFor(() => {
+      expect(git.calls.length).toBeGreaterThan(0);
+    });
+    git.calls.length = 0;
+    await form(app, "/admin/public-origin", token, ORIGIN);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+    expect(git.calls).toHaveLength(0);
+  });
+
+  it("logs a change once, naming the new origin and whether it replaced one", async () => {
+    const lines: { msg: string; origin: string; replaced: boolean }[] = [];
+    const logger = pino(
+      { level: "info" },
+      { write: (line: string) => lines.push(JSON.parse(line) as (typeof lines)[number]) },
+    );
+    const { app, git, token } = await openBuildApp(logger as never);
+    await form(app, "/admin/public-origin", token, ORIGIN);
+    await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
+    await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
+    await vi.waitFor(() => {
+      expect(git.calls.length).toBeGreaterThan(1);
+    });
+    const changes = lines.filter((line) => line.msg.startsWith("public origin changed"));
+    expect(changes.map((line) => [line.origin, line.replaced])).toEqual([
+      [ORIGIN, false],
+      ["https://shelf.acme.io", true],
+    ]);
   });
 
   it("stays paused after a report: a detected origin counts only once confirmed", async () => {
