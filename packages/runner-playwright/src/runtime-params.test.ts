@@ -1,5 +1,5 @@
 import { deferred } from "@storyshelf/core/test-helpers";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { extractAllParameters } from "./runtime-params.ts";
 
 type Preview = { extract?: () => Promise<unknown>; ready?: () => Promise<unknown> };
@@ -16,6 +16,7 @@ function pageWith(preview?: Preview) {
 const ENTRIES = { "a--b": { parameters: { storyshelf: { delay: 5 } } } };
 
 afterEach(() => {
+  vi.useRealTimers();
   Reflect.deleteProperty(globalThis, "__STORYBOOK_PREVIEW__");
 });
 
@@ -42,6 +43,24 @@ describe("extractAllParameters", () => {
     expect(extractCalled).toBe(false);
     gate.resolve();
     expect((await pending)["a--b"]).toMatchObject({ delay: 5 });
+  });
+
+  it("gives up waiting after 15 s and extracts anyway, so the failure is the preview's own", async () => {
+    vi.useFakeTimers();
+    let extractCalled = false;
+    const preview: Preview = {
+      ready: async () => await new Promise(() => {}),
+      extract: async () => {
+        extractCalled = true;
+        throw new Error("SB_PREVIEW_API_0005: extract before initialization");
+      },
+    };
+    const pending = extractAllParameters(pageWith(preview));
+    const outcome = expect(pending).rejects.toThrow("SB_PREVIEW_API_0005");
+    expect(extractCalled).toBe(false);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await outcome;
+    expect(extractCalled).toBe(true);
   });
 
   it("still extracts from a preview that has no ready()", async () => {
