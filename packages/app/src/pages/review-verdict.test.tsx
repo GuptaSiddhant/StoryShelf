@@ -10,7 +10,7 @@ vi.mock("../shell/csrf-field.tsx", () => ({ csrfField: (): string => "" }));
 const build = builds.find((item) => item.id === BUILD_REVIEW);
 if (!build) throw new Error("fixture missing: the build under review");
 
-function data(status: string): ReviewSectionData {
+function data(status: string, overrides: Partial<ReviewSectionData> = {}): ReviewSectionData {
   return {
     project,
     build: { ...build, status },
@@ -27,12 +27,13 @@ function data(status: string): ReviewSectionData {
     publishing: "success",
     canComment: true,
     canVerdict: true,
+    ...overrides,
   } as ReviewSectionData;
 }
 
-async function render(status: string): Promise<string> {
+async function render(status: string, overrides: Partial<ReviewSectionData> = {}): Promise<string> {
   const app = new Hono();
-  app.get("/", async (c) => await c.html(<VerdictCard data={data(status)} />));
+  app.get("/", async (c) => await c.html(<VerdictCard data={data(status, overrides)} />));
   return await (await app.request("/")).text();
 }
 
@@ -46,5 +47,46 @@ describe("VerdictCard controls", () => {
     expect(html).not.toContain("Approve build");
     expect(html).not.toContain("Reject build");
     expect(html).toContain(status);
+  });
+});
+
+describe("VerdictCard on a build that cannot be reviewed", () => {
+  it.each([
+    ["failed", "Nothing to review: this build failed."],
+    ["cancelled", "Nothing to review: this build was cancelled."],
+  ])(
+    "says so in one line on a %s build, with no approval counter or rejection text",
+    async (status, line) => {
+      const html = await render(status);
+      expect(html).toContain(line);
+      expect(html).not.toContain("approval given");
+      expect(html).not.toContain("Any rejection rejects the build");
+    },
+  );
+
+  it("keeps the approval counter for a build under review", async () => {
+    const html = await render("reviewing");
+    expect(html).toContain("0 of 1 approval given");
+    expect(html).not.toContain("Nothing to review");
+  });
+
+  it.each(["failed", "cancelled"])(
+    "offers a retry on a %s build where capture is on and the viewer may retry",
+    async (status) => {
+      const html = await render(status, { testing: true });
+      expect(html).toContain("Retry capture");
+      expect(html).toContain(`/api/v1/projects/${project.slug}/builds/${build.id}/retry`);
+    },
+  );
+
+  it("offers no retry without capture, or to a viewer who may not retry", async () => {
+    expect(await render("failed")).not.toContain("Retry capture");
+    expect(await render("failed", { testing: true, canComment: false })).not.toContain(
+      "Retry capture",
+    );
+  });
+
+  it("offers no retry while the build can still be reviewed", async () => {
+    expect(await render("reviewing", { testing: true })).not.toContain("Retry capture");
   });
 });
