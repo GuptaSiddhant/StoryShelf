@@ -11,6 +11,7 @@ export const contentUses = mysqlTable(
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     releasedAt: datetime("released_at", { mode: "string", fsp: 3 }),
     collectingAt: datetime("collecting_at", { mode: "string", fsp: 3 }),
+    claimToken: varchar("claim_token", { length: 64 }),
   },
   (table) => [
     primaryKey({ columns: [table.buildId, table.contentHash] }),
@@ -26,4 +27,5 @@ export interface ContentUse {
   createdAt: string;
   releasedAt: string | null;
   collectingAt: string | null;
+  claimToken: string | null;
 }

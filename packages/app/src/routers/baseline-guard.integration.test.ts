@@ -145,6 +145,7 @@ function testLifecycle(db: DatabaseAdapter, beforeWrite?: LifecycleHook): BuildR
     completeDeletion: async () => "not-deleting",
     recordContentUses: async () => [],
     claimContent: async () => [],
+    holdsContentClaim: async () => false,
     abandonContentClaim: async () => {},
     finishContentCollection: async () => {},
   };

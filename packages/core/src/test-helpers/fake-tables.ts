@@ -494,6 +494,7 @@ const contentUses = defineTable("content_uses", {
   createdAt: "created_at",
   releasedAt: "released_at",
   collectingAt: "collecting_at",
+  claimToken: "claim_token",
 });
 
 /** Stub schema bundled into the `Tables` map every fake serves. */

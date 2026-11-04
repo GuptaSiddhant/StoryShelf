@@ -65,6 +65,7 @@ function failingLifecycle(error: Error): BuildReferenceLifecycle {
     completeDeletion: async () => "not-deleting",
     recordContentUses: async () => [],
     claimContent: async () => [],
+    holdsContentClaim: async () => false,
     abandonContentClaim: async () => {},
     finishContentCollection: async () => {},
   };

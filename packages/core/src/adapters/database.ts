@@ -223,17 +223,26 @@ export interface BuildReferenceLifecycle {
     hashes: readonly string[],
   ): Promise<string[]>;
   /**
-   * Claim for deletion every hash whose uses are all released, the latest release older than
-   * `idleBefore` (an ISO instant), and no collector holds yet. Also returns, to resume, the hashes
-   * whose claim is older than `staleBefore` (a crashed collector's), and stamps them as claimed
-   * again. A fresh claim is returned to its claimer only, so two collectors never delete one blob.
-   * A claimed hash admits no new use.
+   * Claim for deletion, under the pass's `token` (a fresh id per collector pass), every hash whose
+   * uses are all released, the latest release older than `idleBefore` (an ISO instant), and no
+   * collector holds yet. Also takes over, to resume, the hashes whose claim is older than
+   * `staleBefore` (a crashed collector's): they are re-stamped with the new token, which fences the
+   * old collector out of {@link holdsContentClaim}, {@link abandonContentClaim} and
+   * {@link finishContentCollection}. A fresh claim is returned to its claimer only, so two
+   * collectors never delete one blob. A claimed hash admits no new use. Resolves to the claimed
+   * hashes.
    */
-  claimContent(idleBefore: string, staleBefore: string): Promise<string[]>;
-  /** Give a claim back (a live build still serves the blob); its uses stay released. */
-  abandonContentClaim(hash: string): Promise<void>;
-  /** The blob of a claimed hash is deleted: drop its `content_uses` rows. */
-  finishContentCollection(hash: string): Promise<void>;
+  claimContent(token: string, idleBefore: string, staleBefore: string): Promise<string[]>;
+  /**
+   * Whether the hash is still claimed by this token with no unreleased use. A collector asks right
+   * before it deletes the blob and skips the delete when this is false, which narrows the window a
+   * taken-over collector could delete in to the time between this check and the delete itself.
+   */
+  holdsContentClaim(hash: string, token: string): Promise<boolean>;
+  /** Give a claim back (a live build still serves the blob); only its holder can; uses stay released. */
+  abandonContentClaim(hash: string, token: string): Promise<void>;
+  /** The blob of a claimed hash is deleted: drop its `content_uses` rows, if the token still holds it. */
+  finishContentCollection(hash: string, token: string): Promise<void>;
 }
 
 /** Database-specific metadata: the family plus what the backing platform can carry. */

@@ -384,16 +384,18 @@ describe("content uses", () => {
       const stillLive = "2000-01-01T00:00:00.000Z";
 
       // The collector wins: the use is refused, nothing is written, and the content comes back.
-      expect(await fixture.lifecycle.claimContent(idleBefore, stillLive)).toEqual([ONLY_ONE]);
+      expect(await fixture.lifecycle.claimContent("pass", idleBefore, stillLive)).toEqual([
+        ONLY_ONE,
+      ]);
       expect(
         await fixture.lifecycle.recordContentUses("p", "two", [ONLY_ONE, hashOf("x")]),
       ).toEqual([ONLY_ONE]);
       expect(fixture.uses(hashOf("x"))).toEqual({ active: 0, rows: 0 });
-      await fixture.lifecycle.finishContentCollection(ONLY_ONE);
+      await fixture.lifecycle.finishContentCollection(ONLY_ONE, "pass");
       expect(await fixture.lifecycle.recordContentUses("p", "two", [ONLY_ONE])).toEqual([]);
 
       // The use wins: a blob with an unreleased use is not claimed.
-      expect(await fixture.lifecycle.claimContent(idleBefore, stillLive)).toEqual([]);
+      expect(await fixture.lifecycle.claimContent("pass", idleBefore, stillLive)).toEqual([]);
     });
   });
 
@@ -406,16 +408,40 @@ describe("content uses", () => {
       const other = createBuildReferenceLifecycle(fixture.path);
 
       const results = await Promise.all([
-        fixture.lifecycle.claimContent(idleBefore, live),
-        other.claimContent(idleBefore, live),
+        fixture.lifecycle.claimContent("pass-1", idleBefore, live),
+        other.claimContent("pass-2", idleBefore, live),
       ]);
 
       // Exactly one collector got it; the other must not touch a blob its peer is deleting.
       expect(results.flat()).toEqual([ONLY_ONE]);
       // The claimer "crashed": a later pass resumes the stale claim, once.
-      expect(await other.claimContent(idleBefore, stale)).toEqual([ONLY_ONE]);
-      await fixture.lifecycle.finishContentCollection(ONLY_ONE);
-      expect(await other.claimContent(idleBefore, stale)).toEqual([]);
+      expect(await other.claimContent("pass-3", idleBefore, stale)).toEqual([ONLY_ONE]);
+      await fixture.lifecycle.finishContentCollection(ONLY_ONE, "pass-3");
+      expect(await other.claimContent("pass-4", idleBefore, stale)).toEqual([]);
+    });
+  });
+
+  it("skips the delete of a collector whose claim was taken over, and leaves the blob and its rows", async () => {
+    await withFixture(async (fixture) => {
+      await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
+      const stale = "9999-12-31T00:00:00.000Z";
+      const idleBefore = new Date(afterGrace()).toISOString();
+      // A hung pass claimed the blob; a later pass took the stale claim over.
+      expect(
+        await fixture.lifecycle.claimContent("hung", idleBefore, "2000-01-01T00:00:00.000Z"),
+      ).toEqual([ONLY_ONE]);
+      expect(await fixture.lifecycle.claimContent("successor", idleBefore, stale)).toEqual([
+        ONLY_ONE,
+      ]);
+
+      // The hung pass wakes up still believing it claimed the blob (its claim call returned it
+      // long ago), but its token no longer holds the claim, so it deletes nothing.
+      const lifecycle = { ...fixture.lifecycle, claimContent: async () => [ONLY_ONE] };
+      const removed = await collectUnreferencedContent({ ...deps(fixture), lifecycle });
+      expect(removed).toBe(0);
+      expect(fixture.objects.has(`content/${ONLY_ONE}`)).toBe(true);
+      expect(fixture.uses(ONLY_ONE).rows).toBe(1);
+      expect(await fixture.lifecycle.holdsContentClaim(ONLY_ONE, "successor")).toBe(true);
     });
   });
 });

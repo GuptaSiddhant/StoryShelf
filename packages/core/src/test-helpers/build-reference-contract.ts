@@ -9,6 +9,9 @@ import type {
 /** Cutoffs that put every release before / after them. */
 const LATER = "9999-12-31T00:00:00.000Z";
 const EARLIER = "2000-01-01T00:00:00.000Z";
+/** Collector pass tokens. */
+const PASS_A = "pass-a";
+const PASS_B = "pass-b";
 
 export interface BuildReferenceContractFixture {
   first: BuildReferenceLifecycle;
@@ -230,18 +233,18 @@ export function buildReferenceContractSuite(
         expect(await second.recordContentUses(project, buildIds[0], [hash])).toEqual([]);
         expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([]);
         // Two builds use it: nothing is idle, however late the cutoff.
-        expect(await first.claimContent(LATER, EARLIER)).toEqual([]);
+        expect(await first.claimContent(PASS_A, LATER, EARLIER)).toEqual([]);
 
         await first.claimDeletion(project, buildIds[0]);
         expect(await first.releaseBuildContent(project, buildIds[0], [hash])).toBe("done");
         expect(await second.releaseBuildContent(project, buildIds[0], [hash])).toBe("already-done");
         // Build two still uses it.
-        expect(await first.claimContent(LATER, EARLIER)).toEqual([]);
+        expect(await first.claimContent(PASS_A, LATER, EARLIER)).toEqual([]);
 
         await first.claimDeletion(project, buildIds[1]);
         await first.releaseBuildContent(project, buildIds[1], [hash]);
-        expect(await first.claimContent(EARLIER, EARLIER)).toEqual([]);
-        expect(await first.claimContent(LATER, EARLIER)).toEqual([hash]);
+        expect(await first.claimContent(PASS_A, EARLIER, EARLIER)).toEqual([]);
+        expect(await first.claimContent(PASS_A, LATER, EARLIER)).toEqual([hash]);
       });
     });
     it("ends a use racing a collection in exactly one outcome", async () => {
@@ -253,7 +256,7 @@ export function buildReferenceContractSuite(
         await first.releaseBuildContent(project, buildIds[0], [hash]);
 
         const [claimed, refused] = await Promise.all([
-          first.claimContent(LATER, EARLIER),
+          first.claimContent(PASS_A, LATER, EARLIER),
           second.recordContentUses(project, buildIds[1], [hash]),
         ]);
 
@@ -261,16 +264,16 @@ export function buildReferenceContractSuite(
           // The collector won: the use was refused, so the content must be stored again.
           expect(refused).toEqual([hash]);
           expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([hash]);
-          await first.finishContentCollection(hash);
+          await first.finishContentCollection(hash, PASS_A);
           expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([]);
         } else {
           // The use won: the blob has an unreleased use and is not claimed.
           expect(refused).toEqual([]);
-          expect(await first.claimContent(LATER, EARLIER)).toEqual([]);
+          expect(await first.claimContent(PASS_A, LATER, EARLIER)).toEqual([]);
         }
       });
     });
-    it("resumes a claim until it is finished, and lets an abandoned claim admit uses again", async () => {
+    it("resumes a stale claim under a new token, and fences the old holder out", async () => {
       await withFixture(async ({ first, second, owner, buildIds }) => {
         const project = owner.projectId;
         const hash = "c".repeat(64);
@@ -278,15 +281,26 @@ export function buildReferenceContractSuite(
         await first.claimDeletion(project, buildIds[0]);
         await first.releaseBuildContent(project, buildIds[0], [hash]);
 
-        expect(await first.claimContent(LATER, EARLIER)).toEqual([hash]);
-        // A live claim stays with its claimer; once stale (the claimer "crashed"), another
-        // connection resumes it.
-        expect(await second.claimContent(LATER, EARLIER)).toEqual([]);
-        expect(await second.claimContent(LATER, LATER)).toEqual([hash]);
-        await second.abandonContentClaim(hash);
+        expect(await first.claimContent(PASS_A, LATER, EARLIER)).toEqual([hash]);
+        expect(await first.holdsContentClaim(hash, PASS_A)).toBe(true);
+        // A live claim stays with its claimer; once stale (the claimer "hung"), another pass
+        // takes it over under its own token.
+        expect(await second.claimContent(PASS_B, LATER, EARLIER)).toEqual([]);
+        expect(await second.claimContent(PASS_B, LATER, LATER)).toEqual([hash]);
+
+        // The old holder can no longer check, give back or finish the claim.
+        expect(await first.holdsContentClaim(hash, PASS_A)).toBe(false);
+        expect(await second.holdsContentClaim(hash, PASS_B)).toBe(true);
+        await first.abandonContentClaim(hash, PASS_A);
+        await first.finishContentCollection(hash, PASS_A);
+        expect(await second.holdsContentClaim(hash, PASS_B)).toBe(true);
+        expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([hash]);
+
+        // The current holder gives it back: uses are admitted again and it is no longer idle.
+        await second.abandonContentClaim(hash, PASS_B);
+        expect(await second.holdsContentClaim(hash, PASS_B)).toBe(false);
         expect(await second.recordContentUses(project, buildIds[1], [hash])).toEqual([]);
-        // Used again, so it is no longer idle.
-        expect(await first.claimContent(LATER, EARLIER)).toEqual([]);
+        expect(await first.claimContent(PASS_A, LATER, EARLIER)).toEqual([]);
       });
     });
     it("rejects a duplicate owner in a multi-owner update", async () => {

@@ -480,6 +480,7 @@ CREATE TABLE IF NOT EXISTS content_uses (
   created_at TEXT NOT NULL,
   released_at TEXT,
   collecting_at TEXT,
+  claim_token TEXT,
   PRIMARY KEY (build_id, content_hash)
 );
 CREATE INDEX IF NOT EXISTS content_uses_hash_idx ON content_uses (content_hash);

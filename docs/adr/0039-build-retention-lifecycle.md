@@ -67,17 +67,20 @@ by preset, so it cannot by itself carry this guarantee.
   dropped, with nothing to backfill: a blob without a use row is protected by the manifest guard
   until its builds go. A build's release marks all its rows released (kept for the grace period).
   A collector **claims** a blob in the capability's domain (`claimContent`: every use released,
-  the grace passed, no live manifest names it): a claim is durable and leased (30 minutes): it
-  stays with its collector, so two collectors never delete one blob, and a later pass resumes one
-  the lease has outlived. A claimed hash refuses new uses, so a use racing the delete ends in
-  exactly one outcome: the claim fails because the use landed, or the use is refused and its
-  caller stores the content again and retries. A live manifest found after the claim gives the
-  claim back. A wrong use record can leak storage but never delete served content. The lease is
-  not a fence: object storage cannot refuse a late delete, so a collector that stalls longer than
-  the lease between its claim and its delete could remove a blob a successor already collected and
-  a new build stored again. The lease is far longer than one delete, and a takeover needs a
-  crashed pass, so this is accepted rather than fenced. Without the capability nothing is recorded
-  or collected.
+  the grace passed, no live manifest names it) under a per-pass token. A claim is durable and
+  leased (30 minutes): it stays with its collector, so two collectors never delete one blob, and a
+  later pass takes over one the lease has outlived, re-stamping it with its own token. Right
+  before it deletes, a pass asks the capability whether its token still holds the claim
+  (`holdsContentClaim`) and skips the delete if not; giving a claim back and finishing it are
+  token-checked too, so a taken-over pass can do nothing. A claimed hash refuses new uses, so a
+  use racing the delete ends in exactly one outcome: the claim fails because the use landed, or
+  the use is refused and its caller stores the content again and retries. A live manifest found
+  after the claim gives the claim back. A wrong use record can leak storage but never delete
+  served content. The token is not a full fence: object storage cannot refuse a late delete, so a
+  pass that stalls longer than the lease exactly between its check and its delete could still
+  remove a blob a successor collected and a new build stored again. That window is one delete wide
+  and needs a hung process, so it is accepted rather than fenced. Without the capability nothing
+  is recorded or collected.
 
 ### 3. Lifecycle is an explicit database capability
 

@@ -20,6 +20,7 @@ import {
   abandonContentClaim,
   claimContent,
   finishContentCollection,
+  holdsContentClaim,
   recordContentUses,
 } from "./content-uses.ts";
 import { inTransaction, open, rollbackQuietly, transactionStore } from "./lifecycle-transaction.ts";
@@ -47,13 +48,14 @@ export function createBuildReferenceLifecycle(
       await completeDeletion(path, projectId, buildId, removeRows),
     recordContentUses: async (projectId, buildId, hashes) =>
       await recordContentUses(path, projectId, buildId, hashes),
-    claimContent: async (idleBefore, staleBefore) =>
-      await claimContent(path, idleBefore, staleBefore),
-    abandonContentClaim: async (hash) => {
-      await abandonContentClaim(path, hash);
+    claimContent: async (token, idleBefore, staleBefore) =>
+      await claimContent(path, token, idleBefore, staleBefore),
+    holdsContentClaim: async (hash, token) => await holdsContentClaim(path, hash, token),
+    abandonContentClaim: async (hash, token) => {
+      await abandonContentClaim(path, hash, token);
     },
-    finishContentCollection: async (hash) => {
-      await finishContentCollection(path, hash);
+    finishContentCollection: async (hash, token) => {
+      await finishContentCollection(path, hash, token);
     },
   };
 }

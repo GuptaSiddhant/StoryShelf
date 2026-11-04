@@ -15,4 +15,6 @@ export interface ContentUse {
   releasedAt: string | null;
   /** Set when a collector claimed the hash for deletion; no new use of the hash is admitted. */
   collectingAt: string | null;
+  /** The collector pass that holds the claim; only it can check, give back or finish the claim. */
+  claimToken: string | null;
 }

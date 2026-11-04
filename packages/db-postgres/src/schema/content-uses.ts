@@ -10,6 +10,7 @@ export const contentUses = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     releasedAt: timestamp("released_at", { withTimezone: true, mode: "string" }),
     collectingAt: timestamp("collecting_at", { withTimezone: true, mode: "string" }),
+    claimToken: text("claim_token"),
   },
   (table) => [
     primaryKey({ columns: [table.buildId, table.contentHash] }),
@@ -25,4 +26,5 @@ export interface ContentUse {
   createdAt: string;
   releasedAt: string | null;
   collectingAt: string | null;
+  claimToken: string | null;
 }

@@ -9,6 +9,7 @@ import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/datab
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
 import { publishedGzipPath } from "../utils/paths.ts";
+import { ulid } from "../utils/ulid.ts";
 import { manifestHashes } from "./build-deletion.ts";
 
 /** How long a blob must stand without a use before it is collected. */
@@ -28,21 +29,34 @@ export interface ContentGcDeps {
 
 /** Collect unused content; resolves to how many blobs were removed. */
 export async function collectUnreferencedContent(deps: ContentGcDeps): Promise<number> {
-  const now = deps.now?.() ?? Date.now();
-  const before = (ms: number): string => new Date(now - ms).toISOString();
-  const claimed = await deps.lifecycle.claimContent(
-    before(CONTENT_GRACE_MS),
-    before(CLAIM_LEASE_MS),
-  );
+  const token = ulid();
+  const claimed = await claimIdle(deps, token);
   if (claimed.length === 0) return 0;
   const free = new Set(claimed);
   await dropLiveHashes(deps, free);
   let removed = 0;
   for (const hash of claimed) {
     // oxlint-disable-next-line no-await-in-loop -- one blob at a time keeps a failure to that blob
-    if (free.has(hash) ? await removeBlob(deps, hash) : await giveBack(deps, hash)) removed += 1;
+    if (await settle(deps, hash, token, free.has(hash))) removed += 1;
   }
   return removed;
+}
+
+/** Delete the claimed blob, or give the claim back when a live build still serves it. */
+async function settle(
+  deps: ContentGcDeps,
+  hash: string,
+  token: string,
+  unused: boolean,
+): Promise<boolean> {
+  return unused ? await removeBlob(deps, hash, token) : await giveBack(deps, hash, token);
+}
+
+/** Claim, under this pass's token, what is idle past the grace and what a dead pass left claimed. */
+async function claimIdle(deps: ContentGcDeps, token: string): Promise<string[]> {
+  const now = deps.now?.() ?? Date.now();
+  const before = (ms: number): string => new Date(now - ms).toISOString();
+  return await deps.lifecycle.claimContent(token, before(CONTENT_GRACE_MS), before(CLAIM_LEASE_MS));
 }
 
 /** Take out of `candidates` every hash a live build's manifest names; stops once none is left. */
@@ -63,9 +77,9 @@ async function dropLiveHashes(deps: ContentGcDeps, candidates: Set<string>): Pro
 }
 
 /** A live build serves the blob: give the claim back and count nothing removed. */
-async function giveBack(deps: ContentGcDeps, hash: string): Promise<false> {
+async function giveBack(deps: ContentGcDeps, hash: string, token: string): Promise<false> {
   try {
-    await deps.lifecycle.abandonContentClaim(hash);
+    await deps.lifecycle.abandonContentClaim(hash, token);
   } catch (error) {
     deps.logger?.warn({ err: error, hash }, "content claim could not be given back");
   }
@@ -73,15 +87,18 @@ async function giveBack(deps: ContentGcDeps, hash: string): Promise<false> {
 }
 
 /** Delete the blob, then end the claim; false when it failed, which leaves the claim to resume. */
-async function removeBlob(deps: ContentGcDeps, hash: string): Promise<boolean> {
+async function removeBlob(deps: ContentGcDeps, hash: string, token: string): Promise<boolean> {
   try {
+    // A pass that was taken over (its claim outlived the lease) must not delete: the blob may
+    // have been collected and stored again since. The window left is this check to the delete.
+    if (!(await deps.lifecycle.holdsContentClaim(hash, token))) return false;
     // The blob itself must go before the claim ends: if this throws, the claim stays and the next
     // pass resumes it.
     await deps.storage.delete(`content/${hash}`);
     // Variants are disposable; never let their deletion affect authoritative data.
     if (/^[a-f0-9]{64}$/u.test(hash))
       await deps.storage.delete(publishedGzipPath(hash)).catch(() => {});
-    await deps.lifecycle.finishContentCollection(hash);
+    await deps.lifecycle.finishContentCollection(hash, token);
     return true;
   } catch (error) {
     deps.logger?.warn({ err: error, hash }, "content collection failed");

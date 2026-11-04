@@ -493,6 +493,7 @@ CREATE TABLE IF NOT EXISTS content_uses (
   created_at DATETIME(3) NOT NULL,
   released_at DATETIME(3) NULL,
   collecting_at DATETIME(3) NULL,
+  claim_token VARCHAR(64) NULL,
   PRIMARY KEY (build_id, content_hash)
 );
 CREATE INDEX content_uses_hash_idx ON content_uses (content_hash);

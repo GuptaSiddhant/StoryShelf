@@ -10,6 +10,7 @@ export const contentUses = sqliteTable(
     createdAt: text("created_at").notNull(),
     releasedAt: text("released_at"),
     collectingAt: text("collecting_at"),
+    claimToken: text("claim_token"),
   },
   (table) => [
     primaryKey({ columns: [table.buildId, table.contentHash] }),
@@ -25,4 +26,5 @@ export interface ContentUse {
   createdAt: string;
   releasedAt: string | null;
   collectingAt: string | null;
+  claimToken: string | null;
 }

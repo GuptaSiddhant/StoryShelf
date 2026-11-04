@@ -450,6 +450,7 @@ CREATE TABLE IF NOT EXISTS content_uses (
   created_at TIMESTAMPTZ NOT NULL,
   released_at TIMESTAMPTZ,
   collecting_at TIMESTAMPTZ,
+  claim_token TEXT,
   PRIMARY KEY (build_id, content_hash)
 );
 CREATE INDEX IF NOT EXISTS content_uses_hash_idx ON content_uses (content_hash);

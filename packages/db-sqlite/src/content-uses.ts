@@ -29,11 +29,12 @@ export async function recordContentUses(
 }
 
 /**
- * Claim every idle hash (see the capability) and return it with the hashes whose earlier claim is
- * stale, which are stamped again so a second collector does not resume them too.
+ * Claim every idle hash (see the capability) under the pass's token, taking over the hashes whose
+ * earlier claim is stale. Re-stamping with the new token fences the old collector out.
  */
 export async function claimContent(
   path: string,
+  token: string,
   idleBefore: string,
   staleBefore: string,
 ): Promise<string[]> {
@@ -52,26 +53,57 @@ export async function claimContent(
            AND MAX(released_at) < ?`,
       )
       .all(idleBefore) as unknown as [string][];
-    const claim = db.prepare("UPDATE content_uses SET collecting_at = ? WHERE content_hash = ?");
+    const claim = db.prepare(
+      "UPDATE content_uses SET collecting_at = ?, claim_token = ? WHERE content_hash = ?",
+    );
     const hashes = [...stale, ...idle].map(([hash]) => hash);
-    for (const hash of hashes) claim.run(now, hash);
+    for (const hash of hashes) claim.run(now, token, hash);
     return await Promise.resolve(hashes);
   });
 }
 
-/** Clear the claim of a hash; its uses stay released. */
-export async function abandonContentClaim(path: string, hash: string): Promise<void> {
+/** Whether the token still holds the hash's claim and no use of it is unreleased. */
+export async function holdsContentClaim(
+  path: string,
+  hash: string,
+  token: string,
+): Promise<boolean> {
+  return await inTransaction(path, async (db) => {
+    const row = db
+      .prepare(
+        `SELECT SUM(claim_token = ?), SUM(released_at IS NULL)
+         FROM content_uses WHERE content_hash = ?`,
+      )
+      .get(token, hash) as unknown as [number | null, number | null];
+    const [held, open] = row;
+    return await Promise.resolve((held ?? 0) > 0 && (open ?? 0) === 0);
+  });
+}
+
+/** Clear the claim of a hash if the token holds it; its uses stay released. */
+export async function abandonContentClaim(
+  path: string,
+  hash: string,
+  token: string,
+): Promise<void> {
   await inTransaction(path, async (db) => {
-    db.prepare("UPDATE content_uses SET collecting_at = NULL WHERE content_hash = ?").run(hash);
+    db.prepare(
+      "UPDATE content_uses SET collecting_at = NULL, claim_token = NULL WHERE content_hash = ? AND claim_token = ?",
+    ).run(hash, token);
     await Promise.resolve();
   });
 }
 
-/** Drop the rows of a collected hash. */
-export async function finishContentCollection(path: string, hash: string): Promise<void> {
+/** Drop the rows of a collected hash, if the token still holds its claim. */
+export async function finishContentCollection(
+  path: string,
+  hash: string,
+  token: string,
+): Promise<void> {
   await inTransaction(path, async (db) => {
-    db.prepare("DELETE FROM content_uses WHERE content_hash = ? AND collecting_at IS NOT NULL").run(
+    db.prepare("DELETE FROM content_uses WHERE content_hash = ? AND claim_token = ?").run(
       hash,
+      token,
     );
     await Promise.resolve();
   });
