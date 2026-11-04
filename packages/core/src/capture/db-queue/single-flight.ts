@@ -91,15 +91,29 @@ async function covered(rt: QueueRuntime, holder: CaptureJobRow): Promise<boolean
  * is the price of a database with no transactions or only sequential ones (`metadata.transactions`).
  *
  * `row` is the job row as read before the write; the key is gone from the row once it ends.
+ * `attempt` is the attempt that ran the job: with transactions it ends in the same commit (a
+ * rollback keeps its lease, so the job is redelivered); without them it ends first.
  */
 export async function finishJob(
   rt: QueueRuntime,
   row: CaptureJobRow,
   status: Extract<CaptureJobStatus, "done" | "failed">,
   error: string | null = null,
+  attempt?: { id: string; error?: string | null },
 ): Promise<void> {
-  const ended = await rt.model.endJob(row.jobId, { status, error }, isoAt(rt));
+  const ended = await rt.model.endJob(
+    row.jobId,
+    {
+      status,
+      error,
+      ...(attempt === undefined ? {} : { attempt: { ...attempt, status } }),
+    },
+    isoAt(rt),
+  );
   if (ended === null) {
+    if (attempt !== undefined) {
+      await rt.model.finishAttempt(attempt.id, status, isoAt(rt), attempt.error ?? null);
+    }
     await rt.model.finishJob(row.jobId, status, isoAt(rt), error);
     await startSuccessor(rt, row);
   } else {

@@ -168,6 +168,11 @@ export class CaptureJobModel {
       status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">;
       error?: string | null;
       onlyOpen?: boolean;
+      /**
+       * The attempt that ran the job, ended in the same transaction: its lease goes with the end,
+       * so a rollback leaves it running and the job is redelivered when the lease runs out.
+       */
+      attempt?: { id: string; status: "done" | "failed"; error?: string | null };
     },
     now: string,
   ): Promise<JobEnd | null> {
@@ -179,21 +184,13 @@ export class CaptureJobModel {
       // as a plain statement does). A transaction that reads first and then writes holds a read
       // snapshot another process's commit makes stale, and SQLite refuses its upgrade at once.
       await tx.update(this.#table, jobId, { updatedAt: now });
+      await settleAttemptIn(tx, this.#table, end.attempt, now);
       const before = (await tx.get(this.#table, jobId)) as unknown as CaptureJobRow | null;
       if (before === null) throw new Error("row not found");
       if (end.onlyOpen === true && isTerminalJob(before)) {
         return { applied: false, successor: null };
       }
-      const patch = {
-        status: end.status,
-        visibleAt: null,
-        activeKey: null,
-        finishedAt: now,
-        updatedAt: now,
-      };
-      // The write that ends the job frees its key and holds its row until the commit.
-      const error = end.error ?? null;
-      await tx.update(this.#table, jobId, error === null ? patch : { ...patch, error });
+      await tx.update(this.#table, jobId, endPatch(end, now));
       const successor = await handOver(tx, this.#table, before, end.status, now);
       return { applied: true, successor };
     });
@@ -634,6 +631,39 @@ function blankRow(now: string): BlankRow {
 export interface JobEnd {
   applied: boolean;
   successor: CaptureJobRow | null;
+}
+
+/** The write that ends the job: frees its key and holds its row until the commit. */
+function endPatch(
+  end: { status: string; error?: string | null },
+  now: string,
+): Record<string, unknown> {
+  const patch = {
+    status: end.status,
+    visibleAt: null,
+    activeKey: null,
+    finishedAt: now,
+    updatedAt: now,
+  };
+  const error = end.error ?? null;
+  return error === null ? patch : { ...patch, error };
+}
+
+/** Ends the attempt that ran the job inside the end's transaction (a no-op without one). */
+async function settleAttemptIn(
+  tx: TxStore,
+  table: Table,
+  attempt: { id: string; status: "done" | "failed"; error?: string | null } | undefined,
+  now: string,
+): Promise<void> {
+  if (attempt === undefined) return;
+  await tx.update(table, attempt.id, {
+    status: attempt.status,
+    visibleAt: null,
+    error: attempt.error ?? null,
+    finishedAt: now,
+    updatedAt: now,
+  });
 }
 
 /**

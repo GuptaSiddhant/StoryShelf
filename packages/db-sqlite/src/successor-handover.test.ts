@@ -20,7 +20,7 @@ async function freshDatabase(): Promise<DatabaseAdapter> {
 
 /** A running single-flight job with one request waiting on it. */
 async function runningJobWithRequest(db: DatabaseAdapter) {
-  const queue = createDatabaseCaptureQueue(db, { kinds: ["capture"] });
+  const queue = createDatabaseCaptureQueue(db, { kinds: ["capture"], leaseMs: 50 });
   const id = await queue.enqueueJob({ kind: "capture", buildId: "b1", activeKey: KEY });
   const job = await queue.poll();
   if (job === null) throw new Error("the job was not claimed");
@@ -87,5 +87,11 @@ describe("the single-flight hand-over on node:sqlite", () => {
     });
     expect((await new CaptureJobModel(real).get(id))?.rerunRequestedAt).toBeTruthy();
     expect(await queuedFor(real, id)).toEqual([]);
+
+    // The attempt's lease went with the failed end, not before it: once the lease runs out the
+    // job is claimed again, still holding its key and its request.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const redelivered = await queue.poll();
+    expect(redelivered).toMatchObject({ jobId: id, attempt: 2 });
   });
 });

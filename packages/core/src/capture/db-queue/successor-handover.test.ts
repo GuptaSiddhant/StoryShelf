@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DatabaseAdapter, TxStore } from "../../adapters/database.ts";
 import { BuildModel } from "../../models/build.ts";
-import { CaptureJobModel } from "../../models/capture-job.ts";
+import { attemptRowId, CaptureJobModel } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
 import { claimNext } from "./claim.ts";
@@ -137,8 +137,11 @@ describe("a single-flight job ends and hands its key over in one transaction", (
         });
       })) as R;
 
-    await expect(finishJob(rt, row, "done")).rejects.toThrow("disk full");
+    await expect(finishJob(rt, row, "done", null, { id: attemptRowId("j1", 1) })).rejects.toThrow(
+      "disk full",
+    );
 
+    expect(await rt.model.get(attemptRowId("j1", 1))).toMatchObject({ status: "running" });
     expect(await rt.model.get("j1")).toMatchObject({ status: "running", activeKey: KEY });
     expect((await rt.model.get("j1"))?.rerunRequestedAt).toBeTruthy();
     expect(await others(rt)).toEqual([]);
