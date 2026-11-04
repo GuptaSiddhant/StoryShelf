@@ -36,7 +36,7 @@ interface Entry {
 /**
  * Reuses pages (each in its own context) across captures to skip per-capture
  * context/page startup and keep Storybook's JS in the HTTP cache. A page is
- * reset between captures (storage and cookies cleared, blank document) and
+ * reset between captures (storage, Cache Storage, service workers and cookies cleared, blank document) and
  * discarded, never reused, after a failed capture.
  */
 export class PagePool {
@@ -95,14 +95,23 @@ async function closeEntry(entry: Entry): Promise<void> {
   await entry.context.close().catch(() => {});
 }
 
-/** Runs in the page: clears web storage and IndexedDB for the current origin. */
-async function clearBrowserState(): Promise<void> {
+/**
+ * Runs in the page: clears web storage, IndexedDB, Cache Storage and service worker registrations
+ * for the current origin (the Storybook's). It is serialized into the page, so it must stay one
+ * self-contained function.
+ */
+// oxlint-disable-next-line eslint/max-statements -- runs in the page, so it must stay one self-contained function
+export async function clearBrowserState(): Promise<void> {
   const scope = globalThis as unknown as {
     localStorage: { clear(): void };
     sessionStorage: { clear(): void };
     indexedDB?: {
       databases?: () => Promise<{ name?: string }[]>;
       deleteDatabase(name: string): unknown;
+    };
+    caches?: { keys(): Promise<string[]>; delete(name: string): Promise<boolean> };
+    navigator?: {
+      serviceWorker?: { getRegistrations(): Promise<{ unregister(): Promise<boolean> }[]> };
     };
   };
   scope.localStorage.clear();
@@ -111,4 +120,8 @@ async function clearBrowserState(): Promise<void> {
   for (const database of databases) {
     if (database.name) scope.indexedDB?.deleteDatabase(database.name);
   }
+  const cacheNames = (await scope.caches?.keys()) ?? [];
+  await Promise.all(cacheNames.map(async (name) => await scope.caches?.delete(name)));
+  const registrations = (await scope.navigator?.serviceWorker?.getRegistrations()) ?? [];
+  await Promise.all(registrations.map(async (registration) => await registration.unregister()));
 }
