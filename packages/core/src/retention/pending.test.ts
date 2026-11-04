@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuildReviewModel } from "../models/build-review.ts";
 import { CommentModel } from "../models/comment.ts";
+import { LabelModel } from "../models/label.ts";
 import { createTestBuild, createTestProject } from "../test-helpers/create-project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { pendingCandidates } from "./pending.ts";
@@ -64,6 +65,31 @@ describe("pendingCandidates", () => {
     expect(found.map((candidate) => candidate.buildId)).toEqual([quiet]);
   });
 
+  it("lets a superseded build go at the same window, not sooner", async () => {
+    const { db, project, build } = await setup();
+    const inside = await build("feat", new Date(Date.now() - 20 * DAY).toISOString());
+    await build("feat", RECENT);
+    expect(await pendingCandidates(db, project.id, CUTOFF)).toEqual([]);
+    const outside = await build("old", OLD);
+    await build("old", new Date(Date.now() - 45 * DAY).toISOString());
+    const found = await pendingCandidates(db, project.id, CUTOFF);
+    expect(found.map((candidate) => candidate.buildId).toSorted()).not.toContain(inside);
+    expect(found).toEqual(expect.arrayContaining([{ buildId: outside, reason: "superseded" }]));
+  });
+
+  it("calls an old build idle, not superseded, once someone has commented on it", async () => {
+    const { db, project, build } = await setup();
+    const commented = await build("a", OLD);
+    await build("a", RECENT);
+    const comment = await new CommentModel(db).create(project.id, commented, null, {
+      body: "old note",
+    });
+    await db.update(db.tables.comments, comment.id, { createdAt: OLD });
+    expect(await pendingCandidates(db, project.id, CUTOFF)).toEqual([
+      { buildId: commented, reason: "idle" },
+    ]);
+  });
+
   it("never lists builds that are not pending", async () => {
     const { db, project, build } = await setup();
     await build("a", OLD, { status: "approved" });
@@ -91,6 +117,21 @@ describe("Retention of pending builds", () => {
     expect(result.removedBuilds).toBe(1);
     expect(await db.get(db.tables.builds, stale)).toBeNull();
     expect(await db.get(db.tables.builds, fresh)).not.toBeNull();
+  });
+
+  it("keeps an idle pending build that carries a persistent label", async () => {
+    const { db, project, build } = await setup();
+    const kept = await build("feat", OLD);
+    const gone = await build("other", OLD);
+    await new LabelModel(db).attach(project.id, kept, "persistent", "true");
+    const { storage } = makeStorage();
+    const result = await new Retention(db, storage, tables(db)).purge(project, {
+      ttlDays: 30,
+      keepLatestPerBranch: false,
+    });
+    expect(result.removedBuilds).toBe(1);
+    expect(await db.get(db.tables.builds, kept)).not.toBeNull();
+    expect(await db.get(db.tables.builds, gone)).toBeNull();
   });
 
   it("keeps a pending build that someone commented on recently", async () => {

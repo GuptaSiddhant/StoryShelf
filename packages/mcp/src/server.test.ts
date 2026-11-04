@@ -97,6 +97,51 @@ describe("StoryShelf MCP server", () => {
     });
   });
 
+  it("lists comments with their scope, kind and state untouched, and writes nothing", async () => {
+    const comments = [
+      {
+        id: "c1",
+        buildId: "b1",
+        snapshotId: null,
+        storyId: null,
+        kind: "comment",
+        resolved: false,
+      },
+      { id: "c2", buildId: "b1", snapshotId: null, storyId: "button--primary", kind: "comment" },
+      { id: "c3", buildId: "b1", snapshotId: "s1", storyId: null, parentId: "c1", resolved: true },
+      { id: "c4", buildId: "b1", snapshotId: null, storyId: null, kind: "change_request" },
+    ];
+    const get = vi.fn().mockResolvedValue(comments);
+    const post = vi.fn();
+    const client = await connect(fakeClient({ get, post }), false);
+    const out = JSON.parse(
+      text(await client.callTool({ name: "list_comments", arguments: { buildId: "b1" } })),
+    );
+    expect(get).toHaveBeenCalledWith("/projects/web/builds/b1/comments");
+    expect(out).toEqual(comments);
+    expect(post).not.toHaveBeenCalled();
+    const { tools } = await client.listTools();
+    expect(tools.find((tool) => tool.name === "list_comments")?.annotations?.readOnlyHint).toBe(
+      true,
+    );
+  });
+
+  it("reports a project with review off as a tool error on the comment tools", async () => {
+    const off = new ToolError("StoryShelf API 404: Review is off for this project.");
+    const client = await connect(
+      fakeClient({ get: vi.fn().mockRejectedValue(off), post: vi.fn().mockRejectedValue(off) }),
+    );
+    for (const call of [
+      { name: "list_comments", arguments: { buildId: "b1" } },
+      { name: "add_comment", arguments: { buildId: "b1", body: "x" } },
+    ]) {
+      // eslint-disable-next-line no-await-in-loop -- two calls
+      const result = await client.callTool(call);
+      expect(result.isError, call.name).toBe(true);
+      expect(text(result), call.name).toContain("Review is off");
+    }
+  });
+
   it("returns ToolError text as an error result", async () => {
     const get = vi.fn().mockRejectedValue(new ToolError("StoryShelf API: not found"));
     const client = await connect(fakeClient({ get }));

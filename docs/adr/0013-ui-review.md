@@ -156,11 +156,12 @@ itself still shows, and nothing in review depends on the design.
 With `testing` off the build page shows a component and story changeset computed from the catalog
 (`build_components` hash per component) against the baseline build: the latest accepted build of the
 branch, falling back to the default branch, the rule baselines use. It lists components added,
-removed and changed (the story set, args or source hash differ), each linking to the published story
-and to its component page. With `testing` on, the same list sits above the visual diffs.
+removed and changed (story-index metadata changed: a story was added, removed or renamed, or its type
+or title changed), each linking to the published story and to its component page. With `testing` on, the same list sits above the visual diffs.
 
-This is a coarser signal than pixels and is presented as such: a changed hash means the story's
-definition changed, not that it looks different. `@storyshelf/affected` is not required and is not
+This is a coarser signal than pixels and is presented as such: a changed hash means the story-index
+metadata changed, not that the story looks different. The index carries neither args nor source, so
+a change of those alone is not listed. `@storyshelf/affected` is not required and is not
 run.
 
 ### 9. Reviews that nobody finishes
@@ -214,7 +215,8 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
   the previous accepted build until then. The default branch is never held.
 - Schema surface: `comments.storyId`, `build_reviews`, `projects.review_enabled`,
   `projects.review_approvals`, and a wider retention rule.
-- A hash-based changeset overstates change when stories are re-saved without a visible effect.
+- A hash-based changeset overstates change when story-index metadata is re-saved without a visible
+  effect, and misses a change of args or source that the index does not carry.
 
 ## Alternatives considered
 
