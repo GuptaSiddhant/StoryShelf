@@ -431,7 +431,10 @@ describe("an accepted build whose Storybook content is gone", () => {
       const page = await booted.app.request(`/projects/gate/builds/${build.id}`, {
         headers: { cookie: "storyshelf_session=alice" },
       });
-      expect(await page.text()).toContain("Re-upload the build, or purge it.");
+      const html = await page.text();
+      expect(html).toContain("Storybook content unavailable");
+      expect(html).toContain("Re-upload the build to review it.");
+      expect(html).not.toContain("purge");
     } finally {
       await booted.app.lifecycle.teardown();
     }

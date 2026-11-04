@@ -1,10 +1,10 @@
 /** The verdict card of the build page: where the build stands, the verdicts, and the reviewer's controls. */
-import { STORYBOOK_UNAVAILABLE } from "@storyshelf/core/adapter/notifier";
 import { BUILD_STATUSES } from "@storyshelf/core/types";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -64,7 +64,11 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
 function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
   const { data } = props;
   if (data.publishing === "unavailable") {
-    return <Meta>{unavailableText()}</Meta>;
+    return (
+      <Alert tone="warning" title="Storybook content unavailable">
+        {UNAVAILABLE_TEXT}
+      </Alert>
+    );
   }
   if (!data.canVerdict || data.build.status === "failed") {
     return null;
@@ -80,10 +84,9 @@ function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
   return data.publishing === "success" ? <VerdictForm data={data} /> : null;
 }
 
-/** What the card says when the build's Storybook content is gone, with what an operator can do. */
-function unavailableText(): string {
-  return `${STORYBOOK_UNAVAILABLE}. Re-upload the build, or purge it.`;
-}
+/** What the card says when the build's Storybook content is gone (the git status keeps its own text). */
+const UNAVAILABLE_TEXT =
+  "This build's Storybook content is no longer available, so it can't be reviewed. Re-upload the build to review it.";
 
 /** The reviewer's controls: an optional note and the two verdicts; `disabled` while the build cannot take one yet. */
 function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Rendered {
