@@ -1,6 +1,17 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { BetterAuthPlugin } from "better-auth";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+// Capture what the engine hands to the OAuth and passkey plugins instead of running them.
+vi.mock("@better-auth/passkey", () => ({
+  passkey: vi.fn((config: unknown) => ({ id: "passkey", config })),
+}));
+vi.mock("better-auth/plugins", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("better-auth/plugins")>()),
+  genericOAuth: vi.fn((config: unknown) => ({ id: "generic-oauth", config })),
+}));
+
+import { passkey } from "@better-auth/passkey";
+import { genericOAuth } from "better-auth/plugins";
 import {
   assertNoReservedEndpointCollision,
   buildPlugins,
@@ -124,6 +135,73 @@ describe("buildPlugins", () => {
       "passkey",
       "sso",
       "extra",
+    ]);
+  });
+  it("hands OAuth providers over with their endpoints and the default scopes", () => {
+    vi.mocked(genericOAuth).mockClear();
+    buildPlugins(
+      options({
+        oauth: [
+          {
+            id: "keycloak",
+            label: "Keycloak",
+            clientId: "c",
+            clientSecret: "s",
+            discoveryUrl: "https://kc/.well-known/openid-configuration",
+          },
+          {
+            id: "custom",
+            label: "Custom",
+            clientId: "c2",
+            authorizationUrl: "https://i/auth",
+            tokenUrl: "https://i/token",
+            userInfoUrl: "https://i/me",
+            scopes: ["email"],
+          },
+        ],
+      }),
+      db,
+    );
+    expect(vi.mocked(genericOAuth).mock.calls[0]?.[0]).toEqual({
+      config: [
+        {
+          providerId: "keycloak",
+          name: "Keycloak",
+          clientId: "c",
+          clientSecret: "s",
+          discoveryUrl: "https://kc/.well-known/openid-configuration",
+          authorizationUrl: undefined,
+          tokenUrl: undefined,
+          userInfoUrl: undefined,
+          scopes: ["openid", "email", "profile"],
+        },
+        {
+          providerId: "custom",
+          name: "Custom",
+          clientId: "c2",
+          clientSecret: undefined,
+          discoveryUrl: undefined,
+          authorizationUrl: "https://i/auth",
+          tokenUrl: "https://i/token",
+          userInfoUrl: "https://i/me",
+          scopes: ["email"],
+        },
+      ],
+    });
+  });
+
+  it("derives the passkey relying party from the public URL unless it is set", () => {
+    vi.mocked(passkey).mockClear();
+    buildPlugins(options({ baseURL: "https://shelf.example.com:8443/app", passkeys: {} }), db);
+    buildPlugins(
+      options({
+        passkeys: { rpID: "example.com", rpName: "Acme", origin: "https://acme.example.com" },
+      }),
+      db,
+    );
+    expect(vi.mocked(passkey).mock.calls.map(([config]) => config)).toEqual([
+      { rpID: "shelf.example.com", rpName: "StoryShelf", origin: "https://shelf.example.com:8443" },
+      { rpID: "example.com", rpName: "Acme", origin: "https://acme.example.com" },
     ]);
   });
 });

@@ -1,3 +1,4 @@
+/** SSO setup: the plugin over static OIDC and SAML providers (with group sync) and the management paths kept off. */
 import { sso, type SSOOptions } from "@better-auth/sso";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { BetterAuthPlugin } from "better-auth";

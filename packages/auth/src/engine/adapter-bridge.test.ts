@@ -2,6 +2,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { UserModel } from "@storyshelf/core/models";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { describe, expect, it, vi } from "vitest";
+import { baseAuthTables } from "../auth-tables.ts";
 import { buildAdapter, mirrorUser } from "./adapter-bridge.ts";
 import type { ShelfAuthInstance, ShelfAuthOptions } from "./types.ts";
 
@@ -31,6 +32,41 @@ function instance(overrides: Partial<ShelfAuthInstance["api"]> = {}): ShelfAuthI
       ...overrides,
     },
   };
+}
+
+async function seedAuthUser(db: DatabaseAdapter, id: string): Promise<void> {
+  const now = new Date().toISOString();
+  await db.insert(baseAuthTables.user, {
+    id,
+    name: id,
+    email: `${id}@example.com`,
+    emailVerified: true,
+    image: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+async function seedSession(db: DatabaseAdapter, userId: string, token: string): Promise<string> {
+  const now = new Date().toISOString();
+  const id = `s-${token}`;
+  await db.insert(baseAuthTables.session, {
+    id,
+    userId,
+    token,
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+    ipAddress: "127.0.0.1",
+    userAgent: "Test/1.0",
+    createdAt: now,
+    updatedAt: now,
+  });
+  return id;
+}
+
+async function sessionTokens(db: DatabaseAdapter, userId: string): Promise<string[]> {
+  return (await buildAdapter(instance(), db, options()).listSessions(userId)).map(
+    (session) => session.token,
+  );
 }
 
 const CREATED = { id: "u1", email: "ada@example.com", name: "Ada", image: "https://img/a.png" };
@@ -189,5 +225,77 @@ describe("buildAdapter", () => {
     expect(signOut).not.toHaveBeenCalled();
     await expect(adapter.destroySession("tok.sig")).resolves.toBeUndefined();
     expect(signOut).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("buildAdapter revocation and inventory", () => {
+  it("disabling a user removes that user's sessions only, and re-enabling removes none", async () => {
+    const db = await testDb();
+    await seedAuthUser(db, "u1");
+    await seedAuthUser(db, "u2");
+    await seedSession(db, "u1", "a");
+    await seedSession(db, "u1", "b");
+    await seedSession(db, "u2", "c");
+    const adapter = buildAdapter(instance(), db, options());
+    await adapter.setDisabled("u1", true);
+    expect(await sessionTokens(db, "u1")).toEqual([]);
+    expect(await sessionTokens(db, "u2")).toEqual(["c"]);
+    await seedSession(db, "u1", "d");
+    await adapter.setDisabled("u1", false);
+    expect(await sessionTokens(db, "u1")).toEqual(["d"]);
+  });
+
+  it("re-enabling lets a mirrored user through check() again", async () => {
+    const db = await testDb();
+    await new UserModel(db).upsert({
+      id: "u1",
+      email: "a@x.y",
+      name: "A",
+      avatarUrl: null,
+      role: "member",
+    });
+    const signedIn = instance({
+      getSession: async () =>
+        await Promise.resolve({ user: { id: "u1", email: "a@x.y", name: "A" } }),
+    });
+    const adapter = buildAdapter(signedIn, db, options());
+    await adapter.setDisabled("u1", true);
+    expect(await adapter.check(new Request("https://x"))).toBeNull();
+    await adapter.setDisabled("u1", false);
+    expect(await adapter.check(new Request("https://x"))).toMatchObject({ id: "u1" });
+  });
+
+  it("destroySession deletes the row named by the (signed) token and no other", async () => {
+    const db = await testDb();
+    await seedAuthUser(db, "u1");
+    await seedSession(db, "u1", "keep");
+    await seedSession(db, "u1", "drop");
+    const adapter = buildAdapter(instance(), db, options());
+    await adapter.destroySession("drop.signature");
+    expect(await sessionTokens(db, "u1")).toEqual(["keep"]);
+    await expect(adapter.destroySession("unknown.signature")).resolves.toBeUndefined();
+    expect(await sessionTokens(db, "u1")).toEqual(["keep"]);
+  });
+
+  it("answers the session, passkey and password inventory from the auth tables", async () => {
+    const db = await testDb();
+    await seedAuthUser(db, "u1");
+    await seedSession(db, "u1", "tok");
+    const adapter = buildAdapter(instance(), db, options());
+    expect((await adapter.listSessions("u1")).map((session) => session.token)).toEqual(["tok"]);
+    expect(await adapter.listSessions("nobody")).toEqual([]);
+    expect(await adapter.listPasskeys("u1")).toEqual([]);
+    expect(await adapter.hasPassword("u1")).toBe(false);
+    const now = new Date().toISOString();
+    await db.insert(baseAuthTables.account, {
+      id: "acc1",
+      userId: "u1",
+      accountId: "u1",
+      providerId: "credential",
+      password: "irrelevant",
+      createdAt: now,
+      updatedAt: now,
+    });
+    expect(await adapter.hasPassword("u1")).toBe(true);
   });
 });

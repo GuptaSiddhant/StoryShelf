@@ -1,3 +1,4 @@
+/** The engine's option and instance types, and the provider id minted on every engine identity. */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { EmailSender } from "@storyshelf/core/adapter/email-sender";
 import type { Auth } from "@storyshelf/core/auth";

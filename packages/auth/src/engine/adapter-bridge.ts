@@ -1,3 +1,4 @@
+/** The `Auth` singleton over the Better Auth instance: user mirror, session resolve and revoke, disable. */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";

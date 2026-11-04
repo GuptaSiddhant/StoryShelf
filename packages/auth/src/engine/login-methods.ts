@@ -1,3 +1,4 @@
+/** Login-method wiring: OAuth, social and passkey plugins, the descriptors the login page lists, and the reserved-path guard. */
 import { passkey } from "@better-auth/passkey";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { EngineLoginMethod } from "@storyshelf/core/auth";

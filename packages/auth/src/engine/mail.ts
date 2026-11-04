@@ -1,3 +1,4 @@
+/** Auth mail: the sender address, reset and invite mail, and the invite lifecycle (best-effort delivery). */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { Auth } from "@storyshelf/core/auth";
 import { acceptInvite, issueInvite, verifyInvite } from "../invites.ts";
