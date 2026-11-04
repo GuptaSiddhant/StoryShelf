@@ -275,6 +275,30 @@ describe("notifications settings tab", () => {
     });
   });
 
+  it("lets the switch take effect for an older topic list that left review requests out", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, true);
+    const path = "/projects/notify-project/settings/notifications";
+    const subscriptions = new NotificationSubscriptionModel(seeded.db);
+    await subscriptions.upsert("p1", member.id, {
+      events: ["build:approved"],
+      via: ["email"],
+      enabled: false,
+      reviewRequests: false,
+    });
+    await postForm(`${path}/me`, { reviewRequests: "on" }, app);
+    const row = await subscriptions.getFor("p1", member.id);
+    expect(NotificationSubscriptionModel.eventsOf(row!)).toEqual([
+      "build:approved",
+      "review:requested",
+    ]);
+    expect(row).toMatchObject({ enabled: false, reviewRequests: true });
+    const html = await (
+      await app.request(path, { headers: { cookie: "storyshelf_session=ok" } })
+    ).text();
+    expect(html).toMatch(/name="reviewRequests"[^>]*checked/u);
+  });
+
   it("lists every subscribable topic, review ones included, and the review switch", async () => {
     const seeded = await seed();
     const app = testApp(seeded, true);

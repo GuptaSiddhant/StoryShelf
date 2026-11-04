@@ -111,4 +111,40 @@ describe("NotificationSubscriptionModel", () => {
       reviewRequests: true,
     });
   });
+
+  it("adds review:requested to a topic list that left it out when the switch comes on", async () => {
+    const { db } = makeDatabase();
+    await model(db).upsert("p1", "u1", {
+      events: ["build:approved"],
+      via: ["email"],
+      enabled: false,
+    });
+    await model(db).setReviewRequests("p1", "u1", false);
+    await model(db).setReviewRequests("p1", "u1", true);
+    const row = await model(db).getFor("p1", "u1");
+    expect(NotificationSubscriptionModel.eventsOf(row!)).toEqual([
+      "build:approved",
+      "review:requested",
+    ]);
+    expect(row).toMatchObject({ enabled: false, reviewRequests: true });
+    await model(db).setReviewRequests("p1", "u1", true);
+    expect(NotificationSubscriptionModel.eventsOf((await model(db).getFor("p1", "u1"))!)).toEqual([
+      "build:approved",
+      "review:requested",
+    ]);
+  });
+
+  it("does not write the review switch when a plain save does not give it", async () => {
+    const { db } = makeDatabase();
+    await model(db).upsert("p1", "u1", { via: ["email"], reviewRequests: false });
+    const update = db.update.bind(db);
+    const seen: Record<string, unknown>[] = [];
+    db.update = (async (...args: Parameters<typeof db.update>) => {
+      seen.push(args[2] as Record<string, unknown>);
+      return await update(...args);
+    }) as typeof db.update;
+    await model(db).upsert("p1", "u1", { events: ["build:approved"], via: ["email"] });
+    expect(seen[0]).not.toHaveProperty("reviewRequests");
+    expect((await model(db).getFor("p1", "u1"))!.reviewRequests).toBe(false);
+  });
 });

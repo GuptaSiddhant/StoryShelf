@@ -71,7 +71,8 @@ export class NotificationSubscriptionModel {
         events: encodeList(input.events),
         via: encodeList(input.via),
         enabled: input.enabled ?? true,
-        reviewRequests: input.reviewRequests ?? existing.reviewRequests,
+        // Left out when not given, so a concurrent switch change is not overwritten by a stale read.
+        ...(input.reviewRequests === undefined ? {} : { reviewRequests: input.reviewRequests }),
       })) as unknown as NotificationSubscriptionRow;
     }
     return (await this.db.insert(this.tables.notificationSubscriptions, {
@@ -127,6 +128,7 @@ export class NotificationSubscriptionModel {
     }
     await this.db.update(this.tables.notificationSubscriptions, existing.id, {
       reviewRequests: on,
+      ...(on ? reconciledEvents(existing) : {}),
     });
   }
 
@@ -147,6 +149,18 @@ export class NotificationSubscriptionModel {
   static viaOf(row: NotificationSubscriptionRow): string[] {
     return decodeList(row.via);
   }
+}
+
+/**
+ * Turning review requests on must be able to take effect: a topic list saved before the switch
+ * owned `review:requested` may leave it out, so it is added to the list (all else kept).
+ */
+function reconciledEvents(row: NotificationSubscriptionRow): { events?: string } {
+  const listed = decodeList(row.events);
+  if (listed.length === 0 || listed.includes("review:requested")) {
+    return {};
+  }
+  return { events: JSON.stringify([...listed, "review:requested"]) };
 }
 
 /** Encode an optional string list (undefined/empty = all, stored as null). */
