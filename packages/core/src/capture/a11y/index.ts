@@ -8,3 +8,13 @@ export { axeInjectionScript, loadAxeSource, resetAxeSourceCache } from "./axe-so
 export { inPageReadA11yParameters, inPageRunAxe, type A11yParametersRead } from "./in-page.ts";
 export { mapAxeViolations, MAX_REPORTED_VIOLATIONS, type SlimViolation } from "./map.ts";
 export { A11Y_ROOT_SELECTOR, resolveA11yRun, type A11yRunPlan } from "./options.ts";
+export {
+  axeUnavailableNote,
+  axeUnavailableReason,
+  baselineNote,
+  baselineSha,
+  BASELINE_SHA_LENGTH,
+  isA11yNote,
+  parametersNote,
+  parametersReason,
+} from "./notes.ts";

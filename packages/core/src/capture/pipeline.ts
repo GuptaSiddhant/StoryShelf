@@ -31,6 +31,7 @@ import {
   type Fingerprint,
 } from "./fingerprint.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
+import { inheritedA11yJson } from "./inherited-a11y.ts";
 import type { CaptureProgress } from "./progress.ts";
 
 /** Snapshots persisted at once: each decodes two PNGs for the diff, so unbounded fan-out spikes memory. */
@@ -266,6 +267,7 @@ async function persistInheritedSnapshot(
   // Nothing rendered, so there is no new fingerprint: the snapshot carries the baseline's.
   const infraHash = inherited.baseline.infraHash;
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
+  const sourceId = await sourceSnapshotId(ctx.db, inherited.baseline);
   const comparison = await freezeComparison(
     ctx.storage,
     ctx.project.id,
@@ -278,12 +280,16 @@ async function persistInheritedSnapshot(
       width: inherited.viewport.width,
       height: inherited.viewport.height,
       captureFingerprint: inherited.baseline.fingerprint ?? null,
-      sourceSnapshotId: await sourceSnapshotId(ctx.db, inherited.baseline),
+      sourceSnapshotId: sourceId,
     },
   );
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     ...comparison,
     browser,
+    a11yViolations: await inheritedA11yJson(ctx.db, ctx.tables, {
+      snapshotId: sourceId,
+      buildId: inherited.baseline.sourceBuildId,
+    }),
     storyId: inherited.story.id,
     storyName: inherited.story.name,
     storyTitle: inherited.story.title,
