@@ -6,10 +6,10 @@ import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
 import type { Logger } from "../../logger.ts";
 import { roundedTimings, runWithTimings } from "../../utils/timing.ts";
 import { keepJobLease, type JobLeaseKeeper, type LeaseEnd } from "../db-queue/keeper.ts";
-import type { QueueTimers } from "../db-queue/timers.ts";
+import { REAL_TIMERS, type QueueTimers } from "../db-queue/timers.ts";
 import { reportFinished, type ConsumerMetrics, type JobOutcome } from "./metrics.ts";
 import { backoffDelayMs, DEFAULT_BACKOFF_MS, isFinalAttempt } from "./retry.ts";
-import type { ConsumerJob, KindHandler } from "./types.ts";
+import type { ConsumerJob, JobRunContext, KindHandler } from "./types.ts";
 
 /** What {@link runJob} needs from the consumer. */
 export interface JobRuntime {
@@ -24,6 +24,8 @@ export interface JobRuntime {
   now: () => number;
   timers?: QueueTimers | undefined;
   lease?: { renewEveryMs?: number; checkMs?: number } | undefined;
+  /** Wall-clock bound of one job in ms; absent means unbounded (tests). */
+  maxJobMs?: number | undefined;
 }
 
 /** Why a job's handler stopped: it finished (or threw), or the queue took the job away. */
@@ -110,7 +112,7 @@ async function runHandler(
     rt.onProgress?.(job);
   };
   logger.info("consumer picked up job");
-  const run = invoke(handler, job, { logger, touch });
+  const run = invoke(handler, job, { logger, touch, signal: keeper.signal });
   try {
     const raced = await Promise.race([run, endOf(keeper)]);
     return raced.kind === "ended"
@@ -125,6 +127,7 @@ async function runHandler(
 function keepLease(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKeeper {
   return keepJobLease(rt.queue, job, {
     ...rt.lease,
+    ...(rt.maxJobMs === undefined ? {} : { maxJobMs: rt.maxJobMs }),
     now: rt.now,
     ...(rt.timers === undefined ? {} : { timers: rt.timers }),
     logger,
@@ -135,7 +138,7 @@ function keepLease(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKe
 async function invoke(
   handler: KindHandler,
   job: ConsumerJob,
-  context: { logger: Logger; touch: () => void },
+  context: JobRunContext,
 ): Promise<Race> {
   try {
     const { timings } = await runWithTimings(async () => {
@@ -213,6 +216,9 @@ async function abandon(
   end: LeaseEnd,
 ): Promise<JobOutcome> {
   const { job, handler, logger } = held;
+  if (end === "deadline") {
+    return await endAtDeadline(rt, held);
+  }
   await handler.cancel?.(job).catch((error: unknown) => {
     logger.warn({ err: error }, "failed to cancel the running job");
   });
@@ -223,6 +229,57 @@ async function abandon(
   logger.info("job cancelled, aborting");
   await rt.queue.nack(job, { requeue: false, error: "cancelled" });
   return "cancelled";
+}
+
+/**
+ * The job passed its wall-clock bound: its work was cancelled above and its lease is no longer
+ * renewed, so it runs out and the queue redelivers the job or hands it to its exhausted hook. The
+ * job is not nacked here (that would skip the lease it still holds), and it never ends `cancelled`.
+ */
+async function endAtDeadline(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+): Promise<JobOutcome> {
+  const { job, handler, logger } = held;
+  const seconds = Math.round((rt.maxJobMs ?? 0) / 1000);
+  logger.error({ seconds }, "job deadline exceeded; abandoning it to its lease");
+  await boundedCleanup(rt, handler.cancel?.(job), logger, "cancel the job past its deadline");
+  await boundedCleanup(rt, handler.deadlineExceeded?.(job, seconds), logger, "record the deadline");
+  return "deadline";
+}
+
+/** Longest the cleanup of a job past its deadline may hold the slot; the lease recovers the job. */
+export const DEADLINE_CLEANUP_MS = 10_000;
+
+/** Wait for `work` at most {@link DEADLINE_CLEANUP_MS}; a failure or a stall is logged, never thrown. */
+async function boundedCleanup(
+  rt: JobRuntime,
+  work: Promise<unknown> | undefined,
+  logger: Logger,
+  what: string,
+): Promise<void> {
+  if (work === undefined) {
+    return;
+  }
+  const timers = rt.timers ?? REAL_TIMERS;
+  const stalled = Promise.withResolvers<"stalled">();
+  const handle = timers.setTimeout(() => {
+    stalled.resolve("stalled");
+  }, DEADLINE_CLEANUP_MS);
+  const finished = work.then(
+    () => "finished" as const,
+    (error: unknown) => {
+      logger.warn({ err: error }, `failed to ${what}`);
+      return "finished" as const;
+    },
+  );
+  try {
+    if ((await Promise.race([finished, stalled.promise])) === "stalled") {
+      logger.warn({ what }, "cleanup past the deadline stalled; leaving it to the lease");
+    }
+  } finally {
+    timers.clearTimeout(handle);
+  }
 }
 
 /**

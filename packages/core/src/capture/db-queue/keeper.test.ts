@@ -99,6 +99,38 @@ describe("keepJobLease", () => {
     expect(clock.pending).toBe(0);
   });
 
+  it("stops renewing, aborts the signal and ends with deadline once the job passes maxJobMs", async () => {
+    const clock = createManualClock();
+    const { queue } = fakeQueue();
+    const keeper = keepJobLease(queue, job, {
+      now: clock.now,
+      timers: clock.timers,
+      maxJobMs: 100_000,
+    });
+    await clock.advance(99_000);
+    expect(keeper.signal.aborted).toBe(false);
+    const renewed = queue.extend.mock.calls.length;
+    expect(renewed).toBeGreaterThan(0);
+    await clock.advance(1000);
+    await expect(keeper.ended).resolves.toBe("deadline");
+    expect(keeper.signal.aborted).toBe(true);
+    await clock.advance(600_000);
+    expect(queue.extend.mock.calls.length).toBeLessThanOrEqual(renewed + 1);
+  });
+
+  it("never aborts a job that finishes before its deadline", async () => {
+    const clock = createManualClock();
+    const { queue } = fakeQueue();
+    const keeper = keepJobLease(queue, job, {
+      now: clock.now,
+      timers: clock.timers,
+      maxJobMs: 100_000,
+    });
+    keeper.stop();
+    await clock.advance(200_000);
+    expect(keeper.signal.aborted).toBe(false);
+  });
+
   it("checks the job every 5 s without renewing, and ends on cancel", async () => {
     const clock = createManualClock();
     const { queue, state } = fakeQueue();

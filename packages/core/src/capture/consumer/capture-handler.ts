@@ -7,6 +7,8 @@ import type { StorageAdapter } from "../../adapters/storage.ts";
 import type { ShelfConfig } from "../../config.ts";
 import type { Logger } from "../../logger.ts";
 import { BuildModel } from "../../models/build.ts";
+import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
+import { CaptureLogModel } from "../../models/capture-log.ts";
 import { createPublicOriginResolver } from "../../models/public-origin.ts";
 import type { SecretInput } from "../../utils/encrypt.ts";
 import { createBuildStatePublisher } from "../build-state/publisher.ts";
@@ -108,10 +110,34 @@ export function createCaptureHandler(options: CaptureHandlerOptions): KindHandle
         },
       });
     },
+    deadlineExceeded: async (job, seconds) => {
+      await recordDeadline(options, job, seconds);
+    },
     cancel: async (job) => {
       await options.runner.cancel(job.buildId, job.shard);
     },
   };
+}
+
+/** Put `job deadline exceeded (<n>s)` on the log of the build's open attempt, if it has one. */
+async function recordDeadline(
+  options: CaptureHandlerOptions,
+  job: ConsumerJob,
+  seconds: number,
+): Promise<void> {
+  const tables = options.db.tables;
+  const attempts = await new CaptureAttemptModel(options.db, tables).listByBuild(job.buildId);
+  const open = attempts.findLast((a) => a.status === "queued" || a.status === "running");
+  if (open === undefined) {
+    return;
+  }
+  await new CaptureLogModel(options.db, tables).append(
+    open.projectId,
+    job.buildId,
+    open.id,
+    "error",
+    `job deadline exceeded (${String(seconds)}s)`,
+  );
 }
 
 function toDispatchJob(job: ConsumerJob): CaptureDispatchJob {

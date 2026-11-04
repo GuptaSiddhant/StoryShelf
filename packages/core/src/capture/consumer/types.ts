@@ -28,6 +28,8 @@ export interface JobRunContext {
   logger: Logger;
   /** Report progress: renews the job's lease (throttled) and tells the host (`onProgress`). */
   touch(): void;
+  /** Aborted when the job passes `testing.maxJobSeconds`: stop in-process work. */
+  signal: AbortSignal;
 }
 
 /** The code that runs jobs of one kind. */
@@ -36,6 +38,11 @@ export interface KindHandler {
   run(job: ConsumerJob, context: JobRunContext): Promise<void>;
   /** Whether the job is well-formed; a job that is not is failed without retries. */
   accepts?(job: ConsumerJob): boolean;
+  /**
+   * The job passed its wall-clock bound and was abandoned (its lease is no longer renewed). Record
+   * it where the job's work shows, e.g. the attempt log; failures are logged, never thrown.
+   */
+  deadlineExceeded?(job: ConsumerJob, seconds: number): Promise<void>;
   /**
    * Whether the job was queued for a run that has since been superseded (a retry started a newer
    * one). Checked before `run`; a superseded job ends `cancelled` and nothing it would write happens.
