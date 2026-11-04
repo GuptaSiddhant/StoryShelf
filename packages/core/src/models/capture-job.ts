@@ -173,6 +173,10 @@ export class CaptureJobModel {
   ): Promise<JobEnd | null> {
     if (this.#db.transact === undefined) return null;
     return await this.#db.transact<JobEnd>(async (tx) => {
+      // A write first: it takes the row (and, on SQLite, the write lock, waiting for another process
+      // as a plain statement does). A transaction that reads first and then writes holds a read
+      // snapshot another process's commit makes stale, and SQLite refuses its upgrade at once.
+      await tx.update(this.#table, jobId, { updatedAt: now });
       const before = (await tx.get(this.#table, jobId)) as unknown as CaptureJobRow | null;
       if (before === null) throw new Error("row not found");
       if (end.onlyOpen === true && isTerminalJob(before)) {
