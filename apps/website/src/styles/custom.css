@@ -218,9 +218,12 @@ h1#_top,
 :root[data-theme="dark"] .sl-openapi-examples .sl-openapi-example div.expressive-code .frame pre {
   background-color: var(--sl-color-gray-6);
 }
-/* The "required" label is Starlight's red, which is 2.8:1 on the light property panel. */
-:root[data-theme="light"] .sl-openapi-key-required {
+/* The "required" labels are Starlight's red: 2.8:1 on the light property panel, 4.4:1 on the dark one. */
+:root[data-theme="light"] :is(.sl-openapi-key-required, .sl-openapi-request-body-required) {
   color: #b0103a;
+}
+:root[data-theme="dark"] :is(.sl-openapi-key-required, .sl-openapi-request-body-required) {
+  color: #f26a99;
 }
 /* A long path wraps instead of scrolling inside its box, so it needs no keyboard stop. */
 :root .sl-openapi-operation-method-path {

@@ -123,7 +123,12 @@ function measureOverflow() {
 }
 
 async function audit(page, base, mode, path) {
-  await page.goto(base + path, { waitUntil: "load" });
+  // A few pages reload themselves once (the diagram script re-themes them), which interrupts the
+  // navigation: wait for the page to settle instead of failing.
+  await page.goto(base + path, { waitUntil: "networkidle" }).catch(async (error) => {
+    if (!String(error).includes("interrupted by another navigation")) throw error;
+    await page.waitForLoadState("networkidle");
+  });
   await page.addStyleTag({
     content: "*,*::before,*::after{transition:none!important;animation:none!important}",
   });
