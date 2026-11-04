@@ -1,4 +1,3 @@
-import type { NotificationChannel } from "@storyshelf/core/adapter/notifier";
 /**
  * The `review-request` job kind (ADR 0040): one job per recipient of one build's review request,
  * on the `notify` queue, so a refused delivery is retried for that recipient alone and the others
@@ -7,15 +6,15 @@ import type { NotificationChannel } from "@storyshelf/core/adapter/notifier";
  * cycle when it runs, so a stale or reordered job cannot notify someone who no longer applies.
  * Serverless hosts poll no queue and keep the direct, best-effort delivery (`notify.ts`).
  */
+import type { NotificationChannel } from "@storyshelf/core/adapter/notifier";
 import {
   isFinalAttempt,
   NOTIFY_BACKOFF,
-  NOTIFY_MAX_ATTEMPTS,
   type ConsumerJob,
   type KindHandler,
 } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
-import { BuildModel, CaptureJobModel, ProjectModel } from "@storyshelf/core/models";
+import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { JobQueue } from "./job-queue.ts";
@@ -32,6 +31,7 @@ import {
 } from "./notify.ts";
 import { assignedReviewersOf, assignmentReason } from "./review-assignment.ts";
 import { reviewRequestedData } from "./review-events.ts";
+import { buildIdOf, createReviewRequestEnqueuer, parseJobData } from "./review-request-data.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 const EVENT = "review:requested";
@@ -45,82 +45,6 @@ export interface ReviewRequestWiring {
   enqueue: NotifyDeps["reviewRequests"];
   /** Runs the jobs; null where this host polls no `notify` queue. */
   handler: KindHandler | null;
-}
-
-/** The identity of one request to one recipient: the idempotency key (`eventId` + target). */
-export function reviewRequestKey(eventId: string, target: ReviewTarget): string {
-  const who =
-    target.kind === "channel"
-      ? `channel:${target.channelId}`
-      : `user:${target.userId}:${target.provider}`;
-  return `${eventId}|${who}`;
-}
-
-/** The job's data when it is well-formed, else undefined. */
-function parseJobData(data: Record<string, unknown> | undefined): ReviewRequestJob | undefined {
-  const projectId = data?.["projectId"];
-  const eventId = data?.["eventId"];
-  const target = data?.["target"];
-  if (typeof projectId !== "string" || typeof eventId !== "string" || !isTarget(target)) {
-    return undefined;
-  }
-  return { projectId, eventId, target };
-}
-
-function isTarget(value: unknown): value is ReviewTarget {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const record = value as Record<string, unknown>;
-  return record["kind"] === "channel"
-    ? typeof record["channelId"] === "string"
-    : record["kind"] === "user" &&
-        typeof record["userId"] === "string" &&
-        typeof record["provider"] === "string" &&
-        ["subscription", "default", "assigned"].includes(String(record["route"]));
-}
-
-/** `<buildId>:<cycle>` → the build id (build ids hold no colon). */
-function buildIdOf(eventId: string): string {
-  return eventId.slice(0, Math.max(0, eventId.lastIndexOf(":")));
-}
-
-/** Whether a stored job row is the request `key` (any state: a delivered one is not repeated). */
-function isRequest(payload: string | null, key: string): boolean {
-  try {
-    const stored: unknown = JSON.parse(payload ?? "{}");
-    const data = (stored as { data?: Record<string, unknown> }).data;
-    const job = parseJobData(data);
-    return job !== undefined && reviewRequestKey(job.eventId, job.target) === key;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Queue a request unless the build already has a job for the same `eventId` and target, in any
- * state. The build's review claim already admits one request per cycle; this makes a repeated
- * call (a retried publish, a boot replay) a no-op instead of a second message.
- */
-export function createReviewRequestEnqueuer(
-  deps: Pick<NotifyDeps, "db">,
-  queue: Pick<JobQueue, "get">,
-): (job: ReviewRequestJob) => Promise<void> {
-  return async (job) => {
-    const buildId = buildIdOf(job.eventId);
-    const key = reviewRequestKey(job.eventId, job.target);
-    const rows = await new CaptureJobModel(deps.db).listForBuild(buildId);
-    if (rows.some((row) => row.kind === "review-request" && isRequest(row.payload, key))) {
-      return;
-    }
-    await queue.get().enqueueJob({
-      kind: "review-request",
-      buildId,
-      data: { projectId: job.projectId, eventId: job.eventId, target: job.target },
-      maxAttempts: NOTIFY_MAX_ATTEMPTS,
-      activeKey: `review-request:${key}`,
-    });
-  };
 }
 
 /** One request to one recipient, as it stands now. */
@@ -149,9 +73,9 @@ async function currentRequest(
     return undefined;
   }
   const data = reviewRequestedData(build);
-  const because = await assignmentFor(deps, { project, build }, job.target);
+  const now = await assignmentFor(deps, { project, build }, job.target);
   const channel =
-    because === null ? undefined : await resolveReviewTarget(deps, project.id, job.target, data);
+    now === null ? undefined : await resolveReviewTarget(deps, project.id, now.target, data);
   return channel === undefined
     ? undefined
     : {
@@ -159,48 +83,61 @@ async function currentRequest(
         channel,
         message: {
           event: EVENT,
-          data: { ...data, ...because },
+          data: { ...data, ...now?.because },
           reviewUrl: reviewUrlFor(origin, project.slug, `/builds/${build.id}`),
         },
       };
 }
 
 /**
- * The `assignedBecause` an assigned recipient's message carries (empty for anyone else), or null
- * when the recipient no longer applies: assigned recipients who are no longer assigned, and
- * others who are assigned now and so get the message from the assigned job, not this one.
+ * How the recipient is addressed now. A person assigned since the job was queued is addressed as
+ * assigned (with the reason), whatever route queued them; one no longer assigned who was queued as
+ * assigned is dropped (null): removed from the project, or the owner rules changed.
  */
 async function assignmentFor(
   deps: NotifyDeps,
   scope: { project: Project; build: Build },
   target: ReviewTarget,
-): Promise<Record<string, string> | null> {
+): Promise<{ target: ReviewTarget; because: Record<string, string> } | null> {
   if (target.kind === "channel") {
-    return {};
+    return { target, because: {} };
   }
   const assigned = await assignedReviewersOf(deps.db, scope.project, scope.build);
   const reviewer = assigned.find((entry) => entry.userId === target.userId);
-  if (target.route === "assigned") {
-    // No longer an assigned member (removed from the project, or the rules changed): not a recipient.
-    return reviewer ? { assignedBecause: assignmentReason(reviewer.components) } : null;
+  if (reviewer !== undefined) {
+    const because = { assignedBecause: assignmentReason(reviewer.components) };
+    return { target: { ...target, route: "assigned" }, because };
   }
-  return reviewer === undefined ? {} : null;
+  return target.route === "assigned" ? null : { target, because: {} };
 }
 
-/** Deliver to one recipient; the delivery's error, if any (the notifiers report it, never throw). */
-async function sendTo(deps: NotifyDeps, request: Request): Promise<string | undefined> {
-  let failure: string | undefined;
+/** Deliver to one recipient; whether a delivery was attempted, and its error (notifiers report, never throw). */
+async function sendTo(
+  deps: NotifyDeps,
+  request: Request,
+): Promise<{ attempted: boolean; failure?: string }> {
+  const result: { attempted: boolean; failure?: string } = { attempted: false };
   // oxlint-disable-next-line eslint/require-await -- the outcome callback is async by contract
   await deliver(deps, request.project, request.message, [request.channel], async (outcome) => {
-    failure = outcome.error;
+    result.attempted = true;
+    if (outcome.error !== undefined) {
+      result.failure = outcome.error;
+    }
   });
-  return failure;
+  return result;
 }
 
-/** Deliver a resolved request: a refusal records on the last attempt and throws so the queue retries. */
+/**
+ * Deliver a resolved request: a refusal records on the last attempt and throws so the queue
+ * retries. A channel the core fan-out skipped (a state-only kind) was never attempted, so it
+ * records nothing, success included.
+ */
 async function sendOrRetry(deps: NotifyDeps, job: ConsumerJob, request: Request): Promise<void> {
-  const failure = await sendTo(deps, request);
+  const { attempted, failure } = await sendTo(deps, request);
   const channelId = request.channel.id;
+  if (!attempted) {
+    return;
+  }
   if (failure !== undefined && !isFinalAttempt(job)) {
     throw new Error(failure);
   }

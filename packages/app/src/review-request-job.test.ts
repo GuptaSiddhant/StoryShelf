@@ -12,11 +12,8 @@ import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { notifyProjectWith, type NotifyDeps } from "./notify.ts";
 import { reviewRequestedData } from "./review-events.ts";
-import {
-  createReviewRequestEnqueuer,
-  createReviewRequestHandler,
-  reviewRequestExhausted,
-} from "./review-request-job.ts";
+import { createReviewRequestEnqueuer } from "./review-request-data.ts";
+import { createReviewRequestHandler, reviewRequestExhausted } from "./review-request-job.ts";
 
 /** The reviewers the owner rules assign, which a test sets directly. */
 const assigned = vi.hoisted(() => ({ list: [] as { userId: string; components: string[] }[] }));
@@ -226,6 +223,7 @@ describe("review-request jobs", () => {
     ).rejects.toThrow("room refused");
     const row = await new NotificationChannelModel(fx.db, undefined, SECRET).get(fx.channel.id);
     expect(row?.lastError).toContain("room refused");
+    expect(JSON.stringify(fx.inputs)).not.toContain("sys:notify-failed");
   });
 
   it("shows an exhausted job's error on its channel", async () => {
@@ -304,14 +302,44 @@ describe("review-request jobs", () => {
     expect(fx.sent).toEqual([]);
   });
 
-  it("sends nothing to a default recipient who has been assigned since", async () => {
+  it("delivers a default recipient who has been assigned since as assigned", async () => {
     const fx = await setup();
     assigned.list = [{ userId: "appr1", components: ["Button"] }];
     const eventId = `${fx.build.id}:0`;
     await fx.enqueue({ projectId: fx.project.id, eventId, target: person("default") });
     await drain(fx);
     assigned.list = [];
-    expect(fx.sent).toEqual([]);
+    expect(fx.sent).toEqual([expect.stringMatching(/^email:/u)]);
+    expect(JSON.stringify(fx.inputs)).toContain("because you own Button");
+  });
+
+  it("leaves a channel's stored error alone when its kind delivers state, not messages", async () => {
+    const fx = await setup();
+    const models = new NotificationChannelModel(fx.db, undefined, SECRET);
+    const git = await models.create({
+      projectId: fx.project.id,
+      provider: "git",
+      name: "git",
+      config: { owner: "o", repo: "r" },
+      events: [],
+    } as never);
+    await models.recordOutcome(git.id, "earlier failure");
+    const metadata = {
+      name: "git",
+      version: "0.0.0",
+      kind: "git",
+      category: "notifier" as const,
+      delivery: "state" as const,
+      schema: {} as never,
+    };
+    fx.deps.notifiers.push({ metadata, create: () => ({ metadata }) } as never);
+    await fx.enqueue({
+      projectId: fx.project.id,
+      eventId: `${fx.build.id}:0`,
+      target: { kind: "channel", channelId: git.id },
+    });
+    await drain(fx);
+    expect((await models.get(git.id))?.lastError).toBe("earlier failure");
   });
 
   it("sends nothing to a person disabled after the job was queued", async () => {
