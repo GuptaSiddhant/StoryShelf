@@ -34,10 +34,13 @@ function storybookZip(): Buffer {
 }
 
 let scratchDir = "";
+/** Every booted app's teardown, run before the scratch dir goes so a failed assertion cannot leave a consumer running. */
+const teardowns: (() => Promise<void>)[] = [];
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-publish-flow-"));
 });
 afterEach(async () => {
+  await Promise.all(teardowns.splice(0).map(async (teardown) => await teardown()));
   await rm(scratchDir, { recursive: true, force: true });
 });
 
@@ -51,6 +54,9 @@ async function boot(config: Record<string, unknown> = {}) {
     config: { scratchDir, ...config },
   });
   await app.lifecycle.setup();
+  teardowns.push(async () => {
+    await app.lifecycle.teardown();
+  });
   const response = await app.request("/api/v1/projects", {
     method: "POST",
     headers: { "content-type": "application/json" },
