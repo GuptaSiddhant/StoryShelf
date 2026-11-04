@@ -11,6 +11,10 @@ function sources(): Parameters<typeof collectHealthReport>[0] {
   return { database, storage } as never;
 }
 
+const mail = (name: string) => ({
+  metadata: { name, version: "0.0.0", kind: "smtp", category: "email" },
+});
+
 describe("collectHealthReport", () => {
   it("redacts secrets in setup failure details", async () => {
     const report = await collectHealthReport(
@@ -112,6 +116,26 @@ describe("collectHealthReport", () => {
       expect(
         report.adapters.filter((adapter) => adapter.kind === "unknown").map((a) => a.name),
       ).toEqual(["notifiers[0]", "notifiers[1]"]);
+    });
+
+    it("fails only the adapter whose setup failed when two probed ones share a category and kind", async () => {
+      const report = await collectHealthReport(
+        { ...sources(), notifiers: [mail("Primary"), mail("Backup")] } as never,
+        {
+          ok: false,
+          failures: [{ category: "email", kind: "smtp", name: "Backup", error: "refused" }],
+        },
+        Date.now(),
+        "0.0.0",
+      );
+      const states = report.adapters
+        .filter((adapter) => adapter.kind === "smtp")
+        .map((adapter) => [adapter.name, adapter.state]);
+      expect(states).toEqual([
+        ["Primary", "ok"],
+        ["Backup", "failed"],
+      ]);
+      expect(report.adapters).toHaveLength(4);
     });
 
     it("adds nothing for a successful setup, and nothing twice for a probed adapter", async () => {

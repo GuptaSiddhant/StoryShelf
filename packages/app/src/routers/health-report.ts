@@ -67,6 +67,11 @@ function targetsOf(sources: AdapterSetupSources): ProbeTarget[] {
   return targets;
 }
 
+/** An adapter's identity in a setup failure: two adapters of one category and kind differ by name. */
+function identityOf(adapter: { category: string; kind: string; name: string }): string {
+  return `${adapter.category}/${adapter.kind}/${adapter.name}`;
+}
+
 function sanitize(detail: string): string {
   return sanitizeErrorText(detail, DETAIL_MAX_LENGTH);
 }
@@ -164,7 +169,7 @@ async function probeTarget(
   setupErrors: ReadonlyMap<string, string>,
   starting: boolean,
 ): Promise<AdapterReportFull> {
-  const setupError = setupErrors.get(`${target.metadata.category}/${target.metadata.kind}`);
+  const setupError = setupErrors.get(identityOf(target.metadata));
   if (setupError !== undefined) {
     return setupFailedReport(target, sanitize(setupError));
   }
@@ -178,7 +183,7 @@ function collectSetupErrors(settled: AdapterSetupResult | null): ReadonlyMap<str
   const setupErrors = new Map<string, string>();
   if (settled) {
     for (const failure of settled.failures) {
-      setupErrors.set(`${failure.category}/${failure.kind}`, failure.error);
+      setupErrors.set(identityOf(failure), failure.error);
     }
   }
   return setupErrors;
@@ -203,17 +208,11 @@ function unprobedSetupFailures(
   settled: AdapterSetupResult | null,
   targets: readonly ProbeTarget[],
 ): AdapterReportFull[] {
-  const probed = new Set(
-    targets.map((target) => `${target.metadata.category}/${target.metadata.kind}`),
-  );
-  const unprobed = (settled?.failures ?? []).filter(
-    (failure) => !probed.has(`${failure.category}/${failure.kind}`),
-  );
+  const probed = new Set(targets.map((target) => identityOf(target.metadata)));
+  const unprobed = (settled?.failures ?? []).filter((failure) => !probed.has(identityOf(failure)));
   // One entry per adapter: two providers that share a category and kind (invalid configs without
   // a kind) are told apart by name.
-  const byAdapter = new Map(
-    unprobed.map((failure) => [`${failure.category}/${failure.kind}/${failure.name}`, failure]),
-  );
+  const byAdapter = new Map(unprobed.map((failure) => [identityOf(failure), failure]));
   return [...byAdapter.values()].map((failure) => ({
     category: failure.category,
     kind: failure.kind,
