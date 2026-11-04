@@ -85,7 +85,9 @@ by preset, so it cannot by itself carry this guarantee.
   served content. The token is not a full fence: object storage cannot refuse a late delete, so a
   pass that stalls longer than the lease exactly between its check and its delete could still
   remove a blob a successor collected and a new build stored again. That window is one delete wide
-  and needs a hung process, so it is accepted rather than fenced. Without the capability nothing
+  and needs a hung process, so it is accepted rather than fenced. An upload's record can now be the
+  taker of an expired claim; it re-checks that the blob exists after recording and answers 409
+  (store again) if not, so only a delete still in flight at that instant can win. Without the capability nothing
   is recorded or collected.
 
 ### 3. Lifecycle is an explicit database capability
