@@ -133,8 +133,8 @@ describe.skipIf(!LIVE)("review schema upgrade (real MySQL, gated)", () => {
     /** A fresh scratch database, migrated by the adapter, with a project, two builds and a user. */
     async function withSeededDb(run: (db: DatabaseAdapter) => Promise<void>): Promise<void> {
       const db = createMysqlDatabase({ url: scratchUrl });
-      await db.lifecycle?.setup({ config: {}, logger: silent });
       try {
+        await db.lifecycle?.setup({ config: {}, logger: silent });
         await db.insert(db.tables.projects, {
           id: "p1",
           name: "P",

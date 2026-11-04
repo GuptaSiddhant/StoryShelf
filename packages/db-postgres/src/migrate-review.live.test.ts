@@ -141,8 +141,8 @@ describe.skipIf(!LIVE)("review schema upgrade (real Postgres, gated)", () => {
     it("counts approvals and starts a new cycle on a genuine back-to-pending after the upgrade", async () => {
       await load(fixture);
       const db = createPostgresDatabase({ url: scratchUrl, max: 2 });
-      await db.lifecycle?.setup({ config: {}, logger: silent });
       try {
+        await db.lifecycle?.setup({ config: {}, logger: silent });
         const reviews = new BuildReviewModel(db);
         const project = (await db.get(db.tables.projects, "p-custom")) as {
           reviewApprovals: number;
