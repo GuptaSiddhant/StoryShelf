@@ -1,5 +1,6 @@
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
+import { createHash } from "node:crypto";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -8,6 +9,7 @@ const silentLogger = pino({ level: "silent" });
 
 /** A well-formed content hash: 64 lowercase hex digits. */
 const hashOf = (digit: string): string => digit.repeat(64);
+const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const A = hashOf("a");
 const B = hashOf("b");
 const C = hashOf("c");
@@ -68,14 +70,14 @@ describe("content-addressed dedup", () => {
 
     // upload one hash
     const form = new FormData();
-    form.set(A, new File([Buffer.from("hello")], "a"));
+    form.set(sha256("hello"), new File([Buffer.from("hello")], "a"));
     const contentRes = await app.request("/api/v1/projects/proj/builds/b1/content", {
       method: "POST",
       body: form,
     });
     expect(contentRes.status).toBe(200);
-    expect(await storage.exists(`content/${A}`)).toBe(true);
-    const ref = await db.get(db.tables.contentRefs, A);
+    expect(await storage.exists(`content/${sha256("hello")}`)).toBe(true);
+    const ref = await db.get(db.tables.contentRefs, sha256("hello"));
     expect(ref).not.toBeNull();
   });
 
@@ -266,7 +268,7 @@ describe("content hashes are validated before they become storage keys", () => {
   it.each(BAD_HASHES)("multipart upload refuses the key %j and writes nothing", async (hash) => {
     const { app, calls, objects, keysBefore } = await seedUploadTarget();
     const form = new FormData();
-    form.set(A, new File([Buffer.from("fine")], "ok"));
+    form.set(sha256("fine"), new File([Buffer.from("fine")], "ok"));
     form.set(hash, new File([Buffer.from("evil")], "bad"));
     const res = await app.request(`${BASE}/content`, { method: "POST", body: form });
     expect(res.status).toBe(400);
@@ -292,6 +294,29 @@ describe("content hashes are validated before they become storage keys", () => {
     },
   );
 
+  it("refuses bytes that do not hash to the name they are uploaded under, and writes nothing", async () => {
+    const { app, calls, objects, keysBefore } = await seedUploadTarget();
+    const form = new FormData();
+    form.set(sha256("fine"), new File([Buffer.from("fine")], "ok"));
+    // A valid-looking hash that is not the digest of these bytes: planted content for someone else.
+    form.set(A, new File([Buffer.from("planted")], "bad"));
+    const res = await app.request(`${BASE}/content`, { method: "POST", body: form });
+    expect(res.status).toBe(400);
+    for (const spy of calls) expect(spy).not.toHaveBeenCalled();
+    expect([...objects.keys()]).toEqual(keysBefore);
+  });
+
+  it("refuses a form with a text field next to a file, and writes nothing", async () => {
+    const { app, calls, objects, keysBefore } = await seedUploadTarget();
+    const form = new FormData();
+    form.set(sha256("fine"), new File([Buffer.from("fine")], "ok"));
+    form.set(B, "not a file");
+    const res = await app.request(`${BASE}/content`, { method: "POST", body: form });
+    expect(res.status).toBe(400);
+    for (const spy of calls) expect(spy).not.toHaveBeenCalled();
+    expect([...objects.keys()]).toEqual(keysBefore);
+  });
+
   it("still accepts a well-formed hash on every entry point", async () => {
     const { app, objects } = await seedUploadTarget();
     const dedup = await app.request(`${BASE}/dedup`, {
@@ -301,10 +326,10 @@ describe("content hashes are validated before they become storage keys", () => {
     });
     expect(dedup.status).toBe(200);
     const form = new FormData();
-    form.set(B, new File([Buffer.from("bytes")], "b"));
+    form.set(sha256("bytes"), new File([Buffer.from("bytes")], "b"));
     const upload = await app.request(`${BASE}/content`, { method: "POST", body: form });
     expect(upload.status).toBe(200);
-    expect(objects.has(`content/${B}`)).toBe(true);
+    expect(objects.has(`content/${sha256("bytes")}`)).toBe(true);
     const manifest = await app.request(`${BASE}/manifest`, {
       method: "POST",
       headers: JSON_HEADERS,

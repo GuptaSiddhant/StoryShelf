@@ -8,6 +8,7 @@ import {
   storybookZipPath,
 } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
+import { createHash } from "node:crypto";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { registerAttempts } from "./attempts.ts";
@@ -172,24 +173,20 @@ export function registerBuilds(app: ShelfRouter): void {
     await buildForProject(project.id, buildId);
     const contentType = c.req.header("content-type") ?? "";
     if (contentType.includes("multipart/")) {
-      const form = await c.req.formData();
-      // Every key is checked before anything is written, so a bad one leaves no partial upload.
-      for (const [key, value] of form.entries()) {
-        if (value instanceof File) refuseInvalidHash(key);
-      }
-      for (const [key, value] of form.entries()) {
-        if (value instanceof File) {
-          const hash = key;
-          const buffer = Buffer.from(await value.arrayBuffer());
-          await getStore().storage.write(contentKey(hash), buffer);
-          await upsertContentRef(hash);
-        }
+      // Every file is checked before anything is written, so a bad one leaves no partial upload.
+      const files = await verifiedUploads(await c.req.formData());
+      for (const { hash, buffer } of files) {
+        // oxlint-disable-next-line no-await-in-loop -- one write at a time keeps the order stable
+        await getStore().storage.write(contentKey(hash), buffer);
+        // oxlint-disable-next-line no-await-in-loop -- see above
+        await upsertContentRef(hash);
       }
     } else {
       // Single content upload via PUT with hash header
       const hash = c.req.header("x-content-hash") ?? "";
       refuseInvalidHash(hash);
       const buffer = Buffer.from(await c.req.arrayBuffer());
+      refuseMismatch(hash, buffer);
       await getStore().storage.write(contentKey(hash), buffer);
     }
     return c.json({ ok: true });
@@ -374,11 +371,39 @@ const uploadZipRoute = createRoute({
   },
 });
 
-/** Answer 400 for a hash that is not a SHA-256 hex digest; the value is never logged or echoed. */
+/** Answer 400 and log only the reason: the refused value is never logged or echoed. */
+function refuseUpload(reason: string, message: string): never {
+  getStore().logger.warn({ reason }, "content upload refused");
+  throw new HTTPException(400, { message });
+}
+
+/** Answer 400 for a hash that is not a SHA-256 hex digest. */
 function refuseInvalidHash(hash: string): void {
-  if (isContentHash(hash)) return;
-  getStore().logger.warn({ reason: "invalid content hash" }, "content upload refused");
-  throw new HTTPException(400, { message: "Invalid content hash" });
+  if (!isContentHash(hash)) refuseUpload("invalid content hash", "Invalid content hash");
+}
+
+/**
+ * The shared `content/<hash>` blob belongs to no project, so its bytes must be what its name says:
+ * an upload whose SHA-256 differs from its hash is refused, or one project could plant bytes under
+ * a hash another project's manifest names.
+ */
+function refuseMismatch(hash: string, buffer: Buffer): void {
+  const digest = createHash("sha256").update(buffer).digest("hex");
+  if (digest !== hash)
+    refuseUpload("content does not match its hash", "Content does not match its hash");
+}
+
+/** The files of a multipart content upload; each key is a valid hash and names its own bytes. */
+async function verifiedUploads(form: FormData): Promise<{ hash: string; buffer: Buffer }[]> {
+  return await Promise.all(
+    [...form.entries()].map(async ([hash, value]) => {
+      if (!(value instanceof File)) refuseUpload("not a file", "Only files can be uploaded");
+      refuseInvalidHash(hash);
+      const buffer = Buffer.from(await value.arrayBuffer());
+      refuseMismatch(hash, buffer);
+      return { hash, buffer };
+    }),
+  );
 }
 
 const contentHashSchema = z.string().regex(CONTENT_HASH_PATTERN, "Invalid content hash");
