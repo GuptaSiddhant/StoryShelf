@@ -192,7 +192,6 @@
         "packages/app/src/routers/builds.handlers.ts",
         "packages/app/src/routers/builds.ts",
         "packages/app/src/routers/helpers.ts",
-        "packages/app/src/routers/labels.ts",
         "packages/app/src/routers/snapshots.ts",
         "packages/app/src/routers/storybook.ts",
         "packages/app/src/routers/ui.ts",
