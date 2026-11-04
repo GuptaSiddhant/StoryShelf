@@ -222,6 +222,13 @@ describe("captureAcrossBrowsers", () => {
     expect(result.inherited).toHaveLength(2);
   });
 
+  it("does nothing for a build with no stories: no render, no captures, no error", async () => {
+    const { input, calls } = setup({ stories: [] });
+    const result = await captureAcrossBrowsers(input);
+    expect(calls).toEqual([]);
+    expect(result).toEqual({ captures: [], failures: [], inherited: [], renderCount: 0 });
+  });
+
   it("lets a launch failure through, without isolating or retrying", async () => {
     const { runner, calls } = runnerOf(async () => {
       await Promise.resolve();
@@ -279,6 +286,17 @@ describe("partitionBrowsers", () => {
     for (const entry of partition.work) {
       expect(entry.stories.map((candidate) => candidate.id)).toEqual(["a", "b"]);
     }
+    expect(partition.inherited).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it("plans an empty slice for every engine when there are no stories", async () => {
+    const { input, calls } = setup({ stories: [] });
+    const partition = await partitionBrowsers(input);
+    expect(partition.work).toEqual([
+      { browser: "chromium", stories: [] },
+      { browser: "firefox", stories: [] },
+    ]);
     expect(partition.inherited).toEqual([]);
     expect(calls).toEqual([]);
   });
