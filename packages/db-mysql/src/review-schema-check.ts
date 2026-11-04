@@ -43,7 +43,9 @@ function conflict(what: string): Error {
 export async function assertReviewSchema(run: MigrationRunner): Promise<void> {
   const rows = (await run(COLUMNS_QUERY)) as ColumnRow[];
   const reviews = new Set(
-    rows.filter((row) => row.table_name === "build_reviews").map((row) => row.column_name),
+    rows
+      .filter((row) => row.table_name === "build_reviews")
+      .map((row) => row.column_name.toLowerCase()),
   );
   const missing =
     reviews.size > 0 ? BUILD_REVIEW_COLUMNS.find((name) => !reviews.has(name)) : undefined;
@@ -51,7 +53,9 @@ export async function assertReviewSchema(run: MigrationRunner): Promise<void> {
     throw conflict(`table build_reviews has no column ${missing}`);
   }
   for (const { table, column, type } of TYPED_COLUMNS) {
-    const found = rows.find((row) => row.table_name === table && row.column_name === column);
+    const found = rows.find(
+      (row) => row.table_name === table && row.column_name.toLowerCase() === column,
+    );
     if (found !== undefined && found.data_type.toLowerCase() !== type) {
       throw conflict(`column ${table}.${column} has type ${found.data_type}, expected ${type}`);
     }

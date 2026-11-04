@@ -41,6 +41,13 @@ describe("assertReviewSchema", () => {
     );
   });
 
+  it("requires the reviewer column", async () => {
+    const partial = reviews.filter((row) => row.column_name !== "user_id");
+    await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
+      "table build_reviews has no column user_id",
+    );
+  });
+
   it("also requires the reviewer and body columns", async () => {
     const partial = reviews.filter((row) => row.column_name !== "body");
     await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(

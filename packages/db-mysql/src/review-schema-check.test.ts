@@ -41,6 +41,13 @@ describe("assertReviewSchema", () => {
     );
   });
 
+  it("requires the reviewer column", async () => {
+    const partial = reviews.filter((row) => row.column_name !== "user_id");
+    await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
+      "table build_reviews has no column user_id",
+    );
+  });
+
   it("also requires the reviewer and body columns", async () => {
     const partial = reviews.filter((row) => row.column_name !== "body");
     await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
@@ -54,6 +61,18 @@ describe("assertReviewSchema", () => {
     );
     await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
       "column build_reviews.build_id has type text, expected varchar",
+    );
+  });
+
+  it("compares column names without regard to case, as MySQL does", async () => {
+    const upper = reviews.map((row) =>
+      Object.assign({}, row, { column_name: row.column_name.toUpperCase() }),
+    );
+    await expect(assertReviewSchema(runnerOf([...upper, ...settings]))).resolves.toBeUndefined();
+    const wrong = settings.filter((row) => row.column_name !== "review_approvals");
+    wrong.push({ table_name: "projects", column_name: "REVIEW_APPROVALS", data_type: "text" });
+    await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
+      "column projects.review_approvals has type text, expected int",
     );
   });
 

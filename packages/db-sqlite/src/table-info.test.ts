@@ -24,6 +24,13 @@ describe("parseTableInfo", () => {
     ]);
   });
 
+  it("lower-cases names, as SQLite compares them without regard to case", () => {
+    expect([...parseTableInfo([{ name: "BODY", type: "text" }, [0, "User_Id", "TEXT"]])]).toEqual([
+      ["body", "TEXT"],
+      ["user_id", "TEXT"],
+    ]);
+  });
+
   it("gives an empty map for no rows, a column with no type an empty type, and skips what it cannot read", () => {
     expect(parseTableInfo([]).size).toBe(0);
     expect([...parseTableInfo([{ name: "x" }, [0, "y"]])]).toEqual([
