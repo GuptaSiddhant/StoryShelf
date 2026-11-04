@@ -3,7 +3,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { ShelfOptions } from "./config.ts";
-import { DEFAULT_SCRATCH_DIR, resolveShelfOptions } from "./options.ts";
+import {
+  DEFAULT_SCRATCH_DIR,
+  resolveShelfOptions,
+  sequentialTransactionsWarning,
+} from "./options.ts";
 
 const runner = { metadata: { kind: "r" } } as unknown as CaptureRunner;
 const base = {
@@ -184,5 +188,28 @@ describe("resolveShelfOptions testing process options", () => {
         resolveShelfOptions({ ...base, testing: { runner, workerEntry: "/app/w.ts", mode } }),
       ).not.toThrow();
     }
+  });
+});
+
+describe("sequentialTransactionsWarning", () => {
+  const sequential = {
+    ...base,
+    database: { metadata: { name: "Neon HTTP", category: "database", transactions: "sequential" } },
+  } as unknown as ShelfOptions;
+
+  it("warns when testing runs on a database with only sequential transactions", () => {
+    expect(sequentialTransactionsWarning({ ...sequential, testing: { runner } })).toMatch(
+      /Neon HTTP database runs transactions one statement at a time/u,
+    );
+  });
+
+  it("is silent without testing, and for a database with real transactions", () => {
+    expect(sequentialTransactionsWarning(sequential)).toBeUndefined();
+    expect(sequentialTransactionsWarning({ ...base, testing: { runner } })).toBeUndefined();
+    const atomic = {
+      ...base,
+      database: { metadata: { name: "Fake", category: "database", transactions: "atomic" } },
+    } as unknown as ShelfOptions;
+    expect(sequentialTransactionsWarning({ ...atomic, testing: { runner } })).toBeUndefined();
   });
 });

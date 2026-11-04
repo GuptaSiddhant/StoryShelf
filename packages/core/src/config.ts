@@ -463,5 +463,9 @@ export interface ObservabilityHandle {
   /** Flush exporters and release SDK resources. Must be idempotent. */
   shutdown(): Promise<void>;
 }
-export { DEFAULT_SCRATCH_DIR, resolveShelfOptions } from "./options.ts";
+export {
+  DEFAULT_SCRATCH_DIR,
+  resolveShelfOptions,
+  sequentialTransactionsWarning,
+} from "./options.ts";
 export { ALLOW_SERVERLESS_ENV, assertServerless, isServerlessHost } from "./serverless.ts";

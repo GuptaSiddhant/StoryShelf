@@ -49,6 +49,8 @@ export function createNeonHttpDatabase(options: NeonHttpDatabaseOptions): Databa
       description: "Neon Postgres database adapter (HTTP driver + Drizzle)",
       kind: "neon-http",
       category: "database",
+      // Drizzle emulates `transact` over HTTP without a rollback.
+      transactions: "sequential",
     },
     tables: schema,
     migrate: async ({ logger }) => {
