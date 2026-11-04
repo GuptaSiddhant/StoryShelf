@@ -46,14 +46,16 @@ export async function extractStorybookToScratch(
   buildId: string,
   shardId?: string,
   limits: ExtractionLimits = DEFAULT_EXTRACTION_LIMITS,
+  signal?: AbortSignal,
 ): Promise<string> {
+  signal?.throwIfAborted();
   const base = shardId
     ? shardScratchDir(scratchDir, projectId, buildId, shardId)
     : jobScratchDir(scratchDir, projectId, buildId);
   const targetDir = join(base, "storybook");
   const root = await prepareTargetDir(targetDir);
   const source = await storage.readStream(storybookZipPath(projectId, buildId));
-  await extractZipStream(source, root, limits);
+  await extractZipStream(source, root, limits, signal);
   return targetDir;
 }
 
@@ -76,6 +78,7 @@ async function prepareTargetDir(targetDir: string): Promise<string> {
  * @param projectId - Owning project id.
  * @param buildId - Build the files belong to.
  * @param db - Optional database; with the lifecycle capability the build's content uses are recorded (enables GC).
+ * @param signal - Checked before every write, the content uses and the manifest: an aborted run writes nothing more and throws the signal's reason.
  */
 export async function persistStorybookStatics(
   storage: StorageAdapter,
@@ -83,6 +86,7 @@ export async function persistStorybookStatics(
   projectId: string,
   buildId: string,
   db?: DatabaseAdapter,
+  signal?: AbortSignal,
 ): Promise<void> {
   const root = resolve(sourceDir);
   const destinationPrefix = storybookDir(projectId, buildId);
@@ -93,19 +97,24 @@ export async function persistStorybookStatics(
   // write: the scratch dir is often the storage root, so the per-build path
   // below can be the very file being read (a streamed write would truncate it).
   await mapLimit(files, STATICS_CONCURRENCY, async (file) => {
+    signal?.throwIfAborted();
     const rel = relative(root, file);
     const buffer = await readFile(file);
     const hash = createHash("sha256").update(buffer).digest("hex");
     manifest[rel] = hash;
     // Only write if not already exists (dedup)
     if (!(await storage.exists(contentKey(hash)))) {
+      signal?.throwIfAborted();
       await storage.write(contentKey(hash), buffer);
     }
     // Also write to legacy per-build path for backward compat (can be removed after migration)
+    signal?.throwIfAborted();
     await storage.write(`${destinationPrefix}/${rel}`, buffer);
   });
   // The uses are recorded once per hash, before the manifest that names them makes the build serve.
+  signal?.throwIfAborted();
   await recordContentUses(db, storage, { projectId, buildId }, Object.values(manifest));
+  signal?.throwIfAborted();
   await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }
 

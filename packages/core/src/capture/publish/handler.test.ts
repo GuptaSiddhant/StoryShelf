@@ -82,6 +82,41 @@ describe("createPublishHandler", () => {
     expect(await statusOf()).toBe(before);
   });
 
+  it("an expired invocation writes no more, completes nothing and leaves the scratch to the redelivery", async () => {
+    const files = Object.fromEntries(
+      Array.from({ length: 30 }, (_unused, index) => [`f${String(index)}.html`, `<p>${index}</p>`]),
+    );
+    const { handler, storage, build, project, statusOf, run } = await setup({ files });
+    const before = await statusOf();
+    const controller = new AbortController();
+    const write = storage.write.bind(storage);
+    const writes: string[] = [];
+    storage.write = async (key, data, ...rest) => {
+      writes.push(key);
+      if (writes.length === 1) controller.abort(new Error("job deadline exceeded"));
+      return await write(key, data, ...rest);
+    };
+
+    await expect(
+      handler.run({ buildId: build.id, attempt: 1, maxAttempts: 1 } as ConsumerJob, {
+        logger: stubLogger().logger,
+        touch: () => {},
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("job deadline exceeded");
+
+    const prefix = storybookDir(project.id, build.id);
+    expect(writes.length).toBeLessThan(60);
+    expect(writes).not.toContain(`${prefix}/manifest.json`);
+    expect(await statusOf()).toBe(before);
+    // The shared scratch is the redelivery's: the expired run did not remove it.
+    expect(await readdir(join(scratchDir, SCRATCH_DIRNAME, project.id, build.id))).not.toEqual([]);
+
+    storage.write = write;
+    await run({ attempt: 2 });
+    expect(await storage.exists(`${prefix}/manifest.json`)).toBe(true);
+  });
+
   it("records the build's use of each distinct published blob", async () => {
     const { db, build, run } = await setup();
     const recordContentUses = vi.fn(async () => await Promise.resolve([] as string[]));

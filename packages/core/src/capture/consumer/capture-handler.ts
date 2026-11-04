@@ -15,6 +15,7 @@ import { createBuildStatePublisher } from "../build-state/publisher.ts";
 import type { BuildStatePublisher } from "../build-state/types.ts";
 import { GENERATION_KEY } from "../db-queue/codec.ts";
 import { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "../dispatch.ts";
+import { abortableLease } from "../job-lease.ts";
 import type { CaptureJobOptions, ShardJob } from "../orchestrator.ts";
 import { extractionLimitsOf, resolvePublishLimits } from "../publish/limits.ts";
 import type { ConsumerMetrics } from "./metrics.ts";
@@ -113,11 +114,17 @@ export function createCaptureHandler(options: CaptureHandlerOptions): KindHandle
         );
         return;
       }
-      await dispatchFor(retriesOf(job, fallbackRetries))(toDispatchJob(job), {
-        touch: () => {
-          context.touch();
-        },
-      });
+      await dispatchFor(retriesOf(job, fallbackRetries))(
+        toDispatchJob(job),
+        abortableLease(
+          {
+            touch: () => {
+              context.touch();
+            },
+          },
+          context.signal,
+        ),
+      );
     },
     deadlineExceeded: async (job, seconds) => {
       await recordDeadline(options, job, seconds);

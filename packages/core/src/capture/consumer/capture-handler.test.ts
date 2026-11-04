@@ -119,7 +119,11 @@ describe("a capture job queued for a superseded run", () => {
     const before = await builds.get(build.id);
     const attempts = await options.db.list(options.db.tables.captureAttempts);
 
-    await createCaptureHandler(options).run(job, { logger: options.logger, touch: () => {} });
+    await createCaptureHandler(options).run(job, {
+      logger: options.logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    });
 
     expect(options.runner.render).not.toHaveBeenCalled();
     expect(await builds.get(build.id)).toEqual(before);

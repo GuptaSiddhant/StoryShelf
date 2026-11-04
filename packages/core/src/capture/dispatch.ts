@@ -13,6 +13,7 @@ import { ProjectModel, type ProjectTables } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { redactSecrets } from "../utils/redact.ts";
 import type { BuildStatePublisher } from "./build-state/types.ts";
 import type { ShardRepeatedEvent } from "./consumer/metrics.ts";
@@ -229,6 +230,10 @@ async function runAndReport(ctx: JobContext, job: CaptureDispatchJob): Promise<v
 /** Record a failed run, then rethrow so the job is redelivered, unless another try cannot help. */
 async function reportFailure(ctx: JobContext, error: unknown): Promise<void> {
   const { deps, build } = ctx;
+  if (error instanceof JobAbortedError) {
+    // Abandoned at its deadline: a redelivery owns the build now, so this run writes no status.
+    throw error;
+  }
   await finishAttempt(ctx, "failed", errorText(error));
   await deps.buildState.request(build.id);
   if (error instanceof SignedUrlLifetimeError) {

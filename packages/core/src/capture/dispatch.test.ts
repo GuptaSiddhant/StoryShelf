@@ -15,9 +15,11 @@ import { NotificationChannelModel } from "../models/notification-channel.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { createBuildStatePublisher } from "./build-state/publisher.ts";
 import { createDispatchJob, type DispatchDeps } from "./dispatch.ts";
+import { abortableLease } from "./job-lease.ts";
 import { SignedUrlLifetimeError } from "./token-chunks.ts";
 
 const SECRET = "test-secret-0123456789abcdef";
@@ -234,6 +236,37 @@ describe("createDispatchJob attempt history", () => {
     const attempts = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
     const logs = await new CaptureLogModel(db, tables(db)).listByAttempt(attempts[0]?.id ?? "");
     expect(touch.mock.calls.length).toBeGreaterThanOrEqual(logs.length);
+  });
+
+  it("an abandoned dispatch stops at its next checkpoint and writes no snapshot or status", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const { project, build } = await seedBuild(db);
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const controller = new AbortController();
+    const rendered = successRender();
+    const render: CaptureRunner["render"] = async (...args) => {
+      const result = await rendered(...args);
+      controller.abort(new Error("job deadline exceeded"));
+      return result;
+    };
+    const buildState = { request: vi.fn(async () => {}) };
+    const deps = { ...depsFor(db, storage, fakeRunner(render)), buildState };
+    const runJob = createDispatchJob(deps);
+
+    await expect(
+      runJob({ buildId: build.id }, abortableLease({ touch: () => {} }, controller.signal)),
+    ).rejects.toBeInstanceOf(JobAbortedError);
+
+    expect(await db.count(db.tables.snapshots)).toBe(0);
+    // Still the state the render left it in: not failed, not finalized.
+    expect((await new BuildModel(db, tables(db)).get(build.id))?.status).toBe("capturing");
+    const attempts = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
+    expect(attempts.map((row) => row.status)).not.toContain("failed");
+    const logs = await new CaptureLogModel(db, tables(db)).listByAttempt(attempts[0]?.id ?? "");
+    expect(logs.map((row) => row.message)).not.toContain("capture failed");
+    // Only the pending state before the run started: nothing was announced after the abort.
+    expect(buildState.request).toHaveBeenCalledTimes(1);
   });
 
   it("records a failed attempt with the full error text", async () => {

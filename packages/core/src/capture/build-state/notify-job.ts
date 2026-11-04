@@ -5,6 +5,7 @@
  * at most one non-terminal job per pair (`activeKey`), so a queued job covers a newer request and a
  * request during a delivery earns one more pass.
  */
+import type { Logger } from "../../logger.ts";
 import { NotificationChannelModel } from "../../models/notification-channel.ts";
 import { sanitizeErrorText } from "../../utils/redact.ts";
 import { isFinalAttempt } from "../consumer/retry.ts";
@@ -59,20 +60,32 @@ export function createNotifyHandler(options: NotifyHandlerOptions): KindHandler 
       const channelId = channelIdOf(job);
       context.signal.throwIfAborted();
       try {
-        const result = await deliverBuildState(deps, { buildId: job.buildId, channelId });
-        if (result === "delivered") {
-          await channelModel(deps).recordOutcome(channelId);
-        } else {
-          context.logger.info({ result }, "nothing to deliver");
-        }
+        await deliver(deps, { job, channelId }, context);
       } catch (error) {
-        if (isFinalAttempt(job)) {
+        // Past its deadline the attempt records nothing: the redelivery, or `exhausted`, settles it.
+        if (!context.signal.aborted && isFinalAttempt(job)) {
           await surfaceFailure(options, { channelId, buildId: job.buildId, error });
         }
         throw error;
       }
     },
   };
+}
+
+/** One delivery; the signal is checked before the host is told and before the outcome is recorded. */
+async function deliver(
+  deps: BuildStateDeps,
+  what: { job: ConsumerJob; channelId: string },
+  context: { logger: Logger; signal: AbortSignal },
+): Promise<void> {
+  const { job, channelId } = what;
+  const result = await deliverBuildState(deps, { buildId: job.buildId, channelId }, context.signal);
+  context.signal.throwIfAborted();
+  if (result === "delivered") {
+    await channelModel(deps).recordOutcome(channelId);
+  } else {
+    context.logger.info({ result }, "nothing to deliver");
+  }
 }
 
 /**

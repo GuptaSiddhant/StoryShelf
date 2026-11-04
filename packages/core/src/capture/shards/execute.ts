@@ -1,7 +1,8 @@
-/** The render stage: one shard of a sharded capture, run by whichever worker picked up its job. */
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
+/** The render stage: one shard of a sharded capture, run by whichever worker picked up its job. */
+import { JobAbortedError } from "../../utils/job-aborted.ts";
 import { classifyFailures } from "../failure-sets.ts";
 import { renderWork } from "../matrix.ts";
 import type { CaptureJobOptions } from "../orchestrator.ts";
@@ -109,6 +110,8 @@ async function runShard(
   try {
     await renderShard(target, shard, { progress: input.progress, delivery: input.delivery });
   } catch (error) {
+    // Abandoned at its deadline: the redelivery settles the shard, this run records nothing.
+    if (error instanceof JobAbortedError) throw error;
     await recordFailure(shards, shard, error, final);
     if (final) {
       await finalizeAfterFailure(target, input, error);
