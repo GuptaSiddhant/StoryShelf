@@ -96,6 +96,11 @@ async function rejectInlineZip(build: Build, reason: string): Promise<void> {
     return;
   }
   const failed = await new BuildModel(getStore().db).setStatus(build.id, "failed");
+  if (failed.status !== "failed") {
+    // A cancel landed after the build was read as pending and the write was refused (`cancelled`
+    // is terminal): the build stays as it is and no failure is announced.
+    return;
+  }
   getStore().logger.warn({ buildId: build.id, reason }, "inline zip rejected; build failed");
   await announceBuildStatus(failed.id, "failed", { reason: sanitizeErrorText(reason, 300) });
 }

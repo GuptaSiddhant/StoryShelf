@@ -7,6 +7,13 @@ import { pino } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { createShelfApp } from "../index.tsx";
+import { announceBuildStatus } from "./builds.handlers.ts";
+
+// Pass-through spy: lets a test see whether a status was announced (git, webhooks, notifications).
+vi.mock("./builds.handlers.ts", async (original) => {
+  const real = await original<typeof import("./builds.handlers.ts")>();
+  return { ...real, announceBuildStatus: vi.fn(real.announceBuildStatus) };
+});
 
 /** A rejected inline zip ends the build failed, so its git checks resolve instead of staying pending. */
 const SECRET = "test-secret";
@@ -68,12 +75,36 @@ async function boot() {
 }
 
 describe("a rejected inline zip", () => {
+  beforeEach(() => {
+    vi.mocked(announceBuildStatus).mockClear();
+  });
+
   it("shows a failure on the git channel, not a pending check", async () => {
     const t = await boot();
     expect((await t.upload()).status).toBe(422);
+    expect(announceBuildStatus).toHaveBeenCalledWith(t.buildId, "failed", expect.anything());
     await vi.waitFor(() => {
       expect(t.git.calls.at(-1)?.state).toBe("failure");
     });
+  });
+
+  it("announces no failure when a cancel lands after the build was read as pending", async () => {
+    const t = await boot();
+    await new BuildModel(t.db).setStatus(t.buildId, "cancelled");
+    t.git.calls.length = 0;
+    const read = BuildModel.prototype.get;
+    const stale = vi.spyOn(BuildModel.prototype, "get").mockImplementationOnce(async function (
+      this: BuildModel,
+      id: string,
+    ) {
+      const row = await read.call(this, id);
+      return row === null ? null : { ...row, status: "pending" };
+    });
+    expect((await t.upload()).status).toBe(422);
+    stale.mockRestore();
+    expect((await new BuildModel(t.db).get(t.buildId))?.status).toBe("cancelled");
+    expect(t.git.calls.some((call) => call.state === "failure")).toBe(false);
+    expect(announceBuildStatus).not.toHaveBeenCalled();
   });
 
   it.each(["cancelled", "approved"] as const)(
@@ -85,6 +116,7 @@ describe("a rejected inline zip", () => {
       expect((await t.upload()).status).toBe(422);
       expect((await new BuildModel(t.db).get(t.buildId))?.status).toBe(status);
       expect(t.git.calls.some((call) => call.state === "failure")).toBe(false);
+      expect(announceBuildStatus).not.toHaveBeenCalled();
     },
   );
 });
