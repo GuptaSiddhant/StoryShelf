@@ -116,17 +116,25 @@ describe("waiting for the story to be ready", () => {
   it("waits the configured delay before the play function runs", async () => {
     const { ctx, page } = harness(settled, { executePlay: true });
     const order: string[] = [];
+    const { promise: delayDone, resolve: finishDelay } = Promise.withResolvers<null>();
     const evaluate = page.evaluate;
     page.evaluate = async (fn: unknown, arg?: unknown): Promise<unknown> => {
       if (fn === inPagePlay) order.push("play");
       return await evaluate(fn, arg);
     };
-    const wait = page.waitForTimeout;
     page.waitForTimeout = async (ms: number): Promise<void> => {
       order.push(`delay ${ms}`);
-      await wait(ms);
+      await delayDone;
     };
-    await captureScreenshot(ctx, story(120), viewport);
+    const capturing = captureScreenshot(ctx, story(120), viewport);
+    await vi.waitFor(() => {
+      expect(order).toEqual(["delay 120"]);
+    });
+    // The delay is held open: once every pending microtask has run, play has still not started.
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(order).toEqual(["delay 120"]);
+    finishDelay(null);
+    await capturing;
     expect(order).toEqual(["delay 120", "play"]);
   });
 

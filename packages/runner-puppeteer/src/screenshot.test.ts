@@ -90,16 +90,35 @@ describe("waiting for the story to be ready", () => {
 
   it("waits the configured delay before the play function runs", async () => {
     const order: string[] = [];
-    const waits = recordWaits();
+    const { promise: delayDone, resolve: finishDelay } = Promise.withResolvers<null>();
+    const real = globalThis.setTimeout;
+    // Only the story's 300 ms delay is held; every other timer runs as usual.
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+      callback: TimerHandler,
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (timeout !== 300) return real(callback, timeout, ...args);
+      order.push("delay 300");
+      delayDone.then(() => (callback as (...rest: unknown[]) => void)(...args)).catch(() => {});
+      return 0;
+    }) as typeof setTimeout);
     const { ctx, page } = harness(settled, { executePlay: true });
     const evaluate = page.evaluate;
     page.evaluate = async (fn: unknown, arg?: unknown): Promise<unknown> => {
-      if (fn === inPagePlay) order.push(`play after ${waits.join(",")}`);
+      if (fn === inPagePlay) order.push("play");
       return await evaluate(fn, arg);
     };
-    await captureScreenshot(ctx, story(300), viewport);
-    // The delay had already been asked for when the play function started.
-    expect(order).toEqual(["play after 300"]);
+    const capturing = captureScreenshot(ctx, story(300), viewport);
+    await vi.waitFor(() => {
+      expect(order).toEqual(["delay 300"]);
+    });
+    // The delay is held open: once every pending microtask has run, play has still not started.
+    await new Promise((resolve) => real(resolve, 0));
+    expect(order).toEqual(["delay 300"]);
+    finishDelay(null);
+    await capturing;
+    expect(order).toEqual(["delay 300", "play"]);
   });
 
   it("still honours an explicit delay after the signal", async () => {

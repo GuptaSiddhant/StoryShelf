@@ -23,7 +23,7 @@ describe("InheritedRatioCard", () => {
     ]);
     expect(html).toContain("Average inherited share per build");
     expect(html).toContain("75%");
-    expect(html).toContain("Over the last 2 builds");
+    expect(html).toContain("Over the 2 most recent builds with snapshots");
     expect(html).toContain("reused from a baseline instead of captured again");
     expect(html).toContain("not time or cost saved");
   });
@@ -31,7 +31,7 @@ describe("InheritedRatioCard", () => {
   it("says build in the singular for one build", async () => {
     const html = await render([build(4, 1, "2026-01-01T00:00:00.000Z")]);
     expect(html).toContain("25%");
-    expect(html).toContain("Over the last 1 build,");
+    expect(html).toContain("Over the most recent build with snapshots,");
   });
 
   it("renders nothing until a build holds snapshots", async () => {

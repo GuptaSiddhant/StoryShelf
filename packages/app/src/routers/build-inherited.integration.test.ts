@@ -57,7 +57,7 @@ describe("inherited counts of a build", () => {
     const list = await (await app.request(`/projects/${project.slug}/builds`)).text();
     expect(list).toContain("Average inherited share per build");
     expect(list).toContain("63%");
-    expect(list).toContain("Over the last 2 builds");
+    expect(list).toContain("Over the 2 most recent builds with snapshots");
   });
 
   it("leaves the ratio out when the instance only hosts Storybooks", async () => {

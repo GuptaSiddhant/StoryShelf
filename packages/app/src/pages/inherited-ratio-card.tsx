@@ -19,9 +19,11 @@ export function InheritedRatioCard(props: { builds: Build[] }): ReturnType<typeo
         value={`${Math.round(average.ratio * 100)}%`}
       />
       <Meta>
-        Over the last {average.builds} {average.builds === 1 ? "build" : "builds"}, the average
-        share of a build&apos;s snapshots that was reused from a baseline instead of captured again.
-        This measures capture reuse, not time or cost saved.
+        {average.builds === 1
+          ? "Over the most recent build with snapshots"
+          : `Over the ${average.builds} most recent builds with snapshots`}
+        , the average share of a build&apos;s snapshots that was reused from a baseline instead of
+        captured again. This measures capture reuse, not time or cost saved.
       </Meta>
     </Card>
   );
