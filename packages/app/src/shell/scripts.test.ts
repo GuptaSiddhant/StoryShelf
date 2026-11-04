@@ -341,6 +341,48 @@ describe("signed preview frame", () => {
     });
   });
 
+  it("ignores an automatic renewal that settles after a manual reload started", async () => {
+    const stale = Promise.withResolvers<unknown>();
+    let calls = 0;
+    const page = boot(() => {
+      calls += 1;
+      if (calls === 1) return ok("/_s/first");
+      return calls === 2 ? stale.promise : ok("/_s/reloaded");
+    });
+    page.click();
+    await tick();
+    page.timers.find((timer) => timer.kind === "interval")?.fn();
+    page.reload();
+    await tick();
+    expect(page.frame()?.getAttribute("src")).toBe("/_s/reloaded/iframe.html?id=a");
+    stale.resolve({ ok: true, json: () => Promise.resolve({ base: "/_s/stale" }) });
+    await tick();
+    expect(page.frame()?.getAttribute("src")).toBe("/_s/reloaded/iframe.html?id=a");
+  });
+
+  it("does not show the notice for an automatic renewal that fails after a manual reload", async () => {
+    const stale = Promise.withResolvers<unknown>();
+    let calls = 0;
+    const page = boot(() => {
+      calls += 1;
+      if (calls === 2) return stale.promise;
+      return ok("/_s/ok");
+    });
+    page.click();
+    await tick();
+    page.timers.find((timer) => timer.kind === "interval")?.fn();
+    page.reload();
+    await tick();
+    stale.reject(new Error("down"));
+    await tick();
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      page.timers.findLast((timer) => timer.kind === "timeout")?.fn();
+    }
+    await tick();
+    expect(page.part("notice")?.hidden).toBe(true);
+    expect(page.part("disclosure")?.hidden).toBe(false);
+  });
+
   it("clears the notice when a later scheduled renewal succeeds", async () => {
     let fail = false;
     const page = boot(() => (fail ? Promise.reject(new Error("down")) : ok("/_s/new")));
