@@ -29,6 +29,7 @@ fly status -a storyshelf
 
 - Capture concurrency is sized automatically from the VM's CPU and memory (1 build, 1 page at a time on the 1 GB shared-CPU VM). Set `CAPTURE_CONCURRENCY` in `fly.toml` to override the page count; raise it only after scaling `[[vm]]` CPUs and memory.
 - `NODE_OPTIONS=--max-old-space-size=384` in `fly.toml` caps the Node heap so Chromium keeps the rest of the 1 GB. Raise it together with `[[vm]] memory`.
+- `PURGE_TTL_DAYS = '14'` in `fly.toml` turns on the daily build purge: builds older than 14 days are removed (a build a baseline still needs is kept, and so is each branch's newest), so the volume and bucket stop growing. It is opt-in per deployment; unset it (or change the number) in `fly.toml` and redeploy. It needs retention to be active on the SQLite database: if the System page says "Retention is paused", fix the baseline it names and restart. The same variable works in `apps/dev-server`.
 - Persistent volume `/data` holds `shelf.db`, and, without a bucket, every stored object too (survives redeploys). With the bucket configured it holds only `shelf.db*` and scratch space.
 - `NODE_OPTIONS=--conditions=source` resolves `@storyshelf/*` to `src/` via `exports.source` in `packages/*/package.json:83`.
 - `*.fly.dev` wildcard works for `PUBLISHED_BASE_DOMAIN=storyshelf.fly.dev` if set.

@@ -68,6 +68,7 @@ describe("content-addressed dedup", () => {
     const dedupBody = (await dedupRes.json()) as { needed: string[] };
     expect(dedupBody.needed).toEqual([A, B]);
 
+    const HELLO = sha256("hello");
     // upload one hash
     const form = new FormData();
     form.set(sha256("hello"), new File([Buffer.from("hello")], "a"));
@@ -77,8 +78,40 @@ describe("content-addressed dedup", () => {
     });
     expect(contentRes.status).toBe(200);
     expect(await storage.exists(`content/${sha256("hello")}`)).toBe(true);
-    const ref = await db.get(db.tables.contentRefs, sha256("hello"));
-    expect(ref).not.toBeNull();
+
+    // Storing a blob records no use; the manifest does, once per distinct hash.
+    const recordContentUses = vi.fn(async () => await Promise.resolve([] as string[]));
+    Object.assign(db, { buildReferenceLifecycle: { recordContentUses } });
+    const manifest = async (): Promise<Response> =>
+      await app.request("/api/v1/projects/proj/builds/b1/manifest", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          files: [
+            { rel: "a.js", hash: HELLO, size: 5 },
+            { rel: "b.js", hash: HELLO, size: 5 },
+          ],
+        }),
+      });
+    expect(recordContentUses).not.toHaveBeenCalled();
+    expect((await manifest()).status).toBe(200);
+    expect(recordContentUses).toHaveBeenCalledWith("p1", "b1", [HELLO]);
+    expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(true);
+
+    // A blob a collector claimed first: 409, and no manifest makes the build serve it.
+    await storage.delete("p1/builds/b1/storybook/manifest.json");
+    recordContentUses.mockResolvedValueOnce([HELLO]);
+    expect((await manifest()).status).toBe(409);
+    expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(false);
+
+    // A blob collected between the client's check and the record: 409 as well, no manifest.
+    const gone = await app.request("/api/v1/projects/proj/builds/b1/manifest", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ files: [{ rel: "c.js", hash: hashOf("9"), size: 1 }] }),
+    });
+    expect(gone.status).toBe(409);
+    expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(false);
   });
 
   it("manifest stores and serving via manifest uses immutable cache for buildId", async () => {
@@ -130,12 +163,6 @@ describe("content-addressed dedup", () => {
     );
     objects.set(`${storybookDir("p1", "b1")}/iframe.html`, Buffer.from("<html>preview</html>"));
     objects.set(`${storybookDir("p1", "b1")}/index.html`, Buffer.from("<html>storybook</html>"));
-    await db.insert(db.tables.contentRefs, {
-      hash: C,
-      refCount: 1,
-      lastSeenAt: "2026-01-01T00:00:00.000Z",
-      createdAt: "2026-01-01T00:00:00.000Z",
-    });
 
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
 
@@ -182,16 +209,7 @@ describe("content-addressed dedup", () => {
     expect(db.tables).toBeDefined();
     expect(db.tables.projects).toBeDefined();
     expect(db.tables.builds).toBeDefined();
-    expect(db.tables.contentRefs).toBeDefined();
-    // type-safe insert without as never
-    await db.insert(db.tables.contentRefs, {
-      hash: "h1",
-      refCount: 1,
-      lastSeenAt: "2026-01-01T00:00:00.000Z",
-      createdAt: "2026-01-01T00:00:00.000Z",
-    });
-    const got = await db.get(db.tables.contentRefs, "h1");
-    expect(got).not.toBeNull();
+    expect(db.tables.contentUses).toBeDefined();
   });
 });
 

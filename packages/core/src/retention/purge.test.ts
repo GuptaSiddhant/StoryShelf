@@ -1,13 +1,18 @@
-import { describe, expect, it } from "vitest";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
 import { createDatabaseCaptureQueue } from "../capture/db-queue/index.ts";
 import { BuildComponentModel } from "../models/build-component.ts";
 import { CaptureJobModel } from "../models/capture-job.ts";
 import { LabelModel } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
+import type { Project } from "../schema/project.ts";
 import { createTestProject } from "../test-helpers/create-project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { Retention } from "./purge.ts";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function retentionTables(db: DatabaseAdapter) {
   return {
@@ -358,6 +363,103 @@ async function insertApprovedBuild(db: DatabaseAdapter, id: string, projectId: s
     updatedAt: at,
   });
 }
+
+/** A project with one expired approved build, and a stub capability that protects every claim. */
+async function pass() {
+  const { db } = makeDatabase();
+  const { storage, objects } = makeStorage();
+  const old = new Date(Date.now() - 60 * 86_400_000).toISOString();
+  await db.insert(db.tables.projects, {
+    id: "p1",
+    name: "Test",
+    slug: "test",
+    gitDefaultBranch: "main",
+    createdAt: old,
+    updatedAt: old,
+  });
+  await db.insert(db.tables.builds, {
+    id: "b-old",
+    projectId: "p1",
+    gitSha: "sha",
+    gitBranch: "feature/x",
+    status: "approved",
+    createdAt: old,
+    updatedAt: old,
+  });
+  objects.set("p1/builds/b-old/storybook/index.html", Buffer.from("x"));
+  const claimDeletion = vi.fn(async () => await Promise.resolve("protected" as const));
+  const lifecycle = {
+    listDeleting: async () => await Promise.resolve([]),
+    claimDeletion,
+  } as unknown as BuildReferenceLifecycle;
+  const project = (await db.list(db.tables.projects))[0] as unknown as Project;
+  const retention = new Retention(db, storage, {
+    builds: db.tables.builds,
+    buildLabels: db.tables.buildLabels,
+    baselines: db.tables.baselines,
+  });
+  return { db, objects, lifecycle, claimDeletion, project, retention };
+}
+
+describe("Retention and the lifecycle capability", () => {
+  it("stays fenced when the capability is cleared while the candidates are selected", async () => {
+    const { db, objects, lifecycle, claimDeletion, project, retention } = await pass();
+    Object.assign(db, { buildReferenceLifecycle: lifecycle });
+    const list = db.list.bind(db);
+    // The capability goes away during the first read of the pass (a setup rerun).
+    vi.spyOn(db, "list").mockImplementation(async (...args) => {
+      Object.assign(db, { buildReferenceLifecycle: undefined });
+      return await list(...args);
+    });
+
+    const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
+
+    expect(claimDeletion).toHaveBeenCalledWith("p1", "b-old");
+    expect(result.protectedBuilds).toBe(1);
+    expect(await db.get(db.tables.builds, "b-old")).not.toBeNull();
+    expect(objects.has("p1/builds/b-old/storybook/index.html")).toBe(true);
+  });
+
+  it("uses the capability the caller resolved for its pass, whatever the database says now", async () => {
+    const { db, objects, lifecycle, claimDeletion, project, retention } = await pass();
+
+    const result = await retention.purge(project, {
+      ttlDays: 30,
+      keepLatestPerBranch: false,
+      lifecycle,
+    });
+
+    expect(claimDeletion).toHaveBeenCalledOnce();
+    expect(result.protectedBuilds).toBe(1);
+    expect(await db.get(db.tables.builds, "b-old")).not.toBeNull();
+    expect(objects.has("p1/builds/b-old/storybook/index.html")).toBe(true);
+  });
+
+  it("does not pick up a capability that appears after the caller found none", async () => {
+    const { db, lifecycle, claimDeletion, project, retention } = await pass();
+    Object.assign(db, { buildReferenceLifecycle: lifecycle });
+
+    // The caller's pass found no capability (explicit `undefined`): the snapshot stands.
+    const result = await retention.purge(project, {
+      ttlDays: 30,
+      keepLatestPerBranch: false,
+      lifecycle: undefined,
+    });
+
+    expect(claimDeletion).not.toHaveBeenCalled();
+    expect(result.protectedBuilds).toBeUndefined();
+  });
+
+  it("deletes through the unfenced path only on a database that never had the capability", async () => {
+    const { db, project, retention } = await pass();
+
+    const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
+
+    expect(result.protectedBuilds).toBeUndefined();
+    expect(result.removedBuilds).toBe(1);
+    expect(await db.get(db.tables.builds, "b-old")).toBeNull();
+  });
+});
 
 describe("Retention and the database queue", () => {
   const DAY = 86_400_000;

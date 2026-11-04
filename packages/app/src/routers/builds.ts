@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { ContentCollectingError, recordContentUses } from "@storyshelf/core/capture";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel, PackageUsageModel } from "@storyshelf/core/models";
 import {
@@ -38,28 +39,27 @@ async function planOrDiscard(
   }
 }
 
-async function upsertContentRef(hash: string): Promise<void> {
+/** Record the build's use of each stored blob; a blob a collector already claimed is a 409 to retry. */
+async function recordUses(
+  projectId: string,
+  buildId: string,
+  files: readonly { hash: string }[],
+): Promise<void> {
   try {
-    const contentRefs = getStore().db.tables.contentRefs;
-    const now = new Date().toISOString();
-    const existing = await getStore().db.get(contentRefs, hash);
-    if (existing) {
-      await getStore().db.update(contentRefs, hash, {
-        refCount: (existing as { refCount: number }).refCount + 1,
-        lastSeenAt: now,
-      });
-    } else {
-      await getStore().db.insert(contentRefs, {
-        hash,
-        refCount: 1,
-        lastSeenAt: now,
-        createdAt: now,
-      });
-    }
-  } catch {
-    // ignore — content_refs may not exist on old DB
+    await recordContentUses(
+      getStore().db,
+      getStore().storage,
+      { projectId, buildId },
+      files.map((file) => file.hash),
+    );
+  } catch (error) {
+    if (!(error instanceof ContentCollectingError)) throw error;
+    throw new HTTPException(409, {
+      message: "Some content was being collected: upload the missing files again and retry",
+    });
   }
 }
+
 import { registerBuildCancel } from "./build-cancel.ts";
 import { registerBuildChangeset } from "./build-changeset.ts";
 import { registerBuildReviews } from "./build-reviews.ts";
@@ -178,8 +178,6 @@ export function registerBuilds(app: ShelfRouter): void {
       for (const { hash, buffer } of files) {
         // oxlint-disable-next-line no-await-in-loop -- one write at a time keeps the order stable
         await getStore().storage.write(contentKey(hash), buffer);
-        // oxlint-disable-next-line no-await-in-loop -- see above
-        await upsertContentRef(hash);
       }
     } else {
       // Single content upload via PUT with hash header
@@ -201,33 +199,11 @@ export function registerBuilds(app: ShelfRouter): void {
     for (const f of files) {
       manifest[f.rel] = f.hash;
     }
+    await recordUses(project.id, build.id, files);
     await getStore().storage.write(
       `${project.id}/builds/${build.id}/storybook/manifest.json`,
       Buffer.from(JSON.stringify(manifest)),
     );
-    // Upsert content_refs for each hash
-    for (const f of files) {
-      try {
-        const contentRefs = getStore().db.tables.contentRefs;
-        const now = new Date().toISOString();
-        const existing = await getStore().db.get(contentRefs, f.hash);
-        // oxlint-disable-next-line unicorn/no-if-else -- upsert is clearer as if/else
-        if (!existing) {
-          await getStore().db.insert(contentRefs, {
-            hash: f.hash,
-            refCount: 1,
-            lastSeenAt: now,
-            createdAt: now,
-          });
-        } else {
-          await getStore().db.update(contentRefs, f.hash, {
-            lastSeenAt: now,
-          });
-        }
-      } catch {
-        // ignore — content_refs may not exist
-      }
-    }
     // The files are stored content-addressed: nothing to extract, so publishing is complete.
     await getStore().publish?.completer.complete(build.id, { ok: true });
     const reqId = c.get("requestId");

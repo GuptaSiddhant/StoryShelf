@@ -152,7 +152,6 @@ export { SnapshotModel, type SnapshotCreateInput } from "./snapshot.ts";
 export { TokenModel } from "./token.ts";
 export { UserModel } from "./user.ts";
 export { WebhookModel, type WebhookCreateInput } from "./webhook.ts";
-export { ContentRefModel } from "./content-ref.ts";
 export {
   probeCredentials,
   reencryptCredentials,

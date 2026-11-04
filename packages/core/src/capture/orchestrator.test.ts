@@ -275,12 +275,20 @@ describe("executeCaptureJob", () => {
     expect(await db.list(db.tables.baselines)).toEqual([]);
   });
 
-  it("records the persisted content in content_refs, so retention knows who uses it", async () => {
+  it("records the build's use of the persisted content, so retention knows who uses it", async () => {
     const { db, buildId, options } = await setupBrowsers({});
+    const recordContentUses = vi.fn(async () => await Promise.resolve([] as string[]));
+    Object.assign(db, { buildReferenceLifecycle: { recordContentUses } });
     await executeCaptureJob({ buildId }, options);
-    const refs = await db.list(db.tables.contentRefs);
-    expect(refs.length).toBeGreaterThan(0);
-    expect(refs.every((ref) => ref["refCount"] === 1)).toBe(true);
+    expect(recordContentUses).toHaveBeenCalledTimes(1);
+    const [, usedBy, hashes] = recordContentUses.mock.calls[0] as unknown as [
+      string,
+      string,
+      string[],
+    ];
+    expect(usedBy).toBe(buildId);
+    expect(hashes.length).toBeGreaterThan(0);
+    expect(new Set(hashes).size).toBe(hashes.length);
   });
 
   it("enforces the configured zip caps while extracting for capture", async () => {
