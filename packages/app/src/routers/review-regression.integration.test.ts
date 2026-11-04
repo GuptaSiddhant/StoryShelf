@@ -1,12 +1,14 @@
+import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import { BuildModel, BuildReviewModel, MemberModel, TokenModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sha256, storybookDir } from "@storyshelf/core/utils";
+import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pino } from "pino";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { stubAuth } from "../stub-auth.ts";
@@ -51,7 +53,12 @@ afterEach(async () => {
 });
 
 async function boot(
-  options: { testing?: boolean; noAuth?: boolean; project?: Record<string, unknown> } = {},
+  options: {
+    testing?: boolean;
+    noAuth?: boolean;
+    runner?: CaptureRunner;
+    project?: Record<string, unknown>;
+  } = {},
 ) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -86,7 +93,7 @@ async function boot(
     database: db,
     storage,
     ...(options.noAuth === true ? {} : { auth }),
-    ...(options.testing === true ? { testing: { runner: stubRunner() } } : {}),
+    ...(options.testing === true ? { testing: { runner: options.runner ?? stubRunner() } } : {}),
     config: {
       secret: "s",
       scratchDir,
@@ -293,6 +300,52 @@ describe("the verdict form while publishing", () => {
   });
 });
 
+/** A runner that waits for `release`, then reports its one story as failed to render. */
+function failingRunner(release: Promise<null>): CaptureRunner {
+  return {
+    metadata: { name: "failing", version: "0.0.0", kind: "stub", category: "capture-runner" },
+    render: async () => {
+      await release;
+      return {
+        captures: [],
+        failures: [{ storyId: "button--primary", viewportName: "default", error: "render failed" }],
+      };
+    },
+    cancel: async () => {
+      await Promise.resolve();
+    },
+  };
+}
+
+/** A build with one story, created and uploaded as a zip, so the capture runs. */
+async function uploadStories(booted: Booted): Promise<string> {
+  const created = await booted.app.request("/api/v1/projects/gate/builds", {
+    method: "POST",
+    headers: { cookie: "storyshelf_session=admin", "content-type": "application/json" },
+    body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/x" }),
+  });
+  const { build } = (await created.json()) as { build: { id: string } };
+  const zip = new AdmZip();
+  zip.addFile("iframe.html", Buffer.from("<html></html>"));
+  const entry = { type: "story", id: "button--primary", name: "Primary", title: "Button" };
+  zip.addFile(
+    "index.json",
+    Buffer.from(
+      JSON.stringify({
+        v: 5,
+        entries: { "button--primary": { ...entry, importPath: "./Button.stories.tsx" } },
+      }),
+    ),
+  );
+  const upload = await booted.app.request(`/api/v1/projects/gate/builds/${build.id}/zip`, {
+    method: "PUT",
+    headers: { cookie: "storyshelf_session=admin", "content-type": "application/zip" },
+    body: new Uint8Array(zip.toBuffer()),
+  });
+  expect(upload.status).toBe(202);
+  return build.id;
+}
+
 describe.each(CHANNELS)("a sign-off on a failed build through the %s (testing on)", (channel) => {
   it("is refused and leaves the build failed, with no verdict stored", async () => {
     const booted = await boot({ testing: true });
@@ -303,6 +356,22 @@ describe.each(CHANNELS)("a sign-off on a failed build through the %s (testing on
     expect(given.text).toContain("failed");
     expect(await statusOf(booted, id)).toBe("failed");
     expect(await new BuildReviewModel(booted.db).listByBuild(id)).toEqual([]);
+  });
+
+  it("given during the capture, does not turn failed snapshots into a pass", async () => {
+    const release = Promise.withResolvers<null>();
+    const booted = await boot({ testing: true, runner: failingRunner(release.promise) });
+    try {
+      const id = await uploadStories(booted);
+      await vi.waitFor(async () => expect(await statusOf(booted, id)).toBe("capturing"));
+      const given = await give(booted, channel, id, { user: "alice" });
+      expect(given.status).toBeLessThan(400);
+      release.resolve(null);
+      await vi.waitFor(async () => expect(await statusOf(booted, id)).toBe("failed"));
+      expect(await new BuildReviewModel(booted.db).listByBuild(id)).toHaveLength(1);
+    } finally {
+      release.resolve(null);
+    }
   });
 });
 

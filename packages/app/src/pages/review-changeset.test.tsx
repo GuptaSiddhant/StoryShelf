@@ -15,7 +15,7 @@ function dataWith(baseline: { gitSha: string; gitBranch: string } | null): Revie
 
 async function render(data: ReviewSectionData): Promise<string> {
   const app = new Hono();
-  app.get("/", (c) => c.html(<ChangesetCard data={data} />));
+  app.get("/", async (c) => await c.html(<ChangesetCard data={data} />));
   return await (await app.request("/")).text();
 }
 
