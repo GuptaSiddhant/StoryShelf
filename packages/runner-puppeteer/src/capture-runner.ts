@@ -4,6 +4,7 @@ import {
   createTargetOffers,
   shutdownRemote,
   type CaptureRunner,
+  type RemoteTarget,
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
@@ -55,82 +56,114 @@ export function createPuppeteerCaptureRunner(
   );
   // Until `lifecycle.setup` verifies them, every declared target reads as ready.
   const offers = createTargetOffers(declared);
-  const driver: TargetDriver = {
-    launch: offers.guard(async (target, logger, context) => {
-      const remote = remotes.find((entry) => entry.target === target);
-      return remote
-        ? await connectRemote(remote, context, logger)
-        : {
-            browser: await launchLocal(
-              locals.find((entry) => entry.target === target) as LocalTarget,
-              options.args,
-            ),
-            ownership: "launched",
-          };
-    }),
-    remote: (target) => remotes.find((entry) => entry.target === target),
-  };
-  const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
-  const navigationTimeoutMs =
-    options.navigationTimeoutMs ??
-    envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
-    recommendedNavigationTimeoutMs();
-  const recycleBrowserEvery =
-    options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0);
-  const reusePages =
-    options.reusePages ?? ["1", "true"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? "");
+  const driver = buildDriver(offers, locals, remotes, options.args);
+  const settings = resolveSettings(options);
   return {
-    metadata: {
-      name: "Puppeteer",
-      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
-      description: "Puppeteer capture runner (chrome-headless-shell)",
-      kind: "puppeteer",
-      category: "capture-runner",
-      get targets() {
-        return offers.current();
-      },
-    },
+    metadata: runnerMetadata(offers),
     lifecycle: withShutdown(
       offers.lifecycle(async () => await Promise.resolve(verifyTargets(declared, locals))),
     ),
-    async render(input: PuppeteerRenderInput) {
-      const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
-      const remove = activeRuns.add(input.buildId, input.runId, active);
-      try {
-        return await renderAll(
-          { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
-          active,
-          driver,
-          offers.defaultTarget,
-        );
-      } finally {
-        remove();
-      }
-    },
-    async runTests(input: PuppeteerTestsInput) {
-      const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
-      const remove = activeRuns.add(input.buildId, input.runId, active);
-      try {
+    render: async (input: PuppeteerRenderInput) =>
+      await trackRun(input, async (active) => {
+        return await renderAll({ ...settings, ...input }, active, driver, offers.defaultTarget);
+      }),
+    runTests: async (input: PuppeteerTestsInput) =>
+      await trackRun(input, async (active) => {
+        const { concurrency, navigationTimeoutMs } = settings;
         return await runTestEntries(
           { concurrency, navigationTimeoutMs, ...input },
           active,
           driver,
           offers.defaultTarget,
         );
-      } finally {
-        remove();
+      }),
+    cancel: cancelRuns,
+  };
+}
+
+/** Launches a local engine or leases a remote one, whichever the target names. */
+function buildDriver(
+  offers: ReturnType<typeof createTargetOffers>,
+  locals: readonly LocalTarget[],
+  remotes: readonly RemoteTarget[],
+  args: string[] | undefined,
+): TargetDriver {
+  return {
+    launch: offers.guard(async (target, logger, context) => {
+      const remote = remotes.find((entry) => entry.target === target);
+      if (remote) {
+        return await connectRemote(remote, context, logger);
       }
-    },
-    async cancel(buildId, runId) {
-      await Promise.all(
-        activeRuns.matching(buildId, runId).map(async (active) => {
-          active.cancelled = true;
-          active.abort?.abort();
-          await active.session?.release("cancelled");
-        }),
-      );
+      const local = locals.find((entry) => entry.target === target);
+      if (!local) {
+        throw new Error(`No launchable target named ${target}`);
+      }
+      return { browser: await launchLocal(local, args), ownership: "launched" };
+    }),
+    remote: (target) => remotes.find((entry) => entry.target === target),
+  };
+}
+
+/** Option, then environment variable, then the detected default, for each tunable. */
+function resolveSettings(options: {
+  concurrency?: number;
+  navigationTimeoutMs?: number;
+  recycleBrowserEvery?: number;
+  reusePages?: boolean;
+}): {
+  concurrency: number | undefined;
+  navigationTimeoutMs: number;
+  recycleBrowserEvery: number | undefined;
+  reusePages: boolean;
+} {
+  return {
+    concurrency: options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY"),
+    navigationTimeoutMs:
+      options.navigationTimeoutMs ??
+      envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
+      recommendedNavigationTimeoutMs(),
+    recycleBrowserEvery:
+      options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0),
+    reusePages:
+      options.reusePages ?? ["1", "true"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? ""),
+  };
+}
+
+function runnerMetadata(offers: ReturnType<typeof createTargetOffers>): CaptureRunner["metadata"] {
+  return {
+    name: "Puppeteer",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
+    description: "Puppeteer capture runner (chrome-headless-shell)",
+    kind: "puppeteer",
+    category: "capture-runner",
+    get targets() {
+      return offers.current();
     },
   };
+}
+
+/** Registers the run so `cancel` can find it, and unregisters it however the work ends. */
+async function trackRun<T>(
+  input: { buildId: string; runId?: string | undefined },
+  work: (active: ActiveRun) => Promise<T>,
+): Promise<T> {
+  const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
+  const remove = activeRuns.add(input.buildId, input.runId, active);
+  try {
+    return await work(active);
+  } finally {
+    remove();
+  }
+}
+
+async function cancelRuns(buildId: string, runId?: string): Promise<void> {
+  await Promise.all(
+    activeRuns.matching(buildId, runId).map(async (active) => {
+      active.cancelled = true;
+      active.abort?.abort();
+      await active.session?.release("cancelled");
+    }),
+  );
 }
 
 /** Local targets are checked for an executable; a remote one is not probed (that would open a session). */
@@ -158,7 +191,9 @@ function envPositiveInt(name: string): number | undefined {
 }
 
 function envInt(name: string, min: number): number | undefined {
-  const parsed = Number.parseInt(process.env[name] ?? "", 10);
+  // Leading digits only, as parseInt reads them ("12abc" is 12, "" and "abc" are none).
+  const digits = /^\s*\+?(?<digits>\d+)/u.exec(process.env[name] ?? "")?.groups?.["digits"];
+  const parsed = digits === undefined ? Number.NaN : Number(digits);
   return parsed >= min ? parsed : undefined;
 }
 

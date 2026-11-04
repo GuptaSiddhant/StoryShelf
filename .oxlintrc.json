@@ -214,8 +214,7 @@
         "packages/cli/src/commands/server/init/prompts.ts",
         "packages/cli/src/commands/server/init/writers.ts",
         "packages/cli/src/commands/server/docker.ts",
-        "packages/cli/src/commands/shared/detect-adapters.ts",
-        "packages/runner-puppeteer/src/capture-runner.ts"
+        "packages/cli/src/commands/shared/detect-adapters.ts"
       ],
       "rules": {
         "max-lines-per-function": "allow",
