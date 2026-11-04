@@ -7,6 +7,7 @@ describe("instruments", () => {
     expect(captureMetrics().jobDuration).toBeDefined();
     expect(captureMetrics().jobsCompleted).toBeDefined();
     expect(captureMetrics().jobsFailed).toBeDefined();
+    expect(captureMetrics().shardRepeatedStories).toBeDefined();
   });
 
   it("memoizes db and storage instruments", () => {

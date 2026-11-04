@@ -74,5 +74,8 @@ export function jobMetrics(): ConsumerMetrics {
         instruments.jobsFailed.add(1, attributes);
       }
     },
+    shardRepeated: (event) => {
+      captureMetrics().shardRepeatedStories.add(event.repeated);
+    },
   };
 }
