@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { Logger } from "../logger.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
-import { CaptureAttemptModel } from "./capture-attempt.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
+import { CaptureAttemptModel, emitAttemptLog } from "./capture-attempt.ts";
 import { CaptureLogModel } from "./capture-log.ts";
 
 function attemptTables(db: DatabaseAdapter) {
@@ -141,5 +143,34 @@ describe("CaptureLogModel", () => {
       const model = new CaptureAttemptModel(db, attemptTables(db));
       expect(await model.closeIfOpen("missing", "failed", "x", counts)).toBeNull();
     });
+  });
+});
+
+describe("emitAttemptLog", () => {
+  it("swallows a failed log write but not an abandoned attempt", async () => {
+    const warn = vi.fn();
+    const logger = { warn } as unknown as Logger;
+
+    await emitAttemptLog(
+      async () => {
+        throw new Error("disk full");
+      },
+      logger,
+      "info",
+      "msg",
+    );
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    await expect(
+      emitAttemptLog(
+        async () => {
+          throw new JobAbortedError(new Error("job deadline exceeded"));
+        },
+        logger,
+        "info",
+        "msg",
+      ),
+    ).rejects.toBeInstanceOf(JobAbortedError);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

@@ -15,6 +15,7 @@ import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { parentContext, withSpan } from "../tracing.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory } from "./adapter.ts";
 import type { DiscoverOptions, Viewport } from "./adapter.ts";
@@ -386,6 +387,8 @@ async function runCapturePhases(
     });
     return { storyCount: stories.length, failedCount: blockingFailed.size };
   } catch (error) {
+    // Abandoned at its deadline: a redelivery may own the scratch and the build, so write nothing.
+    if (error instanceof JobAbortedError) throw error;
     await cleanScratch();
     const totalDuration = performance.now() - startTime;
     logger?.error({ durationMs: Math.round(totalDuration), err: error }, "capture failed");

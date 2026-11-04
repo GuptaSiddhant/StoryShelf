@@ -3,7 +3,9 @@ import { BuildModel } from "../../models/build.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
 import type { BuildStatus } from "../../types.ts";
+import { JobAbortedError } from "../../utils/job-aborted.ts";
 import { finalizeBuild } from "../pipeline.ts";
+import type { CaptureProgress } from "../progress.ts";
 import type { PlanResult, ShardPayload, ShardResult } from "../shard-plan.ts";
 import { contextOf, type ShardTarget } from "./context.ts";
 
@@ -25,14 +27,21 @@ export interface FinalSummary {
  * A finalize that throws gives its claim back, so the next run to reduce the build (a redelivery
  * of the same shard) finalizes it instead of finding the claim taken. On a last try (`final`)
  * nothing will come back for it, so the build is failed and the failure reported as the summary.
+ * `progress` is the run's checkpoint: called once the claim is held and before the build's terminal
+ * writes, so an abandoned run gives the claim back and rethrows, failing nothing (a redelivery
+ * finalizes). The finalize itself, once started, is not interrupted.
  */
-export async function reduceBuild(target: ShardTarget, final = true): Promise<FinalSummary | null> {
+export async function reduceBuild(
+  target: ShardTarget,
+  final = true,
+  progress?: CaptureProgress,
+): Promise<FinalSummary | null> {
   const shards = new CaptureShardModel(target.options.db);
   const rows = await closedShards(shards, target.build.id);
   if (!rows || !(await shards.claimFinalize(target.project.id, target.build.id))) {
     return null;
   }
-  return await finalizeClaimed(target, shards, rows, final);
+  return await finalizeClaimed(target, shards, rows, { final, progress });
 }
 
 /** Finalize under the claim this run holds; on failure, give the claim back. */
@@ -40,16 +49,17 @@ async function finalizeClaimed(
   target: ShardTarget,
   shards: CaptureShardModel,
   rows: CaptureShard[],
-  final: boolean,
+  run: { final: boolean; progress: CaptureProgress | undefined },
 ): Promise<FinalSummary> {
   const plan = await shards.plan(target.build.id);
   try {
+    run.progress?.();
     const summary = await finalizeSharded(target, rows, plan);
     await shards.finishFinalize(target.build.id);
     return summary;
   } catch (error) {
     await shards.releaseFinalize(target.build.id);
-    if (!final) {
+    if (!run.final || error instanceof JobAbortedError) {
       throw error;
     }
     return await failFinalize(target, plan, error);
