@@ -2,14 +2,14 @@
 
 ## Status
 
-Accepted. Implementation is partial. This ADR amends ADR 0009 decision 4 (Retention and purge) for
+Accepted. SQLite activated (#536); Postgres and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
 deployments with `testing`; hosting-only retention is unchanged.
 
 Merged: source-build provenance (#345), frozen comparison references and fail-closed testing purge
 (#354), SQLite lifecycle primitives (#382), fenced baseline writers (#389), preparation of legacy
 references (#397), sealing of the capability to fenced mutations (#372) and resumable deletion with
-exactly-once content release (#374). Open: SQLite activation (#536), Postgres and MySQL capability
-(#375, #376) and investigations (#377 to #381).
+exactly-once content release (#374), per-build content uses (#564) and SQLite activation (#536).
+Open: Postgres and MySQL capability (#375, #376) and investigations (#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -104,8 +104,19 @@ by preset, so it cannot by itself carry this guarantee.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
-  reference-sensitive path. Presets are enabled one at a time: SQLite first (#536), then Postgres
-  (#375) and MySQL (#376).
+  reference-sensitive path. Presets are enabled one at a time: SQLite first (#536, done), then
+  Postgres (#375) and MySQL (#376).
+- **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
+  adapter's setup has migrated the schema, it runs `prepareBaselineReferences` once and only then
+  exposes `buildReferenceLifecycle`. A shared file is required, so an in-memory database never has
+  it. If preparation stops with a `BaselineSourceIntegrityError` (a recorded source that is
+  tombstoned or belongs to another project), the capability stays off, the adapter reports
+  `retentionPause` (baseline, build, problem), the server logs it once at error level, and the
+  System page shows "Retention is paused" naming both ids. Retention is then fail closed as for any
+  adapter without the capability; an operator fixes the data and restarts. Any other preparation
+  failure fails the boot instead of guessing. With the capability, `POST /api/v1/admin/purge`
+  reports `{ removedBuilds, protected, resumed }` besides the branch figures, and the branch-GC
+  timer runs in a testing deployment; both answer or skip as before without it.
 
 ### 4. Provenance is immutable and never guessed
 
@@ -131,7 +142,7 @@ All writers use the fenced capability when it is present:
 | `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                      |
 | `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                      |
 | `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                     |
-| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; not invoked as production activation until #536 |
+| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; invoked once at every SQLite boot, before the capability is exposed (#536) |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check
 followed by an independent write is forbidden.
@@ -168,8 +179,8 @@ belongs to another project stops the whole run with `BaselineSourceIntegrityErro
 
 **Negative**
 
-- Until #536 activates SQLite, deployments with `testing` do not purge builds or garbage-collect
-  branches automatically; storage grows and operators must be told.
+- Postgres and MySQL deployments with `testing` still do not purge builds or garbage-collect
+  branches until #375 and #376; their storage grows and operators must be told.
 - Postgres and MySQL need their own capability implementation and multi-connection tests before
   they regain automatic retention.
 - Pinning whole builds keeps more storage than pinning artifacts would.
@@ -187,7 +198,8 @@ belongs to another project stops the whole run with `BaselineSourceIntegrityErro
 
 ## Open questions
 
-- Representative preparation time on large SQLite deployments; batching is designed only if a
-  measured startup budget is exceeded (#397).
-- Whether the SQLite-first activation (#536) ships before or with Postgres support for multi-instance
-  deployments.
+- Batching of the SQLite preparation, only if a deployment outgrows the startup budget. Measured
+  on a 10,000-baseline fixture (each with its own source build; `RUN_BENCH=1` in
+  `db-sqlite/src/retention-activation.test.ts`), preparation takes about 3.9 s and a whole boot
+  3.5 to 3.7 s, roughly 0.4 ms per baseline and linear, so it fits the 5 s budget up to about 12,000
+  baselines. Batching is not designed; the first deployment past that size designs it.

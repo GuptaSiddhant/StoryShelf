@@ -819,8 +819,8 @@ When a story is renamed or removed from Storybook, its baseline is never touched
 ### Trigger
 
 - **Scheduled**: one in-server timer, branch GC (`branchTtlDays` 30 + `branchGcIntervalMs` 24h daily interval clock via `retention-timer.ts`, staggered 1h). Build purge is not scheduled; run it manually.
-- **With `testing` enabled** (until #374 activates lifecycle-aware retention), branch GC is skipped (`retention-timer.ts`) and `POST /api/v1/admin/purge` answers `503` (`routers/admin.ts`); builds are retained. Hosting-only deployments are unaffected.
-- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin; now runs both build purge and branch GC and returns `{removedBuilds,removedBranches,removedBaselines}`).
+- **With `testing` enabled**, build purge and branch GC run only on a database with the `buildReferenceLifecycle` capability (ADR 0039): SQLite on a file, prepared at boot. Without it (Postgres and MySQL until #375/#376, or SQLite with retention paused by a baseline whose source build cannot be pinned, shown on the System page), branch GC is skipped (`retention-timer.ts`) and `POST /api/v1/admin/purge` answers `503` (`routers/admin.ts`); builds are retained. Hosting-only deployments are unaffected.
+- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin; runs both build purge and branch GC and returns `{removedBuilds,removedBranches,removedBaselines}`, plus `protected` (builds a baseline or investigation still pins) and `resumed` (builds an earlier unfinished run had claimed) when the database has the capability).
 
 ## Published Storybook
 

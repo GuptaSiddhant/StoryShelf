@@ -1,4 +1,5 @@
 import type { RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
+import type { RetentionPause } from "@storyshelf/core/adapter/database";
 import type { ShelfConfig } from "@storyshelf/core/config";
 import type { CredentialProbe } from "@storyshelf/core/models";
 import type { CaptureHostSummary } from "@storyshelf/core/utils";
@@ -22,6 +23,7 @@ import {
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
+import { RetentionPausedNotice } from "./retention-paused.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -48,6 +50,20 @@ export interface AdminSystemData {
   publicOrigin?: PublicOriginView | undefined;
   /** Notifiers are wired but no public origin resolves, so nothing is sent (ADR 0014, decision 11). */
   notificationsPaused?: boolean | undefined;
+  /** The database withheld build retention at boot (a baseline's source build cannot be pinned). */
+  retentionPause?: RetentionPause | undefined;
+}
+
+/** What the deployment has paused and why: notifications (no public URL) and build retention. */
+function PausedNotices(props: {
+  data: AdminSystemData;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <>
+      <NotificationsPausedNotice paused={props.data.notificationsPaused} />
+      <RetentionPausedNotice pause={props.data.retentionPause} />
+    </>
+  );
 }
 
 function healthTone(state: string): "success" | "info" | "danger" | "neutral" {
@@ -327,7 +343,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
           </HStack>
         }
       />
-      <NotificationsPausedNotice paused={data.notificationsPaused} />
+      <PausedNotices data={data} />
       {data.testing === false ? (
         <HostingOnlyNotice hiddenSnapshots={data.hiddenSnapshots ?? 0} />
       ) : null}

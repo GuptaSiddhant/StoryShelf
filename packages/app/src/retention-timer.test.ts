@@ -12,10 +12,15 @@ afterEach(() => {
 });
 
 describe("background retention", () => {
-  it.each([true, false])(
-    "runs branch GC only outside testing mode (testing=%s)",
-    async (testing) => {
+  it.each([
+    { testing: true, capability: false, runs: false },
+    { testing: false, capability: false, runs: true },
+    { testing: true, capability: true, runs: true },
+  ])(
+    "runs branch GC unless a testing deployment lacks the lifecycle capability (%o)",
+    async ({ testing, capability, runs }) => {
       const { db } = makeDatabase();
+      if (capability) Object.assign(db, { buildReferenceLifecycle: {} });
       const { storage } = makeStorage();
       await db.insert(db.tables.projects, {
         id: "p",
@@ -50,7 +55,7 @@ describe("background retention", () => {
       expect(typeof scheduled).toBe("function");
       if (typeof scheduled !== "function") throw new Error("retention timer was not scheduled");
       await (scheduled as () => Promise<void>)();
-      expect(purge.mock.calls.length > 0).toBe(!testing);
+      expect(purge.mock.calls.length > 0).toBe(runs);
       expect(await db.get(db.tables.aiUsage, "expired")).toBeNull();
       await (app as unknown as { lifecycle: { teardown(): Promise<void> } }).lifecycle.teardown();
     },

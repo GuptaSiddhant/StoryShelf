@@ -245,6 +245,18 @@ export interface BuildReferenceLifecycle {
   finishContentCollection(hash: string, token: string): Promise<void>;
 }
 
+/**
+ * Why an adapter that could implement {@link BuildReferenceLifecycle} withholds it: preparing the
+ * baselines found a recorded source build it must not pin. Retention stays fail closed until the
+ * data is fixed and the deployment restarted; the System page shows this.
+ */
+export interface RetentionPause {
+  baselineId: string;
+  buildId: string;
+  /** `tombstoned`: the source build is being deleted; `other-project`: it belongs to another project. */
+  problem: "tombstoned" | "other-project";
+}
+
 /** Database-specific metadata: the family plus what the backing platform can carry. */
 export interface DatabaseAdapterMetadata {
   readonly category: "database";
@@ -263,6 +275,11 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
    * `transact` by itself is not evidence of this capability.
    */
   readonly buildReferenceLifecycle?: BuildReferenceLifecycle;
+  /**
+   * Set when the adapter implements the capability but withheld it at boot because of a data
+   * integrity problem. Absent otherwise (including adapters that never implement it).
+   */
+  readonly retentionPause?: RetentionPause | undefined;
   /** Table handles for this adapter's dialect, enforced with type safety. */
   readonly tables: Tables;
   /** Insert a row and return the inserted record. */

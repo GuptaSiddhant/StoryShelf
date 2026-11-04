@@ -139,7 +139,13 @@ describe("purgeClaimedBuilds", () => {
     );
 
     expect(failed).toBe(true);
-    expect(result).toEqual({ removedBuilds: 1, removedFiles: 0, protectedBuilds: 1 });
+    expect(result).toEqual({
+      removedBuilds: 1,
+      removedFiles: 0,
+      protectedBuilds: 1,
+      // "good" was already `deleting` before this run (the scripted list is the same throughout).
+      resumedBuilds: 1,
+    });
     expect(warn).toHaveBeenCalledOnce();
     expect(calls).toContain("claim");
   });

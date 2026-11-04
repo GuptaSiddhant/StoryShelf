@@ -55,9 +55,10 @@ function createBranchGcRunner(
   // oxlint-disable-next-line eslint/max-statements -- the sweep and its error boundary are kept together
   return async (): Promise<void> => {
     try {
-      // Baseline removal must be coordinated with references before testing deployments can GC.
-      // Keep independent AI-data cleanup running even while branch GC is disabled.
-      if (testing) {
+      // Baseline removal must be coordinated with references: a testing deployment GCs only when
+      // its database has the lifecycle capability (ADR 0039). Keep independent AI-data cleanup
+      // running even while branch GC is disabled.
+      if (testing && !db.buildReferenceLifecycle) {
         await purgeAiData(db, new Date(), logger);
         return;
       }

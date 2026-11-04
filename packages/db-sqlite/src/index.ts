@@ -5,6 +5,11 @@ import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import {
+  activateRetention,
+  attachRetention,
+  type RetentionActivation,
+} from "./retention-activation.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -22,8 +27,9 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   sqlite.exec("PRAGMA busy_timeout = 5000");
   const callback = createCallback(sqlite);
   const db = drizzle(callback, { schema });
+  const retention: RetentionActivation = {};
 
-  return createDrizzleAdapter(db, {
+  const adapter = createDrizzleAdapter(db, {
     metadata: {
       name: "SQLite",
       version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
@@ -32,8 +38,9 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       category: "database",
     },
     tables: schema,
-    migrate: () => {
+    migrate: async () => {
       runMigrations(sqlite);
+      await activateRetention(path, retention);
     },
     close: () => {
       sqlite.close();
@@ -42,6 +49,7 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       sqlite.prepare("SELECT 1").get();
     },
   });
+  return attachRetention(adapter, retention);
 }
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";

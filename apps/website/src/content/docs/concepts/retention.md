@@ -47,8 +47,9 @@ Turning a project's review off accepts its pending builds that no capture worked
 ## Triggers
 
 - **Scheduled:** one in-server timer, the daily branch GC. Build purge is not scheduled.
-- **With testing enabled**, branch GC is skipped and admin purge answers `503` (builds are retained) until lifecycle-aware retention lands; hosting-only deployments are unaffected.
-- **Manual:** `storyshelf purge --url $SHELF_URL --token $STORYSHELF_ADMIN_TOKEN` or `POST /api/v1/admin/purge` (admin) — runs both sweeps and returns `{ removedBuilds, removedBranches, removedBaselines }`.
+- **With testing enabled**, retention works on **SQLite** (a database file): the server prepares the baseline pins at boot, and then purge and branch GC run, keeping any build a baseline still needs. **Postgres and MySQL** deployments with testing do not purge yet: branch GC is skipped and admin purge answers `503` (builds are retained, and storage grows) until they gain the same support. Hosting-only deployments are unaffected.
+- **Retention paused:** if a baseline's recorded source build is being deleted or belongs to another project, SQLite keeps retention off and the **System** page says "Retention is paused", naming the baseline and the build. Remove or repoint that baseline and restart the server; retention turns on at the next boot.
+- **Manual:** `storyshelf purge --url $SHELF_URL --token $STORYSHELF_ADMIN_TOKEN` or `POST /api/v1/admin/purge` (admin) — runs both sweeps and returns `{ removedBuilds, removedBranches, removedBaselines }`, plus `protected` (builds kept because a baseline still needs them) and `resumed` (builds an earlier interrupted run had started removing) on a database with testing retention.
 
 Configure via `ShelfConfig` or env:
 

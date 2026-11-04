@@ -92,9 +92,10 @@ async function pausedView(): Promise<boolean> {
 
 /** The System page's capture browsers and public origin (ADR 0007). */
 async function captureView(): Promise<
-  Pick<AdminSystemData, "targets" | "publicOrigin" | "notificationsPaused">
+  Pick<AdminSystemData, "targets" | "publicOrigin" | "notificationsPaused" | "retentionPause">
 > {
   return {
+    retentionPause: getStore().db.retentionPause,
     targets: await runnerTargets(),
     publicOrigin: await publicOriginView(),
     notificationsPaused: await pausedView(),

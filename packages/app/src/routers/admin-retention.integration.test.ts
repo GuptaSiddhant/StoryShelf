@@ -39,6 +39,24 @@ describe("safe retention capability", () => {
     expect(await db.get(db.tables.builds, "old")).not.toBeNull();
     expect(objects.has("p/builds/old/storybook/index.html")).toBe(true);
   });
+  it("tells the administrator why when the database paused retention at boot", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    Object.assign(db, {
+      retentionPause: { baselineId: "B1", buildId: "S1", problem: "tombstoned" },
+    });
+    const app = createShelfApp({ database: db, storage, testing: { runner: stubRunner() } });
+    const response = await app.request("/api/v1/admin/purge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(response.status).toBe(503);
+    const text = await response.text();
+    expect(text).toContain("retention is paused");
+    expect(text).toContain("B1");
+    expect(text).toContain("S1");
+  });
   it("keeps the existing purge path available in hosting-only mode", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
