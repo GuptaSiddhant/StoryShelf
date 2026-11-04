@@ -103,9 +103,12 @@ describe("database queue operations", () => {
   });
 
   it("reports the build's own job, not its shards, as its status", async () => {
-    const { queue: q } = queue();
+    const { db, queue: q } = queue();
     await q.enqueue({ buildId: "b1" });
     await q.enqueue({ buildId: "b1", shard: "s1" });
+    // The build is missing, so nothing was claimed and the own job carries no generation.
+    const own = (await db.list(db.tables.captureJobs)).find((row) => row.shardId === null);
+    expect(decodePayload(own?.payload ?? null).data?.["generation"]).toBeUndefined();
     expect(await q.status("b1")).toMatchObject({ buildId: "b1", status: "queued" });
     expect((await q.status("b1"))?.shard).toBeUndefined();
     const shards = (await q.active()).map((entry) => entry.shard ?? "own");

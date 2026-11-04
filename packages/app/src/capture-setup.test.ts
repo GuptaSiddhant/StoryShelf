@@ -187,6 +187,15 @@ describe("the forked capture handler", () => {
     }
   }, 30_000);
 
+  it("keeps the superseded-run check of the in-process handler", async () => {
+    const { wiring } = forked();
+    // Queued for a generation of a build that is gone: superseded; a job without one is not judged.
+    expect(await wiring.handler?.superseded?.(job("ghost", { data: { generation: 1 } }))).toBe(
+      true,
+    );
+    expect(await wiring.handler?.superseded?.(job("ghost"))).toBe(false);
+  });
+
   it("keeps the in-process handler's own validation of what it accepts", () => {
     const { wiring } = forked();
     expect(wiring.handler?.accepts?.(job("b1"))).toBe(true);
