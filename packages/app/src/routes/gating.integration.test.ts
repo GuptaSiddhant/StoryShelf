@@ -4,6 +4,7 @@ import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { REVIEW_DISABLED_MESSAGE } from "../middleware/require-review.ts";
 import { TESTING_DISABLED_MESSAGE } from "../middleware/require-testing.ts";
+import { stubAuth } from "../stub-auth.ts";
 import { stubRunner } from "../test-runner.ts";
 import { classOfRoute } from "./classification.ts";
 import { listRegisteredRoutes } from "./enumerate.ts";
@@ -106,6 +107,93 @@ describe("testing gate", () => {
     const response = await app.request("/no-such-page");
     expect(response.status).toBe(404);
     expect(await isGateRefusal(response)).toBe(false);
+  });
+});
+
+const NOW = "2026-01-01T00:00:00.000Z";
+
+async function bootAuth(): Promise<App> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const app = createShelfApp({
+    database: db,
+    storage,
+    auth: stubAuth(null),
+    config: { secret: "gate-test-secret" },
+  });
+  apps.push(app);
+  await app.lifecycle.setup();
+  return app;
+}
+
+describe("testing gate and authentication", () => {
+  it("answers a testing route with the gate's 404 before authentication, for an anonymous caller", async () => {
+    const app = await bootAuth();
+
+    // A hosting API route refuses an anonymous caller, so the gate's 404 below is not an auth-less instance.
+    expect((await app.request("/api/v1/projects")).status).toBe(403);
+
+    const api = await app.request("/api/v1/projects/demo/builds/b1/snapshots");
+    expect(api.status).toBe(404);
+    expect(await api.json()).toEqual({ error: TESTING_DISABLED_MESSAGE });
+    const withBadToken = await app.request("/api/v1/projects/demo/builds/b1/snapshots", {
+      headers: { authorization: "Bearer not-a-token" },
+    });
+    expect(withBadToken.status).toBe(404);
+    expect(await withBadToken.json()).toEqual({ error: TESTING_DISABLED_MESSAGE });
+  });
+
+  it("answers a testing page with the gate's 404 instead of a login redirect", async () => {
+    const app = await bootAuth();
+
+    const page = await app.request("/projects/demo/jobs");
+    expect(page.status).toBe(404);
+    expect(await page.text()).toBe(TESTING_DISABLED_MESSAGE);
+  });
+});
+
+describe("design render route", () => {
+  it("is a hosting route and serves a cached render on an instance without `testing`", async () => {
+    expect(classOfRoute("GET", "/api/v1/projects/:slug/design/renders/:renderId")).toBe("hosting");
+
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, {
+      id: "p1",
+      name: "App",
+      slug: "app",
+      gitRepository: null,
+      gitDefaultBranch: "main",
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as never);
+    await db.insert(db.tables.designNodes, {
+      id: "n1",
+      projectId: "p1",
+      provider: "figma",
+      viewerId: "",
+      fileKey: "KEY",
+      nodeId: "1:2",
+      name: "Button",
+      version: "1",
+      lastModified: null,
+      state: "ok",
+      renderPath: "p1/design/figma/KEY/1-2.png",
+      renderVersion: "1",
+      notifiedVersion: null,
+      fetchedAt: NOW,
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as never);
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    await storage.write("p1/design/figma/KEY/1-2.png", png);
+    const app = createShelfApp({ database: db, storage });
+    apps.push(app);
+    await app.lifecycle.setup();
+
+    const response = await app.request("/api/v1/projects/app/design/renders/n1?v=1");
+    expect(response.status).toBe(200);
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(png);
   });
 });
 
