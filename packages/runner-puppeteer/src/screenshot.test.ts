@@ -1,6 +1,7 @@
 import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { inPagePlay } from "./play.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createBrowserSession } from "./session.ts";
@@ -85,6 +86,20 @@ describe("waiting for the story to be ready", () => {
       screenshot: Buffer.from([1]),
     });
     expect(evaluated).toContain(inPagePaint);
+  });
+
+  it("waits the configured delay before the play function runs", async () => {
+    const order: string[] = [];
+    const waits = recordWaits();
+    const { ctx, page } = harness(settled, { executePlay: true });
+    const evaluate = page.evaluate;
+    page.evaluate = async (fn: unknown, arg?: unknown): Promise<unknown> => {
+      if (fn === inPagePlay) order.push(`play after ${waits.join(",")}`);
+      return await evaluate(fn, arg);
+    };
+    await captureScreenshot(ctx, story(300), viewport);
+    // The delay had already been asked for when the play function started.
+    expect(order).toEqual(["play after 300"]);
   });
 
   it("still honours an explicit delay after the signal", async () => {

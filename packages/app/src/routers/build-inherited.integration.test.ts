@@ -55,15 +55,15 @@ describe("inherited counts of a build", () => {
     const page = await (await app.request(`/projects/inherit/builds/${first.id}`)).text();
     expect(page).toContain("Inherited");
     const list = await (await app.request(`/projects/${project.slug}/builds`)).text();
-    expect(list).toContain("Inherited from baseline");
+    expect(list).toContain("Average inherited share per build");
     expect(list).toContain("63%");
-    expect(list).toContain("Average over the last 2 builds");
+    expect(list).toContain("Over the last 2 builds");
   });
 
   it("leaves the ratio out when the instance only hosts Storybooks", async () => {
     const { app, mine } = await setup(false);
     await mine("aaa1111", [true, false]);
     const list = await (await app.request("/projects/inherit/builds")).text();
-    expect(list).not.toContain("Inherited from baseline");
+    expect(list).not.toContain("Average inherited share per build");
   });
 });

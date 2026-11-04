@@ -2,6 +2,7 @@ import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { describe, expect, it, vi } from "vitest";
 import { TransientCaptureError } from "./capture-retry.ts";
+import { inPagePlay } from "./play.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { inPagePaint, inPageWaitSettled, type SettleReport } from "./settle.ts";
@@ -110,6 +111,23 @@ describe("waiting for the story to be ready", () => {
     const { ctx, waits } = harness(settled);
     await captureScreenshot(ctx, story(120), viewport);
     expect(waits).toEqual([120]);
+  });
+
+  it("waits the configured delay before the play function runs", async () => {
+    const { ctx, page } = harness(settled, { executePlay: true });
+    const order: string[] = [];
+    const evaluate = page.evaluate;
+    page.evaluate = async (fn: unknown, arg?: unknown): Promise<unknown> => {
+      if (fn === inPagePlay) order.push("play");
+      return await evaluate(fn, arg);
+    };
+    const wait = page.waitForTimeout;
+    page.waitForTimeout = async (ms: number): Promise<void> => {
+      order.push(`delay ${ms}`);
+      await wait(ms);
+    };
+    await captureScreenshot(ctx, story(120), viewport);
+    expect(order).toEqual(["delay 120", "play"]);
   });
 
   it("honours an explicit delay of zero without the fixed wait", async () => {
