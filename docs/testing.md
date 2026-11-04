@@ -71,6 +71,16 @@ Rules:
 - Prove conformance with the published suites: `storageContractSuite` /
   `databaseContractSuite` from `@storyshelf/core/test-helpers` (one line in
   the package's own test file). `queueContractSuite` covers the database queue; runner/git suites follow in later phases).
+- A database that implements `buildReferenceLifecycle` (build retention, ADR 0039) proves it with
+  `buildReferenceContractSuite` from `@storyshelf/core/test-helpers`, one call in the package's own
+  test file. The fixture hands the suite two lifecycles on **independent connections** (one
+  connection used twice proves nothing about locking), an owner, two `available` builds of its
+  project, and a `marker` (a domain write inside a mutation and a count of committed ones, read
+  through a connection other than the transaction). The suite also pins the typed
+  `ReferenceGenerationConflict` for a stale generation. A stand-in that serves every connection
+  from one session (an in-process Postgres such as PGlite) can run the suite but cannot prove
+  cross-connection row locking; say so where it is used, and prove locking against a real server
+  before enabling the capability on a preset.
 - Core validates untrusted input at the boundary: storage path segments
   (`paths.ts`), screenshot bytes (`capture/guards.ts`: PNG magic + 25 MiB cap),
   list limits (`clampListLimit`, max 1000).

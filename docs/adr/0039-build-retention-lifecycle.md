@@ -107,10 +107,12 @@ by preset, so it cannot by itself carry this guarantee.
   release a newer owner's pin.
 - Each implementation is proven with real multi-connection contract tests, not mocked transactions:
   `buildReferenceContractSuite` (`packages/core/src/test-helpers/build-reference-contract.ts`)
-  covers promotion and pin against purge, a stale generation rejecting a whole multi-owner
-  transaction with its domain writes, release keeping the generation, admission to a deleting or
-  missing build, an admission racing a claim ending in exactly one outcome, and opposite-order
-  multi-build admission without deadlock. Postgres and MySQL (#375, #376) must run the same suite.
+  covers promotion and pin against purge, a stale generation (a typed `ReferenceGenerationConflict`)
+  rejecting a whole multi-owner transaction with its domain writes, exactly one of two updates that
+  saw the same generation winning, invalid generations, empty and partly failing multi-owner
+  batches, release keeping the generation, admission to a deleting or missing build, an admission
+  racing a claim ending in exactly one outcome, and opposite-order multi-build admission without
+  deadlock. Postgres and MySQL (#375, #376) must run the same suite, unchanged.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
