@@ -83,6 +83,9 @@ async function check(browser, id) {
     );
     if (await page.evaluate(() => document.body.classList.contains("sb-show-errordisplay"))) {
       errors.push(`storybook: ${await page.locator("#error-message").innerText()}`);
+    } else if ((await page.locator("#storybook-root").innerHTML()).trim() === "") {
+      // Storybook marks the body before it writes the story's HTML, so an empty string passes the wait above.
+      errors.push("smoke: the story rendered an empty canvas");
     }
     await page.waitForTimeout(200);
   } catch (error) {
