@@ -6,6 +6,7 @@ import {
   makeDatabase,
   makeStorage,
 } from "@storyshelf/core/test-helpers";
+import { createHmac } from "node:crypto";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -38,6 +39,7 @@ function recordingChat(sent: string[]): NotifierProvider {
 interface Delivery {
   url: string;
   headers: Record<string, string>;
+  raw: string;
   body: { event: string; projectId: string; data: Record<string, unknown> };
 }
 
@@ -48,7 +50,12 @@ function stubWebhookReceiver(): Delivery[] {
     "fetch",
     vi.fn(async (url: string, init: { headers: Record<string, string>; body: string }) => {
       await Promise.resolve();
-      deliveries.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+      deliveries.push({
+        url,
+        headers: init.headers,
+        raw: init.body,
+        body: JSON.parse(init.body),
+      });
       return new Response("{}", { status: 200 });
     }),
   );
@@ -79,29 +86,40 @@ async function seed(chat: string[], publicBaseUrl?: string) {
   const webhook = await app.request("/api/v1/projects/app/webhooks", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ url: "https://hooks.example/receive", secret: "whsec-test" }),
+    body: JSON.stringify({ url: "https://hooks.example/receive" }),
   });
   expect(webhook.status).toBe(201);
-  return { app, build, cancel: `/api/v1/projects/app/builds/${build.id}/cancel` };
+  const { secret } = (await webhook.json()) as { secret: string };
+  apps.push(app);
+  return { app, build, secret, cancel: `/api/v1/projects/app/builds/${build.id}/cancel` };
 }
 
-afterEach(() => {
+/** Every app a test booted, torn down even when an assertion failed (each runs a branch-GC timer). */
+const apps: ReturnType<typeof createShelfApp>[] = [];
+afterEach(async () => {
   vi.unstubAllGlobals();
+  await Promise.allSettled(apps.splice(0).map(async (app) => await app.lifecycle.teardown()));
 });
 
 describe("a webhook while no public origin resolves", () => {
   it("is delivered and signed, while chat stays paused", async () => {
     const chat: string[] = [];
     const deliveries = stubWebhookReceiver();
-    const { app, cancel } = await seed(chat);
+    const { app, cancel, secret } = await seed(chat);
     expect((await app.request(cancel, { method: "POST" })).status).toBe(200);
     await vi.waitFor(() => {
       expect(deliveries.map((delivery) => delivery.body.event)).toContain("build:cancelled");
     });
     const delivery = deliveries.find((item) => item.body.event === "build:cancelled");
     expect(delivery?.url).toBe("https://hooks.example/receive");
-    expect(Object.keys(delivery?.headers ?? {}).map((name) => name.toLowerCase())).toContain(
-      "x-storyshelf-event",
+    const headers = Object.fromEntries(
+      Object.entries(delivery?.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]),
+    );
+    expect(headers["x-storyshelf-event"]).toBe("build:cancelled");
+    expect(headers["x-storyshelf-signature"]).toBe(
+      createHmac("sha256", secret)
+        .update(delivery?.raw ?? "")
+        .digest("hex"),
     );
     expect(chat).toEqual([]);
   });

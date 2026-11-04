@@ -684,10 +684,11 @@ describe("auth email sender", () => {
     await vi.waitFor(() => {
       expect(bodies).toHaveLength(1);
     });
-    expect(bodies[0]?.text).toContain(
-      `https://shelf.acme.io/auth/invites/${issued.inviteId}?token=${issued.token}`,
-    );
-    expect(bodies[0]?.text).not.toContain("localhost");
+    const link = /https?:\/\/\S+/u.exec(bodies[0]?.text ?? "")?.[0];
+    const url = new URL(link ?? "about:blank");
+    expect(url.origin).toBe("https://shelf.acme.io");
+    expect(url.pathname).toBe(`/auth/invites/${issued.inviteId}`);
+    expect(url.searchParams.get("token")).toBe(issued.token);
   });
 
   it("builds the password-reset link on the configured base URL, whatever host the request names", async () => {
