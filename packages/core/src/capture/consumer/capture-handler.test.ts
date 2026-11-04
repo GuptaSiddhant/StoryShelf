@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CaptureRunner } from "../../adapters/capture-runner.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { makeDatabase, makeStorage } from "../../test-helpers/fake-adapters.ts";
-import { createCaptureHandler } from "./capture-handler.ts";
+import { captureDispatchDeps, createCaptureHandler } from "./capture-handler.ts";
 import { rig, stubLogger } from "./test-fixtures.ts";
 
 function runner(): CaptureRunner {
@@ -41,6 +41,15 @@ describe("createCaptureHandler", () => {
     expect(vi.mocked(options.runner.cancel).mock.calls[0]?.[0]).toBe("b1");
     expect(vi.mocked(options.runner.cancel).mock.calls[0]?.[1]).toBeUndefined();
     expect(options.runner.cancel).toHaveBeenNthCalledWith(2, "b1", "s1");
+  });
+
+  it("hands the shard-repeated hook to the dispatch it runs, and nothing when there is none", () => {
+    const options = handlerOptions();
+    const onShardRepeated = vi.fn();
+    expect(captureDispatchDeps({ ...options, onShardRepeated }, 2).onShardRepeated).toBe(
+      onShardRepeated,
+    );
+    expect(captureDispatchDeps(options, 2)).not.toHaveProperty("onShardRepeated");
   });
 
   it("runs the core dispatch: a job for an unknown build fails with the dispatch's error", async () => {

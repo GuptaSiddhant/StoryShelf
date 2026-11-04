@@ -13,6 +13,7 @@ import type { BuildStatePublisher } from "../build-state/types.ts";
 import { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "../dispatch.ts";
 import type { CaptureJobOptions, ShardJob } from "../orchestrator.ts";
 import { extractionLimitsOf, resolvePublishLimits } from "../publish/limits.ts";
+import type { ConsumerMetrics } from "./metrics.ts";
 import { DEFAULT_MAX_RETRIES, retriesOf } from "./retry.ts";
 import type { ConsumerJob, KindHandler } from "./types.ts";
 
@@ -54,6 +55,8 @@ export interface CaptureHandlerOptions {
   shardSize?: number;
   /** Retries assumed for jobs that do not state `maxAttempts` (default 2). */
   maxRetries?: number;
+  /** Told when a shard re-captures work an earlier attempt had stored (the consumer's `metrics`). */
+  onShardRepeated?: ConsumerMetrics["shardRepeated"];
 }
 
 /** Whether a polled capture job carries the minimum shape to execute. */
@@ -146,6 +149,7 @@ export function captureDispatchDeps(
     buildState: options.buildState ?? inlineBuildState(options, publicOrigin),
     logger: options.logger,
     maxRetries,
+    ...(options.onShardRepeated === undefined ? {} : { onShardRepeated: options.onShardRepeated }),
   };
 }
 

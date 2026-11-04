@@ -15,6 +15,7 @@ import { storybookZipPath } from "../../utils/paths.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "../orchestrator.ts";
 import { parseTestResults } from "../tests.ts";
 import { executeCaptureShard, type ShardOutcome } from "./execute.ts";
+import type { ShardDelivery } from "./repeated-work.ts";
 
 function tables(db: DatabaseAdapter) {
   return {
@@ -207,8 +208,17 @@ async function world(options: {
   const shards = new CaptureShardModel(db);
   const status = async () => (await new BuildModel(db, tables(db)).get(build.id))?.status;
   const snapshots = async () => await db.list(db.tables.snapshots);
-  const runShard = async (job: ShardJob, final?: boolean): Promise<ShardOutcome> =>
-    await executeCaptureShard({ buildId: job.buildId, shard: job.shard, final }, jobOptions);
+  const runShard = async (
+    job: ShardJob,
+    final?: boolean,
+    delivery?: ShardDelivery,
+  ): Promise<ShardOutcome> =>
+    await executeCaptureShard(
+      { buildId: job.buildId, shard: job.shard, final, delivery },
+      jobOptions,
+    );
+  const repeatLogs = async () =>
+    (await db.list(db.tables.captureLogs)).filter((row) => row.message.startsWith("re-captured"));
   const plan = async () => await executeCaptureJob({ buildId: build.id }, jobOptions);
   /** Plan a second build of the same project, so the first build's timings are history. */
   const planNextBuild = async () => {
@@ -265,11 +275,36 @@ async function world(options: {
     status,
     snapshots,
     runShard,
+    repeatLogs,
     plan,
     planNextBuild,
     planFirefoxOnFeature,
     snapshotsOf,
   };
+}
+
+/** Plan a build with its attempt, run the first shard, then put it back to pending as an interrupted run would. */
+async function interruptedShard() {
+  const w = await world({ stories: 25, shardSize: 10 });
+  const attempt = await new CaptureAttemptModel(w.db, tables(w.db)).startAttempt(
+    w.project.id,
+    w.build.id,
+  );
+  await executeCaptureJob(
+    {
+      buildId: w.build.id,
+      attempt: { id: attempt.id, attemptNo: attempt.attemptNo, projectId: w.project.id },
+    },
+    w.jobOptions,
+  );
+  const [first] = w.queued;
+  await w.runShard(first as ShardJob);
+  const stored = (await w.snapshots()).length;
+  await w.db.update(w.db.tables.captureShards, first?.shard ?? "", {
+    status: "pending",
+    result: null,
+  });
+  return { w, first: first as ShardJob, stored };
 }
 
 describe("sharded capture", () => {
@@ -480,6 +515,62 @@ describe("sharded capture", () => {
 
     await expect(w.runShard(first as ShardJob)).resolves.toMatchObject({ status: "rendered" });
     expect((await w.snapshots()).filter((row) => row.storyId.endsWith("story-00"))).toHaveLength(1);
+  });
+
+  describe("repeated work on a rerun", () => {
+    it("says how much an earlier attempt had stored, in the attempt log, the log and the hook", async () => {
+      const { w, first, stored } = await interruptedShard();
+      const onRepeated = vi.fn();
+      await w.runShard(first, true, { attempt: 2, limit: 3, onRepeated });
+      expect(onRepeated).toHaveBeenCalledExactlyOnceWith({
+        repeated: stored,
+        attempt: 2,
+        limit: 3,
+      });
+      const lines = await w.repeatLogs();
+      expect(lines).toHaveLength(1);
+      expect(lines[0]?.level).toBe("warn");
+      expect(lines[0]?.message).toBe(
+        `re-captured ${stored} snapshots an earlier attempt of shard 1 had already stored (attempt 2 of 3)`,
+      );
+      // Visibility only: the rows are replaced, not resumed or doubled.
+      expect(await w.snapshots()).toHaveLength(stored);
+    });
+
+    it("says nothing for a clean first run", async () => {
+      const w = await world({ stories: 25, shardSize: 10 });
+      await w.plan();
+      const onRepeated = vi.fn();
+      await w.runShard(w.queued[0] as ShardJob, true, { attempt: 1, limit: 3, onRepeated });
+      expect(onRepeated).not.toHaveBeenCalled();
+      expect(await w.repeatLogs()).toEqual([]);
+    });
+
+    it("leaves out the delivery it was not told, and survives a hook that throws", async () => {
+      const { w, first, stored } = await interruptedShard();
+      const onRepeated = vi.fn(() => {
+        throw new Error("hook failed");
+      });
+      await expect(w.runShard(first, true, { onRepeated })).resolves.toMatchObject({
+        status: "rendered",
+      });
+      expect(onRepeated).toHaveBeenCalledExactlyOnceWith({ repeated: stored });
+      const [line] = await w.repeatLogs();
+      expect(line?.message).toBe(
+        `re-captured ${stored} snapshots an earlier attempt of shard 1 had already stored`,
+      );
+    });
+
+    it("counts a rerun after a failed render as nothing repeated when nothing was stored", async () => {
+      const w = await world({ stories: 25, shardSize: 10 });
+      await w.plan();
+      w.behaviour.throwTimes = Number.POSITIVE_INFINITY;
+      await expect(w.runShard(w.queued[0] as ShardJob, false)).rejects.toThrow("browser crashed");
+      w.behaviour.throwTimes = 0;
+      const onRepeated = vi.fn();
+      await w.runShard(w.queued[0] as ShardJob, true, { attempt: 2, limit: 3, onRepeated });
+      expect(onRepeated).not.toHaveBeenCalled();
+    });
   });
 
   it("skips a shard that already finished, vanished, or whose build is no longer capturing", async () => {
