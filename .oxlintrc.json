@@ -174,7 +174,6 @@
         "packages/core/src/capture/orchestrator.ts",
         "packages/core/src/capture/pipeline.ts",
         "packages/core/src/models/baseline.ts",
-        "packages/core/src/models/build.ts",
         "packages/app/src/pages/build-detail.tsx",
         "packages/app/src/pages/compute-jobs.tsx",
         "packages/app/src/pages/label-detail.tsx",
@@ -197,7 +196,6 @@
         "packages/app/src/routers/snapshots.ts",
         "packages/app/src/routers/storybook.ts",
         "packages/app/src/routers/ui.ts",
-        "packages/app/src/shell/document.tsx",
         "packages/app/src/ui/styles.ts",
         "packages/app/src/capture-setup.ts"
       ],
