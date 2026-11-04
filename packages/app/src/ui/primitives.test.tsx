@@ -190,6 +190,18 @@ describe("Table, Thumbnail, Kbd", () => {
     expect(html).toContain("<td>x</td>");
   });
 
+  it("is focusable, and a landmark only when it is named", async () => {
+    const table = <table />;
+    const unnamed = await render(<Table>{table}</Table>);
+    const named = await render(<Table label="API tokens">{table}</Table>);
+    expect(unnamed).toContain('tabindex="0"');
+    expect(unnamed).not.toContain("role=");
+    expect(unnamed).not.toContain("aria-label");
+    expect(named).toContain('role="region"');
+    expect(named).toContain('aria-label="API tokens"');
+    expect(named).toContain('tabindex="0"');
+  });
+
   it("lazy-loads the image or falls back to a placeholder", async () => {
     const withSrc = await render(<Thumbnail src="/s.png" alt="Story" />);
     const without = await render(<Thumbnail alt="Story" placeholder="Nothing" />);
