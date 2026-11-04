@@ -83,8 +83,11 @@ function isolateLifecycle(
     lifecycle: {
       ...lifecycle,
       // Migrations run on the shared connection: never inside another caller's transaction.
-      setup: async (context) =>
-        await mutex.runStatement("setup", async () => await lifecycle.setup(context)),
+      setup: async (context) => {
+        await mutex.runStatement("setup", async () => {
+          await lifecycle.setup(context);
+        });
+      },
       health: async () => await mutex.runStatement("health", async () => await lifecycle.health()),
       teardown: async () => {
         await mutex.runStatement("teardown", async () => {
