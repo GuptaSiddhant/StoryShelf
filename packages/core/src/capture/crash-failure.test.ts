@@ -231,10 +231,11 @@ describe("failCrashedCapture", () => {
       const close = vi
         .spyOn(CaptureAttemptModel.prototype, "markFinished")
         .mockRejectedValueOnce(new Error("database went away"));
-      await expect(failCrashedCapture(w.deps, crashed, "exited 3 times")).rejects.toThrow(
-        "database went away",
-      );
-      close.mockRestore();
+      await expect(
+        failCrashedCapture(w.deps, crashed, "exited 3 times").finally(() => {
+          close.mockRestore();
+        }),
+      ).rejects.toThrow("database went away");
       expect(await w.status()).toBe("failed");
       expect(await openAttempts()).toHaveLength(1);
       const finalizedAt = (await w.builds.get(w.build.id))?.updatedAt;
@@ -337,8 +338,10 @@ describe("failCrashedCapture", () => {
           return await original.apply(this, args);
         });
 
-      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times");
-      close.mockRestore();
+      // `finally` restores the spy even when the call rejects, so it cannot leak into later tests.
+      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times").finally(() => {
+        close.mockRestore();
+      });
 
       expect(outcome).toBe("skipped");
       const [kept] = await attempts.listByBuild(w.build.id);
@@ -373,8 +376,9 @@ describe("failCrashedCapture", () => {
         return row;
       });
 
-      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times");
-      get.mockRestore();
+      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times").finally(() => {
+        get.mockRestore();
+      });
 
       expect(outcome).toBe("finalized");
       const rows = await attempts.listByBuild(w.build.id);
