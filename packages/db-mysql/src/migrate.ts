@@ -8,6 +8,7 @@
  */
 import { DDL } from "./ddl.ts";
 import { FOREIGN_KEYS, type ForeignKeyMigration } from "./foreign-keys.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 
 /** Minimal row-query surface a migration runner needs. */
 export type MigrationRunner = (sql: string) => Promise<unknown[]>;
@@ -145,6 +146,7 @@ const IDENTITY_INDEXES = [
 
 /** Run the full migration set through any row-query runner. */
 export async function runMigrations(run: MigrationRunner): Promise<void> {
+  await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);
   await run(BUILD_CAPTURE_JOB_BACKFILL);

@@ -6,6 +6,7 @@
  * migration path instead of drifting per preset.
  */
 import { DDL } from "./ddl.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 
 /** Minimal row-query surface a migration runner needs. */
 export type MigrationRunner = (sql: string) => Promise<unknown[]>;
@@ -231,6 +232,7 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
 
 /** Run the full migration set through any row-query runner. */
 export async function runMigrations(run: MigrationRunner): Promise<void> {
+  await assertReviewSchema(run);
   await run(DDL);
   await migrateCoreColumns(run);
   await migrateUserAuthColumns(run);
