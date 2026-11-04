@@ -198,7 +198,6 @@
         "packages/app/src/routers/snapshots.ts",
         "packages/app/src/routers/storybook.ts",
         "packages/app/src/routers/ui.ts",
-        "packages/app/src/shell/document.tsx",
         "packages/app/src/ui/styles.ts",
         "packages/app/src/capture-setup.ts"
       ],
