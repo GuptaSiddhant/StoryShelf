@@ -8,7 +8,7 @@ describe("selectFiles", () => {
     "packages/app/scripts/embed-htmx.ts",
     "packages/app/src/ui/button.tsx",
     "package.json",
-    "docs/adr/0013-ui-review.md",
+    "docs/architecture.md",
     "fixtures/storybook-9/src/Button.tsx",
     "fixtures/storybook-9/package.json",
     "apps/website/src/styles.css",
