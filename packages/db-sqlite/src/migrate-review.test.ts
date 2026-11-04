@@ -92,9 +92,11 @@ describe.each(["pre-review.sql", "pre-449.sql"])("upgrading the %s database", (f
     expect(first.column("builds", "review_requested_cycle")).toMatchObject({ notnull: 0 });
     // The reviewer may be unknown (auth off, an admin token): user_id stays nullable and keeps its keys.
     expect(first.column("build_reviews", "user_id")).toMatchObject({ notnull: 0 });
-    expect(first.foreignKeys.map((key) => `${key["from"]}->${key["table"]}.${key["to"]}`)).toEqual(
-      expect.arrayContaining(["build_id->builds.id", "user_id->users.id"]),
-    );
+    expect(
+      first.foreignKeys.map(
+        (key) => `${String(key["from"])}->${String(key["table"])}.${String(key["to"])}`,
+      ),
+    ).toEqual(expect.arrayContaining(["build_id->builds.id", "user_id->users.id"]));
     expect(first.indexes).toContain("build_reviews_build_id_idx");
 
     await openOnce(path);

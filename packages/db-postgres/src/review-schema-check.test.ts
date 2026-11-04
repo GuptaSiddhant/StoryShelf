@@ -1,0 +1,47 @@
+import { describe, expect, it } from "vitest";
+import { assertReviewSchema } from "./review-schema-check.ts";
+
+type Row = { table_name: string; column_name: string; data_type: string };
+
+const runnerOf = (rows: Row[]) => async (): Promise<unknown[]> => await Promise.resolve(rows);
+
+const reviews = ["id", "build_id", "verdict", "created_at"].map((column_name) => ({
+  table_name: "build_reviews",
+  column_name,
+  data_type: "text",
+}));
+const settings: Row[] = [
+  { table_name: "projects", column_name: "review_enabled", data_type: "boolean" },
+  { table_name: "projects", column_name: "review_approvals", data_type: "integer" },
+  { table_name: "builds", column_name: "review_cycle", data_type: "integer" },
+  { table_name: "builds", column_name: "review_requested_cycle", data_type: "integer" },
+];
+
+describe("assertReviewSchema", () => {
+  it("passes on a database with no review table or columns", async () => {
+    await expect(assertReviewSchema(runnerOf([]))).resolves.toBeUndefined();
+  });
+
+  it("passes when only some columns exist, with the right types", async () => {
+    await expect(assertReviewSchema(runnerOf(settings.slice(0, 2)))).resolves.toBeUndefined();
+  });
+
+  it("passes on a complete, matching schema", async () => {
+    await expect(assertReviewSchema(runnerOf([...reviews, ...settings]))).resolves.toBeUndefined();
+  });
+
+  it("names the table and the missing column of a build_reviews table without a required one", async () => {
+    const partial = reviews.filter((row) => row.column_name !== "build_id");
+    await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
+      "table build_reviews has no column build_id",
+    );
+  });
+
+  it("names the table, column and types of a review column of another type", async () => {
+    const wrong = settings.filter((row) => row.column_name !== "review_approvals");
+    wrong.push({ table_name: "projects", column_name: "review_approvals", data_type: "text" });
+    await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
+      "column projects.review_approvals has type text, expected integer",
+    );
+  });
+});

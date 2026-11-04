@@ -42,8 +42,12 @@ describe.skipIf(!LIVE)("review schema upgrade (real MySQL, gated)", () => {
 
   async function upgrade(): Promise<void> {
     const db = createMysqlDatabase({ url: scratchUrl });
-    await db.lifecycle?.setup({ config: {}, logger: silent });
-    await db.lifecycle?.teardown();
+    try {
+      await db.lifecycle?.setup({ config: {}, logger: silent });
+    } finally {
+      // The owned pool is released even when the upgrade is refused.
+      await db.lifecycle?.teardown();
+    }
   }
 
   async function rows(sql: string): Promise<Record<string, unknown>[]> {
