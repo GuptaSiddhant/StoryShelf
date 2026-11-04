@@ -8,10 +8,10 @@ import {
   triageEnvelopeSchema,
   type BuiltEvidence,
 } from "@storyshelf/core/insights";
-import { InsightModel, type InsightStartInput } from "@storyshelf/core/models";
+import { AiUsageModel, InsightModel, type InsightStartInput } from "@storyshelf/core/models";
 import type { Build, InsightRow, Project } from "@storyshelf/core/schema";
 import { createHash } from "node:crypto";
-import { assertWithinBudget } from "./budget.ts";
+import { reserveBudget } from "./budget.ts";
 import type { InsightDeps } from "./deps.ts";
 import { spawnJob } from "./job.ts";
 import { loadHealthEvidence, parseWindow } from "./load-health.ts";
@@ -44,15 +44,70 @@ function digest(data: Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
-/** Budget applies only when a new run would start (cache hits and in-flight rows are free). */
+/**
+ * Budget applies only when a new run would start (cache hits and in-flight rows are free): one
+ * call is reserved for it, whose id is returned (null when nothing was reserved).
+ */
 async function guardBudget(
   deps: InsightDeps,
   input: InsightStartInput,
   existing: InsightRow | null,
-): Promise<void> {
+): Promise<string | null> {
   const inFlight = existing?.status === "pending" || existing?.status === "running";
-  if (!inFlight) {
-    await assertWithinBudget(deps, input.projectId);
+  if (inFlight) {
+    return null;
+  }
+  return await reserveBudget(deps, {
+    projectId: input.projectId,
+    profile: input.profile,
+    task: input.kind,
+    model: input.model,
+  });
+}
+
+/** Tie a reservation to the insight that will use it, or give it back when nothing will run. */
+async function settleReservation(
+  usage: AiUsageModel,
+  reservation: string,
+  started: { row: InsightRow; run: boolean },
+): Promise<void> {
+  await (started.run ? usage.attach(reservation, started.row.id) : usage.release(reservation));
+}
+
+/** Undo a failed start: give the reservation back and do not leave a runnable insight pending. */
+async function undoStart(
+  deps: InsightDeps,
+  reservation: string | null,
+  started: { row: InsightRow; run: boolean } | null,
+): Promise<void> {
+  if (reservation !== null) {
+    await new AiUsageModel(deps.db).release(reservation).catch(() => null);
+  }
+  if (started?.run === true) {
+    // Nothing will run it: later requests would otherwise wait on it.
+    await new InsightModel(deps.db).markFailed(started.row.id, "interrupted").catch(() => null);
+  }
+}
+
+/** Start the insight the reservation is for; the reservation follows the insight or is given back. */
+async function startReserved(
+  deps: InsightDeps,
+  input: InsightStartInput,
+  reservation: string | null,
+): Promise<{ row: InsightRow; run: boolean }> {
+  let held = reservation;
+  let started: { row: InsightRow; run: boolean } | null = null;
+  try {
+    started = await new InsightModel(deps.db).start(input);
+    // An in-flight row seen earlier may have ended before `start`: that run still needs admission.
+    held ??= started.run ? await guardBudget(deps, input, null) : null;
+    if (held !== null) {
+      await settleReservation(new AiUsageModel(deps.db), held, started);
+    }
+    return started;
+  } catch (error) {
+    await undoStart(deps, held, started);
+    throw error;
   }
 }
 
@@ -66,8 +121,8 @@ async function launch(
   if (existing?.status === "done" && existing.inputHash === input.inputHash && !input.force) {
     return { row: existing, status: 200 };
   }
-  await guardBudget(deps, input, existing);
-  const { row, run } = await model.start(input);
+  const reservation = await guardBudget(deps, input, existing);
+  const { row, run } = await startReserved(deps, input, reservation);
   if (run) {
     begin(row);
   }

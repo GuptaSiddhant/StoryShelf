@@ -49,3 +49,35 @@ export const Both = jsxStory(() => (
     <Table dense>{body}</Table>
   </VStack>
 ));
+
+const wide = (
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Story file</th>
+        <th>Last capture</th>
+        <th>Reviewer</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows.map((row) => (
+        <tr key={row.name}>
+          <td class="nowrap">{row.name}</td>
+          <td class="mono nowrap">{row.file}</td>
+          <td class="nowrap">2026-11-04 09:30 UTC, 3 browsers</td>
+          <td class="nowrap">reviewer@example.com</td>
+          <td>
+            <Badge tone={row.tone} icon>
+              {row.status}
+            </Badge>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
+/** Wider than a 375px phone: the surface scrolls sideways and takes focus, so a keyboard can scroll it. */
+export const Overflowing = jsxStory(() => <Table label="Recent captures">{wide}</Table>);
