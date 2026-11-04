@@ -123,7 +123,10 @@ function splitCandidates(
       render.push(story);
     }
   }
-  return { render, inherited };
+  // A rendered story is rendered at every viewport, so none of its viewports is also inherited:
+  // that would write the same snapshot twice.
+  const rendered = new Set(render.map((entry) => entry.id));
+  return { render, inherited: inherited.filter((entry) => !rendered.has(entry.story.id)) };
 }
 
 /**

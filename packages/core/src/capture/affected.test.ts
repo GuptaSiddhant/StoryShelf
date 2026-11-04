@@ -5,6 +5,7 @@ import type { StoryEntry } from "./adapter.ts";
 import { partitionAffectedStories } from "./affected.ts";
 
 const VIEWPORT = { name: "desktop", width: 1280, height: 720 };
+const MOBILE = { name: "mobile", width: 390, height: 844 };
 
 function story(id: string, importPath?: string): StoryEntry {
   return { id, title: "Title", name: id, ...(importPath ? { importPath } : {}), type: "story" };
@@ -121,6 +122,28 @@ describe("baselines promoted after the comparison build (#764)", () => {
     await seedBaseline(db, "a", { branch: "main", sourceBuildId: builds.b });
     const partition = await partitionAffectedStories(input(db, stories, [], "sha-a"));
     expect(partition.render.map((entry) => entry.id)).toEqual(["a"]);
+  });
+
+  it("renders a story at every viewport when only one viewport's baseline was promoted", async () => {
+    const { db } = makeDatabase();
+    const builds = await seedBranch(db);
+    await seedBaseline(db, "a", { branch: "feature", sourceBuildId: builds.a });
+    await db.insert(db.tables.baselines, {
+      id: "bl-a-mobile",
+      projectId: "p1",
+      storyId: "a",
+      viewportName: "mobile",
+      branch: "feature",
+      snapshotId: null,
+      sourceBuildId: builds.b,
+      screenshotPath: "/baselines/a-mobile.png",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const both = { ...input(db, stories, [], "sha-a"), viewports: [VIEWPORT, MOBILE] };
+    const partition = await partitionAffectedStories(both);
+    expect(partition.render.map((entry) => entry.id)).toEqual(["a"]);
+    expect(partition.inherited).toEqual([]);
   });
 
   it("still inherits a baseline from the comparison build or an older one", async () => {
