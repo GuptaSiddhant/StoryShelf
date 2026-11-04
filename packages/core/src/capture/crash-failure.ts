@@ -122,7 +122,11 @@ async function failShard(
     return "skipped";
   }
   if (loaded.build.status !== "capturing") {
-    return await closeEndedAttempt(deps, shards, { buildId, shardId }, error);
+    // A shard that failed finalizes the build as `failed`; any other end (a cancel, a later
+    // decision) is not this hook's to record on the attempt.
+    return loaded.build.status === "failed"
+      ? await closeEndedAttempt(deps, shards, { buildId, shardId }, error)
+      : "skipped";
   }
   return await reduceAfterFailure(deps, loaded, error);
 }

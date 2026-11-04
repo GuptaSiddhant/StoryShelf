@@ -273,7 +273,7 @@ describe("failCrashedCapture", () => {
 
     it("leaves a newer run's attempt alone when the hook arrives after a retry", async () => {
       const { w, crashed, attempts } = await lastShardCrashed();
-      await w.builds.setStatus(w.build.id, "approved");
+      await w.builds.setStatus(w.build.id, "failed");
       // A retry replaced the plan: its rows were cleared and a new plan, with its own attempt, written.
       const shards = new CaptureShardModel(w.db);
       const newer = await attempts.startAttempt(w.project.id, w.build.id);
@@ -289,9 +289,23 @@ describe("failCrashedCapture", () => {
       const rows = await attempts.listByBuild(w.build.id);
       expect(rows.find((row) => row.id === newer.id)?.status).toBe("queued");
     });
+    it("leaves the attempt alone when the build ended some other way than failed", async () => {
+      for (const status of ["approved", "cancelled"] as const) {
+        // oxlint-disable-next-line no-await-in-loop -- one world per status
+        const { w, crashed, openAttempts } = await lastShardCrashed();
+        // oxlint-disable-next-line no-await-in-loop -- as above
+        await w.builds.setStatus(w.build.id, status);
+
+        // oxlint-disable-next-line no-await-in-loop -- as above
+        expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+        // oxlint-disable-next-line no-await-in-loop -- as above
+        expect(await openAttempts()).toHaveLength(1);
+      }
+    });
+
     it("leaves the attempt to the worker that finalized the build when the crashed shard is done", async () => {
       const { w, crashed, openAttempts } = await lastShardCrashed();
-      await w.builds.setStatus(w.build.id, "approved");
+      await w.builds.setStatus(w.build.id, "failed");
       // A duplicate delivery crashed on a shard another run already finished.
       await new CaptureShardModel(w.db).complete(crashed.shard ?? "", "{}");
 
