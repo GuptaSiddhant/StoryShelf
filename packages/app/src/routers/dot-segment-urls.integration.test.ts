@@ -80,6 +80,22 @@ describe("component links with a dot segment", () => {
     },
   );
 
+  it("keeps the file in every tab link of a page opened through the query form", async () => {
+    const app = await seed("../ui/Button.stories.tsx");
+    const html = await (await open(app, urls.component("app", "../ui/Button.stories.tsx"))).text();
+    const encoded = encodeURIComponent("../ui/Button.stories.tsx");
+    const tabLinks = [...html.matchAll(/href="(\?tab=[^"]*)"/gu)].map((match) => match[1] ?? "");
+    expect(tabLinks.length).toBeGreaterThan(1);
+    for (const link of tabLinks) {
+      expect(link).toContain(`&amp;path=${encoded}`);
+    }
+    const history = await open(
+      app,
+      `/projects/app/components/${tabLinks[1] ?? ""}`.replace("&amp;", "&"),
+    );
+    expect(history.status).toBe(200);
+  });
+
   it("keeps the query form together with a tab", async () => {
     const app = await seed("../ui/Button.stories.tsx");
     const link = urls.component("app", "../ui/Button.stories.tsx", { tab: "history" });
