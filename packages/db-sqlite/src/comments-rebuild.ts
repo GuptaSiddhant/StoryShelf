@@ -23,6 +23,8 @@ export function commentsRebuildStatements(): string[] {
   }
   const list = columns.join(", ");
   return [
+    // A run that died part-way (before the rebuild was transactional) may have left the copy behind.
+    "DROP TABLE IF EXISTS comments_new",
     `CREATE TABLE comments_new (${body}\n)`,
     `INSERT INTO comments_new (${list}) SELECT ${list} FROM comments`,
     "DROP TABLE comments",

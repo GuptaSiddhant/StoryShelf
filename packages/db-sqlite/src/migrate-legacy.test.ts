@@ -140,6 +140,25 @@ describe.each([nodeSqlite, betterSqlite3])("upgrading an old volume on $name", (
     );
   });
 
+  it("rebuilds past a comments_new an earlier failed run left behind", async () => {
+    const path = await volume();
+    driver.raw(
+      path,
+      `INSERT INTO users (id, name, email, created_at) VALUES ('u', 'U', 'u@x', '${NOW}');
+       INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', '${NOW}', '${NOW}');
+       INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES ('b', 'p', 's', 'main', 'pending', '${NOW}', '${NOW}');
+       ${LEGACY_COMMENTS}
+       CREATE TABLE comments_new (id TEXT PRIMARY KEY);`,
+    );
+
+    const db = driver.open(path);
+    await boot(db);
+    await db.lifecycle?.teardown();
+
+    expect(driver.ids(path, "comments")).toEqual(["c1"]);
+    expect(driver.columns(path, "comments_new")).toEqual([]);
+  });
+
   it("boots a second time without touching the rebuilt table", async () => {
     const path = await volume();
     driver.raw(path, LEGACY_COMMENTS.replace(/INSERT[\s\S]*$/u, ""));
@@ -277,13 +296,22 @@ describe("a statement that fails stops the boot (better-sqlite3)", () => {
 });
 
 /** Make `DatabaseSync.exec` fail the statements `matches` picks, for every connection in the process. */
-function failNodeSqlite(matches: (sql: string) => boolean, error: Error): void {
+function failNodeSqlite(
+  matches: (sql: string) => boolean,
+  error: Error,
+  beforeThrow?: (exec: (database: DatabaseSync, sql: string) => void) => void,
+): void {
   const original = DatabaseSync.prototype.exec;
   vi.spyOn(DatabaseSync.prototype, "exec").mockImplementation(function (
     this: DatabaseSync,
     sql: string,
   ) {
-    if (matches(sql)) throw error;
+    if (matches(sql)) {
+      beforeThrow?.((database, statement) => {
+        original.call(database, statement);
+      });
+      throw error;
+    }
     return original.call(this, sql);
   });
 }
@@ -310,8 +338,30 @@ describe("a statement that fails stops the boot (node:sqlite)", () => {
     await expect(boot(createSqliteDatabase(path))).rejects.toThrow("database is locked");
     vi.restoreAllMocks();
 
-    failNodeSqlite(adding, new Error("duplicate column name: duration_ms"));
+    // Another boot adds the column on its own connection just before ours fails with "duplicate".
+    failNodeSqlite(adding, new Error("duplicate column name: duration_ms"), (exec) => {
+      const other = new DatabaseSync(path);
+      try {
+        exec(other, "ALTER TABLE snapshots ADD COLUMN duration_ms INTEGER");
+      } finally {
+        other.close();
+      }
+    });
     await expect(boot(createSqliteDatabase(path))).resolves.toBeUndefined();
+    expect(nodeSqlite.columns(path, "snapshots").map(([name]) => name)).toContain("duration_ms");
+  });
+
+  it("stops the boot when existing rows repeat a single-flight key", async () => {
+    const path = await migratedNodeSqlite();
+    nodeSqlite.raw(path, "DROP INDEX capture_jobs_active_key_idx");
+    nodeSqlite.raw(
+      path,
+      `INSERT INTO capture_jobs (id, entry, job_id, kind, status, active_key, created_at, updated_at)
+       VALUES ('j1', 'job', 'j1', 'capture', 'queued', 'capture:b1', 't', 't'),
+              ('j2', 'job', 'j2', 'capture', 'queued', 'capture:b1', 't', 't')`,
+    );
+
+    await expect(boot(createSqliteDatabase(path))).rejects.toThrow(/UNIQUE constraint failed/u);
   });
 
   it("fails on the webhook column drop unless the column is already gone", async () => {

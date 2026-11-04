@@ -41,6 +41,12 @@ describe("which errors a migration statement may skip", () => {
 
     expect(toleratedFor("CREATE UNIQUE INDEX IF NOT EXISTS i ON t (c)")(violation)).toBe(true);
     expect(toleratedFor("CREATE INDEX IF NOT EXISTS i ON t (c)")(violation)).toBe(false);
+    // The single-flight index is never skipped.
+    expect(
+      toleratedFor(
+        "CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx ON capture_jobs (active_key)",
+      )(violation),
+    ).toBe(false);
     expect(toleratedFor("DROP INDEX IF EXISTS i")(violation)).toBe(false);
   });
 });

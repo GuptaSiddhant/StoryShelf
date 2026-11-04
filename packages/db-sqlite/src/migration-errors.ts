@@ -32,9 +32,16 @@ export const isUniqueViolation: ErrorTest = (error) => {
   );
 };
 
-/** For an identity statement: only the creation of a unique index may be skipped, and only for duplicates. */
+/**
+ * For an identity statement: only the creation of a unique index may be skipped, and only for
+ * duplicates. The single-flight index is never skipped: without it the database no longer holds one
+ * active job per key, so duplicate keys must stop the boot (as they do on Postgres).
+ */
 export function toleratedFor(statement: string): ErrorTest {
-  return statement.startsWith("CREATE UNIQUE INDEX") ? isUniqueViolation : () => false;
+  const skippable =
+    statement.startsWith("CREATE UNIQUE INDEX") &&
+    !statement.includes("capture_jobs_active_key_idx");
+  return skippable ? isUniqueViolation : () => false;
 }
 
 /** Run a statement, skipping only the error `tolerated` names; any other failure propagates. */
