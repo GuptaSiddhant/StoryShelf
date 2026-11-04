@@ -38,5 +38,6 @@ describe("parseTableInfo", () => {
       ["y", ""],
     ]);
     expect(parseTableInfo([null, "text", 3, {}]).size).toBe(0);
+    expect([...parseTableInfo([{ name: "z", type: 7 }])]).toEqual([["z", ""]]);
   });
 });
