@@ -707,15 +707,22 @@ describe("executeCaptureJob", () => {
       });
       render.mockResolvedValueOnce(passResult());
       render.mockRejectedValueOnce(new TargetLaunchError("firefox", "executable does not exist"));
-      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(
-        /Cannot launch firefox: executable does not exist/u,
-      );
+      const job = executeCaptureJob({ buildId }, options);
+      await expect(job).rejects.toBeInstanceOf(TargetLaunchError);
+      await expect(job).rejects.toThrow(/Cannot launch firefox: executable does not exist/u);
       // Each engine was tried once, in order: nothing was isolated or retried as a crashing story.
       expect(render.mock.calls.map((call) => (call[0] as { target: string }).target)).toEqual([
         "chromium",
         "firefox",
       ]);
       expect((await new BuildModel(db, tables(db)).get(buildId))?.status).toBe("failed");
+      // No crash isolation was logged: nothing was blamed, narrowed down or retried.
+      const logged = (await db.list(db.tables.captureLogs)).map((row) => String(row["message"]));
+      expect(
+        logged.filter((message) =>
+          /isolating|crashed the browser|crash interrupted/u.test(message),
+        ),
+      ).toEqual([]);
       // The launch failure is the build's error: no story is recorded as failed, and the engine that
       // rendered first has nothing stored either (no partial result).
       expect(await db.list(db.tables.snapshots)).toEqual([]);

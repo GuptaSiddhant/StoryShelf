@@ -308,6 +308,49 @@ function checkProviders(checks: ProviderCheck[]): AdapterSetupFailure[] {
   return failures;
 }
 
+/**
+ * Failures for two wired notifiers that declare one `metadata.kind`. A kind names a provider in
+ * stored channels, so a second provider with it would answer for the first one's channels. Each
+ * later provider fails once, naming the provider that already holds the kind; invalid entries are
+ * left to {@link checkProviders}.
+ */
+function checkNotifierKinds(notifiers: readonly unknown[] | undefined): AdapterSetupFailure[] {
+  const owners = new Map<string, string>();
+  const failures: AdapterSetupFailure[] = [];
+  for (const [index, provider] of (notifiers ?? []).entries()) {
+    const failure = claimNotifierKind(owners, provider, index);
+    if (failure !== null) {
+      failures.push(failure);
+    }
+  }
+  return failures;
+}
+
+/** Record the provider's kind in `owners`, or return the failure when an earlier one holds it. */
+function claimNotifierKind(
+  owners: Map<string, string>,
+  provider: unknown,
+  index: number,
+): AdapterSetupFailure | null {
+  const metadata = asRecord(asRecord(provider)?.["metadata"]);
+  const kind = stringField(metadata, "kind");
+  if (kind === null) {
+    return null;
+  }
+  const name = stringField(metadata, "name") ?? `notifiers[${String(index)}]`;
+  const owner = owners.get(kind);
+  if (owner === undefined) {
+    owners.set(kind, name);
+    return null;
+  }
+  return {
+    category: "notifier",
+    kind,
+    name,
+    error: `notifiers[${String(index)}] ("${name}"): kind "${kind}" is already used by "${owner}"; a notifier kind must be unique`,
+  };
+}
+
 /** Failure for the email sender slot. */
 function checkEmailSender(sender: unknown): AdapterSetupFailure[] {
   if (sender === undefined) {
@@ -378,6 +421,7 @@ export function validateAdapterSources(sources: AdapterSetupSources): AdapterSet
   return [
     ...checkSlots(checks),
     ...checkProviders(providers),
+    ...checkNotifierKinds(sources.notifiers),
     ...checkEmailSender(sources.emailSender),
   ];
 }
