@@ -220,6 +220,12 @@ function summarize(results) {
 }
 
 const paths = pagesToAudit();
+if (paths.length === 0) {
+  console.error(
+    `No page to audit${FILTER ? ` matches --filter "${FILTER}"` : ""}: run \`nub run build\` first.`,
+  );
+  process.exit(1);
+}
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}`;
 const channel = process.env["A11Y_BROWSER_CHANNEL"];
