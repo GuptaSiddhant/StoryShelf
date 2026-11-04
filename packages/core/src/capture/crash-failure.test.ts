@@ -299,6 +299,8 @@ describe("failCrashedCapture", () => {
       const [closed] = await attempts.listByBuild(w.build.id);
       expect(closed).toMatchObject({ status: "cancelled", error: null, storyCount: 0 });
       expect(await w.status()).toBe("cancelled");
+      // Cancel is not a failure: nothing is reported to the git channel as one.
+      expect(w.git.calls.map((call) => call.state)).not.toContain("failure");
     });
 
     it("leaves the attempt alone when the build ended some other way", async () => {
