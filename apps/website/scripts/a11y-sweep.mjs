@@ -98,7 +98,7 @@ function serve() {
       res.writeHead(404).end("not found");
     }
   });
-  return new Promise((resolve) => server.listen(0, () => resolve(server)));
+  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
 }
 
 /** What to measure in the page: sideways scroll and the elements that cause it. */
