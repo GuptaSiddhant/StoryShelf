@@ -178,7 +178,7 @@ could leave them, and they would keep an unrelated build protected.
   evidence expire after 30 days by default and do not pin source builds.
 - Replay is an optional runner capability (Playwright first) with fixed evidence limits and
   redaction; the limits and allowlists are specified in the #343 resolution and belong in
-  `docs/architecture.md` once implemented.
+  `docs/architecture/` once implemented.
 
 ## Consequences
 

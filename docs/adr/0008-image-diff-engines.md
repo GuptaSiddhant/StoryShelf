@@ -81,7 +81,7 @@ dependencies, so one `docker run` keeps working.
    threshold); `maxDiffRatio` is the allowed ratio of differing pixels. The names match their
    meaning. Both are per-project settings (`pixel_threshold`, `max_diff_ratio` on `projects`) and
    the CLI can override them per run (`--max-diff-ratio`, `--pixel-threshold`). The `DiffOptions`
-   and `DiffResult` types live in `docs/architecture.md` (Pixel Diff Engine).
+   and `DiffResult` types live in `docs/architecture/diff.md` (Pixel Diff Engine).
 9. **Overlay.** The diff image shows unchanged pixels at 50% opacity (greyed) and changed pixels in
    red (`[255, 0, 0]`), a heat map of what changed. It is stored next to the build's other
    artefacts and served by the review UI.
