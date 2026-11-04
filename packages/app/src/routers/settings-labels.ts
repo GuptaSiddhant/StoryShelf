@@ -1,8 +1,10 @@
 import { LabelModel } from "@storyshelf/core/models";
+import { UserFacingError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
+import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Label-type settings (create custom types, delete removable ones). */
@@ -47,7 +49,7 @@ async function persistLabelType(
     flash(c, "Label type added");
     return hxRedirect(c, `/projects/${projectSlug}/settings/labels`);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create label";
+    const message = publicMessage(error, "Failed to create label");
     return c.html((await renderSettingsPage(c, "labels", { globalError: message })) ?? "", 400);
   }
 }
@@ -78,10 +80,10 @@ async function persistLabelUpdate(
   try {
     const updated = await new LabelModel(getStore().db).updateType(project.id, key, input);
     if (!updated) {
-      throw new Error("Label type not found");
+      throw new UserFacingError("Label type not found");
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update label";
+    const message = publicMessage(error, "Failed to update label");
     return c.html((await renderSettingsPage(c, "labels", { globalError: message })) ?? "", 400);
   }
   flash(c, "Label type saved");

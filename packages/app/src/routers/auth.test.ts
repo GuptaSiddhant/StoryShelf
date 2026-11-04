@@ -5,7 +5,7 @@ import { makeStorage } from "@storyshelf/core/test-helpers";
 import { ulid } from "@storyshelf/core/utils";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 
@@ -375,6 +375,48 @@ describe("engine auth routes", () => {
 
     const spent = await app.request(`/auth/invites/nope?token=${issued.token}`);
     expect(spent.status).toBe(400);
+  });
+
+  it("shows the password policy and an invalid invite, but never an internal failure's text", async () => {
+    const { db, shelf } = await testEngine();
+    const app = testApp(db, shelf);
+    const issued = await shelf.adapter.issueInvite({
+      email: "gus@example.com",
+      name: "Gus",
+      role: "member",
+    });
+    const accept = async (inviteId: string, token: string, password: string) => {
+      const body = new FormData();
+      body.set("token", token);
+      body.set("password", password);
+      body.set("confirm", password);
+      body.set("csrf_token", getCsrfToken(SECRET));
+      return await app.request(`/auth/invites/${inviteId}`, {
+        method: "POST",
+        headers: { origin: BASE_URL },
+        body,
+      });
+    };
+
+    const short = await accept(issued.inviteId, issued.token, "short");
+    expect(short.status).toBe(400);
+    const shortHtml = await short.text();
+    expect(shortHtml).toContain("Password must be at least 12 characters");
+
+    const wrongToken = await accept(issued.inviteId, "not-the-token", "correct-horse-12");
+    expect(wrongToken.status).toBe(400);
+    expect(await wrongToken.text()).toContain("Invalid or expired invite");
+
+    vi.spyOn(shelf.adapter, "acceptInvite").mockRejectedValue(
+      new Error("SQLITE_BUSY: database is locked (/var/data/shelf.db)"),
+    );
+    const failed = await accept(issued.inviteId, issued.token, "correct-horse-12");
+    const html = await failed.text();
+    vi.restoreAllMocks();
+    expect(failed.status).toBe(400);
+    expect(html).toContain("Invalid or expired invite");
+    expect(html).not.toContain("SQLITE_BUSY");
+    expect(html).not.toContain("shelf.db");
   });
 });
 

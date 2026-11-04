@@ -132,6 +132,28 @@ describe("public origin on the System page", () => {
     expect((await report(app, token, {})).status).toBe(400);
   });
 
+  it("tells the admin why a typed origin is refused, but never a storage failure's text", async () => {
+    const app = await seedApp({});
+    const token = await csrfFrom(app);
+
+    const refused = await form(
+      app,
+      "/admin/public-origin",
+      token,
+      "https://shelf.example.com/path",
+    );
+    expect(flashOf(refused)?.message).toContain("must be an http(s) origin");
+
+    vi.spyOn(SiteSettingsModel.prototype, "set").mockRejectedValue(
+      new Error("SQLITE_BUSY: database is locked (/var/data/shelf.db)"),
+    );
+    const failed = await form(app, "/admin/public-origin", token, ORIGIN);
+    const message = flashOf(failed)?.message ?? "";
+    expect(message).toBe("Invalid origin");
+    expect(message).not.toContain("SQLITE");
+    vi.restoreAllMocks();
+  });
+
   it("stops asking once the configuration or the platform answers", async () => {
     const app = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
     const html = await (await app.request("/admin")).text();

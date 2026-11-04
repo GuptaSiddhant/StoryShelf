@@ -6,7 +6,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { flash } from "./flash.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
+import { publicMessage, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { runSwitchOffPass } from "./review-switch-off.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -89,7 +89,7 @@ async function persistGeneralUpdate(
     flash(c, "Project settings saved");
     return hxRedirect(c, `/projects/${slug}/settings`);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update";
+    const message = publicMessage(error, "Failed to update");
     return c.html((await renderSettingsPage(c, "general", { globalError: message })) ?? "", 400);
   }
 }
@@ -161,7 +161,7 @@ async function persistTestsUpdate(
     flash(c, "Test settings saved");
     return hxRedirect(c, `/projects/${slug}/settings/tests`);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update";
+    const message = publicMessage(error, "Failed to update");
     return c.html((await renderSettingsPage(c, "tests", { globalError: message })) ?? "", 400);
   }
 }

@@ -4,7 +4,7 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
+import { publicMessage, resolveAuthorizedProject } from "./helpers.ts";
 import {
   labelTypeCreateSchema,
   labelTypeSchema,
@@ -114,7 +114,7 @@ export function registerLabels(app: ShelfRouter): void {
         throw error;
       }
       throw new HTTPException(400, {
-        message: error instanceof Error ? error.message : "Cannot update label type",
+        message: publicMessage(error, "Cannot update label type"),
       });
     }
   });

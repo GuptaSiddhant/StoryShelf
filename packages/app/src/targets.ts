@@ -50,10 +50,12 @@ export async function assertTargetsSelectable(
   if (targets.length > MAX_BROWSERS) {
     throw new HTTPException(400, { message: `Choose at most ${MAX_BROWSERS} browsers` });
   }
+  // Read outside the `try`: a failure here is not a refusal, and its text is not for the client.
+  const offered = await runnerTargets();
   try {
     assertSupportedBrowsers(
       (targets as CaptureTarget[]).filter((target) => !current.includes(target)),
-      await runnerTargets(),
+      offered,
     );
   } catch (error) {
     throw new HTTPException(400, { message: error instanceof Error ? error.message : "Refused" });

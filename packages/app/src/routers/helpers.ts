@@ -5,7 +5,7 @@ import { UserModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
-import { sha256, timingSafeEqualString } from "@storyshelf/core/utils";
+import { isUserFacingError, sha256, timingSafeEqualString } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -13,6 +13,28 @@ import { getStore } from "../store.ts";
 /** Send a JSON response with the given status code. */
 export function json(c: Context, data: unknown, status: ContentfulStatusCode = 200): Response {
   return c.json(data, status);
+}
+
+/**
+ * Whether the text of `error` was written for the person who sees it: a `UserFacingError`
+ * (a deliberate refusal) or an `HTTPException` (its message is the answer). Anything else is a
+ * driver, storage or library failure whose text is internal.
+ */
+function isClientSafe(error: unknown): error is Error {
+  return isUserFacingError(error) || error instanceof HTTPException;
+}
+
+/**
+ * The text a handler may answer with for a caught `error`: its own message when it is
+ * {@link isClientSafe}, otherwise `fallback`, with the original logged (never sent). Use this
+ * wherever a `catch` turns an error into response text; never read `error.message` for a response.
+ */
+export function publicMessage(error: unknown, fallback: string): string {
+  if (isClientSafe(error)) {
+    return error.message;
+  }
+  getStore().logger.error({ err: error }, "unexpected error answered with a generic message");
+  return fallback;
 }
 
 /** Throw a 401 Unauthorized error for unauthenticated requests. */
