@@ -2,16 +2,15 @@ import type { StateAnnotation } from "@storyshelf/core/adapter/notifier";
 import type { Logger } from "@storyshelf/core/logger";
 import { httpJson } from "@storyshelf/core/utils";
 import { githubHeaders, repoPath } from "./github-api.ts";
+import { planAnnotations } from "./github-check-annotations.ts";
 import {
   annotationBatches,
   checkRunBody,
   externalIdOf,
-  findingKey,
-  findingsHash,
-  markedHash,
   type CheckAnnotation,
   type CheckRunBody,
   type CheckRunInput,
+  withoutMarker,
 } from "./github-check-mapper.ts";
 
 /** Coordinates and installation token of one repository. */
@@ -22,24 +21,11 @@ export interface CheckRepo {
   logger?: Logger | undefined;
 }
 
-interface ExistingRun {
+export interface ExistingRun {
   id: number;
   external_id?: string | null;
   output?: { annotations_count?: number | null; summary?: string | null } | null;
 }
-
-/** One annotation as the list endpoint returns it. */
-interface ListedAnnotation {
-  path: string;
-  annotation_level: string;
-  title?: string | null;
-  message?: string | null;
-  raw_details?: string | null;
-}
-
-/** Annotations the list endpoint returns per page, and the pages read before giving up. */
-const LIST_PAGE = 100;
-const LIST_PAGES = 10;
 
 /**
  * Show a status as a check run of the commit `sha`, one run per name: find the run that carries
@@ -87,11 +73,17 @@ async function writeRun(
   },
 ): Promise<number> {
   const batches = annotationBatches(what.post);
-  const first = withBatch(what.body, batches[0]);
+  // The finding-set hash goes on with the write that completes the annotations: a post cut short
+  // leaves no hash, so the retry compares the annotations themselves.
+  const interim = batches.length > 1 ? withoutMarker(what.body) : what.body;
+  const first = withBatch(interim, batches[0]);
   const id = what.run
     ? await updateRun(repo, what.run.id, first)
     : await createRun(repo, { ...first, head_sha: what.input.sha });
-  await appendBatches(repo, id, { output: what.body.output, batches: batches.slice(1) });
+  await appendBatches(repo, id, {
+    output: { interim: interim.output, final: what.body.output },
+    batches: batches.slice(1),
+  });
   return id;
 }
 
@@ -101,67 +93,6 @@ type WithAnnotations = Omit<CheckRunBody, "output"> & {
 
 function withBatch(body: CheckRunBody, batch: CheckAnnotation[] | undefined): WithAnnotations {
   return batch === undefined ? body : { ...body, output: { ...body.output, annotations: batch } };
-}
-
-/** What to post: the findings the run lacks, and how many of its annotations are history. */
-interface AnnotationPlan {
-  post: readonly StateAnnotation[];
-  resolved: number;
-}
-
-/** Compare the findings with what `run` shows (nothing when there is no run). */
-async function planAnnotations(
-  repo: CheckRepo,
-  run: ExistingRun | undefined,
-  findings: readonly StateAnnotation[] | undefined,
-): Promise<AnnotationPlan> {
-  const current = findings ?? [];
-  const shown = run?.output?.annotations_count ?? 0;
-  if (run === undefined || shown === 0) {
-    return { post: current, resolved: 0 };
-  }
-  // The same set, and every annotation is there: nothing to post. (A post cut short after its
-  // summary was written has fewer annotations than findings, and falls through to the list.)
-  if (
-    findings !== undefined &&
-    markedHash(run.output?.summary) === findingsHash(findings) &&
-    shown >= findings.length
-  ) {
-    return { post: [], resolved: shown - findings.length };
-  }
-  const listed = await listAnnotations(repo, run.id, 1, []);
-  const keys = new Set(listed.map((annotation) => keyOfListed(annotation)));
-  const post = current.filter((finding) => !keys.has(findingKey(finding)));
-  return { post, resolved: Math.max(0, shown - (current.length - post.length)) };
-}
-
-function keyOfListed(annotation: ListedAnnotation): string {
-  return findingKey({
-    level: annotation.annotation_level,
-    path: annotation.path,
-    title: annotation.title ?? "",
-    message: annotation.message ?? "",
-    url: annotation.raw_details ?? "",
-  });
-}
-
-/** The annotations of a run, page by page (bounded: a run with more history reposts a finding). */
-async function listAnnotations(
-  repo: CheckRepo,
-  id: number,
-  page: number,
-  seen: ListedAnnotation[],
-): Promise<ListedAnnotation[]> {
-  const url = repoPath(
-    repo.owner,
-    repo.repo,
-    `/check-runs/${String(id)}/annotations?per_page=${String(LIST_PAGE)}&page=${String(page)}`,
-  );
-  const listed = await httpJson<ListedAnnotation[]>(url, { headers: githubHeaders(repo.token) });
-  const all = [...seen, ...listed];
-  return listed.length < LIST_PAGE || page >= LIST_PAGES
-    ? all
-    : await listAnnotations(repo, id, page + 1, all);
 }
 
 /** The runs of this commit that carry the status's `external_id`, oldest first. */
@@ -214,19 +145,28 @@ async function alignOthers(
 ): Promise<void> {
   const runs = state.known.length === 0 ? await findRuns(repo, input) : state.known;
   const others = runs.filter((run) => run.id !== state.written);
-  await Promise.all(others.map(async (run) => await updateRun(repo, run.id, state.body)));
+  // Without the hash: these runs show the state, not the findings, so they must not claim the set.
+  const mirror = withoutMarker(state.body);
+  await Promise.all(others.map(async (run) => await updateRun(repo, run.id, mirror)));
 }
 
-/** Append the remaining annotation batches to the run, one request after the other (in order). */
+/**
+ * Append the remaining annotation batches to the run, one request after the other (in order); the
+ * last carries the final output (with the finding-set hash), the others the interim one.
+ */
 async function appendBatches(
   repo: CheckRepo,
   id: number,
-  rest: { output: CheckRunBody["output"]; batches: CheckAnnotation[][] },
+  rest: {
+    output: { interim: CheckRunBody["output"]; final: CheckRunBody["output"] };
+    batches: CheckAnnotation[][];
+  },
 ): Promise<void> {
   const [next, ...later] = rest.batches;
   if (next === undefined) {
     return;
   }
-  await updateRun(repo, id, { output: { ...rest.output, annotations: next } });
+  const output = later.length === 0 ? rest.output.final : rest.output.interim;
+  await updateRun(repo, id, { output: { ...output, annotations: next } });
   await appendBatches(repo, id, { output: rest.output, batches: later });
 }

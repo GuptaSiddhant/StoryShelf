@@ -159,6 +159,16 @@ function findingsMarker(annotations: readonly StateAnnotation[]): string {
   return `<!-- storyshelf:findings=${findingsHash(annotations)} -->`;
 }
 
+/**
+ * The body without the finding-set hash. The hash tells the next post that the run shows the whole
+ * set, so it goes on only with the write that completes the annotations, and never on a run that
+ * only mirrors the state (a duplicate that carries no annotations).
+ */
+export function withoutMarker(body: CheckRunBody): CheckRunBody {
+  const summary = body.output.summary.replace(/\n\n<!-- storyshelf:findings=[0-9a-f]+ -->$/u, "");
+  return { ...body, output: { ...body.output, summary } };
+}
+
 /** The finding-set hash a run's summary ends with, if it has one. */
 export function markedHash(summary: string | null | undefined): string | undefined {
   return MARKER.exec(summary ?? "")?.groups?.["hash"];
