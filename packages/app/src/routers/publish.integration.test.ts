@@ -34,11 +34,23 @@ function storybookZip(): Buffer {
 }
 
 let scratchDir = "";
+/** Every booted app's teardown, run before the scratch dir goes so a failed assertion cannot leave a consumer running. */
+const teardowns: (() => Promise<void>)[] = [];
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-publish-flow-"));
 });
 afterEach(async () => {
-  await rm(scratchDir, { recursive: true, force: true });
+  try {
+    const outcomes = await Promise.allSettled(
+      teardowns.splice(0).map(async (teardown) => await teardown()),
+    );
+    const failed = outcomes.find((outcome) => outcome.status === "rejected");
+    if (failed?.status === "rejected") {
+      throw failed.reason;
+    }
+  } finally {
+    await rm(scratchDir, { recursive: true, force: true });
+  }
 });
 
 async function boot(config: Record<string, unknown> = {}) {
@@ -49,6 +61,10 @@ async function boot(config: Record<string, unknown> = {}) {
     storage,
     logger: silentLogger,
     config: { scratchDir, ...config },
+  });
+  // Registered before setup, so a setup that fails half-way is still torn down.
+  teardowns.push(async () => {
+    await app.lifecycle.teardown();
   });
   await app.lifecycle.setup();
   const response = await app.request("/api/v1/projects", {
@@ -150,6 +166,37 @@ describe("publishing without testing", () => {
     const build = await createBuild(app, project.slug, "main");
 
     await uploadZip(app, project.slug, build.id, storybookZip());
+
+    await vi.waitFor(
+      async () => {
+        expect(await statusOf(db, build.id)).toBe("failed");
+      },
+      { timeout: 10_000, interval: 25 },
+    );
+    await app.lifecycle.teardown();
+  });
+
+  it("fails a build whose queued zip is corrupt, so it never stays pending", async () => {
+    const { app, db, project } = await boot({ maxInlineUnzipSize: 0 });
+    const build = await createBuild(app, project.slug, "main");
+
+    expect(await uploadZip(app, project.slug, build.id, Buffer.from("not a zip"))).toBe(202);
+
+    await vi.waitFor(
+      async () => {
+        expect(await statusOf(db, build.id)).toBe("failed");
+      },
+      { timeout: 10_000, interval: 25 },
+    );
+    expect((await served(app, project.slug, build.id, "iframe.html")).status).not.toBe(200);
+    await app.lifecycle.teardown();
+  });
+
+  it("fails a queued zip over maxUnzippedBytes through the same lifecycle", async () => {
+    const { app, db, project } = await boot({ maxInlineUnzipSize: 0, maxUnzippedBytes: 8 });
+    const build = await createBuild(app, project.slug, "main");
+
+    expect(await uploadZip(app, project.slug, build.id, storybookZip())).toBe(202);
 
     await vi.waitFor(
       async () => {

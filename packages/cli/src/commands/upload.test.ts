@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { handleError } from "./default.ts";
 import { runUpload, resolveIdentity, type GitIdentityProbe } from "./upload.ts";
 
 let dir: string;
@@ -165,6 +166,37 @@ describe("runUpload success", () => {
       expect(urls.every((url) => !url.includes("//api"))).toBe(true);
     },
   );
+
+  it("prints an actionable message and exits non-zero when the server answers 422", async () => {
+    writeFixture(dir);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        await Promise.resolve();
+        if ((init?.method ?? "") === "PUT") {
+          await collectBody(init?.body);
+          return new Response(JSON.stringify({ message: "Invalid Storybook zip" }), {
+            status: 422,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return okJson({ build: { id: "b1" }, uploadUrl: "/api/v1/projects/demo/builds/b1/zip" });
+      }),
+    );
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const savedExitCode = process.exitCode;
+    try {
+      await runUpload({ ...baseOptions(), buildDir: "storybook-static" }).catch(handleError);
+      expect(process.exitCode).toBe(1);
+      const printed = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+      expect(printed).toContain("Invalid Storybook zip");
+      expect(printed).toMatch(/maxZipEntries[\s\S]*maxUnzippedBytes/u);
+      expect(printed).toContain("/api/v1/projects/demo/builds/b1/zip");
+    } finally {
+      stderr.mockRestore();
+      process.exitCode = savedExitCode;
+    }
+  });
 
   it("throws on invalid --label flags", async () => {
     writeFixture(dir);
