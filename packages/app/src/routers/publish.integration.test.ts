@@ -160,6 +160,37 @@ describe("publishing without testing", () => {
     await app.lifecycle.teardown();
   });
 
+  it("fails a build whose queued zip is corrupt, so it never stays pending", async () => {
+    const { app, db, project } = await boot({ maxInlineUnzipSize: 0 });
+    const build = await createBuild(app, project.slug, "main");
+
+    expect(await uploadZip(app, project.slug, build.id, Buffer.from("not a zip"))).toBe(202);
+
+    await vi.waitFor(
+      async () => {
+        expect(await statusOf(db, build.id)).toBe("failed");
+      },
+      { timeout: 10_000, interval: 25 },
+    );
+    expect((await served(app, project.slug, build.id, "iframe.html")).status).not.toBe(200);
+    await app.lifecycle.teardown();
+  });
+
+  it("fails a queued zip over maxUnzippedBytes through the same lifecycle", async () => {
+    const { app, db, project } = await boot({ maxInlineUnzipSize: 0, maxUnzippedBytes: 8 });
+    const build = await createBuild(app, project.slug, "main");
+
+    expect(await uploadZip(app, project.slug, build.id, storybookZip())).toBe(202);
+
+    await vi.waitFor(
+      async () => {
+        expect(await statusOf(db, build.id)).toBe("failed");
+      },
+      { timeout: 10_000, interval: 25 },
+    );
+    await app.lifecycle.teardown();
+  });
+
   it("refuses an over-limit zip with 413 on a serverless host, and the file-by-file route works", async () => {
     vi.stubEnv("NETLIFY", "true");
     const { app, db, project } = await boot({ maxInlineUnzipSize: 10 });
