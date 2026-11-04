@@ -47,116 +47,124 @@ const storage = createLocalStorage(join(dir, "data"));
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const now = new Date().toISOString();
 
-await db.insert(db.tables.projects, {
-  id: "p1",
-  name: "Bench",
-  slug: "bench",
-  gitRepository: null,
-  gitDefaultBranch: "main",
-  pixelThreshold: 0.1,
-  maxDiffRatio: 0.01,
-  publicBranchRegex: null,
-  executePlay: false,
-  playTimeoutMs: 10_000,
-  storybookMeta: null,
-  createdAt: now,
-  updatedAt: now,
-});
-
-const shared = Array.from({ length: Math.floor(ENTRIES * SHARED) }, (_, i) => hash(`shared-${i}`));
-let started = performance.now();
-for (let b = 0; b < BUILDS; b += 1) {
-  const id = `B${String(b).padStart(25, "0")}`;
-  const manifest = {};
-  shared.forEach((h, i) => (manifest[`assets/f${i}.js`] = h));
-  for (let i = shared.length; i < ENTRIES; i += 1) {
-    manifest[`assets/u${b}-${i}.js`] = hash(`u-${b}-${i}`);
-  }
-  await db.insert(db.tables.builds, {
-    id,
-    projectId: "p1",
-    gitSha: "s",
-    gitBranch: "main",
-    isDefault: true,
-    authorEmail: null,
-    authorName: null,
-    message: null,
-    public: false,
-    status: "approved",
-    snapshotCount: 0,
-    changedCount: 0,
-    approvedCount: 0,
-    rejectedCount: 0,
-    inheritedCount: 0,
-    affectedOnly: true,
-    baselineSha: null,
-    changedFiles: null,
-    affectedImportPaths: null,
+let sampler;
+try {
+  await db.insert(db.tables.projects, {
+    id: "p1",
+    name: "Bench",
+    slug: "bench",
+    gitRepository: null,
+    gitDefaultBranch: "main",
+    pixelThreshold: 0.1,
+    maxDiffRatio: 0.01,
+    publicBranchRegex: null,
+    executePlay: false,
+    playTimeoutMs: 10_000,
+    storybookMeta: null,
     createdAt: now,
     updatedAt: now,
   });
-  await storage.write(
-    `p1/builds/${id}/storybook/manifest.json`,
-    Buffer.from(JSON.stringify(manifest)),
+
+  const shared = Array.from({ length: Math.floor(ENTRIES * SHARED) }, (_, i) =>
+    hash(`shared-${i}`),
   );
-}
-console.error(
-  `seeded ${BUILDS} builds x ${ENTRIES} entries in ${((performance.now() - started) / 1000).toFixed(1)}s`,
-);
-
-// Candidates no live manifest names: the pass has to read every manifest to be sure.
-const candidates = Array.from({ length: 50 }, (_, i) => hash(`orphan-${i}`));
-const lifecycle = {
-  claimContent: async () => candidates,
-  abandonContentClaim: async () => {},
-  holdsContentClaim: async () => true,
-  finishContentCollection: async () => {},
-};
-
-let reads = 0;
-let inFlight = 0;
-let peakInFlight = 0;
-if (LATENCY_MS > 0) {
-  const read = storage.read.bind(storage);
-  storage.read = async (key) => {
-    reads += 1;
-    inFlight += 1;
-    peakInFlight = Math.max(peakInFlight, inFlight);
-    await new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
-    inFlight -= 1;
-    return await read(key);
-  };
-}
-
-const rssStart = process.memoryUsage().rss;
-let rssPeak = rssStart;
-const sampler = setInterval(() => {
-  rssPeak = Math.max(rssPeak, process.memoryUsage().rss);
-}, 5);
-for (let run = 1; run <= RUNS; run += 1) {
-  for (const hashValue of candidates) {
-    await storage.write(`content/${hashValue}`, Buffer.from("x"));
+  let started = performance.now();
+  for (let b = 0; b < BUILDS; b += 1) {
+    const id = `B${String(b).padStart(25, "0")}`;
+    const manifest = {};
+    shared.forEach((h, i) => (manifest[`assets/f${i}.js`] = h));
+    for (let i = shared.length; i < ENTRIES; i += 1) {
+      manifest[`assets/u${b}-${i}.js`] = hash(`u-${b}-${i}`);
+    }
+    await db.insert(db.tables.builds, {
+      id,
+      projectId: "p1",
+      gitSha: "s",
+      gitBranch: "main",
+      isDefault: true,
+      authorEmail: null,
+      authorName: null,
+      message: null,
+      public: false,
+      status: "approved",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      inheritedCount: 0,
+      affectedOnly: true,
+      baselineSha: null,
+      changedFiles: null,
+      affectedImportPaths: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await storage.write(
+      `p1/builds/${id}/storybook/manifest.json`,
+      Buffer.from(JSON.stringify(manifest)),
+    );
   }
-  started = performance.now();
-  const removed = await collectUnreferencedContent({ db, storage, lifecycle });
+  console.error(
+    `seeded ${BUILDS} builds x ${ENTRIES} entries in ${((performance.now() - started) / 1000).toFixed(1)}s`,
+  );
+
+  // Candidates no live manifest names: the pass has to read every manifest to be sure.
+  const candidates = Array.from({ length: 50 }, (_, i) => hash(`orphan-${i}`));
+  const lifecycle = {
+    claimContent: async () => candidates,
+    abandonContentClaim: async () => {},
+    holdsContentClaim: async () => true,
+    finishContentCollection: async () => {},
+  };
+
+  let reads = 0;
+  let inFlight = 0;
+  let peakInFlight = 0;
+  if (LATENCY_MS > 0) {
+    const read = storage.read.bind(storage);
+    storage.read = async (key) => {
+      reads += 1;
+      inFlight += 1;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
+      inFlight -= 1;
+      return await read(key);
+    };
+  }
+
+  const rssStart = process.memoryUsage().rss;
+  let rssPeak = rssStart;
+  sampler = setInterval(() => {
+    rssPeak = Math.max(rssPeak, process.memoryUsage().rss);
+  }, 5);
+  for (let run = 1; run <= RUNS; run += 1) {
+    for (const hashValue of candidates) {
+      await storage.write(`content/${hashValue}`, Buffer.from("x"));
+    }
+    started = performance.now();
+    const removed = await collectUnreferencedContent({ db, storage, lifecycle });
+    console.log(
+      JSON.stringify({
+        run,
+        builds: BUILDS,
+        entries: ENTRIES,
+        latencyMs: LATENCY_MS,
+        removed,
+        passMs: Math.round(performance.now() - started),
+      }),
+    );
+  }
   console.log(
     JSON.stringify({
-      run,
-      builds: BUILDS,
-      entries: ENTRIES,
-      latencyMs: LATENCY_MS,
-      removed,
-      passMs: Math.round(performance.now() - started),
+      rssStartMB: Math.round(rssStart / 1e6),
+      rssPeakMB: Math.round(Math.max(rssPeak, process.memoryUsage().rss) / 1e6),
+      heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1e6),
+      ...(LATENCY_MS > 0 ? { slowReads: reads, peakInFlight } : {}),
     }),
   );
+} finally {
+  // A failed seed or pass still stops the sampler, closes the database and removes the data.
+  if (sampler) clearInterval(sampler);
+  await db.lifecycle.teardown();
+  rmSync(dir, { recursive: true, force: true });
 }
-clearInterval(sampler);
-console.log(
-  JSON.stringify({
-    rssStartMB: Math.round(rssStart / 1e6),
-    rssPeakMB: Math.round(Math.max(rssPeak, process.memoryUsage().rss) / 1e6),
-    heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1e6),
-    ...(LATENCY_MS > 0 ? { slowReads: reads, peakInFlight } : {}),
-  }),
-);
-rmSync(dir, { recursive: true, force: true });
