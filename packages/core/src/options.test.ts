@@ -167,6 +167,9 @@ describe("resolveShelfOptions testing process options", () => {
       /testing\.maxJobSeconds must be a positive number of seconds, got 0/u,
     );
     expect(maxJob(Number.NaN)).toThrow(/maxJobSeconds/u);
+    // A timer past 2^31 - 1 ms fires after 1 ms in Node: refuse what it cannot hold.
+    expect(maxJob(2_147_483)).not.toThrow();
+    expect(maxJob(2_147_484)).toThrow(/at most 2147483 seconds/u);
   });
 
   it('requires workerEntry for mode "fork"', () => {
