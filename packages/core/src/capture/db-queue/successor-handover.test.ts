@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DatabaseAdapter, TxStore } from "../../adapters/database.ts";
 import { BuildModel } from "../../models/build.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
@@ -40,10 +40,13 @@ function runtimeOver(db: DatabaseAdapter): QueueRuntime {
 }
 
 /** A running single-flight job holding {@link KEY}, optionally with a request waiting on it. */
-async function runningJob(options: { request: boolean; transactions?: boolean }) {
+async function runningJob(options: { request: boolean; transactions?: boolean | "sequential" }) {
   const { db } = makeDatabase();
   serialized(db);
   if (options.transactions === false) delete db.transact;
+  if (options.transactions === "sequential") {
+    (db.metadata as { transactions?: string }).transactions = "sequential";
+  }
   const rt = runtimeOver(db);
   await rt.model.createKeyed(
     {
@@ -81,6 +84,18 @@ describe("a single-flight job ends and hands its key over in one transaction", (
       rerunRequestedAt: null,
     });
     expect((await rt.model.holderOf(KEY))?.jobId).toBe(successor?.jobId);
+  });
+
+  it("takes the ordered path, without opening a transaction, on a database whose transactions are sequential", async () => {
+    const { db, rt, row } = await runningJob({ request: true, transactions: "sequential" });
+    const transact = vi.spyOn(db, "transact");
+
+    expect(await rt.model.endJob("j1", { status: "done" }, iso(NOW))).toBeNull();
+    await finishJob(rt, row, "done");
+
+    expect(transact).not.toHaveBeenCalled();
+    expect(await others(rt)).toHaveLength(1);
+    expect(await rt.model.get("j1")).toMatchObject({ status: "done", activeKey: null });
   });
 
   it("queues nothing when no request arrived", async () => {

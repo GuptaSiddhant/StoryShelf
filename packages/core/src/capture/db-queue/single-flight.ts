@@ -88,7 +88,7 @@ async function covered(rt: QueueRuntime, holder: CaptureJobRow): Promise<boolean
  * With transactions the end and the handover are one commit (see `CaptureJobModel.endJob`), so
  * a crash cannot lose the request. Without them the job ends first and the successor is started in
  * a second step ({@link startSuccessor}); a crash between the two loses the request, and that gap
- * is the price of a database with no transactions.
+ * is the price of a database with no transactions or only sequential ones (`metadata.transactions`).
  *
  * `row` is the job row as read before the write; the key is gone from the row once it ends.
  */

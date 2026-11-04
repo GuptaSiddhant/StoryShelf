@@ -272,6 +272,13 @@ export interface DatabaseAdapterMetadata {
    * Unset means it can.
    */
   readonly supportsTesting?: boolean;
+  /**
+   * `"sequential"` when `transact` only runs its statements one after another and cannot roll back
+   * (Neon over HTTP). Code that relies on one transaction for crash safety, such as the queue's
+   * end-and-hand-over of a single-flight job, takes its ordered path instead. Unset means atomic,
+   * as `supportsTesting` reads.
+   */
+  readonly transactions?: "atomic" | "sequential";
 }
 
 /** Database abstraction over Drizzle tables, agnostic of dialect and driver. */

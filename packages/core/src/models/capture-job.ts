@@ -159,8 +159,8 @@ export class CaptureJobModel {
    *
    * `onlyOpen` leaves a job that already ended as it is (a late `done` or a cancel keeps its
    * outcome), as {@link finishOpenJob} does. Resolves to `null` when the database has no
-   * transactions: the caller then ends the job and starts the successor in two steps (a crash
-   * between them loses the request).
+   * transactions, or only sequential ones (`metadata.transactions`): the caller then ends the job
+   * and starts the successor in two steps (a crash between them loses the request).
    */
   async endJob(
     jobId: string,
@@ -171,7 +171,9 @@ export class CaptureJobModel {
     },
     now: string,
   ): Promise<JobEnd | null> {
-    if (this.#db.transact === undefined) return null;
+    if (this.#db.transact === undefined || this.#db.metadata.transactions === "sequential") {
+      return null;
+    }
     return await this.#db.transact<JobEnd>(async (tx) => {
       // A write first: it takes the row (and, on SQLite, the write lock, waiting for another process
       // as a plain statement does). A transaction that reads first and then writes holds a read
