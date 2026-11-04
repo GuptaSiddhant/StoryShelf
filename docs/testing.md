@@ -81,6 +81,16 @@ Rules:
   from one session (an in-process Postgres such as PGlite) can run the suite but cannot prove
   cross-connection row locking; say so where it is used, and prove locking against a real server
   before enabling the capability on a preset.
+- The boot step that prepares the baseline pins before a dialect exposes the capability (ADR 0039,
+  "activation") is proven with `retentionActivationContractSuite`. Activation stays each adapter's
+  own step (it is on neither `DatabaseAdapter` nor `BuildReferenceLifecycle`); the dialect hands
+  the suite a harness: its own `prepare()` (resolving to the pause, if any), a lifecycle on its own
+  connection, and seeding and reading of baselines. The suite pins what must hold in every dialect:
+  a source is never guessed, a recorded source whose build is gone is kept unpinned, a stale pin is
+  released, and a tombstoned or other-project source pauses retention and rolls back every pin.
+  What needs a dialect's own internals stays in that dialect's tests and must be mirrored for each
+  new one: the interrupted preparation that resumes after a restart, and the fenced writer racing
+  preparation.
 - Core validates untrusted input at the boundary: storage path segments
   (`paths.ts`), screenshot bytes (`capture/guards.ts`: PNG magic + 25 MiB cap),
   list limits (`clampListLimit`, max 1000).

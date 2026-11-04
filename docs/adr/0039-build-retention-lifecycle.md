@@ -112,7 +112,9 @@ by preset, so it cannot by itself carry this guarantee.
   saw the same generation winning, invalid generations, empty and partly failing multi-owner
   batches, release keeping the generation, admission to a deleting or missing build, an admission
   racing a claim ending in exactly one outcome, and opposite-order multi-build admission without
-  deadlock. Postgres and MySQL (#375, #376) must run the same suite, unchanged.
+  deadlock. `retentionActivationContractSuite` does the same for activation (baseline preparation and
+  the pause cases) through a per-dialect harness; activation itself is not part of the adapter
+  interface. Postgres and MySQL (#375, #376) must run both suites, unchanged.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the

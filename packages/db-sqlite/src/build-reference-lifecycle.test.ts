@@ -1,11 +1,11 @@
-import {
-  BaselineSourceIntegrityError,
-  type BuildReferenceOwner,
-  type TxStore,
-} from "@storyshelf/core/adapter/database";
+import type { BuildReferenceOwner, TxStore } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BaselineModel, BaselineTransferModel, SnapshotModel } from "@storyshelf/core/models";
-import { buildReferenceContractSuite, makeStorage } from "@storyshelf/core/test-helpers";
+import {
+  buildReferenceContractSuite,
+  makeStorage,
+  retentionActivationContractSuite,
+} from "@storyshelf/core/test-helpers";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -21,6 +21,7 @@ import {
   replaceFencedReferences,
 } from "./build-reference-lifecycle.ts";
 import { createSqliteDatabase } from "./index.ts";
+import { activateRetention, type RetentionActivation } from "./retention-activation.ts";
 import { schema } from "./schema/index.ts";
 
 const now = "2026-01-01T00:00:00.000Z";
@@ -39,8 +40,6 @@ const baselineRow = {
   createdAt: now,
   updatedAt: now,
 };
-
-const ownerOf = (id: string) => ({ type: "baseline" as const, projectId: "p", id });
 
 /** Rows of `build_references`, optionally for one baseline, read through a separate connection. */
 function referenceRows(path: string, ownerId?: string): number {
@@ -158,6 +157,68 @@ buildReferenceContractSuite("SQLite", async (run) => {
   });
 });
 
+retentionActivationContractSuite("SQLite", async (run) => {
+  await withDatabase(async (path) => {
+    const db = createSqliteDatabase(path);
+    try {
+      await run({
+        lifecycle: createBuildReferenceLifecycle(path),
+        // The adapter's own boot step, so the pause it reports is the one that ships.
+        prepare: async () => {
+          const state: RetentionActivation = {};
+          await activateRetention(path, state);
+          return state.pause;
+        },
+        seed: {
+          baseline: async (row) => {
+            await db.insert(schema.baselines, {
+              ...baselineRow,
+              storyId: row.storyId ?? row.id,
+              ...row,
+              snapshotId: row.snapshotId === undefined ? "snap" : row.snapshotId,
+            });
+          },
+          snapshot: async (row) => {
+            await db.insert(schema.snapshots, {
+              projectId: "p",
+              storyName: "Story",
+              storyTitle: "Story",
+              viewportName: "desktop",
+              browser: "chromium",
+              screenshotPath: "shot",
+              createdAt: now,
+              updatedAt: now,
+              ...row,
+            });
+          },
+          foreignBuild: async (id) => {
+            await db.insert(schema.projects, {
+              id: "q",
+              name: "Other",
+              slug: "q",
+              createdAt: now,
+              updatedAt: now,
+            });
+            await db.insert(schema.builds, {
+              id,
+              projectId: "q",
+              gitSha: id,
+              gitBranch: "main",
+              createdAt: now,
+              updatedAt: now,
+            });
+          },
+        },
+        baselineSource: async (id) =>
+          ((await db.get(schema.baselines, id))?.["sourceBuildId"] as string | null | undefined) ??
+          null,
+      });
+    } finally {
+      await db.lifecycle?.teardown();
+    }
+  });
+});
+
 async function startContendingClaim(path: string): Promise<PromiseLike<unknown[]>[]> {
   const script = `import('./src/build-reference-lifecycle.ts').then(async ({ createBuildReferenceLifecycle }) => {
     const { writeFileSync } = await import('node:fs');
@@ -268,53 +329,6 @@ describe("SQLite reference lifecycle primitive", () => {
         );
         expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
         expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-  it("recovers the renderer source of an inherited baseline without pinning its containing build", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        await db.insert(schema.snapshots, {
-          id: "inherited",
-          projectId: "p",
-          buildId: "two",
-          storyId: "story",
-          storyName: "Story",
-          storyTitle: "Story",
-          viewportName: "desktop",
-          browser: "chromium",
-          screenshotPath: "shot",
-          inherited: true,
-          sourceBuildId: "one",
-          createdAt: now,
-          updatedAt: now,
-        });
-        await db.insert(schema.baselines, {
-          id: "base",
-          projectId: "p",
-          storyId: "story",
-          viewportName: "desktop",
-          branch: "feature",
-          browser: "chromium",
-          screenshotPath: "shot",
-          snapshotId: "inherited",
-          sourceBuildId: null,
-          createdAt: now,
-          updatedAt: now,
-        });
-        expect(await prepareBaselineReferences(path)).toEqual({
-          protected: 1,
-          unknown: 0,
-          unavailable: 0,
-        });
-        expect((await db.get(schema.baselines, "base"))?.["sourceBuildId"]).toBe("one");
-        expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "one")).toBe(
-          "protected",
-        );
-        expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("claimed");
       } finally {
         await db.lifecycle?.teardown();
       }
@@ -456,236 +470,6 @@ describe("SQLite reference lifecycle primitive", () => {
         );
         expect((await model.getFor("p", "story", "desktop", "main"))?.fingerprint).toBeNull();
         expect(await lifecycle.referenceGeneration(owner)).toBe(0);
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-  it("pins a known source, keeps a recorded source whose build is gone, and repeats as a no-op", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        await db.insert(schema.baselines, { ...baselineRow, id: "known", sourceBuildId: "one" });
-        await db.insert(schema.baselines, {
-          ...baselineRow,
-          id: "gone",
-          storyId: "other",
-          sourceBuildId: "missing",
-        });
-        const lifecycle = createBuildReferenceLifecycle(path);
-        const result = { protected: 1, unknown: 0, unavailable: 1 };
-        expect(await prepareBaselineReferences(path)).toEqual(result);
-        expect(await prepareBaselineReferences(path)).toEqual(result);
-        // The verified historical record stays; no pin, no generation change.
-        expect((await db.get(schema.baselines, "gone"))?.["sourceBuildId"]).toBe("missing");
-        expect(referenceRows(path, "gone")).toBe(0);
-        expect(await lifecycle.referenceGeneration(ownerOf("gone"))).toBe(0);
-        expect(await lifecycle.referenceGeneration(ownerOf("known"))).toBe(1);
-        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
-        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-
-  it("releases a stale pin of a baseline whose recorded source is gone, and keeps the record", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        await db.insert(schema.baselines, { ...baselineRow, id: "gone", sourceBuildId: "missing" });
-        const lifecycle = createBuildReferenceLifecycle(path);
-        // A pin on a build that is not the record's source cannot be justified.
-        await lifecycle.replaceFencedReferences(ownerOf("gone"), 0, ["two"], async () => null);
-        expect(await lifecycle.referenceGeneration(ownerOf("gone"))).toBe(1);
-
-        const result = { protected: 0, unknown: 0, unavailable: 1 };
-        expect(await prepareBaselineReferences(path)).toEqual(result);
-        expect(await prepareBaselineReferences(path)).toEqual(result);
-
-        expect((await db.get(schema.baselines, "gone"))?.["sourceBuildId"]).toBe("missing");
-        expect(referenceRows(path, "gone")).toBe(0);
-        // Advanced once, by the removal; the classification and the repeat do not advance it.
-        expect(await lifecycle.referenceGeneration(ownerOf("gone"))).toBe(2);
-        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-
-  it("releases the pins of a baseline that lost its provenance or was deleted while retention was off", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        await db.insert(schema.baselines, {
-          ...baselineRow,
-          id: "cleared",
-          storyId: "s-cleared",
-          snapshotId: null,
-        });
-        await db.insert(schema.baselines, {
-          ...baselineRow,
-          id: "kept",
-          storyId: "s-kept",
-          sourceBuildId: "two",
-        });
-        const lifecycle = createBuildReferenceLifecycle(path);
-        await lifecycle.replaceFencedReferences(ownerOf("cleared"), 0, ["two"], async () => null);
-        await lifecycle.replaceFencedReferences(ownerOf("deleted"), 0, ["two"], async () => null);
-        await lifecycle.replaceFencedReferences(ownerOf("kept"), 0, ["two"], async () => null);
-
-        await prepareBaselineReferences(path);
-
-        expect(referenceRows(path, "cleared")).toBe(0);
-        expect(referenceRows(path, "deleted")).toBe(0);
-        expect(referenceRows(path, "kept")).toBe(1);
-        expect(await lifecycle.referenceGeneration(ownerOf("deleted"))).toBe(2);
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-
-  it("leaves a baseline of unproven provenance unknown and unpinned", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        // A snapshot that no longer exists proves nothing, and there is no recorded source.
-        await db.insert(schema.baselines, { ...baselineRow, id: "orphan" });
-        const lifecycle = createBuildReferenceLifecycle(path);
-        const result = { protected: 0, unknown: 1, unavailable: 0 };
-        expect(await prepareBaselineReferences(path)).toEqual(result);
-        expect(await prepareBaselineReferences(path)).toEqual(result);
-        expect((await db.get(schema.baselines, "orphan"))?.["sourceBuildId"] ?? null).toBeNull();
-        expect(referenceRows(path, "orphan")).toBe(0);
-        expect(await lifecycle.referenceGeneration(ownerOf("orphan"))).toBe(0);
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-
-  it("stops and rolls everything back when a recorded source is tombstoned", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        // Preparation runs in id order: "a-healthy" is pinned first, then "z-doomed" stops the run;
-        // the pin must not survive the rollback.
-        await db.insert(schema.baselines, {
-          ...baselineRow,
-          id: "a-healthy",
-          sourceBuildId: "one",
-        });
-        await db.insert(schema.baselines, {
-          ...baselineRow,
-          id: "z-doomed",
-          storyId: "other",
-          sourceBuildId: "two",
-        });
-        const lifecycle = createBuildReferenceLifecycle(path);
-        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
-
-        const error = await prepareBaselineReferences(path).catch((caught: unknown) => caught);
-
-        expect(error).toBeInstanceOf(BaselineSourceIntegrityError);
-        expect(error).toMatchObject({
-          baselineId: "z-doomed",
-          buildId: "two",
-          problem: "tombstoned",
-        });
-        expect((error as Error).message).toContain("z-doomed");
-        expect((error as Error).message).toContain("two");
-        expect(referenceRows(path)).toBe(0);
-        expect(await lifecycle.referenceGeneration(ownerOf("a-healthy"))).toBe(0);
-        expect((await db.get(schema.baselines, "z-doomed"))?.["sourceBuildId"]).toBe("two");
-        expect((await db.get(schema.builds, "two"))?.["retentionState"]).toBe("deleting");
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-
-  it("stops and rolls everything back when a recorded source belongs to another project", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        await db.insert(schema.projects, {
-          id: "q",
-          name: "Other",
-          slug: "q",
-          createdAt: now,
-          updatedAt: now,
-        });
-        await db.insert(schema.builds, {
-          id: "foreign",
-          projectId: "q",
-          gitSha: "foreign",
-          gitBranch: "main",
-          createdAt: now,
-          updatedAt: now,
-        });
-        await db.insert(schema.baselines, {
-          ...baselineRow,
-          id: "a-healthy",
-          sourceBuildId: "one",
-        });
-        await db.insert(schema.baselines, {
-          ...baselineRow,
-          id: "z-crossed",
-          storyId: "other",
-          sourceBuildId: "foreign",
-        });
-
-        const error = await prepareBaselineReferences(path).catch((caught: unknown) => caught);
-
-        expect(error).toBeInstanceOf(BaselineSourceIntegrityError);
-        expect(error).toMatchObject({
-          baselineId: "z-crossed",
-          buildId: "foreign",
-          problem: "other-project",
-        });
-        expect((error as Error).message).toContain("another project");
-        expect(referenceRows(path)).toBe(0);
-        expect((await db.get(schema.baselines, "z-crossed"))?.["sourceBuildId"]).toBe("foreign");
-        expect(
-          await createBuildReferenceLifecycle(path).referenceGeneration(ownerOf("a-healthy")),
-        ).toBe(0);
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-
-  it("releases a stale baseline pin when preparation resolves a different source", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        await db.insert(schema.baselines, {
-          id: "base",
-          projectId: "p",
-          storyId: "story",
-          viewportName: "desktop",
-          branch: "main",
-          browser: "chromium",
-          screenshotPath: "shot",
-          snapshotId: "snap",
-          sourceBuildId: "one",
-          createdAt: now,
-          updatedAt: now,
-        });
-        const lifecycle = createBuildReferenceLifecycle(path);
-        const baselineOwner = { type: "baseline" as const, projectId: "p", id: "base" };
-        await lifecycle.replaceFencedReferences(baselineOwner, 0, ["two"], async () => null);
-
-        expect(await prepareBaselineReferences(path)).toEqual({
-          protected: 1,
-          unknown: 0,
-          unavailable: 0,
-        });
-        expect(await lifecycle.referenceGeneration(baselineOwner)).toBe(2);
-        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
-        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
       } finally {
         await db.lifecycle?.teardown();
       }
