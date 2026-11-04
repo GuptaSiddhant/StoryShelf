@@ -57,73 +57,66 @@ const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
   oauth: "@storyshelf/auth",
 };
 
+/** The peer SDK a database preset needs, as package name and pinned range. */
+const DB_SDK: Partial<Record<DatabaseChoice, readonly [string, string]>> = {
+  turso: ["@libsql/client", LIBSQL_CLIENT_SDK],
+  "better-sqlite3": ["better-sqlite3", BETTER_SQLITE3_SDK],
+  pg: ["pg", PG_SDK],
+  neon: ["@neondatabase/serverless", NEON_SDK],
+  "neon-http": ["@neondatabase/serverless", NEON_SDK],
+  vercel: ["@vercel/postgres", VERCEL_POSTGRES_SDK],
+  pglite: ["@electric-sql/pglite", PGLITE_SDK],
+  mysql: ["mysql2", MYSQL2_SDK],
+  planetscale: ["@planetscale/database", PLANETSCALE_SDK],
+  tidb: ["@tidbcloud/serverless", TIDBCLOUD_SDK],
+};
+
+/** The given StoryShelf packages, all at the version of this CLI. */
+function ownPackages(names: readonly string[]): Record<string, string> {
+  const version = __PKG_VERSION__ ?? "0.0.0";
+  return Object.fromEntries(names.map((name) => [name, version]));
+}
+
+/** The app, the database package and, with observability, the packages it adds. */
+function coreNames(answers: Answers): string[] {
+  const names = ["@storyshelf/app", DB_PACKAGE[answers.database]];
+  return wantsObservability(answers)
+    ? [...names, "@storyshelf/core", "@storyshelf/observability"]
+    : names;
+}
+
+/** The storage, runner, auth, git, design and notification packages the answers ask for. */
+function featureNames(answers: Answers): string[] {
+  const auth = AUTH_PACKAGE[answers.auth];
+  return [
+    ...(answers.storage === "local" ? [] : [STORAGE_PACKAGE[answers.storage]]),
+    "@storyshelf/runner-playwright",
+    ...(auth === null ? [] : [auth]),
+    ...(wantsGit(answers) ? ["@storyshelf/notify-git"] : []),
+    ...(wantsDesign(answers) ? ["@storyshelf/design-figma"] : []),
+    ...(wantsNotifications(answers) ? ["@storyshelf/notify-chat", "@storyshelf/notify-email"] : []),
+  ];
+}
+
 function buildDeps(answers: Answers): Record<string, string> {
-  const deps: Record<string, string> = {
+  const sdk = DB_SDK[answers.database];
+  return {
     "@hono/node-server": "^1.17.0",
-    "@storyshelf/app": __PKG_VERSION__ ?? "0.0.0",
-    [DB_PACKAGE[answers.database]]: __PKG_VERSION__ ?? "0.0.0",
+    ...ownPackages(coreNames(answers)),
+    ...(sdk ? { [sdk[0]]: sdk[1] } : {}),
+    ...ownPackages(featureNames(answers)),
+    ...(wantsNotifications(answers) ? { nodemailer: NODEMAILER_SDK } : {}),
   };
-  if (wantsObservability(answers)) {
-    deps["@storyshelf/core"] = __PKG_VERSION__ ?? "0.0.0";
-    deps["@storyshelf/observability"] = __PKG_VERSION__ ?? "0.0.0";
-  }
-  if (answers.database === "turso") {
-    deps["@libsql/client"] = LIBSQL_CLIENT_SDK;
-  }
-  if (answers.database === "better-sqlite3") {
-    deps["better-sqlite3"] = BETTER_SQLITE3_SDK;
-  }
-  if (answers.database === "pg") {
-    deps["pg"] = PG_SDK;
-  }
-  if (answers.database === "neon" || answers.database === "neon-http") {
-    deps["@neondatabase/serverless"] = NEON_SDK;
-  }
-  if (answers.database === "vercel") {
-    deps["@vercel/postgres"] = VERCEL_POSTGRES_SDK;
-  }
-  if (answers.database === "pglite") {
-    deps["@electric-sql/pglite"] = PGLITE_SDK;
-  }
-  if (answers.database === "mysql") {
-    deps["mysql2"] = MYSQL2_SDK;
-  }
-  if (answers.database === "planetscale") {
-    deps["@planetscale/database"] = PLANETSCALE_SDK;
-  }
-  if (answers.database === "tidb") {
-    deps["@tidbcloud/serverless"] = TIDBCLOUD_SDK;
-  }
-
-  if (answers.storage !== "local") {
-    deps[STORAGE_PACKAGE[answers.storage]] = __PKG_VERSION__ ?? "0.0.0";
-  }
-  deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
-  if (answers.auth !== "none") {
-    deps[AUTH_PACKAGE[answers.auth] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
-  }
-  if (wantsGit(answers)) {
-    deps["@storyshelf/notify-git"] = __PKG_VERSION__ ?? "0.0.0";
-  }
-  if (wantsDesign(answers)) {
-    deps["@storyshelf/design-figma"] = __PKG_VERSION__ ?? "0.0.0";
-  }
-  if (wantsNotifications(answers)) {
-    deps["@storyshelf/notify-chat"] = __PKG_VERSION__ ?? "0.0.0";
-    deps["@storyshelf/notify-email"] = __PKG_VERSION__ ?? "0.0.0";
-    deps["nodemailer"] = NODEMAILER_SDK;
-  }
-
-  return deps;
 }
 
-function addInfraScripts(scripts: Record<string, string>): void {
-  scripts["infra:init"] = "terraform -chdir=terraform init";
-  scripts["infra:plan"] = "terraform -chdir=terraform plan -out=tfplan";
-  scripts["infra:apply"] = "terraform -chdir=terraform apply tfplan";
-  scripts["infra:destroy"] = "terraform -chdir=terraform destroy";
-  scripts["infra:outputs"] = "terraform -chdir=terraform output -json";
-}
+/** The Terraform npm scripts of the AWS, Azure and GCP targets. */
+const INFRA_SCRIPTS: Record<string, string> = {
+  "infra:init": "terraform -chdir=terraform init",
+  "infra:plan": "terraform -chdir=terraform plan -out=tfplan",
+  "infra:apply": "terraform -chdir=terraform apply tfplan",
+  "infra:destroy": "terraform -chdir=terraform destroy",
+  "infra:outputs": "terraform -chdir=terraform output -json",
+};
 
 /** `docker:*` npm scripts: compose when several services, plain `docker` for one container. */
 function dockerScripts(answers: Answers): Record<string, string> {
@@ -141,6 +134,18 @@ function dockerScripts(answers: Answers): Record<string, string> {
   };
 }
 
+/** The npm scripts: start, dev and typecheck, plus the Docker or Terraform ones of the deploy target. */
+function scriptsFor(answers: Answers): Record<string, string> {
+  const target = resolveDeployTarget(answers);
+  return {
+    start: `node ${SERVER_ENTRY}`,
+    dev: `node --watch ${SERVER_ENTRY}`,
+    typecheck: "tsc",
+    ...(target === "docker" ? dockerScripts(answers) : {}),
+    ...(target === "aws" || target === "azure" || target === "gcp" ? INFRA_SCRIPTS : {}),
+  };
+}
+
 export function generatePackageJson(answers: Answers): string {
   const pkg = {
     name: answers.name,
@@ -149,26 +154,9 @@ export function generatePackageJson(answers: Answers): string {
     private: true,
     description: "StoryShelf self-hosted visual testing server.",
     engines: { node: ">=24" },
-    scripts: {
-      start: `node ${SERVER_ENTRY}`,
-      dev: `node --watch ${SERVER_ENTRY}`,
-      typecheck: "tsc",
-    } as Record<string, string>,
+    scripts: scriptsFor(answers),
     dependencies: buildDeps(answers),
     devDependencies: SCAFFOLD_DEV_DEPENDENCIES,
   };
-
-  if (resolveDeployTarget(answers) === "docker") {
-    Object.assign(pkg.scripts, dockerScripts(answers));
-  }
-
-  if (
-    resolveDeployTarget(answers) === "aws" ||
-    resolveDeployTarget(answers) === "azure" ||
-    resolveDeployTarget(answers) === "gcp"
-  ) {
-    addInfraScripts(pkg.scripts as Record<string, string>);
-  }
-
   return JSON.stringify(pkg, null, 2);
 }

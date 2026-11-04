@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { devNull, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -14,17 +14,23 @@ let dir: string;
 
 /** Variables a git hook or worktree exports; they would point git at that checkout instead of `dir`. */
 const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] as const;
+/** The user's and the system's git config, which could define `remote.origin.url` for any directory. */
+const GIT_CONFIGS = ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"] as const;
 const savedGitEnv = new Map<string, string | undefined>();
 
 function isolateGitEnv(): void {
-  for (const name of GIT_REDIRECTS) {
+  for (const name of [...GIT_REDIRECTS, ...GIT_CONFIGS]) {
     savedGitEnv.set(name, process.env[name]);
     Reflect.deleteProperty(process.env, name);
+  }
+  for (const name of GIT_CONFIGS) {
+    process.env[name] = devNull;
   }
 }
 
 function restoreGitEnv(): void {
   for (const [name, value] of savedGitEnv) {
+    Reflect.deleteProperty(process.env, name);
     if (value !== undefined) {
       process.env[name] = value;
     }

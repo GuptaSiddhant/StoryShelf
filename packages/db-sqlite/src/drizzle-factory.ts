@@ -13,12 +13,15 @@ import type {
 import type { SQL, Table } from "drizzle-orm";
 import { and, eq, getTableColumns } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
+import { createNestingGuard } from "./nesting-guard.ts";
+import { createTransactionMutex } from "./transaction-mutex.ts";
 
 /**
  * Wrap an adapter with manual BEGIN/COMMIT transactions for synchronous
  * SQLite drivers (better-sqlite3, `bun:sqlite`), whose `transaction()`
  * rejects async callbacks. Statements run on the adapter's own connection,
- * so the open transaction covers them; rollback runs on throw.
+ * so the open transaction covers them; rollback runs on throw. Overlapping calls queue, one
+ * transaction at a time (see `transaction-mutex.ts`).
  *
  * @param adapter - Adapter built by {@link createDrizzleAdapter}.
  * @param exec - Synchronous statement runner on the same connection.
@@ -28,35 +31,44 @@ export function withManualTransactions(
   adapter: DatabaseAdapter,
   exec: (sql: string) => void,
 ): DatabaseAdapter {
+  const mutex = createTransactionMutex(createNestingGuard());
   return {
     ...adapter,
-    transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> => {
-      const tx: TxStore = {
-        insert: async (table, values) => await adapter.insert(table, values),
-        update: async (table, id, values) => await adapter.update(table, id, values),
-        get: async (table, id) => await adapter.get(table, id),
-        remove: async (table, id) => {
-          await adapter.remove(table, id);
-        },
-        list: async (table, opts) => await adapter.list(table, opts),
-        count: async (table, where) => await adapter.count(table, where),
-      };
-      exec("BEGIN");
-      try {
-        const result = await fn(tx);
-        exec("COMMIT");
-        return result;
-      } catch (error) {
-        try {
-          exec("ROLLBACK");
-        } catch {
-          // already rolled back (e.g. constraint abort) — report the cause
-        }
-        throw error;
-      }
-    },
+    transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
+      await mutex.run(async () => await runManualTransaction(adapter, exec, fn)),
   };
 }
+
+async function runManualTransaction<R>(
+  adapter: DatabaseAdapter,
+  exec: (sql: string) => void,
+  fn: (tx: TxStore) => Promise<R>,
+): Promise<R> {
+  const tx: TxStore = {
+    insert: async (table, values) => await adapter.insert(table, values),
+    update: async (table, id, values) => await adapter.update(table, id, values),
+    get: async (table, id) => await adapter.get(table, id),
+    remove: async (table, id) => {
+      await adapter.remove(table, id);
+    },
+    list: async (table, opts) => await adapter.list(table, opts),
+    count: async (table, where) => await adapter.count(table, where),
+  };
+  exec("BEGIN");
+  try {
+    const result = await fn(tx);
+    exec("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      exec("ROLLBACK");
+    } catch {
+      // already rolled back (e.g. constraint abort) — report the cause
+    }
+    throw error;
+  }
+}
+
 /** Setup, teardown (once) and health for the adapter; teardown closes the driver a single time. */
 function buildLifecycle(options: DrizzleAdapterOptions): NonNullable<DatabaseAdapter["lifecycle"]> {
   let closed = false;
@@ -85,6 +97,9 @@ function buildLifecycle(options: DrizzleAdapterOptions): NonNullable<DatabaseAda
 
 export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions): DatabaseAdapter {
   const drizzle = db as DrizzleLike;
+  // The shared connection (or, for a libSQL file, its connection per transaction) cannot overlap
+  // transactions: they queue (see `transaction-mutex.ts`).
+  const mutex = createTransactionMutex(createNestingGuard());
   return {
     metadata: options.metadata,
     tables: options.tables,
@@ -121,7 +136,10 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
       await drizzle.$count(table, where),
     all: async <T>(query: SQL): Promise<T[]> => await drizzle.all(query),
     transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
-      await drizzle.transaction(async (tx) => await fn(buildTxStore(tx as DrizzleLike))),
+      await mutex.run(
+        async () =>
+          await drizzle.transaction(async (tx) => await fn(buildTxStore(tx as DrizzleLike))),
+      ),
   };
 }
 
