@@ -12,6 +12,7 @@ import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { createNestingGuard } from "./nesting-guard.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
 import { parseTableInfo } from "./table-info.ts";
@@ -83,9 +84,13 @@ export function createBetterSqlite3Database(
     },
   });
 
-  return withManualTransactions(adapter, (sql) => {
-    client.exec(sql);
-  });
+  return withManualTransactions(
+    adapter,
+    (sql) => {
+      client.exec(sql);
+    },
+    createNestingGuard(),
+  );
 }
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";

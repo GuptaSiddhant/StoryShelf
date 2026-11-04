@@ -1,8 +1,11 @@
 import type { DatabaseAdapter, TxStore } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createBetterSqlite3Database } from "./better-sqlite3.ts";
 import { createSqliteDatabase } from "./index.ts";
+import { createNestingGuard } from "./nesting-guard.ts";
 import { schema } from "./schema/index.ts";
 import { createTransactionMutex } from "./transaction-mutex.ts";
 
@@ -60,7 +63,7 @@ describe("createTransactionMutex", () => {
   });
 
   it("refuses a nested run from inside a body instead of hanging", async () => {
-    const mutex = createTransactionMutex();
+    const mutex = createTransactionMutex(createNestingGuard());
 
     await expect(
       mutex.run(async () => await mutex.run(async () => await Promise.resolve(1))),
@@ -69,7 +72,7 @@ describe("createTransactionMutex", () => {
   });
 
   it("lets work started inside a body run later, once the body has ended", async () => {
-    const mutex = createTransactionMutex();
+    const mutex = createTransactionMutex(createNestingGuard());
     const gate = Promise.withResolvers<null>();
     let later: Promise<string> = Promise.resolve("never started");
     await mutex.run(async () => {
@@ -147,5 +150,31 @@ describe.each(drivers)("transact on %s", (_name, make) => {
     ).rejects.toThrow("inside a transaction");
     await transact(async (tx) => await tx.insert(schema.siteSettings, setting("after")));
     expect(await db.get(schema.siteSettings, "after")).not.toBeNull();
+  });
+});
+
+/** Every `./x.ts` module the entry point reaches, itself included. */
+function reachable(entry: string): Map<string, string> {
+  const here = import.meta.dirname;
+  const seen = new Map<string, string>();
+  const queue = [entry];
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    if (seen.has(file)) continue;
+    const source = readFileSync(join(here, file), "utf8");
+    seen.set(file, source);
+    for (const match of source.matchAll(/from "\.\/([\w-]+\.ts)"/gu)) {
+      if (match[1] !== undefined) queue.push(match[1]);
+    }
+  }
+  return seen;
+}
+
+describe("entry points that run on edge runtimes", () => {
+  it.each(["d1.ts", "turso.ts"])("%s never reaches node:async_hooks", (entry) => {
+    const offenders = [...reachable(entry)]
+      .filter(([, source]) => source.includes(`from "node:async_hooks"`))
+      .map(([file]) => file);
+
+    expect(offenders).toEqual([]);
   });
 });
