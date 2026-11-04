@@ -14,7 +14,7 @@ import { attemptRowId, isTerminalJob } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { isoAt } from "./clock.ts";
 import { toDatabaseJob } from "./codec.ts";
-import { finishJob, startSuccessor } from "./single-flight.ts";
+import { finishJob, notifyEnded, startSuccessor } from "./single-flight.ts";
 import type { QueueRuntime } from "./types.ts";
 
 /** Error recorded on a job whose last allowed attempt lost its lease. */
@@ -163,6 +163,7 @@ async function settle(
     await successorAfter(rt, current, outcome);
   }
   await rt.model.finishAttempt(own, "done", isoAt(rt));
+  await endedAfter(rt, jobId);
 }
 
 /**
@@ -177,5 +178,13 @@ async function successorAfter(
 ): Promise<void> {
   if (outcome === "failed" && (await rt.model.get(row.jobId))?.status === "failed") {
     await startSuccessor(rt, row);
+  }
+}
+
+/** The host hears of the end once the hook run's own row is written too, and only if the job did end. */
+async function endedAfter(rt: QueueRuntime, jobId: string): Promise<void> {
+  const row = await rt.model.get(jobId);
+  if (row !== null && (row.status === "failed" || row.status === "done")) {
+    await notifyEnded(rt, row);
   }
 }

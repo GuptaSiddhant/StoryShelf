@@ -102,6 +102,24 @@ describe("setupPublishing", () => {
     expect(requested).toContain(build.id);
   });
 
+  it("asks for the build's state again once its publish job has ended", async () => {
+    const opts = options();
+    const jobs = jobsFor(opts, false);
+    const requested: string[] = [];
+    setupPublishing(opts, {}, logger, false, {
+      jobs: jobs,
+      buildState: {
+        request: async (id: string) => {
+          await Promise.resolve();
+          requested.push(id);
+        },
+      } as never,
+      reviewRequested,
+    });
+    await jobs.ended.publish?.({ buildId: "b9", kind: "publish" } as never);
+    expect(requested).toEqual(["b9"]);
+  });
+
   it.each([
     ["a long-running host", false],
     ["a serverless host", true],

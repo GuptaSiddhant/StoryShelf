@@ -82,13 +82,7 @@ export function setupPublishing(
   if (!jobs.kinds.includes("publish")) {
     return { completer, afterPublish, catalog, enqueuePublish: undefined, handler: null };
   }
-  // A publish whose last attempt lost its lease has no running handler to fail the build.
-  jobs.exhausted.publish = async (job, error): Promise<void> => {
-    await completer.complete(job.buildId, { ok: false, error });
-  };
-  // Every hook run failed and the job ended anyway: the build still hears that publishing is over
-  // (its state is requested), or a reviewed build would keep a pending Storybook check.
-  jobs.abandoned.publish = jobs.exhausted.publish;
+  hookPublishJobs(jobs, completer, delivery.buildState);
   return {
     completer,
     afterPublish,
@@ -104,6 +98,28 @@ export function setupPublishing(
       completer,
       logger,
     }),
+  };
+}
+
+/**
+ * What happens to the build when its publish job ends without a handler to say so. The build's
+ * state is read from the job rows, and a publish job still counts as open while its handler (or
+ * exhausted hook) completes the build, so the state is asked for again once the job has ended.
+ */
+function hookPublishJobs(
+  jobs: JobQueue,
+  completer: PublishCompleter,
+  buildState: BuildStatePublisher,
+): void {
+  // A publish whose last attempt lost its lease has no running handler to fail the build. Every
+  // exhausted-job hook run failing (abandoned) ends it the same way, or a reviewed build would
+  // keep a pending Storybook check.
+  jobs.exhausted.publish = async (job, error): Promise<void> => {
+    await completer.complete(job.buildId, { ok: false, error });
+  };
+  jobs.abandoned.publish = jobs.exhausted.publish;
+  jobs.ended.publish = async (job): Promise<void> => {
+    await buildState.request(job.buildId);
   };
 }
 

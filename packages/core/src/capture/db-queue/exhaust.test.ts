@@ -446,3 +446,51 @@ describe("exhausted single-flight jobs", () => {
     expect(await rt.model.get(successor?.jobId ?? "")).toMatchObject({ activeKey: "capture:b1" });
   });
 });
+
+describe("the ended-job hook", () => {
+  it("is told once a job exhausted without a hook has failed, with its row already written", async () => {
+    const { rt, clock } = runtime();
+    const seen: string[] = [];
+    rt.onEnded = async (job) => {
+      seen.push(`${job.jobId}:${(await rt.model.get(job.jobId))?.status}`);
+    };
+    await spendAttempts(rt, clock);
+    await claimNext(rt);
+    expect(seen).toEqual(["j1:failed"]);
+  });
+
+  it("is told after the exhausted-job hook has run and the job is settled", async () => {
+    const { rt, clock } = runtime();
+    const seen: string[] = [];
+    rt.onExhausted = async () => {
+      // Still not ended while the hook runs.
+      seen.push(`hook:${(await rt.model.get("j1"))?.status}`);
+    };
+    rt.onEnded = async (job) => {
+      seen.push(`ended:${(await rt.model.get(job.jobId))?.status}`);
+    };
+    await spendAttempts(rt, clock);
+    await claimNext(rt);
+    expect(seen).toEqual(["hook:exhausting", "ended:failed"]);
+  });
+
+  it("is not called for a job that was cancelled, and a throwing hook blocks nothing", async () => {
+    const { rt, clock } = runtime();
+    const onEnded = vi.fn(async () => {
+      throw new Error("host broke");
+    });
+    rt.onEnded = onEnded;
+    rt.onExhausted = vi.fn<Hook>(async () => {});
+    await spendAttempts(rt, clock);
+    await cancelJobs(rt, "b1");
+    await claimNext(rt);
+    expect(onEnded).not.toHaveBeenCalled();
+
+    const other = runtime();
+    other.rt.onEnded = onEnded;
+    await spendAttempts(other.rt, other.clock);
+    await expect(claimNext(other.rt)).resolves.toBeNull();
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(await other.rt.model.get("j1")).toMatchObject({ status: "failed" });
+  });
+});

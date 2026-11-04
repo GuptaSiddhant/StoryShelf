@@ -1,5 +1,5 @@
 /** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
-import { publishingOfBuild, type Catalog } from "@storyshelf/core/capture";
+import { publishingOf, publishingOfBuild, type Catalog } from "@storyshelf/core/capture";
 import {
   changesetOf,
   CommentModel,
@@ -121,7 +121,8 @@ async function publishingOrPending(build: Build): Promise<ReviewSectionData["pub
   try {
     return await publishingOfBuild({ db: getStore().db, storage: getStore().storage }, build);
   } catch {
-    return await publishingOfBuild({ db: getStore().db, storage: undefined }, build);
+    // The storage-independent reading: no storage to probe and no job lookup to repeat.
+    return await publishingOf(undefined, build, { publishJobOpen: true });
   }
 }
 

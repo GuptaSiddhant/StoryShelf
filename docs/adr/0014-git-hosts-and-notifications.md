@@ -113,7 +113,7 @@ the statuses and the pull-request comment. Its details:
   job (queued, running or exhausting) has lost its content: `failure`, `Storybook content
   unavailable, see build page` (informational, `neutral` on check runs; the page says to re-upload or
   purge). While such a job is open it stays `pending`, since capture can finish first. Every end of
-  a publish job (handler, exhausted and abandoned hooks) requests the state.
+  a publish job requests the state again once its row is written (the queue's `onEnded` hook).
 - A build without a commit SHA, or with a synthetic local identity, shows nothing.
 - Links are always absolute: the function takes a URL builder over the resolved public origin, and
   no state is requested or delivered while none resolves (decision 11).
