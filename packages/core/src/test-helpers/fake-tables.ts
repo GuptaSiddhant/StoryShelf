@@ -475,6 +475,7 @@ const notificationChannels = defineTable("notification_channels", {
   enabled: "enabled",
   lastError: "last_error",
   lastErrorAt: "last_error_at",
+  lastDeliveredAt: "last_delivered_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

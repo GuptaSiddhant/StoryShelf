@@ -11,9 +11,24 @@ import { getStore, type Store } from "./store.ts";
  * outcome, a retry. Delivery reads the build when it runs, so the call needs no state of its own;
  * it never rejects, so a git host cannot fail the action that triggered it.
  */
-export async function requestBuildState(buildId: string): Promise<void> {
+export async function requestBuildState(
+  buildId: string,
+  only?: { channelId?: string },
+): Promise<void> {
   const store = getStore();
-  await (store.buildState ?? inlinePublisher(store)).request(buildId);
+  await (store.buildState ?? inlinePublisher(store)).request(buildId, only);
+}
+
+/**
+ * An operator's "retry current state" for one git channel: ask again for the open builds of its
+ * project, to that channel only. Resolves to how many builds were asked; never rejects. Callers
+ * check for a confirmed origin first, since without one nothing is delivered.
+ */
+export async function requestChannelStateNow(scope: {
+  projectId: string;
+  channelId: string;
+}): Promise<number> {
+  return await requestOpenBuildStates(getStore(), { request: requestBuildState }, scope);
 }
 
 /**

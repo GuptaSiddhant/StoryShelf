@@ -627,7 +627,7 @@ describe("createPuppeteerCaptureRunner targets (ADR 0007)", () => {
       );
     } finally {
       puppeteer.failLaunches(null);
-  puppeteer.resetLaunchGate();
+      puppeteer.resetLaunchGate();
     }
     expect(runner.metadata.targets?.[0]?.status).toEqual({
       unavailable: "Failed to launch the browser process!",

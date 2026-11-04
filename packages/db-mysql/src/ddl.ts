@@ -394,6 +394,7 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   last_error TEXT,
   last_error_at DATETIME(3),
+  last_delivered_at DATETIME(3),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_notification_channels_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

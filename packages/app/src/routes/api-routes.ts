@@ -39,6 +39,7 @@ export const API_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "DELETE /api/v1/projects/:slug/webhooks/:webhookId": "hosting",
   "GET /api/v1/projects/:slug/notification-channels": "hosting",
   "POST /api/v1/projects/:slug/notification-channels": "hosting",
+  "POST /api/v1/projects/:slug/notification-channels/:channelId/retry": "hosting",
   "DELETE /api/v1/projects/:slug/notification-channels/:channelId": "hosting",
   "GET /api/v1/projects/:slug/notifications/me": "hosting",
   "PUT /api/v1/projects/:slug/notifications/me": "hosting",

@@ -3,7 +3,9 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { retryChannelState } from "./channel-retry.ts";
 import { flash } from "./flash.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
 import { createGitChannel } from "./settings-git-channel.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -15,6 +17,7 @@ export function registerNotificationSettings(app: ShelfRouter): void {
   );
   app.post("/projects/:slug/settings/notifications", handleCreateChannel);
   app.post("/projects/:slug/settings/notifications/:channelId/delete", handleDeleteChannel);
+  app.post("/projects/:slug/settings/notifications/:channelId/retry", handleRetryChannel);
   app.post("/projects/:slug/settings/notifications/me", handleSaveMine);
 }
 
@@ -143,6 +146,20 @@ async function handleDeleteChannel(c: Context): Promise<Response> {
   }
   await model.remove(channel.id);
   flash(c, "Channel removed");
+  return c.html((await renderSettingsPage(c, "notifications")) ?? "");
+}
+
+/** Admin-only: ask again for the open builds' state on one git channel (nothing else is sent). */
+async function handleRetryChannel(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  const result = await retryChannelState(project, c.req.param("channelId") ?? "");
+  if (!result.ok) {
+    return c.html(
+      (await renderSettingsPage(c, "notifications", { globalError: result.message })) ?? "",
+      result.status,
+    );
+  }
+  flash(c, result.asked === 0 ? "No open builds to show" : "Asked for the current state again");
   return c.html((await renderSettingsPage(c, "notifications")) ?? "");
 }
 

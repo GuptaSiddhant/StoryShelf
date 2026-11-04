@@ -53,6 +53,8 @@ export interface SettingsNotificationChannel {
   /** Last delivery error, null while the channel delivers cleanly. */
   lastError: string | null;
   lastErrorAt: string | null;
+  /** When a delivery last succeeded, null if none has. */
+  lastDeliveredAt: string | null;
 }
 
 /** The viewer's own subscription for this project (null when opted out). */
@@ -145,21 +147,56 @@ function reactsTo(channel: SettingsNotificationChannel): string {
   return channel.events.length === 0 ? "all events" : channel.events.join(", ");
 }
 
-/** Delivery health: failing with the last error and time, or ok. */
-const ChannelHealth: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) =>
-  channel.lastError === null ? (
-    <Badge tone="success">ok</Badge>
-  ) : (
-    <VStack>
-      <Badge tone="danger">failing</Badge>
-      <Meta as="span">
-        <span class="truncate max-w-cell" title={channel.lastError}>
-          {channel.lastError}
-        </span>
-        {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
-      </Meta>
-    </VStack>
-  );
+/** When a channel last delivered: a relative time, or "Never". */
+const LastDelivered: FC<{ at: string | null }> = ({ at }) => (
+  <Meta as="span">
+    {at === null ? (
+      "Last delivered: never"
+    ) : (
+      <>
+        Last delivered <RelativeTime value={at} />
+      </>
+    )}
+  </Meta>
+);
+
+/** Delivery health: ok or failing (last error and time), and when it last delivered. */
+const ChannelHealth: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => (
+  <VStack>
+    {channel.lastError === null ? (
+      <Badge tone="success">ok</Badge>
+    ) : (
+      <>
+        <Badge tone="danger">failing</Badge>
+        <Meta as="span">
+          <span class="truncate max-w-cell" title={channel.lastError}>
+            {channel.lastError}
+          </span>
+          {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
+        </Meta>
+      </>
+    )}
+    <LastDelivered at={channel.lastDeliveredAt} />
+  </VStack>
+);
+
+/** Git channels only, admins only: ask again for the open builds' state on this channel. */
+const RetryForm: FC<{ project: Project; channel: SettingsNotificationChannel }> = ({
+  project,
+  channel,
+}) => (
+  <form
+    method="post"
+    action={`/projects/${project.slug}/settings/notifications/${channel.id}/retry`}
+    hx-post={`/projects/${project.slug}/settings/notifications/${channel.id}/retry`}
+    hx-target="body"
+  >
+    {csrfField()}
+    <Button variant="secondary" size="sm" type="submit">
+      Retry current state
+    </Button>
+  </form>
+);
 
 /** One channel table row; the delete action renders for admins only. */
 const ChannelRow: FC<{
@@ -181,6 +218,9 @@ const ChannelRow: FC<{
       <ChannelHealth channel={channel} />
     </td>
     <td>
+      {isAdmin && channel.delivery === "state" ? (
+        <RetryForm project={project} channel={channel} />
+      ) : null}
       {isAdmin ? (
         <form
           method="post"

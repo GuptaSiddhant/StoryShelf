@@ -15,20 +15,36 @@ const OPEN: ReadonlySet<BuildStatus> = new Set(["pending", "capturing", "compari
 /** Newest builds looked at per project. */
 const PER_PROJECT = 25;
 
-/** Ask `publisher` for the state of every open recent build; resolves to how many were asked. Never rejects. */
+/** Narrows {@link requestOpenBuildStates}: one project, and within it one git channel. */
+export interface OpenBuildScope {
+  projectId?: string;
+  /** Only this channel is asked (an operator retry); other channels keep what they show. */
+  channelId?: string;
+}
+
+/**
+ * Ask `publisher` for the state of every open recent build (of `scope`, when given); resolves to
+ * how many builds were asked. Never rejects.
+ */
 export async function requestOpenBuildStates(
   deps: Pick<BuildStateDeps, "db" | "logger">,
   publisher: BuildStatePublisher,
+  scope: OpenBuildScope = {},
 ): Promise<number> {
   try {
-    const projects = await new ProjectModel(deps.db).list();
+    const projects = (await new ProjectModel(deps.db).list()).filter(
+      (project) => scope.projectId === undefined || project.id === scope.projectId,
+    );
     const lists = await Promise.all(
       projects.map(async (project) => await openBuildIds(deps, project.id)),
     );
     const ids = lists.flat();
+    const { channelId } = scope;
     await Promise.all(
       ids.map(async (id) => {
-        await publisher.request(id);
+        await (channelId === undefined
+          ? publisher.request(id)
+          : publisher.request(id, { channelId }));
       }),
     );
     return ids.length;
