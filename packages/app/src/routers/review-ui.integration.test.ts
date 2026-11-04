@@ -87,6 +87,8 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
     version: "0.0.0",
     kind: "log",
     category: "notifier" as const,
+    // Stands in for a personal transport as well as the project's room: subscriptions use it.
+    audience: "person" as const,
     schema: z.object({}).loose(),
   };
   const log: NotifierProvider = {

@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { NotificationSubscriptionModel } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, unauthorized } from "./helpers.ts";
@@ -30,6 +31,22 @@ function toPublic(row: NotificationSubscriptionRow): {
     via: NotificationSubscriptionModel.viaOf(row),
     enabled: row.enabled,
   };
+}
+
+/**
+ * Refuse a subscription kind that posts to a room (Slack, Teams): a subscription is personal, so
+ * it may only name kinds that address one person. A room belongs to a project channel. Kinds that
+ * are not wired are left alone (nothing says what they address).
+ */
+function assertPersonalKinds(via: readonly string[] | undefined): void {
+  for (const kind of via ?? []) {
+    const provider = getStore().notifiers.find((candidate) => candidate.metadata.kind === kind);
+    if (provider !== undefined && provider.metadata.audience !== "person") {
+      throw new HTTPException(422, {
+        message: `${provider.metadata.name} posts to a room; add it as a project channel instead`,
+      });
+    }
+  }
 }
 
 /** Require a session user (subscriptions are meaningless without identity). */
@@ -71,6 +88,7 @@ const putSubscriptionRoute = createRoute({
       content: { "application/json": { schema: notificationSubscriptionSchema } },
       description: "Saved notification subscription",
     },
+    422: { description: "A listed delivery kind posts to a room; add it as a project channel" },
     ...notFoundResponse,
     ...unauthorizedResponse,
   },
@@ -119,6 +137,7 @@ export function registerNotificationSubscriptions(app: ShelfRouter): void {
   app.openapi(putSubscriptionRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const body = c.req.valid("json");
+    assertPersonalKinds(body.via);
     const row = await new NotificationSubscriptionModel(getStore().db).upsert(
       project.id,
       currentUserId(),
