@@ -154,15 +154,9 @@ async function closeEndedAttempt(
   target: { buildId: string; shardId: string },
   error: string,
 ): Promise<CrashFailureOutcome> {
-  // The plan first: a retry writes its new plan only after clearing the old rows, so a shard that
-  // is still there after this read belongs to the plan that was read.
-  const plan = await shards.plan(target.buildId);
-  if (!plan?.attemptId || !(await shards.get(target.shardId))) {
-    return "skipped";
-  }
-  const open = await openAttemptOf(deps, target.buildId, plan.attemptId);
+  const open = await openAttemptOfRun(deps, shards, target);
   if (!open) {
-    return "skipped"; // nothing was left to close: the first pass finished
+    return "skipped"; // nothing was left to close, or the run is not this hook's
   }
   // The counts the first pass would have recorded, rebuilt (not by reducing the ended build again).
   const counts = await finalizedCounts(shards, target.buildId);
@@ -174,6 +168,24 @@ async function closeEndedAttempt(
   );
   await deps.buildState.request(target.buildId);
   return "finalized";
+}
+
+/** The plan's attempt, when the hook's own shard failed in that plan and the attempt is still open. */
+async function openAttemptOfRun(
+  deps: DispatchDeps,
+  shards: CaptureShardModel,
+  target: { buildId: string; shardId: string },
+): Promise<CaptureAttempt | undefined> {
+  // The plan first: a retry writes its new plan only after clearing the old rows, so a shard that
+  // is still there after this read belongs to the plan that was read.
+  const plan = await shards.plan(target.buildId);
+  const shard = await shards.get(target.shardId);
+  // Only a shard that really ended `failed` closes an attempt: `fail` leaves a `done` shard alone
+  // (a duplicate delivery), and the worker that finalized the build closes its attempt itself.
+  if (!plan?.attemptId || shard?.status !== "failed") {
+    return undefined;
+  }
+  return await openAttemptOf(deps, target.buildId, plan.attemptId);
 }
 
 /** The build's attempt `attemptId`, when it is still queued or running. */

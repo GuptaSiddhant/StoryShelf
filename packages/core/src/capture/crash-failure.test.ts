@@ -289,6 +289,16 @@ describe("failCrashedCapture", () => {
       const rows = await attempts.listByBuild(w.build.id);
       expect(rows.find((row) => row.id === newer.id)?.status).toBe("queued");
     });
+    it("leaves the attempt to the worker that finalized the build when the crashed shard is done", async () => {
+      const { w, crashed, openAttempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "approved");
+      // A duplicate delivery crashed on a shard another run already finished.
+      await new CaptureShardModel(w.db).complete(crashed.shard ?? "", "{}");
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+      expect(await openAttempts()).toHaveLength(1);
+    });
+
     it("closes only the old run's attempt when a retry replaces the plan mid-cleanup", async () => {
       const { w, crashed, attempts } = await lastShardCrashed();
       const shards = new CaptureShardModel(w.db);
