@@ -8,6 +8,7 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ComponentCatalogView } from "../routers/component-catalog.handlers.ts";
 import type { ComponentReview } from "../routers/review-section.handlers.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Alert,
   Badge,
@@ -17,6 +18,7 @@ import {
   HStack,
   Meta,
   PageHeader,
+  RelativeTime,
   SectionTitle,
   Table,
   Tabs,
@@ -24,7 +26,6 @@ import {
   VStack,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import {
   snapshotCardBody,
   snapshotCardHead,
@@ -34,7 +35,13 @@ import {
 import type { SnapshotGroup } from "./build-diff-model.ts";
 import { snapshotImageUrl, snapshotVariant } from "./build-diff-model.ts";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
-import { ComponentBuilds, StoriesTab } from "./component-stories.tsx";
+import {
+  ComponentBuilds,
+  ShownBadge,
+  StoriesTab,
+  buildParam,
+  showBuildHref,
+} from "./component-stories.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -66,6 +73,15 @@ export interface CapturedComponent {
   presence: ComponentPresence;
 }
 
+/** The build a `?build=` asked the page to show (absent without the parameter). */
+export interface BuildSelection {
+  build: Build;
+  /** Whether it is the newest build that has the file, so the page needs no banner. */
+  newest: boolean;
+  /** Whether the file is in it; when not, the page shows no states and no comments. */
+  present: boolean;
+}
+
 /** Data behind the component page. */
 export interface ComponentPageData {
   project: Project;
@@ -79,6 +95,8 @@ export interface ComponentPageData {
   /** The published Storybook's view of the file: stories, docs entries, build history. */
   catalog: ComponentCatalogView;
   captured: CapturedComponent | null;
+  /** The explicitly selected build, or null for the newest build that has the file. */
+  selection: BuildSelection | null;
   /** Story id the Stories tab previews (the first story when unset or unknown). */
   story: string | undefined;
   /**
@@ -112,17 +130,54 @@ export function renderComponentPage(data: ComponentPageData): RenderedContent {
         description={<span class="mono">{importPath}</span>}
         meta={<HeaderMeta data={data} />}
       />
+      <BuildBanner data={data} />
       <PresenceNotice data={data} />
       <Tabs
         label="Component sections"
         tabs={componentTabs(data.testing).map((tab) => ({
           label: TAB_LABELS[tab],
-          href: `?tab=${tab}`,
+          href: `?tab=${tab}${buildParam(data)}`,
           active: data.tab === tab,
         }))}
       />
       <ActiveTab data={data} />
     </DocumentLayout>
+  );
+}
+
+/** Which build is shown when one was selected, with a way back to the latest. */
+function BuildBanner(props: { data: ComponentPageData }): Rendered | null {
+  const { data } = props;
+  const { selection } = data;
+  if (!selection || (selection.newest && selection.present)) return null;
+  const { build } = selection;
+  const urls = createUrlBuilder("/", data.publishedBaseDomain);
+  const label = `${build.gitSha.slice(0, 7)} (${build.gitBranch})`;
+  const latest = `?tab=${data.tab}`;
+  if (!selection.present) {
+    return (
+      <Alert tone="warning" title="Not in this build">
+        <HStack>
+          <span>This component isn't in build {label}. Show the latest build to see it.</span>
+          <Button variant="secondary" size="sm" href={latest}>
+            Show latest
+          </Button>
+        </HStack>
+      </Alert>
+    );
+  }
+  return (
+    <Alert tone="info" title={`Showing build ${label}`}>
+      <HStack>
+        <span>
+          Captured <RelativeTime value={build.createdAt} />. This is not the latest build.{" "}
+          <a href={urls.build(data.project.slug, build.id)}>Open the build</a>
+        </span>
+        <Button variant="secondary" size="sm" href={latest}>
+          Show latest
+        </Button>
+      </HStack>
+    </Alert>
   );
 }
 
@@ -278,6 +333,7 @@ function CapturedRow(props: { row: ComponentHistoryRow; data: ComponentPageData 
     <tr>
       <td>
         <a href={urls.build(slug, row.build.id)}>{row.build.gitSha.slice(0, 7)}</a>
+        <ShownBadge data={data} buildId={row.build.id} />
       </td>
       <td>{row.build.gitBranch}</td>
       <td>
@@ -287,13 +343,18 @@ function CapturedRow(props: { row: ComponentHistoryRow; data: ComponentPageData 
         <Badge tone={statusTone(row.status)}>{row.status}</Badge>
       </td>
       <td>
-        <Button
-          variant="ghost"
-          size="sm"
-          href={`${urls.buildDiff(slug, row.build.id)}?snapshot=${row.snapshotId}`}
-        >
-          Review
-        </Button>
+        <HStack>
+          <Button variant="ghost" size="sm" href={showBuildHref(row.build.id)}>
+            Show
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            href={`${urls.buildDiff(slug, row.build.id)}?snapshot=${row.snapshotId}`}
+          >
+            Review
+          </Button>
+        </HStack>
       </td>
     </tr>
   );

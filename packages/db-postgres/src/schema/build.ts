@@ -30,6 +30,8 @@ export const builds = pgTable(
     affectedImportPaths: text("affected_import_paths"),
     testResults: text("test_results"),
     captureGeneration: integer("capture_generation").notNull().default(0),
+    reviewCycle: integer("review_cycle").notNull().default(0),
+    reviewRequestedCycle: integer("review_requested_cycle"),
     captureJobId: text("capture_job_id"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
@@ -63,6 +65,8 @@ export interface Build {
   affectedImportPaths: string | null;
   testResults: string | null;
   captureGeneration: number;
+  reviewCycle: number;
+  reviewRequestedCycle: number | null;
   captureJobId: string | null;
   createdAt: string;
   updatedAt: string;

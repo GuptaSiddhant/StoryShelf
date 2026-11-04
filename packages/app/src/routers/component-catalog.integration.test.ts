@@ -162,6 +162,35 @@ describe("component page without testing", () => {
     expect((await app.request("/projects/zzz/components/src/Button.stories.tsx")).status).toBe(404);
   });
 
+  it("shows the stories of an explicitly selected build, with a banner and a way back", async () => {
+    const { app, b1 } = await seed();
+    const html = await page(app, `src/Button.stories.tsx?build=${b1.id}`);
+    expect(html).toContain("Showing build sha-b1");
+    expect(html).toContain("Show latest");
+    expect(html).toContain("2 stories");
+    expect(html).toContain(">Primary<");
+    expect(html).not.toContain(">Tertiary<");
+    expect(html).toContain(`?tab=history&amp;build=${b1.id}`);
+    // The newest build needs no banner, and no parameter changes nothing.
+    const latest = await page(app, "src/Button.stories.tsx");
+    expect(latest).not.toContain("Showing build");
+    expect(latest).toContain(">Tertiary<");
+  });
+
+  it("answers 404 for a build that is unknown or belongs to no such project, and 200 'Not in this build' for one without the file", async () => {
+    const { app, b2 } = await seed();
+    expect(
+      (await app.request("/projects/app/components/src/Button.stories.tsx?build=nope")).status,
+    ).toBe(404);
+    const missing = await app.request(
+      `/projects/app/components/src/Old.stories.tsx?build=${b2.id}`,
+    );
+    expect(missing.status).toBe(200);
+    const html = await missing.text();
+    expect(html).toContain("Not in this build");
+    expect(html).not.toContain("old--default");
+  });
+
   it("catalogues the latest build lazily so presence and history work for older publishes", async () => {
     const { app, db, project, objects } = await seed();
     // forget every row and catalog, as for builds published before the catalog existed

@@ -151,6 +151,8 @@ const builds = defineTable("builds", {
   affectedImportPaths: "affected_import_paths",
   testResults: "test_results",
   captureGeneration: "capture_generation",
+  reviewCycle: "review_cycle",
+  reviewRequestedCycle: "review_requested_cycle",
   captureJobId: "capture_job_id",
   createdAt: "created_at",
   updatedAt: "updated_at",
@@ -317,6 +319,9 @@ const comments = defineTable("comments", {
   createdAt: "created_at",
   updatedAt: "updated_at",
   storyId: "story_id",
+  kind: "kind",
+  resolvedAt: "resolved_at",
+  resolvedBy: "resolved_by",
 });
 
 const labelTypes = defineTable("label_types", {

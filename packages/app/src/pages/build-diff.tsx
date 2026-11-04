@@ -5,8 +5,8 @@ import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
 import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
+import { DocumentLayout, type NavConfig, type RenderedContent } from "../shell/document.tsx";
 import { EmptyState } from "../ui/components.tsx";
-import { DocumentLayout, type NavConfig, type RenderedContent } from "../ui/document.tsx";
 import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
 import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
@@ -28,6 +28,10 @@ export interface BuildDiffData {
   comments: Comment[];
   selectedId?: string;
   canReview: boolean;
+  /** Whether the viewer may resolve and reopen comments. */
+  canTriage: boolean;
+  /** Display names of the users behind comments, by user id. */
+  names: ReadonlyMap<string, string>;
   hasBaseline: Record<string, boolean>;
   reference?: BaselineReference;
   defaultComparison?: DefaultComparison | null;
@@ -52,6 +56,10 @@ interface DiffReviewGridProps {
   comments: Comment[];
   selected?: Snapshot;
   canReview: boolean;
+  /** Whether the viewer may resolve and reopen comments. */
+  canTriage: boolean;
+  /** Display names of the users behind comments, by user id. */
+  names: ReadonlyMap<string, string>;
   hasBaseline: Record<string, boolean>;
   reference?: BaselineReference;
   defaultComparison?: DefaultComparison | null;
@@ -70,11 +78,30 @@ export function selectedSnapshot(snapshots: Snapshot[], selectedId?: string): Sn
   );
 }
 
+/** The comment thread of the selected snapshot; none while the project has review off. */
+function SnapshotComments(props: {
+  grid: DiffReviewGridProps;
+  selected: Snapshot;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { grid, selected } = props;
+  return grid.project.reviewEnabled === false ? null : (
+    <DiffComments
+      project={grid.project}
+      build={grid.build}
+      selectedId={selected.id}
+      selectedStoryId={selected.storyId}
+      comments={grid.comments}
+      canTriage={grid.canTriage}
+      names={grid.names}
+    />
+  );
+}
+
 /** Snapshot nav plus the viewer/comments column for the selected snapshot. */
 function DiffReviewGrid(
   props: DiffReviewGridProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, snapshots, comments, selected, canReview, hasBaseline, drifted } = props;
+  const { project, build, snapshots, selected, canReview, hasBaseline, drifted } = props;
   const { usage, design, publishedBaseDomain } = props;
   return (
     <div class={workspace}>
@@ -95,16 +122,7 @@ function DiffReviewGrid(
               design={design}
               publishedBaseDomain={publishedBaseDomain}
             />
-            {project.reviewEnabled === false ? null : (
-              <DiffComments
-                project={project}
-                build={build}
-                selectedId={selected.id}
-                selectedStoryId={selected.storyId}
-                comments={comments}
-                canReview={canReview}
-              />
-            )}
+            <SnapshotComments grid={props} selected={selected} />
             <DiffActionBar
               project={project}
               build={build}

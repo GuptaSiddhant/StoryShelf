@@ -1,5 +1,5 @@
 /** Build records, status transitions, and publication helpers. */
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
@@ -7,6 +7,40 @@ import type { Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
+
+/** The verdict statuses; a build leaving them for `pending` is reopened. */
+const REVIEWED: ReadonlySet<BuildStatus> = new Set<BuildStatus>(["approved", "rejected"]);
+
+/** Reopening attempts when another writer changes the cycle between the read and the write. */
+const REOPEN_ATTEMPTS = 3;
+
+/** The last stamp handed out by `uniqueStamp` or `nextStamp`; both only ever move it forward. */
+let lastStamp = 0;
+
+/**
+ * An ISO timestamp no other call in this process returns twice and later than `after` (the
+ * `updatedAt` the row had), so it cannot be mistaken for a write that was already there.
+ */
+function uniqueStamp(after: string): string {
+  const seen = Date.parse(after);
+  lastStamp = Math.max(Date.now(), lastStamp + 1, Number.isNaN(seen) ? 0 : seen + 1);
+  return new Date(lastStamp).toISOString();
+}
+
+const TIMESTAMP_TEXT =
+  /^(?<day>\d{4}-\d\d-\d\d)[T ](?<time>\d\d:\d\d:\d\d(?:\.\d+)?)(?<zone>Z|[+-]\d\d(?::?\d\d)?)?$/u;
+
+/** Whether two timestamp texts (ISO, or a driver's `YYYY-MM-DD HH:MM:SS.mmm+00`) are one instant. */
+function sameInstant(left: string, right: string): boolean {
+  const instants = [left, right].map((text) => {
+    const found = TIMESTAMP_TEXT.exec(text)?.groups;
+    if (!found) return Number.NaN;
+    const zone = found["zone"] ?? "Z";
+    const offset = /^[+-]\d\d$/u.test(zone) ? `${zone}:00` : zone;
+    return Date.parse(`${found["day"]}T${found["time"]}${offset}`);
+  });
+  return !Number.isNaN(instants[0]) && instants[0] === instants[1];
+}
 
 /** Tables required by {@link BuildModel}. */
 export interface BuildTables {
@@ -119,6 +153,10 @@ export class BuildModel {
     options: { reset?: boolean } = {},
   ): Promise<Build> {
     const values = { ...patch, updatedAt: new Date().toISOString() };
+    if (patch.status === "pending") {
+      const reopened = await this.reopen(id, values);
+      if (reopened) return reopened;
+    }
     if (patch.status !== undefined && patch.status !== "cancelled" && options.reset !== true) {
       const current = (await this.db.updateWhere(
         this.tables.builds,
@@ -136,6 +174,72 @@ export class BuildModel {
       return current;
     }
     return (await this.db.update(this.tables.builds, id, values)) as unknown as Build;
+  }
+
+  /**
+   * A verdict build going back to `pending` starts a new review cycle. The write is a
+   * compare-and-set on the `review_cycle` just read (`WHERE status IN (approved, rejected) AND
+   * review_cycle = ?`, setting it to the next value), so two writers cannot count one reopening
+   * twice and a lost race is retried against the fresh row. Null when the build was in another
+   * status (the plain write then applies).
+   */
+  private async reopen(
+    id: string,
+    values: Record<string, unknown>,
+    attempts = REOPEN_ATTEMPTS,
+  ): Promise<Build | null> {
+    const { builds } = this.tables;
+    const current = (await this.db.get(builds, id)) as unknown as Build | null;
+    if (!current || !REVIEWED.has(current.status)) return null;
+    const cycle = current.reviewCycle ?? 0;
+    // A refused write returns the current row, so the outcome is read from it: `pending` means
+    // this write or a concurrent reopening landed (counted once either way).
+    const written = (await this.db.updateWhere(
+      builds,
+      id,
+      { ...values, reviewCycle: cycle + 1 } as never,
+      and(
+        inArray(col(builds, "status"), [...REVIEWED]),
+        eq(col(builds, "reviewCycle"), cycle),
+      ) as never,
+    )) as unknown as Build | null;
+    if (written?.status === "pending") return written;
+    return attempts > 1 ? await this.reopen(id, values, attempts - 1) : null;
+  }
+
+  /**
+   * Claim the right to announce this build's review request for its current cycle: one atomic
+   * compare-and-set on the cycle and the requested cycle just read (`review_requested_cycle` goes
+   * from NULL or an older cycle to `review_cycle`, only while `pending`), so it holds across
+   * retries, concurrent hooks and instances. Resolves to the row, whose `reviewCycle` is the cycle
+   * to announce, when this caller won; null when the cycle was already claimed or the build is not
+   * `pending`.
+   *
+   * The adapter returns the current row for a refused write too, so the winner is the caller whose
+   * own `updatedAt` stamp (unique within the process, later than the row's) is on the returned
+   * row. Drivers hand a timestamp back in their own text form, so the two are compared as instants.
+   */
+  async claimReviewRequest(id: string): Promise<Build | null> {
+    const { builds } = this.tables;
+    const before = (await this.db.get(builds, id)) as unknown as Build | null;
+    if (before?.status !== "pending") return null;
+    const cycle = before.reviewCycle ?? 0;
+    const requested = before.reviewRequestedCycle ?? null;
+    if ((requested ?? -1) >= cycle) return null;
+    const stamp = uniqueStamp(before.updatedAt);
+    const written = (await this.db.updateWhere(
+      builds,
+      id,
+      { reviewRequestedCycle: cycle, updatedAt: stamp } as never,
+      and(
+        eq(col(builds, "status"), "pending"),
+        eq(col(builds, "reviewCycle"), cycle),
+        requested === null
+          ? isNull(col(builds, "reviewRequestedCycle"))
+          : eq(col(builds, "reviewRequestedCycle"), requested),
+      ) as never,
+    )) as unknown as Build | null;
+    return written && sameInstant(written.updatedAt, stamp) ? written : null;
   }
 
   async setStatus(id: string, status: BuildStatus): Promise<Build> {
@@ -383,8 +487,6 @@ export interface BuildListFilter {
 
 /** How many times a reset re-reads the generation after losing a race to another reset. */
 const RESET_ATTEMPTS = 5;
-
-let lastStamp = 0;
 
 /** The instant a stored timestamp names, in epoch ms, whichever string form the driver returns. */
 function instantOf(value: string): number {

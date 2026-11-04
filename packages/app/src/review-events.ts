@@ -5,27 +5,37 @@
  *
  * - `review:requested`: a build is waiting for a verdict. Default-on for the project's approvers
  *   and admins (see `notify.ts`).
- * - `review:comment`: a build or story comment (snapshot comments keep `comment:created`).
+ * - `comment:created`: every comment, the one canonical event; `data.scope` is `build`, `story` or
+ *   `snapshot`. `review:comment` is only a filter alias for the build and story scopes (see
+ *   `matchesEvent` in core), never emitted.
  * - `review:verdict`: a reviewer approved or rejected a build.
  */
 import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
 import type { Build, Project } from "@storyshelf/core/schema";
+import { COMMENT_CREATED, REVIEW_COMMENT_ALIAS } from "@storyshelf/core/utils";
 import { credentialKeys } from "./credential-keys.ts";
 import { notifyProjectWith, type NotifyDeps } from "./notify.ts";
 import { getStore } from "./store.ts";
 
-/** Event names of the review topics. */
+/** Event names of the review topics. `comment` is the alias, `commentCreated` the emitted event. */
 export const REVIEW_EVENTS = {
   requested: "review:requested",
-  comment: "review:comment",
+  comment: REVIEW_COMMENT_ALIAS,
+  commentCreated: COMMENT_CREATED,
   verdict: "review:verdict",
 } as const;
+
+/** Events a review announcement raises: the alias `review:comment` is never one of them. */
+export type AnnouncedReviewEvent = Exclude<
+  (typeof REVIEW_EVENTS)[keyof typeof REVIEW_EVENTS],
+  typeof REVIEW_COMMENT_ALIAS
+>;
 
 /** Webhook and notification fan-out for one review event, from explicit dependencies. */
 export async function announceReviewWith(
   deps: NotifyDeps,
   project: Pick<Project, "id" | "slug">,
-  event: (typeof REVIEW_EVENTS)[keyof typeof REVIEW_EVENTS],
+  event: AnnouncedReviewEvent,
   data: Record<string, unknown>,
   buildId: string,
 ): Promise<void> {
@@ -44,16 +54,21 @@ export async function announceReviewWith(
 /** {@link announceReviewWith} inside a request. */
 export async function announceReview(
   project: Pick<Project, "id" | "slug">,
-  event: (typeof REVIEW_EVENTS)[keyof typeof REVIEW_EVENTS],
+  event: AnnouncedReviewEvent,
   data: Record<string, unknown>,
   buildId: string,
 ): Promise<void> {
   await announceReviewWith(getStore(), project, event, data, buildId);
 }
 
-/** What `review:requested` carries: the build to look at. */
+/**
+ * What `review:requested` carries: the build to look at. `eventId` is `<buildId>:<cycle>`, so every
+ * delivery of one cycle's request, retries included, has the same identity, and a reopened build
+ * (a new cycle) a new one.
+ */
 export function reviewRequestedData(build: Build): Record<string, unknown> {
   return {
+    eventId: `${build.id}:${String(build.reviewCycle ?? 0)}`,
     buildId: build.id,
     gitSha: build.gitSha,
     gitBranch: build.gitBranch,

@@ -21,6 +21,7 @@ import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
 import { loadBaselineView } from "./baseline-guard.ts";
 import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
+import { isBuildAuthor } from "./comment-triage.ts";
 import { loadComponentPage } from "./component.handlers.ts";
 import { registerDesignCoverage } from "./design-coverage.ts";
 import {
@@ -33,6 +34,7 @@ import { flash } from "./flash.ts";
 import { currentProjectRole } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { linkedUsageByStory, linkedUsageFor } from "./links.handlers.ts";
+import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
 import { registerSettingsPages } from "./settings.ts";
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
@@ -181,6 +183,7 @@ export function registerUiPages(app: ShelfRouter): void {
     const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
     const { user, authEnabled } = getStore();
     const canReview = !authEnabled || Boolean(user);
+    const canTriage = (await reviewCapabilities(project)).canComment || isBuildAuthor(build);
     const selected = selectedSnapshot(snapshots, snapshotId);
     const design = selected
       ? await loadReviewDesign(
@@ -198,6 +201,8 @@ export function registerUiPages(app: ShelfRouter): void {
         comments,
         selectedId: snapshotId,
         canReview,
+        canTriage,
+        names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),
         hasBaseline,
         drifted,
         reference: selected ? await loadBaselineReference(project, build, selected) : undefined,
@@ -241,7 +246,14 @@ export function registerUiPages(app: ShelfRouter): void {
     const slug = c.req.param("slug");
     const base = `/projects/${slug}/components/`;
     const path = c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "";
-    const data = await loadComponentPage(c, slug, path, c.req.query("tab"), c.req.query("story"));
+    const data = await loadComponentPage(
+      c,
+      slug,
+      path,
+      c.req.query("tab"),
+      c.req.query("story"),
+      c.req.query("build"),
+    );
     return data ? c.html(renderComponentPage(data)) : c.notFound();
   });
 

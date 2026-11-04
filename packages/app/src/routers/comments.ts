@@ -3,10 +3,10 @@ import { CommentModel, type CommentCreateInput } from "@storyshelf/core/models";
 import type { Comment, Project } from "@storyshelf/core/schema";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
-import { notifyProject } from "../notify.ts";
 import { REVIEW_EVENTS, announceReview } from "../review-events.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
+import { resolveTriager } from "./comment-triage.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
@@ -60,7 +60,22 @@ const resolveCommentRoute = createRoute({
   },
 });
 
-/** Register the build comment list, create, and resolve endpoints. */
+const reopenCommentRoute = createRoute({
+  method: "post",
+  tags: ["Review"],
+  summary: "Reopen a resolved comment",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/comments/{commentId}/reopen",
+  request: { params: z.object({ slug: z.string(), buildId: z.string(), commentId: z.string() }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: commentSchema } },
+      description: "Comment reopened",
+    },
+    ...notFound,
+  },
+});
+
+/** Register the build comment list, create, resolve and reopen endpoints. */
 export function registerComments(app: ShelfRouter): void {
   app.openapi(listCommentsRoute, async (c) => {
     const { slug, buildId } = c.req.valid("param");
@@ -81,23 +96,41 @@ export function registerComments(app: ShelfRouter): void {
 
   app.openapi(resolveCommentRoute, async (c) => {
     const { slug, buildId, commentId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
-    const build = await buildForProject(project.id, buildId);
+    const { build } = await resolveTriager(c, slug, buildId);
     const comment = await resolveBuildComment(build.id, commentId);
     hxRefresh(c);
     flashHx(c, "Comment resolved");
     return c.json(comment);
   });
+
+  app.openapi(reopenCommentRoute, async (c) => {
+    const { slug, buildId, commentId } = c.req.valid("param");
+    const { build } = await resolveTriager(c, slug, buildId);
+    const comment = await reopenBuildComment(build.id, commentId);
+    hxRefresh(c);
+    flashHx(c, "Comment reopened");
+    return c.json(comment);
+  });
 }
 
-/** Mark a comment of `buildId` resolved; 404 for a comment of another build. */
+/** A comment of `buildId`; 404 for a comment of another build. */
+async function commentOfBuild(buildId: string, commentId: string): Promise<Comment> {
+  const found = (await new CommentModel(getStore().db).listByBuild(buildId)).find(
+    (item) => item.id === commentId,
+  );
+  return found ?? throwNotFound("Comment not found");
+}
+
+/** Mark a comment of `buildId` resolved by the current user; 404 for a comment of another build. */
 export async function resolveBuildComment(buildId: string, commentId: string): Promise<Comment> {
-  const comments = new CommentModel(getStore().db);
-  const found = (await comments.listByBuild(buildId)).find((item) => item.id === commentId);
-  if (!found) {
-    throwNotFound("Comment not found");
-  }
-  return await comments.resolve(commentId);
+  await commentOfBuild(buildId, commentId);
+  return await new CommentModel(getStore().db).resolve(commentId, getStore().user?.id ?? null);
+}
+
+/** Open a resolved comment of `buildId` again; 404 for a comment of another build. */
+export async function reopenBuildComment(buildId: string, commentId: string): Promise<Comment> {
+  await commentOfBuild(buildId, commentId);
+  return await new CommentModel(getStore().db).reopen(commentId);
 }
 
 /** A comment anchors to the build, a story or a snapshot (ADR 0013, decision 2), never two. */
@@ -112,23 +145,31 @@ function assertOneAnchor(body: {
   }
 }
 
+/** Where a comment is anchored: its snapshot, else its story, else the build. */
+export function commentScope(comment: Comment): "build" | "story" | "snapshot" {
+  if (comment.snapshotId !== null) {
+    return "snapshot";
+  }
+  return comment.storyId === null ? "build" : "story";
+}
+
 /**
- * Snapshot comments keep `comment:created`; build and story comments, the review ones, raise
- * `review:comment` (webhook and notifications, ADR 0013, decision 10). One event per comment.
+ * Every comment raises one `comment:created` (ADR 0013, decision 10), anchored by `scope`.
+ * `review:comment` is a subscription alias for the build and story scopes, not a second event.
+ * `eventId` is the comment id, so a retried delivery carries the same id.
  */
 async function announceComment(project: Project, buildId: string, comment: Comment): Promise<void> {
   const data = {
+    eventId: comment.id,
+    scope: commentScope(comment),
     buildId,
     commentId: comment.id,
     snapshotId: comment.snapshotId,
     storyId: comment.storyId,
+    kind: comment.kind,
     body: comment.body.slice(0, 500),
   };
-  if (comment.snapshotId === null) {
-    await announceReview(project, REVIEW_EVENTS.comment, data, buildId);
-    return;
-  }
-  await notifyProject(project, "comment:created", data, `/builds/${buildId}`);
+  await announceReview(project, REVIEW_EVENTS.commentCreated, data, buildId);
 }
 
 export async function createComment(

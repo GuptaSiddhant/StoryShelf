@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { JSDOM, type DOMWindow } from "jsdom";
 import { describe, expect, it } from "vitest";
-import type { DesignSource } from "../../pages/build-diff-model.ts";
-import { ComparisonSources } from "../../pages/build-diff-reference.tsx";
-import { CompareStage } from "../components.tsx";
+import type { DesignSource } from "../pages/build-diff-model.ts";
+import { ComparisonSources } from "../pages/build-diff-reference.tsx";
+import { CompareStage } from "../ui/components.tsx";
 import { clientScript } from "./client-script.ts";
 
 /**

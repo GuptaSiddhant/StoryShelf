@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS builds (
   affected_import_paths TEXT,
   test_results TEXT,
   capture_generation INTEGER NOT NULL DEFAULT 0,
+  review_cycle INTEGER NOT NULL DEFAULT 0,
+  review_requested_cycle INTEGER,
   capture_job_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -227,7 +229,10 @@ CREATE TABLE IF NOT EXISTS comments (
   resolved INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  story_id TEXT
+  story_id TEXT,
+  kind TEXT NOT NULL DEFAULT 'comment',
+  resolved_at TEXT,
+  resolved_by TEXT
 );
 CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id);
 CREATE TABLE IF NOT EXISTS build_reviews (
