@@ -10,10 +10,10 @@
  * manifest of `--entries` files (`--shared` of them common to all builds, like a real design
  * system's assets), then runs `collectUnreferencedContent` `--runs` times over 50 candidate hashes
  * that no manifest names. That is the worst case: the scan only stops early once no candidate is
- * left, so it reads every manifest. The lifecycle is a stub, so the numbers are the scan's.
+ * left, so it reads every manifest. The lifecycle is a stub, so a pass is the scan plus the removal of the candidates.
  *
- * `--latency <ms>` adds that delay to every storage `exists` and `read`, to stand in for a remote
- * store (S3, GCS, Azure; a manifest costs one of each); local disk is the floor. Prints one JSON line per run (pass time) and one for memory.
+ * `--latency <ms>` adds that delay to every storage `exists`, `read` and `delete`, to stand in for a
+ * remote store (S3, GCS, Azure; a manifest costs one `exists` and one `read`, a removed blob a `delete`); local disk is the floor. Prints one JSON line per run (pass time) and one for memory.
  * Needs the built `dist/` of core, db-sqlite and storage-local (`nubx turbo build`). Not wired
  * into CI: run it by hand to re-measure after a change to `retention/content-gc.ts`.
  */
@@ -121,9 +121,9 @@ try {
   let inFlight = 0;
   let peakInFlight = 0;
   if (LATENCY_MS > 0) {
-    // A remote store answers `exists` (a HEAD) and `read` (a GET) in a round trip each, and a
-    // manifest costs one of each: both are delayed, so a pass pays two requests per build.
-    for (const method of ["exists", "read"]) {
+    // A remote store answers `exists` (a HEAD), `read` (a GET) and `delete` in a round trip each.
+    // A manifest costs one `exists` and one `read`; each removed blob costs `delete` calls.
+    for (const method of ["exists", "read", "delete"]) {
       const real = storage[method].bind(storage);
       storage[method] = async (key) => {
         requests += 1;
