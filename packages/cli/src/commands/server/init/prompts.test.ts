@@ -44,7 +44,7 @@ function asked(call: number): string[] {
 }
 
 /** Number of database choices the third prompt offers, with advanced adapters on or off. */
-async function databaseChoices (advancedAdapters: boolean): Promise<number> {
+async function databaseChoices(advancedAdapters: boolean): Promise<number> {
   vi.mocked(prompts)
     .mockReset()
     .mockResolvedValueOnce({ ...PROJECT, deployTarget: "local" })
@@ -56,7 +56,7 @@ async function databaseChoices (advancedAdapters: boolean): Promise<number> {
     (question) => question.name === "database",
   );
   return database?.choices?.length ?? 0;
-};
+}
 
 describe("promptInitial", () => {
   const choices = [{ value: "a" }, { value: "b" }];
