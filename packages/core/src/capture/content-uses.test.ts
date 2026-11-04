@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
+import { CLAIM_LEASE_MS } from "../retention/content-gc.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/index.ts";
 import { contentKey } from "../utils/paths.ts";
 import { ContentCollectingError, recordContentUses } from "./content-uses.ts";
@@ -33,7 +34,7 @@ describe("recordContentUses", () => {
   it("passes each distinct hash once, and skips the call for none", async () => {
     const { db, record } = withLifecycle([]);
     await recordContentUses(db, storageWith(H1, H2), target, [H1, H2, H1]);
-    expect(record).toHaveBeenCalledWith("p", "b", [H1, H2]);
+    expect(record).toHaveBeenCalledWith("p", "b", [H1, H2], expect.any(String));
 
     record.mockClear();
     await recordContentUses(db, storageWith(), target, []);
@@ -71,7 +72,7 @@ describe("recordContentUses", () => {
     const skipped = await recordContentUses(db, storage, target, [evil, H1, "", evil], logger);
 
     expect(skipped).toBe(2);
-    expect(record).toHaveBeenCalledWith("p", "b", [H1]);
+    expect(record).toHaveBeenCalledWith("p", "b", [H1], expect.any(String));
     expect(exists).toHaveBeenCalledTimes(1);
     expect(exists).toHaveBeenCalledWith(contentKey(H1));
     expect(warn).toHaveBeenCalledTimes(1);
@@ -82,5 +83,17 @@ describe("recordContentUses", () => {
     const { db, record } = withLifecycle([]);
     await expect(recordContentUses(db, storageWith(), target, ["../x"])).resolves.toBe(1);
     expect(record).not.toHaveBeenCalled();
+  });
+
+  it("treats a claim older than the collection lease as abandoned", async () => {
+    const { db, record } = withLifecycle([]);
+    const before = Date.now();
+
+    await recordContentUses(db, storageWith(H1), target, [H1]);
+
+    const calls = record.mock.calls as unknown as [string, string, string[], string][];
+    const staleBefore = Date.parse(calls[0]?.[3] ?? "");
+    expect(staleBefore).toBeGreaterThanOrEqual(before - CLAIM_LEASE_MS);
+    expect(staleBefore).toBeLessThanOrEqual(Date.now() - CLAIM_LEASE_MS);
   });
 });

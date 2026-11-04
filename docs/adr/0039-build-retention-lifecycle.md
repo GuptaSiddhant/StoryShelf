@@ -77,14 +77,19 @@ by preset, so it cannot by itself carry this guarantee.
   later pass takes over one the lease has outlived, re-stamping it with its own token. Right
   before it deletes, a pass asks the capability whether its token still holds the claim
   (`holdsContentClaim`) and skips the delete if not; giving a claim back and finishing it are
-  token-checked too, so a taken-over pass can do nothing. A claimed hash refuses new uses, so a
+  token-checked too, so a taken-over pass can do nothing. A recorded use also takes over a claim the
+  lease has outlived (`recordContentUses` with `staleBefore`), so a crashed pass cannot block
+  uploads until the next purge; the stalled collector then fails its `holdsContentClaim` check and
+  deletes nothing. A claimed hash refuses new uses, so a
   use racing the delete ends in exactly one outcome: the claim fails because the use landed, or
   the use is refused and its caller stores the content again and retries. A live manifest found
   after the claim gives the claim back. A wrong use record can leak storage but never delete
   served content. The token is not a full fence: object storage cannot refuse a late delete, so a
   pass that stalls longer than the lease exactly between its check and its delete could still
   remove a blob a successor collected and a new build stored again. That window is one delete wide
-  and needs a hung process, so it is accepted rather than fenced. Without the capability nothing
+  and needs a hung process, so it is accepted rather than fenced. An upload's record can now be the
+  taker of an expired claim; it re-checks that the blob exists after recording and answers 409
+  (store again) if not, so only a delete still in flight at that instant can win. Without the capability nothing
   is recorded or collected.
 
 ### 3. Lifecycle is an explicit database capability

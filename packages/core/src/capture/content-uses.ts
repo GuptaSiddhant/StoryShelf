@@ -6,6 +6,7 @@
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
+import { CLAIM_LEASE_MS } from "../retention/content-gc.ts";
 import { mapLimit } from "../utils/map-limit.ts";
 import { contentKey, isContentHash } from "../utils/paths.ts";
 
@@ -49,7 +50,13 @@ export async function recordContentUses(
   if (lifecycle === undefined) return 0;
   const { distinct, skipped } = wellFormed(hashes, target.buildId, logger);
   if (distinct.length === 0) return skipped;
-  const refused = await lifecycle.recordContentUses(target.projectId, target.buildId, distinct);
+  const staleBefore = new Date(Date.now() - CLAIM_LEASE_MS).toISOString();
+  const refused = await lifecycle.recordContentUses(
+    target.projectId,
+    target.buildId,
+    distinct,
+    staleBefore,
+  );
   if (refused.length > 0) throw new ContentCollectingError(refused);
   const missing = await missingBlobs(storage, distinct);
   if (missing.length > 0) throw new ContentCollectingError(missing);
