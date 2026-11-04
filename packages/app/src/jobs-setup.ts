@@ -1,6 +1,6 @@
 /**
  * Background jobs of the app (ADR 0006): the one database queue, the handlers of its job kinds
- * (`capture` with `testing`, `publish` on a long-running host, `notify` on a queue of its own) and the one consumer that runs
+ * (`capture` with `testing`, `publish` on a long-running host, `notify` and `review-request` on a queue of its own) and the one consumer that runs
  * them.
  */
 import {
@@ -18,7 +18,7 @@ import { setupCapture, type CaptureWiring } from "./capture-setup.ts";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
 import { createJobCanceller, type JobCanceller } from "./job-canceller.ts";
 import { createJobQueue, type JobQueue } from "./job-queue.ts";
-import { notifyAssignedWith, type NotifyDeps } from "./notify.ts";
+import { notifyAssignedWith, notifyDepsFor, type NotifyDeps } from "./notify.ts";
 import { setupPublishing, type PublishService, type PublishWiring } from "./publish-setup.ts";
 import {
   assignedReviewersOf,
@@ -26,6 +26,7 @@ import {
   type AssignedReviewer,
 } from "./review-assignment.ts";
 import { announceReviewWith, REVIEW_EVENTS, reviewRequestedData } from "./review-events.ts";
+import { setupReviewRequests, type ReviewRequestWiring } from "./review-request-job.ts";
 import type { ServerRuntime } from "./runtime.ts";
 import { isServerlessHost } from "./serverless.ts";
 
@@ -53,6 +54,7 @@ export function setupJobs(
 ): JobsWiring {
   const { jobs, notifyJobs } = queuesFor(options, isServerlessHost(env));
   const buildState = setupBuildState(options, runtime, notifyJobs);
+  const reviewRequests = setupReviewRequests(options, runtime, notifyJobs);
   const capture = setupCapture(
     options,
     runtime.config,
@@ -72,10 +74,10 @@ export function setupJobs(
     {
       jobs,
       buildState: buildState.publisher,
-      reviewRequested: reviewRequestedFor(options, runtime),
+      reviewRequested: reviewRequestedFor(options, runtime, reviewRequests.enqueue),
     },
   );
-  const wiring = { capture, publishing, buildState, notifyJobs };
+  const wiring = { capture, publishing, buildState, reviewRequests, notifyJobs };
   return {
     captureQueue: capture.queue,
     enqueueCapture: capture.enqueueCapture,
@@ -104,7 +106,9 @@ function queuesFor(
   ];
   return {
     jobs: createJobQueue(options, kinds, testing?.retries ?? DEFAULT_RETRIES),
-    notifyJobs: serverless ? null : createJobQueue(options, ["notify"], NOTIFY_MAX_ATTEMPTS - 1),
+    notifyJobs: serverless
+      ? null
+      : createJobQueue(options, ["notify", "review-request"], NOTIFY_MAX_ATTEMPTS - 1),
   };
 }
 
@@ -117,16 +121,22 @@ function consumersOf(
     capture: CaptureWiring;
     publishing: Pick<PublishWiring, "handler">;
     buildState: Pick<BuildStateWiring, "handler">;
+    reviewRequests: Pick<ReviewRequestWiring, "handler">;
     notifyJobs: JobQueue | null;
   },
 ): CaptureConsumer[] {
-  const { capture, publishing, buildState, notifyJobs } = wiring;
+  const { capture, publishing, buildState, reviewRequests, notifyJobs } = wiring;
   return [
     ...(jobs.kinds.length > 0
       ? [databaseConsumer(options, runtime, jobs, { capture, publishing })]
       : []),
     ...(buildState.handler !== null && notifyJobs !== null
-      ? [notifyConsumer(options, runtime, notifyJobs, buildState.handler)]
+      ? [
+          notifyConsumer(options, runtime, notifyJobs, {
+            notify: buildState.handler,
+            ...(reviewRequests.handler ? { "review-request": reviewRequests.handler } : {}),
+          }),
+        ]
       : []),
   ];
 }
@@ -177,17 +187,17 @@ function databaseConsumer(
 /** Deliveries running at once: short HTTP calls to a git host, bounded to stay clear of its rate limits. */
 const NOTIFY_CONCURRENCY = 4;
 
-/** The consumer of `notify` jobs, on its own queue so no capture or publish job can starve it. */
+/** The consumer of `notify` and `review-request` jobs, on its own queue so no capture or publish job can starve it. */
 function notifyConsumer(
   options: ShelfOptions,
   runtime: ServerRuntime,
   queue: JobQueue,
-  handler: KindHandler,
+  handlers: { notify: KindHandler; "review-request"?: KindHandler },
 ): CaptureConsumer {
   return lazyConsumer(
     () => ({
       queue: queue.get(),
-      handlers: { notify: handler },
+      handlers,
       config: { concurrency: NOTIFY_CONCURRENCY, ...maxJobConfig(options) },
       metrics: jobMetrics(),
       logger: runtime.logger.child({ component: "notify-consumer" }),
@@ -224,17 +234,10 @@ async function assignedOrNone(
 function reviewRequestedFor(
   options: ShelfOptions,
   runtime: ServerRuntime,
+  reviewRequests: NotifyDeps["reviewRequests"],
 ): (project: Project, build: Build) => Promise<void> {
   return async (project, build) => {
-    const deps = {
-      db: options.database,
-      config: runtime.config,
-      ui: runtime.ui,
-      logger: runtime.logger,
-      notifiers: runtime.notifiers,
-      notificationsConfig: options.notifications?.config,
-      publicOrigin: runtime.publicOrigin,
-    };
+    const deps = { ...notifyDepsFor(options, runtime), reviewRequests };
     const assigned = await assignedOrNone(deps, project, build);
     await announceReviewWith(
       deps,
