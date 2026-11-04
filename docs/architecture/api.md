@@ -4,7 +4,7 @@
 
 ## API Design
 
-All JSON endpoints are under `/api/v1`, except the Better Auth engine at `/api/auth/*` (below). HTML pages are at `/`. Every route that names a project (HTML, published-Storybook and JSON) addresses it by its `slug`; entities below it are addressed by their own id (the `…Id` parameters such as `buildId` and `snapshotId` are ULIDs, except `storyId`, which is Storybook's story id) or by a natural key (`attemptNo`, a label type's `key`, `modeKey`).
+All JSON endpoints are under `/api/v1`, except the Better Auth engine at `/api/auth/*` and the relying-party helpers under `/.well-known/` (both below). HTML pages are at `/`. Every route that names a project (HTML, published-Storybook and JSON) addresses it by its `slug`; entities below it are addressed by their own id (the `…Id` parameters such as `buildId` and `snapshotId` are ULIDs, except `storyId`, which is Storybook's story id) or by a natural key (`attemptNo`, a label type's `key`, `modeKey`).
 
 ```
 # Projects
