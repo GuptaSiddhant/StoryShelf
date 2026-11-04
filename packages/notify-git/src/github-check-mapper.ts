@@ -57,6 +57,25 @@ export function externalIdOf(context: string): string {
   return `storyshelf:${context}`;
 }
 
+/** A build link carries the build's ULID: `.../builds/<26 Crockford characters>`, then end, `/`, `?` or `#`. */
+const BUILD_ID_IN_LINK = /\/builds\/([0-9A-HJKMNP-TV-Z]{26})(?=[/?#]|$)/u;
+
+/** The build a link points at, or `undefined` when it names none we can read. */
+export function buildIdOf(link?: string | null): string | undefined {
+  return link === null || link === undefined ? undefined : BUILD_ID_IN_LINK.exec(link)?.[1];
+}
+
+/**
+ * Whether a run linked to `shown` belongs to a newer build than the one being delivered. Build ids
+ * are ULIDs, which sort by time, so an id that sorts after the delivered one is newer. An id that
+ * cannot be read on either side is never newer: the update goes ahead.
+ */
+export function showsNewerBuild(shown: string | null | undefined, delivered?: string): boolean {
+  const current = buildIdOf(shown);
+  const incoming = buildIdOf(delivered);
+  return current !== undefined && incoming !== undefined && current > incoming;
+}
+
 /** `pending` is queued or in progress; a final state completes the run; a cancel is `cancelled`. */
 export function phaseOf(
   input: Pick<CheckRunInput, "state" | "progress" | "informational">,

@@ -10,6 +10,7 @@ import {
   type CheckAnnotation,
   type CheckRunBody,
   type CheckRunInput,
+  showsNewerBuild,
   withoutMarker,
 } from "./github-check-mapper.ts";
 
@@ -26,6 +27,7 @@ export interface CheckRepo {
 export interface ExistingRun {
   id: number;
   external_id?: string | null;
+  details_url?: string | null;
   output?: { annotations_count?: number | null; summary?: string | null } | null;
 }
 
@@ -40,12 +42,26 @@ export interface ExistingRun {
  * is posted is the findings the run does not show yet, compared one by one; a run whose summary
  * carries the hash of the same set (and enough annotations) is left alone. The summary says how
  * many earlier annotations belong to findings that are no longer current.
+ *
+ * A late delivery for an older build never overwrites a newer build's run: when a run of the commit
+ * links to a newer build (ULIDs sort by time) than the delivered one, nothing is written.
  */
 export async function postCheckRun(
   repo: CheckRepo,
   input: CheckRunInput & { sha: string },
 ): Promise<void> {
   const runs = await findRuns(repo, input);
+  if (!isSuperseded(repo, runs, input)) {
+    await postToRuns(repo, input, runs);
+  }
+}
+
+/** Write the status to the run (or create it) and mirror it onto any duplicate. */
+async function postToRuns(
+  repo: CheckRepo,
+  input: CheckRunInput & { sha: string },
+  runs: readonly ExistingRun[],
+): Promise<void> {
   const plan = await planAnnotations(repo, runs[0], input.annotations);
   const body = checkRunBody({ ...input, resolved: plan.resolved });
   repo.logger?.debug(
@@ -62,6 +78,22 @@ export async function postCheckRun(
     );
     throw error;
   }
+}
+
+/** Whether a run of the commit shows a newer build than the delivered one (logged, not an error). */
+function isSuperseded(
+  repo: CheckRepo,
+  runs: readonly ExistingRun[],
+  input: { sha: string; context: string; url?: string | undefined },
+): boolean {
+  const newer = runs.some((run) => showsNewerBuild(run.details_url, input.url));
+  if (newer) {
+    repo.logger?.debug(
+      { context: input.context, sha: input.sha },
+      "check run shows a newer build; delivery skipped",
+    );
+  }
+  return newer;
 }
 
 /** Update `run` (or create the run) with the body and the annotations to post, in batches. */
@@ -101,7 +133,7 @@ function withBatch(body: CheckRunBody, batch: CheckAnnotation[] | undefined): Wi
 const RUNS_PAGE = 100;
 const RUNS_PAGES = 10;
 
-/** The runs of this commit that carry the status's `external_id`, oldest first. */
+/** The runs of this commit that carry the status's `external_id`, newest first (the one GitHub shows). */
 async function findRuns(
   repo: CheckRepo,
   input: { sha: string; context: string },
@@ -109,7 +141,7 @@ async function findRuns(
   const all = await listRuns(repo, input, { page: 1, seen: [] });
   return all
     .filter((run) => run.external_id === externalIdOf(input.context))
-    .toSorted((first, second) => first.id - second.id);
+    .toSorted((first, second) => second.id - first.id);
 }
 
 /** Every run of the commit with this name (of this App, when it is known), page by page. */

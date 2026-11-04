@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   annotationBatches,
+  buildIdOf,
+  showsNewerBuild,
   FINDINGS_LISTED,
   findingKey,
   findingsHash,
@@ -173,5 +175,33 @@ describe("findings in the summary", () => {
   it("reads no hash from a summary without one", () => {
     expect(markedHash(null)).toBeUndefined();
     expect(markedHash("plain text")).toBeUndefined();
+  });
+});
+
+const OLDER = "01JBZ0000000000000000000AA";
+const NEWER = "01JBZ0000000000000000000BB";
+const link = (id: string, tail = "") => `https://shelf.example/projects/web/builds/${id}${tail}`;
+
+describe("build ids in links", () => {
+  it("reads the ULID from a build link, its sub pages and a query", () => {
+    expect(buildIdOf(link(OLDER))).toBe(OLDER);
+    expect(buildIdOf(link(OLDER, "/diff?snapshot=S1"))).toBe(OLDER);
+    expect(buildIdOf(link(OLDER, "?x=1"))).toBe(OLDER);
+  });
+
+  it("reads nothing from a link without a build id", () => {
+    expect(buildIdOf()).toBeUndefined();
+    expect(buildIdOf(null)).toBeUndefined();
+    expect(buildIdOf("https://shelf.example/projects/web/builds/B1")).toBeUndefined();
+    expect(buildIdOf("https://shelf.example/projects/web")).toBeUndefined();
+  });
+
+  it("calls a run newer only when both ids read and the shown one sorts after", () => {
+    expect(showsNewerBuild(link(NEWER), link(OLDER))).toBe(true);
+    expect(showsNewerBuild(link(OLDER), link(NEWER))).toBe(false);
+    expect(showsNewerBuild(link(OLDER), link(OLDER))).toBe(false);
+    expect(showsNewerBuild(link(NEWER))).toBe(false);
+    expect(showsNewerBuild(null, link(OLDER))).toBe(false);
+    expect(showsNewerBuild("https://shelf.example/x", link(OLDER))).toBe(false);
   });
 });
