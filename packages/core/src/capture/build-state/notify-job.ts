@@ -64,7 +64,7 @@ export function createNotifyHandler(options: NotifyHandlerOptions): KindHandler 
       } catch (error) {
         // Past its deadline the attempt records nothing: the redelivery, or `exhausted`, settles it.
         if (!context.signal.aborted && isFinalAttempt(job)) {
-          await surfaceFailure(options, { channelId, buildId: job.buildId, error });
+          await surfaceFailure(options, { channelId, buildId: job.buildId, error }, context.signal);
         }
         throw error;
       }
@@ -82,7 +82,7 @@ async function deliver(
   const result = await deliverBuildState(deps, { buildId: job.buildId, channelId }, context.signal);
   context.signal.throwIfAborted();
   if (result === "delivered") {
-    await channelModel(deps).recordOutcome(channelId);
+    await channelModel(deps).recordOutcome(channelId, undefined, context.signal);
   } else {
     context.logger.info({ result }, "nothing to deliver");
   }
@@ -104,6 +104,7 @@ export function notifyExhausted(
 async function surfaceFailure(
   options: NotifyHandlerOptions,
   failure: { channelId: string; buildId: string; error: unknown },
+  signal?: AbortSignal,
 ): Promise<void> {
   const { deps } = options;
   const text = sanitizeErrorText(errorText(failure.error), MAX_ERROR_LENGTH);
@@ -112,7 +113,7 @@ async function surfaceFailure(
     "state delivery given up",
   );
   try {
-    await recordAndAlert(options, { ...failure, error: text });
+    await recordAndAlert(options, { ...failure, error: text }, signal);
   } catch (error) {
     deps.logger.warn({ err: error, channelId: failure.channelId }, "failed to record the failure");
   }
@@ -122,13 +123,16 @@ async function surfaceFailure(
 async function recordAndAlert(
   options: NotifyHandlerOptions,
   failure: { channelId: string; buildId: string; error: string },
+  signal?: AbortSignal,
 ): Promise<void> {
   const model = channelModel(options.deps);
   const row = await model.get(failure.channelId);
+  signal?.throwIfAborted();
   if (row === null) {
     return;
   }
-  await model.recordOutcome(row.id, failure.error);
+  await model.recordOutcome(row.id, failure.error, signal);
+  signal?.throwIfAborted();
   await options.onFailed?.({
     channelId: row.id,
     projectId: row.projectId,

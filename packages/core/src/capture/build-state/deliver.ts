@@ -83,6 +83,7 @@ export async function writeTo(
     sha: build.gitSha,
     states,
     logger: deps.logger,
+    signal: where.signal,
   });
 }
 
