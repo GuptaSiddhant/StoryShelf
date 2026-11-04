@@ -69,7 +69,9 @@ export class Retention {
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
     // Resolved once, before anything is awaited: a capability that is cleared while the candidates
     // are selected (a setup rerun) must not turn this pass into an unfenced one (ADR 0039).
-    const lifecycle = options.lifecycle ?? this.db.buildReferenceLifecycle;
+    // An explicit `lifecycle` (even `undefined`: the caller found none) is the pass's snapshot;
+    // only a caller that gave no option at all gets the database's capability read here.
+    const lifecycle = "lifecycle" in options ? options.lifecycle : this.db.buildReferenceLifecycle;
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const { buildIds, pending } = await this.selectBuilds(project, options, cutoff);
     if (lifecycle) return await this.purgeClaimed(project, lifecycle, buildIds, pending, cutoff);

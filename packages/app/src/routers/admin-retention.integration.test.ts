@@ -156,15 +156,19 @@ describe("safe retention capability", () => {
       removedBaselines: 0,
     });
     const app = createShelfApp({ database: db, storage, testing: { runner: stubRunner() } });
-    const response = await app.request("/api/v1/admin/purge", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "{}",
-    });
-    expect(response.status).toBe(200);
-    expect(purge).toHaveBeenCalledTimes(2);
-    for (const [, options] of purge.mock.calls) expect(options.lifecycle).toBe(lifecycle);
-    expect(await response.json()).toMatchObject({ protected: 0, resumed: 0 });
+    try {
+      const response = await app.request("/api/v1/admin/purge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(response.status).toBe(200);
+      expect(purge).toHaveBeenCalledTimes(2);
+      for (const [, options] of purge.mock.calls) expect(options.lifecycle).toBe(lifecycle);
+      expect(await response.json()).toMatchObject({ protected: 0, resumed: 0 });
+    } finally {
+      await app.lifecycle.teardown();
+    }
   });
   it("keeps the existing purge path available in hosting-only mode", async () => {
     const { db } = makeDatabase();

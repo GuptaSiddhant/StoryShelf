@@ -435,6 +435,21 @@ describe("Retention and the lifecycle capability", () => {
     expect(objects.has("p1/builds/b-old/storybook/index.html")).toBe(true);
   });
 
+  it("does not pick up a capability that appears after the caller found none", async () => {
+    const { db, lifecycle, claimDeletion, project, retention } = await pass();
+    Object.assign(db, { buildReferenceLifecycle: lifecycle });
+
+    // The caller's pass found no capability (explicit `undefined`): the snapshot stands.
+    const result = await retention.purge(project, {
+      ttlDays: 30,
+      keepLatestPerBranch: false,
+      lifecycle: undefined,
+    });
+
+    expect(claimDeletion).not.toHaveBeenCalled();
+    expect(result.protectedBuilds).toBeUndefined();
+  });
+
   it("deletes through the unfenced path only on a database that never had the capability", async () => {
     const { db, project, retention } = await pass();
 

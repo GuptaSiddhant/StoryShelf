@@ -107,6 +107,30 @@ describe("background retention", () => {
   );
 
   describe("scheduled build purge (opt-in)", () => {
+    it("reads the capability once for a pass over several projects", async () => {
+      const { db, timer, run, purge } = await arm({
+        capability: true,
+        config: { purgeTtlDays: 14 },
+      });
+      await db.insert(db.tables.projects, {
+        id: "q",
+        name: "Q",
+        slug: "q",
+        createdAt: "2025-01-01",
+        updatedAt: "2025-01-01",
+      });
+      const original = db.buildReferenceLifecycle;
+      // The capability goes away as soon as the first project's purge has started.
+      purge.mockImplementationOnce(async () => {
+        Object.assign(db, { buildReferenceLifecycle: undefined });
+        return await Promise.resolve({ removedBuilds: 0, removedFiles: 0 });
+      });
+      await run();
+      expect(purge).toHaveBeenCalledTimes(2);
+      for (const [, options] of purge.mock.calls) expect(options.lifecycle).toBe(original);
+      timer?.stop();
+    });
+
     it("purges builds older than purgeTtlDays through the capability, keeping each branch's latest", async () => {
       const { db, timer, run, purge } = await arm({
         capability: true,
