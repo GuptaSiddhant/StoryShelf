@@ -3,7 +3,7 @@
  * routes are classed `review`, so `requireReview` answers 404 for a project with review off.
  */
 import { STORYBOOK_UNAVAILABLE } from "@storyshelf/core/adapter/notifier";
-import { publishingOf } from "@storyshelf/core/capture";
+import { publishingOfBuild } from "@storyshelf/core/capture";
 import {
   BuildModel,
   BuildReviewModel,
@@ -102,11 +102,14 @@ async function assertReviewable(
       message: `The build ${build.status === "failed" ? "failed" : "was cancelled"}; there is nothing to review`,
     });
   }
-  const publishing = await publishingOf(getStore().storage, build, {
-    testing: getStore().testing,
-  });
+  const publishing = await publishingOfBuild(
+    { db: getStore().db, storage: getStore().storage },
+    build,
+  );
   if (publishing === "unavailable") {
-    throw new HTTPException(409, { message: `${STORYBOOK_UNAVAILABLE}; re-upload the build or purge it` });
+    throw new HTTPException(409, {
+      message: `${STORYBOOK_UNAVAILABLE}; re-upload the build or purge it`,
+    });
   }
   if (publishing !== "success") {
     throw new HTTPException(409, {

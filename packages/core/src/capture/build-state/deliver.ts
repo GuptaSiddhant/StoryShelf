@@ -15,7 +15,7 @@ import type { Build } from "../../schema/build.ts";
 import type { Project } from "../../schema/project.ts";
 import type { Snapshot } from "../../schema/snapshot.ts";
 import { createUrlBuilder } from "../../urls.ts";
-import { publishingOf } from "../publish/published.ts";
+import { publishingOfBuild } from "../publish/published.ts";
 import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
 
 /**
@@ -58,14 +58,13 @@ export async function writeTo(
 ): Promise<void> {
   const { build, project } = loaded;
   const { target, origin } = where;
-  const flags = deps.flags(project);
   const states = statusesForBuild({
     build,
     projectSlug: project.slug,
     prefix: channelPrefix(target.channel),
     urls: createUrlBuilder(origin, deps.config.publishedBaseDomain),
-    flags,
-    publishing: await publishingOf(deps.storage, build, { testing: flags.testing }),
+    flags: deps.flags(project),
+    publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
     approvals: await approvalsOf(deps, build, project),
     changes: await changesOf(deps, build, project),
   });

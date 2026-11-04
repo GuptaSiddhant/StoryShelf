@@ -1,5 +1,5 @@
 /** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
-import { publishingOf, type Catalog } from "@storyshelf/core/capture";
+import { publishingOfBuild, type Catalog } from "@storyshelf/core/capture";
 import {
   changesetOf,
   CommentModel,
@@ -43,7 +43,7 @@ export interface ReviewSectionData extends ReviewCapabilities {
   /** Whether the snapshot rollup decides the build, so the verdict is a sign-off only. */
   testing: boolean;
   /** Whether the build's Storybook is published; a verdict waits for `success` (ADR 0013). */
-  publishing: Awaited<ReturnType<typeof publishingOf>>;
+  publishing: Awaited<ReturnType<typeof publishingOfBuild>>;
 }
 
 /** Whether review is on for the project (a row without the column counts as on). */
@@ -78,7 +78,7 @@ export async function loadReviewSection(
     changesetOf(db, project, build),
     new CommentModel(db).listByBuild(build.id),
     reviewCapabilities(project),
-    publishingOrPending(build, testing),
+    publishingOrPending(build),
   ]);
   const shown = comments.filter((comment) => comment.snapshotId === null);
   const changeRequests = comments
@@ -117,14 +117,11 @@ async function snapshotLabelsOf(requests: readonly Comment[]): Promise<Map<strin
 }
 
 /** How publishing stands; a storage probe that fails reads as the storage-independent state. */
-async function publishingOrPending(
-  build: Build,
-  testing: boolean,
-): Promise<ReviewSectionData["publishing"]> {
+async function publishingOrPending(build: Build): Promise<ReviewSectionData["publishing"]> {
   try {
-    return await publishingOf(getStore().storage, build, { testing });
+    return await publishingOfBuild({ db: getStore().db, storage: getStore().storage }, build);
   } catch {
-    return await publishingOf(undefined, build, { testing });
+    return await publishingOfBuild({ db: getStore().db, storage: undefined }, build);
   }
 }
 

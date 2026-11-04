@@ -415,22 +415,26 @@ describe("a verdict waits for publishing", () => {
 describe("an accepted build whose Storybook content is gone", () => {
   it("says so on the card and the git host, and takes no verdict", async () => {
     const booted = await boot();
-    const created = await booted.as("dev")("/builds", {
-      method: "POST",
-      body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/x" }),
-    });
-    const { build } = (await created.json()) as { build: { id: string } };
-    // Accepted (a purge, or a legacy row) with no manifest in storage.
-    await new BuildModel(booted.db).setStatus(build.id, "approved");
+    try {
+      const created = await booted.as("dev")("/builds", {
+        method: "POST",
+        body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/x" }),
+      });
+      const { build } = (await created.json()) as { build: { id: string } };
+      // Accepted (a purge, or a legacy row) with no manifest in storage and no publish job open.
+      await new BuildModel(booted.db).setStatus(build.id, "approved");
 
-    const refused = await booted.as("alice")(`/builds/${build.id}/reviews`, verdict("approved"));
-    expect(refused.status).toBe(409);
-    expect(await refused.text()).toContain("Storybook content unavailable, see build page");
+      const refused = await booted.as("alice")(`/builds/${build.id}/reviews`, verdict("approved"));
+      expect(refused.status).toBe(409);
+      expect(await refused.text()).toContain("Storybook content unavailable, see build page");
 
-    const page = await booted.app.request(`/projects/gate/builds/${build.id}`, {
-      headers: { cookie: "storyshelf_session=alice" },
-    });
-    expect(await page.text()).toContain("Re-upload the build, or purge it.");
+      const page = await booted.app.request(`/projects/gate/builds/${build.id}`, {
+        headers: { cookie: "storyshelf_session=alice" },
+      });
+      expect(await page.text()).toContain("Re-upload the build, or purge it.");
+    } finally {
+      await booted.app.lifecycle.teardown();
+    }
   });
 });
 

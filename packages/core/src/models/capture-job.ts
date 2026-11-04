@@ -312,6 +312,13 @@ export class CaptureJobModel {
     return rows.toSorted(byCreation);
   }
 
+  /** Whether the build has an unfinished job of `kind` (queued, running or exhausting). */
+  async hasOpenJob(buildId: string, kind: CaptureJobKind): Promise<boolean> {
+    return (await this.listForBuild(buildId)).some(
+      (row) => row.kind === kind && ACTIVE_STATUSES.includes(row.status),
+    );
+  }
+
   /** The build's own (non-shard) job of `kinds` most recently queued, or null. */
   async latestForBuild(
     buildId: string,

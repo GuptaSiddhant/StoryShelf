@@ -86,6 +86,9 @@ export function setupPublishing(
   jobs.exhausted.publish = async (job, error): Promise<void> => {
     await completer.complete(job.buildId, { ok: false, error });
   };
+  // Every hook run failed and the job ended anyway: the build still hears that publishing is over
+  // (its state is requested), or a reviewed build would keep a pending Storybook check.
+  jobs.abandoned.publish = jobs.exhausted.publish;
   return {
     completer,
     afterPublish,
