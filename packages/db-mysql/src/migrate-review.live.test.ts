@@ -8,7 +8,9 @@
  * The database in the URL is only used to reach the server; the old schema goes into a new
  * scratch database that is dropped afterwards. The hermetic counterpart is `migrate-review.test.ts`.
  */
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { BuildModel, BuildReviewModel } from "@storyshelf/core/models";
 import { createConnection, type Connection } from "mysql2/promise";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -124,4 +126,83 @@ describe.skipIf(!LIVE)("review schema upgrade (real MySQL, gated)", () => {
     );
     await expect(upgrade()).rejects.toThrow("table build_reviews has no column build_id");
   }, 120_000);
+
+  describe("the review lifecycle on the upgraded schema", () => {
+    const T0 = "2026-01-01T00:00:00.000Z";
+
+    /** A fresh scratch database, migrated by the adapter, with a project, two builds and a user. */
+    async function withSeededDb(run: (db: DatabaseAdapter) => Promise<void>): Promise<void> {
+      const db = createMysqlDatabase({ url: scratchUrl });
+      await db.lifecycle?.setup({ config: {}, logger: silent });
+      try {
+        await db.insert(db.tables.projects, {
+          id: "p1",
+          name: "P",
+          slug: "p",
+          gitDefaultBranch: "main",
+          createdAt: T0,
+          updatedAt: T0,
+        } as never);
+        await Promise.all(
+          ["b1", "b2"].map(
+            async (id) =>
+              await db.insert(db.tables.builds, {
+                id,
+                projectId: "p1",
+                gitSha: id,
+                gitBranch: "feature/x",
+                createdAt: T0,
+                updatedAt: T0,
+              } as never),
+          ),
+        );
+        await db.insert(db.tables.users, {
+          id: "u1",
+          email: "u1@example.com",
+          name: "U1",
+          role: "member",
+          createdAt: T0,
+        } as never);
+        await run(db);
+      } finally {
+        await db.lifecycle?.teardown();
+      }
+    }
+
+    it("lets one of several concurrent claimants win a review cycle, and counts a reopening once", async () => {
+      await withSeededDb(async (db) => {
+        const builds = new BuildModel(db);
+        const claims = await Promise.all(
+          Array.from({ length: 5 }, async () => await builds.claimReviewRequest("b1")),
+        );
+        expect(claims.filter((claim) => claim !== null)).toHaveLength(1);
+        expect(claims.find((claim) => claim !== null)).toMatchObject({ reviewCycle: 0 });
+        expect(await builds.claimReviewRequest("b1")).toBeNull();
+
+        await builds.setStatus("b1", "approved");
+        const moved = await Promise.all([
+          builds.setStatus("b1", "pending"),
+          builds.setStatus("b1", "pending"),
+        ]);
+        expect(moved.map((build) => build.status)).toEqual(["pending", "pending"]);
+        expect((await builds.setStatus("b1", "pending")).reviewCycle).toBe(1);
+        expect(await builds.claimReviewRequest("b1")).toMatchObject({ reviewCycle: 1 });
+        expect(await builds.claimReviewRequest("b1")).toBeNull();
+      });
+    }, 120_000);
+
+    it("drops a build's verdicts with the build and a user's with the user, and keeps an anonymous one", async () => {
+      await withSeededDb(async (db) => {
+        const reviews = new BuildReviewModel(db);
+        await reviews.add("b1", "u1", "approved");
+        await reviews.add("b1", null, "approved");
+        await reviews.add("b2", "u1", "approved");
+        await db.remove(db.tables.builds, "b2");
+        expect(await reviews.listByBuild("b2")).toEqual([]);
+        expect(await reviews.listByBuild("b1")).toHaveLength(2);
+        await db.remove(db.tables.users, "u1");
+        expect((await reviews.listByBuild("b1")).map((review) => review.userId)).toEqual([null]);
+      });
+    }, 120_000);
+  });
 });

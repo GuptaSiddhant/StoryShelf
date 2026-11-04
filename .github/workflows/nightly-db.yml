@@ -75,6 +75,7 @@ jobs:
         env:
           LIVE_CLOUD: "1"
           DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
+          POSTGRES_SCHEMA_MUTATION_TEST: "1"
         run: nubx turbo test --filter='@storyshelf/db-postgres' --force --env-mode=loose
 
   sqlite:
