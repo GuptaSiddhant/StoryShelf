@@ -18,5 +18,10 @@ export {
   PAUSED_MESSAGE,
   type BuildStatePublisherOptions,
 } from "./publisher.ts";
-export { requestOpenBuildStates, type OpenBuildScope } from "./resume.ts";
+export {
+  requestOpenBuildStates,
+  tryRequestOpenBuildStates,
+  type OpenBuildRequest,
+  type OpenBuildScope,
+} from "./resume.ts";
 export type { BuildStateDeps, BuildStatePublisher, SkipReason, StateTarget } from "./types.ts";

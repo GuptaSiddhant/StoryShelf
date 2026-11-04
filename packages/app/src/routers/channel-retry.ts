@@ -13,13 +13,13 @@ import { notificationChannelModel } from "./scoped-models.ts";
 /** What a retry did, or why it refused (`status` is the HTTP answer). */
 export type ChannelRetryResult =
   | { ok: true; asked: number }
-  | { ok: false; status: 400 | 404 | 409; message: string };
+  | { ok: false; status: 400 | 404 | 409 | 503; message: string };
 
-/** Re-request the current state of `project`'s open builds on one of its git channels. */
-export async function retryChannelState(
+/** Why a retry of `channelId` cannot start, or null when it can. */
+async function refusalFor(
   project: Pick<Project, "id">,
   channelId: string,
-): Promise<ChannelRetryResult> {
+): Promise<Extract<ChannelRetryResult, { ok: false }> | null> {
   const channel = await notificationChannelModel().get(channelId);
   if (channel?.projectId !== project.id) {
     return { ok: false, status: 404, message: "Notification channel not found" };
@@ -37,5 +37,20 @@ export async function retryChannelState(
       message: "Couldn't retry: notifications are paused. Set a public origin first.",
     };
   }
-  return { ok: true, asked: await requestChannelStateNow({ projectId: project.id, channelId }) };
+  return null;
+}
+
+/** Re-request the current state of `project`'s open builds on one of its git channels. */
+export async function retryChannelState(
+  project: Pick<Project, "id">,
+  channelId: string,
+): Promise<ChannelRetryResult> {
+  const refusal = await refusalFor(project, channelId);
+  if (refusal !== null) {
+    return refusal;
+  }
+  const requested = await requestChannelStateNow({ projectId: project.id, channelId });
+  return requested.ok
+    ? { ok: true, asked: requested.asked }
+    : { ok: false, status: 503, message: "Couldn't look up open builds, try again" };
 }

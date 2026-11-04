@@ -1,5 +1,10 @@
 /** Ask for a build's state to be shown on its project's git channels (ADR 0014, decision 5). */
-import { createBuildStatePublisher, requestOpenBuildStates } from "@storyshelf/core/capture";
+import {
+  createBuildStatePublisher,
+  requestOpenBuildStates,
+  tryRequestOpenBuildStates,
+  type OpenBuildRequest,
+} from "@storyshelf/core/capture";
 import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import { notificationOrigin } from "./notifications-pause.ts";
@@ -21,14 +26,15 @@ export async function requestBuildState(
 
 /**
  * An operator's "retry current state" for one git channel: ask again for the open builds of its
- * project, to that channel only. Resolves to how many builds were asked; never rejects. Callers
- * check for a confirmed origin first, since without one nothing is delivered.
+ * project, to that channel only. Resolves to how many builds were asked, or `{ ok: false }` when
+ * the lookup of open builds failed (logged once); never rejects. Callers check for a confirmed
+ * origin first, since without one nothing is delivered.
  */
 export async function requestChannelStateNow(scope: {
   projectId: string;
   channelId: string;
-}): Promise<number> {
-  return await requestOpenBuildStates(getStore(), { request: requestBuildState }, scope);
+}): Promise<OpenBuildRequest> {
+  return await tryRequestOpenBuildStates(getStore(), { request: requestBuildState }, scope);
 }
 
 /**

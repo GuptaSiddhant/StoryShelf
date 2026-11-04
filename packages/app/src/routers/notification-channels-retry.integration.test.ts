@@ -1,4 +1,4 @@
-import { NotificationChannelModel } from "@storyshelf/core/models";
+import { BuildModel, NotificationChannelModel } from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
 import { pino } from "pino";
@@ -169,6 +169,41 @@ describe("retry a git channel's current state", () => {
     expect(res.status).toBe(409);
     expect(((await res.json()) as { message: string }).message).toContain("disabled");
     expect(t.git.calls).toEqual([]);
+  });
+
+  it("answers 503, not 'nothing to retry', when the open builds cannot be looked up", async () => {
+    const t = await boot({ origin: true });
+    const lookup = vi
+      .spyOn(BuildModel.prototype, "list")
+      .mockRejectedValueOnce(new Error("database is down"));
+    const res = await post(t.app, t.target.id, "admin");
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as { message: string }).message).toBe(
+      "Couldn't look up open builds, try again",
+    );
+    expect(t.git.calls).toEqual([]);
+    lookup.mockRestore();
+    const retried = await post(t.app, t.target.id, "admin");
+    expect(retried.status).toBe(202);
+  });
+
+  it("tells the settings form the lookup failed instead of flashing 'no open builds'", async () => {
+    const t = await boot({ origin: true });
+    const lookup = vi
+      .spyOn(BuildModel.prototype, "list")
+      .mockRejectedValueOnce(new Error("database is down"));
+    const res = await t.app.request(`/projects/retry/settings/notifications/${t.target.id}/retry`, {
+      method: "POST",
+      headers: {
+        ...as("admin"),
+        "content-type": "application/x-www-form-urlencoded",
+        "x-csrf-token": getCsrfToken(SECRET, "admin"),
+      },
+      body: "",
+    });
+    lookup.mockRestore();
+    expect(res.status).toBe(503);
+    expect(await res.text()).toContain("Couldn&#39;t look up open builds, try again");
   });
 
   it("refuses a chat channel and a channel of another project", async () => {

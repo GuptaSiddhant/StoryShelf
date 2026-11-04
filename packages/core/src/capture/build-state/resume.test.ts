@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { requestOpenBuildStates } from "./resume.ts";
+import { requestOpenBuildStates, tryRequestOpenBuildStates } from "./resume.ts";
 import { world } from "./test-world.ts";
 
 describe("requestOpenBuildStates", () => {
@@ -51,5 +51,32 @@ describe("requestOpenBuildStates", () => {
       throw new Error("boom");
     });
     await expect(requestOpenBuildStates(w.deps, { request })).resolves.toBe(0);
+  });
+
+  describe("tryRequestOpenBuildStates", () => {
+    it("tells how many open builds were asked, and 0 when none is open", async () => {
+      const w = await world();
+      const request = vi.fn(async (_id: string) => {});
+      await expect(tryRequestOpenBuildStates(w.deps, { request })).resolves.toEqual({
+        ok: true,
+        asked: 1,
+      });
+      await expect(
+        tryRequestOpenBuildStates(w.deps, { request }, { projectId: "other-project" }),
+      ).resolves.toEqual({ ok: true, asked: 0 });
+    });
+
+    it("tells a failed lookup apart from nothing to ask, logging it once with the error", async () => {
+      const w = await world();
+      const warn = vi.spyOn(w.deps.logger, "warn");
+      const request = vi.fn(async () => {
+        throw new Error("boom");
+      });
+      await expect(tryRequestOpenBuildStates(w.deps, { request })).resolves.toEqual({
+        ok: false,
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toMatchObject({ err: expect.any(Error) });
+    });
   });
 });

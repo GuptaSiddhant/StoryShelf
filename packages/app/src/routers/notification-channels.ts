@@ -103,7 +103,8 @@ const retryChannelRoute = createRoute({
   summary: "Retry a git channel's current state",
   description:
     "Asks again for the state of the project's open builds on this git channel only. " +
-    "Nothing is sent to chat, email or webhooks. Answers 409 while no public URL is confirmed.",
+    "Nothing is sent to chat, email or webhooks. Answers 409 while no public URL is confirmed, " +
+    "and 503 when the open builds could not be looked up.",
   path: "/api/v1/projects/{slug}/notification-channels/{channelId}/retry",
   request: { params: z.object({ slug: z.string(), channelId: z.string() }) },
   responses: {
@@ -117,7 +118,12 @@ const retryChannelRoute = createRoute({
     },
     409: {
       content: { "application/json": { schema: z.object({ message: z.string() }) } },
-      description: "The channel is disabled, or notifications are paused until a public URL is confirmed",
+      description:
+        "The channel is disabled, or notifications are paused until a public URL is confirmed",
+    },
+    503: {
+      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      description: "The open builds could not be looked up; try again",
     },
     ...notFoundResponse,
     ...unauthorized,
@@ -155,9 +161,13 @@ export function registerNotificationChannels(app: ShelfRouter): void {
     if (!result.ok && result.status === 404) {
       notFound(result.message);
     }
-    return result.ok
-      ? c.json({ asked: result.asked }, 202)
-      : c.json({ message: result.message }, result.status === 409 ? 409 : 400);
+    if (result.ok) {
+      return c.json({ asked: result.asked }, 202);
+    }
+    if (result.status === 503) {
+      return c.json({ message: result.message }, 503);
+    }
+    return c.json({ message: result.message }, result.status === 409 ? 409 : 400);
   });
 
   app.openapi(deleteChannelRoute, async (c) => {
