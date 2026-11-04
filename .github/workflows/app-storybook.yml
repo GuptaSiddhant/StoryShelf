@@ -6,18 +6,27 @@
 # packages/app/.storybook/storyshelf.json, like a customer's committed config; only the project's CI
 # token comes from the environment. The Fly demo seed (apps/fly-app, fixtures/storybook-9) is a
 # separate thing and unchanged. Independent of ci.yml, fly.yml and release.yml.
+#
+# Uploads are kept to what changes the demo: every push to main uploads (the baseline, and the place
+# a change that arrived through core, image or affected shows up), while a pull request uploads only
+# when a file that changes how the UI looks changed (see the paths filter below).
 name: app-storybook
 
 on:
   push:
     branches: [main]
   pull_request:
+    # Only files that change how the UI looks: components and their styles and icons (ui), the app
+    # chrome (shell), pages, every story and its fixtures, the logo and vendored assets, and the
+    # Storybook setup. A change to core, image, affected, routers or tests uploads nothing from a PR.
     paths:
-      # The Storybook bundles code from these workspace packages, so a change to one can change a story.
-      - "packages/app/**"
-      - "packages/core/**"
-      - "packages/image/**"
-      - "packages/affected/**"
+      - "packages/app/src/ui/**"
+      - "packages/app/src/shell/**"
+      - "packages/app/src/pages/**"
+      - "packages/app/src/**/*.stories.tsx"
+      - "packages/app/src/stories-fixtures/**"
+      - "packages/app/src/assets/**"
+      - "packages/app/.storybook/**"
       - ".github/workflows/app-storybook.yml"
 
 # One upload per ref at a time: a newer push cancels an older PR upload, never one on main.
