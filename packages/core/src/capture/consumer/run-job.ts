@@ -84,7 +84,21 @@ async function refuse(
     await failJob(rt, job, "malformed job", logger);
     return "dropped";
   }
-  return null;
+  return (await handler.superseded?.(job)) === true ? await endSuperseded(rt, job, logger) : null;
+}
+
+/** The job's run was superseded: cancel it, so it ends `cancelled` with no build write. */
+async function endSuperseded(
+  rt: JobRuntime,
+  job: ConsumerJob,
+  logger: Logger,
+): Promise<JobOutcome> {
+  logger.info("job belongs to a superseded run; cancelling");
+  if (job.jobId !== undefined) {
+    await rt.queue.cancel?.(job.jobId);
+  }
+  await rt.queue.nack(job, { requeue: false, error: "superseded" });
+  return "cancelled";
 }
 
 async function runHandler(

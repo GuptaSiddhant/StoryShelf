@@ -6,12 +6,14 @@ import type { NotifierProvider } from "../../adapters/notifier/provider.ts";
 import type { StorageAdapter } from "../../adapters/storage.ts";
 import type { ShelfConfig } from "../../config.ts";
 import type { Logger } from "../../logger.ts";
+import { BuildModel } from "../../models/build.ts";
 import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
 import { CaptureLogModel } from "../../models/capture-log.ts";
 import { createPublicOriginResolver } from "../../models/public-origin.ts";
 import type { SecretInput } from "../../utils/encrypt.ts";
 import { createBuildStatePublisher } from "../build-state/publisher.ts";
 import type { BuildStatePublisher } from "../build-state/types.ts";
+import { GENERATION_KEY } from "../db-queue/codec.ts";
 import { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "../dispatch.ts";
 import type { CaptureJobOptions, ShardJob } from "../orchestrator.ts";
 import { extractionLimitsOf, resolvePublishLimits } from "../publish/limits.ts";
@@ -66,6 +68,22 @@ function isValidCaptureJob(job: ConsumerJob): boolean {
   return typeof job.buildId === "string" && job.buildId.length > 0;
 }
 
+/**
+ * Whether a build's capture job was queued for a run the build has left: its payload's generation
+ * is not the build's (a retry started a newer run), or the build is gone. A shard job and a job
+ * queued without a generation are never superseded here.
+ */
+async function isSuperseded(options: CaptureHandlerOptions, job: ConsumerJob): Promise<boolean> {
+  const queuedFor = job.data?.[GENERATION_KEY];
+  if (job.shard !== undefined || typeof queuedFor !== "number") {
+    return false;
+  }
+  const build = await new BuildModel(options.db, options.db.tables, options.logger).get(
+    job.buildId,
+  );
+  return build === null || (build.captureGeneration ?? 0) !== queuedFor;
+}
+
 /** The `capture` handler: runs `createDispatchJob`'s runner, cancels through `runner.cancel`. */
 export function createCaptureHandler(options: CaptureHandlerOptions): KindHandler {
   const fallbackRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
@@ -84,6 +102,7 @@ export function createCaptureHandler(options: CaptureHandlerOptions): KindHandle
   dispatchFor(fallbackRetries);
   return {
     accepts: isValidCaptureJob,
+    superseded: async (job) => await isSuperseded(options, job),
     run: async (job, context) => {
       await dispatchFor(retriesOf(job, fallbackRetries))(toDispatchJob(job), {
         touch: () => {

@@ -288,11 +288,11 @@ describe("BuildModel: a cancelled build is terminal", () => {
 
     await model.resetStatus(id, "pending");
     expect((await model.get(id))?.captureGeneration).toBe(1);
-    expect(await model.stampCaptureJob(id, "OLD", 0)).toBe("stale");
+    expect(await model.stampCaptureJob(id, "OLD", 0)).toEqual({ result: "stale" });
     expect((await model.get(id))?.captureJobId ?? null).toBeNull();
-    expect(await model.stampCaptureJob(id, "NEW", 1)).toBe("stamped");
+    expect(await model.stampCaptureJob(id, "NEW", 1)).toEqual({ result: "stamped", generation: 2 });
     expect((await model.get(id))?.captureJobId).toBe("NEW");
-    expect(await model.stampCaptureJob("missing", "J", 0)).toBe("ignored");
+    expect(await model.stampCaptureJob("missing", "J", 0)).toEqual({ result: "ignored" });
   });
 
   it("retries a reset that lost the generation race to another reset", async () => {
@@ -422,6 +422,29 @@ describe("BuildModel: a cancelled build is terminal", () => {
     await model.stampCaptureJob(id, "J1", 0);
 
     expect((await model.get(id))?.captureJobId ?? null).toBeNull();
+  });
+
+  it("sets a status only at the run generation it was read at, and never on a cancelled build", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await model.setStatus(id, "capturing");
+
+    await model.resetStatus(id, "pending");
+    const old = await model.setStatusAtGeneration(id, "approved", 0);
+    expect(old.applied).toBe(false);
+    expect((await model.get(id))?.status).toBe("pending");
+
+    expect((await model.setStatusAtGeneration(id, "approved", 1)).applied).toBe(true);
+    expect((await model.get(id))?.status).toBe("approved");
+
+    await model.setStatus(id, "cancelled");
+    expect((await model.setStatusAtGeneration(id, "approved", 1)).applied).toBe(false);
+    expect((await model.get(id))?.status).toBe("cancelled");
   });
 
   it("fails a build only for the job that owns it", async () => {

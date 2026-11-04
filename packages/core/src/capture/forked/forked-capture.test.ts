@@ -402,6 +402,21 @@ describe("createForkedCaptureHandler", () => {
     });
   });
 
+  it("leaves the superseded-run check to the fallback", async () => {
+    const back: KindHandler = {
+      run: async () => {},
+      superseded: async (j) => j.buildId === "old",
+    };
+    const handler = createForkedCaptureHandler({ spawn: () => new FakeChild(), fallback: back });
+    expect(await handler.superseded?.(job("old"))).toBe(true);
+    expect(await handler.superseded?.(job("current"))).toBe(false);
+    const plain = createForkedCaptureHandler({
+      spawn: () => new FakeChild(),
+      fallback: { run: async () => {} },
+    });
+    expect(await plain.superseded?.(job("old"))).toBe(false);
+  });
+
   it("leaves recording a passed deadline to the fallback", async () => {
     const seen: [string, number][] = [];
     const back: KindHandler = {

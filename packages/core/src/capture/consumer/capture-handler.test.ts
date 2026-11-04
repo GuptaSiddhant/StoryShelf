@@ -88,6 +88,49 @@ describe("capture jobs through the consumer", () => {
   });
 });
 
+async function queuedBuild() {
+  const options = handlerOptions();
+  const project = await new ProjectModel(options.db).create({ name: "P", gitRepository: "o/r" });
+  const builds = new BuildModel(options.db);
+  const build = await builds.create(project.id, { gitSha: "abc", gitBranch: "main" });
+  return { options, builds, build };
+}
+
+describe("a capture job queued for a superseded run", () => {
+  it("is recognised by its generation, and only for a build's own job", async () => {
+    const { options, builds, build } = await queuedBuild();
+    const { superseded } = createCaptureHandler(options);
+    const job = { buildId: build.id, data: { generation: 1 } };
+    await builds.stampCaptureJob(build.id, "J1", 0);
+    expect(await superseded?.(job)).toBe(false);
+    await builds.resetStatus(build.id, "pending");
+    expect(await superseded?.(job)).toBe(true);
+    // No generation (queued before the fence) and shard jobs are never judged here.
+    expect(await superseded?.({ buildId: build.id })).toBe(false);
+    expect(await superseded?.({ ...job, shard: "s1" })).toBe(false);
+    expect(await superseded?.({ buildId: "ghost", data: { generation: 1 } })).toBe(true);
+  });
+
+  it("ends cancelled before the run, with no build write", async () => {
+    const { options, builds, build } = await queuedBuild();
+    const r = rig({ db: options.db, retries: 1 });
+    const queued = r.queue.enqueue({ buildId: build.id });
+    await queued;
+    // A retry starts a newer run before any worker claims the job.
+    await builds.resetStatus(build.id, "pending");
+    const before = await builds.get(build.id);
+    const consumer = r.consume({ capture: { ...options } });
+    const started = consumer.start();
+    await r.clock.advance(10_000);
+    const [job] = await new CaptureJobModel(r.db).listForBuild(build.id);
+    expect(job?.status).toBe("cancelled");
+    expect(options.runner.render).not.toHaveBeenCalled();
+    expect(await builds.get(build.id)).toEqual(before);
+    await consumer.stop();
+    await started;
+  });
+});
+
 describe("a capture job that passed its deadline", () => {
   it("records `job deadline exceeded` in the log of the build's open attempt", async () => {
     const options = handlerOptions();
