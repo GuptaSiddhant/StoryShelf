@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { BuildReferenceLifecycle, DeletingBuild } from "../adapters/database.ts";
 import { makeDatabase } from "../test-helpers/fake-database.ts";
 import { makeStorage } from "../test-helpers/fake-storage.ts";
-import { deleteClaimedBuild, manifestHashes } from "./build-deletion.ts";
+import { deleteClaimedBuild, manifestHashes, readManifestHashes } from "./build-deletion.ts";
 import { purgeClaimedBuilds } from "./purge-claimed.ts";
 
 const build = (overrides: Partial<DeletingBuild> = {}): DeletingBuild => ({
@@ -63,6 +63,43 @@ describe("manifestHashes", () => {
     storage.read = () => Promise.reject(new Error("disk"));
 
     await expect(manifestHashes({ storage }, "p", "b1")).rejects.toThrow("disk");
+  });
+});
+
+describe("readManifestHashes", () => {
+  const PATH = "p/builds/b1/storybook/manifest.json";
+
+  it("tells a build without a manifest ([]) from a manifest that cannot be parsed (null)", async () => {
+    const { storage } = makeStorage();
+    expect(await readManifestHashes({ storage }, "p", "b1")).toEqual([]);
+    await storage.write(PATH, Buffer.from(JSON.stringify({ "a.js": "h1", "b.js": "h1" })));
+    expect(await readManifestHashes({ storage }, "p", "b1")).toEqual(["h1"]);
+    await storage.write(PATH, Buffer.from("{}"));
+    expect(await readManifestHashes({ storage }, "p", "b1")).toEqual([]);
+  });
+
+  it.each(["{", "", "null", "[]", '["h1"]', "42", '"h1"'])(
+    "answers null for a manifest that is not a JSON object: %j",
+    async (body) => {
+      const { storage } = makeStorage();
+      await storage.write(PATH, Buffer.from(body));
+      expect(await readManifestHashes({ storage }, "p", "b1")).toBeNull();
+    },
+  );
+
+  it("still throws when the manifest cannot be read from storage", async () => {
+    const { storage } = makeStorage();
+    await storage.write(PATH, Buffer.from("{}"));
+    storage.read = () => Promise.reject(new Error("disk"));
+    await expect(readManifestHashes({ storage }, "p", "b1")).rejects.toThrow("disk");
+  });
+
+  it("leaves manifestHashes as it was: a manifest that is not an object names nothing", async () => {
+    const { storage } = makeStorage();
+    await storage.write(PATH, Buffer.from("[]"));
+    expect(
+      await manifestHashes({ storage, logger: { warn: vi.fn() } as never }, "p", "b1"),
+    ).toEqual([]);
   });
 });
 

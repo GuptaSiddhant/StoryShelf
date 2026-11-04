@@ -193,6 +193,29 @@ describe("collectUnreferencedContent reading the live manifests", () => {
     expect(logged[0]?.[0]).toMatchObject({ builds: 12 });
   });
 
+  it.each(["{", "", "null", "[]"])(
+    "treats a live manifest that is not a JSON object (%j) as a failed read: nothing is deleted",
+    async (body) => {
+      const w = world([GOOD, LIVE]);
+      await liveBuilds(w, 10, (index) => (index === 2 ? [LIVE] : []));
+      w.objects.set(`${storybookDir("p1", "b006")}/manifest.json`, Buffer.from(body));
+      w.objects.set(`content/${GOOD}`, Buffer.from("x"));
+      w.objects.set(`content/${LIVE}`, Buffer.from("y"));
+
+      expect(await collectUnreferencedContent(w.deps)).toBe(0);
+
+      expect(w.deleteSpy).not.toHaveBeenCalled();
+      expect(w.objects.has(`content/${GOOD}`)).toBe(true);
+      expect(w.lifecycle.finishContentCollection).not.toHaveBeenCalled();
+      expect(w.lifecycle.abandonContentClaim).toHaveBeenCalledTimes(2);
+      const logged = w.warn.mock.calls.filter(([, message]) =>
+        String(message).startsWith("content collection skipped: a build manifest"),
+      );
+      expect(logged).toHaveLength(1);
+      expect(logged[0]?.[0]).toMatchObject({ builds: 10 });
+    },
+  );
+
   it("collects again on the next pass once the manifests can be read", async () => {
     const w = world([GOOD]);
     await liveBuilds(w, 5, () => []);

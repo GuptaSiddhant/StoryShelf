@@ -10,7 +10,7 @@ import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
 import { contentKey, isContentHash, publishedGzipPath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
-import { manifestHashes } from "./build-deletion.ts";
+import { readManifestHashes } from "./build-deletion.ts";
 
 /** How long a blob must stand without a use before it is collected. */
 export const CONTENT_GRACE_MS = 7 * 86_400_000;
@@ -86,8 +86,8 @@ async function claimIdle(deps: ContentGcDeps, token: string): Promise<string[]> 
 
 /**
  * Take out of `candidates` every hash a live build's manifest names; stops once none is left.
- * Manifests are read {@link MANIFEST_READ_CONCURRENCY} at a time. A read that fails stops the
- * scan and answers false: then no live manifest can be ruled out, so the caller must delete
+ * Manifests are read {@link MANIFEST_READ_CONCURRENCY} at a time. A read that fails, or a manifest
+ * that is not a JSON object, stops the scan and answers false: then no live manifest can be ruled out, so the caller must delete
  * nothing.
  */
 async function dropLiveHashes(deps: ContentGcDeps, candidates: Set<string>): Promise<boolean> {
@@ -127,9 +127,10 @@ async function readLane(
     if (!build) return;
     try {
       // oxlint-disable-next-line no-await-in-loop -- a lane reads one manifest at a time
-      for (const hash of await manifestHashes(deps, build.projectId, build.id)) {
-        candidates.delete(hash);
-      }
+      const hashes = await readManifestHashes(deps, build.projectId, build.id);
+      // A manifest that is not a JSON object names nothing we can trust: treat it as a failed read.
+      if (hashes === null) scan.failed = true;
+      for (const hash of hashes ?? []) candidates.delete(hash);
     } catch {
       scan.failed = true;
     }

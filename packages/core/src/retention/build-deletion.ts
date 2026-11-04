@@ -141,19 +141,37 @@ export async function manifestHashes(
   projectId: string,
   buildId: string,
 ): Promise<string[]> {
+  const hashes = await readManifestHashes(deps, projectId, buildId);
+  if (hashes === null) {
+    deps.logger?.warn({ buildId }, "build manifest unreadable; content counts kept");
+    return [];
+  }
+  return hashes;
+}
+
+/**
+ * Like {@link manifestHashes}, but a manifest that exists and is not a JSON object answers `null`
+ * instead of "names nothing", so a caller that must not guess (content GC, which would otherwise
+ * free a live build's blobs) can tell it from a build with no shared content (`[]`). A manifest
+ * that cannot be read from storage still throws.
+ */
+export async function readManifestHashes(
+  deps: Pick<BuildDeletionDeps, "storage">,
+  projectId: string,
+  buildId: string,
+): Promise<string[] | null> {
   const path = `${buildPrefix(projectId, buildId)}storybook/manifest.json`;
   if (!(await deps.storage.exists(path))) return [];
   const raw = await deps.storage.read(path);
+  let manifest: unknown;
   try {
-    const manifest = JSON.parse(raw.toString("utf8")) as Record<string, unknown>;
-    const hashes = Object.values(manifest).filter(
-      (hash): hash is string => typeof hash === "string",
-    );
-    return [...new Set(hashes)];
-  } catch (error) {
-    deps.logger?.warn({ err: error, buildId }, "build manifest unreadable; content counts kept");
-    return [];
+    manifest = JSON.parse(raw.toString("utf8"));
+  } catch {
+    return null;
   }
+  if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest)) return null;
+  const hashes = Object.values(manifest).filter((hash): hash is string => typeof hash === "string");
+  return [...new Set(hashes)];
 }
 
 /** Delete one file; a file another cleaner already deleted is not an error. */
