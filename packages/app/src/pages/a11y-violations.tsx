@@ -81,14 +81,16 @@ export function a11yCarrierOf<T extends Pick<Snapshot, "a11yViolations">>(
   siblings: readonly T[],
 ): T {
   const found = (candidate: T): boolean => a11yFindingsOf(candidate).length > 0;
-  const unavailable = (candidate: T): boolean => a11yUnavailableReasonOf(candidate) !== undefined;
+  // A note about the run (`axe unavailable`, parameters not applied) shows when nothing found anything.
+  const noted = (candidate: T): boolean =>
+    a11yUnavailableReasonOf(candidate) !== undefined ||
+    a11yParametersNoteOf(candidate) !== undefined;
   if (found(snapshot)) {
     return snapshot;
   }
-  // Findings win over an `axe unavailable` note, which only shows when nothing found anything.
   return (
     siblings.find((sibling) => found(sibling)) ??
-    (unavailable(snapshot) ? snapshot : siblings.find((sibling) => unavailable(sibling))) ??
+    (noted(snapshot) ? snapshot : siblings.find((sibling) => noted(sibling))) ??
     snapshot
   );
 }

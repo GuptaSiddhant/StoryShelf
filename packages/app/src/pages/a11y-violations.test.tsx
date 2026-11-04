@@ -197,6 +197,22 @@ describe("a11y parameters that could not be read", () => {
   });
 });
 
+describe("a parameters note on the primary target", () => {
+  it("is found from a secondary target's snapshot, which has nothing of its own", async () => {
+    const primary = {
+      a11yViolations: JSON.stringify([
+        "a11y parameters not serializable: refers to itself (cyclic)",
+      ]),
+      browser: "chromium",
+    };
+    const carrier = a11yCarrierOf(WITHOUT, [WITHOUT, primary]);
+    expect(carrier).toBe(primary);
+    expect(await render(<A11yViolationsNotice snapshot={carrier} />)).toContain(
+      "story parameters not applied on chromium",
+    );
+  });
+});
+
 describe("a multi-target build whose primary capture failed", () => {
   it("takes the findings from the target that captured and says which one", async () => {
     const webkit = {
