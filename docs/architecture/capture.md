@@ -131,6 +131,8 @@ async function capture(buildId: string): Promise<void> {
 }
 ```
 
+Inheriting is also checked per baseline: a story is inherited only when its baseline's `source_build_id` is the comparison build or an older one (by `created_at`). A baseline promoted from a later build, for example by a per-snapshot approval while that build was still being reviewed, is rendered instead, so a revert to the comparison build's version is not hidden. A baseline with no recorded source (legacy rows) is still inherited.
+
 ### Deterministic Rendering
 
 Rendering happens on the server against the user's uploaded static build, in a pinned browser:

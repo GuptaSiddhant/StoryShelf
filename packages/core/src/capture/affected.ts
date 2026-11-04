@@ -45,19 +45,27 @@ export interface PartitionInput {
   browser?: string;
   /** Affected import paths, or `null` to render everything. */
   affectedPaths: string[] | null;
+  /** The commit the affected set was computed against (`builds.baseline_sha`), when known. */
+  baselineSha?: string | null;
 }
 
-/** Split one inherit candidate by per-viewport baseline availability. */
-async function splitStory(
+/** One viewport of an inherit candidate with the baseline it would reuse, if any. */
+interface Candidate {
+  story: StoryEntry;
+  viewport: Viewport;
+  baseline: Baseline | null;
+}
+
+/** Resolve the per-viewport baselines of one inherit candidate. */
+async function candidatesOf(
   baselines: BaselineModel,
   input: PartitionInput,
   story: StoryEntry,
-): Promise<AffectedPartition> {
-  const render: StoryEntry[] = [];
-  const inherited: InheritedStory[] = [];
+): Promise<Candidate[]> {
   const viewports = resolveStoryViewports(story, input.viewports);
-  const settled = await Promise.all(
+  return await Promise.all(
     viewports.map(async (viewport) => ({
+      story,
       viewport,
       baseline: await baselines.resolve(
         input.projectId,
@@ -69,28 +77,51 @@ async function splitStory(
       ),
     })),
   );
-  for (const { viewport, baseline } of settled) {
-    if (baseline) {
-      inherited.push({
-        story,
-        viewport,
-        baseline,
-        ...(input.browser ? { browser: input.browser } : {}),
-      });
+}
+
+/**
+ * The baselines that were promoted after the comparison build: their source build is newer than
+ * it, so the diff since the comparison commit says nothing about them (a per-snapshot approval on
+ * a later build, then a revert). A baseline without a recorded source (legacy rows), or whose
+ * source build is gone, is not listed and keeps being inherited, so an upgrade costs no full capture.
+ */
+async function promotedAfterComparison(
+  input: PartitionInput,
+  candidates: Candidate[],
+): Promise<Set<string>> {
+  const builds = new BuildModel(input.db);
+  const comparison = input.baselineSha
+    ? await builds.comparisonBuild(input.projectId, input.branch, input.baselineSha)
+    : null;
+  if (!comparison) {
+    return new Set();
+  }
+  const sources = candidates.flatMap(({ baseline }) =>
+    baseline?.sourceBuildId ? [baseline.sourceBuildId] : [],
+  );
+  const created = await builds.createdAtOf([...new Set(sources)]);
+  return new Set(
+    candidates.flatMap(({ baseline }) => {
+      const at = baseline?.sourceBuildId ? created.get(baseline.sourceBuildId) : undefined;
+      return baseline && at !== undefined && at > comparison.createdAt ? [baseline.id] : [];
+    }),
+  );
+}
+
+/** Split the candidates into stories to render and baselines to inherit. */
+function splitCandidates(
+  candidates: Candidate[],
+  promoted: ReadonlySet<string>,
+  browser: string | undefined,
+): AffectedPartition {
+  const render: StoryEntry[] = [];
+  const inherited: InheritedStory[] = [];
+  for (const { story, viewport, baseline } of candidates) {
+    if (baseline && !promoted.has(baseline.id)) {
+      inherited.push({ story, viewport, baseline, ...(browser ? { browser } : {}) });
     } else if (!render.includes(story)) {
       render.push(story);
     }
-  }
-  return { render, inherited };
-}
-
-/** Merge per-story partitions into a single render/inherit split. */
-function mergePartitions(partitions: AffectedPartition[]): AffectedPartition {
-  const render: StoryEntry[] = [];
-  const inherited: InheritedStory[] = [];
-  for (const partition of partitions) {
-    render.push(...partition.render);
-    inherited.push(...partition.inherited);
   }
   return { render, inherited };
 }
@@ -108,9 +139,12 @@ export async function partitionAffectedStories(input: PartitionInput): Promise<A
     return { render: selected.render, inherited: [] };
   }
   const baselines = new BaselineModel(input.db, input.tables);
-  const partitions = await Promise.all(
-    selected.inherit.map(async (story) => await splitStory(baselines, input, story)),
-  );
-  const merged = mergePartitions(partitions);
-  return { render: [...selected.render, ...merged.render], inherited: merged.inherited };
+  const candidates = (
+    await Promise.all(
+      selected.inherit.map(async (story) => await candidatesOf(baselines, input, story)),
+    )
+  ).flat();
+  const promoted = await promotedAfterComparison(input, candidates);
+  const split = splitCandidates(candidates, promoted, input.browser);
+  return { render: [...selected.render, ...split.render], inherited: split.inherited };
 }
