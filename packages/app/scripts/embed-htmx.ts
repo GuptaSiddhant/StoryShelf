@@ -22,13 +22,11 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-
-/** What `htmx.sha256.json` holds. */
-interface RecordedChecksums {
-  version: string;
-  upstream: { package: string; file: string; sha256: string; bytes: number };
-  embedded: { sha256: string; bytes: number };
-}
+import {
+  assertSameBytes,
+  parseRecorded,
+  type RecordedChecksums,
+} from "../src/assets/htmx-checksums.ts";
 
 /** The published file as read from disk. */
 interface Upstream {
@@ -45,30 +43,15 @@ function sha256(data: string | Buffer): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
+/** The recorded checksums; none only when the file is absent. A damaged file throws. */
 async function recordedChecksums(): Promise<RecordedChecksums | undefined> {
   try {
-    return JSON.parse(await readFile(CHECKSUM_FILE, "utf8")) as RecordedChecksums;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Stop when this version was recorded with other bytes, unless the caller accepted the change. */
-function assertSameBytes(
-  recorded: RecordedChecksums | undefined,
-  version: string,
-  upstreamSha: string,
-  accepted: boolean,
-): void {
-  if (!recorded || recorded.version !== version || recorded.upstream.sha256 === upstreamSha) {
-    return;
-  }
-  if (!accepted) {
-    throw new Error(
-      `htmx ${version} was recorded with sha256 ${recorded.upstream.sha256}, but this file is ` +
-        `${upstreamSha}. The same version should be the same bytes: find out why before ` +
-        `re-running with --accept-changed-checksum.`,
-    );
+    return parseRecorded(await readFile(CHECKSUM_FILE, "utf8"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
   }
 }
 
