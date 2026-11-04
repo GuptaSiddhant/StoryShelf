@@ -18,6 +18,9 @@ export const CONTENT_GRACE_MS = 7 * 86_400_000;
 /** How long a claim belongs to its collector; an older one is a crashed pass's and is resumed. */
 export const CLAIM_LEASE_MS = 30 * 60_000;
 
+/** How many live manifests one pass reads at a time; the reads are the cost of a pass on a remote store. */
+export const MANIFEST_READ_CONCURRENCY = 8;
+
 /** What the collector needs. */
 export interface ContentGcDeps {
   db: DatabaseAdapter;
@@ -33,7 +36,7 @@ export async function collectUnreferencedContent(deps: ContentGcDeps): Promise<n
   const claimed = await claimWellFormed(deps, token);
   if (claimed.length === 0) return 0;
   const free = new Set(claimed);
-  await dropLiveHashes(deps, free);
+  if (!(await dropLiveHashes(deps, free))) return await keepAll(deps, claimed, token);
   let removed = 0;
   for (const hash of claimed) {
     // oxlint-disable-next-line no-await-in-loop -- one blob at a time keeps a failure to that blob
@@ -81,21 +84,65 @@ async function claimIdle(deps: ContentGcDeps, token: string): Promise<string[]> 
   return await deps.lifecycle.claimContent(token, before(CONTENT_GRACE_MS), before(CLAIM_LEASE_MS));
 }
 
-/** Take out of `candidates` every hash a live build's manifest names; stops once none is left. */
-async function dropLiveHashes(deps: ContentGcDeps, candidates: Set<string>): Promise<void> {
+/**
+ * Take out of `candidates` every hash a live build's manifest names; stops once none is left.
+ * Manifests are read {@link MANIFEST_READ_CONCURRENCY} at a time. A read that fails stops the
+ * scan and answers false: then no live manifest can be ruled out, so the caller must delete
+ * nothing.
+ */
+async function dropLiveHashes(deps: ContentGcDeps, candidates: Set<string>): Promise<boolean> {
   const builds = (await deps.db.list(deps.db.tables.builds)) as unknown as {
     id: string;
     projectId: string;
     retentionState?: string;
   }[];
-  for (const build of builds) {
-    if (candidates.size === 0) return;
-    if (build.retentionState === "deleting") continue;
-    // oxlint-disable-next-line no-await-in-loop -- manifests are read one at a time
-    for (const hash of await manifestHashes(deps, build.projectId, build.id)) {
-      candidates.delete(hash);
+  const live = builds.filter((build) => build.retentionState !== "deleting");
+  const scan = { next: 0, failed: false };
+  const lanes = Array.from(
+    { length: Math.min(MANIFEST_READ_CONCURRENCY, live.length) },
+    async (): Promise<void> => {
+      await readLane(deps, live, candidates, scan);
+    },
+  );
+  await Promise.all(lanes);
+  if (scan.failed) {
+    deps.logger?.warn(
+      { candidates: candidates.size, builds: live.length, read: Math.min(scan.next, live.length) },
+      "content collection skipped: a build manifest could not be read",
+    );
+  }
+  return !scan.failed;
+}
+
+/** One reader of the scan: takes the next build off the shared cursor until done, stopped or failed. */
+async function readLane(
+  deps: ContentGcDeps,
+  live: { id: string; projectId: string }[],
+  candidates: Set<string>,
+  scan: { next: number; failed: boolean },
+): Promise<void> {
+  while (!scan.failed && candidates.size > 0 && scan.next < live.length) {
+    const build = live[scan.next];
+    scan.next += 1;
+    if (!build) return;
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- a lane reads one manifest at a time
+      for (const hash of await manifestHashes(deps, build.projectId, build.id)) {
+        candidates.delete(hash);
+      }
+    } catch {
+      scan.failed = true;
     }
   }
+}
+
+/** Give every claim back: nothing is collected this pass, so nothing is removed. */
+async function keepAll(deps: ContentGcDeps, claimed: string[], token: string): Promise<0> {
+  for (const hash of claimed) {
+    // oxlint-disable-next-line no-await-in-loop -- one claim at a time
+    await giveBack(deps, hash, token);
+  }
+  return 0;
 }
 
 /** A live build serves the blob: give the claim back and count nothing removed. */
