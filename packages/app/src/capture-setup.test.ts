@@ -9,7 +9,12 @@ import {
 import type { ConsumerJob, JobRunContext } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import {
+  BuildModel,
+  CaptureAttemptModel,
+  CaptureLogModel,
+  ProjectModel,
+} from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
@@ -200,9 +205,21 @@ describe("the forked capture handler", () => {
     expect(await wiring.handler?.superseded?.(job("ghost"))).toBe(false);
   });
 
-  it("keeps the in-process handler's record of a passed deadline", async () => {
-    const { wiring } = forked();
-    // No attempt is open for a build that is not there: nothing to write, and no failure.
+  it("keeps the in-process handler's record of a passed deadline, in the log of the open attempt", async () => {
+    const { wiring, db } = forked();
+    const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
+    const build = await new BuildModel(db).create(project.id, { gitSha: "abc", gitBranch: "main" });
+    const attempts = new CaptureAttemptModel(db);
+    const attempt = await attempts.startAttempt(project.id, build.id);
+    await attempts.markRunning(attempt.id);
+
+    await wiring.handler?.deadlineExceeded?.(job(build.id), 7200);
+
+    const logs = await new CaptureLogModel(db).listByAttempt(attempt.id);
+    expect(logs.map((log) => [log.level, log.message])).toEqual([
+      ["error", "job deadline exceeded (7200s)"],
+    ]);
+    // A build with no open attempt has nothing to write to, and that is no failure.
     await expect(wiring.handler?.deadlineExceeded?.(job("ghost"), 60)).resolves.toBeUndefined();
   });
 
