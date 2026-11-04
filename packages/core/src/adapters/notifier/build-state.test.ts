@@ -331,6 +331,31 @@ describe("statusesForBuild: progress and annotations", () => {
     expect(gate(set)?.omitted).toBeUndefined();
   });
 
+  it.each(["a b&c=d#e", "100%", "ünï/日本", "x?y=1", "../up"])(
+    "links a snapshot id %s as one query value, so the link opens that snapshot",
+    (id) => {
+      const status = gate(run({ build: { status: "reviewing" }, changes: [change(1, { id })] }));
+      const url = status?.annotations?.[0]?.url ?? "";
+      const parsed = new URL(url);
+      expect(parsed.pathname).toBe("/projects/web/builds/b1/diff");
+      expect(parsed.searchParams.get("snapshot")).toBe(id);
+      expect(parsed.hash).toBe("");
+      expect(status?.annotations?.[0]?.message).toContain(url);
+    },
+  );
+
+  it("keeps a path prefix of the public origin in the build and snapshot links", () => {
+    const set = run({
+      base: "https://shelf.example.com/shelf/",
+      build: { status: "reviewing" },
+      changes: [change(1)],
+    });
+    expect(gate(set)?.url).toBe("https://shelf.example.com/shelf/projects/web/builds/b1");
+    expect(gate(set)?.annotations?.[0]?.url).toBe(
+      "https://shelf.example.com/shelf/projects/web/builds/b1/diff?snapshot=S1",
+    );
+  });
+
   it("caps the annotations and counts the rest", () => {
     const changes = Array.from({ length: MAX_ANNOTATIONS + 7 }, (_, i) => change(i));
     const status = gate(run({ build: { status: "reviewing" }, changes }));
