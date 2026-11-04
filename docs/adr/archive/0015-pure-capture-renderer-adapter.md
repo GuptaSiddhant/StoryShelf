@@ -26,7 +26,7 @@ Adapters implement a single `render(input)` that turns an **already-extracted** 
 interface CaptureRunner {
   render(input: {
     buildId: string;
-    storybookDir: string; // extracted Storybook root
+    storybookDir: string;  // extracted Storybook root
     stories: StoryEntry[];
     viewports: Viewport[];
     logger?: Logger;

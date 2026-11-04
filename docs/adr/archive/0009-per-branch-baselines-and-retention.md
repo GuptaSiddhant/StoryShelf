@@ -10,7 +10,7 @@ Visual testing hinges on one question: **which screenshot do we compare against?
 
 1. **Always diff against the default branch.** Simple, but every commit to a feature branch re-flags stories that were already accepted against an untouched default branch. Multi-commit PRs force reviewers to re-approve the same change repeatedly.
 
-2. **Per-branch baselines with fallback to default (Chromatic's model).** Accepting a change on a branch records a baseline _for that branch_; subsequent builds on that branch diff against the accepted version. Stories never accepted on a branch fall back to the default branch.
+2. **Per-branch baselines with fallback to default (Chromatic's model).** Accepting a change on a branch records a baseline *for that branch*; subsequent builds on that branch diff against the accepted version. Stories never accepted on a branch fall back to the default branch.
 
 A second, orthogonal concern is **retention**: because the server stores every screenshot and never clones a repo from which to re-derive them, screenshots accumulate indefinitely. Baselines are the durable truth; everything else is transient.
 
@@ -37,7 +37,6 @@ For a snapshot of `(story, viewport)` on branch `B`:
 **Never purged:** default-branch `baselines/**` files/rows and builds bearing a `persistent` label (see ADR 0013). Feature-branch baselines are purged via branch GC below.
 
 **Purged:**
-
 - Builds in a terminal review state (`approved`/`rejected`) older than `purge_ttl` (default 30 days).
 - Old builds of a branch: retain the most recent build per branch (it backs the PR status link); purge older ones past TTL.
 - Builds in non-terminal states are never purged (a `reviewing` build must not vanish before review).
@@ -57,14 +56,12 @@ A story renamed or removed from Storybook leaves a stale baseline. On each defau
 ## Consequences
 
 **Positive:**
-
 - No re-review of already-accepted changes on multi-commit PRs
 - Baselines survive build purging (canonical file, not a pointer into a transient build)
 - Disk usage is bounded by TTL + per-branch retention
 - Merge-to-default is implicit (next default build re-baselines)
 
 **Negative:**
-
 - Feature-branch baselines can diverge from default; a `git pull` after main moves under a story re-flags it (correct, but surprising the first time)
 - "Auto-approve default" means a regression pushed straight to default is baselined silently — an accepted consequence of the model, with a future "require approval on default changes" escape hatch if needed
 

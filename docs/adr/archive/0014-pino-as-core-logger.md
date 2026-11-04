@@ -19,7 +19,6 @@ We evaluated whether to keep the `LoggerAdapter` abstraction and concluded we di
 `@storyshelf/core` depends on **pino** and exposes `createShelfLogger()` as the single logger factory (defaults to `info` level, structured JSON to stdout via a `pino/file` transport).
 
 Logging conventions (see `AGENTS.md`):
-
 - Always log structured objects; never interpolate into the message: `logger.info({ projectId, buildId }, "build started")`.
 - Attach errors as an `err` child field: `logger.error({ err }, "capture failed")`.
 - Derive scoped child loggers for background work: `logger.child({ buildId })`.

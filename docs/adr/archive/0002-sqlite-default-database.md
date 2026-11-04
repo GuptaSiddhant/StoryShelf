@@ -40,7 +40,7 @@ import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 
 const client = createClient({
-  url: process.env.TURSO_DATABASE_URL, // "libsql://your-db.turso.io"
+  url: process.env.TURSO_DATABASE_URL,      // "libsql://your-db.turso.io"
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 const db = drizzle(client, { schema });
@@ -59,7 +59,6 @@ Drizzle supports all three with the same schema definitions. The adapter interfa
 ## Consequences
 
 **Positive:**
-
 - Zero configuration on VPS/Docker — no server, no connection string, no credentials
 - Single file on disk — `data/shelf.db` — easy backup, easy migration
 - WAL mode handles concurrent reads + single writer perfectly for this use case
@@ -69,7 +68,6 @@ Drizzle supports all three with the same schema definitions. The adapter interfa
 - Same schema works for SQLite, Turso, and PostgreSQL — future-proof
 
 **Negative:**
-
 - SQLite single writer: cannot scale to multiple server processes (fine for single-tenant)
 - Turso free tier: 500 databases, 5GB storage, 500M reads/month (sufficient for most teams)
 - Turso write latency: 15-50ms vs SQLite's 0.05ms (acceptable for review workflows, not for high-throughput writes)

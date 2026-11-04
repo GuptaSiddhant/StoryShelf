@@ -8,7 +8,7 @@ Amended in part by ADRs 0034, 0035 and 0036 (statuses come from build state, not
 
 ## Context
 
-Visual testing only pays off when it _blocks bad merges_. Users want to integrate StoryShelf with GitHub or GitLab so a PR cannot merge until its visual changes have been reviewed and approved in StoryShelf.
+Visual testing only pays off when it *blocks bad merges*. Users want to integrate StoryShelf with GitHub or GitLab so a PR cannot merge until its visual changes have been reviewed and approved in StoryShelf.
 
 Two levels of integration exist:
 
@@ -24,7 +24,7 @@ Two levels of integration exist:
 - Posts `success` when all `new`/`changed` snapshots are approved.
 - Posts `failure` when changes are rejected or remain unresolved.
 
-It authenticates with a **separate, per-project Git credential** (PAT or app installation token), _not_ the CLI project token — the project token identifies a build, while the status credential authorizes writes to the repo. Posting statuses is the user's explicit opt-in; no statuses are posted without it.
+It authenticates with a **separate, per-project Git credential** (PAT or app installation token), *not* the CLI project token — the project token identifies a build, while the status credential authorizes writes to the repo. Posting statuses is the user's explicit opt-in; no statuses are posted without it.
 
 **v2: GitHub App / GitLab integration.** Rich check runs, per-snapshot annotations, deep links to the review UI, and auto-reject. The app is repo-installed (no long-lived PAT), receives webhooks to know when builds are resolved, and is the natural home for future merge confirmation.
 
@@ -35,14 +35,12 @@ The merge gate is why **approver** and **developer** are distinct roles: develop
 ## Consequences
 
 **Positive:**
-
 - v1 ships with a working merge gate using only a commit status + branch protection
 - No OAuth App or long-running service is required to get started
 - The status adapter's responsibilities are well-scoped and testable
 - Approver/developer split maps cleanly onto the merge-gate workflow
 
 **Negative:**
-
 - v1 depends on the repo owner configuring branch protection (a manual step; a CLI/UI helper can scaffold it)
 - A PAT for status writes is a credential to manage and rotate
 - Rich per-snapshot annotation UX is deferred to v2

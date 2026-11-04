@@ -186,7 +186,6 @@ the codec does not dominate here, revisit the premise before building the pool.
 
   Baselines from before fingerprints are compared normally and backfilled. This replaces
   the unused `projects.automigrate` flag's size-change special case.
-
 - **Content-address screenshot blobs** as `<project>/content/<sha256>.png`: per project (not
   global, so project deletion and isolation stay simple), shared by snapshots and
   baselines (a baseline repoints instead of copying), and skipped on upload when the

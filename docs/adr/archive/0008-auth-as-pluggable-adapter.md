@@ -9,7 +9,6 @@ Accepted. Extended by [ADR 0021](0021-composite-auth-and-local-accounts.md) (com
 StoryShelf is a self-hosted tool that may be deployed behind a VPN (no auth needed), exposed publicly (auth required), or integrated into an enterprise environment with existing identity providers (OAuth, SAML, LDAP, Keycloak, Authentik, Okta, etc.).
 
 The auth model must handle two distinct concerns:
-
 1. **Web UI authentication** — who is the logged-in user? (session-based)
 2. **CLI authentication** — which project is this build for? (token-based, already in the entity model)
 
@@ -41,7 +40,7 @@ interface AuthUser {
   email: string;
   name: string;
   avatarUrl?: string;
-  role: "admin" | "member"; // SITE-level role only; project roles live in project_members
+  role: "admin" | "member";   // SITE-level role only; project roles live in project_members
 }
 
 interface AuthCallback {
@@ -92,11 +91,11 @@ if (options.auth) {
 
 ### Three auth modes
 
-| Mode                | Config                                                | Who it's for                                                                   |
-| ------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------ |
-| **None** (default)  | No `auth` adapter passed                              | Local dev, VPN-protected networks. All requests are anonymous.                 |
+| Mode | Config | Who it's for |
+|------|--------|-------------|
+| **None** (default) | No `auth` adapter passed | Local dev, VPN-protected networks. All requests are anonymous. |
 | **Shared password** | `createPasswordAuth({ password: env.AUTH_PASSWORD })` | Small teams. Single password set via env var. Simple but no per-user identity. |
-| **OAuth/OIDC**      | `createOAuthAuth({ issuer, clientId, clientSecret })` | Enterprise. Plugs into Keycloak, Authentik, Okta, GitHub, GitLab, Google, etc. |
+| **OAuth/OIDC** | `createOAuthAuth({ issuer, clientId, clientSecret })` | Enterprise. Plugs into Keycloak, Authentik, Okta, GitHub, GitLab, Google, etc. |
 
 ### OAuth/OIDC adapter (built-in)
 
@@ -115,7 +114,7 @@ The OAuth adapter uses the standard authorization code flow:
 import { createOAuthAuth } from "@storyshelf/auth-oauth";
 
 const auth = createOAuthAuth({
-  issuer: process.env.OIDC_ISSUER, // "https://keycloak.example.com/realms/myteam"
+  issuer: process.env.OIDC_ISSUER,         // "https://keycloak.example.com/realms/myteam"
   clientId: process.env.OIDC_CLIENT_ID,
   clientSecret: process.env.OIDC_CLIENT_SECRET,
   // Optional:
@@ -152,10 +151,10 @@ Sessions are stored in encrypted cookies (not in the database):
 
 ```typescript
 interface SessionConfig {
-  secret: string; // HMAC signing key (from env SECRET)
-  maxAge: number; // cookie lifetime (default: 7 days)
-  secure: boolean; // HTTPS-only (default: true in production)
-  httpOnly: boolean; // no JS access (always true)
+  secret: string;           // HMAC signing key (from env SECRET)
+  maxAge: number;           // cookie lifetime (default: 7 days)
+  secure: boolean;          // HTTPS-only (default: true in production)
+  httpOnly: boolean;        // no JS access (always true)
   sameSite: "lax" | "strict";
 }
 ```
@@ -186,24 +185,24 @@ Four roles, ordered by capability, assigned per project via `project_members`:
 - **developer** — can view and re-run/trigger builds, but cannot approve/reject.
 - **viewer** — read-only.
 
-| Action                      | admin       | approver | developer | viewer | anonymous             |
-| --------------------------- | ----------- | -------- | --------- | ------ | --------------------- |
-| View builds and diffs       | ✓           | ✓        | ✓         | ✓      | ✗ (✓ if build public) |
-| View published Storybook    | ✓           | ✓        | ✓         | ✓      | ✓ if build public     |
-| Re-run / retry builds       | ✓           | ✓        | ✓         | ✗      | ✗                     |
-| Comment on builds/snapshots | ✓           | ✓        | ✓         | ✗      | ✗                     |
-| Approve/reject snapshots    | ✓           | ✓        | ✗         | ✗      | ✗                     |
-| Create/delete projects      | site admin  | ✗        | ✗         | ✗      | ✗                     |
-| Manage members              | ✓ (project) | ✗        | ✗         | ✗      | ✗                     |
-| Manage tokens               | ✓ (project) | ✗        | ✗         | ✗      | ✗                     |
-| Manage webhooks             | ✓ (project) | ✗        | ✗         | ✗      | ✗                     |
-| Server settings             | site admin  | ✗        | ✗         | ✗      | ✗                     |
+| Action | admin | approver | developer | viewer | anonymous |
+|--------|-------|----------|-----------|--------|-----------|
+| View builds and diffs | ✓ | ✓ | ✓ | ✓ | ✗ (✓ if build public) |
+| View published Storybook | ✓ | ✓ | ✓ | ✓ | ✓ if build public |
+| Re-run / retry builds | ✓ | ✓ | ✓ | ✗ | ✗ |
+| Comment on builds/snapshots | ✓ | ✓ | ✓ | ✗ | ✗ |
+| Approve/reject snapshots | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Create/delete projects | site admin | ✗ | ✗ | ✗ | ✗ |
+| Manage members | ✓ (project) | ✗ | ✗ | ✗ | ✗ |
+| Manage tokens | ✓ (project) | ✗ | ✗ | ✗ | ✗ |
+| Manage webhooks | ✓ (project) | ✗ | ✗ | ✗ | ✗ |
+| Server settings | site admin | ✗ | ✗ | ✗ | ✗ |
 
 Effective role resolution:
 
 ```typescript
 function effectiveRole(user, project): "admin" | "approver" | "developer" | "viewer" | null {
-  if (user.role === "admin") return "admin"; // site admin sees all projects
+  if (user.role === "admin") return "admin";                       // site admin sees all projects
   return projectMembers.find((m) => m.userId === user.id)?.role ?? null; // null = no access
 }
 ```
@@ -215,7 +214,6 @@ A non-admin user must have a `project_members` row to access a project at all. W
 ## Consequences
 
 **Positive:**
-
 - Enterprise teams plug in their existing IdP (Keycloak, Authentik, Okta, GitHub)
 - Small teams use shared password or no auth behind VPN
 - CLI auth (tokens) is independent of user auth (sessions) — no coupling
@@ -223,7 +221,6 @@ A non-admin user must have a `project_members` row to access a project at all. W
 - The app never imports passport.js, next-auth, or any auth library directly
 
 **Negative:**
-
 - Session management adds complexity (cookie signing, secure flags, expiry)
 - OAuth flow requires redirect handling (but this is standard Hono middleware)
 - Role mapping from external providers requires configuration (but sensible defaults help)

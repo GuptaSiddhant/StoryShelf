@@ -50,14 +50,12 @@ The CLI attaches labels at upload: `--label key=value` (repeatable). CI template
 ## Consequences
 
 **Positive:**
-
 - Provider-agnostic: `pr` vs `mr`, Jira vs Linear are config, not code
 - Label values become actionable external links
 - First-class and queryable (unlike StoryBooker's comma-string); no denormalised state to maintain
 - Release/tag builds persist automatically via the built-in `persistent` label
 
 **Negative:**
-
 - `label_types` is new configuration surface (project settings UI + seed defaults)
 - Resolving "latest build for a label" is a join query rather than an O(1) lookup (acceptable at self-hosted scale; can denormalise later if needed)
 - A `branch` label type is available for uniform search but is redundant with `builds.git_branch`; teams that don't want it can delete the type

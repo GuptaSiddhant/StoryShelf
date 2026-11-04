@@ -16,7 +16,7 @@ Two candidate architectures were considered:
 
 1. **Client-side capture (the Lost Pixel model):** the CLI runs Playwright locally in CI and uploads PNGs. The server only diffs. This pushes browser-version determinism onto the user's arbitrary CI environment and forces the CLI to ship ~150MB of browser binaries.
 
-2. **Server-side render:** the CLI builds Storybook, uploads the _static build_, and the server renders stories in its own pinned Playwright environment.
+2. **Server-side render:** the CLI builds Storybook, uploads the *static build*, and the server renders stories in its own pinned Playwright environment.
 
 A third option — the server **clones the git repo** and builds Storybook itself — was rejected. StoryBooker needed that to run arbitrary user build scripts; StoryShelf does not, because the CLI already built the Storybook. Cloning repos server-side adds a git-credential surface, a Docker socket (DinD) mount, and the entire guardian/reconciliation complexity that StoryBooker's compute system accumulated.
 
@@ -36,12 +36,12 @@ Everything after upload is asynchronous: `POST /builds` stores the zip and retur
 
 ### Why Playwright over alternatives
 
-| Option                | Pros                                                                                                                 | Cons                                |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **Playwright**        | Industry standard, multi-browser, `toHaveScreenshot` battle-tested, deterministic rendering, Docker images available | ~150MB browser binaries             |
-| Puppeteer             | Lighter                                                                                                              | Chromium-only, less maintained      |
-| BackstopJS            | Self-contained                                                                                                       | Full-page only, not component-level |
-| Storybook test-runner | Storybook-native                                                                                                     | Requires running Storybook server   |
+| Option | Pros | Cons |
+|--------|------|------|
+| **Playwright** | Industry standard, multi-browser, `toHaveScreenshot` battle-tested, deterministic rendering, Docker images available | ~150MB browser binaries |
+| Puppeteer | Lighter | Chromium-only, less maintained |
+| BackstopJS | Self-contained | Full-page only, not component-level |
+| Storybook test-runner | Storybook-native | Requires running Storybook server |
 
 ### Why server-side render (and not client-side capture)
 
@@ -53,14 +53,12 @@ Everything after upload is asynchronous: `POST /builds` stores the zip and retur
 ## Consequences
 
 **Positive:**
-
 - Server controls rendering determinism; the capture image and browser are one pinned artifact
 - CLI stays lightweight (no Playwright dependency)
 - One adapter interface; no script generation, no user-defined job steps
 - Cloud runners (v2) can be added without changing the capture logic
 
 **Negative:**
-
 - Upload payload is the full Storybook static build (can be tens of MB) -- mitigated by zip + resumable re-runs
 - Server CPU is the scaling bottleneck (every build re-renders every story) -- TurboSnap is the v2 answer
 - Server must serve the uploaded statics over HTTP during capture (Storybook needs an origin to fetch JS/assets)

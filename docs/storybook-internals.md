@@ -369,4 +369,4 @@ and an adapter `screenshotSelector` per view mode.
 | `.storyStore.fromId(id).play({ canvasElement })`                  | Last-resort fallback                                                 |
 | CLI `STORYBOOK_BUILD_STORIES_JSON=true`                           | Requests `stories.json` when supported by the Storybook build        |
 | `discover()` filters `subtype === 'test'`                         | CSF-Next `.test()` story marking                                     |
-| `parameters.*` (chromatic/storyshelf keys)                        | Index parameters when present, otherwise preview `extract()`         |
+| `parameters.*` (chromatic/storyshelf keys)                        | Index parameters when present, otherwise preview `extract()`          |

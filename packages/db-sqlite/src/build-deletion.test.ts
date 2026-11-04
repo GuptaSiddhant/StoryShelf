@@ -233,6 +233,7 @@ describe("resumable build deletion on SQLite", () => {
       expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(0);
       expect(fixture.uses(ONLY_ONE).rows).toBe(1);
       // Still claimed: no build can start using a blob that is on its way out.
+      await publish(fixture.db, fixture.storage, "late", { "index.html": "shared" });
       expect(await fixture.lifecycle.recordContentUses("p", "late", [ONLY_ONE])).toEqual([
         ONLY_ONE,
       ]);

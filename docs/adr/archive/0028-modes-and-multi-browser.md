@@ -12,7 +12,7 @@ Capture was `story × viewport` on one `project.browser`. Theme/locale globals c
 
 ## Decision
 
-1. **Modes are named and come from story parameters**, Chromatic-compatible: `parameters.chromatic.modes` and `parameters.storyshelf.modes`, at project, component or story level, merged per mode name (`storyshelf` wins). A mode is `{ viewport?, disable?, ...globals }`. `disable: true` drops an inherited mode (or a project viewport of the same name). `globalTypes` is **not** scanned: this replaces the issue's canonical-query `mode_key` and auto-discovery, because Chromatic keys a baseline by the mode _name_, so changing what a mode does keeps comparing against the same baseline.
+1. **Modes are named and come from story parameters**, Chromatic-compatible: `parameters.chromatic.modes` and `parameters.storyshelf.modes`, at project, component or story level, merged per mode name (`storyshelf` wins). A mode is `{ viewport?, disable?, ...globals }`. `disable: true` drops an inherited mode (or a project viewport of the same name). `globalTypes` is **not** scanned: this replaces the issue's canonical-query `mode_key` and auto-discovery, because Chromatic keys a baseline by the mode *name*, so changing what a mode does keeps comparing against the same baseline.
 2. **Identity.** A mode's baseline key is the slug of its name (`modeSlug`). It is stored in the existing `viewport_name` column, so legacy viewport rows and storage paths stay valid; a mode named like a project viewport replaces it. `mode` (JSON of the applied globals) is display/capture metadata only.
 3. **Globals reach Storybook through the `globals=` URL argument** (`a:b;c.d:e`, nested objects flattened, `!true`/`!hex()` forms). `viewport` sizes the page and is not forwarded as a global. Verified on Storybook 8, 9 and 10 (Chromium and Firefox, fixtures `Themed` stories): declared globals apply, undeclared ones are ignored, strings pass through, `!hex()` works.
 4. **Parameters are read from the running preview.** `index.json` rarely carries parameters, so `CaptureRunner.extractParameters` (optional) loads the preview once and returns resolved parameters before the capture matrix is built. A runner without it (Puppeteer) only sees index parameters.
@@ -24,12 +24,12 @@ Capture was `story × viewport` on one `project.browser`. Theme/locale globals c
 
 ## Alternatives considered
 
-| Option                                  | Why not                                                                    |
-| --------------------------------------- | -------------------------------------------------------------------------- |
-| Canonical query string as mode identity | Any value change creates a new baseline; diverges from Chromatic           |
-| Copy chromium baselines to a new engine | Font/anti-aliasing differences make every story diff                       |
-| Parallel engines                        | Memory multiplies per engine; sequential keeps one browser alive at a time |
-| Separate approval per engine            | Review load scales with engines; theme/token bumps become unreviewable     |
+| Option | Why not |
+|---|---|
+| Canonical query string as mode identity | Any value change creates a new baseline; diverges from Chromatic |
+| Copy chromium baselines to a new engine | Font/anti-aliasing differences make every story diff |
+| Parallel engines | Memory multiplies per engine; sequential keeps one browser alive at a time |
+| Separate approval per engine | Review load scales with engines; theme/token bumps become unreviewable |
 
 ## Consequences
 

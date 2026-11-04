@@ -37,13 +37,11 @@ No special retention for published builds — they are purged like any other bui
 ## Consequences
 
 **Positive:**
-
 - Designers and managers get a browsable component surface with no CI or code access
 - Monorepos are supported without a special model (one project per Storybook)
 - Public sharing is opt-in and scoped to specific builds/branches, so test builds stay private
 
 **Negative:**
-
 - The "latest public build" can change as builds are purged; links to a purged build may 404
 - Public Storybooks need a robots/cache policy to avoid indexing test content
 
