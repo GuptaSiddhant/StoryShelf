@@ -83,6 +83,7 @@ export class BuildModel {
       changedFiles: serializePaths(input.changedFiles),
       affectedImportPaths: serializePaths(input.affectedImportPaths),
       status: "pending",
+      captureGeneration: 0,
       createdAt: now,
       updatedAt: now,
     })) as unknown as Build;
@@ -247,24 +248,76 @@ export class BuildModel {
 
   /**
    * Put a finished build back to `status` for a retry. The one write that leaves `cancelled`
-   * (a user chose it), so it skips the terminal guard of {@link BuildModel.update}.
+   * (a user chose it), so it skips the terminal guard of {@link BuildModel.update}. It clears the
+   * owning run and advances the run generation in one conditional write (compare-and-set on the
+   * generation it read), so an enqueue that read the old generation can no longer stamp its job.
    */
   async resetStatus(id: string, status: BuildStatus): Promise<Build> {
-    // No run owns the build now: a late crash hook of the run that ended must not touch the next.
-    return await this.update(id, { status, captureJobId: null }, { reset: true });
+    for (let attempt = 0; attempt < RESET_ATTEMPTS; attempt += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- each retry needs the generation the loser lost to
+      const reset = await this.resetOnce(id, status);
+      if (reset !== null) {
+        return reset;
+      }
+    }
+    throw new Error("Build reset lost the race repeatedly");
+  }
+
+  /** One compare-and-set reset; null when another writer advanced the generation first. */
+  private async resetOnce(id: string, status: BuildStatus): Promise<Build | null> {
+    const current = await this.get(id);
+    if (current === null) {
+      throw new Error("Build not found");
+    }
+    const generation = current.captureGeneration ?? 0;
+    const stamp = nextStamp();
+    const row = (await this.db.updateWhere(
+      this.tables.builds,
+      id,
+      { status, captureJobId: null, captureGeneration: generation + 1, updatedAt: stamp },
+      eq(col(this.tables.builds, "captureGeneration"), generation),
+    )) as unknown as Build | null;
+    // Only our own write carries our stamp (see `failIfOwnedBy`).
+    if (
+      row?.captureGeneration !== generation + 1 ||
+      instantOf(row.updatedAt) !== instantOf(stamp)
+    ) {
+      return null;
+    }
+    return row;
   }
 
   /**
-   * Record `jobId` as the capture job whose run owns the build (called once its job row exists).
-   * A cancelled or missing build is left alone.
+   * Record `jobId` as the capture job whose run owns the build (called once its job row exists),
+   * only while the build is still at `generation`, the value the enqueue read before inserting the
+   * job: one conditional write, so a stale enqueue never overwrites a newer run. `stale` means a
+   * retry superseded this run (the caller cancels its job); `ignored` is a cancelled or missing
+   * build, left alone.
    */
-  async stampCaptureJob(id: string, jobId: string): Promise<void> {
-    await this.db.updateWhere(
-      this.tables.builds,
+  async stampCaptureJob(
+    id: string,
+    jobId: string,
+    generation: number,
+  ): Promise<"stamped" | "stale" | "ignored"> {
+    const stamp = nextStamp();
+    const columns = this.tables.builds;
+    const row = (await this.db.updateWhere(
+      columns,
       id,
-      { captureJobId: jobId, updatedAt: new Date().toISOString() },
-      ne(col(this.tables.builds, "status"), "cancelled"),
-    );
+      { captureJobId: jobId, updatedAt: stamp },
+      // `and` of two conditions is never undefined.
+      and(
+        ne(col(columns, "status"), "cancelled"),
+        eq(col(columns, "captureGeneration"), generation),
+      ) as SQL,
+    )) as unknown as Build | null;
+    if (row === null) {
+      return "ignored";
+    }
+    if (row.captureJobId === jobId && instantOf(row.updatedAt) === instantOf(stamp)) {
+      return "stamped";
+    }
+    return (row.captureGeneration ?? 0) === generation ? "ignored" : "stale";
   }
 
   /**
@@ -431,6 +484,9 @@ export interface BuildListFilter {
   /** Newest builds to return at most. */
   limit?: number;
 }
+
+/** How many times a reset re-reads the generation after losing a race to another reset. */
+const RESET_ATTEMPTS = 5;
 
 /** The instant a stored timestamp names, in epoch ms, whichever string form the driver returns. */
 function instantOf(value: string): number {

@@ -426,7 +426,10 @@ describe("releaseProblems, every published manifest", () => {
   const changed = [{ status: "M", path: "packages/core/package.json" }];
 
   it("passes when the manifests the release did not touch are already at the version", () => {
-    assert.deepEqual(runRelease(changed, {}, ["packages/core/package.json", "packages/app/package.json"]), []);
+    assert.deepEqual(
+      runRelease(changed, {}, ["packages/core/package.json", "packages/app/package.json"]),
+      [],
+    );
   });
 
   it("fails a published package left at the old version, naming it", () => {
@@ -447,9 +450,12 @@ describe("releaseProblems, every published manifest", () => {
   });
 });
 
+/** A reader that returns a changeset naming `name`. */
+const readNaming = (name) => () => `---\n"${name}": patch\n---\n\nFixed a thing.\n`;
+
 describe("malformedChangesets, unknown packages", () => {
   const file = ".changeset/typo.md";
-  const read = (name) => () => `---\n"${name}": patch\n---\n\nFixed a thing.\n`;
+  const read = readNaming;
 
   it("fails a package that is not published here, with the file and the name", () => {
     const problems = malformedChangesets([file], read("@storyshelf/nope"), ["@storyshelf/core"]);
@@ -458,7 +464,10 @@ describe("malformedChangesets, unknown packages", () => {
   });
 
   it("passes a known package, and does not check names without a list", () => {
-    assert.deepEqual(malformedChangesets([file], read("@storyshelf/core"), ["@storyshelf/core"]), []);
+    assert.deepEqual(
+      malformedChangesets([file], read("@storyshelf/core"), ["@storyshelf/core"]),
+      [],
+    );
     assert.deepEqual(malformedChangesets([file], read("@storyshelf/nope")), []);
   });
 });
