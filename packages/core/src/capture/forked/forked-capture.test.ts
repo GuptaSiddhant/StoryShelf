@@ -66,6 +66,41 @@ function pushedTo(child: FakeChild, buildId: string) {
 }
 
 describe("createForkedCaptureHandler", () => {
+  it("hands a child's repeated-shard-work event to the host hook once", async () => {
+    const events: unknown[] = [];
+    const { handler, latest } = rig({ onShardRepeated: (event) => events.push(event) });
+    const running = handler.run(job("b1"), context());
+    await tick();
+    latest().say({ type: "shard-repeated", repeated: 4, attempt: 2, limit: 3 });
+    expect(events).toEqual([{ repeated: 4, attempt: 2, limit: 3 }]);
+    latest().say({ type: "done", runId: pushedTo(latest(), "b1")?.runId });
+    await running;
+    expect(events).toHaveLength(1);
+  });
+
+  it("survives a throwing hook and a parent without one", async () => {
+    const warn = vi.fn();
+    const { handler, latest } = rig({
+      onShardRepeated: () => {
+        throw new Error("hook broke");
+      },
+      logger: { warn, error() {}, info() {}, debug() {}, child: () => ({}) } as never,
+    });
+    const running = handler.run(job("b1"), context());
+    await tick();
+    latest().say({ type: "shard-repeated", repeated: 1 });
+    expect(warn).toHaveBeenCalledOnce();
+    latest().say({ type: "done", runId: pushedTo(latest(), "b1")?.runId });
+    await expect(running).resolves.toBeUndefined();
+
+    const bare = rig();
+    const second = bare.handler.run(job("b2"), context());
+    await tick();
+    bare.latest().say({ type: "shard-repeated", repeated: 1 });
+    bare.latest().say({ type: "done", runId: pushedTo(bare.latest(), "b2")?.runId });
+    await expect(second).resolves.toBeUndefined();
+  });
+
   it("pushes a leased job to the child and resolves when the child reports it done", async () => {
     const { handler, latest } = rig();
     const ctx = context();

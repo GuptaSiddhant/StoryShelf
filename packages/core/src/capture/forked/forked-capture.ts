@@ -11,6 +11,7 @@
  * to the in-process handler.
  */
 import type { Logger } from "../../logger.ts";
+import type { ShardRepeatedEvent } from "../consumer/metrics.ts";
 import { isFinalAttempt } from "../consumer/retry.ts";
 import type { ConsumerJob, JobRunContext, KindHandler } from "../consumer/types.ts";
 import { DEFAULT_LEASE_MS } from "../db-queue/types.ts";
@@ -41,6 +42,8 @@ export interface ForkedCaptureOptions {
    * (the build, or the shard, fails). Runs before the job is failed on the queue.
    */
   onCrashed?: (job: ConsumerJob, error: string) => Promise<void>;
+  /** The child's shard run re-captured stored work (the same hook as `ConsumerMetrics.shardRepeated`). */
+  onShardRepeated?: (event: ShardRepeatedEvent) => void;
   logger?: Logger;
 }
 
@@ -233,6 +236,10 @@ class ForkedCapture {
     if (!isChildMessage(message)) {
       return;
     }
+    if (message.type === "shard-repeated") {
+      this.#onShardRepeated(message);
+      return;
+    }
     const run = this.#runs.get(message.runId);
     if (!run) {
       return;
@@ -240,7 +247,17 @@ class ForkedCapture {
     this.#onRunMessage(run, message);
   }
 
-  #onRunMessage(run: Run, message: ChildMessage): void {
+  /** Hand the counts to the host's hook; a throwing hook must not take the message loop down. */
+  #onShardRepeated(message: Extract<ChildMessage, { type: "shard-repeated" }>): void {
+    const { type: _type, ...event } = message;
+    try {
+      this.#options.onShardRepeated?.(event);
+    } catch (error) {
+      this.#options.logger?.warn({ err: error }, "shard-repeated hook failed");
+    }
+  }
+
+  #onRunMessage(run: Run, message: Exclude<ChildMessage, { type: "shard-repeated" }>): void {
     if (message.type === "progress") {
       this.#leases.touch(run.runId);
       run.context.touch();
