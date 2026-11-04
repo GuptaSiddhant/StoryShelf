@@ -109,7 +109,7 @@ export class CaptureAttemptModel {
    */
   async closeIfOpen(
     id: string,
-    status: Extract<JobStatus, "completed" | "failed">,
+    status: Extract<JobStatus, "completed" | "failed" | "cancelled">,
     error: string | undefined,
     counts: { storyCount: number; failedCount: number },
   ): Promise<CaptureAttempt | null> {

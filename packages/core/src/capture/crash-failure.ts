@@ -122,13 +122,34 @@ async function failShard(
     return "skipped";
   }
   if (loaded.build.status !== "capturing") {
-    // A shard that failed finalizes the build as `failed`; any other end (a cancel, a later
-    // decision) is not this hook's to record on the attempt.
-    return loaded.build.status === "failed"
-      ? await closeEndedAttempt(deps, shards, { buildId, shardId }, error)
-      : "skipped";
+    return await closeAfterEnd(deps, shards, loaded.build, { buildId, shardId }, error);
   }
   return await reduceAfterFailure(deps, loaded, error);
+}
+
+/**
+ * The build left `capturing`. A shard that failed finalizes it as `failed`, and the attempt closes
+ * `failed` with this hook's error; a cancel (common while shards run) closes it `cancelled` with no
+ * error, so it is not left open; any other end (a later decision) is not this hook's to record.
+ */
+async function closeAfterEnd(
+  deps: DispatchDeps,
+  shards: CaptureShardModel,
+  build: Build,
+  target: { buildId: string; shardId: string },
+  error: string,
+): Promise<CrashFailureOutcome> {
+  if (build.status === "failed") {
+    return await closeEndedAttempt(deps, shards, target, "failed", error);
+  }
+  if (build.status === "cancelled") {
+    return await closeEndedAttempt(deps, shards, target, "cancelled");
+  }
+  deps.logger.debug(
+    { buildId: target.buildId, shardId: target.shardId, status: build.status },
+    "crashed shard's build ended another way; attempt left alone",
+  );
+  return "skipped";
 }
 
 /** The build is still capturing: the failed shard may have been its last open one. */
@@ -156,11 +177,15 @@ async function closeEndedAttempt(
   deps: DispatchDeps,
   shards: CaptureShardModel,
   target: { buildId: string; shardId: string },
-  error: string,
+  status: "failed" | "cancelled",
+  error?: string,
 ): Promise<CrashFailureOutcome> {
   // The counts the first pass would have recorded, rebuilt (not by reducing the ended build
   // again). Done first, so the open check below sits right before the write.
-  const counts = await finalizedCounts(shards, target.buildId);
+  const counts =
+    status === "failed"
+      ? await finalizedCounts(shards, target.buildId)
+      : { storyCount: 0, failedCount: 0 };
   const open = await openAttemptOfRun(deps, shards, target);
   if (!open) {
     return "skipped"; // nothing was left to close, or the run is not this hook's
@@ -168,7 +193,7 @@ async function closeEndedAttempt(
   // One conditional write: a close that landed since the read (a finished run, a cancel) wins.
   const closed = await new CaptureAttemptModel(deps.db, deps.tables).closeIfOpen(
     open.id,
-    "failed",
+    status,
     error,
     counts,
   );

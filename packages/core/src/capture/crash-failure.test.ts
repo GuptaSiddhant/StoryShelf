@@ -289,18 +289,24 @@ describe("failCrashedCapture", () => {
       const rows = await attempts.listByBuild(w.build.id);
       expect(rows.find((row) => row.id === newer.id)?.status).toBe("queued");
     });
-    it("leaves the attempt alone when the build ended some other way than failed", async () => {
-      for (const status of ["approved", "cancelled"] as const) {
-        // oxlint-disable-next-line no-await-in-loop -- one world per status
-        const { w, crashed, openAttempts } = await lastShardCrashed();
-        // oxlint-disable-next-line no-await-in-loop -- as above
-        await w.builds.setStatus(w.build.id, status);
+    it("closes the attempt as cancelled, without the error, when the build was cancelled", async () => {
+      const { w, crashed, attempts, openAttempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "cancelled");
 
-        // oxlint-disable-next-line no-await-in-loop -- as above
-        expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
-        // oxlint-disable-next-line no-await-in-loop -- as above
-        expect(await openAttempts()).toHaveLength(1);
-      }
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("finalized");
+
+      expect(await openAttempts()).toHaveLength(0);
+      const [closed] = await attempts.listByBuild(w.build.id);
+      expect(closed).toMatchObject({ status: "cancelled", error: null, storyCount: 0 });
+      expect(await w.status()).toBe("cancelled");
+    });
+
+    it("leaves the attempt alone when the build ended some other way", async () => {
+      const { w, crashed, openAttempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "approved");
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+      expect(await openAttempts()).toHaveLength(1);
     });
 
     it("leaves the attempt to the worker that finalized the build when the crashed shard is done", async () => {
