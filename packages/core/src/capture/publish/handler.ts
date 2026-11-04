@@ -38,6 +38,7 @@ export function createPublishHandler(options: PublishHandlerOptions): KindHandle
         context.logger.warn("build is gone; dropping publish job");
         return;
       }
+      context.signal.throwIfAborted();
       await publishOnce(options, job, context, build.projectId);
     },
   };
@@ -46,13 +47,20 @@ export function createPublishHandler(options: PublishHandlerOptions): KindHandle
 async function publishOnce(
   options: PublishHandlerOptions,
   job: ConsumerJob,
-  context: { logger: Logger; touch: () => void },
+  context: { logger: Logger; touch: () => void; signal: AbortSignal },
   projectId: string,
 ): Promise<void> {
   const { completer, storage, scratchDir, limits, db } = options;
   try {
     await publishStoredZip(
-      { storage, scratchDir, limits, db, logger: context.logger, touch: context.touch },
+      {
+        storage,
+        scratchDir,
+        limits,
+        db,
+        logger: context.logger,
+        touch: touchUnlessAborted(context),
+      },
       { projectId, buildId: job.buildId },
     );
   } catch (error) {
@@ -66,6 +74,14 @@ async function publishOnce(
     throw error;
   }
   await completer.complete(job.buildId, { ok: true });
+}
+
+/** Extraction reports progress per entry: past the deadline the next report stops it. */
+function touchUnlessAborted(context: { touch: () => void; signal: AbortSignal }): () => void {
+  return () => {
+    context.signal.throwIfAborted();
+    context.touch();
+  };
 }
 
 function messageOf(error: unknown): string {

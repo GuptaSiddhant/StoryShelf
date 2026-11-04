@@ -18,6 +18,7 @@ function context(): JobRunContext & { touches: number } {
   const ctx = {
     touches: 0,
     logger: {} as never,
+    signal: new AbortController().signal,
     touch: () => {
       ctx.touches += 1;
     },

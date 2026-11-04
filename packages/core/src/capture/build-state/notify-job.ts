@@ -57,6 +57,7 @@ export function createNotifyHandler(options: NotifyHandlerOptions): KindHandler 
     backoff: NOTIFY_BACKOFF,
     run: async (job, context) => {
       const channelId = channelIdOf(job);
+      context.signal.throwIfAborted();
       try {
         const result = await deliverBuildState(deps, { buildId: job.buildId, channelId });
         if (result === "delivered") {

@@ -154,6 +154,7 @@ function databaseConsumer(
       config: {
         concurrency: capturesHere ? options.testing?.concurrency : 1,
         maxRetries: options.testing?.retries ?? DEFAULT_RETRIES,
+        ...maxJobConfig(options),
       },
       scratchDir: runtime.config.scratchDir ?? DEFAULT_SCRATCH_DIR,
       metrics: jobMetrics(),
@@ -187,7 +188,7 @@ function notifyConsumer(
     () => ({
       queue: queue.get(),
       handlers: { notify: handler },
-      config: { concurrency: NOTIFY_CONCURRENCY },
+      config: { concurrency: NOTIFY_CONCURRENCY, ...maxJobConfig(options) },
       metrics: jobMetrics(),
       logger: runtime.logger.child({ component: "notify-consumer" }),
       ...(options.testing?.queueClock === undefined
@@ -253,4 +254,10 @@ function reviewRequestedFor(
       }),
     );
   };
+}
+
+/** The consumer's wall-clock bound for one job, when `testing.maxJobSeconds` states it. */
+function maxJobConfig(options: ShelfOptions): { maxJobSeconds?: number } {
+  const seconds = options.testing?.maxJobSeconds;
+  return seconds === undefined ? {} : { maxJobSeconds: seconds };
 }

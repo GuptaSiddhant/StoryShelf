@@ -57,6 +57,8 @@ When one host is not enough, add instances rather than a second kind of service:
 - **Shards.** Split a very large build across instances with `testing.shardSize`. See [Sharding big builds](/concepts/capture/#sharding-big-builds).
 - **Browsers elsewhere.** List remote browsers (a self-hosted Playwright server or a hosted service) and the app host needs no browsers of its own. See [Remote browsers](/guides/remote-browsers/).
 
+A single job (capture, publish or notification) is bounded by `testing.maxJobSeconds`, two hours by default. Past it the job's lease is no longer renewed and its work is aborted, so a hung page or extraction cannot hold a slot forever; raise it only if a build legitimately takes longer.
+
 ## Working out the cost
 
 Add up what you run:

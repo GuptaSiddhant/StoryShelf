@@ -61,6 +61,7 @@ function assertTestingNumbers(testing: ShelfOptions["testing"]): void {
   assertConcurrency(testing?.concurrency);
   assertRetries(testing?.retries);
   assertLeaseSeconds(testing?.leaseSeconds);
+  assertMaxJobSeconds(testing?.maxJobSeconds);
   assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit);
 }
 
@@ -85,6 +86,15 @@ function assertLeaseSeconds(seconds: number | undefined): void {
   if (seconds !== undefined && (!Number.isFinite(seconds) || seconds <= 0)) {
     throw new Error(
       `testing.leaseSeconds must be a positive number of seconds, got ${String(seconds)}`,
+    );
+  }
+}
+
+/** A positive number of seconds; `0` would abandon every job at once. */
+function assertMaxJobSeconds(seconds: number | undefined): void {
+  if (seconds !== undefined && (!Number.isFinite(seconds) || seconds <= 0)) {
+    throw new Error(
+      `testing.maxJobSeconds must be a positive number of seconds, got ${String(seconds)}`,
     );
   }
 }

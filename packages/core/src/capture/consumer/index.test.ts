@@ -359,6 +359,44 @@ describe("lease and cancel", () => {
     await started;
   });
 
+  it("abandons a job past maxJobSeconds: aborts its signal, cancels the run, records it, writes nothing", async () => {
+    const hold = gate();
+    const cancel = vi.fn(async () => {});
+    const deadlineExceeded = vi.fn(async () => {});
+    const signals: AbortSignal[] = [];
+    const r = rig({
+      handlers: {
+        capture: {
+          run: async (_job, context) => {
+            signals.push(context.signal);
+            await hold.promise;
+          },
+          cancel,
+          deadlineExceeded,
+        },
+      },
+    });
+    const ack = vi.spyOn(r.queue, "ack");
+    const nack = vi.spyOn(r.queue, "nack");
+    const consumer = r.consume({ config: { concurrency: 1, maxJobSeconds: 60 } });
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.clock.advance(59_000);
+    expect(signals[0]?.aborted).toBe(false);
+    await r.clock.advance(2000);
+
+    expect(signals[0]?.aborted).toBe(true);
+    expect(cancel).toHaveBeenCalledWith(expect.objectContaining({ buildId: "b1" }));
+    expect(deadlineExceeded).toHaveBeenCalledWith(expect.objectContaining({ buildId: "b1" }), 60);
+    // Not settled here: its lease runs out and the queue redelivers or exhausts it.
+    expect(ack).not.toHaveBeenCalled();
+    expect(nack).not.toHaveBeenCalled();
+    expect(await new CaptureJobModel(r.db).get(id)).toMatchObject({ status: "running" });
+    hold.open();
+    await consumer.stop();
+    await started;
+  });
+
   it("does not fall back to ack when the final nack fails on a counted queue", async () => {
     const r = rig({
       retries: 0,

@@ -57,7 +57,11 @@ function wire(testing?: ShelfOptions["testing"], config: { scratchDir?: string }
   };
 }
 
-const runContext = (): JobRunContext => ({ logger: {} as never, touch: () => {} });
+const runContext = (): JobRunContext => ({
+  logger: {} as never,
+  touch: () => {},
+  signal: new AbortController().signal,
+});
 
 describe("setupCapture", () => {
   it("wires nothing without testing", () => {

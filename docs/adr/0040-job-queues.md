@@ -49,6 +49,12 @@ semantics.
   up to five runs, then the job fails and `JobQueue.abandoned[kind]` alerts once (#432).
 - Lease renewal through `keepJobLease` for any phase that can run longer than a third of the lease.
 - Cancellation by build id, honored within the cancel latency of ADR 0006 decision 11.
+- A wall-clock bound: `testing.maxJobSeconds` (default 7200) applies to every kind. Past it
+  `keepJobLease` stops renewing, the `AbortSignal` in the handler's context fires, the run is
+  cancelled and the consumer's slot is freed; the job is not settled, so its lease runs out and the
+  normal exhausted or redelivery path takes over. A capture ends its build `failed`, never
+  `cancelled`, and its attempt log records `job deadline exceeded (<n>s)`. Publish stops at its next
+  zip entry; storage adapters keep their SDK timeouts. There is no per-phase knob.
 - Its retry limit stated where the queue is built, not inferred from `testing.retries`.
 - Kinds that must be single-flight per key use `active_key` (a unique column, cleared in the write
   that ends the job), never a check before the insert.

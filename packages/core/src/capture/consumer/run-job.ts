@@ -9,7 +9,7 @@ import { keepJobLease, type JobLeaseKeeper, type LeaseEnd } from "../db-queue/ke
 import type { QueueTimers } from "../db-queue/timers.ts";
 import { reportFinished, type ConsumerMetrics, type JobOutcome } from "./metrics.ts";
 import { backoffDelayMs, DEFAULT_BACKOFF_MS, isFinalAttempt } from "./retry.ts";
-import type { ConsumerJob, KindHandler } from "./types.ts";
+import type { ConsumerJob, JobRunContext, KindHandler } from "./types.ts";
 
 /** What {@link runJob} needs from the consumer. */
 export interface JobRuntime {
@@ -24,6 +24,8 @@ export interface JobRuntime {
   now: () => number;
   timers?: QueueTimers | undefined;
   lease?: { renewEveryMs?: number; checkMs?: number } | undefined;
+  /** Wall-clock bound of one job in ms; absent means unbounded (tests). */
+  maxJobMs?: number | undefined;
 }
 
 /** Why a job's handler stopped: it finished (or threw), or the queue took the job away. */
@@ -96,7 +98,7 @@ async function runHandler(
     rt.onProgress?.(job);
   };
   logger.info("consumer picked up job");
-  const run = invoke(handler, job, { logger, touch });
+  const run = invoke(handler, job, { logger, touch, signal: keeper.signal });
   try {
     const raced = await Promise.race([run, endOf(keeper)]);
     return raced.kind === "ended"
@@ -111,6 +113,7 @@ async function runHandler(
 function keepLease(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKeeper {
   return keepJobLease(rt.queue, job, {
     ...rt.lease,
+    ...(rt.maxJobMs === undefined ? {} : { maxJobMs: rt.maxJobMs }),
     now: rt.now,
     ...(rt.timers === undefined ? {} : { timers: rt.timers }),
     logger,
@@ -121,7 +124,7 @@ function keepLease(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKe
 async function invoke(
   handler: KindHandler,
   job: ConsumerJob,
-  context: { logger: Logger; touch: () => void },
+  context: JobRunContext,
 ): Promise<Race> {
   try {
     const { timings } = await runWithTimings(async () => {
@@ -202,6 +205,9 @@ async function abandon(
   await handler.cancel?.(job).catch((error: unknown) => {
     logger.warn({ err: error }, "failed to cancel the running job");
   });
+  if (end === "deadline") {
+    return await endAtDeadline(rt, held);
+  }
   if (end === "lost") {
     logger.warn("queue lease lost, aborting job");
     return "lost";
@@ -209,6 +215,23 @@ async function abandon(
   logger.info("job cancelled, aborting");
   await rt.queue.nack(job, { requeue: false, error: "cancelled" });
   return "cancelled";
+}
+
+/**
+ * The job passed its wall-clock bound: its work was cancelled above and its lease is no longer
+ * renewed, so it runs out and the queue redelivers the job or hands it to its exhausted hook. The
+ * job is not nacked here (that would skip the lease it still holds), and it never ends `cancelled`.
+ */
+async function endAtDeadline(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+): Promise<JobOutcome> {
+  const seconds = Math.round((rt.maxJobMs ?? 0) / 1000);
+  held.logger.error({ seconds }, "job deadline exceeded; abandoning it to its lease");
+  await held.handler.deadlineExceeded?.(held.job, seconds).catch((error: unknown) => {
+    held.logger.warn({ err: error }, "failed to record the job deadline");
+  });
+  return "deadline";
 }
 
 /**
