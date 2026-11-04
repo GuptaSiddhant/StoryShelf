@@ -278,6 +278,33 @@ describe("the notify job", () => {
     expect(olderLog.info).toHaveBeenCalledWith("notify job was cancelled; outcome not recorded");
   });
 
+  it("a cancel for a lost attempt does not stop the reclaimed attempt that runs now", async () => {
+    const { w, handler } = await setup();
+    const lost = {
+      buildId: w.build.id,
+      jobId: "n6",
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    const reclaimed = { ...(lost as object), attempt: 2 } as never;
+    const origin = w.deps.publicOrigin;
+    const gate = deferred();
+    const entered = deferred();
+    (w.deps as { publicOrigin: () => Promise<string | undefined> }).publicOrigin = async () => {
+      entered.resolve();
+      await gate.promise;
+      return await origin();
+    };
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const running = handler.run(reclaimed, { logger, touch: () => {} } as never);
+    await entered.promise;
+    await handler.cancel?.(lost);
+    gate.resolve();
+    await running;
+    expect(statusLog(w.git).length).toBeGreaterThan(0);
+  });
+
   it("writes when no cancel arrives, with the same setup", async () => {
     const { w, handler } = await setup();
     const job = {

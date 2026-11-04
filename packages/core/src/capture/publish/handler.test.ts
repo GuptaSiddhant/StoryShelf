@@ -7,6 +7,7 @@ import { BuildModel } from "../../models/build.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { createTestBuild, createTestProject } from "../../test-helpers/create-project.ts";
 import { makeDatabase, makeStorage } from "../../test-helpers/fake-adapters.ts";
+import { deferred } from "../../test-helpers/index.ts";
 import { storybookDir, storybookZipPath } from "../../utils/paths.ts";
 import { zipStream } from "../../utils/zip-write.ts";
 import { rig, stubLogger } from "../consumer/test-fixtures.ts";
@@ -210,6 +211,25 @@ describe("createPublishHandler", () => {
     await handler.cancel?.(job);
     await expect(second).resolves.toBeUndefined();
     expect(newer.destroyed).toBe(true);
+  });
+
+  it("a cancel for a lost attempt does not stop the reclaimed attempt that runs now", async () => {
+    const { handler, storage, build, log } = await setup();
+    const stream = new PassThrough();
+    const opened = deferred();
+    storage.readStream = async () => {
+      opened.resolve();
+      return await Promise.resolve(stream);
+    };
+    const lost = { buildId: build.id, jobId: "j4", attempt: 1, maxAttempts: 3 } as ConsumerJob;
+    const reclaimed = { ...lost, attempt: 2 } as ConsumerJob;
+    const running = handler.run(reclaimed, { logger: log.logger, touch: () => {} });
+    await opened.promise;
+    // The consumer that lost attempt 1 reports it: attempt 2 is a different run.
+    await handler.cancel?.(lost);
+    // Still running: a broken zip is what fails it, a stopped run would resolve instead.
+    stream.end(Buffer.from("not a zip"));
+    await expect(running).rejects.toThrow();
   });
 
   it("tolerates a cancel for a job that is not running", async () => {

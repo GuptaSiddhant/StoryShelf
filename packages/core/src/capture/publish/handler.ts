@@ -18,9 +18,9 @@ export interface PublishHandlerOptions {
   logger: Logger;
 }
 
-/** The key a running job is tracked under: its row, else its build. */
+/** The key a running job is tracked under: its row (else its build) and its attempt. */
 function keyOf(job: ConsumerJob): string {
-  return job.jobId ?? job.buildId;
+  return `${job.jobId ?? job.buildId}#${job.attempt ?? 1}`;
 }
 
 /** A `publish` job needs the build to publish. */

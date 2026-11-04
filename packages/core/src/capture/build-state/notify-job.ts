@@ -84,9 +84,9 @@ interface StopToken {
   stopped: boolean;
 }
 
-/** The key a job is tracked under while it runs: its row, else its channel and build. */
+/** The key a job is tracked under while it runs: its row (else its channel and build) and its attempt. */
 function keyOf(job: ConsumerJob): string {
-  return job.jobId ?? `${job.buildId}:${channelIdOf(job)}`;
+  return `${job.jobId ?? `${job.buildId}:${channelIdOf(job)}`}#${job.attempt ?? 1}`;
 }
 
 /** One delivery attempt; a cancel (checked after the request) suppresses its outcome and failure. */
