@@ -17,6 +17,7 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
 import { createSqliteDatabase } from "./index.ts";
+import { rollbackQuietly } from "./lifecycle-transaction.ts";
 import { schema } from "./schema/index.ts";
 
 const old = "2026-01-01T00:00:00.000Z";
@@ -220,6 +221,24 @@ describe("resumable build deletion on SQLite", () => {
     });
   });
 
+  it("keeps the row of a blob whose storage delete failed, so the next pass retries it", async () => {
+    await withFixture(async (fixture) => {
+      await deleteClaimedBuild(deps(fixture), await claimed(fixture, "one"));
+      const remove = fixture.storage.delete.bind(fixture.storage);
+      fixture.storage.delete = async (path) => {
+        if (path.startsWith("content/")) throw new Error("storage down");
+        await remove(path);
+      };
+
+      expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(0);
+      expect(await fixture.refCount(ONLY_ONE)).toBe(0);
+
+      fixture.storage.delete = remove;
+      expect(await collectUnreferencedContent({ ...deps(fixture), now: afterGrace })).toBe(1);
+      expect(await fixture.refCount(ONLY_ONE)).toBeUndefined();
+    });
+  });
+
   it("purges through the capability and keeps a build a baseline still pins", async () => {
     await withFixture(async (fixture) => {
       const generation = await fixture.lifecycle.referenceGeneration(owner);
@@ -344,5 +363,13 @@ describe("recorded deletion steps", () => {
         { ...build, contentReleased: true, storageDeleted: true },
       ]);
     });
+  });
+});
+
+describe("rollbackQuietly", () => {
+  it("does not throw when SQLite has no transaction to roll back", () => {
+    const db = new DatabaseSync(":memory:");
+    expect(() => rollbackQuietly(db)).not.toThrow();
+    db.close();
   });
 });

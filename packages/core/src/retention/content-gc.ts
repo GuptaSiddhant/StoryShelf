@@ -63,7 +63,8 @@ async function removeBlob(
   const current = await refs.get(hash);
   if (current === null || current.refCount > 0 || current.lastSeenAt >= cutoff) return false;
   try {
-    await deps.storage.delete(`content/${hash}`).catch(() => {});
+    // The blob itself must go before its row: if this throws, the row stays and the next pass retries.
+    await deps.storage.delete(`content/${hash}`);
     // Variants are disposable; never let their deletion affect authoritative data.
     if (/^[a-f0-9]{64}$/u.test(hash))
       await deps.storage.delete(publishedGzipPath(hash)).catch(() => {});

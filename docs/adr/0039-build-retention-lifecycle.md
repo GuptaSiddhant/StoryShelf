@@ -82,7 +82,7 @@ by preset, so it cannot by itself carry this guarantee.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
-  reference-sensitive path. Presets are enabled one at a time: SQLite first (#374), then Postgres
+  reference-sensitive path. Presets are enabled one at a time: SQLite first (#536), then Postgres
   (#375) and MySQL (#376).
 
 ### 4. Provenance is immutable and never guessed
@@ -109,7 +109,7 @@ All writers use the fenced capability when it is present:
 | `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                      |
 | `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                      |
 | `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                     |
-| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; not invoked as production activation until #374 |
+| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; not invoked as production activation until #536 |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check
 followed by an independent write is forbidden.
@@ -146,7 +146,7 @@ belongs to another project stops the whole run with `BaselineSourceIntegrityErro
 
 **Negative**
 
-- Until #374 activates SQLite, deployments with `testing` do not purge builds or garbage-collect
+- Until #536 activates SQLite, deployments with `testing` do not purge builds or garbage-collect
   branches automatically; storage grows and operators must be told.
 - Postgres and MySQL need their own capability implementation and multi-connection tests before
   they regain automatic retention.
@@ -167,5 +167,5 @@ belongs to another project stops the whole run with `BaselineSourceIntegrityErro
 
 - Representative preparation time on large SQLite deployments; batching is designed only if a
   measured startup budget is exceeded (#397).
-- Whether the SQLite-first activation (#374) ships before or with Postgres support for multi-instance
+- Whether the SQLite-first activation (#536) ships before or with Postgres support for multi-instance
   deployments.

@@ -56,7 +56,7 @@ async function claimAll(
   let protectedBuilds = 0;
   for (const buildId of buildIds) {
     // oxlint-disable-next-line no-await-in-loop -- each claim is its own short transaction
-    const claim = await deps.lifecycle.claimDeletion(projectId, buildId);
+    const claim = await claimOne(deps, projectId, buildId);
     if (claim !== "protected") continue;
     protectedBuilds += 1;
     deps.logger?.info(
@@ -65,4 +65,18 @@ async function claimAll(
     );
   }
   return protectedBuilds;
+}
+
+/** Claim one candidate; a failed claim (for example a write-lock timeout) skips it, not the purge. */
+async function claimOne(
+  deps: ClaimedPurgeDeps,
+  projectId: string,
+  buildId: string,
+): Promise<string | null> {
+  try {
+    return await deps.lifecycle.claimDeletion(projectId, buildId);
+  } catch (error) {
+    deps.logger?.warn({ err: error, projectId, buildId }, "build claim failed");
+    return null;
+  }
 }

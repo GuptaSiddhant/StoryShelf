@@ -65,9 +65,18 @@ export async function inTransaction<T>(
     db.exec("COMMIT");
     return result;
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollbackQuietly(db);
     throw error;
   } finally {
     db.close();
+  }
+}
+
+/** Roll back, keeping the original error if SQLite already ended the transaction. */
+export function rollbackQuietly(db: DatabaseSync): void {
+  try {
+    db.exec("ROLLBACK");
+  } catch {
+    // The transaction has already ended; the caller rethrows the real failure.
   }
 }

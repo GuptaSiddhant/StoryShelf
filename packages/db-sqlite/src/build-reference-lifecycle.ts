@@ -16,7 +16,7 @@ import {
   markStorageDeleted,
   releaseBuildContent,
 } from "./build-deletion-steps.ts";
-import { inTransaction, open, transactionStore } from "./lifecycle-transaction.ts";
+import { inTransaction, open, rollbackQuietly, transactionStore } from "./lifecycle-transaction.ts";
 import { schema } from "./schema/index.ts";
 
 /** Not yet exposed by the adapter: all domain mutations and cleanup must be wired first. */
@@ -304,7 +304,7 @@ async function claimDeletion(
     db.exec("COMMIT");
     return result;
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollbackQuietly(db);
     throw error;
   } finally {
     db.close();

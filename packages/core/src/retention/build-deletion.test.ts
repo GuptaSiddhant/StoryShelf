@@ -143,4 +143,27 @@ describe("purgeClaimedBuilds", () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(calls).toContain("claim");
   });
+
+  it("skips a candidate whose claim throws and still claims the rest and finishes the others", async () => {
+    const { deps } = setup({
+      list: [build({ buildId: "ready", contentReleased: true, storageDeleted: true })],
+    });
+    const warn = vi.fn();
+    const claimed: string[] = [];
+    deps.lifecycle.claimDeletion = (_project, buildId) => {
+      if (buildId === "locked") return Promise.reject(new Error("write lock timeout"));
+      claimed.push(buildId);
+      return Promise.resolve("claimed");
+    };
+
+    const result = await purgeClaimedBuilds(
+      { ...deps, logger: { warn, info: vi.fn() } as never },
+      "p",
+      ["locked", "free"],
+    );
+
+    expect(claimed).toEqual(["free"]);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(result.removedBuilds).toBe(1);
+  });
 });
