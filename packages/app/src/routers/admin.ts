@@ -1,6 +1,6 @@
 /* oxlint-disable typescript/promise-function-async -- admin helpers are async by design */
 import { createRoute, z } from "@hono/zod-openapi";
-import type { RetentionPause } from "@storyshelf/core/adapter/database";
+import type { BuildReferenceLifecycle, RetentionPause } from "@storyshelf/core/adapter/database";
 import { ProjectModel } from "@storyshelf/core/models";
 import { Retention } from "@storyshelf/core/retention";
 import type { ShelfRouter } from "../app-types.ts";
@@ -78,11 +78,11 @@ export function registerAdmin(app: ShelfRouter): void {
 
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin(c);
-    const refusal = purgeRefusal();
-    if (refusal) return c.json({ message: refusal }, 503);
+    const pass = startPurgePass();
+    if (pass.refusal) return c.json({ message: pass.refusal }, 503);
     const body = c.req.valid("json");
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
-    const builds = await purgeBuilds(ttlDays);
+    const builds = await purgeBuilds(ttlDays, pass.lifecycle);
     const { removedBuilds } = builds;
     const branch = await purgeBranches();
     await notifySystem("sys:purge-completed", {
@@ -108,15 +108,19 @@ export function registerAdmin(app: ShelfRouter): void {
 }
 
 /**
- * Why purge is refused, if it is. Without atomic reference admission and tombstones, deletion in a
- * testing deployment can race a baseline promotion (ADR 0039). A database that withheld the
- * capability for a data problem refuses too, with or without `testing`: the unfenced path would
- * delete builds a baseline still names.
+ * Start a purge pass: read the lifecycle capability once, and decide from that one read whether the
+ * pass is refused. The capability is then handed to every deletion of the pass; it is never read
+ * again, so one that is cleared meanwhile cannot make the pass unfenced (ADR 0039).
+ *
+ * Without atomic reference admission and tombstones, deletion in a testing deployment can race a
+ * baseline promotion. A database that withheld the capability for a data problem refuses too, with
+ * or without `testing`: the unfenced path would delete builds a baseline still names.
  */
-function purgeRefusal(): string | undefined {
+function startPurgePass(): { lifecycle: BuildReferenceLifecycle | undefined; refusal?: string } {
   const { testing, db } = getStore();
-  if (db.buildReferenceLifecycle || !(testing || db.retentionPause)) return undefined;
-  return unavailableMessage(db.retentionPause);
+  const lifecycle = db.buildReferenceLifecycle;
+  if (lifecycle || !(testing || db.retentionPause)) return { lifecycle };
+  return { lifecycle, refusal: unavailableMessage(db.retentionPause) };
 }
 
 /** Why a testing deployment refuses to purge: no capability, and whether the database paused it. */
@@ -136,7 +140,10 @@ interface PurgeTotals {
 }
 
 // oxlint-disable-next-line typescript/promise-function-async
-async function purgeBuilds(ttlDays: number): Promise<PurgeTotals> {
+async function purgeBuilds(
+  ttlDays: number,
+  lifecycle: BuildReferenceLifecycle | undefined,
+): Promise<PurgeTotals> {
   const projects = await new ProjectModel(getStore().db).list();
   const retention = new Retention(
     getStore().db,
@@ -149,12 +156,14 @@ async function purgeBuilds(ttlDays: number): Promise<PurgeTotals> {
     getStore().logger,
   );
   const results = await Promise.all(
-    projects.map((project) => retention.purge(project, { ttlDays, keepLatestPerBranch: true })),
+    projects.map((project) =>
+      retention.purge(project, { ttlDays, keepLatestPerBranch: true, lifecycle }),
+    ),
   );
   const sum = (pick: (result: (typeof results)[number]) => number | undefined): number =>
     results.reduce((total, result) => total + (pick(result) ?? 0), 0);
   // With the capability the totals exist even when there is no project (zeros).
-  const claimed = Boolean(getStore().db.buildReferenceLifecycle);
+  const claimed = Boolean(lifecycle);
   return {
     removedBuilds: sum((result) => result.removedBuilds),
     ...(claimed

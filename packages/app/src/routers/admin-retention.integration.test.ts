@@ -128,6 +128,48 @@ describe("safe retention capability", () => {
       expect(branches.mock.calls.length > 0).toBe(removes);
     },
   );
+  it("hands the capability read at the start of the pass to every project's purge", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    for (const id of ["p1", "p2"]) {
+      // oxlint-disable-next-line no-await-in-loop -- two rows, in order
+      await db.insert(db.tables.projects, {
+        id,
+        name: id,
+        slug: id,
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+    }
+    const lifecycle = {};
+    Object.assign(db, { buildReferenceLifecycle: lifecycle });
+    const purge = vi
+      .spyOn(Retention.prototype, "purge")
+      .mockResolvedValue({ removedBuilds: 0, removedFiles: 0 });
+    // The capability goes away as soon as the first project's purge has started.
+    purge.mockImplementationOnce(async () => {
+      Object.assign(db, { buildReferenceLifecycle: undefined });
+      return await Promise.resolve({ removedBuilds: 0, removedFiles: 0 });
+    });
+    vi.spyOn(Retention.prototype, "purgeStaleBranches").mockResolvedValue({
+      removedBranches: 0,
+      removedBaselines: 0,
+    });
+    const app = createShelfApp({ database: db, storage, testing: { runner: stubRunner() } });
+    try {
+      const response = await app.request("/api/v1/admin/purge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(response.status).toBe(200);
+      expect(purge).toHaveBeenCalledTimes(2);
+      for (const [, options] of purge.mock.calls) expect(options.lifecycle).toBe(lifecycle);
+      expect(await response.json()).toMatchObject({ protected: 0, resumed: 0 });
+    } finally {
+      await app.lifecycle.teardown();
+    }
+  });
   it("keeps the existing purge path available in hosting-only mode", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
