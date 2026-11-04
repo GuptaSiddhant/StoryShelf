@@ -66,6 +66,56 @@ const shellBackdrop = css`
   }
 `;
 
+/** The document head: metadata, the CSRF token, the base styles and the boot script. */
+const DocumentHead: FC<{
+  title: string;
+  name: string;
+  csrfToken: string;
+  styles: string;
+}> = ({ title, name, csrfToken, styles }) => (
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="csrf-token" content={csrfToken} />
+    {/* Favicon is the product's own mark, not brandable: it identifies
+        StoryShelf in the tab strip. `ui.logo` stays overridable. */}
+    <link rel="icon" type="image/svg+xml" href={assetManifest.mark.href} />
+    <title>
+      {title} · {name}
+    </title>
+    <style dangerouslySetInnerHTML={{ __html: styles }} />
+    <Style />
+    <script dangerouslySetInnerHTML={{ __html: bootScript() }} />
+  </head>
+);
+
+/** The app chrome around a page: sidebar, top bar, the content column and the sidebar backdrop. */
+const AppChrome: FC<{
+  nav?: NavConfig;
+  name: string;
+  logo: string;
+  layout: PageLayout;
+  children?: unknown;
+}> = ({ nav, name, logo, layout, children }) => (
+  <>
+    <div class={shellRoot}>
+      <Sidebar nav={nav} name={name} logo={logo} />
+      <div>
+        <TopBar nav={nav} />
+        <main
+          id="main-content"
+          class={layout === "wide" ? shellContentWide : shellContent}
+          tabindex={-1}
+        >
+          {children}
+        </main>
+      </div>
+    </div>
+    <div class={shellBackdrop} data-sidebar-backdrop hidden />
+  </>
+);
+
 // Hono's JSX.Element is typed as `HtmlEscapedString | Promise<...>`, so JSX-returning
 // Functions can legitimately return a promise; the rule is a false positive here.
 /** Full HTML document shell with sidebar, top bar, theme, toasts, and HTMX. */
@@ -86,21 +136,12 @@ export const DocumentLayout: FC<{
       {/* Without a doctype browsers use quirks mode (form margins, line-box struts, …). */}
       {raw("<!DOCTYPE html>")}
       <html lang="en" data-theme="system">
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <meta name="color-scheme" content="light dark" />
-          <meta name="csrf-token" content={getCsrfToken(config.secret, sessionId)} />
-          {/* Favicon is the product's own mark, not brandable: it identifies
-              StoryShelf in the tab strip. `ui.logo` stays overridable. */}
-          <link rel="icon" type="image/svg+xml" href={assetManifest.mark.href} />
-          <title>
-            {title} · {name}
-          </title>
-          <style dangerouslySetInnerHTML={{ __html: baseStyle(light, dark) }} />
-          <Style />
-          <script dangerouslySetInnerHTML={{ __html: bootScript() }} />
-        </head>
+        <DocumentHead
+          title={title}
+          name={name}
+          csrfToken={getCsrfToken(config.secret, sessionId)}
+          styles={baseStyle(light, dark)}
+        />
         <body>
           <a class="skip-link" href="#main-content">
             Skip to content
@@ -110,22 +151,9 @@ export const DocumentLayout: FC<{
               {children}
             </BareShell>
           ) : (
-            <>
-              <div class={shellRoot}>
-                <Sidebar nav={nav} name={name} logo={logo} />
-                <div>
-                  <TopBar nav={nav} />
-                  <main
-                    id="main-content"
-                    class={layout === "wide" ? shellContentWide : shellContent}
-                    tabindex={-1}
-                  >
-                    {children}
-                  </main>
-                </div>
-              </div>
-              <div class={shellBackdrop} data-sidebar-backdrop hidden />
-            </>
+            <AppChrome nav={nav} name={name} logo={logo} layout={layout}>
+              {children}
+            </AppChrome>
           )}
           <ToastRegion />
           <script src={assetManifest.htmx.href} />
