@@ -102,6 +102,15 @@ export function createCaptureHandler(options: CaptureHandlerOptions): KindHandle
     accepts: isValidCaptureJob,
     superseded: async (job) => await isSuperseded(options, job),
     run: async (job, context) => {
+      // The consumer checked before it claimed a slot; a job that waited for a forked child's slot,
+      // or was pushed to it again after a crash, is checked again right before it writes.
+      if (await isSuperseded(options, job)) {
+        options.logger.info(
+          { buildId: job.buildId, jobId: job.jobId },
+          "superseded capture skipped",
+        );
+        return;
+      }
       await dispatchFor(retriesOf(job, fallbackRetries))(toDispatchJob(job), {
         touch: () => {
           context.touch();
