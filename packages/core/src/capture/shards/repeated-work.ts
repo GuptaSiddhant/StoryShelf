@@ -44,7 +44,7 @@ export async function reportRepeatedWork(
   };
   target.options.logger?.warn({ buildId: target.build.id, ...fields }, message);
   await emitAttemptLog(
-    await planAttemptLog(target),
+    await recorderOrNone(target),
     target.options.logger,
     "warn",
     message,
@@ -58,6 +58,19 @@ export async function reportRepeatedWork(
     });
   } catch {
     // A metrics hook must never break the shard.
+  }
+}
+
+/** The plan attempt's recorder, or none when it cannot be looked up: saying so is never worth failing the shard. */
+async function recorderOrNone(target: ShardTarget): Promise<AttemptLogRecorder | undefined> {
+  try {
+    return await planAttemptLog(target);
+  } catch (error) {
+    target.options.logger?.warn(
+      { err: error, buildId: target.build.id },
+      "could not find the build's attempt log; the repeated work is logged here only",
+    );
+    return undefined;
   }
 }
 

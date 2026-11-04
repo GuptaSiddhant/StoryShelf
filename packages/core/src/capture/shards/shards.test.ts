@@ -537,6 +537,26 @@ describe("sharded capture", () => {
       expect(await w.snapshots()).toHaveLength(stored);
     });
 
+    it("still completes the shard when the build's attempt log cannot be looked up", async () => {
+      const { w, first, stored } = await interruptedShard();
+      const onRepeated = vi.fn();
+      const lookup = vi
+        .spyOn(CaptureShardModel.prototype, "plan")
+        .mockRejectedValue(new Error("database unavailable"));
+      await expect(
+        w.runShard(first, true, { attempt: 2, limit: 3, onRepeated }),
+      ).resolves.toMatchObject({ status: "rendered" });
+      lookup.mockRestore();
+      // The earlier rows were replaced and the new ones stored; only the attempt-log line is missing.
+      expect(await w.snapshots()).toHaveLength(stored);
+      expect(onRepeated).toHaveBeenCalledExactlyOnceWith({
+        repeated: stored,
+        attempt: 2,
+        limit: 3,
+      });
+      expect(await w.repeatLogs()).toEqual([]);
+    });
+
     it("says nothing for a clean first run", async () => {
       const w = await world({ stories: 25, shardSize: 10 });
       await w.plan();
