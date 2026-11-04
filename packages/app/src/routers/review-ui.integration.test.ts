@@ -54,18 +54,26 @@ const auth = stubAuth(null, {
 let scratchDir = "";
 /** Stop functions of the apps the running test booted; `afterEach` runs them, whatever the outcome. */
 const running: (() => Promise<void>)[] = [];
-beforeEach(async () => {
-  scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-review-ui-"));
-});
-afterEach(async () => {
+
+/** Stop every app the test booted, give each its chance, then report the ones that failed. */
+async function stopApps(): Promise<void> {
   const stopped = await Promise.allSettled(running.splice(0).map(async (stop) => await stop()));
-  await rm(scratchDir, { recursive: true, force: true });
-  // Every app was given its chance to stop and the directory is gone; now report what failed.
   const failures = stopped.flatMap((result) =>
     result.status === "rejected" ? [result.reason] : [],
   );
   if (failures.length > 0) {
     throw new AggregateError(failures, "an app did not stop cleanly");
+  }
+}
+
+beforeEach(async () => {
+  scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-review-ui-"));
+});
+afterEach(async () => {
+  try {
+    await stopApps();
+  } finally {
+    await rm(scratchDir, { recursive: true, force: true });
   }
 });
 
@@ -856,8 +864,14 @@ describe("review events", () => {
       return seen;
     }
 
-    afterEach(() => {
-      vi.unstubAllGlobals();
+    afterEach(async () => {
+      // Apps stop while the stubs are still in place, as they did before teardown moved here, so a
+      // pending delivery meets the fetch stub and not the network.
+      try {
+        await stopApps();
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
 
     it("emits one comment:created per comment, anchored by scope, with the event header", async () => {
