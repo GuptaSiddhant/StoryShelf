@@ -42,7 +42,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
       {queueView.length === 0 ? (
         <Meta>No captures are currently queued or running.</Meta>
       ) : (
-        <Table>
+        <Table label="Active queue">
           <table>
             <thead>
               <tr>
@@ -116,7 +116,7 @@ export async function renderComputeJobsPage(
       <Card>
         <SectionTitle>Recent builds</SectionTitle>
         <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
-        <Table>
+        <Table label="Recent builds">
           <table>
             <thead>
               <tr>

@@ -176,7 +176,7 @@ describe("Dropdown", () => {
 describe("Table, Thumbnail, Kbd", () => {
   it("wraps native table markup in the table surface", async () => {
     const html = await render(
-      <Table dense>
+      <Table dense label="Rows">
         <table>
           <tbody>
             <tr>
@@ -188,6 +188,17 @@ describe("Table, Thumbnail, Kbd", () => {
     );
     expect(html).toContain("ss-table-dense-");
     expect(html).toContain("<td>x</td>");
+  });
+
+  it("is a focusable region named by its label", async () => {
+    const html = await render(
+      <Table label="API tokens">
+        <table />
+      </Table>,
+    );
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="API tokens"');
+    expect(html).toContain('tabindex="0"');
   });
 
   it("lazy-loads the image or falls back to a placeholder", async () => {
