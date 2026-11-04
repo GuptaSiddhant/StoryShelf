@@ -39,7 +39,7 @@ const savedGitEnv = new Map<string, string | undefined>();
  * cannot point git at another checkout or define `remote.origin.url` for the fixture, and use no
  * user or system git config.
  */
-function isolateGitEnv(): void {
+function isolateGitEnv(ceiling: string): void {
   for (const name of Object.keys(process.env).filter((key) => key.startsWith("GIT_"))) {
     savedGitEnv.set(name, process.env[name]);
     Reflect.deleteProperty(process.env, name);
@@ -47,6 +47,8 @@ function isolateGitEnv(): void {
   for (const name of GIT_CONFIG_FILES) {
     process.env[name] = devNull;
   }
+  // Keep git from finding a checkout above the fixture (e.g. a tmpdir inside a worktree).
+  process.env["GIT_CEILING_DIRECTORIES"] = ceiling;
 }
 
 function restoreGitEnv(): void {
@@ -64,7 +66,7 @@ function restoreGitEnv(): void {
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "storyshelf-cli-config-snapshot-"));
   vi.stubEnv("npm_config_user_agent", "");
-  isolateGitEnv();
+  isolateGitEnv(dirname(dir));
 });
 
 afterEach(() => {
@@ -241,8 +243,17 @@ describe("git detection", () => {
     vi.stubEnv("GIT_CONFIG_COUNT", "1");
     vi.stubEnv("GIT_CONFIG_KEY_0", "remote.origin.url");
     vi.stubEnv("GIT_CONFIG_VALUE_0", "https://github.com/inherited/override.git");
-    isolateGitEnv();
+    isolateGitEnv(dirname(dir));
     expect(detectGitRepository(dir)).toBeNull();
+  });
+
+  it("restores an inherited git ceiling after the fixture's own", () => {
+    restoreGitEnv();
+    vi.stubEnv("GIT_CEILING_DIRECTORIES", "/inherited");
+    isolateGitEnv(dirname(dir));
+    expect(process.env["GIT_CEILING_DIRECTORIES"]).toBe(dirname(dir));
+    restoreGitEnv();
+    expect(process.env["GIT_CEILING_DIRECTORIES"]).toBe("/inherited");
   });
 
   it.each([
