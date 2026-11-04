@@ -14,14 +14,15 @@ import type { SQL, Table } from "drizzle-orm";
 import { and, eq, getTableColumns } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 import { createNestingGuard } from "./nesting-guard.ts";
-import { createTransactionMutex } from "./transaction-mutex.ts";
+import { createTransactionMutex, type TransactionMutex } from "./transaction-mutex.ts";
 
 /**
  * Wrap an adapter with manual BEGIN/COMMIT transactions for synchronous
  * SQLite drivers (better-sqlite3, `bun:sqlite`), whose `transaction()`
  * rejects async callbacks. Statements run on the adapter's own connection,
  * so the open transaction covers them; rollback runs on throw. Overlapping calls queue, one
- * transaction at a time (see `transaction-mutex.ts`).
+ * transaction at a time, and the adapter's plain statements take their turn in the same queue, so
+ * none lands inside a transaction it does not belong to (see `transaction-mutex.ts`).
  *
  * @param adapter - Adapter built by {@link createDrizzleAdapter}.
  * @param exec - Synchronous statement runner on the same connection.
@@ -32,10 +33,62 @@ export function withManualTransactions(
   exec: (sql: string) => void,
 ): DatabaseAdapter {
   const mutex = createTransactionMutex(createNestingGuard());
+  // `tx` calls the inner adapter below directly; only the outer one's plain methods take turns.
+  return isolatePlainStatements(
+    {
+      ...adapter,
+      transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
+        await mutex.run(async () => await runManualTransaction(adapter, exec, fn)),
+    },
+    mutex,
+  );
+}
+
+type PlainMethod = (...args: unknown[]) => Promise<unknown>;
+
+/** The adapter methods that run one statement on the connection. */
+const PLAIN_METHODS = ["insert", "update", "updateWhere", "get", "remove", "list", "count", "all"];
+
+/**
+ * Make every plain method of `adapter` take a one-statement turn on `mutex`: after every
+ * transaction and statement that asked before it, so it never lands inside an open transaction
+ * (and is never rolled back with one), and an error at once from inside a callback, where it
+ * should have used `tx`. `health` takes a statement turn and `teardown` waits its turn, then closes.
+ */
+export function isolatePlainStatements(
+  adapter: DatabaseAdapter,
+  mutex: TransactionMutex,
+): DatabaseAdapter {
+  const wrapped: Record<string, unknown> = {};
+  for (const method of PLAIN_METHODS) {
+    // The one contained cast: the methods are generic, and this only forwards their arguments.
+    const original = (adapter as unknown as Record<string, PlainMethod | undefined>)[method];
+    if (original !== undefined) {
+      wrapped[method] = async (...args: unknown[]): Promise<unknown> =>
+        await mutex.runStatement(method, async () => await original.apply(adapter, args));
+    }
+  }
+  return { ...adapter, ...wrapped, ...isolateLifecycle(adapter, mutex) };
+}
+
+function isolateLifecycle(
+  adapter: DatabaseAdapter,
+  mutex: TransactionMutex,
+): Pick<DatabaseAdapter, "lifecycle"> {
+  const { lifecycle } = adapter;
+  if (lifecycle === undefined) {
+    return {};
+  }
   return {
-    ...adapter,
-    transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
-      await mutex.run(async () => await runManualTransaction(adapter, exec, fn)),
+    lifecycle: {
+      ...lifecycle,
+      health: async () => await mutex.runStatement("health", async () => await lifecycle.health()),
+      teardown: async () => {
+        await mutex.runStatement("teardown", async () => {
+          await lifecycle.teardown();
+        });
+      },
+    },
   };
 }
 
@@ -95,12 +148,25 @@ function buildLifecycle(options: DrizzleAdapterOptions): NonNullable<DatabaseAda
   };
 }
 
-export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions): DatabaseAdapter {
+/** What differs between the drivers sharing {@link createDrizzleAdapter}. */
+export interface DrizzleAdapterBehavior {
+  /**
+   * Plain statements take their turn in the transaction queue (`node:sqlite`, on one connection).
+   * Off for drivers with a connection per transaction (Turso, D1) and for lifecycle transaction handles.
+   */
+  isolateStatements?: boolean;
+}
+
+export function createDrizzleAdapter(
+  db: unknown,
+  options: DrizzleAdapterOptions,
+  behavior: DrizzleAdapterBehavior = {},
+): DatabaseAdapter {
   const drizzle = db as DrizzleLike;
   // The shared connection (or, for a libSQL file, its connection per transaction) cannot overlap
   // transactions: they queue (see `transaction-mutex.ts`).
   const mutex = createTransactionMutex(createNestingGuard());
-  return {
+  const adapter: DatabaseAdapter = {
     metadata: options.metadata,
     tables: options.tables,
     lifecycle: buildLifecycle(options),
@@ -141,6 +207,7 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
           await drizzle.transaction(async (tx) => await fn(buildTxStore(tx as DrizzleLike))),
       ),
   };
+  return behavior.isolateStatements === true ? isolatePlainStatements(adapter, mutex) : adapter;
 }
 
 async function updateWhereOne<T extends AnySQLiteTable>(

@@ -1,5 +1,6 @@
 import type { DatabaseAdapter, TxStore } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { sql } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -195,6 +196,102 @@ describe("createTransactionMutex where nesting cannot be detected", () => {
   });
 });
 
+describe("plain statements on the mutex", () => {
+  it("waits for an open transaction, and runs when none is open", async () => {
+    const mutex = createTransactionMutex(createNestingGuard());
+    const gate = Promise.withResolvers<null>();
+    const log: string[] = [];
+    const opened = mutex.run(async () => {
+      log.push("tx:start");
+      await gate.promise;
+      log.push("tx:end");
+    });
+    await settle();
+
+    const statement = mutex.runStatement("get", async () => {
+      log.push("statement");
+      return await Promise.resolve("row");
+    });
+    await settle();
+    expect(log).toEqual(["tx:start"]);
+    gate.resolve(null);
+
+    await opened;
+    await expect(statement).resolves.toBe("row");
+    expect(log).toEqual(["tx:start", "tx:end", "statement"]);
+    await expect(mutex.runStatement("get", async () => await Promise.resolve(1))).resolves.toBe(1);
+  });
+
+  it("queues statements and transactions in the order they asked, so a statement never waits for a later transaction", async () => {
+    const mutex = createTransactionMutex(createNestingGuard());
+    const gate = Promise.withResolvers<null>();
+    const log: string[] = [];
+    const first = mutex.run(async () => {
+      await gate.promise;
+      log.push("tx1");
+    });
+    const statement = mutex.runStatement("insert", async () => {
+      log.push("statement");
+      return await Promise.resolve();
+    });
+    const later = mutex.run(async () => {
+      log.push("tx2");
+      return await Promise.resolve();
+    });
+    await settle();
+    gate.resolve(null);
+
+    await Promise.all([first, statement, later]);
+
+    expect(log).toEqual(["tx1", "statement", "tx2"]);
+  });
+
+  it("refuses a plain statement from inside a transaction at once, naming the method", async () => {
+    const mutex = createTransactionMutex(createNestingGuard());
+
+    await expect(
+      mutex.run(
+        async () => await mutex.runStatement("insert", async () => await Promise.resolve()),
+      ),
+    ).rejects.toThrow(
+      "a plain insert was called on the database inside its own transaction; use `tx`",
+    );
+    await expect(
+      mutex.runStatement("get", async () => await Promise.resolve("after")),
+    ).resolves.toBe("after");
+  });
+
+  it("releases after a statement throws, reporting the error to its own caller only", async () => {
+    const mutex = createTransactionMutex(createNestingGuard());
+    const failing = mutex.runStatement("get", async () => await Promise.reject(new Error("boom")));
+    const next = mutex.run(async () => await Promise.resolve("ran"));
+
+    await expect(failing).rejects.toThrow("boom");
+    await expect(next).resolves.toBe("ran");
+  });
+
+  it("where nesting cannot be detected, fails after the wait limit instead of hanging", async () => {
+    const clock = manualScheduler();
+    const mutex = createTransactionMutex(blindGuard, {
+      waitLimitMs: 1000,
+      schedule: clock.schedule,
+    });
+    // A plain call made from inside a transaction: it waits for the transaction that waits for it.
+    const outer = mutex.run(
+      async () => await mutex.runStatement("insert", async () => await Promise.resolve(1)),
+    );
+    outer.catch(() => {});
+    await settle();
+
+    clock.fireAll();
+
+    await expect(outer).rejects.toThrow("plain insert waited 1000 ms");
+    await expect(
+      mutex.runStatement("get", async () => await Promise.resolve("after")),
+    ).resolves.toBe("after");
+  });
+});
+
 const drivers: [string, () => DatabaseAdapter][] = [
   ["node:sqlite", () => createSqliteDatabase(":memory:")],
   ["better-sqlite3", () => createBetterSqlite3Database({ path: ":memory:" })],
@@ -245,7 +342,76 @@ describe.each(drivers)("transact on %s", (_name, make) => {
     await transact(async (tx) => await tx.insert(schema.siteSettings, setting("after")));
     expect(await db.get(schema.siteSettings, "after")).not.toBeNull();
   });
+
+  it("keeps a plain insert from another context when the open transaction rolls back", async () => {
+    const db = await open(make());
+    const transact = await transactOf(db);
+    const open$ = Promise.withResolvers<null>();
+    const release = Promise.withResolvers<null>();
+
+    const failing = transact(async (tx) => {
+      await tx.insert(schema.siteSettings, setting("doomed"));
+      open$.resolve(null);
+      await release.promise;
+      throw new Error("abort");
+    });
+    await open$.promise;
+    // Another context writes while the transaction is open and awaiting: it must wait its turn.
+    const outside = db.insert(schema.siteSettings, setting("outside"));
+    await settleTicks();
+    release.resolve(null);
+
+    await expect(failing).rejects.toThrow("abort");
+    await outside;
+    expect(await db.get(schema.siteSettings, "doomed")).toBeNull();
+    expect(await db.get(schema.siteSettings, "outside")).not.toBeNull();
+  });
+
+  it("fails a plain call made on the outer adapter inside a transaction at once, naming `tx`", async () => {
+    const db = await open(make());
+    const transact = await transactOf(db);
+
+    await expect(
+      transact(async () => await db.get(schema.siteSettings, "anything")),
+    ).rejects.toThrow(
+      "a plain get was called on the database inside its own transaction; use `tx`",
+    );
+    await expect(
+      transact(async () => await db.insert(schema.siteSettings, setting("x"))),
+    ).rejects.toThrow("a plain insert was called");
+    // The failed transactions rolled back and released the queue.
+    expect(await db.get(schema.siteSettings, "x")).toBeNull();
+    await transact(async (tx) => await tx.insert(schema.siteSettings, setting("fine")));
+    expect(await db.get(schema.siteSettings, "fine")).not.toBeNull();
+  });
+
+  it("serves every plain method, health and teardown, one after another with transactions", async () => {
+    const db = await open(make());
+    const transact = await transactOf(db);
+    await db.insert(schema.siteSettings, setting("a"));
+    await db.update(schema.siteSettings, "a", { value: "b" });
+    expect((await db.get(schema.siteSettings, "a"))?.["value"]).toBe("b");
+    expect(await db.list(schema.siteSettings)).toHaveLength(1);
+    expect(await db.count(schema.siteSettings)).toBe(1);
+    expect(
+      await db.updateWhere(schema.siteSettings, "a", { value: "c" }, sql`id = 'a'`),
+    ).toMatchObject({ value: "c" });
+    expect(await db.lifecycle?.health()).toEqual({ ok: true });
+    await transact(async (tx) => {
+      await tx.remove(schema.siteSettings, "a");
+    });
+    await db.remove(schema.siteSettings, "a");
+    await db.lifecycle?.teardown();
+    expect(await db.lifecycle?.health()).toMatchObject({ ok: false });
+  });
 });
+
+const settleTicks = async (): Promise<void> => {
+  for (let tick = 0; tick < 10; tick += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- let queued promise callbacks run
+    await Promise.resolve();
+  }
+};
 
 /** Every `./x.ts` module the entry point reaches, itself included. */
 function reachable(entry: string): Map<string, string> {
