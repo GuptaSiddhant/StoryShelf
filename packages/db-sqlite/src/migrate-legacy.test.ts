@@ -1,11 +1,12 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import Database from "better-sqlite3";
+import { sql as sqlTag } from "drizzle-orm";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBetterSqlite3Database } from "./better-sqlite3.ts";
 import { createSqliteDatabase } from "./index.ts";
 
@@ -241,6 +242,30 @@ describe("a statement that fails stops the boot (better-sqlite3)", () => {
     expect(names).not.toContain("design_links_project_import_path_idx");
   });
 
+  it("leaves the old comments table and its rows, and foreign keys on, when the rebuild fails", async () => {
+    const path = await migrated();
+    betterSqlite3.raw(
+      path,
+      `INSERT INTO users (id, name, email, created_at) VALUES ('u', 'U', 'u@x', '${NOW}');
+       INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', '${NOW}', '${NOW}');
+       INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES ('b', 'p', 's', 'main', 'pending', '${NOW}', '${NOW}');
+       ${LEGACY_COMMENTS}`,
+    );
+    const client = failing(new Database(path), (query) => query === "DROP TABLE comments", locked);
+
+    await expect(boot(createBetterSqlite3Database({ client }))).rejects.toThrow(
+      "database is locked",
+    );
+
+    expect(client.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
+    client.close();
+    expect(betterSqlite3.ids(path, "comments")).toEqual(["c1"]);
+    expect(betterSqlite3.columns(path, "comments_new")).toEqual([]);
+    expect(betterSqlite3.columns(path, "comments").find(([name]) => name === "user_id")?.[1]).toBe(
+      1,
+    );
+  });
+
   it("does not skip any other failure of that unique index", async () => {
     const path = await migrated();
     betterSqlite3.raw(path, "DROP INDEX design_links_project_import_path_idx");
@@ -248,5 +273,87 @@ describe("a statement that fails stops the boot (better-sqlite3)", () => {
     await expect(
       bootWith(path, (sql) => sql.includes("design_links_project_import_path_idx"), locked),
     ).rejects.toThrow("database is locked");
+  });
+});
+
+/** Make `DatabaseSync.exec` fail the statements `matches` picks, for every connection in the process. */
+function failNodeSqlite(matches: (sql: string) => boolean, error: Error): void {
+  const original = DatabaseSync.prototype.exec;
+  vi.spyOn(DatabaseSync.prototype, "exec").mockImplementation(function (
+    this: DatabaseSync,
+    sql: string,
+  ) {
+    if (matches(sql)) throw error;
+    return original.call(this, sql);
+  });
+}
+
+async function migratedNodeSqlite(): Promise<string> {
+  const path = join(dir, "test.sqlite");
+  const db = createSqliteDatabase(path);
+  await boot(db);
+  await db.lifecycle?.teardown();
+  return path;
+}
+
+describe("a statement that fails stops the boot (node:sqlite)", () => {
+  const locked = new Error("database is locked");
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fails on a column that cannot be added, and carries on when another boot added it first", async () => {
+    const path = await migratedNodeSqlite();
+    nodeSqlite.raw(path, "ALTER TABLE snapshots DROP COLUMN duration_ms");
+    failNodeSqlite(adding, locked);
+    await expect(boot(createSqliteDatabase(path))).rejects.toThrow("database is locked");
+    vi.restoreAllMocks();
+
+    failNodeSqlite(adding, new Error("duplicate column name: duration_ms"));
+    await expect(boot(createSqliteDatabase(path))).resolves.toBeUndefined();
+  });
+
+  it("fails on the webhook column drop unless the column is already gone", async () => {
+    const path = await migratedNodeSqlite();
+    failNodeSqlite(dropping, locked);
+    await expect(boot(createSqliteDatabase(path))).rejects.toThrow("database is locked");
+    vi.restoreAllMocks();
+
+    failNodeSqlite(dropping, new Error('no such column: "secret"'));
+    await expect(boot(createSqliteDatabase(path))).resolves.toBeUndefined();
+  });
+
+  it("fails on an error while replacing the git-sha index", async () => {
+    const path = await migratedNodeSqlite();
+    failNodeSqlite(
+      (sql) => sql.startsWith("DROP INDEX IF EXISTS builds_project_gitsha_idx"),
+      locked,
+    );
+
+    await expect(boot(createSqliteDatabase(path))).rejects.toThrow("database is locked");
+  });
+
+  it("leaves the old comments table and its rows, and foreign keys on, when the rebuild fails", async () => {
+    const path = await migratedNodeSqlite();
+    nodeSqlite.raw(
+      path,
+      `INSERT INTO users (id, name, email, created_at) VALUES ('u', 'U', 'u@x', '${NOW}');
+       INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', '${NOW}', '${NOW}');
+       INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES ('b', 'p', 's', 'main', 'pending', '${NOW}', '${NOW}');
+       ${LEGACY_COMMENTS}`,
+    );
+    failNodeSqlite((sql) => sql === "DROP TABLE comments", locked);
+    const db = createSqliteDatabase(path);
+
+    await expect(boot(db)).rejects.toThrow("database is locked");
+
+    vi.restoreAllMocks();
+    expect(nodeSqlite.ids(path, "comments")).toEqual(["c1"]);
+    expect(nodeSqlite.columns(path, "comments_new")).toEqual([]);
+    expect(nodeSqlite.columns(path, "comments").find(([name]) => name === "user_id")?.[1]).toBe(1);
+    const flag = await db.all<unknown[]>(sqlTag`PRAGMA foreign_keys`);
+    expect(flag).toEqual([[1]]);
+    await db.lifecycle?.teardown();
   });
 });

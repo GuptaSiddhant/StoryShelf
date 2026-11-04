@@ -547,6 +547,28 @@ describe("runMigrations: a failing statement stops the boot", () => {
     expect(outcomes.filter((outcome) => outcome !== "failed")).toEqual([]);
   });
 
+  it("drops the user_id NOT NULL of an old comments table, and stops the boot when that fails", async () => {
+    const alter = "ALTER TABLE comments ALTER COLUMN user_id DROP NOT NULL";
+    const required = (fail: boolean) => {
+      const issued: string[] = [];
+      const run = async (sql: string): Promise<unknown[]> => {
+        issued.push(sql);
+        if (sql.includes("information_schema.columns") && sql.includes("'comments'")) {
+          return await Promise.resolve([{ is_nullable: "NO" }]);
+        }
+        if (fail && sql === alter) throw new Error("permission denied for table comments");
+        return await Promise.resolve([]);
+      };
+      return { issued, run };
+    };
+
+    const ok = required(false);
+    await runMigrations(ok.run);
+    expect(ok.issued).toContain(alter);
+
+    await expect(runMigrations(required(true).run)).rejects.toThrow("permission denied");
+  });
+
   it("skips a unique index that existing duplicates prevent, and only for that error", async () => {
     const statements = await statementsOfARun();
     const uniqueIndexes = statements.filter(
