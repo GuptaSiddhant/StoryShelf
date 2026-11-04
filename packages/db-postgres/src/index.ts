@@ -81,8 +81,8 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
-      await runMigrations(async (sql: string) => await client.unsafe(sql));
+    migrate: async ({ logger }) => {
+      await runMigrations(async (sql: string) => await client.unsafe(sql), logger);
     },
     close: async () => {
       await client.end();

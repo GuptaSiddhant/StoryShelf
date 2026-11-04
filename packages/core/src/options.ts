@@ -61,6 +61,7 @@ function assertTestingNumbers(testing: ShelfOptions["testing"]): void {
   assertConcurrency(testing?.concurrency);
   assertRetries(testing?.retries);
   assertLeaseSeconds(testing?.leaseSeconds);
+  assertMaxJobSeconds(testing?.maxJobSeconds);
   assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit);
 }
 
@@ -88,6 +89,24 @@ function assertLeaseSeconds(seconds: number | undefined): void {
     );
   }
 }
+
+/** A positive number of seconds; `0` would abandon every job at once. */
+function assertMaxJobSeconds(seconds: number | undefined): void {
+  if (seconds !== undefined && (!Number.isFinite(seconds) || seconds <= 0)) {
+    throw new Error(
+      `testing.maxJobSeconds must be a positive number of seconds, got ${String(seconds)}`,
+    );
+  }
+  // Node runs a timer longer than 2^31 - 1 ms after 1 ms, which would abandon every job at once.
+  if (seconds !== undefined && seconds * 1000 > MAX_TIMER_MS) {
+    throw new Error(
+      `testing.maxJobSeconds must be at most ${String(Math.floor(MAX_TIMER_MS / 1000))} seconds (about 24 days), got ${String(seconds)}`,
+    );
+  }
+}
+
+/** The longest delay Node's timers keep (2^31 - 1 ms). */
+const MAX_TIMER_MS = 2_147_483_647;
 
 /** `0` would deadlock the consumer. */
 function assertConcurrency(concurrency: number | undefined): void {

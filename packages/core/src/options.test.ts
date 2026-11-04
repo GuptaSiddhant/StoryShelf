@@ -103,6 +103,12 @@ function lease(leaseSeconds: number): () => void {
   };
 }
 
+function maxJob(maxJobSeconds: number): () => void {
+  return () => {
+    resolveShelfOptions({ ...base, testing: { runner, maxJobSeconds } });
+  };
+}
+
 function concurrent(concurrency: number): () => void {
   return () => {
     resolveShelfOptions({ ...base, testing: { runner, concurrency } });
@@ -153,6 +159,17 @@ describe("resolveShelfOptions testing process options", () => {
     expect(lease(0)).toThrow(/testing\.leaseSeconds must be a positive number of seconds, got 0/u);
     expect(lease(-1)).toThrow(/leaseSeconds/u);
     expect(lease(Number.NaN)).toThrow(/leaseSeconds/u);
+  });
+
+  it("validates maxJobSeconds as a positive number", () => {
+    expect(maxJob(7200)).not.toThrow();
+    expect(maxJob(0)).toThrow(
+      /testing\.maxJobSeconds must be a positive number of seconds, got 0/u,
+    );
+    expect(maxJob(Number.NaN)).toThrow(/maxJobSeconds/u);
+    // A timer past 2^31 - 1 ms fires after 1 ms in Node: refuse what it cannot hold.
+    expect(maxJob(2_147_483)).not.toThrow();
+    expect(maxJob(2_147_484)).toThrow(/at most 2147483 seconds/u);
   });
 
   it('requires workerEntry for mode "fork"', () => {

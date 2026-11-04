@@ -59,12 +59,29 @@ async function setup(options: { files?: Record<string, string>; maxEntries?: num
     await handler.run({ buildId: build.id, attempt: 1, maxAttempts: 3, ...job } as ConsumerJob, {
       logger: log.logger,
       touch: () => {},
+      signal: new AbortController().signal,
     });
   };
   return { db, storage, project, build, handler, run, statusOf, log };
 }
 
 describe("createPublishHandler", () => {
+  it("stops at the deadline: an aborted job runs nothing and completes no publication", async () => {
+    const { handler, build, statusOf } = await setup();
+    const before = await statusOf();
+    const controller = new AbortController();
+    controller.abort(new Error("job deadline exceeded"));
+
+    await expect(
+      handler.run({ buildId: build.id, attempt: 1, maxAttempts: 3 } as ConsumerJob, {
+        logger: stubLogger().logger,
+        touch: () => {},
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("job deadline exceeded");
+    expect(await statusOf()).toBe(before);
+  });
+
   it("records the build's use of each distinct published blob", async () => {
     const { db, build, run } = await setup();
     const recordContentUses = vi.fn(async () => await Promise.resolve([] as string[]));

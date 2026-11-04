@@ -35,8 +35,8 @@ export function applyListOptions<C extends ChainFilter<C>>(query: C, opts: ListO
 export function buildLifecycle(options: DrizzleAdapterOptions): AdapterLifecycle {
   let closed = false;
   return {
-    setup: async () => {
-      await options.migrate();
+    setup: async (context) => {
+      await options.migrate({ logger: context.logger });
     },
     teardown: async () => {
       if (closed) {

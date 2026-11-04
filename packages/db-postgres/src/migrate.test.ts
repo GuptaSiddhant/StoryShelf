@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runMigrations } from "./migrate.ts";
 
 /** Run SQL through PGlite as the shared migration runner does (multi-statement allowed). */
@@ -510,5 +510,138 @@ describe("runMigrations: builds.capture_generation", () => {
       "SELECT capture_generation FROM builds WHERE id = 'b'",
     );
     expect(rows.rows).toEqual([{ capture_generation: 0 }]);
+  }, 60_000);
+});
+
+/** Every distinct statement a clean run issues, in order. */
+async function statementsOfARun(): Promise<string[]> {
+  const seen: string[] = [];
+  await runMigrations(async (sql) => {
+    seen.push(sql);
+    return await Promise.resolve([]);
+  });
+  return [...new Set(seen)];
+}
+
+/** A runner that fails the statement `target` with `error` and does nothing else. */
+const failing = (target: string, error: unknown) => async (sql: string) => {
+  if (sql === target) throw error;
+  return await Promise.resolve([] as unknown[]);
+};
+
+describe("runMigrations: a failing statement stops the boot", () => {
+  it("fails on any statement that errors, whichever column or index it adds", async () => {
+    const statements = await statementsOfARun();
+    expect(statements.length).toBeGreaterThan(80);
+
+    const outcomes = await Promise.all(
+      statements.map(
+        async (target) =>
+          await runMigrations(failing(target, new Error("boom"))).then(
+            () => `${target} did not fail the boot`,
+            () => "failed",
+          ),
+      ),
+    );
+
+    expect(outcomes.filter((outcome) => outcome !== "failed")).toEqual([]);
+  });
+
+  it("drops the user_id NOT NULL of an old comments table, and stops the boot when that fails", async () => {
+    const alter = "ALTER TABLE comments ALTER COLUMN user_id DROP NOT NULL";
+    const required = (fail: boolean) => {
+      const issued: string[] = [];
+      const run = async (sql: string): Promise<unknown[]> => {
+        issued.push(sql);
+        if (sql.includes("information_schema.columns") && sql.includes("'comments'")) {
+          return await Promise.resolve([{ is_nullable: "NO" }]);
+        }
+        if (fail && sql === alter) throw new Error("permission denied for table comments");
+        return await Promise.resolve([]);
+      };
+      return { issued, run };
+    };
+
+    const ok = required(false);
+    await runMigrations(ok.run);
+    expect(ok.issued).toContain(alter);
+
+    await expect(runMigrations(required(true).run)).rejects.toThrow("permission denied");
+  });
+
+  it("skips a unique index that existing duplicates prevent, and only for that error", async () => {
+    const statements = await statementsOfARun();
+    const uniqueIndexes = statements.filter(
+      (sql) =>
+        sql.startsWith("CREATE UNIQUE INDEX") && !sql.includes("capture_jobs_active_key_idx"),
+    );
+    expect(uniqueIndexes.length).toBeGreaterThanOrEqual(3);
+
+    for (const target of uniqueIndexes) {
+      // oxlint-disable-next-line no-await-in-loop -- one statement at a time
+      await expect(
+        runMigrations(failing(target, Object.assign(new Error("duplicate"), { code: "23505" }))),
+      ).resolves.toBeUndefined();
+      // oxlint-disable-next-line no-await-in-loop -- see above
+      await expect(
+        runMigrations(failing(target, Object.assign(new Error("denied"), { code: "42501" }))),
+      ).rejects.toThrow("denied");
+    }
+  });
+
+  it("never skips the single-flight index, even for a unique violation", async () => {
+    const index = (await statementsOfARun()).find((sql) =>
+      sql.includes("capture_jobs_active_key_idx ON"),
+    );
+
+    await expect(
+      runMigrations(failing(index ?? "", Object.assign(new Error("dup"), { code: "23505" }))),
+    ).rejects.toThrow("dup");
+  });
+
+  it("builds the design-link index when the rows allow it and leaves it out when they repeat", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      DROP INDEX design_links_project_import_path_idx;
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO design_links (id, project_id, import_path, url, created_at, updated_at)
+        VALUES ('d1', 'p', './A.tsx', 'u1', now(), now()), ('d2', 'p', './A.tsx', 'u2', now(), now());
+    `);
+
+    const error = vi.fn();
+
+    await expect(runMigrations(run, { error } as never)).resolves.toBeUndefined();
+
+    const indexes = await client.query<{ indexname: string }>(
+      "SELECT indexname FROM pg_indexes WHERE tablename = 'design_links'",
+    );
+    expect(indexes.rows.map((row) => row.indexname)).not.toContain(
+      "design_links_project_import_path_idx",
+    );
+    // Said once, with the table, index and number of repeated keys, never a row's contents.
+    expect(error).toHaveBeenCalledOnce();
+    const [fields, message] = error.mock.calls[0] as [Record<string, unknown>, string];
+    expect(fields).toEqual({
+      table: "design_links",
+      index: "design_links_project_import_path_idx",
+      duplicateGroups: 1,
+    });
+    expect(message).toContain("created on the next boot");
+    expect(message).not.toContain("u1");
+
+    // Clean the data: the next boot creates the index and says nothing more.
+    await client.exec("DELETE FROM design_links WHERE id = 'd2'");
+    error.mockClear();
+    await runMigrations(run, { error } as never);
+    const after = await client.query<{ indexname: string }>(
+      "SELECT indexname FROM pg_indexes WHERE tablename = 'design_links'",
+    );
+    expect(after.rows.map((row) => row.indexname)).toContain(
+      "design_links_project_import_path_idx",
+    );
+    expect(error).not.toHaveBeenCalled();
+    await client.close();
   }, 60_000);
 });
