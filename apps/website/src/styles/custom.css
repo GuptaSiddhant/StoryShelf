@@ -205,3 +205,26 @@ h1#_top,
     display: none;
   }
 }
+
+/* --- API reference (starlight-openapi) ------------------------------------ */
+/*
+ * The plugin paints its example code on the mid-grey panel colour, but the syntax token colours are
+ * chosen for the docs' own code background and fall below 4.5:1 on it. Use the same background as
+ * every other code block.
+ */
+:root[data-theme="light"] .sl-openapi-examples .sl-openapi-example div.expressive-code .frame pre {
+  background-color: var(--sl-color-gray-7);
+}
+:root[data-theme="dark"] .sl-openapi-examples .sl-openapi-example div.expressive-code .frame pre {
+  background-color: var(--sl-color-gray-6);
+}
+/* The "required" label is Starlight's red, which is 2.8:1 on the light property panel. */
+:root[data-theme="light"] .sl-openapi-key-required {
+  color: #b0103a;
+}
+/* A long path wraps instead of scrolling inside its box, so it needs no keyboard stop. */
+:root .sl-openapi-operation-method-path {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}

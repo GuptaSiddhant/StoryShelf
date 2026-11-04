@@ -9,7 +9,7 @@ const section = sectionOf(Astro.url.pathname, base);
 const links = sectionLinks(base);
 ---
 
-<nav class="header-links" aria-label="Main">
+<nav class="header-links" aria-label="Site">
   {
     links.map((l) => (
       <a href={l.href} aria-current={l.section === section ? "true" : undefined}>

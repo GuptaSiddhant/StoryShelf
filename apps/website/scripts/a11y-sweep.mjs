@@ -158,10 +158,16 @@ async function runMode(browser, base, mode, paths) {
   const page = await context.newPage();
   const results = [];
   for (const path of paths) {
-    try {
-      results.push(await audit(page, base, mode, path));
-    } catch (error) {
-      results.push({ mode: mode.name, path, error: String(error).slice(0, 120) });
+    // One retry: a navigation can be interrupted when the machine is busy.
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        results.push(await audit(page, base, mode, path));
+        break;
+      } catch (error) {
+        if (attempt === 2) {
+          results.push({ mode: mode.name, path, error: String(error).slice(0, 400) });
+        }
+      }
     }
   }
   await context.close();
