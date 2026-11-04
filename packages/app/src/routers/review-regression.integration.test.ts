@@ -1,4 +1,4 @@
-import { BuildModel, MemberModel, TokenModel } from "@storyshelf/core/models";
+import { BuildModel, BuildReviewModel, MemberModel, TokenModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sha256, storybookDir } from "@storyshelf/core/utils";
@@ -290,6 +290,19 @@ describe("the verdict form while publishing", () => {
     const ready = await page(booted, "alice", `/builds/${id}`);
     expect(ready).not.toContain("Waiting for the Storybook to publish");
     expect(ready).not.toMatch(/<button[^>]*disabled[^>]*value="approved"/u);
+  });
+});
+
+describe.each(CHANNELS)("a sign-off on a failed build through the %s (testing on)", (channel) => {
+  it("is refused and leaves the build failed, with no verdict stored", async () => {
+    const booted = await boot({ testing: true });
+    const id = await createBuild(booted);
+    await new BuildModel(booted.db).setStatus(id, "failed");
+    const given = await give(booted, channel, id, { user: "alice" });
+    expect(given.status).toBe(409);
+    expect(given.text).toContain("failed");
+    expect(await statusOf(booted, id)).toBe("failed");
+    expect(await new BuildReviewModel(booted.db).listByBuild(id)).toEqual([]);
   });
 });
 

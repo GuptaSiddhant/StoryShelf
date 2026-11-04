@@ -794,6 +794,21 @@ describe("review events", () => {
     });
   });
 
+  it("raises no review:requested with testing on, for the publish or for a sign-off", async () => {
+    const booted = await boot({ testing: true });
+    await withChannel(booted);
+    const id = await publish(booted, "feature/x");
+    await vi.waitFor(() => expect(events(booted)).toContain("build:created"));
+    const given = await booted.api("alice", `/builds/${id}/reviews`, {
+      method: "POST",
+      body: JSON.stringify({ verdict: "approved" }),
+    });
+    expect(given.status).toBe(201);
+    // `review:verdict` is raised after the sign-off is stored, so a request would be in by now.
+    await vi.waitFor(() => expect(events(booted)).toContain("review:verdict"));
+    expect(reviewRequests(booted)).toBe(0);
+  });
+
   it("raises build:pending when a rewritten verdict sends the build back to pending", async () => {
     const booted = await boot({ project: { reviewApprovals: 2 } });
     await withChannel(booted);
