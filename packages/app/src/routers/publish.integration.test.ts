@@ -40,8 +40,17 @@ beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-publish-flow-"));
 });
 afterEach(async () => {
-  await Promise.all(teardowns.splice(0).map(async (teardown) => await teardown()));
-  await rm(scratchDir, { recursive: true, force: true });
+  try {
+    const outcomes = await Promise.allSettled(
+      teardowns.splice(0).map(async (teardown) => await teardown()),
+    );
+    const failed = outcomes.find((outcome) => outcome.status === "rejected");
+    if (failed?.status === "rejected") {
+      throw failed.reason;
+    }
+  } finally {
+    await rm(scratchDir, { recursive: true, force: true });
+  }
 });
 
 async function boot(config: Record<string, unknown> = {}) {
@@ -53,10 +62,11 @@ async function boot(config: Record<string, unknown> = {}) {
     logger: silentLogger,
     config: { scratchDir, ...config },
   });
-  await app.lifecycle.setup();
+  // Registered before setup, so a setup that fails half-way is still torn down.
   teardowns.push(async () => {
     await app.lifecycle.teardown();
   });
+  await app.lifecycle.setup();
   const response = await app.request("/api/v1/projects", {
     method: "POST",
     headers: { "content-type": "application/json" },
