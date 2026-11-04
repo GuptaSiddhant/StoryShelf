@@ -39,34 +39,41 @@ export interface AssignedOwner {
 export const MAX_PATTERN_LENGTH = 200;
 export const MAX_PATTERN_WILDCARDS = 8;
 
-/** Regex-special characters escaped when a glob is translated. */
-const REGEX_SPECIALS = new Set(["+", "^", "$", "{", "}", "(", ")", "|", "[", "]", "\\", "."]);
+/** One piece of a glob. */
+type Token =
+  | { kind: "literal"; char: string }
+  | { kind: "one" }
+  | { kind: "star" }
+  | { kind: "globstar" }
+  | { kind: "folders" };
 
 /**
  * A single star stays within a folder; a double star crosses folders. A double star followed by a
- * slash also matches no folder at all, so a pattern like `src/<double star>/Button.stories.tsx`
+ * slash (`folders`) also matches no folder at all, so a pattern like `src/<double star>/Button.stories.tsx`
  * matches `src/Button.stories.tsx`, and a leading one matches a file at the root.
  */
-function starToken(pattern: string, index: number): { text: string; advance: number } {
-  if (pattern[index + 1] !== "*") {
-    return { text: "[^/]*", advance: 1 };
+function tokenize(glob: string): Token[] {
+  const tokens: Token[] = [];
+  let index = 0;
+  while (index < glob.length) {
+    const next = nextToken(glob, index);
+    tokens.push(next.token);
+    index += next.advance;
   }
-  return pattern[index + 2] === "/" ? { text: "(?:.*/)?", advance: 3 } : { text: ".*", advance: 2 };
+  return tokens;
 }
 
-/** Translate the glob token at `index` into regex text and how far to advance. */
-function translateToken(pattern: string, index: number): { text: string; advance: number } {
-  const char = pattern[index];
+/** The token that starts at `index` and how many characters it spans. */
+function nextToken(glob: string, index: number): { token: Token; advance: number } {
+  const char = glob.charAt(index);
+  if (char === "*" && glob.charAt(index + 1) === "*") {
+    const folders = glob.charAt(index + 2) === "/";
+    return { token: { kind: folders ? "folders" : "globstar" }, advance: folders ? 3 : 2 };
+  }
   if (char === "*") {
-    return starToken(pattern, index);
+    return { token: { kind: "star" }, advance: 1 };
   }
-  if (char === "?") {
-    return { text: "[^/]", advance: 1 };
-  }
-  return {
-    text: char !== undefined && REGEX_SPECIALS.has(char) ? `\\${char}` : (char ?? ""),
-    advance: 1,
-  };
+  return { token: char === "?" ? { kind: "one" } : { kind: "literal", char }, advance: 1 };
 }
 
 /**
@@ -78,21 +85,79 @@ function normalizePattern(pattern: string): string {
   return bare.endsWith("/") ? `${bare}**` : bare;
 }
 
+/** Whether the token at `state` can match nothing, so matching can move on without a character. */
+function canSkip(tokens: readonly Token[], state: number): boolean {
+  const kind = tokens[state]?.kind;
+  return kind === "star" || kind === "globstar" || kind === "folders";
+}
+
+/** Add every state reachable without consuming a character. */
+function close(tokens: readonly Token[], states: Set<number>): Set<number> {
+  const pending = [...states];
+  for (let state = pending.pop(); state !== undefined; state = pending.pop()) {
+    if (canSkip(tokens, state) && !states.has(state + 1)) {
+      states.add(state + 1);
+      pending.push(state + 1);
+    }
+  }
+  return states;
+}
+
+/**
+ * The states after reading `char` in `state`. States up to `tokens.length` are positions in the
+ * glob; a state above it is the "any folders" run of the token `state - tokens.length - 1`.
+ */
+function step(tokens: readonly Token[], state: number, char: string): number[] {
+  const token = tokens[state];
+  if (token !== undefined) {
+    return stepToken(tokens, state, token, char);
+  }
+  if (state === tokens.length) {
+    return [];
+  }
+  return char === "/" ? [state - tokens.length, state] : [state];
+}
+
+function stepToken(tokens: readonly Token[], state: number, token: Token, char: string): number[] {
+  switch (token.kind) {
+    case "literal": {
+      return char === token.char ? [state + 1] : [];
+    }
+    case "one": {
+      return char === "/" ? [] : [state + 1];
+    }
+    case "star": {
+      return char === "/" ? [] : [state];
+    }
+    case "globstar": {
+      return [state];
+    }
+    default: {
+      // Folders: the char is part of the run, and a slash may end it.
+      const run = tokens.length + 1 + state;
+      return char === "/" ? [run, state + 1] : [run];
+    }
+  }
+}
+
 /**
  * A matcher for one glob (`*` within a folder, `**` across folders, `?`), compiled once so it can
- * be tried against many story files.
+ * be tried against many story files. It follows every way the glob can match at once, so the work
+ * is bounded by the glob's length times the path's, whatever wildcards the glob has: a pattern an
+ * admin writes cannot make a near-match path slow.
  */
 export function compileOwnerPattern(pattern: string): (path: string) => boolean {
-  const glob = normalizePattern(pattern);
-  const parts: string[] = [];
-  let index = 0;
-  while (index < glob.length) {
-    const token = translateToken(glob, index);
-    parts.push(token.text);
-    index += token.advance;
-  }
-  const expression = new RegExp(`^${parts.join("")}$`, "u");
-  return (path) => expression.test(path.replace(/^\.?\//u, ""));
+  const tokens = tokenize(normalizePattern(pattern));
+  return (path) => {
+    let states = close(tokens, new Set([0]));
+    for (const char of path.replace(/^\.?\//u, "")) {
+      states = close(tokens, new Set([...states].flatMap((state) => step(tokens, state, char))));
+      if (states.size === 0) {
+        return false;
+      }
+    }
+    return states.has(tokens.length);
+  };
 }
 
 /** Whether a story file path matches a glob. */

@@ -287,6 +287,7 @@ describe("the review request", () => {
   });
 
   it("sends each owner one message per review cycle, however often publishing completes", async () => {
+    const claim = vi.spyOn(BuildModel.prototype, "claimReviewRequest");
     const booted = await boot({
       componentOwners: JSON.stringify([{ pattern: "src/forms/**", owners: ["dev", "alice"] }]),
     });
@@ -299,12 +300,14 @@ describe("the review request", () => {
       body: new Uint8Array(storybookZip()),
     });
     expect(again.status).toBe(202);
-    await new Promise((resolve) => {
-      setTimeout(resolve, 100);
-    });
+    // The second completion reached the claim, and the cycle was already taken.
+    await vi.waitFor(() => expect(claim).toHaveBeenCalledTimes(2));
+    expect(await claim.mock.results[0]?.value).toBeTruthy();
+    expect(await claim.mock.results[1]?.value).toBeFalsy();
     expect(mailsTo(booted, "dev")).toHaveLength(1);
     expect(mailsTo(booted, "alice")).toHaveLength(1);
     expect(mailsTo(booted, "bob")).toHaveLength(1);
+    claim.mockRestore();
   });
 
   it("reaches an assigned owner who opted out of the default email", async () => {

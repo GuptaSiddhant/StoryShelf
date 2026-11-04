@@ -30,12 +30,31 @@ describe("matchesOwnerPattern", () => {
     ["src/**/Button.stories.tsx", "src/a/b/Button.stories.tsx", true],
     ["src/**/Button.stories.tsx", "srcX/Button.stories.tsx", false],
     ["src/**/Button.stories.tsx", "src/Card.stories.tsx", false],
+    ["a", "ab", false],
+    ["a", "a", true],
+    ["src/forms", "src/forms/Input.tsx", false],
+    ["**", "any/deep/file.tsx", true],
+    ["*.tsx", "dir/file.tsx", false],
+    ["**/**/x", "x", true],
+    ["a/**/b/**/c", "a/q/b/r/s/c", true],
+    ["a/**/b/**/c", "a/b/c", true],
+    ["a/**/b/**/c", "a/q/c", false],
   ])("%s on %s is %s", (pattern, path, expected) => {
     expect(matchesOwnerPattern(pattern, path)).toBe(expected);
   });
 });
 
 describe("compileOwnerPattern", () => {
+  it("answers a near-match path in linear time, however the wildcards nest", () => {
+    // Regex engines backtrack on this: eight stars over a long path that almost matches.
+    const matches = compileOwnerPattern("a*a*a*a*a*a*a*a*b.stories.tsx");
+    const started = performance.now();
+
+    expect(matches(`${"a".repeat(2000)}b.stories.ts`)).toBe(false);
+    expect(matches(`${"a".repeat(2000)}b.stories.tsx`)).toBe(true);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
   it("gives the same answers as matchesOwnerPattern, for many paths", () => {
     const matches = compileOwnerPattern("src/forms/**");
 
