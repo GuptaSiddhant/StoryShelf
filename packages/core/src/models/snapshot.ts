@@ -62,6 +62,7 @@ export class SnapshotModel {
       browser: input.browser ?? DEFAULT_BROWSER,
       durationMs: input.durationMs ?? null,
       a11yViolations: input.a11yViolations ?? null,
+      unstable: null,
       status: "pending",
       createdAt: now,
       updatedAt: now,

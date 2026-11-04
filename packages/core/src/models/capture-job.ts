@@ -47,6 +47,9 @@ const KEYED_INSERT_TRIES = 3;
 /** Statuses of rows the poll may claim: a queued job, or a running attempt whose lease ran out. */
 const CANDIDATE_STATUSES = ["queued", "running"];
 
+/** Statuses of unfinished jobs the queue views list: candidates plus a job running its exhausted-job hook. */
+const ACTIVE_STATUSES = [...CANDIDATE_STATUSES, "exhausting"];
+
 /**
  * Data operations of the database queue. Writes are unconditional updates by id or inserts; the
  * atomic primitives are the unique-key insert of an attempt row ({@link claim}), which fences
@@ -226,12 +229,54 @@ export class CaptureJobModel {
   }
 
   /**
+   * The last attempt lost its lease: the job row records that the exhausted-job hook runs as
+   * `attempt` (numbered after the allowed attempts, so it also counts the runs) and leaves the
+   * poll's range; the hook run's own attempt row carries the lease. Conditional on the job being
+   * unfinished (a late `done` is never overwritten) and on no later run having been recorded: false
+   * when it did not apply.
+   */
+  async markExhausting(
+    jobId: string,
+    attempt: number,
+    error: string,
+    now: string,
+  ): Promise<boolean> {
+    const row = (await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      { status: "exhausting", attempt, visibleAt: null, error, updatedAt: now },
+      // A superseded run (a lower number) writes nothing.
+      allOf(inArray(this.#c.status, ACTIVE_STATUSES), lt(this.#c.attempt, attempt)),
+    )) as unknown as CaptureJobRow | null;
+    // `updateWhere` returns the row either way; only our write leaves it exhausting at our run.
+    return row?.status === "exhausting" && row.attempt === attempt;
+  }
+
+  /** End a job row for good unless it already ended (a late `done` or a cancel keeps its outcome). */
+  async finishOpenJob(
+    jobId: string,
+    status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">,
+    now: string,
+    error: string | null = null,
+  ): Promise<void> {
+    // Ending the job frees its `activeKey` in the same write; until then (while `exhausting`
+    // included) the key stays held, so no second job for it can start.
+    const patch = { status, visibleAt: null, activeKey: null, finishedAt: now, updatedAt: now };
+    await this.#db.updateWhere(
+      this.#table,
+      jobId,
+      error === null ? patch : { ...patch, error },
+      inArray(this.#c.status, ACTIVE_STATUSES),
+    );
+  }
+
+  /**
    * End a job row for good. The same statement frees its `activeKey`, so a later request for the
    * key creates a new job; there is no moment where the job is over but still holds the key.
    */
   async finishJob(
     jobId: string,
-    status: Exclude<CaptureJobStatus, "queued" | "running">,
+    status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">,
     now: string,
     error: string | null = null,
   ): Promise<void> {
@@ -286,13 +331,13 @@ export class CaptureJobModel {
     return rows.toSorted((a, b) => a.attempt - b.attempt);
   }
 
-  /** Job rows of `kinds` that are queued or running, oldest first. */
+  /** Job rows of `kinds` that are unfinished (queued, running or exhausting), oldest first. */
   async listActive(kinds: readonly CaptureJobKind[]): Promise<CaptureJobRow[]> {
     const rows = (await this.#db.list(this.#table, {
       where: and(
         jobEntries(this.#c),
         kindFilter(this.#c, kinds),
-        inArray(this.#c.status, CANDIDATE_STATUSES),
+        inArray(this.#c.status, ACTIVE_STATUSES),
       ),
     })) as unknown as CaptureJobRow[];
     return rows.toSorted(byCreation);
@@ -386,6 +431,7 @@ interface JobColumns {
   activeKey: Column;
   rerunRequestedAt: Column;
   status: Column;
+  attempt: Column;
   visibleAt: Column;
   createdAt: Column;
 }
@@ -400,6 +446,7 @@ function jobColumns(table: Table): JobColumns {
     activeKey: col(table, "activeKey"),
     rerunRequestedAt: col(table, "rerunRequestedAt"),
     status: col(table, "status"),
+    attempt: col(table, "attempt"),
     visibleAt: col(table, "visibleAt"),
     createdAt: col(table, "createdAt"),
   };

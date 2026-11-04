@@ -2,6 +2,7 @@
 import type { Build, Comment, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Badge,
   Button,
@@ -11,8 +12,7 @@ import {
   TextareaField,
   VStack,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
-import { CommentCard } from "./build-diff-comments.tsx";
+import { CommentCard, RequestChangeField } from "./build-diff-comments.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -21,7 +21,7 @@ type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 /** Comments on the build as a whole and on its stories, with a form for a build comment. */
 export function CommentsCard(props: { data: ReviewSectionData }): Rendered {
   const { data } = props;
-  const { project, build, comments, canComment } = data;
+  const { project, build, comments, canComment, canTriage, names } = data;
   return (
     <Card>
       <SectionTitle>Comments</SectionTitle>
@@ -40,7 +40,8 @@ export function CommentsCard(props: { data: ReviewSectionData }): Rendered {
             project={project}
             build={build}
             comment={comment}
-            canReview={canComment}
+            canTriage={canTriage}
+            names={names}
             anchor={
               <Badge tone="neutral">{comment.storyId ? `story ${comment.storyId}` : "build"}</Badge>
             }
@@ -59,8 +60,10 @@ export function StoryComments(props: {
   storyId: string;
   comments: readonly Comment[];
   canComment: boolean;
+  canTriage: boolean;
+  names?: ReadonlyMap<string, string>;
 }): Rendered {
-  const { project, build, storyId, canComment } = props;
+  const { project, build, storyId, canComment, canTriage, names } = props;
   const comments = props.comments.filter((comment) => comment.storyId === storyId);
   return (
     <Card id="story-comments">
@@ -74,7 +77,8 @@ export function StoryComments(props: {
             project={project}
             build={build}
             comment={comment}
-            canReview={canComment}
+            canTriage={canTriage}
+            names={names}
           />
         ))}
       </VStack>
@@ -105,6 +109,7 @@ function CommentForm(props: {
             storyId ? "Leave a comment on this story…" : "Leave a comment on this build…"
           }
         />
+        <RequestChangeField id={storyId ? "story-request-change" : "build-request-change"} />
         <div>
           <Button variant="primary" type="submit">
             Comment

@@ -4,6 +4,7 @@ import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { loadHealthPanel, type HealthPanelData } from "../insights/health-panel.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { catalogOf, getStore, testingEnabled } from "../store.ts";
 import {
   Button,
@@ -16,7 +17,6 @@ import {
   statusTone,
   Badge,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { ProjectDesignLinks } from "./design-links.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 import { LibraryGrid } from "./library-grid.tsx";
@@ -190,6 +190,11 @@ function LibraryHeader(props: {
           <Button variant="ghost" size="sm" icon="external-link" href={urls.short(build.id)}>
             View Storybook
           </Button>
+          {getStore().design.length > 0 ? (
+            <Button variant="ghost" size="sm" href={urls.designCoverage(project.slug)}>
+              Design coverage
+            </Button>
+          ) : null}
           <BranchPicker project={project} build={build} branches={props.branches} />
         </HStack>
       }

@@ -26,6 +26,7 @@ import {
   fingerprintHash,
   mergeFingerprint,
   parseFingerprint,
+  unknownFields,
   type EnvironmentChange,
   type Fingerprint,
 } from "./fingerprint.ts";
@@ -47,12 +48,15 @@ export const PERSIST_CONCURRENCY = 4;
  * (blocking failures). They force the build to `failed`.
  * @param flakyFailedStoryIds - Story ids that failed but are marked flaky
  * (non-blocking). They are logged as warnings and do not block the build.
+ * @param beforeFinalize - Runs after every snapshot row exists and before the build is finalized
+ * (the stability pass), so what it records is there when the build is announced.
  */
 export async function persistCapture(
   input: CaptureContext,
   renderFailedStoryIds: ReadonlySet<string> = new Set(),
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
   a11yFailedStoryIds: ReadonlySet<string> = new Set(),
+  beforeFinalize?: () => Promise<void>,
 ): Promise<void> {
   const sets = await persistRendered(
     input,
@@ -63,6 +67,7 @@ export async function persistCapture(
   for (const id of await persistInherited(input)) {
     sets.failed.add(id);
   }
+  await beforeFinalize?.();
   await finalizeBuild(input, allStoryIds(input), sets.failed, sets.flaky, sets.a11y);
 }
 
@@ -474,7 +479,16 @@ function environmentChange(baseline: Baseline, now: CaptureFingerprint): Environ
     return null;
   }
   const changed = changedFields(from, now.fingerprint);
-  return changed.length > 0 ? { changed, from, to: now.fingerprint } : null;
+  const unknown = unknownFields(from, now.fingerprint);
+  if (changed.length === 0 && unknown.length === 0) {
+    return null;
+  }
+  return {
+    changed,
+    ...(unknown.length > 0 ? { unknown } : {}),
+    from,
+    to: now.fingerprint,
+  };
 }
 
 /**
@@ -501,7 +515,8 @@ async function createWithBaseline(
     sourceSnapshotId: await sourceSnapshotId(ctx.db, baseline),
   });
   const input = { ctx, capture, viewport, screenshot, baseline, now, change, comparison };
-  if (change && ctx.build.isDefault) {
+  // Components measured differently across versions are only recorded as unknown, never migrated.
+  if (change && change.changed.length > 0 && ctx.build.isDefault) {
     await persistMigration(input, change);
   } else {
     await persistDiff(input);

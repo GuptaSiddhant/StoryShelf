@@ -32,4 +32,18 @@ describe("createProgram", () => {
     expect(createProgram().version()).toBe(cliVersion() ?? "0.0.0-dev");
     expect(createProgram().version()).not.toBe("0.2.0");
   });
+
+  it.each(["upload", "build"])(
+    "leaves buildStats unset on `%s` unless the flag is given, so the config file decides",
+    (name) => {
+      const command = createProgram().commands.find((candidate) => candidate.name() === name);
+      expect(command).toBeDefined();
+      command?.parseOptions([]);
+      expect(command?.opts()["buildStats"]).toBeUndefined();
+      command?.parseOptions(["--no-build-stats"]);
+      expect(command?.opts()["buildStats"]).toBe(false);
+      command?.parseOptions(["--build-stats"]);
+      expect(command?.opts()["buildStats"]).toBe(true);
+    },
+  );
 });

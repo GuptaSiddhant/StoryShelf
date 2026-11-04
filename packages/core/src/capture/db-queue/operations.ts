@@ -45,7 +45,11 @@ function viewKinds(rt: QueueRuntime): readonly CaptureJobKind[] {
 
 /** `CaptureQueue.enqueue`: a capture job for a build or one of its shards. */
 export async function enqueueCapture(rt: QueueRuntime, job: CaptureJob): Promise<void> {
-  await enqueueJob(rt, { ...job, kind: "capture" });
+  const jobId = await enqueueJob(rt, { ...job, kind: "capture" });
+  if (job.shard === undefined) {
+    // The build's own run (not a shard of it) owns the build until it is reset.
+    await rt.builds.stampCaptureJob(job.buildId, jobId);
+  }
 }
 
 /** The build's own job most recently queued, as a queue entry. */

@@ -7,6 +7,7 @@ import type {
 } from "../../adapters/capture-queue.ts";
 import type { AdapterLifecycle } from "../../adapters/metadata.ts";
 import type { Logger } from "../../logger.ts";
+import type { BuildModel } from "../../models/build.ts";
 import type { CaptureJobModel } from "../../models/capture-job.ts";
 import type { CaptureJobKind } from "../../schema/capture-job.ts";
 import type { QueueTimers } from "./timers.ts";
@@ -29,11 +30,17 @@ export interface DatabaseCaptureQueueOptions {
   /** Explicit logger override; the host normally binds one through `setLogger`. */
   logger?: Logger;
   /**
-   * Called after a job failed because its last attempt lost its lease: nothing was running to
-   * record the failure, so the host writes it (a build left `capturing`). May run on every
-   * instance that finds the job, so it must be idempotent; a throw is logged and ignored.
+   * Called after a job's last attempt lost its lease: nothing was running to record the failure, so
+   * the host writes it (a build left `capturing`). The job is `exhausting` meanwhile; a throw leaves
+   * it so, and once the hook's lease ends any instance runs it again, up to five runs in total
+   * (`MAX_HOOK_RUNS`). It may therefore run on several instances and must be idempotent.
    */
   onExhausted?: (job: DatabaseJob, error: string) => Promise<void>;
+  /**
+   * Called once the hook has failed `MAX_HOOK_RUNS` times: the job fails regardless, so this
+   * is the host's chance to tell an operator the work behind it may be stuck. Best effort.
+   */
+  onAbandoned?: (job: DatabaseJob, error: string) => Promise<void>;
 }
 
 /** Default lease per attempt: long enough for a slow stage, short enough to recover a crash. */
@@ -96,6 +103,8 @@ export interface DatabaseCaptureQueue extends PollableCaptureQueue {
 /** State shared by the queue's modules. */
 export interface QueueRuntime {
   model: CaptureJobModel;
+  /** Stamps the build a capture job was queued for ({@link BuildModel.stampCaptureJob}). */
+  builds: BuildModel;
   kinds: readonly CaptureJobKind[];
   leaseMs: number;
   maxAttempts: number;
@@ -107,6 +116,7 @@ export interface QueueRuntime {
   pollVersion: number;
   logger?: Logger;
   onExhausted?: DatabaseCaptureQueueOptions["onExhausted"];
+  onAbandoned?: DatabaseCaptureQueueOptions["onAbandoned"];
 }
 
 /** The capture-shaped job `enqueue` takes, re-exported for the modules. */

@@ -8,14 +8,11 @@ import { attemptRowId, isTerminalJob } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { isoAt } from "./clock.ts";
 import { toDatabaseJob } from "./codec.ts";
-import { finishJob } from "./single-flight.ts";
+import { exhaust } from "./exhaust.ts";
 import type { DatabaseJob, QueueRuntime } from "./types.ts";
 
 /** Candidates tried per poll when other instances win the race for them. */
 const MAX_CLAIM_TRIES = 3;
-
-/** Error recorded on a job whose last allowed attempt lost its lease. */
-export const LEASE_EXHAUSTED_ERROR = "lease expired on the final attempt";
 
 /** Probe once and claim the job found; on a lost race, try the next candidate (a few times). */
 export async function claimNext(rt: QueueRuntime): Promise<DatabaseJob | null> {
@@ -63,7 +60,7 @@ async function claimNextAttempt(
   // An attempt row ahead of its job row belongs to a claimer that died before marking the job.
   const made = Math.max(job.attempt, stale?.attempt ?? 0);
   if (made >= job.maxAttempts) {
-    await exhaust(rt, job, stale);
+    await exhaust(rt, job, stale, made);
     return null;
   }
   return await claimAttempt(rt, job, made + 1, stale);
@@ -141,59 +138,4 @@ async function retire(rt: QueueRuntime, stale: CaptureJobRow | null): Promise<vo
   }
 }
 
-/**
- * The final attempt lost its lease: the job fails (one limit covers failed attempts and lost
- * leases). Idempotent, so two instances finding the same row write the same outcome. If the late
- * holder finished after all, its `done` wins.
- */
-async function exhaust(
-  rt: QueueRuntime,
-  job: CaptureJobRow,
-  stale: CaptureJobRow | null,
-): Promise<void> {
-  if (stale !== null && (await rt.model.get(stale.id))?.status === "done") {
-    await finishJob(rt, job, "done");
-    return;
-  }
-  await retire(rt, stale);
-  await finishJob(rt, job, "failed", LEASE_EXHAUSTED_ERROR);
-  rt.logger?.warn({ jobId: job.jobId, attempts: job.attempt }, "job failed: lease exhausted");
-  await reportExhausted(rt, job);
-}
-
-/** Sleep for `ms`, using injected timers when available. */
-async function sleep(rt: QueueRuntime, ms: number): Promise<void> {
-  if (rt.timers === undefined) {
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, ms);
-    });
-    return;
-  }
-  await new Promise<void>((resolve) => {
-    rt.timers?.setTimeout(resolve, ms);
-  });
-}
-
-/** Tell the host a job ended without any holder to record it; its failure never blocks the poll. */
-async function reportExhausted(rt: QueueRuntime, job: CaptureJobRow): Promise<void> {
-  if (rt.onExhausted === undefined) {
-    return;
-  }
-  const attempts = 3;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential retries
-      await rt.onExhausted(toDatabaseJob(job, job.attempt, rt.leaseMs), LEASE_EXHAUSTED_ERROR);
-      return;
-    } catch (error) {
-      rt.logger?.error(
-        { err: error, jobId: job.jobId, attempt, attempts },
-        "exhausted-job hook failed",
-      );
-      if (attempt < attempts) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- sequential retries
-        await sleep(rt, 100 * attempt);
-      }
-    }
-  }
-}
+export { LEASE_EXHAUSTED_ERROR } from "./exhaust.ts";

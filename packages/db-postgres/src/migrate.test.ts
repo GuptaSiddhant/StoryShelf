@@ -102,6 +102,31 @@ describe("runMigrations: builds and projects gain later columns", () => {
   }, 60_000);
 });
 
+describe("runMigrations: builds gain the review cycle columns", () => {
+  it("adds review_cycle (default 0) and review_requested_cycle (null) to older builds", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, created_at, updated_at)
+        VALUES ('b', 'p', 'abc', 'main', now(), now());
+      ALTER TABLE builds DROP COLUMN review_cycle;
+      ALTER TABLE builds DROP COLUMN review_requested_cycle;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const build = await client.query<{
+      review_cycle: number;
+      review_requested_cycle: number | null;
+    }>("SELECT review_cycle, review_requested_cycle FROM builds WHERE id = 'b'");
+    expect(build.rows).toEqual([{ review_cycle: 0, review_requested_cycle: null }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: review, a11y, comment and notification columns", () => {
   it("back-fills every later column on older tables with the current defaults", async () => {
     const client = new PGlite();
@@ -118,6 +143,9 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
       ALTER TABLE snapshots DROP COLUMN duration_ms;
       ALTER TABLE snapshots DROP COLUMN a11y_violations;
       ALTER TABLE comments DROP COLUMN story_id;
+      ALTER TABLE comments DROP COLUMN kind;
+      ALTER TABLE comments DROP COLUMN resolved_at;
+      ALTER TABLE comments DROP COLUMN resolved_by;
       ALTER TABLE notification_channels DROP COLUMN last_error;
       ALTER TABLE notification_channels DROP COLUMN last_error_at;
     `);
@@ -145,11 +173,14 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
     const columns = await client.query<{ table_name: string; column_name: string }>(`
       SELECT table_name, column_name FROM information_schema.columns
       WHERE (table_name = 'snapshots' AND column_name IN ('duration_ms', 'a11y_violations'))
-         OR (table_name = 'comments' AND column_name = 'story_id')
+         OR (table_name = 'comments' AND column_name IN ('story_id', 'kind', 'resolved_at', 'resolved_by'))
          OR (table_name = 'notification_channels' AND column_name IN ('last_error', 'last_error_at'))
       ORDER BY table_name, column_name
     `);
     expect(columns.rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([
+      "comments.kind",
+      "comments.resolved_at",
+      "comments.resolved_by",
       "comments.story_id",
       "notification_channels.last_error",
       "notification_channels.last_error_at",
@@ -336,5 +367,55 @@ describe("runMigrations: capture_jobs single-flight key", () => {
       "permission denied for table capture_jobs",
     );
     await client.close();
+  }, 60_000);
+});
+
+describe("runMigrations: builds.capture_job_id", () => {
+  it("gives a pending or capturing build the newest unfinished capture job of its own", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES
+        ('run', 'p', 'a', 'main', 'capturing', now(), now()),
+        ('old', 'p', 'b', 'main', 'pending', now(), now()),
+        ('none', 'p', 'c', 'main', 'pending', now(), now()),
+        ('cancelled', 'p', 'e', 'main', 'pending', now(), now()),
+        ('tie', 'p', 'f', 'main', 'pending', now(), now()),
+        ('many', 'p', 'g', 'main', 'pending', now(), now()),
+        ('done', 'p', 'd', 'main', 'passed', now(), now());
+      INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, shard_id, status, created_at, updated_at) VALUES
+        ('j1', 'job', 'j1', 'capture', 'run', NULL, 'running', '2026-01-01', '2026-01-01'),
+        ('j1:1', 'attempt', 'j1', 'capture', 'run', NULL, 'running', '2026-01-02', '2026-01-02'),
+        ('j2', 'job', 'j2', 'capture', 'old', NULL, 'failed', '2026-01-01', '2026-01-01'),
+        ('j3', 'job', 'j3', 'capture', 'old', NULL, 'queued', '2026-01-02', '2026-01-02'),
+        ('s1', 'job', 's1', 'capture', 'run', 'shard', 'queued', '2026-01-03', '2026-01-03'),
+        ('j4', 'job', 'j4', 'capture', 'done', NULL, 'queued', '2026-01-01', '2026-01-01'),
+        ('j5', 'job', 'j5', 'capture', 'cancelled', NULL, 'running', '2026-01-01', '2026-01-01');
+      INSERT INTO capture_jobs (id, entry, job_id, kind, build_id, shard_id, status, created_at, updated_at) VALUES
+        ('t1', 'job', 't1', 'capture', 'tie', NULL, 'queued', '2026-01-05', '2026-01-05'),
+        ('t2', 'job', 't2', 'capture', 'tie', NULL, 'queued', '2026-01-05', '2026-01-05'),
+        ('m1', 'job', 'm1', 'capture', 'many', NULL, 'queued', '2026-01-01', '2026-01-01'),
+        ('m2', 'job', 'm2', 'capture', 'many', NULL, 'queued', '2026-01-09', '2026-01-09');
+      UPDATE capture_jobs SET cancel_requested_at = now() WHERE id = 'j5';
+      ALTER TABLE builds DROP COLUMN capture_job_id;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const rows = await client.query<{ id: string; capture_job_id: string | null }>(
+      "SELECT id, capture_job_id FROM builds ORDER BY id",
+    );
+    expect(rows.rows).toEqual([
+      { id: "cancelled", capture_job_id: null },
+      { id: "done", capture_job_id: null },
+      { id: "many", capture_job_id: null },
+      { id: "none", capture_job_id: null },
+      { id: "old", capture_job_id: "j3" },
+      { id: "run", capture_job_id: "j1" },
+      { id: "tie", capture_job_id: null },
+    ]);
   }, 60_000);
 });

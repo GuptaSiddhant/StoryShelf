@@ -190,3 +190,39 @@ describe("DesignNodeModel batching and limits", () => {
     expect(results === null || results.get(FILE)?.state === "ok").toBe(true);
   });
 });
+
+describe("DesignNodeModel.claimChange", () => {
+  const change = { change: "deleted", key: "deleted:1", designVersion: "1" } as const;
+
+  it("lets exactly one of many concurrent callers claim a design version", async () => {
+    const { nodes } = await setup();
+    const node = await nodes.refresh("p1", NODE_A, T0);
+    const claims = await Promise.all(
+      Array.from({ length: 8 }, async () => await nodes.claimChange(node as never, change)),
+    );
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    expect(await nodes.claimChange(node as never, change)).toBe(false);
+  });
+
+  it("claims again for a new design version or a different kind of change", async () => {
+    const { nodes } = await setup();
+    const node = (await nodes.refresh("p1", NODE_A, T0)) as never;
+    expect(await nodes.claimChange(node, change)).toBe(true);
+    expect(await nodes.claimChange(node, { ...change, key: "deleted:2" })).toBe(true);
+    expect(await nodes.claimChange(node, { ...change, key: "modified-after-approval:2" })).toBe(
+      true,
+    );
+    expect(await nodes.claimChange(node, { ...change, key: "deleted:2" })).toBe(true);
+  });
+
+  it("never claims for a member's own-connection row or a missing row", async () => {
+    const { nodes } = await setup();
+    const node = (await nodes.refresh("p1", NODE_A, T0)) as never;
+    expect(await nodes.claimChange({ ...(node as object), viewerId: "u1" } as never, change)).toBe(
+      false,
+    );
+    expect(await nodes.claimChange({ ...(node as object), id: "missing" } as never, change)).toBe(
+      false,
+    );
+  });
+});

@@ -4,5 +4,17 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["server.ts"]
+  "include": [
+    "server.ts",
+    "ai.ts",
+    "ai.test.ts",
+    "vitest.config.ts",
+    "sprite.ts",
+    "sprite.test.ts",
+    "storage.ts",
+    "storage.test.ts",
+    "migrate.ts",
+    "migrate.test.ts",
+    "migrate-to-s3.ts"
+  ]
 }

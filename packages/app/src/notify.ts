@@ -24,6 +24,7 @@ import {
 } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
+import { matchesEvent } from "@storyshelf/core/utils";
 import { credentialKeys } from "./credential-keys.ts";
 import { clearPaused, notificationOrigin, warnPaused } from "./notifications-pause.ts";
 import { getStore } from "./store.ts";
@@ -109,18 +110,26 @@ function recordOutcomes(
   };
 }
 
-/** Subscriptions matching an event (enabled + allowlist). */
+/** Subscriptions matching an event (enabled + allowlist, alias included). */
 function matchingSubs(
   rows: NotificationSubscriptionRow[],
   event: string,
+  data: Record<string, unknown>,
 ): NotificationSubscriptionRow[] {
-  return rows.filter((row) => {
-    if (!row.enabled) {
-      return false;
-    }
-    const events = NotificationSubscriptionModel.eventsOf(row);
-    return events.length === 0 || events.includes(event);
-  });
+  return rows.filter(
+    (row) => row.enabled && matchesEvent(NotificationSubscriptionModel.eventsOf(row), event, data),
+  );
+}
+
+/** Stored channels that admit the event; the core fan-out then needs no filter of its own. */
+function admittedChannels(
+  channels: NotificationChannel[],
+  event: string,
+  data: Record<string, unknown>,
+): NotificationChannel[] {
+  return channels
+    .filter((channel) => matchesEvent(channel.events, event, data))
+    .map((channel) => Object.assign({}, channel, { events: [] }));
 }
 
 /** Per-subscriber targets for one subscription (wired kinds only). */
@@ -147,7 +156,10 @@ async function targetsForSub(
     }));
 }
 
-/** Topics that reach a project's approvers and admins unless they opted out (ADR 0013, decision 4). */
+/**
+ * Topics that reach a project's approvers and admins unless they opted out (ADR 0013, decision 4).
+ * Every other topic (`design:changed` included) reaches only people who subscribed to it.
+ */
 const DEFAULT_ON_EVENTS: ReadonlySet<string> = new Set(["review:requested"]);
 
 /** Roles that review builds: the default recipients of {@link DEFAULT_ON_EVENTS}. */
@@ -196,11 +208,12 @@ async function subscriberTargets(
   db: DatabaseAdapter,
   projectId: string,
   event: string,
+  data: Record<string, unknown>,
   wired: ReadonlySet<string>,
 ): Promise<NotificationChannel[]> {
   const rows = await new NotificationSubscriptionModel(db).list(projectId);
   const nested = await Promise.all(
-    matchingSubs(rows, event).map(async (sub) => await targetsForSub(db, sub, wired)),
+    matchingSubs(rows, event, data).map(async (sub) => await targetsForSub(db, sub, wired)),
   );
   const defaults = DEFAULT_ON_EVENTS.has(event)
     ? await defaultTargets(db, projectId, rows, wired)
@@ -228,8 +241,8 @@ export async function notifyProjectWith(
   }
   const reviewUrl = reviewSuffix ? reviewUrlFor(origin, project.slug, reviewSuffix) : undefined;
   const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
-  const channels = await loadChannels(deps, project.id);
-  const targets = await subscriberTargets(deps.db, project.id, event, wired);
+  const channels = admittedChannels(await loadChannels(deps, project.id), event, data);
+  const targets = await subscriberTargets(deps.db, project.id, event, data, wired);
   await emitNotifications(
     { event, projectId: project.id, projectSlug: project.slug, data, timestamp: now() },
     {

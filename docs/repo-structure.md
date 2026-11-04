@@ -49,8 +49,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
 - `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
 - `@storyshelf/observability` root barrel is runtime-agnostic (`@opentelemetry/api`
-  only); the Node SDK lifecycle lives under `observability/node` and must never
-  be imported under Deno. `core` never imports `observability` (no-cycle rule,
+  only); the Node SDK lifecycle lives under `observability/node`. `core` never imports `observability` (no-cycle rule,
   ADR 0015 §5) — cross-package span/propagation helpers are intentionally
   duplicated, not shared.
 
@@ -70,8 +69,17 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   are the reference implementations.
 - Pages follow the same rule: section components in `<page>-<section>.tsx`
   (`build-diff-header/nav/viewer/comments.tsx`), composed by a thin `<page>.tsx`.
+- Storybook (`packages/app/.storybook/`, `src/**/*.stories.tsx`, `src/stories-fixtures/`) is the
+  design-system showcase: every shared component and the key pages, light and dark, from the real
+  source. `main.ts` aliases a few server-only modules to `.storybook/shims/` (store, csrf, icon sprite,
+  Node built-ins); `render.tsx` renders JSX to HTML like `c.html()`; `page.tsx` shows a page's full
+  document in a frame. It is a dev dependency only: `files` and `exports` are unchanged, nothing
+  story-related is published, and `turbo verify` builds it (`build-storybook`).
 - UI primitives live in `ui/` by family (`buttons`, `feedback`, `forms`, `layout`)
-  behind the `ui/components.tsx` facade — import from the facade.
+  behind the `ui/components.tsx` facade — import from the facade. `ui/` is presentational (no
+  store, routers, middleware, pages or core models; `consistency.test.ts` enforces it). The
+  app-coupled chrome lives in `shell/`: `DocumentLayout`, `csrfField`, the sidebar and top bar,
+  and the boot and client scripts.
 
 ## Test placement
 
@@ -82,12 +90,13 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 
 ## Config ownership
 
-| File                        | Owns                                                                                                |
-| --------------------------- | --------------------------------------------------------------------------------------------------- |
-| `package.json` (root)       | Workspaces list, `catalog` pins (dev tools: TS, tsdown, vitest, oxlint/oxfmt, pino, yaml)           |
-| `nub.jsonc`                 | `source` condition, isolated linker, public hoists                                                  |
-| `turbo.json`                | `build → ^build`; `lint/test/test:integration` need `^build`; `verify = build+lint+test`            |
-| `config/tsconfig.base.json` | Strict TS, `hono/jsx`, `customConditions: ["source"]`                                               |
-| `config/tsdown.ts`          | `libConfig` / `cliConfig`                                                                           |
-| `.oxlintrc.json`            | Rule-based lint (no per-file path exemptions)                                                       |
-| `scripts/`                  | Release/publish tooling only (`release.mjs`, `jsr.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`) |
+| File                                  | Owns                                                                                                                                                                                                                                                        |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.json` (root)                 | Workspaces list, `catalog` pins (dev tools: TS, tsdown, vitest, oxlint/oxfmt, pino, yaml)                                                                                                                                                                   |
+| `nub.jsonc`                           | `source` condition, isolated linker, public hoists                                                                                                                                                                                                          |
+| `turbo.json`                          | `build → ^build`; `lint/test/test:integration` need `^build`; `verify = build+build-storybook+lint+test`                                                                                                                                                    |
+| `config/tsconfig.base.json`           | Strict TS, `hono/jsx`, `customConditions: ["source"]`                                                                                                                                                                                                       |
+| `config/tsdown.ts`                    | `libConfig` / `cliConfig`                                                                                                                                                                                                                                   |
+| `.github/workflows/app-storybook.yml` | Dogfood: builds `packages/app`'s Storybook and uploads it to the demo project `storyshelf-ui` with the published CLI, like a customer (`packages/app/.storybook/storyshelf.json` holds url, slug, `untraced`); separate from `ci.yml` and the Fly demo seed |
+| `.oxlintrc.json`                      | Rule-based lint (no per-file path exemptions)                                                                                                                                                                                                               |
+| `scripts/`                            | Repository automation and tooling (`release.mjs`, `release-detect.mjs`, `version-packages.mjs`, `changeset-add.mjs`, `changeset-check.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`)                                                                     |

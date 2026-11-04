@@ -42,6 +42,7 @@ projects (
   public_branch_regex text,                    -- branches whose builds are publicly viewable (ADR 0010)
   run_a11y            boolean NOT NULL DEFAULT true,   -- axe accessibility checks during capture; results are shown in review and never block (ADR 0004, decision 6)
   run_tests           boolean NOT NULL DEFAULT false,  -- run Storybook 10 `.test()` entries as interaction tests during capture (ADR 0004, decision 10)
+  detect_unstable     boolean NOT NULL DEFAULT true,   -- re-render a changed snapshot once and flag it when the two renders differ (advisory; `capture/stability.ts`)
   review_enabled      boolean NOT NULL DEFAULT true,   -- review on: non-default builds wait for a verdict (ADR 0013, decision 1)
   review_approvals    integer NOT NULL DEFAULT 1,      -- approvals a build needs with `testing` off (ADR 0013, decision 3)
   storybook_url_ttl_seconds integer,           -- lifetime of the signed Storybook URLs of a render; NULL derives it from the build (ADR 0007, decision 5)
@@ -93,6 +94,7 @@ snapshots (
   reviewed_by         text,
   reviewed_at         text,
   a11y_violations     text,                    -- JSON array of the axe violation lines found on this capture (non-blocking); NULL when none or not checked (axe runs on the primary target only; `browser` names the target)
+  unstable            boolean,                 -- true: a second render of this changed snapshot differed from the first (likely flaky); false: it matched; NULL: not re-rendered. Never changes `status`
   created_at          text NOT NULL,
   updated_at          text NOT NULL,
   baseline_id         text,                    -- baseline row the diff was computed against (NULL: none, or legacy row)
@@ -486,7 +488,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 - `POST /builds` stores the zip and returns **202 Accepted** immediately.
 - The job goes on the **database queue** (`capture_jobs`, below). Every instance with `testing` consumes it, with a **configurable concurrency** (`testing.concurrency`, auto-sized by default).
 - A user can cancel a build that is `pending`, `capturing` or `comparing` (`POST …/builds/:id/cancel`, **Cancel build** on the build page): its jobs of every kind are cancelled, a running capture stops within the 5 s cancel check, and the build ends `cancelled` (a status of its own, terminal: later status writes from the capture path are refused, a retry resets it; `build:cancelled` is the event, git channels show it as `cancelled`). The MCP server does not expose it.
-- There is no boot sweep. A build left `capturing` by a killed instance is recovered by lease expiry: another instance claims the job again, and if every attempt (`testing.retries + 1`) is lost the job fails and `onExhausted` fails the build (`failCrashedCapture`: the attempt closes, the build becomes `failed`, a failure git status is posted, admins are alerted), so a crash loop cannot repeat captures forever and a second instance can boot without touching the first one's builds.
+- There is no boot sweep. A build left `capturing` by a killed instance is recovered by lease expiry: another instance claims the job again, and if every attempt (`testing.retries + 1`) is lost the job becomes `exhausting` and `onExhausted` fails the build (`failCrashedCapture`: the attempt closes, the build becomes `failed`, a failure git status is posted, admins are alerted), so a crash loop cannot repeat captures forever and a second instance can boot without touching the first one's builds. A hook run is itself a leased attempt: one that throws or dies is re-run by any instance after its lease, five runs at most, and then the job fails and admins are alerted that the build may be stuck.
 
 #### Database queue (`capture_jobs`)
 
@@ -513,7 +515,8 @@ visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates ha
 4. **Finish.** `ack` marks the attempt and the job `done`. `nack` is ignored from a superseded
    holder; otherwise it requeues with a delay (`visible_at`), or fails the job past `max_attempts`
    or with `requeue: false`, or ends it `cancelled` when flagged. A final attempt that loses its
-   lease fails the job too (one limit covers failures and lost leases).
+   lease moves the job to `exhausting` instead (one limit covers failures and lost leases): the
+   host's `onExhausted` hook runs under a lease, five runs at most, and then the job fails.
 5. **Cancel.** `cancel(jobId | buildId)` ends a queued job at once and flags a running one on its
    job and attempt rows; a build id covers every job kind of the build (capture, publish, notify).
 
@@ -532,7 +535,7 @@ new holder settles the job), a cancel ends the job `cancelled`. `stop()` (SIGTER
 and waits for the jobs in flight; the runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the
 queue's depth and oldest waiting job (a sample costs one read; off unless `queueSample` is given).
 
-**In the app** (`packages/app/src/jobs-setup.ts`). One lazily built database queue carries every job kind and one consumer runs them: the `capture` handler (`capture-setup.ts`: `createCaptureHandler`, wrapped to alert admins when a capture leaves its build failed), the `publish` handler (`publish-setup.ts`); `notify` jobs run on a second queue and consumer (see PR Status Checks & Merge Gate), kept apart so a status never waits behind a capture. The consumer starts when adapters are ready and `teardown()` drains it. `DatabaseCaptureQueueOptions.onExhausted` is the one hook the queue offers its host: a job whose final attempt lost its lease has no running handler to record the failure, so the host writes it (the crash path of the capture handler for `capture`, the publish completer for `publish`). There is no `testing.queue`: `testing` requires a `runner` and the database queue is the only queue.
+**In the app** (`packages/app/src/jobs-setup.ts`). One lazily built database queue carries every job kind and one consumer runs them: the `capture` handler (`capture-setup.ts`: `createCaptureHandler`, wrapped to alert admins when a capture leaves its build failed), the `publish` handler (`publish-setup.ts`); `notify` jobs run on a second queue and consumer (see PR Status Checks & Merge Gate), kept apart so a status never waits behind a capture. The consumer starts when adapters are ready and `teardown()` drains it. `DatabaseCaptureQueueOptions.onExhausted` is the hook the queue offers its host: a job whose final attempt lost its lease has no running handler to record the failure, so the host writes it (the crash path of the capture handler for `capture`, the publish completer for `publish`) while the job is `exhausting`; `onAbandoned` is called once if that hook failed five times. There is no `testing.queue`: `testing` requires a `runner` and the database queue is the only queue.
 
 **Forked capture** (`testing.workerEntry`, `core/src/capture/forked/`, opt-in, no new investment). The parent is the consumer: `createForkedCaptureHandler` is its `capture` handler, which pushes each leased job to a child over IPC (`{ type: "run", runId, job }`, and `cancel`) and waits for `progress`, `done` or `failed`. Progress renews the lease the consumer keeps; there are no `poll`, `enqueue`, `ack` or `nack` messages, and the concurrency slots live in the parent. The child (`runCaptureChild`) runs `createCaptureHandler` over the same database, storage and runner, and inserts shard jobs into the database queue itself. A child crash fails the run of the job it took down (charged against `testing.retries` like any attempt; runs that shared the crashed child are pushed again uncharged, one at a time); a child that makes no progress for a lease is killed; three crashes in five minutes, or a failed fork, hand everything to the in-process handler.
 
@@ -671,6 +674,31 @@ baseline that applies _now_ (own branch, else default):
 - Re-diff skips approved/rejected snapshots (decisions), inherited snapshots (never rendered), and
   default-branch builds (authoritative); the build roll-up is refreshed afterwards.
 
+### Capture environment fingerprint
+
+A baseline stores a `Fingerprint` (JSON, `packages/core/src/capture/fingerprint.ts`) next to its
+`infraHash`; a snapshot stores the `infraHash` of its capture and, when the environment differed from
+its baseline's, the before and after fingerprints in `envChange`. A fingerprint holds: engine, browser
+version, platform, device scale factor, fonts digest, viewport and sizing. The hash covers exactly those
+components; a difference on the default branch is an environment migration (ADR 0009), on a feature
+branch it rides along as `envChange`.
+
+**Measurement version.** `measurementVersion` says how the browser-measured components were read. It is
+**not part of `infraHash`**, so changing it never changes a baseline's identity or causes a mass
+migration; a fingerprint stored without it is version 1.
+
+- Between two different versions, a component whose measurement changed (listed per version in
+  `REMEASURED_IN`) is compared as **unknown**, never as a mismatch: it cannot cause a migration, an
+  earlier value of it is not carried over a capture that lacks it, and the review says "Environment
+  partly unknown (measurement updated)". Components measured the same way still compare; with equal
+  versions nothing differs from before.
+- Bump `MEASUREMENT_VERSION` only together with a probe change, and add the components that probe change
+  re-measures to `REMEASURED_IN` in the same commit.
+
+| Version | What it measures                                                                               |
+| ------- | ---------------------------------------------------------------------------------------------- |
+| 1       | The in-browser probe of the first fingerprint release: browser version, platform, scale, fonts |
+
 ### Baseline Portability (export/import)
 
 Baselines are portable between instances (backup/restore, migration, staging → prod promotion):
@@ -706,7 +734,7 @@ With `testing` off (ADR 0013, decision 3) the verdicts in `build_reviews` decide
 
 **The review UI.** The build page (`pages/build-detail.tsx`) renders `VerdictCard` (standing, approvals against the requirement, each reviewer's latest verdict, approve and reject for approvers and admins; a "Waiting for the Storybook to publish" notice in place of the form while `publishingOf` is `pending`), `ChangesetCard` and `CommentsCard` from `loadReviewSection` when review is on; with `testing` off the verdict card and the changeset are the page's main content, with `testing` on the changeset sits above the snapshots and the verdict and comments below. The changeset (`core/src/models/changeset.ts`) is `computeChangeset` over the build's `build_components` rows and the rows of its baseline build (`findChangesetBaseline`: the latest accepted build of the branch created before it, else of the default branch): components added, removed and changed by hash (the hash covers story id, name, type and title), plus the count of unchanged ones; `GET …/builds/:buildId/changeset` returns it. Story comments show under the previewed story of the component page (the build it shows) and in the snapshot review thread of that story. Browser forms post `application/x-www-form-urlencoded`, which the JSON API refuses, so the comment, resolve and verdict forms post to page routes in `routers/review-forms.ts` (class `review`, CSRF-guarded) that call the API handlers. The review switch and approvals are edited in the General settings tab (`POST /projects/:slug/settings/review`, project admins; class `hosting` so review can be turned back on); turning review off runs the switch-off pass (`acceptPendingWithoutWork`, `core/src/models/review-switch-off.ts`): the project's `pending` builds with no capture attempts and no snapshots become `approved`, with no approval event.
 
-**Events.** `review:requested` (the `afterPublish` hook in `publish-setup.ts`, for a published build left `pending` without `testing`; recipients are the channels and webhooks plus the project's approvers and admins by email unless they opted out: `defaultTargets` in `notify.ts`, an `enabled = false` subscription or a topic list without the event opts out), `review:comment` (build and story comments) and `review:verdict` (every verdict) are raised by `announceReview` (`app/src/review-events.ts`): signed webhooks plus the notification fan-out. Snapshot comments keep `comment:created`, so no comment raises two events.
+**Events.** `review:requested` (the `afterPublish` hook in `publish-setup.ts`, for a published build left `pending` without `testing`; recipients are the channels and webhooks plus the project's approvers and admins by email unless they opted out: `defaultTargets` in `notify.ts`, an `enabled = false` subscription or a topic list without the event opts out), `comment:created` (every comment, `data.scope` build, story or snapshot; `review:comment` is only a filter alias, for webhooks, channels and subscriptions, matching the build and story scopes; see `matchesEvent` in core) and `review:verdict` (every verdict) are raised by `announceReview` (`app/src/review-events.ts`): signed webhooks plus the notification fan-out. No comment raises two events.
 
 ### PR Status Checks & Merge Gate
 
@@ -1009,7 +1037,8 @@ StoryShelf/
         routers/          # API + UI routes (incl. health, OpenAPI)
         routes/           # route classification table (hosting/testing/review/both) + completeness test
         pages/            # UI page components (server-rendered JSX)
-        ui/               # DocumentLayout, theme, components, styles
+        ui/               # presentational components, theme, styles (no app state)
+        shell/            # DocumentLayout, csrfField, sidebar/top bar, client scripts (app-coupled)
         middleware/       # request id/logging/gate/rate-limit/scope/auth
         store.ts          # AsyncLocalStorage request context
         assets/           # vendored HTMX (served locally, no CDN)
@@ -1083,7 +1112,7 @@ StoryShelf/
 
     observability/
       src/
-        index.ts          # runtime-agnostic OTEL entrypoint (api only; Deno-safe)
+        index.ts          # runtime-agnostic OTEL entrypoint (api only)
         node.ts           # Node SDK lifecycle (OTLP/HTTP exporters)
         config.ts         # env resolution (OTEL_* standard, STORYSHELF_OTEL_* gaps)
         tracing.ts        # withSpan helper
@@ -1145,13 +1174,13 @@ StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/c
 
 - **Layout:** a full-height icon **sidebar** (brand, project/developer/admin navigation; footer with the account, theme and collapse controls; collapses to a rail, drawer on phones) plus a slim neutral **top bar** (project picker and the page's ancestor breadcrumbs). The customer accent appears only in small places (brand mark, active nav, primary actions, derived tints). The content area is image-first.
 - **Pages** live in `app/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
-- **Layout & theming** live in `app/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
+- **Layout & theming:** the presentational components, styles and the `BrandTheme` of light/dark color tokens live in `app/src/ui/`; the `DocumentLayout` (head, vendored HTMX, styles) and the app chrome live in `app/src/shell/`, which may use app state.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
 - **Brand config** is passed as `ui: { name, logo, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code. The **favicon is not brandable**: the app always serves its own mark (`app/src/assets/mark.svg`, content-hashed under `/assets/`) so a StoryShelf tab is recognisable; `ui.favicon` is accepted for config compatibility but ignored. `ui.logo` defaults to the same mark.
 - **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the sidebar account menu links to the personal `/profile` page (editable display name, local password change, memberships).
 - **Public origin** (ADR 0007, decision 6): one resolver (`createPublicOriginResolver`, `core/src/models/public-origin.ts`) answers every absolute link built in the background (commit-status links, notification review links) and the OAuth callback URLs. It tries `config.publicBaseUrl` (`PUBLIC_BASE_URL`), then the platform's address from its environment (`detectPublicBaseUrl`, `core/src/utils/public-origin.ts`), then the origin a site admin confirmed (the System page posts `location.origin`; the first report is stored in `site_settings` as unconfirmed and is **not used** until an admin confirms it; confirm, replace or forget on the System page). The `Host` header is never used for background links; only authentication, through `PublicOriginResolver.authOrigin(requestOrigin)` (the `/.well-known/openid-configuration` helper and OAuth redirect URIs), falls back to the request's own address when nothing is confirmed. Without a resolved origin no notification is sent at all (ADR 0014, decision 11): git statuses and the pull-request comment are neither queued nor delivered, message notifications to chat, email and log channels are skipped, no channel is marked as errored, and the System page and notification settings say so. Webhooks (ids only) and auth mail are unaffected.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
-- **Review workspace:** a snapshot filmstrip with filters and progress, and a comparison stage with side-by-side, swipe, onion-skin, diff and flip modes plus zoom; a sticky action bar approves/rejects and auto-advances to the next open snapshot (keyboard: `j`/`k`, `a`/`r`, `1`–`5`, `f`, `t`, `?`). A small vanilla-JS layer (`app/src/ui/shell/*-script.ts`, idempotent across HTMX body swaps) covers the shell and review behaviour. The published-Storybook page is an `<iframe>` of Storybook's own static build.
+- **Review workspace:** a snapshot filmstrip with filters and progress, and a comparison stage with side-by-side, swipe, onion-skin, diff and flip modes plus zoom; a sticky action bar approves/rejects and auto-advances to the next open snapshot (keyboard: `j`/`k`, `a`/`r`, `1`–`5`, `f`, `t`, `?`). A small vanilla-JS layer (`app/src/shell/*-script.ts`, idempotent across HTMX body swaps) covers the shell and review behaviour. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
 ## Deployment
 

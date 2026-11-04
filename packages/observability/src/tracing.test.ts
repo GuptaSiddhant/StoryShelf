@@ -1,4 +1,5 @@
 import { SpanStatusCode } from "@opentelemetry/api";
+import { HttpError } from "@storyshelf/core/utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 import { withSpan } from "./tracing.ts";
@@ -10,6 +11,17 @@ describe("withSpan", () => {
     await telemetry?.cleanup();
     telemetry = undefined;
   });
+
+  async function recorded(thrown: unknown) {
+    telemetry = installTestTelemetry();
+    const caught = await withSpan("test.secret", async () => {
+      await Promise.resolve();
+      throw thrown;
+    }).catch((error: unknown) => error);
+    const [span] = telemetry.exporter.getFinishedSpans();
+    const event = span?.events.find((item) => item.name === "exception");
+    return { caught, attributes: JSON.stringify(event?.attributes ?? {}) };
+  }
 
   it("returns the callback value with attributes", async () => {
     telemetry = installTestTelemetry();
@@ -45,5 +57,44 @@ describe("withSpan", () => {
   it("is a noop-safe passthrough without a provider", async () => {
     const result = await withSpan("test.noop", async () => "ok");
     expect(result).toBe("ok");
+  });
+  describe("recorded exceptions", () => {
+    const PASSWORD = "secretpw";
+    const KEY = "ghp_AbCdEf0123456789AbCdEf0123456789";
+
+    it("records neither a connection-string password nor an API key, and rethrows the original", async () => {
+      const original = new Error(`connect postgres://u:${PASSWORD}@h/db failed, token ${KEY}`);
+      const { caught, attributes } = await recorded(original);
+      expect(caught).toBe(original);
+      expect(original.message).toContain(PASSWORD);
+      expect(attributes).not.toContain(PASSWORD);
+      expect(attributes).not.toContain(KEY);
+      expect(attributes).toContain("connect postgres://");
+    });
+
+    it("keeps the error name and redacts secrets in the stack too", async () => {
+      const original = new TypeError(`bad ${KEY}`);
+      original.stack = `TypeError: bad ${KEY}\n    at apikey=${PASSWORD} (file.ts:1:1)`;
+      const { attributes } = await recorded(original);
+      expect(attributes).toContain("TypeError");
+      expect(attributes).not.toContain(KEY);
+      expect(attributes).not.toContain(PASSWORD);
+    });
+
+    it("records only the status of an HttpError, never its body", async () => {
+      const { caught, attributes } = await recorded(
+        new HttpError(502, `upstream said https://u:${PASSWORD}@h/x?token=abc`),
+      );
+      expect(caught).toBeInstanceOf(HttpError);
+      expect(attributes).toContain("HTTP 502");
+      expect(attributes).not.toContain(PASSWORD);
+      expect(attributes).not.toContain("upstream said");
+    });
+
+    it("redacts a thrown non-error value", async () => {
+      const { caught, attributes } = await recorded(`oops ${KEY}`);
+      expect(caught).toBe(`oops ${KEY}`);
+      expect(attributes).not.toContain(KEY);
+    });
   });
 });

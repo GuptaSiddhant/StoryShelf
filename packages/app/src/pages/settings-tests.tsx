@@ -1,4 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
@@ -9,7 +10,6 @@ import {
   Meta,
   SectionTitle,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Tests settings tab: play execution, Storybook 10 test runs, accessibility checks, play timeout. */
 export function renderSettingsTests(
@@ -72,6 +72,14 @@ export function renderSettingsTests(
             checked={project.runA11y === false ? undefined : true}
             disabled={!isAdmin}
             hint="On by default. Each story is scanned with axe-core (WCAG A/AA and best-practice rules). Violations are shown on the snapshot in review and never block the build."
+          />
+          <CheckField
+            label="Detect unstable renders"
+            name="detectUnstable"
+            value="true"
+            checked={project.detectUnstable === false ? undefined : true}
+            disabled={!isAdmin}
+            hint="On by default. A snapshot that differs from its baseline is rendered once more; if the two renders differ, it is flagged as a likely flaky story. It stays a change to review and never changes the build status. Costs one extra render per changed snapshot."
           />
           <Field
             label="Play timeout (ms)"

@@ -254,6 +254,34 @@ describe("notifyProject", () => {
       expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
     });
 
+    it("sends nothing to a disabled reviewer, a site admin who is no member, or an instance without email", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      await db.update(db.tables.users, "appr1", { disabled: true });
+      await db.insert(db.tables.users, {
+        id: "site1",
+        email: "site1@example.com",
+        name: "site1",
+        avatarUrl: null,
+        role: "admin",
+        lastLoginAt: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        passwordHash: null,
+        displayNameOverride: null,
+        authProvider: "local",
+        disabled: false,
+      });
+      expect(await recipients(db, "review:requested")).toEqual([
+        "admin1@example.com",
+        "appr2@example.com",
+      ]);
+      const sent: unknown[] = [];
+      await runWithStore(storeFor(db, [recordingProvider("log", sent)]), async () => {
+        await notifyProject({ id: "p1", slug: "test-project" }, "review:requested", {});
+      });
+      expect(sent).toEqual([]);
+    });
+
     it("sends a subscribed reviewer one message, and other topics stay opt-in", async () => {
       const { db } = makeDatabase();
       await seedUsers(db);
@@ -264,6 +292,18 @@ describe("notifyProject", () => {
         "appr2@example.com",
       ]);
       expect(await recipients(db, "review:verdict")).toEqual(["appr1@example.com"]);
+    });
+  });
+
+  describe("design:changed (opt-in, never default-on)", () => {
+    it("reaches only subscribers of the topic, not reviewers by role", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      expect(await recipients(db, "design:changed")).toEqual([]);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "dev1", { events: ["design:changed"], via: ["email"] });
+      await subscriptions.upsert("p1", "appr1", { events: ["build:approved"], via: ["email"] });
+      expect(await recipients(db, "design:changed")).toEqual(["dev1@example.com"]);
     });
   });
 
@@ -342,5 +382,55 @@ describe("notifySystem", () => {
       await notifySystem("sys:purge-completed", { removedBuilds: 3 });
     });
     expect(sent).toHaveLength(1);
+  });
+});
+
+async function sentFor(
+  events: string[],
+  scope: string,
+  via: "channel" | "subscription" = "channel",
+): Promise<number> {
+  const { db } = makeDatabase();
+  const sent: unknown[] = [];
+  const wired = [recordingProvider("log", sent), recordingProvider("email", sent)];
+  if (via === "channel") {
+    await seedProject(db);
+    await new NotificationChannelModel(db, undefined, SECRET).create({
+      projectId: "p1",
+      provider: "log",
+      config: {},
+      events,
+    });
+  } else {
+    await seedUsers(db);
+    await new NotificationSubscriptionModel(db).upsert("p1", "dev1", { via: ["email"], events });
+  }
+  await runWithStore(storeFor(db, wired), async () => {
+    await notifyProject(
+      { id: "p1", slug: "test-project" },
+      "comment:created",
+      { scope, buildId: "b1", commentId: "c1" },
+      "/builds/b1",
+    );
+  });
+  return sent.length;
+}
+
+describe("comment:created and the review:comment alias", () => {
+  it("delivers to a channel filtered on the alias for build and story comments only", async () => {
+    expect(await sentFor(["review:comment"], "build")).toBe(1);
+    expect(await sentFor(["review:comment"], "story")).toBe(1);
+    expect(await sentFor(["review:comment"], "snapshot")).toBe(0);
+  });
+
+  it("sends one message to a channel subscribed to both names", async () => {
+    expect(await sentFor(["review:comment", "comment:created"], "story")).toBe(1);
+    expect(await sentFor(["review:comment", "comment:created"], "snapshot")).toBe(1);
+  });
+
+  it("applies the alias to per-user subscriptions as well", async () => {
+    expect(await sentFor(["review:comment"], "build", "subscription")).toBe(1);
+    expect(await sentFor(["review:comment"], "snapshot", "subscription")).toBe(0);
+    expect(await sentFor(["review:comment", "comment:created"], "build", "subscription")).toBe(1);
   });
 });

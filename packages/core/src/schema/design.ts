@@ -48,6 +48,8 @@ export interface DesignNode {
   renderPath: string | null;
   /** File `version` the cached render was taken at; a newer file version refetches. */
   renderVersion: string | null;
+  /** Claim of the last `design:changed` event sent for this node (see `designChange`); null when none. */
+  notifiedVersion: string | null;
   fetchedAt: string;
   createdAt: string;
   updatedAt: string;

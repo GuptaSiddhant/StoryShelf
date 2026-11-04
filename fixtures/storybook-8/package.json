@@ -5,7 +5,7 @@
   "description": "Minimal deterministic Storybook used as the capture test fixture and try-it sample.",
   "scripts": {
     "storybook": "storybook dev -p 6008",
-    "build-storybook": "storybook build -o storybook-static"
+    "build-storybook": "storybook build -o storybook-static --stats-json"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -176,3 +176,12 @@ describe("remote", () => {
     ).toThrow(/CDP protocol drives Chromium only, not "firefox"/u);
   });
 });
+
+describe("experimental vendor presets", () => {
+  it("marks the vendor presets and leaves the generic ones alone", () => {
+    const azure = azurePlaywright({ endpoint: "wss://x.example/b", token: "t" });
+    const stack = browserstack({ username: "u", accessKey: "k" });
+    expect([azure.experimental, stack.experimental]).toEqual([true, true]);
+    expect(playwrightServer({ endpoint: "ws://x/" }).experimental).toBe(false);
+  });
+});

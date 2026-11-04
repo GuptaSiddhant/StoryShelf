@@ -38,3 +38,9 @@ Add a Figma personal access token (read access to file content) under **Settings
 ## Reference renders
 
 With a token, node links (`?node-id=…`) also get a cached PNG render. The review page shows it as a **Figma reference** pane under the diff stage, and library cards open a small popover with the render and an **Open in Figma** action. Renders are downloaded and stored by StoryShelf (Figma's image URLs expire) and refreshed only when the Figma file version changes. The render is a reference only — StoryShelf never pixel-diffs against it. Links to a whole file (no node) stay plain deep links.
+
+## Compare to design
+
+When a component's link has a cached render, the review stage gets a **Compare against** switch: **Baseline** (the usual baseline, current and diff) or **Design**. The Design view puts the current screenshot next to the render, or over it with **Swipe** and **Onion skin**, using the same controls as the baseline view. There is no diff, score or flip in this view, and the zoom stays on fit: the render is scaled to the screenshot's width, and the view says so.
+
+It is labelled **Design reference: not a test**. It never changes a snapshot's status, a verdict, git status checks or AI triage. The stale-design and design-not-found notices still show above the stage. Without a cached render (no token, a whole-file link, or a deleted node), the switch is not offered and the **Figma reference** pane under the stage is unchanged.

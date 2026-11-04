@@ -268,18 +268,21 @@ const checkInput = css`
 export const CheckField: FC<{
   label: unknown;
   name: string;
+  /** DOM id when several forms on a page use the same field name (defaults to `name`). */
+  id?: string;
   value?: string;
   checked?: boolean;
   disabled?: boolean;
   hint?: string;
-}> = ({ label, name, value, checked, disabled, hint }) => {
+}> = ({ label, name, id, value, checked, disabled, hint }) => {
+  const domId = id ?? name;
   return (
     <div class={fieldWrap}>
-      <label class={checkLabel} for={name}>
+      <label class={checkLabel} for={domId}>
         <input
           class={checkInput}
           type="checkbox"
-          id={name}
+          id={domId}
           name={name}
           value={value}
           checked={checked}
@@ -288,7 +291,7 @@ export const CheckField: FC<{
         {label}
       </label>
       {hint ? (
-        <p class={fieldHint} id={`${name}-hint`}>
+        <p class={fieldHint} id={`${domId}-hint`}>
           {hint}
         </p>
       ) : null}

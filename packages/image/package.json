@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/image",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "description": "StoryShelf image engine: pixel diffing, overlay rendering and thumbnails on a worker-thread pool, with pngjs (default) or sharp codecs.",
   "keywords": [
     "diff",
@@ -81,14 +81,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "bun": true,
-      "workerd": false,
-      "browser": false
-    }
   }
 }

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { keyOfModuleId, type PathBase } from "./paths.ts";
 import type { DepGraph } from "./types.ts";
 
 /** Basename of the Vite stats file emitted next to a built Storybook. */
@@ -43,6 +44,18 @@ export function normalizePath(value: string): string {
     .replaceAll(/^\//gu, "");
 }
 
+/** Turns a raw stats path into the key the graph is built on. */
+type KeyOf = (raw: string) => string;
+
+/**
+ * The graph key of a raw stats path: its legacy normalized form, or with a {@link PathBase} the
+ * absolute path it names, so it can only meet a changed file that is the same file (#502).
+ */
+function keyFor(base?: PathBase): KeyOf {
+  if (!base) return normalizePath;
+  return (raw) => keyOfModuleId(base, stripQueryAndLoader(raw)) ?? normalizePath(raw);
+}
+
 /** True when stats module `candidate` refers to repo-relative file `target`. */
 function matchesFile(candidate: string, target: string): boolean {
   if (candidate === target) {
@@ -52,14 +65,14 @@ function matchesFile(candidate: string, target: string): boolean {
 }
 
 /** Coerce an unknown stats value to a list of normalized paths. */
-function asPathList(value: unknown): string[] {
+function asPathList(value: unknown, keyOf: KeyOf): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
   const paths: string[] = [];
   for (const entry of value) {
     if (typeof entry === "string" && entry.length > 0) {
-      paths.push(normalizePath(entry));
+      paths.push(keyOf(entry));
     }
   }
   return paths;
@@ -72,19 +85,19 @@ function stringField(entry: StatsModule, key: "id" | "name" | "identifier"): str
 }
 
 /** Read the file a stats module entry refers to, if any. */
-function moduleFile(entry: StatsModule): string | null {
+function moduleFile(entry: StatsModule, keyOf: KeyOf): string | null {
   const raw =
     stringField(entry, "id") ?? stringField(entry, "name") ?? stringField(entry, "identifier");
-  return raw === null ? null : normalizePath(raw);
+  return raw === null ? null : keyOf(raw);
 }
 
 /** Forward imports declared by a stats module entry, if any. */
-function moduleImports(entry: StatsModule): string[] {
-  return asPathList(entry.imported ?? entry.importedIds ?? entry.dependencies);
+function moduleImports(entry: StatsModule, keyOf: KeyOf): string[] {
+  return asPathList(entry.imported ?? entry.importedIds ?? entry.dependencies, keyOf);
 }
 
 /** Dependent names declared via Webpack-style `reasons`, if any. */
-function moduleReasonNames(entry: StatsModule): string[] {
+function moduleReasonNames(entry: StatsModule, keyOf: KeyOf): string[] {
   if (!Array.isArray(entry.reasons)) {
     return [];
   }
@@ -94,7 +107,7 @@ function moduleReasonNames(entry: StatsModule): string[] {
       const record = reason as Record<string, unknown>;
       const name = record["moduleName"] ?? record["module"];
       if (typeof name === "string" && name.length > 0) {
-        names.push(normalizePath(name));
+        names.push(keyOf(name));
       }
     }
   }
@@ -150,15 +163,16 @@ function addEntryEdges(
   imports: Map<string, Set<string>>,
   importedBy: Map<string, Set<string>>,
   entry: StatsModule,
+  keyOf: KeyOf,
 ): void {
-  const file = moduleFile(entry);
+  const file = moduleFile(entry, keyOf);
   if (!file) {
     return;
   }
-  for (const imported of moduleImports(entry)) {
+  for (const imported of moduleImports(entry, keyOf)) {
     addEdge(imports, importedBy, file, imported);
   }
-  for (const dependent of moduleReasonNames(entry)) {
+  for (const dependent of moduleReasonNames(entry, keyOf)) {
     addEdge(imports, importedBy, dependent, file);
   }
 }
@@ -178,13 +192,16 @@ function toGraph(
  * Build a bidirectional dependency graph from parsed stats modules.
  *
  * @param entries - Module entries from a Vite or Webpack stats document.
+ * @param base - Resolve module ids to absolute paths against these roots; without it ids keep
+ * their legacy normalized, repo-relative-looking form.
  * @returns Bidirectional graph, or `null` when no usable edges exist.
  */
-export function buildGraph(entries: StatsModule[]): DepGraph | null {
+export function buildGraph(entries: StatsModule[], base?: PathBase): DepGraph | null {
+  const keyOf = keyFor(base);
   const imports = new Map<string, Set<string>>();
   const importedBy = new Map<string, Set<string>>();
   for (const entry of entries) {
-    addEntryEdges(imports, importedBy, entry);
+    addEntryEdges(imports, importedBy, entry, keyOf);
   }
   if (imports.size === 0) {
     return null;
@@ -196,9 +213,10 @@ export function buildGraph(entries: StatsModule[]): DepGraph | null {
  * Load and parse a stats file into a dependency graph.
  *
  * @param statsPath - Absolute or cwd-relative path to the stats JSON file.
+ * @param base - See {@link buildGraph}.
  * @returns Graph, or `null` when the file is missing or unrecognized.
  */
-export async function loadDepGraph(statsPath: string): Promise<DepGraph | null> {
+export async function loadDepGraph(statsPath: string, base?: PathBase): Promise<DepGraph | null> {
   let raw: string;
   try {
     raw = await readFile(statsPath, "utf8");
@@ -211,7 +229,7 @@ export async function loadDepGraph(statsPath: string): Promise<DepGraph | null> 
   } catch {
     return null;
   }
-  return buildGraph(moduleEntries(document));
+  return buildGraph(moduleEntries(document), base);
 }
 
 /** Resolve the stats file path for a built Storybook directory. */

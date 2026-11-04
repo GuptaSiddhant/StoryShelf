@@ -25,6 +25,8 @@ export default defineConfig({
   // silently fall back to diffing on the main thread.
   input: {
     server: resolve(root, "apps/fly-app/server.ts"),
+    // `migrate-to-s3.sh` runs this once on the machine: it shares the bundle's inlined AWS SDK.
+    "migrate-to-s3": resolve(root, "apps/fly-app/migrate-to-s3.ts"),
     worker: resolve(root, "packages/image/src/worker.ts"),
   },
   output: {

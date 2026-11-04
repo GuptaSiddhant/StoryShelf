@@ -18,6 +18,8 @@ export interface Project {
    * decision 11); off by default because it changes what a build contains.
    */
   runTests?: boolean;
+  /** Re-render a changed snapshot once and flag it when the two renders differ; on by default. */
+  detectUnstable?: boolean;
   browser?: string;
   viewports?: string | null;
   /** JSON list of browsers to capture (null: legacy single `browser`). */

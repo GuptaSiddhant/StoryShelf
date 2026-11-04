@@ -92,6 +92,14 @@ export async function finishJob(
   error: string | null = null,
 ): Promise<void> {
   await rt.model.finishJob(row.jobId, status, isoAt(rt), error);
+  await startSuccessor(rt, row);
+}
+
+/**
+ * After a job ended: if a request arrived while it ran, a successor takes its key at once. For a
+ * job that ended a way other than {@link finishJob} (the exhausted-job path), after its own write.
+ */
+export async function startSuccessor(rt: QueueRuntime, row: CaptureJobRow): Promise<void> {
   if (row.activeKey === null) {
     return;
   }

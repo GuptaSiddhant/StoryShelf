@@ -10,6 +10,7 @@
 import { hostname } from "node:os";
 import type { DatabaseAdapter } from "../../adapters/database.ts";
 import type { Logger } from "../../logger.ts";
+import { BuildModel } from "../../models/build.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { ulid } from "../../utils/ulid.ts";
 import { extendJob, inspectJob } from "./lease.ts";
@@ -87,6 +88,7 @@ function resolveRuntime(db: DatabaseAdapter, options: DatabaseCaptureQueueOption
   }
   const rt: QueueRuntime = {
     model: new CaptureJobModel(db),
+    builds: new BuildModel(db),
     kinds,
     leaseMs: positive(options.leaseMs, DEFAULT_LEASE_MS),
     maxAttempts: retries + 1,
@@ -99,13 +101,16 @@ function resolveRuntime(db: DatabaseAdapter, options: DatabaseCaptureQueueOption
   return withHooks(rt, options);
 }
 
-/** The optional logger and exhausted-job hook, when given. */
+/** The optional logger and exhausted-job hooks, when given. */
 function withHooks(rt: QueueRuntime, options: DatabaseCaptureQueueOptions): QueueRuntime {
   if (options.logger !== undefined) {
     rt.logger = options.logger;
   }
   if (options.onExhausted !== undefined) {
     rt.onExhausted = options.onExhausted;
+  }
+  if (options.onAbandoned !== undefined) {
+    rt.onAbandoned = options.onAbandoned;
   }
   return rt;
 }
@@ -122,5 +127,5 @@ export {
   type DatabaseJob,
   type QueueJobInput,
 } from "./types.ts";
-export { LEASE_EXHAUSTED_ERROR } from "./claim.ts";
+export { LEASE_EXHAUSTED_ERROR, MAX_HOOK_RUNS } from "./exhaust.ts";
 export { MAX_NACK_DELAY_MS } from "./poll.ts";

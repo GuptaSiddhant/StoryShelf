@@ -101,12 +101,33 @@ describe("runMigrations: MySQL 8 compatibility", () => {
       "ALTER TABLE projects ADD COLUMN review_enabled TINYINT(1) NOT NULL DEFAULT 1",
     );
     expect(queries).toContain("ALTER TABLE projects ADD COLUMN storybook_url_ttl_seconds INT");
+    expect(queries).toContain("ALTER TABLE builds ADD COLUMN review_cycle INT NOT NULL DEFAULT 0");
+    expect(queries).toContain("ALTER TABLE builds ADD COLUMN review_requested_cycle INT NULL");
     expect(queries).toContain("ALTER TABLE snapshots ADD COLUMN a11y_violations TEXT");
     expect(queries).toContain("ALTER TABLE comments ADD COLUMN story_id TEXT");
+    expect(queries).toContain(
+      "ALTER TABLE comments ADD COLUMN kind VARCHAR(32) NOT NULL DEFAULT 'comment'",
+    );
+    expect(queries).toContain("ALTER TABLE comments ADD COLUMN resolved_at DATETIME(3) NULL");
+    expect(queries).toContain("ALTER TABLE comments ADD COLUMN resolved_by VARCHAR(64) NULL");
     expect(queries).toContain(
       "ALTER TABLE notification_channels ADD COLUMN last_error_at DATETIME(3)",
     );
     expect(queries).toContain("ALTER TABLE comments MODIFY COLUMN user_id VARCHAR(64) NULL");
+  });
+
+  it("adds builds.capture_job_id, then backfills the run each in-flight build owns", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+
+    const added = queries.indexOf("ALTER TABLE builds ADD COLUMN capture_job_id VARCHAR(26) NULL");
+    const backfill = queries.findIndex((sql) => sql.startsWith("UPDATE builds SET capture_job_id"));
+    expect(added).toBeGreaterThanOrEqual(0);
+    expect(backfill).toBeGreaterThan(added);
+    expect(queries[backfill]).toContain("j.status IN ('queued', 'running')");
+    expect(queries[backfill]).toContain(
+      "WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing')",
+    );
   });
 });
 

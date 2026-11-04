@@ -8,6 +8,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
  */
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
@@ -149,6 +150,7 @@ function runMigrations(client: BetterSqlite3Client): void {
   client.exec(DDL);
   ensureColumns(client, DDL);
   applyIdentityStatements(client);
+  client.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
   try {
     client.exec(WEBHOOK_SECRET_DROP);
   } catch {

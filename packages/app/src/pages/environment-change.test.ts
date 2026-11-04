@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { environmentChangeOf, labelOf, summariseEnvironmentChanges } from "./environment-change.ts";
+import {
+  environmentChangeOf,
+  labelOf,
+  summariseEnvironmentChanges,
+  summarisePartlyUnknown,
+} from "./environment-change.ts";
 
 const fingerprint = (browserVersion: string) => ({
   engine: "chromium",
@@ -58,5 +63,33 @@ describe("summariseEnvironmentChanges", () => {
   it("labels unknown components as themselves", () => {
     expect(labelOf("fontsHash")).toBe("installed fonts");
     expect(labelOf("somethingNew")).toBe("somethingNew");
+  });
+});
+
+const unknownOnly = (unknown: string[]) => ({
+  envChange: JSON.stringify({
+    changed: [],
+    unknown,
+    from: fingerprint("124"),
+    to: fingerprint("124"),
+  }),
+});
+
+describe("components compared as unknown across measurement versions", () => {
+  it("are not a migration: a record with nothing changed is left out of the migration summary", () => {
+    expect(summariseEnvironmentChanges([unknownOnly(["fontsHash"])])).toBeNull();
+    const mixed = summariseEnvironmentChanges([unknownOnly(["fontsHash"]), change("124", "126")]);
+    expect(mixed?.count).toBe(1);
+  });
+
+  it("are summarised on their own, with labels", () => {
+    expect(summarisePartlyUnknown([{ envChange: null }, change("124", "126")])).toBeNull();
+    expect(
+      summarisePartlyUnknown([
+        unknownOnly(["fontsHash"]),
+        unknownOnly(["fontsHash", "platform"]),
+        { envChange: null },
+      ]),
+    ).toEqual({ count: 2, fields: ["installed fonts", "host platform"] });
   });
 });

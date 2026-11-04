@@ -21,6 +21,7 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "GET /projects/:slug/settings/links": "hosting",
   "POST /projects/:slug/settings/links": "hosting",
   "POST /projects/:slug/settings/links/delete": "hosting",
+  "GET /projects/:slug/design/coverage": "hosting",
   "GET /projects/:slug/settings/design": "hosting",
   "POST /projects/:slug/settings/design/files": "hosting",
   "POST /projects/:slug/settings/design/files/:id/delete": "hosting",
@@ -93,6 +94,7 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   // review
   "POST /projects/:slug/builds/:buildId/comments": "review",
   "POST /projects/:slug/builds/:buildId/comments/:commentId/resolve": "review",
+  "POST /projects/:slug/builds/:buildId/comments/:commentId/reopen": "review",
   "POST /projects/:slug/builds/:buildId/reviews": "review",
   // both
   "GET /projects/:slug": "both",

@@ -18,10 +18,18 @@ flowchart LR
 ```
 
 1. **Ancestor.** `POST /api/v1/projects/:slug/builds` returns `baselineSha`: the latest prior revision on the same branch with a build (`null` for first builds).
-2. **Changed files.** The CLI diffs `baselineSha..HEAD` (plus staged and untracked files) to get the repo-relative change list.
+2. **Changed files.** The CLI diffs `baselineSha..HEAD` (plus staged and untracked files) to get the change list, relative to the repository root.
 3. **Trace.** The change list is traced through the bundler dependency graph (`preview-stats.json` in the built Storybook) down to story files. New stories — files with no baseline — always render regardless of the trace.
 4. **Record.** The CLI posts `{ baselineSha, changedFiles, affectedImportPaths }` to `POST …/builds/:id/affected` before uploading the bundle, so the computation is auditable on the build row.
 5. **Partition.** The orchestrator splits discovered stories into render vs inherit sets, renders only the affected ones, and creates `unchanged` snapshots for the rest that reuse the baseline screenshot (`inherited: true`). Counts include inherited snapshots; `changedCount` excludes them. The build stores how many it inherited as `inheritedCount`.
+
+## Storybook in a monorepo package
+
+Git reports changed files relative to the repository root, while the bundler's module ids and the story index are relative to the Storybook project. When Storybook lives in a package (`packages/app`, an Nx or Turborepo workspace), StoryShelf resolves both to absolute paths before comparing them, so a change to `packages/app/src/ui/kbd.tsx` finds the stories that import `./src/ui/kbd.tsx`. A change in a sibling workspace package (`packages/core/src/x.ts`, which the stats call `../core/src/x.ts`) finds its importers the same way.
+
+- **Run `storyshelf upload` from the Storybook package** (the directory holding `.storybook/`), the same place you build it. The repository root is found from there with `git`. From the repository root with `--build-dir packages/app/storybook-static`, module ids would be read against the wrong directory.
+- A change that touches nothing in the graph (the root `README.md`, a docs-only or test-only change) legitimately affects no story: the upload is selective and `fullReason` stays empty. There is no "nothing matched, so render everything" guess; the `path-base-unknown` reason covers the one case where the paths cannot be anchored at all.
+- Story paths on the build stay relative to the Storybook project, as before.
 
 ## Opting out
 
@@ -46,6 +54,7 @@ Affected capture never fails an upload. When it cannot prove a story unchanged, 
 | `dependency-graph-unavailable` | No usable `preview-stats.json` in the built Storybook                                                        |
 | `story-index-unreadable`       | No `index.json`/`stories.json` to map stories to files                                                       |
 | `global-file-changed`          | A change touches `preview.*`, `manager.*`, `.storybook/main.*`, or a lockfile — these can affect every story |
+| `path-base-unknown`            | The repository root, or where the Storybook project sits inside it, could not be determined                  |
 | `too-many-changed-files`       | Change list exceeds 10,000 files (large merges, vendored drops)                                              |
 | First build                    | No baseline revision exists yet (`baselineSha: null`)                                                        |
 
@@ -70,18 +79,20 @@ storyshelf upload --untraced "**/*.generated.ts" --untraced "**/mocks/**"
 For project-wide exclusions that apply to every upload, commit them once in `.storybook/storyshelf.json` instead of repeating flags (see [Configuration](/guides/config/)):
 
 ```json
-{ "slug": "my-design-system", "untraced": ["**/*.generated.ts"] } }
+{ "slug": "my-design-system", "untraced": ["**/*.generated.ts"] }
 ```
 
-Config and flag globs are combined (union, deduplicated). Untraced files are dropped _before_ tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
+Config and flag globs are combined (union, deduplicated). A glob matches a changed file written relative to the Storybook project (what you write next to `.storybook/`, such as `src/generated/**`) and also relative to the repository root (`packages/app/src/generated/**`), so configs written for either keep working. Untraced files are dropped _before_ tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
 
-**Custom stats file.** The graph is read from `<buildDir>/preview-stats.json` by default (emitted by the Vite builder). Override per run:
+**Stats when the CLI builds.** When `upload` (or `build`) runs the build script itself and affected capture is on, the CLI appends `--stats-json` to it, so you get the stats file without asking. A custom `buildCommand` is never changed: add `--stats-json` to it yourself, or the CLI prints one warning after the build and the upload renders everything. For a script that rejects the flag, set `"buildStats": false` (or pass `--no-build-stats`).
+
+**Custom stats file.** The graph is read from `<buildDir>/preview-stats.json` by default (written by `storybook build --stats-json`; without that flag the file does not exist and every upload renders everything). Override per run:
 
 ```bash
 storyshelf upload --stats-file ./stats/preview-stats.json
 ```
 
-**Diagnose.** `storyshelf doctor` reports affected-capture readiness: shallow clones and missing stats produce warnings (not failures).
+**Diagnose.** `storyshelf doctor` reports affected-capture readiness, including the Storybook project directory and the repository root it will use: shallow clones, missing stats and an unplaceable project produce warnings (not failures).
 
 ## What you see in the UI
 

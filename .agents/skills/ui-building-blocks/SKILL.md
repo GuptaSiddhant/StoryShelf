@@ -4,7 +4,7 @@ description: Build or migrate server-rendered UI with strict facade components a
 license: MIT
 metadata:
   audience: maintainers
-  scope: packages/app/src/ui, packages/app/src/pages
+  scope: packages/app/src/ui, packages/app/src/shell, packages/app/src/pages
 ---
 
 # UI Building Blocks — Facade Components + Colocated hono/css
@@ -21,8 +21,8 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   `CardSection`, `PageHeader`, `SectionTitle`, `Meta`, `HStack`, `VStack`,
   `Icon`, `Avatar`, `Kbd`, `Segmented`, `SubNavLayout`, `Table`,
   `Thumbnail`, `Dropdown`, `Progress`, `CompareStage`, `CodeBlock`,
-  `FilterInput`, `RelativeTime`) and the shell (`../ui/document.tsx`:
-  `DocumentLayout`), plus shared cross-page style objects
+  `FilterInput`, `RelativeTime`) and the shell (`../shell/document.tsx`: `DocumentLayout`;
+  `../shell/csrf-field.tsx`: `csrfField`; no other `shell/` module), plus shared cross-page style objects
   (`../ui/styles/review.ts`: snapshot cards, comment threads;
   `../ui/styles/review-layout.ts`: review workspace layout) and
   `../ui/css.ts` (page-local one-off styles only — last resort after
@@ -83,12 +83,14 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   page. The top bar renders `[project picker] › ancestors…` and *drops* the
   current page — its heading names it, so never show a title in both places
   (on phones only the parent shows, as `‹ Parent`, and the project picker shrinks to its icon, keeping its chevron when there are several projects). Account, theme and collapse live in the sidebar footer.
-- **Chrome lives in `ui/shell/`** (`sidebar`, `topbar`, `bare`, boot and
-  client scripts). `DocumentLayout` takes `layout="default" | "wide" |
+- **Chrome lives in `shell/`** (`sidebar`, `topbar`, `bare`, boot and
+  client scripts, `document.tsx`, `csrf-field.tsx`), not in `ui/`: `ui/` is presentational and
+  never imports `store.ts`, `routers/`, `middleware/`, `pages/` or core models (the consistency
+  test fails if it does). A component that needs a URL or a token takes it as a prop. `DocumentLayout` takes `layout="default" | "wide" |
   "bare"` (`bare` = sign-in/invite, no app chrome).
 - **Review comparison:** swipe has a draggable `[data-compare-knob]` (pointer events + capture) mirrored into the `[data-compare-swipe]` range; zoom levels live in `ZOOMS` (`review-script.ts`) and `compare-stage.tsx` — keep them in sync, and keep zoomed images `image-rendering: pixelated`.
 - **The client script runs once per document.** HTMX `body` swaps re-execute
-  inline scripts, so `ui/shell/client-script.ts` guards on `window.__ssInit`:
+  inline scripts, so `shell/client-script.ts` guards on `window.__ssInit`:
   bind `document` listeners once (look elements up lazily), and put
   per-render wiring in `inits`. Never add `document.addEventListener` at
   the top level of a re-executed script.
@@ -129,6 +131,42 @@ mounted in `DocumentLayout` right after the token `<style>` tag) with
   under `declaration: true` (TS4023). Keep the wrappers; don't "simplify"
   them back to `export { css } from "hono/css"` (loses labels + breaks `tsc`).
 
+## Stories: a new component or variant ships with one
+
+The app has its own Storybook (`packages/app/.storybook/`). Add `<name>.stories.tsx` beside the
+component (a family module in `ui/`, or the page in `pages/`):
+
+```tsx
+// oxlint-disable typescript/promise-function-async -- story factories return Hono JSX
+import type { Meta } from "@storybook/html-vite";
+import { jsxStory } from "../../.storybook/render.tsx";
+import { Badge, HStack } from "./components.tsx";
+
+const meta: Meta = { title: "UI/Badge" };
+export default meta;
+
+export const Tones = jsxStory(() => (
+  <HStack><Badge tone="danger">Failed</Badge></HStack>
+));
+```
+
+- One story per variant or state (empty, populated, error, permission-denied, testing off); no
+  clicking through. Compose the shared components, never `style="..."` (the consistency ratchet
+  covers stories too).
+- Pages use `pageStory(() => renderXPage(...), { dataset, store })` over the seeded in-memory
+  database in `src/stories-fixtures/`; add rows there (typed with the real schema interfaces, fixed
+  ids, times via `hoursAgo()`), never `Date.now()` or randomness.
+- A view a script changes (the review comparison stage: mode, zoom, flip) is shown as a fixed state,
+  one story each: `jsxStory(factory, { stage: { view: "swipe" } })` or
+  `pageStory(render, { stage: { zoom: "200" } })` (`.storybook/stage-state.ts` sets the state on the
+  rendered HTML; the component itself still renders its default). Give the component one
+  `interactive: true` story that runs the shell's own boot and client scripts for that story only
+  (`.storybook/review-client.ts`); never load them globally in `preview.ts`, or every other story
+  stops being a fixed, capturable state.
+- A page that cannot render in the browser needs a story-only stand-in in `.storybook/shims/` and
+  an alias in `.storybook/main.ts`, never an `if` in production code.
+- `nub run storybook` (from the repo root) to look at it; `nub run build-storybook` (from `packages/app`) must pass.
+
 ## Gotchas this repo already hit
 
 - **Never render CSS as a JSX text child** (`<style>{cssString}</style>`).
@@ -139,7 +177,7 @@ mounted in `DocumentLayout` right after the token `<style>` tag) with
   `hx-target="body"`, so a class *first introduced by swapped content*
   relies on hono/css's fallback append-script. The component set is nearly
   identical across states, so this is safe — but verify with the
-  `storyshelf-css` collection test in `ui/document.test.ts` when adding a
+  `storyshelf-css` collection test in `shell/document.test.ts` when adding a
   conditionally-rendered variant.
 - **No string surgery on rendered HTML.** The tokens-tab secret banner used
   `html.replace('<nav class="tabs"', …)` and broke the moment tabs were
@@ -150,11 +188,12 @@ mounted in `DocumentLayout` right after the token `<style>` tag) with
 1. `nubx tsc --noEmit -p tsconfig.json` (from `packages/app/`)
 2. `nub run lint` (from `packages/app/`)
 3. `nub run test` — includes `ui/consistency.test.ts` (ratchet) and
-   `ui/document.test.ts` (unescaped stylesheet + style collection)
+   `shell/document.test.ts` (unescaped stylesheet + style collection)
 4. `nub run build`
-5. Run the app against seeded data and look at it (light + dark, 375px and
+5. `nub run build-storybook` (from `packages/app/`) and open the story in light and dark.
+6. Run the app against seeded data and look at it (light + dark, 375px and
    desktop). Optionally audit with axe-core — the redesign shipped with zero
    violations across the main pages in both themes.
-6. `nub run screenshots` (repo root; `screenshots:app` / `screenshots:og` for
+7. `nub run screenshots` (repo root; `screenshots:app` / `screenshots:og` for
    one half) when docs screenshots (light + dark, in `apps/website/src/assets/screenshots`) need refreshing; eyeball the PNGs before
    committing

@@ -37,10 +37,19 @@ The build status flips to `approved` when every `new`/`changed` snapshot is reso
 Threaded review comments live on a build, a story of the build's catalog or a single snapshot, with **resolve**. A comment has exactly one anchor:
 
 - `GET /api/v1/projects/:slug/builds/:id/comments`
-- `POST …/comments { body, snapshotId? | storyId?, parentId? }` (`snapshotId` and `storyId` together are refused with 400)
-- `POST …/comments/:commentId/resolve`
+- `POST …/comments { body, snapshotId? | storyId?, parentId?, kind? }` (`snapshotId` and `storyId` together are refused with 400; `kind` is `comment`, the default, or `change_request`)
+- `POST …/comments/:commentId/resolve` and `POST …/comments/:commentId/reopen`
 
 `developer`, `approver` and `admin` write; `viewer` reads. Build and story comments show on the build page and story comments also on the story's [component page](#component-pages); the snapshot review page shows the thread of the selected snapshot together with the build comments and the comments on that snapshot's story. The forms in the UI post to the same handlers through page routes under `/projects/:slug/builds/:id/…`, since a browser form cannot send JSON.
+
+### Change requests
+
+Tick **Request a change** when you comment to mark the comment as a **change request**: it asks the build's author to address something. A change request has a status badge (**Change requested**, then **Resolved**), is resolved with **Mark resolved** and reopened with **Reopen**, and a resolved one folds to a line saying who resolved it and when.
+
+- **Who resolves.** `developer`, `approver` and `admin` resolve and reopen; so does the build's own author (the signed-in user whose email is the build's git author), even when they only view the project. Any other viewer, and anyone who is not a member, gets `403`.
+- **The checklist.** The build page shows the number of open change requests beside the verdict (nothing when there are none) and a **Change requests** card listing each one with a link to its anchor: the build, a story or a snapshot. Resolved ones sit under **Resolved (N)**.
+- **They do not gate anything.** Open change requests never block approval and never change a build's status or its git status. **Approve build** asks "There are N open change requests. Approve anyway?" while some are open, and the approval then goes through as usual. Making them gating would be a per-project setting; it is an open question in ADR 0013, not built.
+- **Events.** `comment:created` carries the `kind`; resolving or reopening raises no event.
 
 Comments persist until the build is purged (see [Retention](/concepts/retention/)). The UI's diff overlay (baseline | current | diff) is the heat map: red = changed pixels, thresholds from `pixel_threshold` / `max_diff_ratio` or per-story `diffThreshold`.
 
@@ -70,14 +79,14 @@ With review off every review route answers **404** for that project, evaluated o
 The `approver` and `admin` roles are the reviewers; there is no separate reviewer role, no per-build assignment and no "request review from" step. Every approver and admin of the project reviews every build that waits.
 
 - **Being asked.** When a published build waits for a verdict, a `review:requested` event goes to the project's approvers and admins. Unlike other [notification topics](/guides/notifications/), which are opt-in, this one is on by default for those roles: a reviewer with no subscription receives it by email (when an email transport is wired), and turns it off by saving their notification preferences for the project with **Email me** unticked, or with a topic list that leaves it out. Channels and webhooks receive it like any other event.
-- **Commenting.** `developer` and above comment; `viewer` reads only. Unresolved comments never block a verdict.
+- **Commenting.** `developer` and above comment; `viewer` reads only. Unresolved comments and open [change requests](#change-requests) never block a verdict.
 - **A new build needs a new approval.** Verdicts belong to the build, as snapshot approvals do. The build under review is the latest on its branch; earlier pending builds fall away under [retention](#builds-nobody-finishes).
 
 ### The build page
 
 A build's page is the review workspace for a project without `testing`, and with `testing` the changeset sits above the visual diffs and the verdict and comments below them:
 
-- **Review card.** While the build's Storybook is still publishing, the card shows "Waiting for the Storybook to publish" instead of the verdict buttons (the server refuses a verdict until then). The build's standing (`waiting for review`, `approved`, `rejected`), the approvals so far against the requirement, each reviewer's latest verdict with their note, and, for approvers and admins, **Approve build** and **Reject build** with an optional note. With `testing` the card says the verdict is a sign-off only.
+- **Review card.** While the build's Storybook is still publishing, the card shows "Waiting for the Storybook to publish" and the verdict buttons stay disabled (the server refuses a verdict until then). The build's standing (`waiting for review`, `approved`, `rejected`), the approvals so far against the requirement, each reviewer's latest verdict with their note, and, for approvers and admins, **Approve build** and **Reject build** with an optional note. With `testing` the card says the verdict is a sign-off only.
 - **Changes in this build.** The components the build added, removed or changed against its baseline, each with a link to the published story and to its component page (see [the changeset](#the-changeset)).
 - **Comments.** Build comments and story comments with their anchor, resolve actions, and a form to add a build comment (`developer` and above).
 
@@ -95,6 +104,18 @@ Approvers and admins give a build a verdict, `approved` or `rejected`, with an o
 A reviewer's newest verdict counts, so rewriting one is another `POST`. With `testing` off the build is `approved` once the project's required approvals (`reviewApprovals`, default 1) are present among the reviewers' latest verdicts and none of those is `rejected`; it is `rejected` when any is, and `pending` otherwise (for example when a rejecting reviewer rewrites to an approval and too few approvals remain). Each reviewer counts once. A failed build answers 409, and so does a build whose publishing has not ended: a verdict is accepted once the build's Storybook is published (the build page and the API say "still publishing" until then), and a build whose publish failed is `failed` and not reviewable.
 
 **Who gave the verdict.** A verdict is attributed to a user. In the UI that is the signed-in user; with the API it is the user who owns the token, so a CI token created by a reviewer approves as that reviewer. A caller that is no user, such as the bootstrap admin token or a token without an owner, gets 403 when authentication is on. Only an instance with **no authentication configured at all** records a verdict without a user, as one anonymous reviewer; that only works while the project requires **one** approval (`reviewApprovals` of 1). With a higher requirement the anonymous verdict is refused with 409, because one anonymous reviewer could never supply a second approval: enable authentication to review such a project.
+
+**What a refusal means.** The same rules apply to the API and to the build page's form:
+
+| Answer | When                                                                                                                                                                              |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `403`  | The caller is not an `approver` or `admin` of the project, or is a token that traces to no user (the bootstrap admin token, a token without an owner or whose owner was deleted). |
+| `404`  | The project or build does not exist, or the project has review off.                                                                                                               |
+| `409`  | The build failed or was cancelled, its Storybook is not published yet, or the instance has no authentication and the project needs more than one approval.                        |
+
+A signed-in user and a token that user owns are one reviewer: giving a verdict by both counts once. A bearer token is an API credential only; the build page's form needs a session.
+
+**Sign-off versus verdict.** With `testing` on, a verdict is a sign-off: the snapshots decide the build's status, so a sign-off on a published build whose capture is still running is accepted, appears as a sign-off on the build page, and changes neither the capture status, the commit status nor any baseline.
 
 A build that failed or that a user cancelled (status `cancelled`, [Builds](/concepts/builds/)) has nothing to review: a verdict and a snapshot approval on it answer `409`, and the build page shows no verdict card. A verdict that approves or rejects the build, or that sends it back to `pending` (a rejecting reviewer rewrites to an approval and too few approvals remain), fires the matching `build:approved` / `build:rejected` / `build:pending` webhook and notifications, and every verdict fires `review:verdict`. Accepting a build automatically (default branch, or any branch with review off) fires no approval event.
 
@@ -116,11 +137,12 @@ The build's git channels show `<prefix>/review` (`pending`, then `success` or `f
 
 Review raises three [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
 
-| Event              | When                                                                                                      |
-| ------------------ | --------------------------------------------------------------------------------------------------------- |
-| `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins. |
-| `review:comment`   | A build or story comment is posted. Snapshot comments keep `comment:created`.                             |
-| `review:verdict`   | A reviewer approves or rejects a build.                                                                   |
+| Event              | When                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins.                                  |
+| `comment:created`  | Any comment is posted. `data.scope` is `build`, `story` or `snapshot`; `data.eventId` is the comment id.                                   |
+| `review:comment`   | A filter alias, never sent: in a webhook, notification channel or subscription it matches a `comment:created` of scope `build` or `story`. |
+| `review:verdict`   | A reviewer approves or rejects a build.                                                                                                    |
 
 ### Builds nobody finishes
 
@@ -129,6 +151,22 @@ A `pending` build waits for a verdict, so it needs an exit. The [retention purge
 ### For agents
 
 The [MCP server](/ai/mcp/) can read and write comments, including `storyId` comments, but has no tool to give a verdict: an agent cannot sign off a build.
+
+## Unstable renders
+
+A story that renders differently every time shows up as a real change, and reviewers learn to wave
+it through. When a snapshot differs from its baseline, StoryShelf renders it **once more** in the
+same pass and compares the two renders. If they match, nothing changes. If they differ, the
+snapshot is flagged **Unstable render: likely flaky**, with a note suggesting an [ignore region](/guides/chromatic-migration/#ignore-regions)
+(`data-storyshelf-ignore` or `ignoreSelectors`) or marking the story `flakyTest`.
+
+The flag is advice only. The snapshot is still a change that needs review, the build status does not
+move, and nothing is posted to your git host because of it. The first render is the one kept and
+compared. It is never retried more than once; if the second render itself fails, the snapshot is left
+unflagged. The extra render follows the same rules as any render pass: its own render timeout, a fresh
+signed Storybook URL for a remote browser, and the build's job lease kept alive while it runs. Turn it off under **Settings → Tests → Detect
+unstable renders** (`detectUnstable`). The API returns the flag as `unstable` on each snapshot
+(`true`, `false` once checked and matching, or `null` when it was not checked).
 
 ## Retry & merge gate
 

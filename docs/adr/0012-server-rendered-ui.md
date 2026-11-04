@@ -103,8 +103,10 @@ Pages compose facade components from `app/src/ui/components.tsx` (`Button`, `Tab
 never use raw `btn`, `tabs` or `card` classes, never `style="..."`, and never import component
 families directly. Component styles are colocated through `hono/css` imported from `app/src/ui/css.ts`,
 with readable `ss-<label>-<hash>` names and one `<style id="storyshelf-css">` mounted in
-`DocumentLayout`. `app/src/ui/consistency.test.ts` is the ratchet, with zero tolerance on classes,
-imports and inline styles. The `ui-building-blocks` skill is the working guide.
+`DocumentLayout` (`app/src/shell/document.tsx`). `app/src/ui/consistency.test.ts` is the ratchet,
+with zero tolerance on classes, imports and inline styles. `app/src/ui/` stays presentational: it never
+imports app state (store, routers, middleware, pages, core models), which the same test enforces; the
+app-coupled chrome lives in `app/src/shell/`. The `ui-building-blocks` skill is the working guide.
 
 ## Consequences
 

@@ -31,6 +31,16 @@ export interface Build {
    * the project does not run tests or the Storybook has none.
    */
   testResults?: string | null;
+  /** Times the build went back to `pending` from a verdict; each starts a new review cycle (ADR 0013). */
+  reviewCycle?: number;
+  /** The review cycle whose `review:requested` was already announced; null until the first. */
+  reviewRequestedCycle?: number | null;
+  /**
+   * The capture job whose run owns this build, stamped when the build is enqueued and cleared on
+   * reset. A late crash hook compares it with its own job id, so it never fails a newer run. Null
+   * means no run owns the build.
+   */
+  captureJobId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

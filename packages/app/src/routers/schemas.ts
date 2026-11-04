@@ -4,6 +4,7 @@ import { WebhookModel } from "@storyshelf/core/models";
 import {
   BUILD_STATUSES,
   PROJECT_ROLES,
+  COMMENT_KINDS,
   REVIEW_VERDICTS,
   SNAPSHOT_STATUSES,
 } from "@storyshelf/core/types";
@@ -53,6 +54,8 @@ export const projectSchema = z
     runA11y: z.boolean().optional(),
     /** Storybook 10 `.test()` entries run as interaction tests during capture (default off). */
     runTests: z.boolean().optional(),
+    /** Changed snapshots are rendered once more and flagged when the renders differ (default on). */
+    detectUnstable: z.boolean().optional(),
     // Stored rows predate enum validation, so the response stays a plain string.
     browser: z.string().optional(),
     /** JSON array of capture targets, primary first, primary first; null = just `browser`. */
@@ -85,6 +88,8 @@ export const projectCreateSchema = z
     runA11y: z.boolean().optional(),
     /** Run Storybook 10 `.test()` entries as interaction tests during capture; off when omitted. */
     runTests: z.boolean().optional(),
+    /** Re-render changed snapshots once and flag unstable ones; on when omitted. */
+    detectUnstable: z.boolean().optional(),
     reviewEnabled: z.boolean().optional(),
     reviewApprovals: reviewApprovalsSchema.optional(),
   })
@@ -106,6 +111,8 @@ export const projectUpdateSchema = z
     runA11y: z.boolean().optional(),
     /** Turn the Storybook 10 `.test()` runs on or off (admins). */
     runTests: z.boolean().optional(),
+    /** Turn unstable-render detection on or off (admins). */
+    detectUnstable: z.boolean().optional(),
     /** Single capture target; clears `browsers`. */
     browser: captureTargetSchema.optional(),
     /** Capture targets, primary first (max 3); null returns to single `browser`. */
@@ -178,6 +185,8 @@ export const snapshotSchema = z
     inherited: z.boolean(),
     /** JSON array of the axe violations found on this capture (non-blocking); null when none. */
     a11yViolations: z.string().nullable().optional(),
+    /** A second render of this changed snapshot differed from the first (likely flaky); null: not checked. */
+    unstable: z.boolean().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -231,6 +240,10 @@ export const commentSchema = z
     body: z.string(),
     parentId: z.string().nullable(),
     resolved: z.boolean(),
+    /** `change_request` asks the build's author to address the comment; resolve it when done. */
+    kind: z.enum(COMMENT_KINDS),
+    resolvedAt: z.string().nullable(),
+    resolvedBy: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -245,6 +258,8 @@ export const commentCreateSchema = z
     /** Anchor to a story of the build; not together with `snapshotId`. */
     storyId: z.string().min(1).optional(),
     parentId: z.string().optional(),
+    /** `change_request` marks it as one the author is asked to address (default `comment`). */
+    kind: z.enum(COMMENT_KINDS).optional(),
   })
   .openapi("CommentCreateInput");
 

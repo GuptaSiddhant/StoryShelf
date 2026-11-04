@@ -3,6 +3,7 @@ import { MAX_BROWSERS, parseBrowsers, parseModesAllowlist } from "@storyshelf/co
 import type { Project } from "@storyshelf/core/schema";
 import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL_OVERRIDE } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
@@ -15,7 +16,6 @@ import {
   SelectField,
   TextareaField,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 import { targetChoices, type TargetChoices } from "./target-choices.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
