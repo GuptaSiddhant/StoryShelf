@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { CaptureJobModel } from "../../models/capture-job.ts";
+import { DEADLINE_CLEANUP_MS } from "./run-job.ts";
 import { gate, rig, recordingHandler } from "./test-fixtures.ts";
 import type { ConsumerJob, KindHandler } from "./types.ts";
 
@@ -392,6 +393,59 @@ describe("lease and cancel", () => {
     expect(ack).not.toHaveBeenCalled();
     expect(nack).not.toHaveBeenCalled();
     expect(await new CaptureJobModel(r.db).get(id)).toMatchObject({ status: "running" });
+    hold.open();
+    await consumer.stop();
+    await started;
+  });
+
+  it("hands a job past its deadline to lease expiry: redelivered, then failed on its last attempt", async () => {
+    const hold = gate();
+    const attempts: number[] = [];
+    const handler: KindHandler = {
+      run: async (job) => {
+        attempts.push(job.attempt ?? 0);
+        await hold.promise;
+      },
+    };
+    const r = rig({ handlers: { capture: handler }, retries: 1 });
+    const consumer = r.consume({ config: { concurrency: 1, maxRetries: 1, maxJobSeconds: 60 } });
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.clock.advance(61_000);
+    expect(attempts).toEqual([1]);
+    expect(await new CaptureJobModel(r.db).get(id)).toMatchObject({ status: "running" });
+
+    // The lease is no longer renewed: once it runs out the queue redelivers (attempt 2), and the
+    // second deadline leaves the last attempt to expire into a failed job.
+    await r.clock.advance(400_000);
+    expect(attempts).toEqual([1, 2]);
+    await r.clock.advance(400_000);
+    expect(await new CaptureJobModel(r.db).get(id)).toMatchObject({ status: "failed" });
+    hold.open();
+    await consumer.stop();
+    await started;
+  });
+
+  it("frees the slot when the cleanup of a job past its deadline stalls", async () => {
+    const seen: string[] = [];
+    const hold = gate();
+    const handler: KindHandler = {
+      run: async (job) => {
+        seen.push(job.buildId);
+        await hold.promise;
+      },
+      cancel: async () => await new Promise<void>(() => {}),
+    };
+    const r = rig({ handlers: { capture: handler } });
+    const consumer = r.consume({ config: { concurrency: 1, maxJobSeconds: 60 } });
+    const started = consumer.start();
+    await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.queue.enqueueJob({ kind: "capture", buildId: "b2" });
+    await r.clock.advance(61_000);
+    expect(seen).toEqual(["b1"]);
+    await r.clock.advance(DEADLINE_CLEANUP_MS + 3000);
+
+    expect(seen).toEqual(["b1", "b2"]);
     hold.open();
     await consumer.stop();
     await started;

@@ -6,7 +6,7 @@ import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
 import type { Logger } from "../../logger.ts";
 import { roundedTimings, runWithTimings } from "../../utils/timing.ts";
 import { keepJobLease, type JobLeaseKeeper, type LeaseEnd } from "../db-queue/keeper.ts";
-import type { QueueTimers } from "../db-queue/timers.ts";
+import { REAL_TIMERS, type QueueTimers } from "../db-queue/timers.ts";
 import { reportFinished, type ConsumerMetrics, type JobOutcome } from "./metrics.ts";
 import { backoffDelayMs, DEFAULT_BACKOFF_MS, isFinalAttempt } from "./retry.ts";
 import type { ConsumerJob, JobRunContext, KindHandler } from "./types.ts";
@@ -202,12 +202,12 @@ async function abandon(
   end: LeaseEnd,
 ): Promise<JobOutcome> {
   const { job, handler, logger } = held;
-  await handler.cancel?.(job).catch((error: unknown) => {
-    logger.warn({ err: error }, "failed to cancel the running job");
-  });
   if (end === "deadline") {
     return await endAtDeadline(rt, held);
   }
+  await handler.cancel?.(job).catch((error: unknown) => {
+    logger.warn({ err: error }, "failed to cancel the running job");
+  });
   if (end === "lost") {
     logger.warn("queue lease lost, aborting job");
     return "lost";
@@ -226,12 +226,46 @@ async function endAtDeadline(
   rt: JobRuntime,
   held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
 ): Promise<JobOutcome> {
+  const { job, handler, logger } = held;
   const seconds = Math.round((rt.maxJobMs ?? 0) / 1000);
-  held.logger.error({ seconds }, "job deadline exceeded; abandoning it to its lease");
-  await held.handler.deadlineExceeded?.(held.job, seconds).catch((error: unknown) => {
-    held.logger.warn({ err: error }, "failed to record the job deadline");
-  });
+  logger.error({ seconds }, "job deadline exceeded; abandoning it to its lease");
+  await boundedCleanup(rt, handler.cancel?.(job), logger, "cancel the job past its deadline");
+  await boundedCleanup(rt, handler.deadlineExceeded?.(job, seconds), logger, "record the deadline");
   return "deadline";
+}
+
+/** Longest the cleanup of a job past its deadline may hold the slot; the lease recovers the job. */
+export const DEADLINE_CLEANUP_MS = 10_000;
+
+/** Wait for `work` at most {@link DEADLINE_CLEANUP_MS}; a failure or a stall is logged, never thrown. */
+async function boundedCleanup(
+  rt: JobRuntime,
+  work: Promise<unknown> | undefined,
+  logger: Logger,
+  what: string,
+): Promise<void> {
+  if (work === undefined) {
+    return;
+  }
+  const timers = rt.timers ?? REAL_TIMERS;
+  const stalled = Promise.withResolvers<"stalled">();
+  const handle = timers.setTimeout(() => {
+    stalled.resolve("stalled");
+  }, DEADLINE_CLEANUP_MS);
+  const finished = work.then(
+    () => "finished" as const,
+    (error: unknown) => {
+      logger.warn({ err: error }, `failed to ${what}`);
+      return "finished" as const;
+    },
+  );
+  try {
+    if ((await Promise.race([finished, stalled.promise])) === "stalled") {
+      logger.warn({ what }, "cleanup past the deadline stalled; leaving it to the lease");
+    }
+  } finally {
+    timers.clearTimeout(handle);
+  }
 }
 
 /**

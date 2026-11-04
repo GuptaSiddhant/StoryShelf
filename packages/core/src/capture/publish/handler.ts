@@ -76,7 +76,7 @@ async function publishOnce(
   await completer.complete(job.buildId, { ok: true });
 }
 
-/** Extraction reports progress per entry: past the deadline the next report stops it. */
+/** Publishing reports progress after extraction and after persisting: past the deadline the next report stops it. */
 function touchUnlessAborted(context: { touch: () => void; signal: AbortSignal }): () => void {
   return () => {
     context.signal.throwIfAborted();
