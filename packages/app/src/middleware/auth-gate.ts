@@ -26,6 +26,14 @@ export async function resolveRequestUser(
 const PUBLISHED_STORYBOOK = /^\/projects\/[^/]+\/storybook(?:\/|$)/u;
 
 /**
+ * Short links to a published Storybook (`/_/<build id or project slug>/...`). The handler decides
+ * access itself (a public build opens, anything else answers like a private one), so a signed-out
+ * visitor with a link to a public build is not sent to login first (ADR 0011). Anchored: `/_s/` is
+ * the signed-URL prefix and `/_/` alone is not a link.
+ */
+const SHORT_LINK = /^\/_\/[^/]+(?:\/|$)/u;
+
+/**
  * Gate the server-rendered UI behind auth (ADR 0008): unauthenticated HTML
  * requests redirect to login. API/auth routes answer 401/403 themselves, and
  * published-Storybook routes enforce their own auth (public builds are
@@ -46,6 +54,7 @@ export function authGate() {
       path.startsWith(STORYBOOK_TOKEN_PREFIX) ||
       path.startsWith("/.well-known/") ||
       PUBLISHED_STORYBOOK.test(path) ||
+      SHORT_LINK.test(path) ||
       /^\/projects\/[^/]+\/?$/u.test(path)
     ) {
       await next();

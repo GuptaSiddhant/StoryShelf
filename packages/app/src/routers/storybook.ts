@@ -4,6 +4,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { storybookDir } from "@storyshelf/core/utils";
+import type { Context } from "hono";
 import { posix } from "node:path";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
@@ -23,6 +24,15 @@ async function staticsReady(projectId: string, buildId: string): Promise<boolean
   return await getStore().storage.exists(
     posix.join(storybookDir(projectId, buildId), "iframe.html"),
   );
+}
+
+/**
+ * The answer for a short link that names nothing the caller may open: a missing build or project
+ * and a private one look the same, so the link never confirms that a private id exists. Without
+ * sign-in every build is open, so a missing id is a plain 404.
+ */
+function unreachable(c: Context): Response | Promise<Response> {
+  return getStore().authEnabled ? c.redirect("/auth/login", 302) : c.notFound();
 }
 
 /** Register the published Storybook resolver and static-asset routes. */
@@ -54,14 +64,10 @@ export function registerStorybook(app: ShelfRouter): void {
   app.get("/_/:id", async (c) => {
     const id = c.req.param("id");
     const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
-    if (isUlid26) {
-      const build = await new BuildModel(getStore().db).get(id);
-      if (!build) notFound();
-    } else {
-      const project = await new ProjectModel(getStore().db).getBySlug(id);
-      if (!project) notFound();
-    }
-    return c.redirect(`/_/${id}/`, 302);
+    const found = isUlid26
+      ? await new BuildModel(getStore().db).get(id)
+      : await new ProjectModel(getStore().db).getBySlug(id);
+    return found ? c.redirect(`/_/${id}/`, 302) : unreachable(c);
   });
 
   app.get("/_/:id/*", async (c) => {
@@ -73,14 +79,14 @@ export function registerStorybook(app: ShelfRouter): void {
     let build: Build | null = null;
     if (isUlid26) {
       build = await new BuildModel(getStore().db).get(id);
-      if (!build) return c.notFound();
+      if (!build) return unreachable(c);
       project = await new ProjectModel(getStore().db).get(build.projectId);
-      if (!project) return c.notFound();
+      if (!project) return unreachable(c);
     } else {
       project = await new ProjectModel(getStore().db).getBySlug(id);
-      if (!project) return c.notFound();
+      if (!project) return unreachable(c);
       build = await new BuildModel(getStore().db).latestApprovedDefault(project);
-      if (!build) return c.notFound();
+      if (!build) return unreachable(c);
     }
     const access = await publishedAccess(build, project);
     if (!access) return c.redirect("/auth/login", 302);

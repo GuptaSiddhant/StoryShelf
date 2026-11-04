@@ -420,3 +420,66 @@ describe("storybook routes", () => {
     expect(bad.status).toBe(404);
   });
 });
+
+describe("short links for a signed-out visitor (auth on)", () => {
+  const PUBLIC_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+  const PRIVATE_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+  const UNKNOWN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
+
+  async function signedOutApp() {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ id: PUBLIC_ID, public: true }));
+    await db.insert(
+      db.tables.builds,
+      mockBuild({ id: PRIVATE_ID, public: false, gitBranch: "feature/x" }),
+    );
+    for (const id of [PUBLIC_ID, PRIVATE_ID]) {
+      objects.set(`${storybookDir("p1", id)}/index.html`, Buffer.from(`<html>${id}</html>`));
+      objects.set(`${storybookDir("p1", id)}/iframe.html`, Buffer.from("<html>preview</html>"));
+    }
+    return createShelfApp({ database: db, storage, logger: silentLogger, auth: stubAuth(null) });
+  }
+
+  it("opens a public build's short link without signing in", async () => {
+    const app = await signedOutApp();
+    const response = await app.request(`/_/${PUBLIC_ID}/`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(`<html>${PUBLIC_ID}</html>`);
+  });
+
+  it("redirects the no-slash form of a public link to the canonical one, not to login", async () => {
+    const app = await signedOutApp();
+    const response = await app.request(`/_/${PUBLIC_ID}`);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(`/_/${PUBLIC_ID}/`);
+  });
+
+  it("answers a private build and an unknown id with the same login redirect", async () => {
+    const app = await signedOutApp();
+    const answers = await Promise.all(
+      [PRIVATE_ID, UNKNOWN_ID]
+        .flatMap((id) => [`/_/${id}`, `/_/${id}/`, `/_/${id}/iframe.js`])
+        .map(async (path) => {
+          const response = await app.request(path);
+          return [response.status, response.headers.get("location")];
+        }),
+    );
+    // `/_/<id>` redirects to `/_/<id>/` for a build that exists; the canonical form is what must
+    // not tell the two apart.
+    const canonical = answers.filter((_answer, index) => index % 3 !== 0);
+    expect(canonical).toEqual(Array.from({ length: 4 }, () => [302, "/auth/login"]));
+    expect(answers[0]).toEqual([302, `/_/${PRIVATE_ID}/`]);
+    expect(answers[3]).toEqual([302, "/auth/login"]);
+  });
+
+  it("does not open the gate for other paths under /_", async () => {
+    const app = await signedOutApp();
+    const paths = ["/_", "/_/", "/_x/y", "/projects/test-project/builds"];
+    const responses = await Promise.all(paths.map(async (path) => await app.request(path)));
+    expect(
+      responses.map((response) => [response.status, response.headers.get("location")]),
+    ).toEqual(paths.map(() => [302, "/auth/login"]));
+  });
+});
