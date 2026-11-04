@@ -9,7 +9,7 @@ import {
 } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { notifyProjectWith, type NotifyDeps } from "./notify.ts";
 import { reviewRequestedData } from "./review-events.ts";
 import {
@@ -17,6 +17,14 @@ import {
   createReviewRequestHandler,
   reviewRequestExhausted,
 } from "./review-request-job.ts";
+
+/** The reviewers the owner rules assign, which a test sets directly. */
+const assigned = vi.hoisted(() => ({ list: [] as { userId: string; components: string[] }[] }));
+
+vi.mock("./review-assignment.ts", async (original) => ({
+  ...(await original<typeof import("./review-assignment.ts")>()),
+  assignedReviewersOf: () => Promise.resolve(assigned.list),
+}));
 
 const SECRET = "test-server-secret-32-chars-long!!";
 const CONTEXT = {
@@ -26,7 +34,11 @@ const CONTEXT = {
 };
 
 /** A person-addressed (email) and a room (chat) notifier that record what they send. */
-function notifiers(sent: string[], failing: { chat: boolean }): NotifierProvider[] {
+function notifiers(
+  sent: string[],
+  failing: { chat: boolean },
+  inputs: unknown[],
+): NotifierProvider[] {
   const make = (kind: string, audience: "person" | "room"): NotifierProvider => {
     const metadata = {
       name: kind,
@@ -42,6 +54,7 @@ function notifiers(sent: string[], failing: { chat: boolean }): NotifierProvider
         metadata,
         // oxlint-disable-next-line eslint/require-await -- send is async by contract
         send: async (input: { channel: { id: string } }) => {
+          inputs.push(input);
           if (kind === "chat" && failing.chat) {
             throw new Error("room refused");
           }
@@ -56,6 +69,7 @@ function notifiers(sent: string[], failing: { chat: boolean }): NotifierProvider
 async function setup(options: { origin?: boolean; queued?: boolean } = {}) {
   const { db } = makeDatabase();
   const sent: string[] = [];
+  const inputs: unknown[] = [];
   const failing = { chat: false };
   const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
   const build = await new BuildModel(db).create(project.id, { gitSha: "abc", gitBranch: "main" });
@@ -89,7 +103,7 @@ async function setup(options: { origin?: boolean; queued?: boolean } = {}) {
     },
     ui: {},
     logger: pino({ level: "silent" }),
-    notifiers: notifiers(sent, failing),
+    notifiers: notifiers(sent, failing, inputs),
   };
   const enqueue = createReviewRequestEnqueuer(deps, { get: () => queue });
   const queued: NotifyDeps = options.queued === false ? deps : { ...deps, reviewRequests: enqueue };
@@ -97,7 +111,7 @@ async function setup(options: { origin?: boolean; queued?: boolean } = {}) {
   const announce = async () => {
     await notifyProjectWith(queued, project, "review:requested", data, `/builds/${build.id}`);
   };
-  return { db, sent, failing, project, build, channel, queue, deps, announce, enqueue };
+  return { db, sent, inputs, failing, project, build, channel, queue, deps, announce, enqueue };
 }
 
 type Fixture = Awaited<ReturnType<typeof setup>>;
@@ -127,6 +141,13 @@ async function drain(fixture: Fixture, limit = 2): Promise<number> {
   /* oxlint-enable eslint/no-await-in-loop */
   return ran;
 }
+
+const person = (route: "default" | "assigned") => ({
+  kind: "user" as const,
+  userId: "appr1",
+  provider: "email",
+  route,
+});
 
 describe("review-request jobs", () => {
   it("queues one job per recipient, with references only", async () => {
@@ -259,5 +280,43 @@ describe("review-request jobs", () => {
   it("fails a malformed job without running it", () => {
     const handler = createReviewRequestHandler({} as NotifyDeps);
     expect(handler.accepts?.({ buildId: "b", data: { projectId: "p" } } as never)).toBe(false);
+  });
+  it("tells an assigned reviewer why they were asked", async () => {
+    const fx = await setup();
+    assigned.list = [{ userId: "appr1", components: ["Button"] }];
+    const eventId = `${fx.build.id}:0`;
+    await fx.enqueue({ projectId: fx.project.id, eventId, target: person("assigned") });
+    await drain(fx);
+    assigned.list = [];
+    expect(fx.sent).toEqual([expect.stringMatching(/^email:/u)]);
+    expect(JSON.stringify(fx.inputs)).toContain("because you own Button");
+  });
+
+  it("sends nothing to a default recipient who has been assigned since", async () => {
+    const fx = await setup();
+    assigned.list = [{ userId: "appr1", components: ["Button"] }];
+    const eventId = `${fx.build.id}:0`;
+    await fx.enqueue({ projectId: fx.project.id, eventId, target: person("default") });
+    await drain(fx);
+    assigned.list = [];
+    expect(fx.sent).toEqual([]);
+  });
+
+  it("sends nothing to a person disabled after the job was queued", async () => {
+    const fx = await setup();
+    await fx.enqueue({
+      projectId: fx.project.id,
+      eventId: `${fx.build.id}:0`,
+      target: person("default"),
+    });
+    await fx.db.update(fx.db.tables.users, "appr1", { disabled: true });
+    await drain(fx);
+    expect(fx.sent).toEqual([]);
+  });
+
+  it("refuses a job whose target has an unknown route", () => {
+    const handler = createReviewRequestHandler({} as NotifyDeps);
+    const data = { projectId: "p", eventId: "b:0", target: { ...person("default"), route: "x" } };
+    expect(handler.accepts?.({ buildId: "b", data } as never)).toBe(false);
   });
 });
