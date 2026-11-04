@@ -118,9 +118,7 @@ Dynamic content (a timestamp, an avatar, an ad) can be hidden before the screens
 - for migration, `.chromatic-ignore` and `[data-chromatic="ignore"]`, which need no change.
 
 ```ts
-export const Clock = {
-  parameters: { storyshelf: { ignoreSelectors: [".clock", "[data-testid=avatar]"] } },
-};
+export const Clock = { parameters: { storyshelf: { ignoreSelectors: [".clock", "[data-testid=avatar]"] } } };
 ```
 
 Both browser engines inject the same stylesheet, which sets `visibility: hidden` and `opacity: 0` on the element, so its whole subtree disappears while the layout stays put. An invalid selector is skipped with a warning in the build log and never fails the build; at most 50 selectors count per story. Baseline keys and the diff itself are unchanged, so **adding a mask produces a one-time expected diff** on the first build after it lands: approve it to refresh the baseline.
@@ -142,7 +140,7 @@ Both browser engines inject the same stylesheet, which sets `visibility: hidden`
 | **TurboSnap**             | Yes (dependency graph)                    | Yes — affected capture (on by default)     | Similar skip rates on Vite Storybooks; needs `fetch-depth: 0` and `preview-stats.json`              |
 | **Cross-browser**         | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
 | **Modes/Globals**         | Yes                                       | No                                         | Theme/locale matrices need workarounds                                                              |
-| **A11y testing**          | Yes (aXe)                                 | axe-core checks, on by default (`runA11y`) | Results are shown in review, not a review gate                                                      |
+| **A11y testing**          | Yes (aXe)                                 | axe-core checks, on by default (`runA11y`) | Results are shown in review, not a review gate                                             |
 | **Cloud parallelization** | Automatic                                 | Manual (`testing.concurrency`)             | Limited by your server CPU/memory                                                                   |
 | **Baseline export**       | UI only                                   | API + UI                                   | Cannot bulk-import Chromatic baselines                                                              |
 | **Flake detection**       | Auto-detect                               | Explicit `flakyTest`                       | Manual marking required                                                                             |
