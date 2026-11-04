@@ -138,6 +138,17 @@ describe("runMigrations: MySQL 8 compatibility", () => {
   });
 });
 
+describe("runMigrations: builds.capture_generation", () => {
+  it("adds the run generation as a NOT NULL column defaulting to 0", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+
+    expect(queries).toContain(
+      "ALTER TABLE builds ADD COLUMN capture_generation INTEGER NOT NULL DEFAULT 0",
+    );
+  });
+});
+
 /** The `users` table block of the DDL. */
 function usersDdl(): string {
   const start = DDL.indexOf("CREATE TABLE IF NOT EXISTS users (");

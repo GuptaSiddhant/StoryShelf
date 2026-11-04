@@ -2,7 +2,7 @@ import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { createShelfLogger } from "../logger.ts";
@@ -19,6 +19,13 @@ import { failCrashedCapture } from "./crash-failure.ts";
 import type { DispatchDeps } from "./dispatch.ts";
 import { executeCaptureJob, type ShardJob } from "./orchestrator.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
+import { reduceBuild } from "./shards/reduce.ts";
+
+// Counts the calls; the real reduction still runs.
+vi.mock("./shards/reduce.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./shards/reduce.ts")>();
+  return { ...original, reduceBuild: vi.fn(original.reduceBuild) };
+});
 
 const SECRET = "test-secret-0123456789abcdef";
 
@@ -123,6 +130,31 @@ async function world(stories = 1) {
   return { db, deps, project, builds, build, queued, status, git };
 }
 
+/** All siblings done, the crashed one last: failing it finalizes the build. */
+async function lastShardCrashed() {
+  const w = await world(25);
+  const attempts = new CaptureAttemptModel(w.db, tables(w.db));
+  const started = await attempts.startAttempt(w.project.id, w.build.id);
+  await attempts.markRunning(started.id);
+  await executeCaptureJob(
+    {
+      buildId: w.build.id,
+      attempt: { id: started.id, attemptNo: started.attemptNo, projectId: w.project.id },
+    },
+    w.deps.jobOptions,
+  );
+  const [crashed, ...rest] = w.queued;
+  for (const job of rest) {
+    // oxlint-disable-next-line no-await-in-loop -- shards one after another
+    await executeCaptureShard(job, w.deps.jobOptions);
+  }
+  const openAttempts = async () =>
+    (await attempts.listByBuild(w.build.id)).filter(
+      (attempt) => attempt.status === "queued" || attempt.status === "running",
+    );
+  return { w, crashed: crashed as ShardJob, attempts, openAttempts };
+}
+
 describe("failCrashedCapture", () => {
   it("fails a whole-build job and closes its open attempt", async () => {
     const w = await world();
@@ -192,10 +224,174 @@ describe("failCrashedCapture", () => {
     expect(outcome).toBe("finalized");
     expect(await w.status()).toBe("failed");
   });
+  describe("a crashed shard whose build was already finalized", () => {
+    it("closes the attempt on retry, without finalizing the build again", async () => {
+      const { w, crashed, attempts, openAttempts } = await lastShardCrashed();
+      // The close step fails once, after `reduceBuild` finalized the build.
+      const close = vi
+        .spyOn(CaptureAttemptModel.prototype, "markFinished")
+        .mockRejectedValueOnce(new Error("database went away"));
+      await expect(
+        failCrashedCapture(w.deps, crashed, "exited 3 times").finally(() => {
+          close.mockRestore();
+        }),
+      ).rejects.toThrow("database went away");
+      expect(await w.status()).toBe("failed");
+      expect(await openAttempts()).toHaveLength(1);
+      const finalizedAt = (await w.builds.get(w.build.id))?.updatedAt;
+      vi.mocked(reduceBuild).mockClear();
+
+      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times");
+
+      expect(outcome).toBe("finalized");
+      expect(await openAttempts()).toHaveLength(0);
+      const [closed] = await attempts.listByBuild(w.build.id);
+      expect(closed).toMatchObject({ status: "failed", error: "exited 3 times" });
+      expect(await w.status()).toBe("failed");
+      expect((await w.builds.get(w.build.id))?.updatedAt).toBe(finalizedAt);
+      expect(reduceBuild).not.toHaveBeenCalled();
+
+      // The counts equal what an uninterrupted pass records for the same plan and shards.
+      const reference = await lastShardCrashed();
+      await failCrashedCapture(reference.w.deps, reference.crashed, "exited 3 times");
+      const [normal] = await reference.attempts.listByBuild(reference.w.build.id);
+      expect(normal?.storyCount).toBeGreaterThan(0);
+      expect(normal?.failedCount).toBeGreaterThan(0);
+      expect(closed).toMatchObject({
+        storyCount: normal?.storyCount,
+        failedCount: normal?.failedCount,
+      });
+    });
+
+    it("skips when the first pass closed everything", async () => {
+      const { w, crashed } = await lastShardCrashed();
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("finalized");
+      vi.mocked(reduceBuild).mockClear();
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+      expect(reduceBuild).not.toHaveBeenCalled();
+    });
+
+    it("leaves a newer run's attempt alone when the hook arrives after a retry", async () => {
+      const { w, crashed, attempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "failed");
+      // A retry replaced the plan: its rows were cleared and a new plan, with its own attempt, written.
+      const shards = new CaptureShardModel(w.db);
+      const newer = await attempts.startAttempt(w.project.id, w.build.id);
+      await shards.clearBuild(w.build.id);
+      await shards.createPlan(
+        w.project.id,
+        w.build.id,
+        { attemptId: newer.id, payload: "{}", result: "{}" },
+        [{ payload: "{}" }],
+      );
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+      const rows = await attempts.listByBuild(w.build.id);
+      expect(rows.find((row) => row.id === newer.id)?.status).toBe("queued");
+    });
+    it("closes the attempt as cancelled, without the error, when the build was cancelled", async () => {
+      const { w, crashed, attempts, openAttempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "cancelled");
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("finalized");
+
+      expect(await openAttempts()).toHaveLength(0);
+      const [closed] = await attempts.listByBuild(w.build.id);
+      expect(closed).toMatchObject({ status: "cancelled", error: null, storyCount: 0 });
+      expect(await w.status()).toBe("cancelled");
+      // Cancel is not a failure: nothing is reported to the git channel as one.
+      expect(w.git.calls.map((call) => call.state)).not.toContain("failure");
+    });
+
+    it("leaves the attempt alone when the build ended some other way", async () => {
+      const { w, crashed, openAttempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "approved");
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+      expect(await openAttempts()).toHaveLength(1);
+    });
+
+    it("leaves the attempt to the worker that finalized the build when the crashed shard is done", async () => {
+      const { w, crashed, openAttempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "failed");
+      // A duplicate delivery crashed on a shard another run already finished.
+      await new CaptureShardModel(w.db).complete(crashed.shard ?? "", "{}");
+
+      expect(await failCrashedCapture(w.deps, crashed, "exited 3 times")).toBe("skipped");
+      expect(await openAttempts()).toHaveLength(1);
+    });
+
+    it("does not overwrite an attempt another writer completes between the read and the write", async () => {
+      const { w, crashed, attempts } = await lastShardCrashed();
+      await w.builds.setStatus(w.build.id, "failed"); // an earlier pass already finalized the build
+      const [older] = await attempts.listByBuild(w.build.id);
+      const original = CaptureAttemptModel.prototype.closeIfOpen;
+      // The worker that finalized the build completes the attempt just before the hook's write.
+      const close = vi
+        .spyOn(CaptureAttemptModel.prototype, "closeIfOpen")
+        .mockImplementation(async function (this: CaptureAttemptModel, ...args) {
+          await this.markFinished(older?.id ?? "", "completed", undefined, {
+            storyCount: 25,
+            failedCount: 0,
+          });
+          return await original.apply(this, args);
+        });
+
+      // `finally` restores the spy even when the call rejects, so it cannot leak into later tests.
+      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times").finally(() => {
+        close.mockRestore();
+      });
+
+      expect(outcome).toBe("skipped");
+      const [kept] = await attempts.listByBuild(w.build.id);
+      expect(kept).toMatchObject({ status: "completed", error: null, storyCount: 25 });
+    });
+
+    it("closes only the old run's attempt when a retry replaces the plan mid-cleanup", async () => {
+      const { w, crashed, attempts } = await lastShardCrashed();
+      const shards = new CaptureShardModel(w.db);
+      const [older] = await attempts.listByBuild(w.build.id);
+      await w.builds.setStatus(w.build.id, "failed"); // an earlier pass already finalized the build
+      const original = CaptureShardModel.prototype.get;
+      let reads = 0;
+      // The retry lands right after the cleanup's third shard read: the guard in `failShard`, the
+      // one inside `fail`, then the check in `closeEndedAttempt` (before or after its plan read).
+      const get = vi.spyOn(CaptureShardModel.prototype, "get").mockImplementation(async function (
+        this: CaptureShardModel,
+        id: string,
+      ) {
+        const row = await original.call(this, id);
+        reads += 1;
+        if (reads === 3) {
+          const newer = await attempts.startAttempt(w.project.id, w.build.id);
+          await shards.clearBuild(w.build.id);
+          await shards.createPlan(
+            w.project.id,
+            w.build.id,
+            { attemptId: newer.id, payload: "{}", result: "{}" },
+            [{ payload: "{}" }],
+          );
+        }
+        return row;
+      });
+
+      const outcome = await failCrashedCapture(w.deps, crashed, "exited 3 times").finally(() => {
+        get.mockRestore();
+      });
+
+      expect(outcome).toBe("finalized");
+      const rows = await attempts.listByBuild(w.build.id);
+      expect(rows.find((row) => row.id === older?.id)?.status).toBe("failed");
+      const newer = rows.find((row) => row.id !== older?.id);
+      expect(newer?.status).toBe("queued");
+    });
+  });
+
   it("fails the build its job still owns", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
 
     const outcome = await failCrashedCapture(
       w.deps,
@@ -210,10 +406,10 @@ describe("failCrashedCapture", () => {
   it("leaves a rerun alone when the hook of the run that ended arrives late", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     // J1 exhausted; the build is retried and queued again as J2 before J1's hook runs.
     await w.builds.resetStatus(w.build.id, "pending");
-    await w.builds.stampCaptureJob(w.build.id, "J2");
+    await w.builds.stampCaptureJob(w.build.id, "J2", 1);
     await w.builds.setStatus(w.build.id, "capturing");
 
     const outcome = await failCrashedCapture(
@@ -245,7 +441,7 @@ describe("failCrashedCapture", () => {
   it("reports one failure when the hook runs twice with nothing left to clean up", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     const job = { buildId: w.build.id, jobId: "J1" };
 
     expect(await failCrashedCapture(w.deps, job, "lease exhausted")).toBe("failed");
@@ -255,7 +451,7 @@ describe("failCrashedCapture", () => {
   it("leaves open an attempt a newer run began after this run failed the build", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     const { build: failed } = await w.builds.failIfOwnedBy(w.build.id, "J1");
     const attempts = new CaptureAttemptModel(w.db, tables(w.db));
     const newer = await attempts.startAttempt(w.project.id, w.build.id);
@@ -279,7 +475,7 @@ describe("failCrashedCapture", () => {
   it("finishes the cleanup when the first run failed the build but not its attempts", async () => {
     const w = await world();
     await w.builds.setStatus(w.build.id, "capturing");
-    await w.builds.stampCaptureJob(w.build.id, "J1");
+    await w.builds.stampCaptureJob(w.build.id, "J1", 0);
     const attempts = new CaptureAttemptModel(w.db, tables(w.db));
     const attempt = await attempts.startAttempt(w.project.id, w.build.id);
     await attempts.markRunning(attempt.id);

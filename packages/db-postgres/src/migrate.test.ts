@@ -448,3 +448,46 @@ describe("runMigrations: builds.capture_job_id", () => {
     ]);
   }, 60_000);
 });
+
+describe("runMigrations: a failing build-column ALTER stops the boot", () => {
+  it.each(["review_cycle", "review_requested_cycle", "capture_job_id", "capture_generation"])(
+    "does not swallow a failure adding builds.%s",
+    async (column) => {
+      const client = new PGlite();
+      const inner = runnerFor(client);
+      const failing = async (sql: string): Promise<unknown[]> => {
+        if (sql.startsWith(`ALTER TABLE builds ADD COLUMN IF NOT EXISTS ${column} `)) {
+          throw new Error(`permission denied for table builds (${column})`);
+        }
+        return await inner(sql);
+      };
+      await expect(runMigrations(failing)).rejects.toThrow(
+        `permission denied for table builds (${column})`,
+      );
+      await client.close();
+    },
+    60_000,
+  );
+});
+
+describe("runMigrations: builds.capture_generation", () => {
+  it("adds the run generation at 0 to existing builds, and again without harm", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES
+        ('b', 'p', 'a', 'main', 'capturing', now(), now());
+      ALTER TABLE builds DROP COLUMN capture_generation;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const rows = await client.query<{ capture_generation: number }>(
+      "SELECT capture_generation FROM builds WHERE id = 'b'",
+    );
+    expect(rows.rows).toEqual([{ capture_generation: 0 }]);
+  }, 60_000);
+});
