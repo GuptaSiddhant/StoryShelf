@@ -1,3 +1,4 @@
+import { readOwnerRules } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -14,6 +15,7 @@ import {
   SelectField,
   Table,
 } from "../ui/components.tsx";
+import { ComponentOwnersCard, type OwnersFormState } from "./settings-component-owners.tsx";
 
 /** Project member row as rendered in the members settings tab. */
 export interface SettingsMember {
@@ -30,7 +32,7 @@ export function renderSettingsMembers(
   members: SettingsMember[],
   groupMappings: ProjectGroupMapping[],
   isAdmin: boolean,
-  formState?: { globalError?: string },
+  formState?: { globalError?: string } & OwnersFormState,
 ): unknown {
   return (
     <div class="grid max-w-form">
@@ -38,7 +40,7 @@ export function renderSettingsMembers(
       <Card>
         <SectionTitle>Members</SectionTitle>
         <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
-        <Table>
+        <Table label="Members">
           <table>
             <thead>
               <tr>
@@ -125,6 +127,15 @@ export function renderSettingsMembers(
       ) : null}
 
       <div class="mt-1">
+        <ComponentOwnersCard
+          project={project}
+          rules={readOwnerRules(project.componentOwners)}
+          isAdmin={isAdmin}
+          formState={formState}
+        />
+      </div>
+
+      <div class="mt-1">
         <Card>
           <SectionTitle level={3}>Identity-provider group mappings</SectionTitle>
           <Meta>
@@ -132,7 +143,7 @@ export function renderSettingsMembers(
             next login; removing a mapping revokes synced grants but never manual ones. Wildcards
             are not expanded.
           </Meta>
-          <Table>
+          <Table label="Identity-provider group mappings">
             <table>
               <thead>
                 <tr>

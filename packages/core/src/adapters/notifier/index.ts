@@ -20,6 +20,7 @@ export type {
   MessageNotifierMetadata,
   MessageNotifierProvider,
   NotifierAdapter,
+  NotifierAudience,
   NotifierDelivery,
   NotifierMetadata,
   NotifierProvider,

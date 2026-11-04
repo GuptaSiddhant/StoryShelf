@@ -217,18 +217,24 @@ async function memberProject(slug: string, userId: string): Promise<Project | nu
   return isMember ? project : null;
 }
 
-/** Enable (opt-in email) or disable (remove) a subscription. */
+/**
+ * Enable or disable the viewer's email subscription. Disabling keeps the row (switched off), so
+ * it stays recorded and the person is not handed back to the default recipients; enabling an
+ * existing row keeps its topics and review-request choice.
+ */
 async function applyProfileToggle(
   projectId: string,
   userId: string,
   enable: boolean,
 ): Promise<void> {
   const model = new NotificationSubscriptionModel(getStore().db);
-  if (enable) {
-    await model.upsert(projectId, userId, { via: ["email"] });
+  if (await model.getFor(projectId, userId)) {
+    await model.setEnabled(projectId, userId, enable);
     return;
   }
-  await model.remove(projectId, userId);
+  if (enable) {
+    await model.upsert(projectId, userId, { via: ["email"] });
+  }
 }
 
 function registerPasswordRoute(app: ShelfRouter, auth: Auth): void {

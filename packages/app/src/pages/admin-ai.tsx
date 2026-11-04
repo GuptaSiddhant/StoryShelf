@@ -17,7 +17,7 @@ function DaysTable(props: {
   days: UsageReport["days"];
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <Table dense>
+    <Table dense label="AI usage by day">
       <table>
         <thead>
           <tr>
@@ -46,7 +46,7 @@ function ProfilesTable(props: {
   profiles: UsageReport["profiles"];
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <Table dense>
+    <Table dense label="AI usage by profile">
       <table>
         <thead>
           <tr>

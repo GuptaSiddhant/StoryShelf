@@ -24,7 +24,7 @@ import {
 } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
-import { matchesEvent } from "@storyshelf/core/utils";
+import { COMMENT_MENTIONED, matchesEvent } from "@storyshelf/core/utils";
 import { credentialKeys } from "./credential-keys.ts";
 import { clearPaused, notificationOrigin, warnPaused } from "./notifications-pause.ts";
 import { getStore } from "./store.ts";
@@ -110,14 +110,20 @@ function recordOutcomes(
   };
 }
 
-/** Subscriptions matching an event (enabled + allowlist, alias included). */
+/** The one default-on topic, which a subscription can switch off with `reviewRequests`. */
+const REVIEW_REQUESTED = "review:requested";
+
+/** Subscriptions matching an event (enabled + allowlist, alias included, review requests on). */
 function matchingSubs(
   rows: NotificationSubscriptionRow[],
   event: string,
   data: Record<string, unknown>,
 ): NotificationSubscriptionRow[] {
   return rows.filter(
-    (row) => row.enabled && matchesEvent(NotificationSubscriptionModel.eventsOf(row), event, data),
+    (row) =>
+      row.enabled &&
+      (event !== REVIEW_REQUESTED || row.reviewRequests) &&
+      matchesEvent(NotificationSubscriptionModel.eventsOf(row), event, data),
   );
 }
 
@@ -132,20 +138,62 @@ function admittedChannels(
     .map((channel) => Object.assign({}, channel, { events: [] }));
 }
 
-/** Per-subscriber targets for one subscription (wired kinds only). */
+/** The notifier kinds a fan-out may use, and which of them address one person. */
+interface DeliveryKinds {
+  /** Every wired kind. */
+  wired: ReadonlySet<string>;
+  /** The wired kinds whose provider declares `audience: "person"`: all a subscription may use. */
+  personal: ReadonlySet<string>;
+  /** Called for a subscription kind that is wired but not personal, so it can be logged. */
+  skipped: (subscriptionId: string, kind: string) => void;
+}
+
+/** Subscription kinds already logged as skipped, so each is reported once per process. */
+const reportedSkips = new Set<string>();
+
+/** The kinds of a fan-out, with the once-per-subscription-and-kind warning for room kinds. */
+function deliveryKindsOf(deps: Pick<NotifyDeps, "notifiers" | "logger">): DeliveryKinds {
+  return {
+    wired: new Set(deps.notifiers.map((candidate) => candidate.metadata.kind)),
+    personal: new Set(
+      deps.notifiers
+        .filter((candidate) => candidate.metadata.audience === "person")
+        .map((candidate) => candidate.metadata.kind),
+    ),
+    skipped: (subscriptionId, kind) => {
+      const key = `${subscriptionId}:${kind}`;
+      if (!reportedSkips.has(key)) {
+        reportedSkips.add(key);
+        deps.logger.warn(
+          { subscriptionId, kind },
+          "subscription skips a delivery kind that posts to a room; use a project channel",
+        );
+      }
+    },
+  };
+}
+
+/**
+ * Per-subscriber targets for one subscription: its personal kinds only. A kind that posts to a
+ * room (or is not wired) is skipped, the former with one warning, and the rest still deliver.
+ */
 async function targetsForSub(
   db: DatabaseAdapter,
   sub: NotificationSubscriptionRow,
-  wired: ReadonlySet<string>,
+  kinds: DeliveryKinds,
 ): Promise<NotificationChannel[]> {
   const user = await new UserModel(db).get(sub.userId);
   if (!user || user.disabled) {
     return [];
   }
-  const kinds = NotificationSubscriptionModel.viaOf(sub);
-  const wants = kinds.length > 0 ? kinds : ["email"];
-  return wants
-    .filter((kind) => wired.has(kind))
+  const via = NotificationSubscriptionModel.viaOf(sub);
+  const wants = via.length > 0 ? via : ["email"];
+  const wired = wants.filter((kind) => kinds.wired.has(kind));
+  for (const kind of wired.filter((entry) => !kinds.personal.has(entry))) {
+    kinds.skipped(sub.id, kind);
+  }
+  return wired
+    .filter((kind) => kinds.personal.has(kind))
     .map((kind) => ({
       id: `sub:${sub.id}:${kind}`,
       projectId: sub.projectId,
@@ -160,47 +208,58 @@ async function targetsForSub(
  * Topics that reach a project's approvers and admins unless they opted out (ADR 0013, decision 4).
  * Every other topic (`design:changed` included) reaches only people who subscribed to it.
  */
-const DEFAULT_ON_EVENTS: ReadonlySet<string> = new Set(["review:requested"]);
+const DEFAULT_ON_EVENTS: ReadonlySet<string> = new Set([REVIEW_REQUESTED]);
 
 /** Roles that review builds: the default recipients of {@link DEFAULT_ON_EVENTS}. */
 const REVIEWER_ROLES: ReadonlySet<string> = new Set(["approver", "admin"]);
 
 /**
  * Reviewers with no subscription row for the project: a default-on topic reaches them by email.
- * Anyone with a row decides for themselves (`enabled` off or a topic list without the event opts
- * out), so a row never adds a second message here.
+ * Anyone with a row decides for themselves (`enabled` off, `reviewRequests` off or a topic list
+ * without the event opts out), so a row never adds a second message here.
  */
 async function defaultTargets(
   db: DatabaseAdapter,
   projectId: string,
   rows: NotificationSubscriptionRow[],
-  wired: ReadonlySet<string>,
+  kinds: DeliveryKinds,
+  skipUsers: ReadonlySet<string>,
 ): Promise<NotificationChannel[]> {
-  if (!wired.has("email")) {
+  if (!kinds.personal.has("email")) {
     return [];
   }
   const subscribed = new Set(rows.map((row) => row.userId));
   const members = (await new MemberModel(db).list(projectId)).filter(
-    (member) => REVIEWER_ROLES.has(member.role) && !subscribed.has(member.userId),
+    (member) =>
+      REVIEWER_ROLES.has(member.role) &&
+      !subscribed.has(member.userId) &&
+      !skipUsers.has(member.userId),
   );
   const targets = await Promise.all(
-    members.map(async (member): Promise<NotificationChannel[]> => {
-      const user = await new UserModel(db).get(member.userId);
-      return !user || user.disabled
-        ? []
-        : [
-            {
-              id: `default:${projectId}:${member.userId}`,
-              projectId,
-              provider: "email",
-              config: { to: user.email },
-              events: [],
-              enabled: true,
-            },
-          ];
-    }),
+    members.map(async (member) => await emailTarget(db, projectId, member.userId)),
   );
   return targets.flat();
+}
+
+/** The default email target of one user (none for a missing or disabled account). */
+async function emailTarget(
+  db: DatabaseAdapter,
+  projectId: string,
+  userId: string,
+): Promise<NotificationChannel[]> {
+  const user = await new UserModel(db).get(userId);
+  return !user || user.disabled
+    ? []
+    : [
+        {
+          id: `default:${projectId}:${userId}`,
+          projectId,
+          provider: "email",
+          config: { to: user.email },
+          events: [],
+          enabled: true,
+        },
+      ];
 }
 
 /** Per-subscriber targets for an event (only kinds that are wired). */
@@ -209,16 +268,52 @@ async function subscriberTargets(
   projectId: string,
   event: string,
   data: Record<string, unknown>,
-  wired: ReadonlySet<string>,
+  kinds: DeliveryKinds,
+  skipUsers: ReadonlySet<string>,
 ): Promise<NotificationChannel[]> {
-  const rows = await new NotificationSubscriptionModel(db).list(projectId);
+  const all = await new NotificationSubscriptionModel(db).list(projectId);
+  const rows = all.filter((row) => !skipUsers.has(row.userId));
   const nested = await Promise.all(
-    matchingSubs(rows, event, data).map(async (sub) => await targetsForSub(db, sub, wired)),
+    matchingSubs(rows, event, data).map(async (sub) => await targetsForSub(db, sub, kinds)),
   );
   const defaults = DEFAULT_ON_EVENTS.has(event)
-    ? await defaultTargets(db, projectId, rows, wired)
+    ? await defaultTargets(db, projectId, rows, kinds, skipUsers)
     : [];
   return [...nested.flat(), ...defaults];
+}
+
+/** Narrowing options of a project fan-out. */
+export interface NotifyOptions {
+  /**
+   * Users who already get this event another way (a mention, or an assignment from the component
+   * owners): their subscriptions and the default recipients skip it.
+   */
+  skipUsers?: ReadonlySet<string>;
+}
+
+/** Send one event to the given channels with the brand and a review link under `origin`. */
+async function deliver(
+  deps: NotifyDeps,
+  project: Pick<Project, "id" | "slug">,
+  message: { event: string; data: Record<string, unknown>; reviewUrl: string | undefined },
+  channels: NotificationChannel[],
+): Promise<void> {
+  await emitNotifications(
+    {
+      event: message.event,
+      projectId: project.id,
+      projectSlug: project.slug,
+      data: message.data,
+      timestamp: now(),
+    },
+    {
+      notifiers: deps.notifiers,
+      channels,
+      brand: brandFor(deps.ui, deps.notificationsConfig, message.reviewUrl),
+      logger: deps.logger,
+      onOutcome: recordOutcomes(deps),
+    },
+  );
 }
 
 /**
@@ -231,6 +326,7 @@ export async function notifyProjectWith(
   event: string,
   data: Record<string, unknown>,
   reviewSuffix?: string,
+  options: NotifyOptions = {},
 ): Promise<void> {
   if (deps.notifiers.length === 0) {
     return;
@@ -240,19 +336,105 @@ export async function notifyProjectWith(
     return;
   }
   const reviewUrl = reviewSuffix ? reviewUrlFor(origin, project.slug, reviewSuffix) : undefined;
-  const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
+  const kinds = deliveryKindsOf(deps);
   const channels = admittedChannels(await loadChannels(deps, project.id), event, data);
-  const targets = await subscriberTargets(deps.db, project.id, event, data, wired);
-  await emitNotifications(
-    { event, projectId: project.id, projectSlug: project.slug, data, timestamp: now() },
-    {
-      notifiers: deps.notifiers,
-      channels: [...channels, ...targets],
-      brand: brandFor(deps.ui, deps.notificationsConfig, reviewUrl),
-      logger: deps.logger,
-      onOutcome: recordOutcomes(deps),
-    },
+  const targets = await subscriberTargets(
+    deps.db,
+    project.id,
+    event,
+    data,
+    kinds,
+    options.skipUsers ?? new Set(),
   );
+  await deliver(deps, project, { event, data, reviewUrl }, [...channels, ...targets]);
+}
+
+/**
+ * Where a mention of `userId` is delivered (#463): their own subscription's channels when they
+ * have one and it is enabled (a disabled one opts them out), else a default email. Never a stored
+ * project channel: a mention is addressed to one person and must not reach a room.
+ */
+async function mentionTargets(
+  db: DatabaseAdapter,
+  projectId: string,
+  userId: string,
+  kinds: DeliveryKinds,
+): Promise<NotificationChannel[]> {
+  const rows = await new NotificationSubscriptionModel(db).list(projectId);
+  const own = rows.find((row) => row.userId === userId);
+  // The record of "no review requests" opts out of those and nothing else: they still get a
+  // mention by default email.
+  if (own !== undefined && !NotificationSubscriptionModel.isReviewOptOutOnly(own)) {
+    return own.enabled ? await targetsForSub(db, own, kinds) : [];
+  }
+  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId) : [];
+}
+
+/**
+ * Where a review request is delivered to a member assigned as a component owner (#465): their own
+ * subscription's channels when it is enabled, else a default email. Being assigned overrides an
+ * opt-out (a disabled subscription, or a topic list without `review:requested`), because someone
+ * asked for this person by name. Never a stored project channel: the request is for one person.
+ */
+async function assignedTargets(
+  db: DatabaseAdapter,
+  projectId: string,
+  userId: string,
+  kinds: DeliveryKinds,
+): Promise<NotificationChannel[]> {
+  const own = (await new NotificationSubscriptionModel(db).list(projectId)).find(
+    (row) => row.userId === userId,
+  );
+  // `targetsForSub` keeps personal kinds only, so a state or room kind never counts as a target.
+  const chosen = own?.enabled ? await targetsForSub(db, own, kinds) : [];
+  if (chosen.length > 0) {
+    return chosen;
+  }
+  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId) : [];
+}
+
+/**
+ * Send a review request to one member assigned from the component owners. The regular fan-out
+ * skips them (see `NotifyOptions.skipUsers`), so they get exactly one message per cycle.
+ */
+export async function notifyAssignedWith(
+  deps: NotifyDeps,
+  project: Pick<Project, "id" | "slug">,
+  userId: string,
+  data: Record<string, unknown>,
+  reviewSuffix: string,
+): Promise<void> {
+  if (deps.notifiers.length === 0) {
+    return;
+  }
+  const event = "review:requested";
+  const origin = await originOrPause(deps, event);
+  if (origin === undefined) {
+    return;
+  }
+  const targets = await assignedTargets(deps.db, project.id, userId, deliveryKindsOf(deps));
+  const reviewUrl = reviewUrlFor(origin, project.slug, reviewSuffix);
+  await deliver(deps, project, { event, data, reviewUrl }, targets);
+}
+
+/** Notify one project member that a comment mentions them. Best-effort, like every fan-out. */
+export async function notifyMentionWith(
+  deps: NotifyDeps,
+  project: Pick<Project, "id" | "slug">,
+  userId: string,
+  data: Record<string, unknown>,
+  reviewSuffix: string,
+): Promise<void> {
+  if (deps.notifiers.length === 0) {
+    return;
+  }
+  const origin = await originOrPause(deps, COMMENT_MENTIONED);
+  if (origin === undefined) {
+    return;
+  }
+  const targets = await mentionTargets(deps.db, project.id, userId, deliveryKindsOf(deps));
+  const reviewUrl = reviewUrlFor(origin, project.slug, reviewSuffix);
+  await deliver(deps, project, { event: COMMENT_MENTIONED, data, reviewUrl }, targets);
 }
 
 /**
@@ -264,8 +446,9 @@ export async function notifyProject(
   event: string,
   data: Record<string, unknown>,
   reviewSuffix?: string,
+  options?: NotifyOptions,
 ): Promise<void> {
-  await notifyProjectWith(getStore(), project, event, data, reviewSuffix);
+  await notifyProjectWith(getStore(), project, event, data, reviewSuffix, options);
 }
 
 /** Fan out a site-wide admin alert to project-less channels. */

@@ -301,7 +301,7 @@ function CapturedHistory(props: {
   return (
     <Card>
       <SectionTitle>Captured builds</SectionTitle>
-      <Table>
+      <Table label="Captured builds">
         <table>
           <thead>
             <tr>

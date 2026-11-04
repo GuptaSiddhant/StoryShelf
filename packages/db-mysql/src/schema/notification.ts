@@ -31,6 +31,7 @@ export const notificationSubscriptions = mysqlTable("notification_subscriptions"
   events: text("events"),
   via: text("via"),
   enabled: boolean("enabled").notNull().default(true),
+  reviewRequests: boolean("review_requests").notNull().default(true),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
 });
 
@@ -58,5 +59,6 @@ export interface NotificationSubscription {
   events: string | null;
   via: string | null;
   enabled: boolean;
+  reviewRequests: boolean;
   createdAt: string;
 }

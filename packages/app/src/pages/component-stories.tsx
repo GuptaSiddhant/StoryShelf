@@ -51,7 +51,7 @@ export function StoriesTab(props: { data: ComponentPageData }): Rendered {
         />
       ) : null}
       <Card padded={false}>
-        <Table>
+        <Table label="Stories in this build">
           <table>
             <thead>
               <tr>
@@ -178,7 +178,7 @@ export function ComponentBuilds(props: { data: ComponentPageData }): Rendered {
   return (
     <Card>
       <SectionTitle>Published builds</SectionTitle>
-      <Table>
+      <Table label="Published builds">
         <table>
           <thead>
             <tr>

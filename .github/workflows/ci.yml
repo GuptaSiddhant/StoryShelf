@@ -1,7 +1,8 @@
 name: CI
 
-# `verify` runs build/lint/test and smoke checks; `website` builds the docs site and runs its
-# link and accessibility checks; `capture` (capture.yml) runs the
+# `verify` runs build/lint/test and smoke checks; `storybook-dev` opens every story of the app's
+# Storybook in the dev server (the production build tree-shakes what the dev server still runs);
+# `website` builds the docs site and runs its link and accessibility checks; `capture` (capture.yml) runs the
 # real-browser capture tests on storybook-9; `fly` (fly-dry-run.yml) is the deploy dry run.
 # Every Storybook fixture and the Fly dry run also run nightly (nightly.yml).
 #
@@ -39,6 +40,7 @@ jobs:
       website: ${{ steps.detect.outputs.website }}
       heavy: ${{ steps.detect.outputs.heavy }}
       full: ${{ steps.detect.outputs.full }}
+      app: ${{ steps.detect.outputs.app }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -64,6 +66,7 @@ jobs:
           website=true
           heavy=true
           full=true
+          app=true
           case "$EVENT" in
             pull_request)
               # HEAD is the PR merge commit: first parent is the base branch tip.
@@ -80,6 +83,9 @@ jobs:
             echo "changed files:"; cat changed.txt
             if grep -qE '^apps/website/' changed.txt; then website=true; else website=false; fi
             if grep -vqE "$IGNORABLE" changed.txt; then heavy=true; else heavy=false; fi
+            # The app's Storybook imports core, so a change to either (or the lockfile, or this
+            # workflow) can break it in the dev server.
+            if grep -qE '^(packages/(app|core)/|nub\.lock|\.github/workflows/ci\.yml)' changed.txt; then app=true; else app=false; fi
             if [ "$EVENT" = "pull_request" ]; then
               # An epic branch merging into main carries many tasks: always verify everything.
               if grep -qE "$FULL" changed.txt \
@@ -94,7 +100,8 @@ jobs:
           echo "website=$website" >> "$GITHUB_OUTPUT"
           echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
           echo "full=$full" >> "$GITHUB_OUTPUT"
-          echo "website=$website heavy=$heavy full=$full"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "website=$website heavy=$heavy full=$full app=$app"
 
   verify:
     name: verify
@@ -169,6 +176,29 @@ jobs:
       - name: Save turbo cache
         uses: ./.github/actions/save-turbo-cache
 
+  storybook-dev:
+    name: storybook-dev
+    needs: changes
+    if: ${{ needs.changes.outputs.app == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Build the packages the app's Storybook imports
+        run: nubx turbo run build --filter='@storyshelf/app^...'
+
+      - name: Open every story in the Storybook dev server (a console error fails)
+        working-directory: packages/app
+        env:
+          # The runner's preinstalled Chrome, as in the website a11y check: no Playwright download.
+          STORYBOOK_SMOKE_BROWSER_CHANNEL: chrome
+        run: nub run smoke:storybook
+
   website:
     name: website
     needs: changes
@@ -237,7 +267,7 @@ jobs:
   ci:
     name: ci
     if: ${{ always() }}
-    needs: [changes, verify, website, capture, fly, changeset]
+    needs: [changes, verify, storybook-dev, website, capture, fly, changeset]
     runs-on: ubuntu-latest
     steps:
       - name: Check results

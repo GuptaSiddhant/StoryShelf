@@ -1,0 +1,86 @@
+import { describe, expect, it } from "vitest";
+import { assertReviewSchema } from "./review-schema-check.ts";
+
+type Row = { table_name: string; column_name: string; data_type: string };
+
+const runnerOf = (rows: Row[]) => async (): Promise<unknown[]> => await Promise.resolve(rows);
+
+const reviews: Row[] = [
+  { table_name: "build_reviews", column_name: "id", data_type: "varchar" },
+  { table_name: "build_reviews", column_name: "build_id", data_type: "varchar" },
+  { table_name: "build_reviews", column_name: "user_id", data_type: "varchar" },
+  { table_name: "build_reviews", column_name: "verdict", data_type: "text" },
+  { table_name: "build_reviews", column_name: "body", data_type: "text" },
+  { table_name: "build_reviews", column_name: "created_at", data_type: "datetime" },
+];
+
+const settings: Row[] = [
+  { table_name: "projects", column_name: "review_enabled", data_type: "tinyint" },
+  { table_name: "projects", column_name: "review_approvals", data_type: "int" },
+  { table_name: "builds", column_name: "review_cycle", data_type: "int" },
+  { table_name: "builds", column_name: "review_requested_cycle", data_type: "int" },
+];
+
+describe("assertReviewSchema", () => {
+  it("passes on a database with no review table or columns", async () => {
+    await expect(assertReviewSchema(runnerOf([]))).resolves.toBeUndefined();
+  });
+
+  it("passes when only some columns exist, with the right types", async () => {
+    await expect(assertReviewSchema(runnerOf(settings.slice(0, 2)))).resolves.toBeUndefined();
+  });
+
+  it("passes on a complete, matching schema", async () => {
+    await expect(assertReviewSchema(runnerOf([...reviews, ...settings]))).resolves.toBeUndefined();
+  });
+
+  it("names the table and the missing column of a build_reviews table without a required one", async () => {
+    const partial = reviews.filter((row) => row.column_name !== "build_id");
+    await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
+      "table build_reviews has no column build_id",
+    );
+  });
+
+  it("requires the reviewer column", async () => {
+    const partial = reviews.filter((row) => row.column_name !== "user_id");
+    await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
+      "table build_reviews has no column user_id",
+    );
+  });
+
+  it("also requires the reviewer and body columns", async () => {
+    const partial = reviews.filter((row) => row.column_name !== "body");
+    await expect(assertReviewSchema(runnerOf(partial))).rejects.toThrow(
+      "table build_reviews has no column body",
+    );
+  });
+
+  it("refuses a build_id that is not varchar, which MySQL cannot index", async () => {
+    const wrong = reviews.map((row) =>
+      row.column_name === "build_id" ? Object.assign({}, row, { data_type: "text" }) : row,
+    );
+    await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
+      "column build_reviews.build_id has type text, expected varchar",
+    );
+  });
+
+  it("compares column names without regard to case, as MySQL does", async () => {
+    const upper = reviews.map((row) =>
+      Object.assign({}, row, { column_name: row.column_name.toUpperCase() }),
+    );
+    await expect(assertReviewSchema(runnerOf([...upper, ...settings]))).resolves.toBeUndefined();
+    const wrong = settings.filter((row) => row.column_name !== "review_approvals");
+    wrong.push({ table_name: "projects", column_name: "REVIEW_APPROVALS", data_type: "text" });
+    await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
+      "column projects.review_approvals has type text, expected int",
+    );
+  });
+
+  it("names the table, column and types of a review column of another type", async () => {
+    const wrong = settings.filter((row) => row.column_name !== "review_approvals");
+    wrong.push({ table_name: "projects", column_name: "review_approvals", data_type: "text" });
+    await expect(assertReviewSchema(runnerOf(wrong))).rejects.toThrow(
+      "column projects.review_approvals has type text, expected int",
+    );
+  });
+});

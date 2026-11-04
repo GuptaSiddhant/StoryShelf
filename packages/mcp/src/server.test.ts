@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToolError, type ApiClient } from "./client.ts";
 import { createStoryShelfMcpServer } from "./server.ts";
 
@@ -24,6 +24,10 @@ async function connect(api: ApiClient, testing = true): Promise<Client> {
 function text(result: unknown): string {
   return (result as { content: { text: string }[] }).content[0]?.text ?? "";
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("StoryShelf MCP server", () => {
   it("lists the v1 tools and exposes no approval tool", async () => {
@@ -95,6 +99,89 @@ describe("StoryShelf MCP server", () => {
       body: "Focus ring?",
       storyId: "button--primary",
     });
+  });
+
+  it("lists comments with their scope, kind and state untouched, and writes nothing", async () => {
+    const comments = [
+      {
+        id: "c1",
+        buildId: "b1",
+        snapshotId: null,
+        storyId: null,
+        kind: "comment",
+        resolved: false,
+      },
+      { id: "c2", buildId: "b1", snapshotId: null, storyId: "button--primary", kind: "comment" },
+      { id: "c3", buildId: "b1", snapshotId: "s1", storyId: null, parentId: "c1", resolved: true },
+      { id: "c4", buildId: "b1", snapshotId: null, storyId: null, kind: "change_request" },
+    ];
+    const get = vi.fn().mockResolvedValue(comments);
+    const post = vi.fn();
+    const client = await connect(fakeClient({ get, post }), false);
+    const out = JSON.parse(
+      text(await client.callTool({ name: "list_comments", arguments: { buildId: "b1" } })),
+    );
+    expect(get).toHaveBeenCalledWith("/projects/web/builds/b1/comments");
+    await client.callTool({
+      name: "list_comments",
+      arguments: { project: "other", buildId: "b1" },
+    });
+    expect(get).toHaveBeenCalledWith("/projects/other/builds/b1/comments");
+    expect(out).toEqual(comments);
+    expect(post).not.toHaveBeenCalled();
+    const { tools } = await client.listTools();
+    expect(tools.find((tool) => tool.name === "list_comments")?.annotations?.readOnlyHint).toBe(
+      true,
+    );
+  });
+
+  it("says review is off, not that the build was not found, when the project has review off", async () => {
+    const off = new ToolError(
+      "StoryShelf API: not found: check the project slug and build id",
+      404,
+    );
+    const get = vi.fn().mockImplementation(async (path: string) => {
+      if (path === "/projects/web") {
+        return await Promise.resolve({ slug: "web", reviewEnabled: false });
+      }
+      throw off;
+    });
+    const post = vi.fn().mockRejectedValue(off);
+    const client = await connect(fakeClient({ get, post }));
+    const calls = [
+      { name: "list_comments", arguments: { buildId: "b1" } },
+      { name: "add_comment", arguments: { buildId: "b1", body: "x" } },
+      { name: "resolve_comment", arguments: { buildId: "b1", commentId: "c1" } },
+    ];
+    for (const result of await Promise.all(
+      calls.map(async (call) => await client.callTool(call)),
+    )) {
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain("review is off for this project");
+    }
+  });
+
+  it("still says not found for a wrong build id when review is on, and for non-review tools", async () => {
+    const off = new ToolError(
+      "StoryShelf API: not found: check the project slug and build id",
+      404,
+    );
+    const get = vi.fn().mockImplementation(async (path: string) => {
+      if (path === "/projects/web") {
+        return await Promise.resolve({ slug: "web", reviewEnabled: true });
+      }
+      throw off;
+    });
+    const client = await connect(fakeClient({ get }));
+    const comments = await client.callTool({
+      name: "list_comments",
+      arguments: { buildId: "nope" },
+    });
+    expect(text(comments)).toContain("not found");
+    const build = await client.callTool({ name: "get_build", arguments: { buildId: "nope" } });
+    expect(text(build)).toContain("not found");
+    // get_build is not a review tool, so the project was not even asked about it.
+    expect(get.mock.calls.filter(([path]) => path === "/projects/web")).toHaveLength(1);
   });
 
   it("returns ToolError text as an error result", async () => {

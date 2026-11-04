@@ -8,6 +8,7 @@
  */
 import { DDL } from "./ddl.ts";
 import { FOREIGN_KEYS, type ForeignKeyMigration } from "./foreign-keys.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 
 /** Minimal row-query surface a migration runner needs. */
 export type MigrationRunner = (sql: string) => Promise<unknown[]>;
@@ -48,6 +49,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   { table: "projects", column: "review_approvals", definition: "INT NOT NULL DEFAULT 1" },
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
+  { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
@@ -94,6 +96,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
+  {
+    table: "notification_subscriptions",
+    column: "review_requests",
+    definition: "BOOLEAN NOT NULL DEFAULT TRUE",
+  },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
   {
@@ -102,6 +109,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'manual'",
   },
   { table: "comments", column: "story_id", definition: "TEXT" },
+  { table: "comments", column: "mentions", definition: "TEXT" },
   { table: "comments", column: "kind", definition: "VARCHAR(32) NOT NULL DEFAULT 'comment'" },
   { table: "comments", column: "resolved_at", definition: "DATETIME(3) NULL" },
   { table: "comments", column: "resolved_by", definition: "VARCHAR(64) NULL" },
@@ -147,6 +155,7 @@ const IDENTITY_INDEXES = [
 
 /** Run the full migration set through any row-query runner. */
 export async function runMigrations(run: MigrationRunner): Promise<void> {
+  await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);
   await run(BUILD_CAPTURE_JOB_BACKFILL);

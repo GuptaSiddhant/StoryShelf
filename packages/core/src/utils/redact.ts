@@ -18,6 +18,7 @@ const SECRET_PATTERNS: RegExp[] = [
   /github_pat_[A-Za-z0-9_]+/gu,
   /glpat-[A-Za-z0-9_-]+/gu,
   /xox[bpasr]-[A-Za-z0-9-]+/gu,
+  /sk-ant-[A-Za-z0-9_-]+/gu,
   /eyJ[\w-]{8,}\.eyJ[\w-]{8,}\.[\w-]+/gu,
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,
 ];

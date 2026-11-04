@@ -13,7 +13,9 @@ import { createRequire } from "node:module";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
+import { parseTableInfo } from "./table-info.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -61,6 +63,9 @@ export function createTursoDatabase(options: TursoDatabaseOptions): DatabaseAdap
     },
     tables: schema,
     migrate: async () => {
+      await assertReviewSchema(async (table) =>
+        parseTableInfo((await client.execute(`PRAGMA table_info(${table})`)).rows),
+      );
       await runMigrations(client);
     },
     close: () => {

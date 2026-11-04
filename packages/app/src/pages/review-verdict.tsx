@@ -5,6 +5,7 @@ import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
+  Avatar,
   Badge,
   Button,
   Card,
@@ -36,6 +37,7 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
         </HStack>
       </HStack>
       <Meta>{summary(data)}</Meta>
+      <AssignedReviewers data={data} />
       <VStack>
         {data.state.latest.map((review): Rendered => (
           <HStack key={review.id} align="baseline" wrap={false}>
@@ -55,6 +57,51 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
       <VerdictControls data={data} />
     </Card>
   );
+}
+
+/**
+ * The members the component owners assigned to this build, each with where they stand. Display
+ * only: any approver may still approve, and the counts and rules do not read this. Nothing renders
+ * when no owner matched, since the default behaviour needs no explanation.
+ */
+function AssignedReviewers(props: { data: ReviewSectionData }): Rendered | null {
+  const { data } = props;
+  if (data.assigned.length === 0) {
+    return null;
+  }
+  return (
+    <VStack gap="md">
+      <SectionTitle level={3}>Assigned reviewers</SectionTitle>
+      <VStack>
+        {data.assigned.map((reviewer): Rendered => {
+          const verdict = data.state.latest.find((review) => review.userId === reviewer.userId);
+          const name = data.names.get(reviewer.userId) ?? reviewer.userId;
+          return (
+            <HStack key={reviewer.userId}>
+              <Avatar name={name} size="sm" />
+              <strong>{name}</strong>
+              <Badge tone={verdictTone(verdict?.verdict)}>{verdictWord(verdict?.verdict)}</Badge>
+              <Meta as="span">{reviewer.components.join(", ")}</Meta>
+            </HStack>
+          );
+        })}
+      </VStack>
+      <Meta>Assigned from component owners. Anyone who can approve may still approve.</Meta>
+      {data.state.latest.length > 0 ? <SectionTitle level={3}>Verdicts</SectionTitle> : null}
+    </VStack>
+  );
+}
+
+/** The word for an assigned reviewer's standing (never colour alone). */
+function verdictWord(verdict: string | undefined): string {
+  if (verdict === "approved") return "Approved";
+  return verdict === "rejected" ? "Rejected" : "Waiting";
+}
+
+/** The badge tone of an assigned reviewer's standing. */
+function verdictTone(verdict: string | undefined): "success" | "danger" | "neutral" {
+  if (verdict === "approved") return "success";
+  return verdict === "rejected" ? "danger" : "neutral";
 }
 
 /**

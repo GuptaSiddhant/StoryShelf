@@ -30,6 +30,7 @@ export const notificationSubscriptions = sqliteTable("notification_subscriptions
   events: text("events"),
   via: text("via"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  reviewRequests: integer("review_requests", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull(),
 });
 
@@ -57,5 +58,6 @@ export interface NotificationSubscription {
   events: string | null;
   via: string | null;
   enabled: boolean;
+  reviewRequests: boolean;
   createdAt: string;
 }

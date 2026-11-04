@@ -78,4 +78,16 @@ describe.skipIf(!HAS_BUN)("createBunSqliteDatabase (bun runtime)", () => {
 
     await db.lifecycle?.teardown();
   });
+
+  it("refuses an upgrade over a build_reviews table made outside StoryShelf, naming its column", async () => {
+    const { createBunSqliteDatabase } = await import("./bun-sqlite.ts");
+    const { Database } = await import("bun:sqlite");
+    const client = new Database(":memory:");
+    client.exec(
+      "DROP TABLE IF EXISTS build_reviews; CREATE TABLE build_reviews (id TEXT PRIMARY KEY, verdict TEXT)",
+    );
+    const db = createBunSqliteDatabase({ client });
+    await expect(initDb(db)).rejects.toThrow("table build_reviews has no column build_id");
+    client.close();
+  });
 });

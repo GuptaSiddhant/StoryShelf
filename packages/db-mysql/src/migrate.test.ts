@@ -103,8 +103,12 @@ describe("runMigrations: MySQL 8 compatibility", () => {
     expect(queries).toContain("ALTER TABLE projects ADD COLUMN storybook_url_ttl_seconds INT");
     expect(queries).toContain("ALTER TABLE builds ADD COLUMN review_cycle INT NOT NULL DEFAULT 0");
     expect(queries).toContain("ALTER TABLE builds ADD COLUMN review_requested_cycle INT NULL");
+    expect(queries).toContain(
+      "ALTER TABLE notification_subscriptions ADD COLUMN review_requests BOOLEAN NOT NULL DEFAULT TRUE",
+    );
     expect(queries).toContain("ALTER TABLE snapshots ADD COLUMN a11y_violations TEXT");
     expect(queries).toContain("ALTER TABLE comments ADD COLUMN story_id TEXT");
+    expect(queries).toContain("ALTER TABLE comments ADD COLUMN mentions TEXT");
     expect(queries).toContain(
       "ALTER TABLE comments ADD COLUMN kind VARCHAR(32) NOT NULL DEFAULT 'comment'",
     );

@@ -183,7 +183,7 @@ export async function refreshBuild(buildId: string): Promise<void> {
 export async function announceBuildStatus(
   buildId: string,
   status: BuildStatus,
-  extra: { snapshotCount?: number } = {},
+  extra: { snapshotCount?: number; reason?: string } = {},
 ): Promise<void> {
   const { db, config } = getStore();
   const build = await new BuildModel(db).get(buildId);

@@ -161,7 +161,7 @@ export function BuildsTable({
   builds: Build[];
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <Table>
+    <Table label="Builds">
       <table>
         <thead>
           <tr>
