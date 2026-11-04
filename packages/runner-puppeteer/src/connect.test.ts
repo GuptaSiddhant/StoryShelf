@@ -29,6 +29,13 @@ describe("reasonOf", () => {
     expect(text).not.toMatch(/farm|sekret|tenant/u);
   });
 
+  it("removes a bare Bearer token that a nested cause quotes without the scheme", () => {
+    const error = new Error("connect failed", { cause: { message: "401 for token sekret-token" } });
+    const text = reasonOf(error, connection);
+    expect(text).not.toContain("sekret-token");
+    expect(text).toContain("connect failed");
+  });
+
   it("removes the endpoint, its credentials and header values from any shape", () => {
     const text = reasonOf(
       { message: `cannot reach ${connection.endpoint} with Bearer sekret-token` },

@@ -49,7 +49,9 @@ function chainOf(value: unknown): string[] {
   const parts: string[] = [];
   const seen = new Set<unknown>();
   let current: unknown = value;
-  while (parts.length < MAX_DEPTH && current !== undefined && current !== null) {
+  // At most MAX_DEPTH links are visited, repeated messages included, so a long chain of the same
+  // message cannot make this loop long.
+  for (let link = 0; link < MAX_DEPTH && current !== undefined && current !== null; link += 1) {
     if (seen.has(current)) break;
     seen.add(current);
     const text = shown(current);

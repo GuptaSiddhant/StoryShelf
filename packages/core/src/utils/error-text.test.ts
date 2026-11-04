@@ -81,6 +81,26 @@ describe("errorText", () => {
     expect(errorText(chain)).toBe("e9: e8: e7: e6");
   });
 
+  it("visits at most four links even when every cause repeats the same message", () => {
+    const reads = { count: 0 };
+    const linked = (cause: Error | undefined): Error => {
+      const error = new Error("same");
+      if (cause !== undefined) {
+        Object.defineProperty(error, "cause", {
+          get: () => {
+            reads.count += 1;
+            return cause;
+          },
+        });
+      }
+      return error;
+    };
+    let chain: Error | undefined;
+    for (let link = 0; link < 1000; link += 1) chain = linked(chain);
+    expect(errorText(chain)).toBe("same");
+    expect(reads.count).toBeLessThanOrEqual(4);
+  });
+
   it("names an Error with no message by its kind", () => {
     expect(errorText(new TypeError(""))).toBe("TypeError");
   });
