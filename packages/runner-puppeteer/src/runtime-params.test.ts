@@ -51,7 +51,7 @@ describe("runtimeParametersForStory", () => {
   });
 
   it("gives up waiting after 15 s and extracts anyway, so the run reads no parameters", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     let extractCalled = false;
     const preview: Preview = {
       ready: async () => await new Promise(() => {}),
