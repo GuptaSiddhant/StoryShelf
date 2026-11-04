@@ -1,4 +1,4 @@
-import { SESSION_COOKIE } from "@storyshelf/core/types";
+import { readSessionCookie } from "@storyshelf/core/types";
 import { timingSafeEqualString } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 import { createHash, randomBytes } from "node:crypto";
@@ -46,17 +46,7 @@ function verifyToken(secret: string, token: string, sessionId: string): boolean 
  * minted for one session never validates for another.
  */
 export function sessionIdFrom(c: Pick<Context, "req">): string {
-  const header = c.req.header("cookie") ?? "";
-  for (const part of header.split(";")) {
-    const eqIndex = part.indexOf("=");
-    if (eqIndex !== -1 && part.slice(0, eqIndex).trim() === SESSION_COOKIE) {
-      const value = part.slice(eqIndex + 1).trim();
-      if (value) {
-        return value;
-      }
-    }
-  }
-  return DEFAULT_SESSION;
+  return readSessionCookie(c.req.header("cookie")) ?? DEFAULT_SESSION;
 }
 
 /** Read a CSRF token from the request header or form body (never the URL: query tokens leak via logs, history, and Referer). */

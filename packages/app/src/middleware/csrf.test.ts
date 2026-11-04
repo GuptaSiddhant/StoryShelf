@@ -11,6 +11,15 @@ function app(secret?: string): Hono {
   return router;
 }
 
+/** Status of a write to the guarded path with the given cookie header and token. */
+async function send(cookie: string, csrfToken: string): Promise<number> {
+  const res = await app("test-secret").request("/protected/page", {
+    method: "POST",
+    headers: { cookie, "x-csrf-token": csrfToken },
+  });
+  return res.status;
+}
+
 describe("csrf", () => {
   it("rejects a write without a token", async () => {
     const res = await app("test-secret").request("/protected/page", { method: "POST" });
@@ -33,6 +42,15 @@ describe("csrf", () => {
       headers: { "x-csrf-token": token },
     });
     expect(res.status).toBe(403);
+  });
+
+  it("binds the token to the __Secure- session cookie used over https", async () => {
+    const secure = "__Secure-storyshelf_session";
+    const token = getCsrfToken("test-secret", "session-a");
+    expect(await send(`${secure}=session-a`, token)).toBe(200);
+    // Another session's token is refused, and so is the anonymous one.
+    expect(await send(`${secure}=session-b`, token)).toBe(403);
+    expect(await send(`${secure}=session-a`, getCsrfToken("test-secret"))).toBe(403);
   });
 
   it("rejects a token minted for another session", async () => {
