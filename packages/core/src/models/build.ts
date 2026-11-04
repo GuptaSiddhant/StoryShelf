@@ -308,7 +308,12 @@ export class BuildModel {
     };
     const sameGeneration = eq(col(builds, "captureGeneration"), generation);
     if (status !== "pending" || !REVIEWED.has(current.status)) {
-      return { values: base, where: sameGeneration };
+      // Also the status just read: a verdict that lands before this write is not overwritten, and
+      // the retry reads it and reopens its review cycle instead.
+      return {
+        values: base,
+        where: allOf(sameGeneration, eq(col(builds, "status"), current.status)),
+      };
     }
     const cycle = current.reviewCycle ?? 0;
     return {

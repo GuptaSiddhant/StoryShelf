@@ -380,6 +380,35 @@ describe("BuildModel: a cancelled build is terminal", () => {
     expect(reset.captureGeneration).toBe((before?.captureGeneration ?? 0) + 1);
   });
 
+  it("reopens the review cycle of a verdict that lands between a reset's read and its write", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await model.update(id, { status: "failed" });
+    const before = await model.get(id);
+    // The verdict is written once, right before the reset's first write.
+    const racing = Object.create(db) as typeof db;
+    let verdictLanded = false;
+    racing.updateWhere = async (table, rowId, values, where) => {
+      if (!verdictLanded) {
+        verdictLanded = true;
+        await model.update(rowId, { status: "approved" });
+      }
+      return await db.updateWhere(table, rowId, values, where);
+    };
+
+    const reset = await new BuildModel(racing, buildTables(db)).resetStatus(id, "pending");
+
+    expect(verdictLanded).toBe(true);
+    expect(reset.status).toBe("pending");
+    expect(reset.reviewCycle).toBe((before?.reviewCycle ?? 0) + 1);
+    expect(reset.captureGeneration).toBe((before?.captureGeneration ?? 0) + 1);
+  });
+
   it("does not stamp a cancelled build", async () => {
     const { db } = makeDatabase();
     const model = new BuildModel(db, buildTables(db));
