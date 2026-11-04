@@ -204,7 +204,6 @@
         "packages/app/src/ui/styles.ts",
         "packages/app/src/capture-setup.ts",
         "packages/cli/src/commands/server/init/codegen.ts",
-        "packages/cli/src/commands/server/init/prompts.ts",
         "packages/cli/src/commands/server/docker.ts",
         "packages/cli/src/commands/shared/detect-adapters.ts"
       ],
