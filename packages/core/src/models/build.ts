@@ -269,13 +269,14 @@ export class BuildModel {
     if (current === null) {
       throw new Error("Build not found");
     }
-    const generation = current.captureGeneration ?? 0;
     const stamp = nextStamp();
+    const generation = current.captureGeneration ?? 0;
+    const { values, where } = this.resetWrite(current, status, stamp);
     const row = (await this.db.updateWhere(
       this.tables.builds,
       id,
-      { status, captureJobId: null, captureGeneration: generation + 1, updatedAt: stamp },
-      eq(col(this.tables.builds, "captureGeneration"), generation),
+      values as never,
+      where,
     )) as unknown as Build | null;
     // Only our own write carries our stamp (see `failIfOwnedBy`).
     if (
@@ -285,6 +286,39 @@ export class BuildModel {
       return null;
     }
     return row;
+  }
+
+  /**
+   * The reset write and its condition. Always a compare-and-set on the run generation read. A
+   * verdict build going back to `pending` also starts the next review cycle, as
+   * {@link BuildModel.update} does for any such write, guarded by the cycle just read.
+   */
+  private resetWrite(
+    current: Build,
+    status: BuildStatus,
+    stamp: string,
+  ): { values: Record<string, unknown>; where: SQL } {
+    const { builds } = this.tables;
+    const generation = current.captureGeneration ?? 0;
+    const base = {
+      status,
+      captureJobId: null,
+      captureGeneration: generation + 1,
+      updatedAt: stamp,
+    };
+    const sameGeneration = eq(col(builds, "captureGeneration"), generation);
+    if (status !== "pending" || !REVIEWED.has(current.status)) {
+      return { values: base, where: sameGeneration };
+    }
+    const cycle = current.reviewCycle ?? 0;
+    return {
+      values: { ...base, reviewCycle: cycle + 1 },
+      where: allOf(
+        sameGeneration,
+        inArray(col(builds, "status"), [...REVIEWED]),
+        eq(col(builds, "reviewCycle"), cycle),
+      ),
+    };
   }
 
   /**
@@ -502,4 +536,9 @@ function instantOf(value: string): number {
 function nextStamp(): string {
   lastStamp = Math.max(Date.now(), lastStamp + 1);
   return new Date(lastStamp).toISOString();
+}
+
+/** `and` of conditions, which is never undefined when it is given at least one. */
+function allOf(first: SQL, ...rest: SQL[]): SQL {
+  return and(first, ...rest) ?? first;
 }
