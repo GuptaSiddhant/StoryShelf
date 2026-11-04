@@ -249,15 +249,15 @@ describe("the owners editor", () => {
   });
 });
 
+const mailsTo = (booted: Booted, id: string): Mail[] =>
+  booted.mails.filter((mail) => mail.to === `${id}@example.com`);
+
+async function requested(booted: Booted): Promise<void> {
+  await publish(booted);
+  await vi.waitFor(() => expect(booted.mails.length).toBeGreaterThan(0));
+}
+
 describe("the review request", () => {
-  const mailsTo = (booted: Booted, id: string): Mail[] =>
-    booted.mails.filter((mail) => mail.to === `${id}@example.com`);
-
-  async function requested(booted: Booted): Promise<void> {
-    await publish(booted);
-    await vi.waitFor(() => expect(booted.mails.length).toBeGreaterThan(0));
-  }
-
   it("goes to the owners of the changed components, once each, with the reason", async () => {
     const booted = await boot({
       componentOwners: JSON.stringify([

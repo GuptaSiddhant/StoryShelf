@@ -114,6 +114,27 @@ async function recipients(
   return emailed.map((item) => item.channel.config.to).toSorted();
 }
 
+/** Emails sent for one assigned owner, as recipient addresses. */
+async function assignedEmails(
+  db: ReturnType<typeof makeDatabase>["db"],
+  userId: string,
+  providers: string[] = ["email"],
+): Promise<{ to: string; text: string }[]> {
+  const sent: { channel: { config: { to: string } }; text?: string }[] = [];
+  const store = storeFor(
+    db,
+    providers.map((kind) => recordingProvider(kind, sent)),
+  );
+  await notifyAssignedWith(
+    store,
+    { id: "p1", slug: "test-project" },
+    userId,
+    { buildId: "b1", assignedBecause: "You were asked to review this because you own Button." },
+    "/builds/b1",
+  );
+  return sent.map((item) => ({ to: item.channel.config.to, text: JSON.stringify(item) }));
+}
+
 describe("notifyProject", () => {
   it("delivers project events to stored channels", async () => {
     const { db } = makeDatabase();
@@ -296,27 +317,6 @@ describe("notifyProject", () => {
   });
 
   describe("review:requested for assigned component owners (#465)", () => {
-    /** Emails sent for one assigned owner, as recipient addresses. */
-    async function assignedEmails(
-      db: ReturnType<typeof makeDatabase>["db"],
-      userId: string,
-      providers: string[] = ["email"],
-    ): Promise<{ to: string; text: string }[]> {
-      const sent: { channel: { config: { to: string } }; text?: string }[] = [];
-      const store = storeFor(
-        db,
-        providers.map((kind) => recordingProvider(kind, sent)),
-      );
-      await notifyAssignedWith(
-        store,
-        { id: "p1", slug: "test-project" },
-        userId,
-        { buildId: "b1", assignedBecause: "You were asked to review this because you own Button." },
-        "/builds/b1",
-      );
-      return sent.map((item) => ({ to: item.channel.config.to, text: JSON.stringify(item) }));
-    }
-
     it("sends the owner one message, even a developer who is no default reviewer", async () => {
       const { db } = makeDatabase();
       await seedUsers(db);

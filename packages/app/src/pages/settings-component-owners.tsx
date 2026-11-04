@@ -1,3 +1,4 @@
+/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 import { ownerRulesText, type OwnerProblem, type OwnerRule } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
@@ -26,7 +27,6 @@ const HINT =
 const PLACEHOLDER = "src/components/forms/**  user_01H  user_02J";
 
 /** The saved rules as a read-only table (pattern and owners). */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 const RulesTable: FC<{ rules: readonly OwnerRule[] }> = (props) => {
   return (
     <Table>
@@ -59,7 +59,6 @@ const RulesTable: FC<{ rules: readonly OwnerRule[] }> = (props) => {
 };
 
 /** The refusal of a save: one line per problem, nothing was stored. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 const ProblemsAlert: FC<{ problems: readonly OwnerProblem[] }> = (props) => {
   return (
     <Alert tone="danger" title="Couldn't save the owners">
@@ -75,7 +74,6 @@ const ProblemsAlert: FC<{ problems: readonly OwnerProblem[] }> = (props) => {
 };
 
 /** The edit form (admins): a CODEOWNERS-style textarea and one save button. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 const OwnersForm: FC<{
   project: Project;
   text: string;
@@ -107,7 +105,6 @@ const OwnersForm: FC<{
  * Component owners on the Members tab (#465): who is asked to review a build that changes a
  * component. Admins edit; everyone else sees the saved rules. Nothing renders while review is off.
  */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const ComponentOwnersCard: FC<{
   project: Project;
   rules: readonly OwnerRule[];
