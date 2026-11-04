@@ -82,6 +82,16 @@ export const reviewCommentBody = css`
   font-size: 0.875rem;
 `;
 
+/** An `@mention` of a project member inside a comment body (#463). */
+export const reviewMention = css`
+  /* review-mention */
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  border-radius: 0.25rem;
+  padding: 0 0.25em;
+  font-weight: 600;
+`;
+
 export const reviewCommentActions = css`
   /* review-comment-actions */
   margin-top: 0.5rem;

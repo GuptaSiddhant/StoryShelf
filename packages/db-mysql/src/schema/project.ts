@@ -26,6 +26,7 @@ export const projects = mysqlTable("projects", {
   reviewEnabled: boolean("review_enabled").notNull().default(true),
   reviewApprovals: int("review_approvals").notNull().default(1),
   storybookUrlTtlSeconds: int("storybook_url_ttl_seconds"),
+  componentOwners: text("component_owners"),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
   updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
 });
@@ -55,6 +56,7 @@ export interface Project {
   reviewEnabled: boolean;
   reviewApprovals: number;
   storybookUrlTtlSeconds: number | null;
+  componentOwners: string | null;
   createdAt: string;
   updatedAt: string;
 }
