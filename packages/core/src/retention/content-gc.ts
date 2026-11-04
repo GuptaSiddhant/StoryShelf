@@ -10,7 +10,7 @@ import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
 import { contentKey, isContentHash, publishedGzipPath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
-import { manifestHashes } from "./build-deletion.ts";
+import { dropLiveHashes } from "./manifest-scan.ts";
 
 /** How long a blob must stand without a use before it is collected. */
 export const CONTENT_GRACE_MS = 7 * 86_400_000;
@@ -33,7 +33,7 @@ export async function collectUnreferencedContent(deps: ContentGcDeps): Promise<n
   const claimed = await claimWellFormed(deps, token);
   if (claimed.length === 0) return 0;
   const free = new Set(claimed);
-  await dropLiveHashes(deps, free);
+  if (!(await dropLiveHashes(deps, free))) return await keepAll(deps, claimed, token);
   let removed = 0;
   for (const hash of claimed) {
     // oxlint-disable-next-line no-await-in-loop -- one blob at a time keeps a failure to that blob
@@ -81,21 +81,13 @@ async function claimIdle(deps: ContentGcDeps, token: string): Promise<string[]> 
   return await deps.lifecycle.claimContent(token, before(CONTENT_GRACE_MS), before(CLAIM_LEASE_MS));
 }
 
-/** Take out of `candidates` every hash a live build's manifest names; stops once none is left. */
-async function dropLiveHashes(deps: ContentGcDeps, candidates: Set<string>): Promise<void> {
-  const builds = (await deps.db.list(deps.db.tables.builds)) as unknown as {
-    id: string;
-    projectId: string;
-    retentionState?: string;
-  }[];
-  for (const build of builds) {
-    if (candidates.size === 0) return;
-    if (build.retentionState === "deleting") continue;
-    // oxlint-disable-next-line no-await-in-loop -- manifests are read one at a time
-    for (const hash of await manifestHashes(deps, build.projectId, build.id)) {
-      candidates.delete(hash);
-    }
+/** Give every claim back: nothing is collected this pass, so nothing is removed. */
+async function keepAll(deps: ContentGcDeps, claimed: string[], token: string): Promise<0> {
+  for (const hash of claimed) {
+    // oxlint-disable-next-line no-await-in-loop -- one claim at a time
+    await giveBack(deps, hash, token);
   }
+  return 0;
 }
 
 /** A live build serves the blob: give the claim back and count nothing removed. */
