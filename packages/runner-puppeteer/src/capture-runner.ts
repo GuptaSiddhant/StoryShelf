@@ -8,20 +8,15 @@ import {
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
-import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { verifyLocalTargets } from "./availability.ts";
-import { activeRuns } from "./browser.ts";
+import { cancelRuns, trackRun } from "./browser.ts";
 import { connectRemote } from "./connect.ts";
 import { launchLocal } from "./launch.ts";
 import { renderAll } from "./pipeline.ts";
+import { resolveSettings } from "./settings.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
 import { runTestEntries } from "./tests.ts";
-import type {
-  ActiveRun,
-  PuppeteerRenderInput,
-  PuppeteerTestsInput,
-  TargetDriver,
-} from "./types.ts";
+import type { PuppeteerRenderInput, PuppeteerTestsInput, TargetDriver } from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -104,31 +99,6 @@ function buildDriver(
   };
 }
 
-/** Option, then environment variable, then the detected default, for each tunable. */
-function resolveSettings(options: {
-  concurrency?: number;
-  navigationTimeoutMs?: number;
-  recycleBrowserEvery?: number;
-  reusePages?: boolean;
-}): {
-  concurrency: number | undefined;
-  navigationTimeoutMs: number;
-  recycleBrowserEvery: number | undefined;
-  reusePages: boolean;
-} {
-  return {
-    concurrency: options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY"),
-    navigationTimeoutMs:
-      options.navigationTimeoutMs ??
-      envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
-      recommendedNavigationTimeoutMs(),
-    recycleBrowserEvery:
-      options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0),
-    reusePages:
-      options.reusePages ?? ["1", "true"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? ""),
-  };
-}
-
 function runnerMetadata(offers: ReturnType<typeof createTargetOffers>): CaptureRunner["metadata"] {
   return {
     name: "Puppeteer",
@@ -140,30 +110,6 @@ function runnerMetadata(offers: ReturnType<typeof createTargetOffers>): CaptureR
       return offers.current();
     },
   };
-}
-
-/** Registers the run so `cancel` can find it, and unregisters it however the work ends. */
-async function trackRun<T>(
-  input: { buildId: string; runId?: string | undefined },
-  work: (active: ActiveRun) => Promise<T>,
-): Promise<T> {
-  const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
-  const remove = activeRuns.add(input.buildId, input.runId, active);
-  try {
-    return await work(active);
-  } finally {
-    remove();
-  }
-}
-
-async function cancelRuns(buildId: string, runId?: string): Promise<void> {
-  await Promise.all(
-    activeRuns.matching(buildId, runId).map(async (active) => {
-      active.cancelled = true;
-      active.abort?.abort();
-      await active.session?.release("cancelled");
-    }),
-  );
 }
 
 /** Local targets are checked for an executable; a remote one is not probed (that would open a session). */
@@ -184,17 +130,6 @@ function withShutdown(lifecycle: AdapterLifecycle): AdapterLifecycle {
       await lifecycle.teardown();
     },
   };
-}
-
-function envPositiveInt(name: string): number | undefined {
-  return envInt(name, 1);
-}
-
-function envInt(name: string, min: number): number | undefined {
-  // Leading digits only, as parseInt reads them ("12abc" is 12, "" and "abc" are none).
-  const digits = /^\s*\+?(?<digits>\d+)/u.exec(process.env[name] ?? "")?.groups?.["digits"];
-  const parsed = digits === undefined ? Number.NaN : Number(digits);
-  return parsed >= min ? parsed : undefined;
 }
 
 // Re-exports for backward compatibility (tests import these from capture-runner).
