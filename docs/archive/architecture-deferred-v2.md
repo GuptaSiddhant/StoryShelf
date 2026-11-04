@@ -2,6 +2,8 @@
 
 > Moved out of [`docs/architecture.md`](../architecture.md) (now a pointer to [`docs/architecture/`](../architecture/README.md)) on 2026-11-04. It is history, not the current-state spec.
 
+> **Status on `main` (checked 2026-11-04):** most of this list has shipped, and the heading is kept only as history. The items below are unedited. Shipped: (1) affected capture, `affectedOnly` in `core/src/capture/affected.ts` and `packages/affected`; (2) required commit statuses and GitHub check runs, `packages/notify-git` (`github-check-mapper.ts`), ADR 0014; (3) remote browsers, `core/src/adapters/remote-browser.ts`; (4) named modes, `core/src/capture/storybook.ts`; (6) a story's `defaultViewport` captured with the project's viewports, `core/src/capture/storybook.ts:107`; (7) the provenance route `GET /api/v1/projects/{slug}/builds/{buildId}/snapshots/{snapshotId}/usage`, `app/src/routers/links.ts:75`. Still unbuilt: auto-reject on review rejection (2), an args matrix (4), Ladle and Histoire sources, where only the `StorySourceAdapter` interface exists (5, `core/src/capture/adapter.ts:126`), and automatic re-diffing of dependent projects (7).
+
 ## Deliberately Deferred (v2)
 
 1. **Affected capture** -- builds declare `affectedOnly` (default true); the CLI traces
@@ -11,7 +13,7 @@
    Any uncertainty (shallow clone, missing stats/history, global-file change) falls
    back to a full render, and `--full` opts out per run.
 2. **Git-provider merge gate (GitHub App / GitLab)** -- required commit statuses, GitHub check runs and per-snapshot annotations are implemented (ADR 0014); auto-reject on review rejection remains deferred.
-3. **Remote browsers** -- render in a browser farm (ADR 0007). The runner `browsers` list, `CaptureTarget`, the public origin, remote connect (`./remote` presets), in-browser fingerprints, session limits and retries are in place; signed Storybook URLs (`/s/<token>/`), which `reach: "url"` targets use, are minted per render pass and served by the app.
+3. **Remote browsers** -- render in a browser farm (ADR 0007). The runner `browsers` list, `CaptureTarget`, the public origin, remote connect (`./remote` presets), in-browser fingerprints, session limits and retries are in place; signed Storybook URLs (`/_s/<token>/`), which `reach: "url"` targets use, are minted per render pass and served by the app.
 4. **`parameters.chromatic` equivalents** -- `modes` are implemented (named modes from `parameters.chromatic.modes` / `parameters.storyshelf.modes`, ADR 0004); an args matrix is not. Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
 5. **Ladle / Histoire / custom pages** -- the `StorySourceAdapter` interface anticipates them.
 6. **Per-story viewport presets** -- a story's Storybook `defaultViewport` is captured **in addition to** the project's global list (union, deduped by name; issue #82), including inline `parameters.viewport.viewports`. Global defaults remain the project-level surface.

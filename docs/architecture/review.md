@@ -99,7 +99,7 @@ handles HTTP.
   streamed one at a time; the manifest is written last. Missing images are listed under `skipped` (and logged); other storage
   errors, or growing past the 512 MiB archive limit shared with import, abort the stream.
 - **Import is all-or-nothing validation, then upsert** (images stored first, rows applied in one
-  transaction when the driver has one, imports per project serialized). The archive (buffered, capped at
+  transaction when the driver has one, imports for the same project serialized within one process by an in-memory queue, not across app instances). The archive (buffered, capped at
   `min(maxUploadBytes, 512 MiB)`) is checked before any write: zip structure (no zip64, encryption,
   or multi-disk; entry-count, per-entry and total-size limits applied before inflation; CRC checked),
   entry names (no absolute paths, `..`, backslashes), manifest schema, identity segments (the same

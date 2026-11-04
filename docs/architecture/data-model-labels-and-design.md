@@ -77,6 +77,7 @@ design_nodes (
   state          text NOT NULL DEFAULT 'ok',
   render_path    text,                     -- storage path of the cached PNG render (node links only)
   render_version text,                     -- file version the render was taken at
+  notified_version text,                   -- claim of the last `design:changed` event sent for this node: `<change key>#<ulid>`, NULL when none; set by compare-and-set so one caller announces a change (project-credential rows only)
   fetched_at     text NOT NULL,
   created_at     text NOT NULL,
   updated_at     text NOT NULL,
