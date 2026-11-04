@@ -40,6 +40,7 @@ import {
   ShownBadge,
   StoriesTab,
   buildParam,
+  pathParam,
   showBuildHref,
 } from "./component-stories.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
@@ -136,7 +137,7 @@ export function renderComponentPage(data: ComponentPageData): RenderedContent {
         label="Component sections"
         tabs={componentTabs(data.testing).map((tab) => ({
           label: TAB_LABELS[tab],
-          href: `?tab=${tab}${buildParam(data)}`,
+          href: `?tab=${tab}${buildParam(data)}${pathParam(data)}`,
           active: data.tab === tab,
         }))}
       />
@@ -153,7 +154,7 @@ function BuildBanner(props: { data: ComponentPageData }): Rendered | null {
   const { build } = selection;
   const urls = createUrlBuilder("/", data.publishedBaseDomain);
   const label = `${build.gitSha.slice(0, 7)} (${build.gitBranch})`;
-  const latest = `?tab=${data.tab}`;
+  const latest = `?tab=${data.tab}${pathParam(data)}`;
   if (!selection.present) {
     return (
       <Alert tone="warning" title="Not in this build">
@@ -344,7 +345,7 @@ function CapturedRow(props: { row: ComponentHistoryRow; data: ComponentPageData 
       </td>
       <td>
         <HStack>
-          <Button variant="ghost" size="sm" href={showBuildHref(row.build.id)}>
+          <Button variant="ghost" size="sm" href={showBuildHref(row.build.id, data)}>
             Show
           </Button>
           <Button

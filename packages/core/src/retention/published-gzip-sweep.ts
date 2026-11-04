@@ -1,4 +1,5 @@
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { contentKey } from "../utils/paths.ts";
 
 const PREFIX = "derived/published-gzip/";
 const MAX_PER_SWEEP = 128;
@@ -25,7 +26,7 @@ export async function sweepPublishedGzip(storage: StorageAdapter): Promise<void>
 async function removeOrphan(storage: StorageAdapter, key: string): Promise<void> {
   const hash = key.slice(PREFIX.length, -3);
   try {
-    if (!(await storage.exists(`content/${hash}`))) await storage.delete(key);
+    if (!(await storage.exists(contentKey(hash)))) await storage.delete(key);
   } catch {
     // Retention is best effort; a missing variant can always be regenerated.
   }
