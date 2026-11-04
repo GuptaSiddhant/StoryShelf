@@ -13,7 +13,8 @@ import type {
 import type { SQL, Table } from "drizzle-orm";
 import { and, eq, getTableColumns } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
-import { createTransactionMutex, type NestingGuard } from "./transaction-mutex.ts";
+import { createNestingGuard } from "./nesting-guard.ts";
+import { createTransactionMutex } from "./transaction-mutex.ts";
 
 /**
  * Wrap an adapter with manual BEGIN/COMMIT transactions for synchronous
@@ -24,15 +25,13 @@ import { createTransactionMutex, type NestingGuard } from "./transaction-mutex.t
  *
  * @param adapter - Adapter built by {@link createDrizzleAdapter}.
  * @param exec - Synchronous statement runner on the same connection.
- * @param guard - Detects a nested `transact` (Node and Bun only; see `nesting-guard.ts`).
  * @returns The adapter with `transact` replaced.
  */
 export function withManualTransactions(
   adapter: DatabaseAdapter,
   exec: (sql: string) => void,
-  guard?: NestingGuard,
 ): DatabaseAdapter {
-  const mutex = createTransactionMutex(guard);
+  const mutex = createTransactionMutex(createNestingGuard());
   return {
     ...adapter,
     transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
@@ -96,13 +95,11 @@ function buildLifecycle(options: DrizzleAdapterOptions): NonNullable<DatabaseAda
   };
 }
 
-export function createDrizzleAdapter(
-  db: unknown,
-  options: DrizzleAdapterOptions,
-  guard?: NestingGuard,
-): DatabaseAdapter {
+export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions): DatabaseAdapter {
   const drizzle = db as DrizzleLike;
-  const mutex = createTransactionMutex(guard);
+  // The shared connection (or, for a libSQL file, its connection per transaction) cannot overlap
+  // transactions: they queue (see `transaction-mutex.ts`).
+  const mutex = createTransactionMutex(createNestingGuard());
   return {
     metadata: options.metadata,
     tables: options.tables,

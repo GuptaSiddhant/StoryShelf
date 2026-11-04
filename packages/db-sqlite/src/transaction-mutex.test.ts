@@ -28,7 +28,7 @@ async function transactOf(db: DatabaseAdapter) {
 
 describe("createTransactionMutex", () => {
   it("runs bodies one at a time, in the order they asked", async () => {
-    const mutex = createTransactionMutex();
+    const mutex = createTransactionMutex(createNestingGuard());
     const log: string[] = [];
     const gate = Promise.withResolvers<null>();
     const body = (name: string, hold?: Promise<null>) => async () => {
@@ -54,7 +54,7 @@ describe("createTransactionMutex", () => {
   });
 
   it("releases after a body throws, and reports the error to its own caller only", async () => {
-    const mutex = createTransactionMutex();
+    const mutex = createTransactionMutex(createNestingGuard());
     const failing = mutex.run(async () => await Promise.reject(new Error("boom")));
     const next = mutex.run(async () => await Promise.resolve("ran"));
 
@@ -90,8 +90,8 @@ describe("createTransactionMutex", () => {
   });
 
   it("gives each mutex its own queue", async () => {
-    const first = createTransactionMutex();
-    const second = createTransactionMutex();
+    const first = createTransactionMutex(createNestingGuard());
+    const second = createTransactionMutex(createNestingGuard());
     const gate = Promise.withResolvers<null>();
     const held = first.run(async () => await gate.promise);
 

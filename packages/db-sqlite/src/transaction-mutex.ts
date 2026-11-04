@@ -5,10 +5,9 @@
  * wait for the first to commit or roll back instead.
  *
  * A callback that calls `transact` on the same adapter again could never get the mutex it already
- * holds, which would hang. Where the runtime has async context tracking, a {@link NestingGuard}
- * (`nesting-guard.ts`) turns that into an immediate error that says to use the `tx` the callback
- * was given. This module must not import it: the D1 and Turso entry points load this file, and
- * they also run where `node:async_hooks` does not exist. Without a guard a nested call waits.
+ * holds, which would hang, so every mutex takes a {@link NestingGuard} (`nesting-guard.ts`) that
+ * turns that into an immediate error saying to use the `tx` the callback was given, where the
+ * runtime can track async context.
  */
 
 /** Marks the code running inside a transaction, so a nested `transact` can be told apart. */
@@ -25,14 +24,14 @@ export interface TransactionMutex {
 }
 
 /** A mutex for one adapter; each adapter instance owns its own. */
-export function createTransactionMutex(guard?: NestingGuard): TransactionMutex {
+export function createTransactionMutex(guard: NestingGuard): TransactionMutex {
   let tail: Promise<unknown> = Promise.resolve();
   return {
     run: async <R>(body: () => Promise<R>): Promise<R> => {
-      if (guard?.inside() === true) {
+      if (guard.inside()) {
         throw new Error("transact was called inside a transaction of the same database; use `tx`");
       }
-      const turn = tail.then(async () => (guard ? await guard.enter(body) : await body()));
+      const turn = tail.then(async () => await guard.enter(body));
       // The next transaction waits for this one to end either way, never for its error.
       tail = turn.catch(() => {});
       return await turn;

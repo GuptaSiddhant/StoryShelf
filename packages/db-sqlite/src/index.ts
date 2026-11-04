@@ -5,7 +5,6 @@ import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
-import { createNestingGuard } from "./nesting-guard.ts";
 import {
   activateRetention,
   attachRetention,
@@ -32,31 +31,27 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   const db = drizzle(callback, { schema });
   const retention: RetentionActivation = {};
 
-  const adapter = createDrizzleAdapter(
-    db,
-    {
-      metadata: {
-        name: "SQLite",
-        version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
-        description: "SQLite database adapter (node:sqlite + Drizzle)",
-        kind: "sqlite",
-        category: "database",
-      },
-      tables: schema,
-      migrate: async () => {
-        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
-        runMigrations(sqlite);
-        await activateRetention(path, retention);
-      },
-      close: () => {
-        sqlite.close();
-      },
-      ping: () => {
-        sqlite.prepare("SELECT 1").get();
-      },
+  const adapter = createDrizzleAdapter(db, {
+    metadata: {
+      name: "SQLite",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
+      description: "SQLite database adapter (node:sqlite + Drizzle)",
+      kind: "sqlite",
+      category: "database",
     },
-    createNestingGuard(),
-  );
+    tables: schema,
+    migrate: async () => {
+      await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
+      runMigrations(sqlite);
+      await activateRetention(path, retention);
+    },
+    close: () => {
+      sqlite.close();
+    },
+    ping: () => {
+      sqlite.prepare("SELECT 1").get();
+    },
+  });
   return attachRetention(adapter, retention);
 }
 
