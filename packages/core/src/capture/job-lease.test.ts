@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ProgressLease } from "./job-lease.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
+import { abortableLease, ProgressLease } from "./job-lease.ts";
 
 const sleep = async (ms: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,5 +50,29 @@ describe("ProgressLease", () => {
     const lease = new ProgressLease(0);
     await sleep(40);
     expect(await settled(lease.expired)).toBe(false);
+  });
+});
+
+describe("abortableLease", () => {
+  it("passes touches through until the signal aborts, then throws a JobAbortedError", () => {
+    const controller = new AbortController();
+    let touches = 0;
+    const lease = abortableLease(
+      {
+        touch: () => {
+          touches += 1;
+        },
+      },
+      controller.signal,
+    );
+
+    lease.touch();
+    lease.check?.();
+    controller.abort(new Error("job deadline exceeded"));
+
+    expect(touches).toBe(1);
+    expect(() => lease.touch()).toThrow(JobAbortedError);
+    expect(() => lease.check?.()).toThrow("job deadline exceeded");
+    expect(touches).toBe(1);
   });
 });

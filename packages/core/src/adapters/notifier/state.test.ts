@@ -48,6 +48,28 @@ describe("channelPrefix", () => {
 });
 
 describe("writeBuildState", () => {
+  it("sends no comment once the attempt was abandoned while the statuses were in flight", async () => {
+    const fake = makeFakeStateNotifier();
+    const controller = new AbortController();
+    const { provider } = fake;
+    const create = provider.create.bind(provider);
+    provider.create = (input) => {
+      const adapter = create(input);
+      const setState = adapter.setState.bind(adapter);
+      adapter.setState = async (state) => {
+        await setState(state);
+        controller.abort(new Error("job deadline exceeded"));
+      };
+      return adapter;
+    };
+
+    await expect(
+      writeBuildState(provider, channel(), { sha: "abc", states, signal: controller.signal }),
+    ).rejects.toThrow("job deadline exceeded");
+
+    expect(fake.calls.map((call) => call.target.kind)).toEqual(["status", "status"]);
+  });
+
   it("writes every status verbatim, then the comment, with the channel token", async () => {
     const fake = makeFakeStateNotifier();
     await writeBuildState(fake.provider, channel(), { sha: "abc", states });

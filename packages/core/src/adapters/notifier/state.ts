@@ -21,9 +21,15 @@ export function channelPrefix(channel: NotificationChannel): string {
 export async function writeBuildState(
   provider: StateNotifierProvider,
   channel: NotificationChannel,
-  write: { sha: string; states: BuildStateSet; logger?: Logger | undefined },
+  write: {
+    sha: string;
+    states: BuildStateSet;
+    logger?: Logger | undefined;
+    /** Checked before the comment is sent, after the statuses settled; an aborted one throws. */
+    signal?: AbortSignal | undefined;
+  },
 ): Promise<void> {
-  const { sha, states, logger } = write;
+  const { sha, states, logger, signal } = write;
   const adapter = provider.create({ config: channel.config, secret: channel.secret, logger });
   const results = await Promise.allSettled(
     states.statuses.map(async (status) => {
@@ -50,17 +56,29 @@ export async function writeBuildState(
     throw failed.reason;
   }
   if (states.comment !== null) {
-    const { comment } = states;
-    await adapter
-      .setState({
-        channel,
-        target: { kind: "comment", sha, markdown: comment.markdown },
-        state: comment.state,
-        url: comment.url,
-        logger,
-      })
-      .catch((error: unknown) => {
-        logger?.warn({ err: error, channelId: channel.id }, "failed to upsert comment");
-      });
+    signal?.throwIfAborted();
+    await upsertComment({ adapter, channel, sha, comment: states.comment, logger });
   }
+}
+
+/** The PR comment: a failed write is logged and never fails the statuses written before it. */
+async function upsertComment(input: {
+  adapter: ReturnType<StateNotifierProvider["create"]>;
+  channel: NotificationChannel;
+  sha: string;
+  comment: NonNullable<BuildStateSet["comment"]>;
+  logger: Logger | undefined;
+}): Promise<void> {
+  const { adapter, channel, sha, comment, logger } = input;
+  await adapter
+    .setState({
+      channel,
+      target: { kind: "comment", sha, markdown: comment.markdown },
+      state: comment.state,
+      url: comment.url,
+      logger,
+    })
+    .catch((error: unknown) => {
+      logger?.warn({ err: error, channelId: channel.id }, "failed to upsert comment");
+    });
 }

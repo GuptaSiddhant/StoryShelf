@@ -13,6 +13,7 @@ import { ProjectModel, type ProjectTables } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { redactSecrets } from "../utils/redact.ts";
 import type { BuildStatePublisher } from "./build-state/types.ts";
 import type { ShardRepeatedEvent } from "./consumer/metrics.ts";
@@ -45,14 +46,7 @@ async function runBuildJob(
   if (!target) {
     return;
   }
-  await deps.buildState.request(job.buildId);
-  const { attempt, recordLog } = await beginAttempt(
-    deps,
-    target.project,
-    target.build,
-    job.reqId,
-    lease,
-  );
+  const { attempt, recordLog } = await announceAndBegin(deps, target, job, lease);
   const ctx: JobContext = {
     deps,
     build: target.build,
@@ -65,6 +59,23 @@ async function runBuildJob(
     return;
   }
   await runAndReport(ctx, job);
+}
+
+/**
+ * Show the build as pending, then open the run's attempt. The lease is checked after the target
+ * load and again after the request: either may have outlived the attempt, and an abandoned run
+ * must announce nothing and open no attempt row next to the redelivery's.
+ */
+async function announceAndBegin(
+  deps: DispatchDeps,
+  target: { build: Build; project: Project },
+  job: CaptureDispatchJob,
+  lease?: JobLease,
+): Promise<{ attempt: CaptureAttempt; recordLog: AttemptLogRecorder }> {
+  lease?.check?.();
+  await deps.buildState.request(job.buildId);
+  lease?.check?.();
+  return await beginAttempt(deps, target.project, target.build, job.reqId, lease);
 }
 
 /** Table handles required by dispatch. */
@@ -229,6 +240,10 @@ async function runAndReport(ctx: JobContext, job: CaptureDispatchJob): Promise<v
 /** Record a failed run, then rethrow so the job is redelivered, unless another try cannot help. */
 async function reportFailure(ctx: JobContext, error: unknown): Promise<void> {
   const { deps, build } = ctx;
+  if (error instanceof JobAbortedError) {
+    // Abandoned at its deadline: a redelivery owns the build now, so this run writes no status.
+    throw error;
+  }
   await finishAttempt(ctx, "failed", errorText(error));
   await deps.buildState.request(build.id);
   if (error instanceof SignedUrlLifetimeError) {
