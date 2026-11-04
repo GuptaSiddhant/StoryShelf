@@ -1057,10 +1057,19 @@ describe("mention suggestions and highlights (#463)", () => {
     const html = await ok.text();
     expect(html).toContain("story-comment-body");
     expect(html).toContain("ask @alice ");
-    // A member who was not offered (not matching, or not a member) cannot be forced in.
-    expect((await complete("outsider")).status).toBe(400);
-    expect((await complete("dev")).status).toBe(400);
-    expect((await complete("")).status).toBe(400);
+    // A member who was not offered (not matching, or not a member) cannot be forced in, and the
+    // typed text comes back untouched: the box is swapped, so an error would delete the draft.
+    const refused = await Promise.all(
+      ["outsider", "dev", ""].map(async (pick) => {
+        const res = await complete(pick);
+        return { status: res.status, text: await res.text() };
+      }),
+    );
+    for (const { status, text } of refused) {
+      expect(status).toBe(200);
+      expect(text).toContain("ask @al");
+      expect(text).not.toMatch(/@(?:outsider|dev)\b/u);
+    }
   });
 
   it("completes a mention at the end of a long comment without losing text", async () => {

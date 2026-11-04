@@ -4,7 +4,6 @@
  * reveals who belongs to another project, and a member who cannot comment gets none.
  */
 import type { Context } from "hono";
-import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import {
   completeMention,
@@ -90,10 +89,12 @@ export function registerMentionSuggest(app: ShelfRouter): void {
   app.post("/projects/:slug/builds/:buildId/mention-complete", async (c) => {
     const { slug, buildId, kind, text, typed, suggestions, pick } = await typing(c);
     const chosen = suggestions.find((suggestion) => suggestion.userId === pick);
-    if (typed === undefined || chosen === undefined) {
-      throw new HTTPException(400, { message: "Pick a member from the list" });
-    }
-    const value = completeMention(text, typed, chosen.handle);
+    // A pick that no longer matches (the text moved on since the list was drawn, or the member was
+    // not offered) leaves the text as it is: the box is swapped, so an error would delete the draft.
+    const value =
+      typed === undefined || chosen === undefined
+        ? text
+        : completeMention(text, typed, chosen.handle);
     return c.html(<CommentBodyField slug={slug} buildId={buildId} kind={kind} value={value} />);
   });
 }

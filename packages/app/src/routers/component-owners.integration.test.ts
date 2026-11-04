@@ -260,9 +260,14 @@ describe("the owners editor", () => {
 const mailsTo = (booted: Booted, id: string): Mail[] =>
   booted.mails.filter((mail) => mail.to === `${id}@example.com`);
 
-async function requested(booted: Booted): Promise<void> {
+/** Publish, then wait until every expected recipient has been mailed (delivery is one at a time). */
+async function requested(booted: Booted, recipients: string[]): Promise<void> {
   await publish(booted);
-  await vi.waitFor(() => expect(booted.mails.length).toBeGreaterThan(0));
+  await vi.waitFor(() => {
+    for (const id of recipients) {
+      expect(mailsTo(booted, id).length).toBeGreaterThan(0);
+    }
+  });
 }
 
 describe("the review request", () => {
@@ -273,7 +278,7 @@ describe("the review request", () => {
         { pattern: "src/forms/Button.stories.tsx", owners: ["dev"] },
       ]),
     });
-    await requested(booted);
+    await requested(booted, ["dev", "alice", "bob"]);
     // dev is no default reviewer; alice and bob are. alice is assigned, so she gets the assigned
     // message instead of the default one; bob gets the ordinary one.
     expect(mailsTo(booted, "dev")).toHaveLength(1);
@@ -316,7 +321,7 @@ describe("the review request", () => {
       componentOwners: JSON.stringify([{ pattern: "src/charts/**", owners: ["bob"] }]),
     });
     await new NotificationSubscriptionModel(booted.db).upsert("p1", "bob", { enabled: false });
-    await requested(booted);
+    await requested(booted, ["bob"]);
     expect(mailsTo(booted, "bob")).toHaveLength(1);
     expect(mailsTo(booted, "bob")[0]?.text).toContain("you own Chart");
   });
@@ -325,7 +330,7 @@ describe("the review request", () => {
     const booted = await boot({
       componentOwners: JSON.stringify([{ pattern: "src/other/**", owners: ["dev"] }]),
     });
-    await requested(booted);
+    await requested(booted, ["alice", "bob", "boss"]);
     expect(booted.mails.map((mail) => mail.to).toSorted()).toEqual([
       "alice@example.com",
       "bob@example.com",
@@ -338,7 +343,7 @@ describe("the review request", () => {
     const booted = await boot({
       componentOwners: JSON.stringify([{ pattern: "src/forms/**", owners: ["dev", "gone"] }]),
     });
-    await requested(booted);
+    await requested(booted, ["dev"]);
     expect(mailsTo(booted, "dev")).toHaveLength(1);
     expect(booted.mails.some((mail) => mail.to.startsWith("gone"))).toBe(false);
   });
