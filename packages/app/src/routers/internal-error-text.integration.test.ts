@@ -1,4 +1,4 @@
-import { LabelModel, ProjectModel } from "@storyshelf/core/models";
+import { LabelModel, ProjectModel, SiteSettingsModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { UserFacingError } from "@storyshelf/core/utils";
 import { pino } from "pino";
@@ -139,6 +139,22 @@ describe("a failure inside a handler never sends its text to the client", () => 
 
     expect(response.status).toBe(400);
     expect(body).toContain("Cannot update label type");
+    expect(body).not.toContain("SQLITE_CONSTRAINT");
+    expectLogged(logged);
+  });
+});
+
+describe("a failure reading the offered capture targets", () => {
+  it("is still a 400, with generic text, and the original is logged", async () => {
+    const { logged, json, createProject } = boot();
+    const slug = await createProject("Targets");
+    vi.spyOn(SiteSettingsModel.prototype, "get").mockRejectedValue(new Error(INTERNAL));
+
+    const response = await json("PATCH", `/projects/${slug}`, { browser: "chromium" });
+    const body = await response.text();
+
+    expect(response.status).toBe(400);
+    expect(body).toContain("Refused");
     expect(body).not.toContain("SQLITE_CONSTRAINT");
     expectLogged(logged);
   });

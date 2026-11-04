@@ -7,6 +7,7 @@ import {
 } from "@storyshelf/core/adapter/capture-runner";
 import { MAX_BROWSERS, assertSupportedBrowsers, offeredTargets } from "@storyshelf/core/capture";
 import { HTTPException } from "hono/http-exception";
+import { publicMessage } from "./routers/helpers.ts";
 import { getStore, type Store } from "./store.ts";
 
 /**
@@ -50,14 +51,13 @@ export async function assertTargetsSelectable(
   if (targets.length > MAX_BROWSERS) {
     throw new HTTPException(400, { message: `Choose at most ${MAX_BROWSERS} browsers` });
   }
-  // Read outside the `try`: a failure here is not a refusal, and its text is not for the client.
-  const offered = await runnerTargets();
   try {
     assertSupportedBrowsers(
       (targets as CaptureTarget[]).filter((target) => !current.includes(target)),
-      offered,
+      await runnerTargets(),
     );
   } catch (error) {
-    throw new HTTPException(400, { message: error instanceof Error ? error.message : "Refused" });
+    // Still a 400; only a refusal's own text is shown (a failure reading the offered targets is not).
+    throw new HTTPException(400, { message: publicMessage(error, "Refused") });
   }
 }
