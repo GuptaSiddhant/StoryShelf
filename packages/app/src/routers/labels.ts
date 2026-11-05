@@ -1,6 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
-import type { LabelType } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { isUserFacingError } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
@@ -64,6 +63,10 @@ const deleteLabelRoute = createRoute({
   request: { params: z.object({ slug: z.string(), key: z.string() }) },
   responses: {
     204: { description: "Deleted label type" },
+    400: {
+      content: { "application/json": { schema: errorSchema } },
+      description: "A reserved label type cannot be removed",
+    },
     ...notFound,
   },
 });
@@ -95,13 +98,20 @@ export function registerLabels(app: ShelfRouter): void {
 
   app.openapi(createLabelRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
-    return c.json(await createLabelType(project.id, c.req.valid("json")), 201);
+    const body = c.req.valid("json");
+    const created = await refusing(
+      409,
+      async () => await new LabelModel(getStore().db).createType(project.id, body),
+    );
+    return c.json(created, 201);
   });
 
   app.openapi(deleteLabelRoute, async (c) => {
     const { slug, key } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    await new LabelModel(getStore().db).removeType(project.id, key);
+    await refusing(400, async () => {
+      await new LabelModel(getStore().db).removeType(project.id, key);
+    });
     return c.body(null, 204);
   });
 
@@ -126,16 +136,13 @@ export function registerLabels(app: ShelfRouter): void {
   });
 }
 
-/** Create a label type; a key the project already has is a 409 carrying the model's own message. */
-async function createLabelType(
-  projectId: string,
-  body: Parameters<LabelModel["createType"]>[1],
-): Promise<LabelType> {
+/** Run `action`; a deliberate refusal (a `UserFacingError`) is answered with `status` and its own message. */
+async function refusing<T>(status: 400 | 409, action: () => Promise<T>): Promise<T> {
   try {
-    return await new LabelModel(getStore().db).createType(projectId, body);
+    return await action();
   } catch (error) {
     if (isUserFacingError(error)) {
-      throw new HTTPException(409, { message: error.message });
+      throw new HTTPException(status, { message: error.message });
     }
     throw error;
   }
