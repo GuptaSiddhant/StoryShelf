@@ -70,6 +70,7 @@ import { hxRefresh } from "./htmx.ts";
 import {
   badRequest,
   buildSchema,
+  errorSchema,
   forbidden as forbiddenResponse,
   notFound as notFoundResponse,
   unauthorized,
@@ -324,20 +325,16 @@ const uploadZipRoute = createRoute({
         "Zip stored. A zip up to maxInlineUnzipSize (default 50 MB) is extracted inline in this request; a larger one is published by a background job. With testing off, the build becomes approved when publishing finishes on the project's default branch (failed if it cannot be published) and stays pending on other branches; with testing on, capture sets the status.",
     },
     422: {
-      content: { "text/plain": { schema: z.string() } },
+      content: { "application/json": { schema: errorSchema } },
       description:
         "The inline zip is invalid, unsafe, or exceeds the extraction limits. The build ends `failed`; upload again to create a new build.",
     },
     409: {
-      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      content: { "application/json": { schema: errorSchema } },
       description: "The build already failed (for example a rejected zip); create a new build",
     },
     413: {
-      content: {
-        "application/json": {
-          schema: z.object({ message: z.string() }).openapi("Error"),
-        },
-      },
+      content: { "application/json": { schema: errorSchema } },
       description:
         "Upload exceeds the configured size limit, or the zip is over the inline limit and this host (serverless) runs no publish consumer: upload file by file instead (POST /dedup, PUT /content, POST /manifest)",
     },

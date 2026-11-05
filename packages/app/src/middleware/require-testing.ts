@@ -1,6 +1,7 @@
 import type { Context, Next } from "hono";
 import { matchedRoutes } from "hono/route";
 import { classOfRoute, type RouteClass } from "../routes/classification.ts";
+import { jsonRefusal } from "./api-errors.ts";
 
 /** Body of the 404 a `testing` route answers on a hosting-only instance. */
 export const TESTING_DISABLED_MESSAGE = "Testing is not enabled on this instance.";
@@ -20,7 +21,7 @@ export function requireTesting(enabled: boolean) {
       return;
     }
     if (c.req.path.startsWith("/api/")) {
-      return c.json({ error: TESTING_DISABLED_MESSAGE }, 404);
+      return jsonRefusal(c, 404, TESTING_DISABLED_MESSAGE);
     }
     return c.text(TESTING_DISABLED_MESSAGE, 404);
   };

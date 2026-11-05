@@ -1,0 +1,6 @@
+---
+"@storyshelf/app": minor
+"storyshelf": minor
+---
+
+API change: every `/api/v1` error now answers JSON, `{ "error": { "message": string } }`, with the same status as before, as the OpenAPI document always declared. Until now most refusals (unknown project or build, forbidden, validation failures, upload limits, duplicate keys) answered plain text, and a few guards answered `{ "error": string }` or `{ "message": string }`, so generated clients read the body the wrong way. One handler now answers the refusals, an unexpected error (a generic `Internal Server Error`; the detail is logged, never sent) and unknown API paths (JSON `404`), and a request that fails validation answers `400` with the failed fields in `error.message`. The `baseline_changed` `409` keeps its `code`, `snapshotId` and `baselineStatus`, now inside `error`; the setup gate's `failures` too. The OpenAPI document declares one shared `Error` schema on every error response. Pages, forms and the requests the app's own pages make with HTMX keep the answers they had. The `storyshelf` CLI reads `error.message` and falls back to the raw text for an older server, so it prints the same messages against both. **If you parse error text by hand**, read `error.message` from the JSON body instead.

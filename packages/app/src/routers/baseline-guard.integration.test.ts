@@ -184,9 +184,9 @@ describe("approval guard for changed baselines", () => {
     const response = await post(app, "f1/snapshots/sf1/approve");
 
     expect(response.status).toBe(409);
-    const body = (await response.json()) as { code: string; snapshotId: string };
-    expect(body.code).toBe("baseline_changed");
-    expect(body.snapshotId).toBe("sf1");
+    const { error } = (await response.json()) as { error: { code: string; snapshotId: string } };
+    expect(error.code).toBe("baseline_changed");
+    expect(error.snapshotId).toBe("sf1");
     expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("changed");
     expect(await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x")).toBeNull();
   });
@@ -240,9 +240,9 @@ describe("approval guard for changed baselines", () => {
     const response = await post(app, "f1/snapshots/sf1/approve");
 
     expect(response.status).toBe(409);
-    const body = (await response.json()) as { code: string; snapshotId: string };
-    expect(body.code).toBe("baseline_changed");
-    expect(body.snapshotId).toBe("sf1");
+    const { error } = (await response.json()) as { error: { code: string; snapshotId: string } };
+    expect(error.code).toBe("baseline_changed");
+    expect(error.snapshotId).toBe("sf1");
     expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("changed");
     expect(await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x")).toBeNull();
   });

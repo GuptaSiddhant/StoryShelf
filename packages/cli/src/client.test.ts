@@ -1,6 +1,12 @@
 import { Readable as NodeReadable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createClient, normalizeBaseUrl, postFormWithProgress, RequestError } from "./client.ts";
+import {
+  apiErrorText,
+  createClient,
+  normalizeBaseUrl,
+  postFormWithProgress,
+  RequestError,
+} from "./client.ts";
 
 describe("normalizeBaseUrl", () => {
   it("strips trailing slashes", () => {
@@ -144,6 +150,25 @@ describe("server url forms", () => {
     );
   });
 
+  it("shows the message of a JSON error from a current server", async () => {
+    const body = { error: { message: "Project not found" } };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body, { status: 404 })));
+    const failure = createClient("https://shelf.test").projects.get("demo");
+    await expect(failure).rejects.toMatchObject({ name: "RequestError", status: 404 });
+    await expect(failure).rejects.toThrow("Request failed (404): Project not found");
+  });
+
+  it("shows the message of a JSON error on the form and JSON posts too", async () => {
+    const body = { error: { message: "Upload too large" } };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async () => Response.json(body, { status: 413 })),
+    );
+    await expect(postFormWithProgress("https://shelf.test/x", new FormData())).rejects.toThrow(
+      "Request failed (413): Upload too large",
+    );
+  });
+
   it("describes an HTML page where the zip upload expects JSON", async () => {
     const page = new Response("<html></html>", { headers: { "content-type": "text/html" } });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(page));
@@ -179,5 +204,28 @@ describe("server url forms", () => {
       status: 502,
     });
     expect(cancel).toHaveBeenCalled();
+  });
+});
+
+describe("apiErrorText", () => {
+  it("reads error.message from the JSON envelope", () => {
+    expect(apiErrorText('{"error":{"message":"No such build"}}')).toBe("No such build");
+  });
+
+  it("falls back to the raw text for an older server's plain text", () => {
+    expect(apiErrorText("Build not found")).toBe("Build not found");
+    expect(apiErrorText("")).toBe("");
+  });
+
+  it("keeps JSON of another shape as it is", () => {
+    for (const body of [
+      '{"message":"old json"}',
+      '{"error":"text"}',
+      '{"error":{"message":""}}',
+      "null",
+      "[]",
+    ]) {
+      expect(apiErrorText(body)).toBe(body);
+    }
   });
 });
