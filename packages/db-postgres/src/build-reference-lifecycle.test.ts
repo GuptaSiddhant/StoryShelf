@@ -8,7 +8,7 @@
  * compatibility workflow), each lifecycle on its own connection.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { BuildReferenceLifecycle, DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   buildReferenceContractSuite,
@@ -19,7 +19,7 @@ import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
-import { afterAll, describe, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
 import { createPostgresDatabase } from "./index.ts";
 import { createPgliteDatabase } from "./pglite.ts";
@@ -76,6 +76,23 @@ function marker(
   };
 }
 
+/**
+ * A build with tens of thousands of files records them in one call. One advisory lock per hash would
+ * put one entry per file in the shared lock table (about 6400 by default) and fail with
+ * "out of shared memory"; the locks are bounded, so this must pass on any server.
+ */
+async function recordsManyHashes(adapter: DatabaseAdapter, lifecycle: BuildReferenceLifecycle) {
+  const seeded = await seed(adapter);
+  const hashes = Array.from({ length: 70_000 }, (_, index) => `many-${seeded.run}-${index}`);
+  const buildId = seeded.buildIds[0];
+  expect(await lifecycle.recordContentUses(seeded.owner.projectId, buildId, hashes)).toEqual([]);
+  // The same call again changes nothing, and a collector pass over them finds them all in use.
+  expect(await lifecycle.recordContentUses(seeded.owner.projectId, buildId, hashes)).toEqual([]);
+  expect(
+    await lifecycle.claimContent("many", "9999-12-31T00:00:00.000Z", "2000-01-01T00:00:00.000Z"),
+  ).toEqual([]);
+}
+
 let pglite: Promise<{ client: PGlite; adapter: DatabaseAdapter }> | undefined;
 
 async function sharedPglite(): Promise<{ client: PGlite; adapter: DatabaseAdapter }> {
@@ -111,6 +128,14 @@ buildReferenceContractSuite("Postgres (PGlite, one connection)", async (run) => 
   });
 });
 
+it("records tens of thousands of hashes in one call (PGlite)", async () => {
+  const { client, adapter } = await sharedPglite();
+  await recordsManyHashes(
+    adapter,
+    createBuildReferenceLifecycle(drizzlePglite(client, { schema })),
+  );
+});
+
 describe.skipIf(!LIVE)("real Postgres, one connection per lifecycle", () => {
   const url = process.env["DATABASE_URL"] ?? "";
   const clients = [postgres(url), postgres(url), postgres(url)] as const;
@@ -133,5 +158,15 @@ describe.skipIf(!LIVE)("real Postgres, one connection per lifecycle", () => {
         return Number(rows[0]?.["n"]);
       }),
     });
+  });
+
+  it("records tens of thousands of hashes in one call (real server)", async () => {
+    const [one] = clients;
+    const adapter = createPostgresDatabase({ client: one });
+    await adapter.lifecycle?.setup({ config: {}, logger: silent });
+    await recordsManyHashes(
+      adapter,
+      createBuildReferenceLifecycle(drizzlePostgres(one, { schema })),
+    );
   });
 });

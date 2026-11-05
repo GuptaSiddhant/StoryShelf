@@ -19,9 +19,9 @@ export interface LifecycleTx {
 }
 
 /** postgres.js returns the rows; PGlite returns `{ rows }`. */
-function rowsOf(result: unknown): Row[] {
+export function rowsOf(result: unknown): Row[] {
   if (Array.isArray(result)) return result as Row[];
-  return (result as { rows?: Row[] }).rows ?? [];
+  return (result as { rows?: Row[] } | undefined)?.rows ?? [];
 }
 
 /** Run `fn` in one transaction: it commits when `fn` resolves and rolls back when it throws. */
@@ -44,6 +44,15 @@ export function valueList(values: readonly string[]): SQL {
     values.map((value) => sql`${value}`),
     sql`, `,
   );
+}
+
+/**
+ * The strings as rows of one bound JSON parameter, for `IN (SELECT * FROM ...)` or `FROM ...`. One
+ * parameter whatever the count, so a build with tens of thousands of files stays under the
+ * protocol's limit of 65535 parameters per statement.
+ */
+export function textRows(values: readonly string[]): SQL {
+  return sql`jsonb_array_elements_text(${JSON.stringify(values)}::jsonb)`;
 }
 
 /** An ISO instant as a bound `timestamptz`. */

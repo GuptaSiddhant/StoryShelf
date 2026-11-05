@@ -1,26 +1,40 @@
 /**
  * Build uses of shared content and its claim for collection (ADR 0039). A use and a collector's
  * claim of one blob must end in exactly one outcome, so both take a transaction-scoped advisory
- * lock on the hash first, in sorted order (no deadlock), and re-read what they decide on after it.
+ * lock first (see {@link lockHashes}), and re-read what they decide on after it.
  */
 import { sql, type SQL } from "drizzle-orm";
 import {
   inTransaction,
   instant,
-  valueList,
+  textRows,
   type LifecycleDatabase,
   type LifecycleTx,
 } from "./lifecycle-transaction.ts";
 
-/** Hold the hash's lock until the transaction ends; a 64-bit key, so a clash only serializes more. */
-async function lockHash(tx: LifecycleTx, hash: string): Promise<void> {
-  await tx.query(sql`SELECT pg_advisory_xact_lock(hashtextextended(${hash}, 0))`);
-}
+/** How many advisory locks a transaction can hold for hashes, however many hashes it touches. */
+const STRIPES = 64;
+/** The first key of those locks, so they cannot collide with another feature's advisory locks. */
+const LOCK_CLASS = 39;
 
+/**
+ * Hold, until the transaction ends, an advisory lock on every stripe the hashes fall in, taken in
+ * stripe order so two transactions never deadlock. A lock per hash would put one entry in the
+ * shared lock table for each file of a build (thousands) and can exhaust it; striping bounds that
+ * to {@link STRIPES}. Two hashes of one stripe only wait for each other, which costs time, never
+ * correctness: a use and a claim of the same hash always share a stripe.
+ */
 async function lockHashes(tx: LifecycleTx, hashes: readonly string[]): Promise<void> {
-  for (const hash of hashes.toSorted()) {
-    // oxlint-disable-next-line no-await-in-loop -- locks are taken one at a time, in hash order
-    await lockHash(tx, hash);
+  if (hashes.length === 0) return;
+  const mask = sql.raw(String(STRIPES - 1));
+  const stripes =
+    await tx.query(sql`SELECT DISTINCT (hashtextextended(h, 0) & ${mask})::int AS stripe
+    FROM ${textRows(hashes)} AS h ORDER BY stripe`);
+  for (const row of stripes) {
+    // oxlint-disable-next-line no-await-in-loop -- at most STRIPES locks, one at a time, in stripe order
+    await tx.query(
+      sql`SELECT pg_advisory_xact_lock(${LOCK_CLASS}::int, ${Number(row["stripe"])}::int)`,
+    );
   }
 }
 
@@ -48,11 +62,9 @@ export async function recordContentUses(
     if (claimed.size > 0) return distinct.filter((hash) => claimed.has(hash));
     await clearAbandonedClaims(tx, distinct, staleBefore);
     const now = new Date().toISOString();
-    for (const hash of distinct) {
-      // oxlint-disable-next-line no-await-in-loop -- one use row per hash
-      await tx.query(sql`INSERT INTO content_uses (build_id, content_hash, project_id, created_at)
-        VALUES (${buildId}, ${hash}, ${projectId}, ${instant(now)}) ON CONFLICT DO NOTHING`);
-    }
+    await tx.query(sql`INSERT INTO content_uses (build_id, content_hash, project_id, created_at)
+      SELECT ${buildId}, h, ${projectId}, ${instant(now)} FROM ${textRows(distinct)} AS h
+      ON CONFLICT DO NOTHING`);
     return [];
   });
 }
@@ -66,7 +78,7 @@ async function claimedHashes(
   const live: SQL =
     staleBefore === undefined ? sql`true` : sql`collecting_at >= ${instant(staleBefore)}`;
   const rows = await tx.query(sql`SELECT DISTINCT content_hash FROM content_uses
-    WHERE content_hash IN (${valueList(hashes)}) AND collecting_at IS NOT NULL AND ${live}`);
+    WHERE content_hash IN (SELECT * FROM ${textRows(hashes)}) AND collecting_at IS NOT NULL AND ${live}`);
   return new Set(rows.map((row) => String(row["content_hash"])));
 }
 
@@ -78,7 +90,7 @@ async function clearAbandonedClaims(
 ): Promise<void> {
   if (staleBefore === undefined) return;
   await tx.query(sql`UPDATE content_uses SET collecting_at = NULL, claim_token = NULL
-    WHERE content_hash IN (${valueList(hashes)}) AND collecting_at IS NOT NULL
+    WHERE content_hash IN (SELECT * FROM ${textRows(hashes)}) AND collecting_at IS NOT NULL
       AND collecting_at < ${instant(staleBefore)}`);
 }
 
@@ -120,12 +132,12 @@ export async function claimContent(
         OR (COUNT(*) FILTER (WHERE released_at IS NULL) = 0
           AND COUNT(*) FILTER (WHERE collecting_at IS NOT NULL) = 0
           AND MAX(released_at) < ${instant(idleBefore)})`);
+    const hashes = candidates.map((row) => String(row["content_hash"])).toSorted();
+    await lockHashes(tx, hashes);
     const claimed: string[] = [];
     const now = new Date().toISOString();
-    for (const hash of candidates.map((row) => String(row["content_hash"])).toSorted()) {
-      // oxlint-disable-next-line no-await-in-loop -- lock, re-check and stamp one hash at a time
-      await lockHash(tx, hash);
-      // oxlint-disable-next-line no-await-in-loop -- the check must follow the lock
+    for (const hash of hashes) {
+      // oxlint-disable-next-line no-await-in-loop -- the check follows the locks, one hash at a time
       if (!(await claimable(tx, hash, idleBefore, staleBefore))) continue;
       // oxlint-disable-next-line no-await-in-loop -- stamp under the lock just taken
       await tx.query(sql`UPDATE content_uses SET collecting_at = ${instant(now)}, claim_token = ${token}
