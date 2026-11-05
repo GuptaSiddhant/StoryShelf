@@ -1,11 +1,14 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
+import type { LabelType } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { isUserFacingError } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
+import { publicMessage, resolveAuthorizedProject } from "./helpers.ts";
 import {
+  errorSchema,
   labelTypeCreateSchema,
   labelTypeSchema,
   labelTypeUpdateSchema,
@@ -44,6 +47,10 @@ const createLabelRoute = createRoute({
     201: {
       content: { "application/json": { schema: labelTypeSchema } },
       description: "Created label type",
+    },
+    409: {
+      content: { "application/json": { schema: errorSchema } },
+      description: "The project already has a label type with this key",
     },
     ...notFound,
   },
@@ -88,8 +95,7 @@ export function registerLabels(app: ShelfRouter): void {
 
   app.openapi(createLabelRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
-    const body = c.req.valid("json");
-    return c.json(await new LabelModel(getStore().db).createType(project.id, body), 201);
+    return c.json(await createLabelType(project.id, c.req.valid("json")), 201);
   });
 
   app.openapi(deleteLabelRoute, async (c) => {
@@ -114,8 +120,23 @@ export function registerLabels(app: ShelfRouter): void {
         throw error;
       }
       throw new HTTPException(400, {
-        message: error instanceof Error ? error.message : "Cannot update label type",
+        message: publicMessage(error, "Cannot update label type"),
       });
     }
   });
+}
+
+/** Create a label type; a key the project already has is a 409 carrying the model's own message. */
+async function createLabelType(
+  projectId: string,
+  body: Parameters<LabelModel["createType"]>[1],
+): Promise<LabelType> {
+  try {
+    return await new LabelModel(getStore().db).createType(projectId, body);
+  } catch (error) {
+    if (isUserFacingError(error)) {
+      throw new HTTPException(409, { message: error.message });
+    }
+    throw error;
+  }
 }

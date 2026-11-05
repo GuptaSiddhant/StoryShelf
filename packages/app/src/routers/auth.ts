@@ -2,6 +2,7 @@ import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
 import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
 import { SESSION_COOKIE } from "@storyshelf/core/types";
+import { UserFacingError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -10,6 +11,7 @@ import { renderInviteInvalidPage, renderInvitePage } from "../pages/invite.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
 import { getStore } from "../store.ts";
 import { syncLoginMemberships } from "./auth-sync.ts";
+import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 
 /** Provider ids are URL path segments: strict charset, bounded length. */
@@ -274,7 +276,7 @@ async function finishInviteAccept(
     password,
   });
   if (res.status !== 200) {
-    throw new Error("Sign in failed");
+    throw new UserFacingError("Sign in failed");
   }
   copySetCookies(c, res);
   await syncEngineUser({ id: user.id, email: user.email, name: user.name });
@@ -287,7 +289,7 @@ async function inviteAcceptError(
   token: string,
   error: unknown,
 ): Promise<Response> {
-  const message = error instanceof Error ? error.message : "Invalid or expired invite";
+  const message = publicMessage(error, "Invalid or expired invite");
   if (message.includes(`at least ${MIN_PASSWORD_LENGTH}`)) {
     return c.html(await renderInvitePage({ inviteId, token, error: message }), 400);
   }
