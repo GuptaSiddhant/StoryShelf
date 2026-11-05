@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
+import { UserFacingError } from "../utils/user-facing-error.ts";
 import { createPublicOriginResolver, PUBLIC_ORIGIN_KEY } from "./public-origin.ts";
 import { SiteSettingsModel } from "./site-settings.ts";
 
@@ -17,6 +18,16 @@ function setup(
 }
 
 describe("createPublicOriginResolver", () => {
+  it("refuses an origin with a path as a user-facing error and stores nothing", async () => {
+    const { resolver } = setup();
+    const refused = await resolver
+      .set("https://shelf.example.com/path")
+      .catch((caught: unknown) => caught);
+    expect(refused).toBeInstanceOf(UserFacingError);
+    expect((refused as Error).message).toContain("must be an http(s) origin");
+    expect(await resolver.stored()).toBeNull();
+  });
+
   it("resolves nothing when nothing is configured, detected or reported", async () => {
     const { resolver } = setup();
     expect(await resolver.resolve()).toBeNull();

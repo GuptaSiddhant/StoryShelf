@@ -15,7 +15,13 @@ import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
 import { eq, getTableColumns, sql } from "@storyshelf/core/orm";
 import type { SQL, Table } from "@storyshelf/core/orm";
 import type { AuthUser } from "@storyshelf/core/types";
-import { randomToken, sha256, timingSafeEqualString, ulid } from "@storyshelf/core/utils";
+import {
+  UserFacingError,
+  randomToken,
+  sha256,
+  timingSafeEqualString,
+  ulid,
+} from "@storyshelf/core/utils";
 import { hashPassword } from "better-auth/crypto";
 import { baseAuthTables } from "./auth-tables.ts";
 
@@ -79,7 +85,7 @@ function isEmail(value: string): boolean {
 }
 
 function inviteError(): Error {
-  return new Error("Invalid or expired invite");
+  return new UserFacingError("Invalid or expired invite");
 }
 
 /** Resolve a shelf/engine table column, failing fast on schema drift. */
@@ -93,7 +99,7 @@ export function tableColumn(table: Table, name: string): SQL {
 
 function assertPasswordPolicy(password: string): void {
   if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error("Password must be at least 12 characters");
+    throw new UserFacingError("Password must be at least 12 characters");
   }
 }
 

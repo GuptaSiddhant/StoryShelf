@@ -6,6 +6,7 @@ import {
   type CaptureTarget,
   type RunnerTarget,
 } from "../adapters/capture-target.ts";
+import { UserFacingError } from "../utils/user-facing-error.ts";
 
 /** Upper bound on targets per project (each multiplies render time). */
 export const MAX_BROWSERS = 3;
@@ -84,7 +85,7 @@ export function assertSupportedBrowsers(
 ): void {
   const refusals = targets.flatMap((target) => refusalFor(target, offered) ?? []);
   if (refusals.length > 0) {
-    throw new Error(`Capture runner cannot render: ${refusals.join("; ")}`);
+    throw new UserFacingError(`Capture runner cannot render: ${refusals.join("; ")}`);
   }
 }
 
