@@ -10,6 +10,7 @@ import { notifySystem } from "../notify.ts";
 import { renderInviteInvalidPage, renderInvitePage } from "../pages/invite.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
 import { getStore } from "../store.ts";
+import { loginFailureOf } from "./auth-login-failure.ts";
 import { syncLoginMemberships } from "./auth-sync.ts";
 import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
@@ -146,22 +147,13 @@ async function finishCredentialLogin(
 ): Promise<Response> {
   const res = await forwardToEngine(c, engine, "/api/auth/sign-in/email", { email, password });
   if (res.status !== 200) {
-    // Generic message either way (no user enumeration), but propagate
-    // rate-limit/upstream statuses instead of masking them as 401.
-    if (res.status === 429) {
-      return renderEngineLogin(c, engine, "Invalid credentials", email, 429);
+    const failure = loginFailureOf(res.status);
+    if (failure.notify) {
+      // Admins opted into sys:* see a login-attempt signal. Spray attempts can fan out
+      // here; the /auth/* rate-limit bucket bounds it.
+      await notifySystem("sys:auth-failed", { email });
     }
-    if (res.status >= 500) {
-      return renderEngineLogin(c, engine, "Invalid credentials", email, 502);
-    }
-    if (res.status === 400) {
-      return renderEngineLogin(c, engine, "Enter a valid email address", email, 400);
-    }
-    // Credential failures only (never rate-limit/upstream noise, never
-    // secrets): admins opted into sys:* see a login-attempt signal. Spray
-    // attempts can fan out here; the /auth/* rate-limit bucket bounds it.
-    await notifySystem("sys:auth-failed", { email });
-    return renderEngineLogin(c, engine, "Invalid credentials", email, 401);
+    return renderEngineLogin(c, engine, failure.message, email, failure.status);
   }
   copySetCookies(c, res);
   const body = (await res.json()) as { user: { id: string; email: string; name: string } };
