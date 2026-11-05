@@ -200,6 +200,25 @@ describe("PATCH label-type endpoint", () => {
     expect(response.status).toBe(404);
   });
 
+  it("answers 409 with the model's message when the project already has the key", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, localProject);
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const create = async () =>
+      await app.request("/api/v1/projects/test-project/label-types", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key: "jira", name: "Jira" }),
+      });
+
+    expect((await create()).status).toBe(201);
+    const again = await create();
+
+    expect(again.status).toBe(409);
+    expect(await again.text()).toContain("A label type with the key 'jira' already exists.");
+  });
+
   it("rejects patching a reserved label type", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
