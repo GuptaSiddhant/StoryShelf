@@ -81,6 +81,14 @@ Rules:
   from one session (an in-process Postgres such as PGlite) can run the suite but cannot prove
   cross-connection row locking; say so where it is used, and prove locking against a real server
   before enabling the capability on a preset.
+- Postgres (`db-postgres/src/build-reference-lifecycle.test.ts`) runs `buildReferenceContractSuite`
+  twice. On PGlite it always runs and proves the SQL, the constraints and the rollback of domain
+  writes, but both lifecycles share one session, so it does not prove locking (removing the row
+  locks leaves it green). On a real server (`LIVE_CLOUD=1` and `DATABASE_URL`, one connection per
+  lifecycle) it does: the same mutation fails it. CI runs that half on every pull request that
+  touches `packages/db-postgres/`, `packages/core/src/test-helpers/` or
+  `packages/core/src/adapters/database.ts` (job `postgres-lifecycle`, a `postgres:16` service
+  container), and the nightly database workflow runs it with the rest of the live suite.
 - The boot step that prepares the baseline pins before a dialect exposes the capability (ADR 0039,
   "activation") is proven with `retentionActivationContractSuite`. Activation stays each adapter's
   own step (it is on neither `DatabaseAdapter` nor `BuildReferenceLifecycle`); the dialect hands
