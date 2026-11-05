@@ -75,6 +75,9 @@ const BASELINE_FINGERPRINT_ALTER =
 const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const BUILD_AFFECTED_ONLY_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
+/** Build retention (ADR 0039): `available` until the lifecycle capability tombstones the build. */
+const BUILD_RETENTION_STATE_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS retention_state TEXT NOT NULL DEFAULT 'available'";
 const BUILD_BASELINE_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS baseline_sha TEXT";
 const BUILD_CHANGED_FILES_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS changed_files TEXT";
 const BUILD_AFFECTED_PATHS_ALTER =
@@ -241,9 +244,14 @@ async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> 
   await run(PROJECT_COMPONENT_OWNERS_ALTER);
 }
 
+async function migrateBuildRetentionColumns(run: MigrationRunner): Promise<void> {
+  await run(BUILD_RETENTION_STATE_ALTER);
+  await run(BUILD_BASELINE_SHA_ALTER);
+}
+
 async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_AFFECTED_ONLY_ALTER);
-  await run(BUILD_BASELINE_SHA_ALTER);
+  await migrateBuildRetentionColumns(run);
   await run(BUILD_CHANGED_FILES_ALTER);
   await run(BUILD_AFFECTED_PATHS_ALTER);
   await run(BUILD_INHERITED_COUNT_ALTER);
