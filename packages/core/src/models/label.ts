@@ -5,6 +5,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { BuildLabel, LabelType } from "../schema/label.ts";
 import { PERSISTENT_LABEL_KEY, RESERVED_LABEL_KEYS, SEEDED_LABEL_KEYS } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
+import { UserFacingError } from "../utils/user-facing-error.ts";
 import { col } from "./columns.ts";
 
 /** Tables required by {@link LabelModel}. */
@@ -80,6 +81,9 @@ export class LabelModel {
     projectId: string,
     input: { key: string; name: string; linkTemplate?: string; color?: string },
   ): Promise<LabelType> {
+    if (await this.getType(projectId, input.key)) {
+      throw new UserFacingError(`A label type with the key '${input.key}' already exists.`);
+    }
     return (await this.db.insert(this.tables.labelTypes, {
       id: ulid(),
       projectId,
@@ -98,7 +102,7 @@ export class LabelModel {
     input: { name?: string; linkTemplate?: string | null; color?: string | null },
   ): Promise<LabelType | null> {
     if (key === PERSISTENT_LABEL_KEY || RESERVED_LABEL_KEYS.includes(key as never)) {
-      throw new Error(`Label type '${key}' cannot be updated.`);
+      throw new UserFacingError(`Label type '${key}' cannot be updated.`);
     }
     const existing = await this.getType(projectId, key);
     if (!existing) {
@@ -114,7 +118,7 @@ export class LabelModel {
   /** Remove a custom label type, rejecting reserved or persistent types. */
   async removeType(projectId: string, key: string): Promise<void> {
     if (key === PERSISTENT_LABEL_KEY || RESERVED_LABEL_KEYS.includes(key as never)) {
-      throw new Error(`Label type '${key}' cannot be removed.`);
+      throw new UserFacingError(`Label type '${key}' cannot be removed.`);
     }
     const existing = await this.getType(projectId, key);
     if (existing) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
+import { UserFacingError } from "../utils/user-facing-error.ts";
 import { LabelModel } from "./label.ts";
 
 describe("LabelModel", () => {
@@ -105,6 +106,30 @@ describe("LabelModel", () => {
     await expect(model.updateType("p1", "build", { name: "X" })).rejects.toThrow(
       "Label type 'build' cannot be updated.",
     );
+  });
+
+  it("its deliberate refusals are user-facing errors", async () => {
+    const { db } = makeDatabase();
+    const model = new LabelModel(db);
+    await expect(model.updateType("p1", "persistent", { name: "X" })).rejects.toBeInstanceOf(
+      UserFacingError,
+    );
+    await expect(model.removeType("p1", "persistent")).rejects.toBeInstanceOf(UserFacingError);
+  });
+
+  it("createType refuses a key the project already has, as a user-facing error", async () => {
+    const { db } = makeDatabase();
+    const model = new LabelModel(db);
+    await model.createType("p1", { key: "pr", name: "Pull request" });
+    const refused = await model
+      .createType("p1", { key: "pr", name: "Again" })
+      .catch((caught: unknown) => caught);
+    expect(refused).toBeInstanceOf(UserFacingError);
+    expect((refused as Error).message).toBe("A label type with the key 'pr' already exists.");
+    expect(await model.listTypes("p1")).toHaveLength(1);
+    // The same key in another project is a different label type.
+    await model.createType("p2", { key: "pr", name: "Pull request" });
+    expect(await model.listTypes("p2")).toHaveLength(1);
   });
 
   it("lists the project's persistent build ids", async () => {
