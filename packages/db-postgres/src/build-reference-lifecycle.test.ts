@@ -93,6 +93,33 @@ async function recordsManyHashes(adapter: DatabaseAdapter, lifecycle: BuildRefer
   ).toEqual([]);
 }
 
+/**
+ * A build deleted after it recorded tens of thousands of files leaves that many idle hashes. One
+ * collector pass claims them all with a fixed number of statements, so the locks it holds do not
+ * stall uploads for the time of a round trip per hash.
+ */
+async function claimsManyIdleHashes(adapter: DatabaseAdapter, lifecycle: BuildReferenceLifecycle) {
+  const seeded = await seed(adapter);
+  const { projectId } = seeded.owner;
+  const buildId = seeded.buildIds[0];
+  const hashes = Array.from({ length: 20_000 }, (_, index) => `idle-${seeded.run}-${index}`);
+  expect(await lifecycle.recordContentUses(projectId, buildId, hashes)).toEqual([]);
+  expect(await lifecycle.claimDeletion(projectId, buildId)).toBe("claimed");
+  expect(await lifecycle.releaseBuildContent(projectId, buildId, [])).toBe("done");
+  const claimed = await lifecycle.claimContent(
+    "pass",
+    "9999-12-31T00:00:00.000Z",
+    "2000-01-01T00:00:00.000Z",
+  );
+  expect(claimed).toHaveLength(hashes.length);
+  expect(new Set(claimed)).toEqual(new Set(hashes));
+  // Claimed hashes are held by the pass's token and refuse a new use.
+  expect(await lifecycle.holdsContentClaim(hashes[0] ?? "", "pass")).toBe(true);
+  expect(
+    await lifecycle.recordContentUses(projectId, seeded.buildIds[1], hashes.slice(0, 2)),
+  ).toEqual(hashes.slice(0, 2));
+}
+
 let pglite: Promise<{ client: PGlite; adapter: DatabaseAdapter }> | undefined;
 
 async function sharedPglite(): Promise<{ client: PGlite; adapter: DatabaseAdapter }> {
@@ -126,6 +153,14 @@ buildReferenceContractSuite("Postgres (PGlite, one connection)", async (run) => 
       return Number(result.rows[0]?.n);
     }),
   });
+});
+
+it("claims tens of thousands of idle hashes in one pass (PGlite)", async () => {
+  const { client, adapter } = await sharedPglite();
+  await claimsManyIdleHashes(
+    adapter,
+    createBuildReferenceLifecycle(drizzlePglite(client, { schema })),
+  );
 });
 
 it("records tens of thousands of hashes in one call (PGlite)", async () => {
@@ -165,6 +200,16 @@ describe.skipIf(!LIVE)("real Postgres, one connection per lifecycle", () => {
     const adapter = createPostgresDatabase({ client: one });
     await adapter.lifecycle?.setup({ config: {}, logger: silent });
     await recordsManyHashes(
+      adapter,
+      createBuildReferenceLifecycle(drizzlePostgres(one, { schema })),
+    );
+  });
+
+  it("claims tens of thousands of idle hashes in one pass (real server)", async () => {
+    const [one] = clients;
+    const adapter = createPostgresDatabase({ client: one });
+    await adapter.lifecycle?.setup({ config: {}, logger: silent });
+    await claimsManyIdleHashes(
       adapter,
       createBuildReferenceLifecycle(drizzlePostgres(one, { schema })),
     );

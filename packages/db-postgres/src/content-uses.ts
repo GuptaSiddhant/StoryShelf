@@ -94,30 +94,14 @@ async function clearAbandonedClaims(
       AND collecting_at < ${instant(staleBefore)}`);
 }
 
-/** Whether the hash may be claimed now: its claim is stale, or it is idle and released long enough. */
-async function claimable(
-  tx: LifecycleTx,
-  hash: string,
-  idleBefore: string,
-  staleBefore: string,
-): Promise<boolean> {
-  const rows = await tx.query(sql`SELECT
-      COUNT(*) FILTER (WHERE collecting_at IS NOT NULL AND collecting_at < ${instant(staleBefore)}) AS stale_n,
-      COUNT(*) FILTER (WHERE released_at IS NULL) AS open_n,
-      COUNT(*) FILTER (WHERE collecting_at IS NOT NULL) AS claimed_n,
-      COALESCE(MAX(released_at) < ${instant(idleBefore)}, false) AS old_enough
-    FROM content_uses WHERE content_hash = ${hash}`);
-  const row = rows[0] ?? {};
-  if (Number(row["stale_n"]) > 0) return true;
-  return (
-    Number(row["open_n"]) === 0 && Number(row["claimed_n"]) === 0 && row["old_enough"] === true
-  );
-}
-
 /**
  * Claim every idle hash (see the capability) under the pass's token, taking over the hashes whose
- * earlier claim is stale. Re-stamping with the new token fences the old collector out. Candidates
- * are read first, then each is locked and re-checked, so a use recorded in between wins.
+ * earlier claim is stale. Re-stamping with the new token fences the old collector out.
+ *
+ * The candidates are read first, only to know which stripes to lock. Under those locks one
+ * statement decides again which are claimable (a use recorded in between has either not happened
+ * or is visible) and stamps them, so the locks are held for a fixed number of statements however
+ * many hashes the pass covers, and a concurrent upload waits for a moment, not a round trip per hash.
  */
 export async function claimContent(
   db: LifecycleDatabase,
@@ -127,25 +111,27 @@ export async function claimContent(
 ): Promise<string[]> {
   return await inTransaction(db, async (tx) => {
     const candidates = await tx.query(sql`SELECT content_hash FROM content_uses
-      GROUP BY content_hash
-      HAVING COUNT(*) FILTER (WHERE collecting_at IS NOT NULL AND collecting_at < ${instant(staleBefore)}) > 0
-        OR (COUNT(*) FILTER (WHERE released_at IS NULL) = 0
-          AND COUNT(*) FILTER (WHERE collecting_at IS NOT NULL) = 0
-          AND MAX(released_at) < ${instant(idleBefore)})`);
-    const hashes = candidates.map((row) => String(row["content_hash"])).toSorted();
+      GROUP BY content_hash HAVING ${claimable(idleBefore, staleBefore)}`);
+    const hashes = candidates.map((row) => String(row["content_hash"]));
+    if (hashes.length === 0) return [];
     await lockHashes(tx, hashes);
-    const claimed: string[] = [];
-    const now = new Date().toISOString();
-    for (const hash of hashes) {
-      // oxlint-disable-next-line no-await-in-loop -- the check follows the locks, one hash at a time
-      if (!(await claimable(tx, hash, idleBefore, staleBefore))) continue;
-      // oxlint-disable-next-line no-await-in-loop -- stamp under the lock just taken
-      await tx.query(sql`UPDATE content_uses SET collecting_at = ${instant(now)}, claim_token = ${token}
-        WHERE content_hash = ${hash}`);
-      claimed.push(hash);
-    }
-    return claimed;
+    const stamped = await tx.query(sql`UPDATE content_uses
+      SET collecting_at = ${instant(new Date().toISOString())}, claim_token = ${token}
+      WHERE content_hash IN (
+        SELECT content_hash FROM content_uses
+        WHERE content_hash IN (SELECT * FROM ${textRows(hashes)})
+        GROUP BY content_hash HAVING ${claimable(idleBefore, staleBefore)})
+      RETURNING content_hash`);
+    return [...new Set(stamped.map((row) => String(row["content_hash"])))].toSorted();
   });
+}
+
+/** Whether a hash may be claimed: its claim is stale, or it is idle and was released long enough ago. */
+function claimable(idleBefore: string, staleBefore: string): SQL {
+  return sql`(COUNT(*) FILTER (WHERE collecting_at IS NOT NULL AND collecting_at < ${instant(staleBefore)}) > 0
+    OR (COUNT(*) FILTER (WHERE released_at IS NULL) = 0
+      AND COUNT(*) FILTER (WHERE collecting_at IS NOT NULL) = 0
+      AND MAX(released_at) < ${instant(idleBefore)}))`;
 }
 
 /** Whether the token still holds the hash's claim and no use of it is unreleased. */
