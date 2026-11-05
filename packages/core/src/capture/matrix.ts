@@ -113,6 +113,7 @@ export async function partitionBrowsers(input: MatrixInput): Promise<Partitioned
       viewports: input.viewports,
       browser,
       affectedPaths: input.affectedPaths,
+      baselineSha: build.baselineSha,
     });
     work.push({ browser, stories: partition.render });
     inherited.push(...tagged(partition.inherited, browser));
@@ -271,6 +272,7 @@ async function passOnBrowser(
     viewports: input.viewports,
     browser,
     affectedPaths: input.affectedPaths,
+    baselineSha: build.baselineSha,
   });
   mirror.log("info", "affected capture partitioned", {
     browser,

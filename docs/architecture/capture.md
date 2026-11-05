@@ -131,6 +131,10 @@ async function capture(buildId: string): Promise<void> {
 }
 ```
 
+**Affected capture and `baselineSha`.** With `affectedOnly`, the CLI renders only the stories a change reaches since `baselineSha` and the rest are inherited from the baselines. `baselineSha` is the commit of the newest earlier build on the branch whose outcome reached the baselines (`BuildModel.newestComparableBuild`): today an `approved` build, with a planned `skipped` build (resolved to its source) joining the same rule. A build still being reviewed, or cancelled, failed or rejected, is passed over, because inheriting past it would show its unreviewed changes as unchanged. With no such build `baselineSha` is `null` and the first-build path (a full capture) applies.
+
+Inheriting is also checked per baseline: a story is inherited only when its baseline's `source_build_id` is the comparison build or an older one (by `created_at`). A baseline promoted from a later build, for example by a per-snapshot approval while that build was still being reviewed, is rendered instead, so a revert to the comparison build's version is not hidden. A baseline with no recorded source (legacy rows) is still inherited.
+
 ### Deterministic Rendering
 
 Rendering happens on the server against the user's uploaded static build, in a pinned browser:
