@@ -4,8 +4,10 @@
  * PGlite always runs. It is one in-process connection, so it proves the SQL (the statements, the
  * constraints, rollback of domain writes) but NOT cross-connection locking: its "first" and "second"
  * lifecycles queue behind each other's transactions. Real Postgres proves the locks. It runs when
- * `LIVE_CLOUD=1` and `DATABASE_URL` are set (the CI job `postgres-lifecycle` and the nightly
- * compatibility workflow), each lifecycle on its own connection.
+ * `LIVE_CLOUD=1`, `POSTGRES_SCHEMA_MUTATION_TEST=1` (this database may be wiped: the suite clears
+ * `content_uses` and its collector pass claims every idle hash) and `DATABASE_URL` are set, which the
+ * CI job `postgres-lifecycle` and the nightly compatibility workflow do against a disposable service
+ * container, each lifecycle on its own connection.
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { BuildReferenceLifecycle, DatabaseAdapter } from "@storyshelf/core/adapter/database";
@@ -27,7 +29,11 @@ import { schema } from "./schema/index.ts";
 
 const silent = createShelfLogger({ level: "silent" });
 const now = "2026-01-01T00:00:00.000Z";
-const LIVE = process.env["LIVE_CLOUD"] === "1" && process.env["DATABASE_URL"] !== undefined;
+// The live half deletes every `content_uses` row and claims idle ones: only a disposable database may run it.
+const LIVE =
+  process.env["LIVE_CLOUD"] === "1" &&
+  process.env["POSTGRES_SCHEMA_MUTATION_TEST"] === "1" &&
+  process.env["DATABASE_URL"] !== undefined;
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
 
 /** A project with two available builds; every id carries the run's suffix, so a shared database needs no cleanup. */

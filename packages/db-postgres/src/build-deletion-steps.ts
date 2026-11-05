@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import {
   inTransaction,
   isoOf,
+  textRows,
   type LifecycleDatabase,
   type LifecycleTx,
 } from "./lifecycle-transaction.ts";
@@ -48,11 +49,9 @@ export async function releaseBuildContent(
     await tx.query(sql`INSERT INTO build_deletions (build_id, project_id, created_at, updated_at)
       VALUES (${buildId}, ${projectId}, ${now}::timestamptz, ${now}::timestamptz)
       ON CONFLICT DO NOTHING`);
-    for (const hash of new Set(hashes)) {
-      // oxlint-disable-next-line no-await-in-loop -- one release record per hash
-      await tx.query(sql`INSERT INTO build_content_releases (build_id, content_hash, released_at)
-        VALUES (${buildId}, ${hash}, ${now}::timestamptz) ON CONFLICT DO NOTHING`);
-    }
+    await tx.query(sql`INSERT INTO build_content_releases (build_id, content_hash, released_at)
+      SELECT ${buildId}, h, ${now}::timestamptz FROM ${textRows([...new Set(hashes)])} AS h
+      ON CONFLICT DO NOTHING`);
     // Every use the build holds, whatever its manifest lists; the blob stays for the grace period.
     await tx.query(sql`UPDATE content_uses SET released_at = ${now}::timestamptz
       WHERE build_id = ${buildId} AND released_at IS NULL`);

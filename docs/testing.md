@@ -84,8 +84,10 @@ Rules:
 - Postgres (`db-postgres/src/build-reference-lifecycle.test.ts`) runs `buildReferenceContractSuite`
   twice. On PGlite it always runs and proves the SQL, the constraints and the rollback of domain
   writes, but both lifecycles share one session, so it does not prove locking (removing the row
-  locks leaves it green). On a real server (`LIVE_CLOUD=1` and `DATABASE_URL`, one connection per
-  lifecycle) it does: the same mutation fails it. CI runs that half on every pull request that
+  locks leaves it green). On a real server (one connection per lifecycle) it does: removing the same
+  locks fails it. That half needs `LIVE_CLOUD=1`, `DATABASE_URL` and `POSTGRES_SCHEMA_MUTATION_TEST=1`;
+  the last says the database is disposable, because the suite clears `content_uses` and its
+  collector pass claims every idle hash. CI runs that half on every pull request that
   touches `packages/db-postgres/`, `packages/core/src/test-helpers/` or
   `packages/core/src/adapters/database.ts` (job `postgres-lifecycle`, a `postgres:16` service
   container), and the nightly database workflow runs it with the rest of the live suite.

@@ -250,6 +250,8 @@ jobs:
         working-directory: packages/db-postgres
         env:
           LIVE_CLOUD: "1"
+          # The suite clears and claims shared content rows: this service container is disposable.
+          POSTGRES_SCHEMA_MUTATION_TEST: "1"
           DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
         run: nubx vitest run src/build-reference-lifecycle.test.ts
 
