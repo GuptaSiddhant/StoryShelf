@@ -74,7 +74,6 @@ export function setupCapture(
     return { queue: null, enqueueCapture: undefined, handler: null };
   }
   const queue = jobs.view;
-  const enqueueCapture = enqueuerFor(queue);
   const handlerOptions = captureHandlerOptions(options, config, delivery, logger, {
     runner: testing.runner,
     enqueue: async (job) => {
@@ -82,26 +81,57 @@ export function setupCapture(
     },
   });
   const retries = options.testing?.retries ?? DEFAULT_RETRIES;
-  const dispatch = captureDispatchDeps(handlerOptions, retries);
+  const alert = {
+    failed: async (buildId: string): Promise<void> => {
+      await notifyCaptureFailed(options, config, logger, buildId, delivery.publicOrigin);
+    },
+    stuck: async (buildId: string): Promise<void> => {
+      await notifyCaptureStuck(options, config, logger, buildId, delivery.publicOrigin);
+    },
+  };
+  const failed = registerCrashHooks(jobs, captureDispatchDeps(handlerOptions, retries), alert);
+  const handler = handlerFor(options, handlerOptions, { retries, onCrashed: failed, logger });
+  return {
+    queue,
+    enqueueCapture: enqueuerFor(queue),
+    handler: alerting(handler, retries, alert.failed),
+  };
+}
+
+/**
+ * What happens to a capture job that ran out of retries (its build fails, admins are alerted) or
+ * was abandoned (admins are alerted). Returns the failing hook, which a forked worker's crash uses too.
+ */
+function registerCrashHooks(
+  jobs: JobQueue,
+  dispatch: ReturnType<typeof captureDispatchDeps>,
+  alert: { failed: (buildId: string) => Promise<void>; stuck: (buildId: string) => Promise<void> },
+): (job: ConsumerJob, error: string) => Promise<void> {
   const failed = async (job: ConsumerJob, error: string): Promise<void> => {
     await failCrashedCapture(dispatch, job, error);
-    await notifyCaptureFailed(options, config, logger, job.buildId, delivery.publicOrigin);
+    await alert.failed(job.buildId);
   };
   jobs.exhausted.capture = failed;
   jobs.abandoned.capture = async (job): Promise<void> => {
-    await notifyCaptureStuck(options, config, logger, job.buildId, delivery.publicOrigin);
+    await alert.stuck(job.buildId);
   };
+  return failed;
+}
+
+/** The capture handler: in this process, or forked into a worker (which falls back to this process). */
+function handlerFor(
+  options: ShelfOptions,
+  handlerOptions: CaptureHandlerOptions,
+  parts: {
+    retries: number;
+    onCrashed: (job: ConsumerJob, error: string) => Promise<void>;
+    logger: Logger;
+  },
+): CaptureHandler {
   const inProcess = createCaptureHandler(handlerOptions);
-  const handler = shouldForkCapture(testing, logger)
-    ? forkedHandler(options, { fallback: inProcess, retries, onCrashed: failed, logger })
+  return shouldForkCapture(options.testing, parts.logger)
+    ? forkedHandler(options, { fallback: inProcess, ...parts })
     : inProcess;
-  return {
-    queue,
-    enqueueCapture,
-    handler: alerting(handler, retries, async (buildId) => {
-      await notifyCaptureFailed(options, config, logger, buildId, delivery.publicOrigin);
-    }),
-  };
 }
 
 function captureHandlerOptions(
