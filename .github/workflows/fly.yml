@@ -11,6 +11,7 @@ on:
     paths:
       - "packages/**"
       - "apps/fly-app/**"
+      - ".dockerignore" # the build context of the image
       - "fixtures/storybook-9/**"
       - "package.json"
       - "nub.lock"
