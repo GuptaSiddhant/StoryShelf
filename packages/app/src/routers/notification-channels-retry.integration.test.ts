@@ -156,7 +156,7 @@ describe("retry a git channel's current state", () => {
     const t = await boot({ origin: false });
     const res = await post(t.app, t.target.id, "admin");
     expect(res.status).toBe(409);
-    expect(((await res.json()) as { message: string }).message).toContain(
+    expect(((await res.json()) as { error: { message: string } }).error.message).toContain(
       "notifications are paused",
     );
     expect(t.git.calls).toEqual([]);
@@ -167,7 +167,9 @@ describe("retry a git channel's current state", () => {
     await t.db.update(t.db.tables.notificationChannels, t.target.id, { enabled: false });
     const res = await post(t.app, t.target.id, "admin");
     expect(res.status).toBe(409);
-    expect(((await res.json()) as { message: string }).message).toContain("disabled");
+    expect(((await res.json()) as { error: { message: string } }).error.message).toContain(
+      "disabled",
+    );
     expect(t.git.calls).toEqual([]);
   });
 
@@ -178,7 +180,7 @@ describe("retry a git channel's current state", () => {
       .mockRejectedValueOnce(new Error("database is down"));
     const res = await post(t.app, t.target.id, "admin");
     expect(res.status).toBe(503);
-    expect(((await res.json()) as { message: string }).message).toBe(
+    expect(((await res.json()) as { error: { message: string } }).error.message).toBe(
       "Couldn't look up open builds, try again",
     );
     expect(t.git.calls).toEqual([]);

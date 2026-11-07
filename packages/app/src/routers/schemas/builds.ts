@@ -122,9 +122,11 @@ export const rediffResultSchema = z
 /** 409 returned when approving a snapshot whose baseline changed after the diff. */
 export const baselineChangedSchema = z
   .object({
-    code: z.literal("baseline_changed"),
-    message: z.string(),
-    snapshotId: z.string(),
-    baselineStatus: z.enum(["stale", "removed"]),
+    error: z.object({
+      code: z.literal("baseline_changed"),
+      message: z.string(),
+      snapshotId: z.string(),
+      baselineStatus: z.enum(["stale", "removed"]),
+    }),
   })
   .openapi("BaselineChanged");

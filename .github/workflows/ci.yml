@@ -2,7 +2,8 @@ name: CI
 
 # `verify` runs build/lint/test and smoke checks; `storybook-dev` opens every story of the app's
 # Storybook in the dev server (the production build tree-shakes what the dev server still runs);
-# `website` builds the docs site and runs its link and accessibility checks; `capture` (capture.yml) runs the
+# `postgres-lifecycle` runs the build-reference contract against a real Postgres server (PGlite cannot
+# prove row locking); `website` builds the docs site and runs its link and accessibility checks; `capture` (capture.yml) runs the
 # real-browser capture tests on storybook-9; `fly` (fly-dry-run.yml) is the deploy dry run.
 # Every Storybook fixture and the Fly dry run also run nightly (nightly.yml).
 #
@@ -41,6 +42,7 @@ jobs:
       heavy: ${{ steps.detect.outputs.heavy }}
       full: ${{ steps.detect.outputs.full }}
       app: ${{ steps.detect.outputs.app }}
+      postgres: ${{ steps.detect.outputs.postgres }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -67,6 +69,7 @@ jobs:
           heavy=true
           full=true
           app=true
+          postgres=true
           case "$EVENT" in
             pull_request)
               # HEAD is the PR merge commit: first parent is the base branch tip.
@@ -86,6 +89,9 @@ jobs:
             # The app's Storybook imports core, so a change to either (or the lockfile, or this
             # workflow) can break it in the dev server.
             if grep -qE '^(packages/(app|core)/|nub\.lock|\.github/workflows/ci\.yml)' changed.txt; then app=true; else app=false; fi
+            # The Postgres retention lifecycle: its package, the shared contract it must pass, and
+            # the interface that contract exercises (a locking regression must not merge).
+            if grep -qE '^(packages/db-postgres/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then postgres=true; else postgres=false; fi
             if [ "$EVENT" = "pull_request" ]; then
               # An epic branch merging into main carries many tasks: always verify everything.
               if grep -qE "$FULL" changed.txt \
@@ -101,7 +107,8 @@ jobs:
           echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
           echo "full=$full" >> "$GITHUB_OUTPUT"
           echo "app=$app" >> "$GITHUB_OUTPUT"
-          echo "website=$website heavy=$heavy full=$full app=$app"
+          echo "postgres=$postgres" >> "$GITHUB_OUTPUT"
+          echo "website=$website heavy=$heavy full=$full app=$app postgres=$postgres"
 
   verify:
     name: verify
@@ -205,6 +212,49 @@ jobs:
           STORYBOOK_SMOKE_BROWSER_CHANNEL: chrome
         run: nub run smoke:storybook
 
+  # The build-reference contract (ADR 0039) on a real Postgres server, one connection per lifecycle.
+  # PGlite runs the same suite in `verify` but is a single connection, so only this job proves the
+  # row locks. The service is the one the nightly compatibility workflow uses.
+  postgres-lifecycle:
+    name: postgres-lifecycle
+    needs: changes
+    if: ${{ needs.changes.outputs.postgres == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: storyshelf_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d storyshelf_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Build the packages the adapter imports
+        run: nubx turbo run build --filter='@storyshelf/db-postgres^...'
+
+      - name: Run the build-reference contract against real Postgres
+        working-directory: packages/db-postgres
+        env:
+          LIVE_CLOUD: "1"
+          # The suite clears and claims shared content rows: this service container is disposable.
+          POSTGRES_SCHEMA_MUTATION_TEST: "1"
+          DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
+        run: nubx vitest run src/build-reference-lifecycle.test.ts
+
   website:
     name: website
     needs: changes
@@ -273,7 +323,7 @@ jobs:
   ci:
     name: ci
     if: ${{ always() }}
-    needs: [changes, verify, storybook-dev, website, capture, fly, changeset]
+    needs: [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly, changeset]
     runs-on: ubuntu-latest
     steps:
       - name: Check results
