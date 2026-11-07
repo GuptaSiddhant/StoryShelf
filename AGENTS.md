@@ -282,6 +282,30 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   about two weeks. P0/security fixes, standalone issues and docs/config changes still target `main`
   directly.
 
+## Agent operating model
+
+The weekly usage quota is shared, so agents work in short, fresh sessions and talk through GitHub.
+
+- **One session per issue.** The architect starts a developer session for one issue. It ends when
+  the PR merges, and is then archived. Don't pick up a second issue in the same session; a new
+  session reads the issue, AGENTS.md and the code, not old conversation.
+- **At most one open PR per developer.** Finish, or hand back, before starting the next.
+- **GitHub is the channel.** Questions go on the issue or PR with the `architect` label; status
+  goes in the PR body. Use `send_message` only when you are blocked and a comment would not reach
+  anyone. Never send acknowledgements, "FYI" notes or progress reports.
+- **The owner talks to the architect** for priorities and decisions, or comments on a PR or issue.
+  A comment on a PR wakes the session that owns it.
+- **Merging is native.** After review, the architect enables GitHub auto-merge on a PR.
+  `pr-autoupdate.yml` brings the oldest queued PR up to date with `main`, one at a time, and
+  GitHub merges it when `ci` passes and every conversation is resolved. Once auto-merge is on,
+  don't push to the PR without telling the architect on the PR first.
+- **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
+  Label those PRs `skip-review`, so CodeRabbit skips them.
+- **Schedules.** Agents have one scheduled run a day: the architect's triage. It answers
+  `architect` items, enables auto-merge, starts sessions for ready issues, archives finished
+  ones, and posts one digest comment on issue #370. No other agent session runs on a clock (CI's own
+  nightly workflows are unaffected).
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know

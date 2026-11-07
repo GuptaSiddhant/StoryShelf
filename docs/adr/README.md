@@ -44,5 +44,7 @@ Each current ADR below lists the archived ones it supersedes.
 | 0040 | Job Queues and Adding Queued Work                                            | — (amends 0006)                    |
 | 0041 | Single Source of Truth for the Database Schema (proposed)                    | —                                  |
 | 0043 | Release Channels                                                             | —                                  |
+| 0044 | Skipped Builds for Commits That Change No Story (proposed)                   | — (amends 0004, 0014)              |
+| 0045 | Cancel Superseded Builds on a Branch (proposed)                              | — (amends 0004, 0006, 0014)        |
 
 Implementation work is tracked in GitHub issues; the ordered pickup list is issue #370.
