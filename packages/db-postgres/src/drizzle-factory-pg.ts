@@ -144,6 +144,11 @@ export function createDrizzlePgAdapter(
   };
 }
 
+/** The {@link TxStore} of a Drizzle transaction handle, for code that runs its own locking SQL. */
+export function transactionStore(tx: unknown): TxStore {
+  return buildTxStore(tx as DrizzlePgLike);
+}
+
 /** CRUD subset bound to a Postgres transaction handle. */
 function buildTxStore(drizzle: DrizzlePgLike): TxStore {
   return {

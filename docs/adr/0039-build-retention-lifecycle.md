@@ -120,6 +120,13 @@ by preset, so it cannot by itself carry this guarantee.
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
   reference-sensitive path. Presets are enabled one at a time: SQLite first (#536, done), then
   Postgres (#375) and MySQL (#376).
+- **Postgres lifecycle** (`db-postgres/src/build-reference-lifecycle.ts`, #375). Where SQLite
+  serializes through its write lock, Postgres takes row locks in one fixed order: each owner's
+  generation row `FOR UPDATE` (the fence), then the referenced builds `FOR SHARE`, which conflicts
+  with the tombstone's `FOR UPDATE` of the same build row, so an admission and a deletion claim of
+  one build end in exactly one outcome. A use of shared content and a collector's claim of the same
+  hash take a transaction-scoped advisory lock on the hash, in hash order, and re-read after it.
+  It is not yet exposed by any preset; activation (#375 step 2c) follows.
 - **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
   adapter's setup has migrated the schema, it runs `prepareBaselineReferences` once and only then
   exposes `buildReferenceLifecycle`. A shared file is required, so an in-memory database never has
