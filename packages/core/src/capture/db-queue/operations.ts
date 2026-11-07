@@ -34,12 +34,16 @@ export async function enqueueJob(rt: QueueRuntime, job: QueueJobInput): Promise<
   return id;
 }
 
+/** Kinds of many short delivery jobs, which the queue's views leave out. */
+const DELIVERY_KINDS: ReadonlySet<CaptureJobKind> = new Set(["notify", "review-request"]);
+
 /**
  * The kinds the queue's views (`status`, `active`, `recent`, `cancel`) show: every polled kind but
- * `notify` (unless it is the only one), whose many short delivery jobs would bury a build's capture and publish jobs.
+ * the delivery kinds (`notify`, `review-request`; unless they are all it polls), whose many short
+ * jobs would bury a build's capture and publish jobs.
  */
 function viewKinds(rt: QueueRuntime): readonly CaptureJobKind[] {
-  const shown = rt.kinds.filter((kind) => kind !== "notify");
+  const shown = rt.kinds.filter((kind) => !DELIVERY_KINDS.has(kind));
   return shown.length > 0 ? shown : rt.kinds;
 }
 
