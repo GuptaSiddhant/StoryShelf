@@ -5,7 +5,7 @@ import { z } from "@hono/zod-openapi";
 export const okSchema = z.object({ ok: z.boolean() }).openapi("Ok");
 
 /** OpenAPI schema for an error response message. */
-export const errorSchema = z.object({ message: z.string() }).openapi("Error");
+export const errorSchema = z.object({ error: z.object({ message: z.string() }) }).openapi("Error");
 
 /** Shared response spec for a 400 Bad Request. */
 export const badRequest = {

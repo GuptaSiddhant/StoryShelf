@@ -125,6 +125,38 @@ describe("OpenAPI spec", () => {
     expect(unmarked).toEqual([]);
   });
 
+  it("declares the shared Error schema on every error response", async () => {
+    const doc = (await (await app().request("/api/v1/openapi.json")).json()) as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            responses?: Record<
+              string,
+              { content?: Record<string, { schema?: { $ref?: string } }> }
+            >;
+          }
+        >
+      >;
+    };
+    const allowed = new Set(["#/components/schemas/Error", "#/components/schemas/BaselineChanged"]);
+    const stray: string[] = [];
+    for (const [path, operations] of Object.entries(doc.paths)) {
+      for (const [method, operation] of Object.entries(operations)) {
+        for (const [status, response] of Object.entries(operation.responses ?? {})) {
+          const refs = Object.values(response.content ?? {}).map(
+            (media) => media.schema?.$ref ?? "",
+          );
+          if (/^[45]/u.test(status) && (refs.length !== 1 || !allowed.has(refs[0] ?? ""))) {
+            stray.push(`${method.toUpperCase()} ${path} ${status}`);
+          }
+        }
+      }
+    }
+    expect(stray).toEqual([]);
+  });
+
   it("documents project paths with typed responses", async () => {
     const response = await app().request("/api/v1/openapi.json");
     const doc = (await response.json()) as OpenApiDocument;

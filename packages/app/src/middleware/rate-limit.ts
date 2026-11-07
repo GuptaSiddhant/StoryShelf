@@ -1,4 +1,5 @@
 import type { Context, MiddlewareHandler } from "hono";
+import { jsonRefusal } from "./api-errors.ts";
 
 interface RateLimitEntry {
   count: number;
@@ -108,7 +109,7 @@ function applyLimit(
   entry.count += 1;
   if (entry.count > max) {
     c.header("Retry-After", String(Math.ceil((entry.resetAt - now) / 1000)));
-    return c.json({ error: "Too many requests" }, 429);
+    return jsonRefusal(c, 429, "Too many requests");
   }
   c.header("X-RateLimit-Limit", String(max));
   c.header("X-RateLimit-Remaining", String(Math.max(0, max - entry.count)));
