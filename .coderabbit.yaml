@@ -39,6 +39,9 @@ reviews:
     ignore_title_keywords:
       - "WIP"
       - "DO NOT MERGE"
+    # Mechanical sweeps (lint, stories, renames) opt out with this label (AGENTS.md "Agent operating model").
+    labels:
+      - "!skip-review"
   finishing_touches:
     docstrings:
       enabled: false

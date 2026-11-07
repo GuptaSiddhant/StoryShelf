@@ -1,0 +1,80 @@
+# Keeps the auto-merge queue moving without an agent (AGENTS.md "Agent operating model").
+# Branch protection requires PRs to be up to date with main, and GitHub merges a PR once its checks
+# pass. This job brings the oldest auto-merge PR up to date, one at a time: while that PR is current
+# (its CI is running), it waits, so a merge never sends every queued PR back through CI at once.
+#
+# The update must be pushed with a token other than GITHUB_TOKEN: pushes made with GITHUB_TOKEN do
+# not start workflows, so CI would never run on the updated branch. Set the repository secret
+# AUTOUPDATE_TOKEN to a fine-grained token with "Contents" and "Pull requests" write access on this
+# repository. Without it, the job only logs what it would do.
+name: pr-autoupdate
+
+on:
+  push:
+    branches: [main]
+  # No checkout and no PR code runs here, so pull_request_target is safe.
+  pull_request_target:
+    types: [auto_merge_enabled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-autoupdate
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          HAS_TOKEN: ${{ secrets.AUTOUPDATE_TOKEN != '' }}
+        with:
+          github-token: ${{ secrets.AUTOUPDATE_TOKEN || github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const open = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: "open", base: "main", per_page: 100,
+            });
+            const queued = open
+              .filter((pr) => pr.auto_merge && !pr.draft)
+              .toSorted((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+            if (queued.length === 0) {
+              core.info("No PR has auto-merge enabled.");
+              return;
+            }
+            for (const pr of queued) {
+              const { data } = await github.rest.repos.compareCommits({
+                owner, repo, base: "main", head: pr.head.sha,
+              });
+              if (data.behind_by === 0) {
+                const { data: checks } = await github.rest.checks.listForRef({
+                  owner, repo, ref: pr.head.sha, per_page: 100,
+                });
+                if (checks.check_runs.some((run) => run.conclusion === "failure")) {
+                  // A red PR needs its developer; don't let it hold the queue.
+                  core.info(`#${pr.number} is up to date but failing; skipping it.`);
+                  continue;
+                }
+                core.info(`#${pr.number} is up to date; waiting for its checks before updating another.`);
+                return;
+              }
+              if (process.env.HAS_TOKEN !== "true") {
+                core.notice(`#${pr.number} is ${data.behind_by} behind main; set AUTOUPDATE_TOKEN to update it.`);
+                return;
+              }
+              try {
+                await github.rest.pulls.updateBranch({
+                  owner, repo, pull_number: pr.number, expected_head_sha: pr.head.sha,
+                });
+                core.info(`Updated #${pr.number} with main (${data.behind_by} behind).`);
+                return;
+              } catch (error) {
+                // A conflict needs its developer; try the next PR in the queue.
+                core.warning(`#${pr.number} could not be updated: ${error.message}`);
+              }
+            }
