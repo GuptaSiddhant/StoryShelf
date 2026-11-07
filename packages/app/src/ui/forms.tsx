@@ -1,9 +1,6 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type FieldLayout = "stack" | "inline";
 
 const fieldWrap = css`
@@ -93,6 +90,23 @@ const fieldTextareaError = css`
   line-height: var(--leading-normal);
 `;
 
+/** For fields that hold patterns or code (globs, config): the mono face, a little smaller. */
+const fieldTextareaMono = css`
+  /* field-textarea-mono */
+  ${fieldTextarea}
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  tab-size: 2;
+`;
+
+const fieldTextareaMonoError = css`
+  /* field-textarea-mono-error */
+  ${fieldTextareaError}
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  tab-size: 2;
+`;
+
 const fieldHint = css`
   /* field-hint */
   margin: 0;
@@ -154,8 +168,6 @@ function fieldDescribedBy(
   }
   return undefined;
 }
-
-// eslint-disable-next-line promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString>
 const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string | undefined }> = ({
   name,
   error,
@@ -180,7 +192,6 @@ const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string
 };
 
 /** Labeled text input with error and hint states. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const Field: FC<{
   label: string;
   name: string;
@@ -264,7 +275,6 @@ const checkInput = css`
 `;
 
 /** Inline checkbox row with an optional hint. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const CheckField: FC<{
   label: unknown;
   name: string;
@@ -299,8 +309,13 @@ export const CheckField: FC<{
   );
 };
 
+/** The textarea class for a face (plain or mono) and a state (ok or error). */
+const TEXTAREA_CLASS = {
+  plain: { ok: fieldTextarea, error: fieldTextareaError },
+  mono: { ok: fieldTextareaMono, error: fieldTextareaMonoError },
+} as const;
+
 /** Labeled textarea with error and hint states. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const TextareaField: FC<{
   label: string;
   name: string;
@@ -310,9 +325,25 @@ export const TextareaField: FC<{
   placeholder?: string;
   rows?: number;
   required?: boolean;
+  /** Focus the box when it is swapped in (HTMX acts on `autofocus` of swapped content). */
+  autofocus?: boolean;
   hint?: string;
   error?: string;
-}> = ({ label, name, id, value, placeholder, rows = 3, required, hint, error }) => {
+  /** For patterns or code: the mono face, and no spell-checking (it is not prose). */
+  monospace?: boolean;
+}> = ({
+  label,
+  name,
+  id,
+  value,
+  placeholder,
+  rows = 3,
+  required,
+  autofocus,
+  hint,
+  error,
+  monospace = false,
+}) => {
   const domId = id ?? name;
   return (
     <div class={fieldWrap}>
@@ -320,12 +351,14 @@ export const TextareaField: FC<{
         {label}
       </label>
       <textarea
-        class={error ? fieldTextareaError : fieldTextarea}
+        class={TEXTAREA_CLASS[monospace ? "mono" : "plain"][error ? "error" : "ok"]}
+        spellcheck={monospace ? false : undefined}
         id={domId}
         name={name}
         placeholder={placeholder}
         rows={rows}
         required={required}
+        autofocus={autofocus}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={fieldDescribedBy(domId, error, hint)}
       >
@@ -337,7 +370,6 @@ export const TextareaField: FC<{
 };
 
 /** Labeled select dropdown with an optional hint. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const SelectField: FC<{
   label: string;
   name: string;

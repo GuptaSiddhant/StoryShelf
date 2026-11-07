@@ -79,6 +79,47 @@ describe("setupPublishing", () => {
     );
   });
 
+  it("tells the build a publish job was abandoned, so its state is requested", async () => {
+    const opts = options();
+    const project = await createTestProject(opts.database, opts.database.tables);
+    const build = await createTestBuild(opts.database, opts.database.tables, project.id);
+    const jobs = jobsFor(opts, false);
+    const requested: string[] = [];
+    setupPublishing(opts, {}, logger, false, {
+      jobs: jobs,
+      buildState: {
+        request: async (id: string) => {
+          await Promise.resolve();
+          requested.push(id);
+        },
+      } as never,
+      reviewRequested,
+    });
+    await jobs.abandoned.publish?.(
+      { buildId: build.id, kind: "publish" } as never,
+      "lease expired on the final attempt",
+    );
+    expect(requested).toContain(build.id);
+  });
+
+  it("asks for the build's state again once its publish job has ended", async () => {
+    const opts = options();
+    const jobs = jobsFor(opts, false);
+    const requested: string[] = [];
+    setupPublishing(opts, {}, logger, false, {
+      jobs: jobs,
+      buildState: {
+        request: async (id: string) => {
+          await Promise.resolve();
+          requested.push(id);
+        },
+      } as never,
+      reviewRequested,
+    });
+    await jobs.ended.publish?.({ buildId: "b9", kind: "publish" } as never);
+    expect(requested).toEqual(["b9"]);
+  });
+
   it.each([
     ["a long-running host", false],
     ["a serverless host", true],

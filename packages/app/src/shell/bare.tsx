@@ -2,9 +2,6 @@ import { safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
 import { css } from "../ui/css.ts";
 import { Icon } from "../ui/icons/icon.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Chrome-free page for signed-out flows: brand over a centered column. */
 const bareRoot = css`
   /* bare */

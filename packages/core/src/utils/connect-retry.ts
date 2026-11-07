@@ -1,4 +1,5 @@
 /** Retrying a connection to a remote browser service (ADR 0007, decision 4). */
+import { errorMessage } from "./error-text.ts";
 
 /** Options of {@link retryConnect}. */
 export interface RetryConnectOptions {
@@ -26,7 +27,8 @@ const CONNECTION =
 
 /** Whether a connect error is worth retrying: connection-level, not a configuration mistake. */
 export function isRetryableConnectError(error: unknown): boolean {
-  const text = error instanceof Error ? error.message : String(error);
+  // An Error is judged by its message as always; any other shape by what it says, not `[object Object]`.
+  const text = errorMessage(error);
   return !PERMANENT.test(text) && CONNECTION.test(text);
 }
 

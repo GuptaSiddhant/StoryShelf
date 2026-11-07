@@ -1,8 +1,8 @@
 # StoryShelf Architecture Diagrams
 
-> Visual companion to [`architecture.md`](./architecture.md) and [`repo-structure.md`](./repo-structure.md).
+> Visual companion to [`architecture/`](./architecture/README.md) and [`repo-structure.md`](./repo-structure.md).
 > All diagrams are [Mermaid](https://mermaid.js.org/) — rendered natively on GitHub and in most Markdown previews.
-> Source of truth for entities/interfaces remains `architecture.md`; these diagrams are derived views.
+> Source of truth for entities/interfaces remains [`architecture/`](./architecture/README.md); these diagrams are derived views.
 
 ---
 
@@ -47,7 +47,7 @@ flowchart TB
     class GH,Store,DB,Browser,SB external;
 ```
 
-**Reads as:** the CLI builds/zips Storybook and uploads it (`architecture.md:14`); the server renders asynchronously via Playwright (`architecture.md:17`) without cloning the repo; reviewers approve in the server-rendered UI; the server posts commit statuses back to the git host (ADR 0014). Storage and database are swappable adapters.
+**Reads as:** the CLI builds/zips Storybook and uploads it ([Product Workflow](./architecture/overview.md#product-workflow)); the server renders asynchronously via Playwright ([Product Workflow](./architecture/overview.md#product-workflow)) without cloning the repo; reviewers approve in the server-rendered UI; the server posts commit statuses back to the git host (ADR 0014). Storage and database are swappable adapters.
 
 ---
 
@@ -201,7 +201,7 @@ flowchart LR
     class createRouter,Runtime,Lifecycle,Wiring,Routes2 router;
 ```
 
-**Lifecycle:** `createShelfApp` kicks `lifecycle.init` eagerly (`Promise.allSettled`, `packages/app/src/lifecycle.ts:39`); callers `await app.lifecycle.init()` for fail-fast startup (migrations run here) or let first request gate on settlement (503 with per-adapter failures). `close()` on `SIGTERM`. Health is two-tier and ungated by init (`architecture.md:250`).
+**Lifecycle:** `createShelfApp` kicks `lifecycle.init` eagerly (`Promise.allSettled`, `packages/app/src/lifecycle.ts:39`); callers `await app.lifecycle.init()` for fail-fast startup (migrations run here) or let first request gate on settlement (503 with per-adapter failures). `close()` on `SIGTERM`. Health is two-tier and ungated by init ([Health](./architecture/capture.md#health)).
 
 ---
 
@@ -234,7 +234,7 @@ sequenceDiagram
     Handler-->>Client: JSON (/api/v1) or HTML (hono/jsx + HTMX) + HX-Redirect
 ```
 
-Conventions: IDs are ULIDs, timestamps ISO-8601 (`architecture.md:30`); `createUrlBuilder` for type-safe URLs; outbound HTTP via `httpJson`/`HttpError` (`core/utils`), never hand-rolled fetch (ADR 0001); structured logs `logger.info({ buildId }, "msg")` with `err` child (ADR 0015).
+Conventions: IDs are ULIDs, timestamps ISO-8601 ([Entity Model](./architecture/data-model.md#entity-model)); `createUrlBuilder` for type-safe URLs; outbound HTTP via `httpJson`/`HttpError` (`core/utils`), never hand-rolled fetch (ADR 0001); structured logs `logger.info({ buildId }, "msg")` with `err` child (ADR 0015).
 
 ---
 
@@ -312,7 +312,7 @@ sequenceDiagram
     Orc->>Orc: scratchDir cleanup
 ```
 
-**Performance note:** v1 re-renders every story (`architecture.md:797` deferred TurboSnap); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `STORYSHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`ShelfConfig.captureConcurrency`).
+**Performance note:** a build renders only the stories its diff affects and inherits the rest from their baselines where one exists (a story or viewport with no baseline renders; `affectedOnly`, default true, `splitStory` in `core/src/capture/affected.ts`; any uncertainty or `--full` renders everything, see [affected capture](./archive/architecture-deferred-v2.md#deliberately-deferred-v2)); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `STORYSHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`testing.concurrency`, `ShelfTestingOptions` in `core/src/config.ts`).
 
 ---
 
@@ -357,7 +357,7 @@ flowchart TB
     class autoApprove,statusChanged,statusUnchanged terminal;
 ```
 
-Accepting a diff on feature branch writes `baselines(branch=B)` so subsequent commits on `B` diff against the accepted version, not the untouched default (`architecture.md:371`).
+Accepting a diff on feature branch writes `baselines(branch=B)` so subsequent commits on `B` diff against the accepted version, not the untouched default ([Key Relationships](./architecture/data-model.md#key-relationships)).
 
 ### 6b. Build & Snapshot State Machine
 
@@ -390,13 +390,13 @@ stateDiagram-v2
     }
 ```
 
-Snapshot `status` values (`architecture.md:81`): `pending|new|unchanged|changed|approved|rejected`. Build `status` (`architecture.md:55`): `pending|capturing|comparing|reviewing|approved|rejected|failed`.
+Snapshot `status` values ([Entity Model](./architecture/data-model.md#entity-model)): `pending|new|unchanged|changed|approved|rejected`. Build `status` ([Entity Model](./architecture/data-model.md#entity-model)): `pending|capturing|comparing|reviewing|approved|rejected|failed`.
 
 ---
 
 ## 7. Entity-Relationship Model
 
-Derived from `architecture.md:31-181` and `packages/core/src/schema/*`. All PKs are ULIDs; timestamps ISO-8601.
+Derived from [Entity Model](./architecture/data-model.md#entity-model) and `packages/core/src/schema/*`. All PKs are ULIDs; timestamps ISO-8601.
 
 ```mermaid
 erDiagram
@@ -545,14 +545,14 @@ erDiagram
 **Invariants:**
 
 - `UNIQUE(build_id, story_id, viewport_name)` on snapshots; `UNIQUE(project_id, story_id, viewport_name, branch)` on baselines; `UNIQUE(project_id, user_id)` on members; `UNIQUE(build_id, type_key, value)` on build_labels.
-- Baselines store canonical files — builds are transient and purged without losing truth (`architecture.md:225`).
-- `persistent` label type is built-in, non-removable; `branch` is seeded; `build` is reserved (`architecture.md:488`).
+- Baselines store canonical files — builds are transient and purged without losing truth ([Key Relationships](./architecture/data-model.md#key-relationships)).
+- `persistent` label type is built-in, non-removable; `branch` is seeded; `build` is reserved ([Build Labels](./architecture/design-and-labels.md#build-labels)).
 
 ---
 
 ## 8. Storage Layout
 
-`--data-dir` (default `./data`) is a flat path namespace (`read/write/delete/exists/list`) — no container abstraction (`architecture.md:221`).
+`--data-dir` (default `./data`) is a flat path namespace (`read/write/delete/exists/list`) — no container abstraction ([Storage Layout](./architecture/storage.md#storage-layout)).
 
 ```mermaid
 flowchart TB
@@ -573,7 +573,7 @@ flowchart TB
 
     Purge[/"Retention Purge<br/>packages/core/src/retention/purge.ts:30<br/>removes builds/* + stale branch baselines/*"/]
     BranchGC[/"Branch GC<br/>packages/core/src/retention/purge.ts:107<br/>purgeStaleBranches + retention-timer.ts daily"/]
-    Publish[/"Published Storybook<br/>most recent public build<br/>per project (architecture.md:471)"/]
+    Publish[/"Published Storybook<br/>most recent public build<br/>per project (architecture/published-storybook.md)"/]
 
     Builds -. TTL + keep-latest-per-branch .-> Purge
     Baselines -. stale branches TTL'd .-> BranchGC
@@ -631,8 +631,8 @@ flowchart LR
     class p1,p2,p3,sub pub;
 ```
 
-- HTML and published routes use `slug`; JSON uses ULID (`architecture.md:507`).
-- `/storybook` and `/storybook/:key/:value` are resolvers (302) — assets served only under `/storybook/build/:buildId/...` to avoid `key/value` vs `assets/foo.js` collision (`architecture.md:477`).
+- HTML and published routes use `slug`; JSON uses ULID ([API Design](./architecture/api.md#api-design)).
+- `/storybook` and `/storybook/:key/:value` are resolvers (302) — assets served only under `/storybook/build/:buildId/...` to avoid `key/value` vs `assets/foo.js` collision ([URL structure](./architecture/published-storybook.md#url-structure)).
 - `public` = `builds.public` OR `branch` matches `projects.public_branch_regex`; otherwise auth + `viewer` membership required (ADR 0011).
 - `createUrlBuilder` switches between path and subdomain forms based on `publishedBaseDomain`.
 
@@ -676,7 +676,7 @@ flowchart TB
     note -. explains .-> Query
 ```
 
-`build` is a reserved type key (route collision); latest build for `(key, value)` is an indexed join over `build_labels` → `builds`, no denormalized pointer (`architecture.md:502`).
+`build` is a reserved type key (route collision); latest build for `(key, value)` is an indexed join over `build_labels` → `builds`, no denormalized pointer ([Build Labels](./architecture/design-and-labels.md#build-labels)).
 
 ---
 
@@ -719,7 +719,7 @@ flowchart TB
     class done done2;
 ```
 
-Never purged: `baselines/**` + builds with `persistent` label (`architecture.md:440`). Builds in non-terminal `reviewing` are not candidates.
+Never purged: `baselines/**` + builds with `persistent` label ([What is never purged](./architecture/retention.md#what-is-never-purged)). Builds in non-terminal `reviewing` are not candidates.
 
 ---
 
@@ -755,7 +755,7 @@ flowchart TB
 
 ## 13. Deployment Topologies
 
-### 13a. Local / Docker (recommended, `architecture.md:732`)
+### 13a. Local / Docker (recommended, [Docker (recommended)](./architecture/deployment.md#docker-recommended))
 
 ```mermaid
 flowchart TB
@@ -803,7 +803,7 @@ flowchart TB
     class Edge,Turso,S3 cloud;
 ```
 
-`createShelfApp` returns a plain `FetchHandler` — works on any runtime; only the capture consumer constrains Node (`architecture.md:247`).
+`createShelfApp` returns a plain `FetchHandler` — works on any runtime; only the capture consumer constrains Node ([Tech Stack](./architecture/tech-stack.md#tech-stack)).
 
 ### 13c. Dev (hot-restart from source, no build)
 
@@ -853,7 +853,7 @@ flowchart TB
     class R1,R2,R3,R4 rbac;
 ```
 
-CLI uses API `tokens` (`hash` SHA-256) separate from user auth; tokens are per-project (`architecture.md:142`).
+CLI uses API `tokens` (`hash` SHA-256) separate from user auth; tokens are per-project ([Entity Model: access and system tables](./architecture/data-model-access-and-system.md#entity-model-continued-access-webhooks-queue-and-system-tables)).
 
 ---
 
@@ -889,34 +889,34 @@ flowchart LR
     class Passed,Pixels,Overlay,Dims,FS2 output;
 ```
 
-Uses same libs Playwright does internally (`architecture.md:424`); overlay stored as `diffs/{story}/{viewport}.png`.
+Uses same libs Playwright does internally ([Pixel Diff Engine](./architecture/diff.md#pixel-diff-engine)); overlay stored as `diffs/{story}/{viewport}.png`.
 
 ---
 
 ## Appendix: Diagram Index & Maintenance
 
-| #   | Diagram             | Type         | Source Entities                                        |
-| --- | ------------------- | ------------ | ------------------------------------------------------ |
-| 1   | System Context      | flowchart    | `architecture.md:11` workflow                          |
-| 2   | Package Map         | flowchart    | `package.json` workspaces, `repo-structure.md`         |
-| 3   | Adapter Composition | flowchart    | `packages/app/src/index.tsx:44`, `core/config.ts:146`  |
-| 4   | Middleware Chain    | sequence     | `packages/app/src/index.tsx:74`, `app/middleware/*`    |
-| 5   | Capture Pipeline    | sequence     | `core/capture/orchestrator.ts:32`, `runner-playwright` |
-| 6   | Baseline Resolution | flowchart    | `architecture.md:363`, ADR 0009                        |
-| 7   | State Machine       | stateDiagram | `architecture.md:55,81`                                |
-| 8   | ER Model            | erDiagram    | `architecture.md:31`, `core/schema/*`                  |
-| 9   | Storage Layout      | flowchart    | `architecture.md:204`, `core/utils/paths.ts`           |
-| 10  | URL Model           | flowchart    | `architecture.md:471`, `core/urls.ts`                  |
-| 11  | Labels              | flowchart    | `architecture.md:490`, `core/schema/label.ts`          |
-| 12  | Retention           | flowchart    | `core/retention/purge.ts:30`, ADR 0009                 |
-| 13  | Lifecycle/Health    | flowchart    | `app/lifecycle.ts:33`, `architecture.md:250`           |
-| 14  | Deployment          | flowchart ×3 | `architecture.md:732`, `docs/adr/*`                    |
-| 15  | Auth/RBAC           | flowchart    | `architecture.md:199`, ADR 0011                        |
-| 16  | Diff Engine         | flowchart    | `core/diff`, `architecture.md:405`                     |
+| #   | Diagram             | Type         | Source Entities                                                                                                                                                   |
+| --- | ------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | System Context      | flowchart    | [Product Workflow](./architecture/overview.md#product-workflow) workflow                                                                                          |
+| 2   | Package Map         | flowchart    | `package.json` workspaces, `repo-structure.md`                                                                                                                    |
+| 3   | Adapter Composition | flowchart    | `packages/app/src/index.tsx:44`, `core/config.ts:146`                                                                                                             |
+| 4   | Middleware Chain    | sequence     | `packages/app/src/index.tsx:74`, `app/middleware/*`                                                                                                               |
+| 5   | Capture Pipeline    | sequence     | `core/capture/orchestrator.ts:32`, `runner-playwright`                                                                                                            |
+| 6   | Baseline Resolution | flowchart    | [Baseline Resolution & Review Workflow](./architecture/review.md#baseline-resolution--review-workflow), ADR 0009                                                  |
+| 7   | State Machine       | stateDiagram | [Entity Model](./architecture/data-model.md#entity-model)                                                                                                         |
+| 8   | ER Model            | erDiagram    | [Entity Model](./architecture/data-model.md#entity-model), `core/schema/*`                                                                                        |
+| 9   | Storage Layout      | flowchart    | [Storage Layout](./architecture/storage.md#storage-layout), `core/utils/paths.ts`                                                                                 |
+| 10  | URL Model           | flowchart    | [URL structure](./architecture/published-storybook.md#url-structure), `core/urls.ts`                                                                              |
+| 11  | Labels              | flowchart    | [Build Labels](./architecture/design-and-labels.md#build-labels), `core/schema/label.ts`                                                                          |
+| 12  | Retention           | flowchart    | `core/retention/purge.ts:30`, ADR 0009                                                                                                                            |
+| 13  | Lifecycle/Health    | flowchart    | `app/lifecycle.ts:33`, [Health](./architecture/capture.md#health)                                                                                                 |
+| 14  | Deployment          | flowchart ×3 | [Docker (recommended)](./architecture/deployment.md#docker-recommended), `docs/adr/*`                                                                             |
+| 15  | Auth/RBAC           | flowchart    | [Entity Model: access and system tables](./architecture/data-model-access-and-system.md#entity-model-continued-access-webhooks-queue-and-system-tables), ADR 0011 |
+| 16  | Diff Engine         | flowchart    | `core/diff`, [Pixel Diff Engine](./architecture/diff.md#pixel-diff-engine)                                                                                        |
 
 **When to update:**
 
 - New adapter → §2 and §3.
-- New entity/column → §8 + `architecture.md:31`.
+- New entity/column → §8 + [Entity Model](./architecture/data-model.md#entity-model).
 - Capture flow change → §5 (keep in sync with `core/capture/orchestrator.ts:32`).
 - Deployment option → §13.

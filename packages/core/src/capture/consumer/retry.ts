@@ -11,6 +11,8 @@ export const DEFAULT_MAX_RETRIES = 2;
 export const DEFAULT_BACKOFF_MS = 1000;
 /** Longest a retry waits, however many attempts were made. */
 export const MAX_BACKOFF_MS = 30_000;
+/** Longest a job may run before its lease stops being renewed (`testing.maxJobSeconds`, 2 h). */
+export const DEFAULT_MAX_JOB_SECONDS = 7200;
 /** Long-poll wait handed to queues that block inside `poll` (SQS, Redis, Service Bus, IPC). */
 export const DEFAULT_WAIT_TIME_SECONDS = 20;
 
@@ -20,6 +22,8 @@ export interface RetryConfig {
   maxRetries?: number;
   /** Base delay of the exponential backoff in ms (default {@link DEFAULT_BACKOFF_MS}). */
   backoffMs?: number;
+  /** Wall-clock bound of one job in seconds (default {@link DEFAULT_MAX_JOB_SECONDS}). */
+  maxJobSeconds?: number;
 }
 
 /** Delay before retry number `attempts` (0 = the first retry): `base * 2^attempts`, capped. */

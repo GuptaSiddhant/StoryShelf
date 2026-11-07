@@ -18,7 +18,13 @@ import { setupCapture, type CaptureWiring } from "./capture-setup.ts";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
 import { createJobCanceller, type JobCanceller } from "./job-canceller.ts";
 import { createJobQueue, type JobQueue } from "./job-queue.ts";
+import { notifyAssignedWith, type NotifyDeps } from "./notify.ts";
 import { setupPublishing, type PublishService, type PublishWiring } from "./publish-setup.ts";
+import {
+  assignedReviewersOf,
+  assignmentReason,
+  type AssignedReviewer,
+} from "./review-assignment.ts";
 import { announceReviewWith, REVIEW_EVENTS, reviewRequestedData } from "./review-events.ts";
 import type { ServerRuntime } from "./runtime.ts";
 import { isServerlessHost } from "./serverless.ts";
@@ -148,6 +154,7 @@ function databaseConsumer(
       config: {
         concurrency: capturesHere ? options.testing?.concurrency : 1,
         maxRetries: options.testing?.retries ?? DEFAULT_RETRIES,
+        ...maxJobConfig(options),
       },
       scratchDir: runtime.config.scratchDir ?? DEFAULT_SCRATCH_DIR,
       metrics: jobMetrics(),
@@ -181,7 +188,7 @@ function notifyConsumer(
     () => ({
       queue: queue.get(),
       handlers: { notify: handler },
-      config: { concurrency: NOTIFY_CONCURRENCY },
+      config: { concurrency: NOTIFY_CONCURRENCY, ...maxJobConfig(options) },
       metrics: jobMetrics(),
       logger: runtime.logger.child({ component: "notify-consumer" }),
       ...(options.testing?.queueClock === undefined
@@ -196,26 +203,61 @@ function notifyConsumer(
   );
 }
 
+/**
+ * The reviewers the component owners assign to a build (#465). Best-effort: a failed lookup logs and
+ * leaves the request to the default recipients, so a broken rule never swallows a review request.
+ */
+async function assignedOrNone(
+  deps: Pick<NotifyDeps, "db" | "logger">,
+  project: Project,
+  build: Build,
+): Promise<AssignedReviewer[]> {
+  try {
+    return await assignedReviewersOf(deps.db, project, build);
+  } catch (error) {
+    deps.logger.warn({ err: error, buildId: build.id }, "component owners could not be resolved");
+    return [];
+  }
+}
+
 /** Tells the project's reviewers a published build waits for a verdict (webhook and notifications). */
 function reviewRequestedFor(
   options: ShelfOptions,
   runtime: ServerRuntime,
 ): (project: Project, build: Build) => Promise<void> {
   return async (project, build) => {
+    const deps = {
+      db: options.database,
+      config: runtime.config,
+      ui: runtime.ui,
+      logger: runtime.logger,
+      notifiers: runtime.notifiers,
+      notificationsConfig: options.notifications?.config,
+      publicOrigin: runtime.publicOrigin,
+    };
+    const assigned = await assignedOrNone(deps, project, build);
     await announceReviewWith(
-      {
-        db: options.database,
-        config: runtime.config,
-        ui: runtime.ui,
-        logger: runtime.logger,
-        notifiers: runtime.notifiers,
-        notificationsConfig: options.notifications?.config,
-        publicOrigin: runtime.publicOrigin,
-      },
+      deps,
       project,
       REVIEW_EVENTS.requested,
       reviewRequestedData(build),
       build.id,
+      { skipUsers: new Set(assigned.map((reviewer) => reviewer.userId)) },
+    );
+    await Promise.all(
+      assigned.map(async (reviewer) => {
+        const data = {
+          ...reviewRequestedData(build),
+          assignedBecause: assignmentReason(reviewer.components),
+        };
+        await notifyAssignedWith(deps, project, reviewer.userId, data, `/builds/${build.id}`);
+      }),
     );
   };
+}
+
+/** The consumer's wall-clock bound for one job, when `testing.maxJobSeconds` states it. */
+function maxJobConfig(options: ShelfOptions): { maxJobSeconds?: number } {
+  const seconds = options.testing?.maxJobSeconds;
+  return seconds === undefined ? {} : { maxJobSeconds: seconds };
 }

@@ -24,7 +24,12 @@ import type { DatabaseCaptureQueue } from "../db-queue/types.ts";
 import { createCaptureHandler } from "./capture-handler.ts";
 import { startSlotLoop } from "./loop.ts";
 import { startQueueSampling } from "./metrics.ts";
-import { DEFAULT_BACKOFF_MS, DEFAULT_MAX_RETRIES, DEFAULT_WAIT_TIME_SECONDS } from "./retry.ts";
+import {
+  DEFAULT_BACKOFF_MS,
+  DEFAULT_MAX_JOB_SECONDS,
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_WAIT_TIME_SECONDS,
+} from "./retry.ts";
 import { runJob, type JobRuntime } from "./run-job.ts";
 import { applyImageSettings, ensureImageEngine, sweepScratch } from "./startup.ts";
 import type {
@@ -157,6 +162,7 @@ function buildRuntime(options: CaptureConsumerOptions, logger: Logger): JobRunti
     now: options.now ?? Date.now,
     timers: options.timers,
     lease: options.lease,
+    maxJobMs: (options.config?.maxJobSeconds ?? DEFAULT_MAX_JOB_SECONDS) * 1000,
   };
 }
 
@@ -169,6 +175,9 @@ function registry(options: CaptureConsumerOptions, logger: Logger): Map<string, 
         await options.queue.enqueue(job);
       },
       maxRetries: options.config?.maxRetries,
+      onShardRepeated: (event) => {
+        options.metrics?.shardRepeated?.(event);
+      },
       ...options.capture,
       logger,
     });

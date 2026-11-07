@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunnerTarget } from "../adapters/capture-runner.ts";
+import { UserFacingError } from "../utils/user-facing-error.ts";
 import {
   assertBrowserCount,
   assertSupportedBrowsers,
@@ -101,6 +102,10 @@ describe("assertSupportedBrowsers", () => {
     expect(() => assertSupportedBrowsers(["chromium", "firefox", "webkit"], offered)).toThrow(
       /firefox is not offered.*; webkit is not offered/u,
     );
+  });
+
+  it("refuses with a user-facing error, whose text is written to be shown", () => {
+    expect(() => assertSupportedBrowsers(["firefox"], offered)).toThrow(UserFacingError);
   });
 });
 

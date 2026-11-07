@@ -9,6 +9,7 @@ import { repeatEvery, type QueueTimers } from "../db-queue/timers.ts";
 
 /** How a consumed job ended. */
 export type JobOutcome =
+  | "deadline"
   | "completed"
   | "retried"
   | "failed"
@@ -27,6 +28,16 @@ export interface JobFinishedEvent {
   attempt: number;
 }
 
+/** A shard run that captured again what an earlier attempt of it had already stored. */
+export interface ShardRepeatedEvent {
+  /** Snapshots stored by the earlier attempt(s) and captured again by this one. */
+  repeated: number;
+  /** This delivery, from 1, when the queue said. */
+  attempt?: number;
+  /** Deliveries the queue allows, when it said. */
+  limit?: number;
+}
+
 /** A reading of the queue's backlog. */
 export interface QueueSample {
   /** Jobs waiting to be claimed. */
@@ -40,6 +51,8 @@ export interface QueueSample {
 /** Hooks the host may pass. Both are optional and must not throw. */
 export interface ConsumerMetrics {
   jobFinished?(event: JobFinishedEvent): void;
+  /** Called by a shard run that re-captured work an earlier attempt had stored; nothing is resumed. */
+  shardRepeated?(event: ShardRepeatedEvent): void;
   /** Called every `sampleEveryMs` with the queue's depth and oldest waiting job. Costs one read. */
   queueSample?(sample: QueueSample): void;
   /** Sampling interval (default {@link DEFAULT_SAMPLE_MS}); sampling is off without `queueSample`. */

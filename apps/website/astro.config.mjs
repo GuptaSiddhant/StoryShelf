@@ -70,10 +70,11 @@ export default defineConfig({
         },
         { tag: "meta", attrs: { name: "theme-color", content: "#1d5fcf" } },
         {
-          // Tables that scroll sideways on narrow screens must be keyboard-focusable.
+          // Tables, and code blocks the page's own scripts left without a focus stop, that scroll
+          // sideways on narrow screens must be keyboard-focusable.
           tag: "script",
           content:
-            "addEventListener('DOMContentLoaded',()=>{for(const t of document.querySelectorAll('.sl-markdown-content table'))t.tabIndex=0})",
+            "addEventListener('DOMContentLoaded',()=>{for(const t of document.querySelectorAll('.sl-markdown-content table'))t.tabIndex=0;for(const p of document.querySelectorAll('pre'))if(p.scrollWidth>p.clientWidth&&!p.hasAttribute('tabindex'))p.tabIndex=0})",
         },
         { tag: "meta", attrs: { property: "og:image", content: OG_IMAGE } },
         { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },

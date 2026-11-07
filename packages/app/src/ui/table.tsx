@@ -1,8 +1,5 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const tableWrap = css`
   /* table */
   overflow: auto;
@@ -10,6 +7,10 @@ const tableWrap = css`
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
+  &:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
   & table {
     width: 100%;
     border-collapse: separate;
@@ -60,8 +61,20 @@ const tableDense = css`
 
 /**
  * Scrollable bordered table surface. Pass native `<table>` markup as
- * children; the header, row hover, and spacing are styled here.
+ * children; the header, row hover, and spacing are styled here. The surface
+ * is a focusable, named `region` so a keyboard can scroll it when the table
+ * overflows and a screen reader says which table it is. `label` is required;
+ * give each table on a page its own name (two regions with the same name fail
+ * axe's `landmark-unique`).
  */
-export const Table: FC<{ dense?: boolean; children?: unknown }> = ({ dense = false, children }) => {
-  return <div class={dense ? tableDense : tableWrap}>{children}</div>;
+export const Table: FC<{ dense?: boolean; label: string; children?: unknown }> = ({
+  dense = false,
+  label,
+  children,
+}) => {
+  return (
+    <div class={dense ? tableDense : tableWrap} role="region" aria-label={label} tabindex={0}>
+      {children}
+    </div>
+  );
 };

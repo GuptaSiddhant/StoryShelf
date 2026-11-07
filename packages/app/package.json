@@ -51,11 +51,12 @@
     "lint": "oxlint --type-aware --type-check ./src ./.storybook",
     "lint:fix": "nub run lint -- --fix",
     "prepublishOnly": "nub run build",
+    "smoke:storybook": "node scripts/storybook-dev-smoke.mjs",
     "storybook": "storybook dev -p 6006",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/jobs.integration.test.ts src/capture-status-fanout.test.ts src/routers/design.integration.test.ts"
+    "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/jobs.integration.test.ts src/capture-status-fanout.test.ts src/routers/design.integration.test.ts src/routers/published-compression.test.ts"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.6.1",
@@ -81,6 +82,7 @@
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "pino": "catalog:",
+    "playwright-core": "1.63.0",
     "storybook": "10.6.5",
     "tsdown": "catalog:",
     "typescript": "catalog:",

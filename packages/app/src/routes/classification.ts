@@ -4,8 +4,9 @@
  * route missing here and on any entry that no longer matches a route, so a new route must be
  * classified in `api-routes.ts` or `page-routes.ts` in the same change.
  *
- * Today the table only describes the routes; nothing is gated by it yet (gating comes with the
- * `testing` option work, which will apply it as middleware).
+ * The table is enforced at request time: `requireTesting` answers 404 for `testing` routes on an
+ * instance without the `testing` option, and `requireReview` answers 404 for `review` routes of a
+ * project with review off (see `gating.integration.test.ts`).
  */
 import { API_ROUTE_CLASSES } from "./api-routes.ts";
 import { PAGE_ROUTE_CLASSES } from "./page-routes.ts";

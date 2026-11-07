@@ -1,5 +1,6 @@
-/** Starting a local browser, and telling one that would not start from one that crashed. */
 import { TargetLaunchError } from "@storyshelf/core/adapter/capture-runner";
+/** Starting a local browser, and telling one that would not start from one that crashed. */
+import { errorText } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
 import type { LocalTarget } from "./targets.ts";
@@ -50,7 +51,7 @@ export async function launchLocal(
 
 /** Launch errors carry a long log tail; the first line says what failed. */
 function firstLine(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error);
+  const text = error instanceof Error ? error.message : errorText(error);
   return (
     text
       .split("\n")

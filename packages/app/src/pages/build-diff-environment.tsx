@@ -8,9 +8,6 @@ import {
   summariseEnvironmentChanges,
   summarisePartlyUnknown,
 } from "./environment-change.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /**
  * Build-level note: some snapshots were captured in a different environment than their baseline.
  * The default branch migrates them without a diff; a feature branch still diffs them (ADR 0005).

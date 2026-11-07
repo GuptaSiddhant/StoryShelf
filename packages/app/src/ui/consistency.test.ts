@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
  *   storybook.tsx is a separate one-off outside the system).
  * - No direct family imports in `pages/` (facade + document shell +
  *   shared review styles + page-local `ui/css.ts` only).
- * - No inline `style="..."` in `pages/` at all (zero ceiling).
+ * - No inline `style="..."` in `pages/` or `src/ui/` at all (zero ceiling).
  * - `src/ui/` stays presentational: no store, routers, middleware, pages, core models or
  *   test-helpers (the app-coupled chrome lives in `src/shell/`).
  */
@@ -78,6 +78,9 @@ const RUNTIME_URLS_REFERENCES: readonly RegExp[] = [
 function usesUrlsAtRuntime(source: string): boolean {
   return RUNTIME_URLS_REFERENCES.some((pattern) => pattern.test(source));
 }
+
+/** A JSX `style` attribute in any spelling: `style="..."`, `style='...'`, `style={...}`, with spaces. */
+const INLINE_STYLE = /\bstyle\s*=\s*["'{`]/gu;
 
 function countMatches(source: string, pattern: RegExp): number {
   return source.match(pattern)?.length ?? 0;
@@ -173,6 +176,29 @@ describe("ui-building-blocks contract", () => {
   it("has no inline styles in pages/", async () => {
     const over = (await pageSources())
       .map(({ file, source }) => ({ file, count: countMatches(source, /style="/gu) }))
+      .filter(({ count }) => count > 0);
+    expect(over).toEqual([]);
+  });
+
+  it("recognises every spelling of a JSX inline style", () => {
+    const spellings = [
+      '<i style="width:1px" />',
+      "<i style='width:1px' />",
+      "<i style={{ a: 1 }} />",
+    ];
+    const spaced = ['<i style = "width:1px" />', "<i style\n={`width:1px`} />"];
+    for (const source of [...spellings, ...spaced]) {
+      expect(countMatches(source, INLINE_STYLE), source).toBe(1);
+    }
+    // The word in prose, or as part of another name, is not a style attribute.
+    expect(countMatches("// the style rules; unstyled = {}; restyle={1}", INLINE_STYLE)).toBe(0);
+  });
+
+  it("has no inline styles in src/ui/", async () => {
+    // css.ts only mentions the word in prose.
+    const over = (await uiSources())
+      .filter(({ file }) => file !== "consistency.test.ts")
+      .map(({ file, source }) => ({ file, count: countMatches(source, INLINE_STYLE) }))
       .filter(({ count }) => count > 0);
     expect(over).toEqual([]);
   });

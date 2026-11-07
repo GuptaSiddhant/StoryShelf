@@ -29,6 +29,7 @@ export {
   type MultiInstanceOptions,
   type SharedDatabaseFactory,
 } from "./queue-multi-instance.ts";
+export { databaseQueueSingleFlightSuite } from "./queue-single-flight.ts";
 export { createManualClock, type ManualClock } from "./manual-clock.ts";
 export { runnerContractSuite } from "./runner-contract.ts";
 export { storageContractSuite } from "./storage-contract.ts";
@@ -39,3 +40,10 @@ export {
   type BuildReferenceContractFixture,
   type BuildReferenceContractFixtureRunner,
 } from "./build-reference-contract.ts";
+export {
+  retentionActivationContractSuite,
+  type RetentionActivationHarness,
+  type RetentionActivationHarnessRunner,
+  type SeededBaseline,
+  type SeededSnapshot,
+} from "./retention-activation-contract.ts";

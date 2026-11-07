@@ -10,9 +10,6 @@ import {
   HStack,
   Meta,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** "Connect your own account" state for a provider whose project has no shared credential. */

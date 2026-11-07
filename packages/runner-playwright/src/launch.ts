@@ -1,5 +1,6 @@
-/** Starting a local engine, and telling a browser that would not start from one that crashed. */
 import { TargetLaunchError, type BrowserName } from "@storyshelf/core/adapter/capture-runner";
+/** Starting a local engine, and telling a browser that would not start from one that crashed. */
+import { errorText } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import type { LocalTarget } from "./targets.ts";
 
@@ -70,7 +71,7 @@ function launcherOf(
 
 /** Playwright's launch errors run to a screenful of install hints; the first line says what failed. */
 function firstLine(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error);
+  const text = error instanceof Error ? error.message : errorText(error);
   return (
     text
       .split("\n")

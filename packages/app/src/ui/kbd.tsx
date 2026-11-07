@@ -1,8 +1,5 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const kbdKey = css`
   /* kbd */
   display: inline-flex;

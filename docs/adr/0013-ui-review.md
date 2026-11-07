@@ -82,7 +82,11 @@ branch does not carry a verdict over.
 
 - **Who reviews.** The `approver` and `admin` roles are the reviewers; there is no separate reviewer
   role. Every approver and admin of the project is a reviewer of every build awaiting review. There
-  is no per-build assignment, no component ownership rule and no "request review from" step.
+  is no "request review from" step. A project may add **component owners** (#465): a setting that
+  maps story-file globs to members. The owners of the components a build added or changed are its
+  assigned reviewers; each gets that cycle's `review:requested` once, even if they opted out of the
+  default email, and the build page lists them. Assignment is advisory: approvals, verdicts and
+  statuses do not read it, and with no matching owner the default recipients are asked.
 - **Being asked.** When a build becomes `pending` with review on, a `review:requested` event goes to
   the project's approvers and admins through the notification channels and their per-user
   subscriptions (ADR 0014). Unlike other topics, which are opt-in, this one is on by default for
@@ -156,11 +160,12 @@ itself still shows, and nothing in review depends on the design.
 With `testing` off the build page shows a component and story changeset computed from the catalog
 (`build_components` hash per component) against the baseline build: the latest accepted build of the
 branch, falling back to the default branch, the rule baselines use. It lists components added,
-removed and changed (the story set, args or source hash differ), each linking to the published story
-and to its component page. With `testing` on, the same list sits above the visual diffs.
+removed and changed (story-index metadata changed: a story was added, removed or renamed, or its type
+or title changed), each linking to the published story and to its component page. With `testing` on, the same list sits above the visual diffs.
 
-This is a coarser signal than pixels and is presented as such: a changed hash means the story's
-definition changed, not that it looks different. `@storyshelf/affected` is not required and is not
+This is a coarser signal than pixels and is presented as such: a changed hash means the story-index
+metadata changed, not that the story looks different. The index carries neither args nor source, so
+a change of those alone is not listed. `@storyshelf/affected` is not required and is not
 run.
 
 ### 9. Reviews that nobody finishes
@@ -190,7 +195,11 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
   de-duplicate. `review:comment` is a filter alias, never emitted: a webhook, notification channel or
   subscription listing it receives a `comment:created` of scope `build` or `story`, and one listing
   both names receives it once. One predicate (`matchesEvent` in core) applies the rule to every
-  filter, so the alias has a single definition.
+  filter, so the alias has a single definition. A comment that `@`-mentions a project member also
+  raises `comment:mentioned` to that member alone (#463): a notification, never a webhook, and never
+  to a stored project channel. The mentioned ids are resolved on the server against the project's
+  members only and stored with the comment, so a non-member handle stays plain text and nothing about
+  other projects is disclosed.
 - **Auth.** Review never widens who can view a project (ADR 0011 Authentication and Access).
 
 ## Consequences
@@ -210,7 +219,8 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
   the previous accepted build until then. The default branch is never held.
 - Schema surface: `comments.storyId`, `build_reviews`, `projects.review_enabled`,
   `projects.review_approvals`, and a wider retention rule.
-- A hash-based changeset overstates change when stories are re-saved without a visible effect.
+- A hash-based changeset overstates change when story-index metadata is re-saved without a visible
+  effect, and misses a change of args or source that the index does not carry.
 
 ## Alternatives considered
 

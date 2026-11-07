@@ -17,9 +17,6 @@ import {
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { ProjectCard, type ProjectSummary } from "./projects-card.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const projectGrid = css`
   /* project-grid */
   display: grid;
@@ -70,6 +67,37 @@ function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
   );
 }
 
+/** The filterable grid of project cards, each with its own set of links. */
+function ProjectGrid({
+  summaries,
+  urls,
+}: {
+  summaries: ProjectSummary[];
+  urls: ReturnType<typeof createUrlBuilder>;
+}): ReturnType<typeof Card> {
+  return (
+    <div class={projectGrid} data-filter-scope>
+      {summaries.map((summary) => (
+        <ProjectCard
+          key={summary.project.id}
+          summary={summary}
+          urls={{
+            library: urls.library(summary.project.slug),
+            settings: urls.settings(summary.project.slug),
+            storybook: urls.short(summary.project.slug),
+            review: summary.latest
+              ? urls.buildDiff(summary.project.slug, summary.latest.id)
+              : urls.library(summary.project.slug),
+          }}
+        />
+      ))}
+      <div data-filter-empty hidden>
+        <Meta center>No projects match your filter.</Meta>
+      </div>
+    </div>
+  );
+}
+
 /** Projects overview: searchable project cards with review state, plus setup help. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
   const { db, user, config } = getStore();
@@ -103,25 +131,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
             action={newProject}
           />
         ) : (
-          <div class={projectGrid} data-filter-scope>
-            {summaries.map((summary) => (
-              <ProjectCard
-                key={summary.project.id}
-                summary={summary}
-                urls={{
-                  library: urls.library(summary.project.slug),
-                  settings: urls.settings(summary.project.slug),
-                  storybook: urls.short(summary.project.slug),
-                  review: summary.latest
-                    ? urls.buildDiff(summary.project.slug, summary.latest.id)
-                    : urls.library(summary.project.slug),
-                }}
-              />
-            ))}
-            <div data-filter-empty hidden>
-              <Meta center>No projects match your filter.</Meta>
-            </div>
-          </div>
+          <ProjectGrid summaries={summaries} urls={urls} />
         )}
         <SetupGuide open={projects.length === 0} />
       </VStack>

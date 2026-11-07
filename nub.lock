@@ -488,6 +488,9 @@ importers:
       pino:
         specifier: 'catalog:'
         version: 10.4.0
+      playwright-core:
+        specifier: 1.63.0
+        version: 1.63.0(zod@4.6.7)
       storybook:
         specifier: 10.6.5
         version: 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)
@@ -14181,6 +14184,10 @@ snapshots:
   pkg-pr-new@0.0.92: {}
 
   playwright-core@1.63.0: {}
+
+  playwright-core@1.63.0(zod@4.6.7):
+    dependencies:
+      zod: 4.6.7
 
   pngjs@7.0.0: {}
 

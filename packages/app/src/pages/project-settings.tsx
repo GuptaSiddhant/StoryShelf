@@ -73,6 +73,9 @@ export interface SettingsFormState {
   secret?: string;
   /** Label type key whose edit form is open (labels tab). */
   editKey?: string;
+  /** Members tab: a refused component-owners submission, shown again as typed. */
+  ownerText?: string;
+  ownerProblems?: { line: number; message: string }[];
 }
 
 function tabHref(project: Project, tab: SettingsTab): string {

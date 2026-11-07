@@ -5,7 +5,11 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { databaseQueueMultiInstanceSuite, queueContractSuite } from "@storyshelf/core/test-helpers";
+import {
+  databaseQueueMultiInstanceSuite,
+  databaseQueueSingleFlightSuite,
+  queueContractSuite,
+} from "@storyshelf/core/test-helpers";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createSqliteDatabase } from "./index.ts";
@@ -40,6 +44,8 @@ queueContractSuite(
 );
 
 databaseQueueMultiInstanceSuite("node:sqlite", freshDatabase);
+
+databaseQueueSingleFlightSuite("node:sqlite", freshDatabase);
 
 describe("poll probe on SQLite", () => {
   it("is one range scan of capture_jobs_poll_idx with no sort", async () => {

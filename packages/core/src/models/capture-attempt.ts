@@ -1,10 +1,11 @@
-/** Capture attempts and their log lines: per-run history for a build. */
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { JobStatus } from "../adapters/capture-queue.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { CaptureAttempt, CaptureLogLevel } from "../schema/capture-attempt.ts";
+/** Capture attempts and their log lines: per-run history for a build. */
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { redactSecrets } from "../utils/redact.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
@@ -103,6 +104,39 @@ export class CaptureAttemptModel {
   }
 
   /**
+   * Close an attempt only while it is still `queued` or `running`, in one conditional write, so a
+   * close that raced ahead (a completed run, a cancel) is never overwritten. Resolves to the closed
+   * row, or null when the attempt was not open any more (or does not exist).
+   */
+  async closeIfOpen(
+    id: string,
+    status: Extract<JobStatus, "completed" | "failed" | "cancelled">,
+    error: string | undefined,
+    counts: { storyCount: number; failedCount: number },
+  ): Promise<CaptureAttempt | null> {
+    const table = this.tables.captureAttempts;
+    const stamp = nextStamp();
+    const row = (await this.db.updateWhere(
+      table,
+      id,
+      {
+        status,
+        error: error ?? null,
+        storyCount: counts.storyCount,
+        failedCount: counts.failedCount,
+        finishedAt: stamp,
+        updatedAt: stamp,
+      },
+      inArray(columnsOf(table, "status"), ["queued", "running"]),
+    )) as unknown as CaptureAttempt | null;
+    // `updateWhere` returns the row whether or not the write applied; only ours carries our stamp,
+    // compared as instants because Postgres hands the column back in its own text form.
+    const written =
+      typeof row?.finishedAt === "string" && instantOf(row.finishedAt) === instantOf(stamp);
+    return row !== null && written && row.status === status ? row : null;
+  }
+
+  /**
    * The attempt row when a cancel already closed it (ADR 0006): a run that ends after a user
    * cancelled the build must not rewrite the row as `completed` or `failed`. Null otherwise.
    */
@@ -148,7 +182,8 @@ export type AttemptLogRecorder = (
 
 /**
  * Record one attempt log line without breaking the capture on write failure.
- * Log-write failures are reported through pino and never thrown.
+ * Log-write failures are reported through pino and never thrown; a {@link JobAbortedError} from
+ * the recorder (the attempt was abandoned) is rethrown.
  */
 export async function emitAttemptLog(
   record: AttemptLogRecorder | undefined,
@@ -163,6 +198,27 @@ export async function emitAttemptLog(
   try {
     await record(level, redactSecrets(message), fields);
   } catch (error) {
+    // An abandoned attempt must stop, not log a warning and carry on.
+    if (error instanceof JobAbortedError) {
+      throw error;
+    }
     logger?.warn({ err: error }, "attempt log write failed");
   }
+}
+
+/** The last stamp handed out by {@link nextStamp}; it only ever moves forward. */
+let lastStamp = 0;
+
+/** An ISO timestamp strictly later than the previous one this process handed out. */
+function nextStamp(): string {
+  lastStamp = Math.max(Date.now(), lastStamp + 1);
+  return new Date(lastStamp).toISOString();
+}
+
+/** The instant a stored timestamp names, whichever text form the driver returns. */
+function instantOf(value: string): number {
+  const direct = Date.parse(value);
+  if (!Number.isNaN(direct)) return direct;
+  // `2026-11-03 19:46:04.101+00` (Postgres) is not ISO: make it so, for runtimes that do not guess.
+  return Date.parse(value.replace(" ", "T").replace(/(?<hours>[+-]\d{2})$/u, "$<hours>:00"));
 }

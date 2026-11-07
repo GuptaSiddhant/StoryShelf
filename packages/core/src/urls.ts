@@ -6,9 +6,16 @@ export interface ComponentUrlOptions {
   tab?: string | undefined;
 }
 
-/** The query string of a component page: `?build=` and `?tab=` when given, else nothing. */
-function componentQuery(options: ComponentUrlOptions | undefined): string {
+/**
+ * The query string of a component page: `?build=` and `?tab=` when given, else nothing. `path`
+ * is the import path itself, for the one case that cannot travel in the URL path (see
+ * {@link hasDotSegment}).
+ */
+function componentQuery(options: ComponentUrlOptions | undefined, path?: string): string {
   const params = new URLSearchParams();
+  if (path !== undefined) {
+    params.set("path", path);
+  }
   if (options?.build) {
     params.set("build", options.build);
   }
@@ -69,10 +76,19 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     designCoverage: (slug) => `${root}/projects/${slug}/design/coverage`,
     jobs: (slug) => `${root}/projects/${slug}/jobs`,
     labels: (slug) => `${root}/projects/${slug}/labels`,
-    label: (slug, key, value) =>
-      `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodePath(value)}`,
-    component: (slug, importPath, options) =>
-      `${root}/projects/${slug}/components/${encodePath(importPath.replace(/^(?:\.\/)+/u, ""))}${componentQuery(options)}`,
+    label: (slug, key, value) => {
+      const page = `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/`;
+      return hasDotSegment(value)
+        ? `${page}?value=${encodeURIComponent(value)}`
+        : `${page}${encodePath(value)}`;
+    },
+    component: (slug, importPath, options) => {
+      const path = importPath.replace(/^(?:\.\/)+/u, "");
+      const page = `${root}/projects/${slug}/components/`;
+      return hasDotSegment(path)
+        ? `${page}${componentQuery(options, path)}`
+        : `${page}${encodePath(path)}${componentQuery(options)}`;
+    },
     storybook: (slug) =>
       publishedBaseDomain
         ? `https://${slug}.${publishedBaseDomain}`
@@ -116,4 +132,14 @@ function encodePath(value: string): string {
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
+}
+
+/**
+ * Whether a value has a path segment that is exactly `.` or `..`. A browser, and `new URL`,
+ * resolve such a segment (even as `%2E%2E`) before the request, so the link would open another
+ * page. These values travel in the query string of the same page instead (`?value=`, `?path=`);
+ * the routes accept both forms. Every other value keeps its path form.
+ */
+export function hasDotSegment(value: string): boolean {
+  return value.split("/").some((segment) => segment === "." || segment === "..");
 }

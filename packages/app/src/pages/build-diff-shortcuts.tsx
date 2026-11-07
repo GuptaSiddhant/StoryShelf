@@ -1,9 +1,6 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Button, Kbd } from "../ui/components.tsx";
 import { shortcutsDialog } from "../ui/styles/review-layout.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const SHORTCUTS: { keys: string[]; action: string }[] = [
   { keys: ["j", "→"], action: "Next snapshot" },
   { keys: ["k", "←"], action: "Previous snapshot" },

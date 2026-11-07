@@ -25,6 +25,7 @@ export const projects = pgTable("projects", {
   reviewEnabled: boolean("review_enabled").notNull().default(true),
   reviewApprovals: integer("review_approvals").notNull().default(1),
   storybookUrlTtlSeconds: integer("storybook_url_ttl_seconds"),
+  componentOwners: text("component_owners"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
 });
@@ -54,6 +55,7 @@ export interface Project {
   reviewEnabled: boolean;
   reviewApprovals: number;
   storybookUrlTtlSeconds: number | null;
+  componentOwners: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,7 +1,8 @@
-/** The render stage: one shard of a sharded capture, run by whichever worker picked up its job. */
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
+/** The render stage: one shard of a sharded capture, run by whichever worker picked up its job. */
+import { JobAbortedError } from "../../utils/job-aborted.ts";
 import { classifyFailures } from "../failure-sets.ts";
 import { renderWork } from "../matrix.ts";
 import type { CaptureJobOptions } from "../orchestrator.ts";
@@ -14,6 +15,7 @@ import { extractStorybookToScratch } from "../statics.ts";
 import { loadTarget } from "../target.ts";
 import { contextOf, matrixInputOf, type ShardTarget } from "./context.ts";
 import { reduceBuild, type FinalSummary } from "./reduce.ts";
+import { reportRepeatedWork, type ShardDelivery } from "./repeated-work.ts";
 
 /** A shard job being run. */
 export interface ShardRunInput {
@@ -27,6 +29,8 @@ export interface ShardRunInput {
   final?: boolean | undefined;
   /** Reports render and persist progress to the job's lease (see `leaseProgress`). */
   progress?: CaptureProgress | undefined;
+  /** Which delivery of the job this is, so a shard that re-captures earlier work can say so. */
+  delivery?: ShardDelivery | undefined;
   /**
    * Called once by the run that finalized the build, and by no other, with the summary and, when
    * the shard that ended the build failed, its error. The caller closes the plan's attempt here.
@@ -71,7 +75,7 @@ async function reduceRendered(
   input: ShardRunInput,
   final: boolean,
 ): Promise<ShardOutcome> {
-  const summary = await reduceBuild(target, final);
+  const summary = await reduceBuild(target, final, input.progress);
   if (!summary) {
     return { status: "rendered", finalized: false };
   }
@@ -85,7 +89,7 @@ async function reduceFinished(
   input: ShardRunInput,
   final: boolean,
 ): Promise<ShardOutcome> {
-  const summary = await reduceBuild(target, final);
+  const summary = await reduceBuild(target, final, input.progress);
   if (!summary) {
     return { status: "skipped", reason: "shard already finished" };
   }
@@ -104,8 +108,10 @@ async function runShard(
   await shards.markRunning(shard.id);
   input.progress?.();
   try {
-    await renderShard(target, shard, input.progress);
+    await renderShard(target, shard, { progress: input.progress, delivery: input.delivery });
   } catch (error) {
+    // Abandoned at its deadline: the redelivery settles the shard, this run records nothing.
+    if (error instanceof JobAbortedError) throw error;
     await recordFailure(shards, shard, error, final);
     if (final) {
       await finalizeAfterFailure(target, input, error);
@@ -168,7 +174,7 @@ async function recordFailure(
 async function renderShard(
   target: ShardTarget,
   shard: CaptureShard,
-  progress: CaptureProgress | undefined,
+  run: { progress: CaptureProgress | undefined; delivery: ShardDelivery | undefined },
 ): Promise<void> {
   const { options, build, project } = target;
   const payload = JSON.parse(shard.payload ?? "{}") as ShardPayload;
@@ -181,13 +187,14 @@ async function renderShard(
     shard.id,
     options.limits,
   );
-  progress?.();
+  run.progress?.();
   try {
     const result = await renderAndPersist(target, payload, {
       storybookDir,
       runId: shard.id,
       shardIndex: shard.ordinal,
-      progress,
+      progress: run.progress,
+      delivery: run.delivery,
     });
     const durationMs = Math.round(performance.now() - started);
     await new CaptureShardModel(options.db).complete(
@@ -207,6 +214,7 @@ async function renderAndPersist(
     runId: string;
     shardIndex: number;
     progress: CaptureProgress | undefined;
+    delivery: ShardDelivery | undefined;
   },
 ): Promise<Omit<ShardResult, "durationMs">> {
   const stories = payload.browsers.flatMap((engine) => engine.stories);
@@ -223,7 +231,8 @@ async function renderAndPersist(
   });
   const rendered = await renderWork(matrix, payload.browsers);
   const failures = classifyFailures(stories, rendered.failures);
-  await clearEarlierRun(target, payload);
+  const removed = await clearEarlierRun(target, payload);
+  await reportRepeatedWork(target, run.shardIndex, run.delivery ?? {}, removed);
   const persisted = await persistRendered(
     contextOf(target, {
       viewports: payload.viewports,
@@ -257,10 +266,11 @@ function shardScope(payload: ShardPayload): ReadonlySet<string> {
 /**
  * Drop what an interrupted earlier run of this shard persisted: the rendered rows of the
  * (story, engine) pairs it is about to write. The plan's inherited rows stay, including those of
- * these stories on engines or viewports this shard does not render.
+ * these stories on engines or viewports this shard does not render. Returns how many rows it
+ * dropped: the work an earlier attempt had stored and this one has just captured again.
  */
-async function clearEarlierRun(target: ShardTarget, payload: ShardPayload): Promise<void> {
-  await new SnapshotModel(target.options.db, target.options.tables).removeRendered(
+async function clearEarlierRun(target: ShardTarget, payload: ShardPayload): Promise<number> {
+  return await new SnapshotModel(target.options.db, target.options.tables).removeRendered(
     target.build.id,
     payload.browsers.map((engine) => ({
       browser: engine.browser,

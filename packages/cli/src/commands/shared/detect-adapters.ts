@@ -32,124 +32,141 @@ export interface DetectedAdapters {
  * @returns Detected adapter selections (partial).
  */
 export function detectInstalledAdapters(dir: string): DetectedAdapters {
-  const pkgPath = join(dir, "package.json");
-  let raw: string;
-  try {
-    raw = readFileSync(pkgPath, "utf8");
-  } catch {
+  const deps = readDependencyNames(dir);
+  if (!deps) {
     return {};
   }
-  let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+  return { ...detectDatabase(dir, deps), ...detectStorage(deps), ...detectGit(deps) };
+}
+
+type Database = NonNullable<DetectedAdapters["database"]>;
+
+/** Every dependency name of the project's package.json, or undefined when it is missing or malformed. */
+function readDependencyNames(dir: string): Set<string> | undefined {
   try {
-    pkg = JSON.parse(raw) as typeof pkg;
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    return new Set([
+      ...Object.keys(pkg.dependencies ?? {}),
+      ...Object.keys(pkg.devDependencies ?? {}),
+    ]);
   } catch {
-    return {};
+    return undefined;
   }
-  const deps = new Set<string>([
-    ...Object.keys(pkg.dependencies ?? {}),
-    ...Object.keys(pkg.devDependencies ?? {}),
-  ]);
+}
 
-  const result: DetectedAdapters = {};
+/** The generated sources, read only when a dependency alone does not settle the flavor. */
+type ReadSources = () => string;
 
-  if (deps.has("@storyshelf/db-mysql")) {
-    result.database = detectMysqlFlavor(dir, deps);
-  } else if (deps.has("@storyshelf/db-postgres")) {
-    result.database = detectPostgresFlavor(dir, deps);
-  } else if (deps.has("@storyshelf/db-turso")) {
-    // Legacy package (see docs/deprecated.md) — upgrades to the turso preset.
-    result.database = "turso";
-  } else if (deps.has("@storyshelf/db-sqlite")) {
-    result.database = detectSqliteFlavor(dir, deps);
-  }
-
-  if (deps.has("@storyshelf/storage-azure")) {
-    result.storage = "azure";
-  } else if (deps.has("@storyshelf/storage-gcs")) {
-    result.storage = "gcs";
-  } else if (deps.has("@storyshelf/storage-s3")) {
-    result.storage = "s3";
-  } else if (deps.has("@storyshelf/storage-local")) {
-    result.storage = "local";
-  }
-
-  if (deps.has("@storyshelf/notify-git")) {
-    result.git = "git";
-  }
-
-  return result;
+/** How one `@storyshelf/db-*` package is told apart: marker dependencies first, then subpath imports. */
+interface FlavorRules {
+  /** The subpath prefix generated sources import presets from. */
+  prefix: string;
+  /** Marker dependencies, in order; a function decides from the sources. */
+  deps: readonly (readonly [string, Database | ((sources: ReadSources) => Database)])[];
+  /** Subpath imports found in the generated sources, in order. */
+  sources: readonly (readonly [string, Database])[];
+  fallback: Database;
 }
 
 /**
- * Distinguish the `@storyshelf/db-sqlite` presets. Peer deps disambiguate
- * turso/better-sqlite3; `bun:sqlite` is a builtin and D1 has no marker dep,
- * so fall back to scanning generated sources for subpath imports.
+ * The `@storyshelf/db-sqlite` presets. Peer deps disambiguate turso/better-sqlite3; `bun:sqlite` is
+ * a builtin and D1 has no marker dep, so fall back to scanning generated sources for subpath imports.
  */
-function detectSqliteFlavor(
-  dir: string,
-  deps: Set<string>,
-): NonNullable<DetectedAdapters["database"]> {
-  if (deps.has("better-sqlite3")) {
-    return "better-sqlite3";
+const SQLITE_RULES: FlavorRules = {
+  prefix: "@storyshelf/db-sqlite",
+  deps: [
+    ["better-sqlite3", "better-sqlite3"],
+    ["@libsql/client", "turso"],
+  ],
+  sources: [
+    ["bun-sqlite", "bun-sqlite"],
+    ["d1", "d1"],
+    ["better-sqlite3", "better-sqlite3"],
+    ["turso", "turso"],
+  ],
+  fallback: "sqlite",
+};
+
+const POSTGRES_RULES: FlavorRules = {
+  prefix: "@storyshelf/db-postgres",
+  deps: [
+    ["pg", "pg"],
+    [
+      "@neondatabase/serverless",
+      (sources) => (sources().includes("@storyshelf/db-postgres/neon-http") ? "neon-http" : "neon"),
+    ],
+    ["@vercel/postgres", "vercel"],
+    ["@electric-sql/pglite", "pglite"],
+  ],
+  sources: [
+    ["pg", "pg"],
+    ["neon-http", "neon-http"],
+    ["neon", "neon"],
+    ["vercel", "vercel"],
+    ["pglite", "pglite"],
+  ],
+  fallback: "postgres",
+};
+
+const MYSQL_RULES: FlavorRules = {
+  prefix: "@storyshelf/db-mysql",
+  deps: [
+    ["@planetscale/database", "planetscale"],
+    ["@tidbcloud/serverless", "tidb"],
+  ],
+  sources: [
+    ["planetscale", "planetscale"],
+    ["tidb", "tidb"],
+  ],
+  fallback: "mysql",
+};
+
+/** The database package that is installed, in precedence order, and its flavor. */
+const DATABASE_PACKAGES: readonly (readonly [string, Database | FlavorRules])[] = [
+  ["@storyshelf/db-mysql", MYSQL_RULES],
+  ["@storyshelf/db-postgres", POSTGRES_RULES],
+  // Legacy package (see docs/deprecated.md) — upgrades to the turso preset.
+  ["@storyshelf/db-turso", "turso"],
+  ["@storyshelf/db-sqlite", SQLITE_RULES],
+];
+
+function detectDatabase(dir: string, deps: Set<string>): Pick<DetectedAdapters, "database"> {
+  const found = DATABASE_PACKAGES.find(([name]) => deps.has(name))?.[1];
+  if (found === undefined) {
+    return {};
   }
-  if (deps.has("@libsql/client")) {
-    return "turso";
-  }
-  const sources = readGeneratedSources(dir);
-  if (sources.includes("@storyshelf/db-sqlite/bun-sqlite")) {
-    return "bun-sqlite";
-  }
-  if (sources.includes("@storyshelf/db-sqlite/d1")) {
-    return "d1";
-  }
-  if (sources.includes("@storyshelf/db-sqlite/better-sqlite3")) {
-    return "better-sqlite3";
-  }
-  if (sources.includes("@storyshelf/db-sqlite/turso")) {
-    return "turso";
-  }
-  return "sqlite";
+  return { database: typeof found === "string" ? found : detectFlavor(dir, deps, found) };
 }
 
-function detectPostgresFlavor(
-  dir: string,
-  deps: Set<string>,
-): NonNullable<DetectedAdapters["database"]> {
-  if (deps.has("pg")) {
-    return "pg";
+function detectFlavor(dir: string, deps: Set<string>, rules: FlavorRules): Database {
+  const sources: ReadSources = () => readGeneratedSources(dir);
+  const marker = rules.deps.find(([name]) => deps.has(name))?.[1];
+  if (marker !== undefined) {
+    return typeof marker === "function" ? marker(sources) : marker;
   }
-  if (deps.has("@neondatabase/serverless")) {
-    const sources = readGeneratedSources(dir);
-    if (sources.includes("@storyshelf/db-postgres/neon-http")) return "neon-http";
-    return "neon";
-  }
-  if (deps.has("@vercel/postgres")) return "vercel";
-  if (deps.has("@electric-sql/pglite")) return "pglite";
-  const sources = readGeneratedSources(dir);
-  if (sources.includes("@storyshelf/db-postgres/pg")) return "pg";
-  if (sources.includes("@storyshelf/db-postgres/neon-http")) return "neon-http";
-  if (sources.includes("@storyshelf/db-postgres/neon")) return "neon";
-  if (sources.includes("@storyshelf/db-postgres/vercel")) return "vercel";
-  if (sources.includes("@storyshelf/db-postgres/pglite")) return "pglite";
-  return "postgres";
+  const text = sources();
+  const imported = rules.sources.find(([subpath]) => text.includes(`${rules.prefix}/${subpath}`));
+  return imported?.[1] ?? rules.fallback;
 }
 
-function detectMysqlFlavor(
-  dir: string,
-  deps: Set<string>,
-): NonNullable<DetectedAdapters["database"]> {
-  if (deps.has("@planetscale/database")) return "planetscale";
-  if (deps.has("@tidbcloud/serverless")) return "tidb";
-  if (deps.has("mysql2")) {
-    const sources = readGeneratedSources(dir);
-    if (sources.includes("@storyshelf/db-mysql/planetscale")) return "planetscale";
-    if (sources.includes("@storyshelf/db-mysql/tidb")) return "tidb";
-    return "mysql";
-  }
-  const sources = readGeneratedSources(dir);
-  if (sources.includes("@storyshelf/db-mysql/planetscale")) return "planetscale";
-  if (sources.includes("@storyshelf/db-mysql/tidb")) return "tidb";
-  return "mysql";
+/** The storage package that is installed, in precedence order. */
+const STORAGE_PACKAGES: readonly (readonly [string, NonNullable<DetectedAdapters["storage"]>])[] = [
+  ["@storyshelf/storage-azure", "azure"],
+  ["@storyshelf/storage-gcs", "gcs"],
+  ["@storyshelf/storage-s3", "s3"],
+  ["@storyshelf/storage-local", "local"],
+];
+
+function detectStorage(deps: Set<string>): Pick<DetectedAdapters, "storage"> {
+  const storage = STORAGE_PACKAGES.find(([name]) => deps.has(name))?.[1];
+  return storage === undefined ? {} : { storage };
+}
+
+function detectGit(deps: Set<string>): Pick<DetectedAdapters, "git"> {
+  return deps.has("@storyshelf/notify-git") ? { git: "git" } : {};
 }
 
 function readGeneratedSources(dir: string): string {

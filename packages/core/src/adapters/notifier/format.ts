@@ -39,6 +39,12 @@ function headline(event: NotificationEvent): string {
   return `${event.event}${branch ? ` on ${branch}` : ""}${status ? ` (${status})` : ""}`;
 }
 
+/** Why this recipient was asked, when the sender says so (an assigned reviewer): one line. */
+function reasonLines(event: NotificationEvent): string[] {
+  const reason = str(event.data, "assignedBecause");
+  return reason ? [reason] : [];
+}
+
 /** Append author/message/counts lines for verbose bodies. */
 function appendDetails(
   lines: string[],
@@ -111,7 +117,7 @@ export function formatNotification(
   const resolved = togglesOf(toggles);
   const name = brand?.name ?? "StoryShelf";
   const subject = `${resolved.subjectPrefix} ${headline(event)}`.trim();
-  const lines = [`${name}: ${headline(event)}`];
+  const lines = [`${name}: ${headline(event)}`, ...reasonLines(event)];
   appendDetails(lines, event, resolved);
   if (brand?.reviewUrl) {
     lines.push(brand.reviewUrl);

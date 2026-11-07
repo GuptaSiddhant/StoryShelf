@@ -1,8 +1,15 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { ContentCollectingError, recordContentUses } from "@storyshelf/core/capture";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel, PackageUsageModel } from "@storyshelf/core/models";
-import { storybookZipPath } from "@storyshelf/core/utils";
+import {
+  CONTENT_HASH_PATTERN,
+  contentKey,
+  isContentHash,
+  storybookZipPath,
+} from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
+import { createHash } from "node:crypto";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { registerAttempts } from "./attempts.ts";
@@ -32,28 +39,27 @@ async function planOrDiscard(
   }
 }
 
-async function upsertContentRef(hash: string): Promise<void> {
+/** Record the build's use of each stored blob; a blob a collector already claimed is a 409 to retry. */
+async function recordUses(
+  projectId: string,
+  buildId: string,
+  files: readonly { hash: string }[],
+): Promise<void> {
   try {
-    const contentRefs = getStore().db.tables.contentRefs;
-    const now = new Date().toISOString();
-    const existing = await getStore().db.get(contentRefs, hash);
-    if (existing) {
-      await getStore().db.update(contentRefs, hash, {
-        refCount: (existing as { refCount: number }).refCount + 1,
-        lastSeenAt: now,
-      });
-    } else {
-      await getStore().db.insert(contentRefs, {
-        hash,
-        refCount: 1,
-        lastSeenAt: now,
-        createdAt: now,
-      });
-    }
-  } catch {
-    // ignore — content_refs may not exist on old DB
+    await recordContentUses(
+      getStore().db,
+      getStore().storage,
+      { projectId, buildId },
+      files.map((file) => file.hash),
+    );
+  } catch (error) {
+    if (!(error instanceof ContentCollectingError)) throw error;
+    throw new HTTPException(409, {
+      message: "Some content was being collected: upload the missing files again and retry",
+    });
   }
 }
+
 import { registerBuildCancel } from "./build-cancel.ts";
 import { registerBuildChangeset } from "./build-changeset.ts";
 import { registerBuildReviews } from "./build-reviews.ts";
@@ -127,6 +133,11 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
+    if (build.status === "failed") {
+      throw new HTTPException(409, {
+        message: `Build ${build.id} failed; run storyshelf upload again to create a new build`,
+      });
+    }
     const maxBytes = getStore().config.maxUploadBytes ?? DEFAULT_MAX_UPLOAD_BYTES;
     const zipBytes = await storeUploadStream(
       getStore().storage,
@@ -148,7 +159,7 @@ export function registerBuilds(app: ShelfRouter): void {
     const { hashes } = c.req.valid("json");
     const needed: string[] = [];
     for (const hash of hashes) {
-      if (!(await getStore().storage.exists(`content/${hash}`))) {
+      if (!(await getStore().storage.exists(contentKey(hash)))) {
         needed.push(hash);
       }
     }
@@ -162,21 +173,19 @@ export function registerBuilds(app: ShelfRouter): void {
     await buildForProject(project.id, buildId);
     const contentType = c.req.header("content-type") ?? "";
     if (contentType.includes("multipart/")) {
-      const form = await c.req.formData();
-      for (const [key, value] of form.entries()) {
-        if (value instanceof File) {
-          const hash = key;
-          const buffer = Buffer.from(await value.arrayBuffer());
-          await getStore().storage.write(`content/${hash}`, buffer);
-          await upsertContentRef(hash);
-        }
+      // Every file is checked before anything is written, so a bad one leaves no partial upload.
+      const files = await verifiedUploads(await c.req.formData());
+      for (const { hash, buffer } of files) {
+        // oxlint-disable-next-line no-await-in-loop -- one write at a time keeps the order stable
+        await getStore().storage.write(contentKey(hash), buffer);
       }
     } else {
       // Single content upload via PUT with hash header
       const hash = c.req.header("x-content-hash") ?? "";
-      if (!hash) throw new HTTPException(400, { message: "Missing X-Content-Hash" });
+      refuseInvalidHash(hash);
       const buffer = Buffer.from(await c.req.arrayBuffer());
-      await getStore().storage.write(`content/${hash}`, buffer);
+      refuseMismatch(hash, buffer);
+      await getStore().storage.write(contentKey(hash), buffer);
     }
     return c.json({ ok: true });
   });
@@ -190,33 +199,11 @@ export function registerBuilds(app: ShelfRouter): void {
     for (const f of files) {
       manifest[f.rel] = f.hash;
     }
+    await recordUses(project.id, build.id, files);
     await getStore().storage.write(
       `${project.id}/builds/${build.id}/storybook/manifest.json`,
       Buffer.from(JSON.stringify(manifest)),
     );
-    // Upsert content_refs for each hash
-    for (const f of files) {
-      try {
-        const contentRefs = getStore().db.tables.contentRefs;
-        const now = new Date().toISOString();
-        const existing = await getStore().db.get(contentRefs, f.hash);
-        // oxlint-disable-next-line unicorn/no-if-else -- upsert is clearer as if/else
-        if (!existing) {
-          await getStore().db.insert(contentRefs, {
-            hash: f.hash,
-            refCount: 1,
-            lastSeenAt: now,
-            createdAt: now,
-          });
-        } else {
-          await getStore().db.update(contentRefs, f.hash, {
-            lastSeenAt: now,
-          });
-        }
-      } catch {
-        // ignore — content_refs may not exist
-      }
-    }
     // The files are stored content-addressed: nothing to extract, so publishing is complete.
     await getStore().publish?.completer.complete(build.id, { ok: true });
     const reqId = c.get("requestId");
@@ -338,7 +325,12 @@ const uploadZipRoute = createRoute({
     },
     422: {
       content: { "text/plain": { schema: z.string() } },
-      description: "The inline zip is invalid, unsafe, or exceeds the extraction limits",
+      description:
+        "The inline zip is invalid, unsafe, or exceeds the extraction limits. The build ends `failed`; upload again to create a new build.",
+    },
+    409: {
+      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      description: "The build already failed (for example a rejected zip); create a new build",
     },
     413: {
       content: {
@@ -355,7 +347,43 @@ const uploadZipRoute = createRoute({
   },
 });
 
-const dedupHashesSchema = z.object({ hashes: z.array(z.string()) });
+/** Answer 400 and log only the reason: the refused value is never logged or echoed. */
+function refuseUpload(reason: string, message: string): never {
+  getStore().logger.warn({ reason }, "content upload refused");
+  throw new HTTPException(400, { message });
+}
+
+/** Answer 400 for a hash that is not a SHA-256 hex digest. */
+function refuseInvalidHash(hash: string): void {
+  if (!isContentHash(hash)) refuseUpload("invalid content hash", "Invalid content hash");
+}
+
+/**
+ * The shared `content/<hash>` blob belongs to no project, so its bytes must be what its name says:
+ * an upload whose SHA-256 differs from its hash is refused, or one project could plant bytes under
+ * a hash another project's manifest names.
+ */
+function refuseMismatch(hash: string, buffer: Buffer): void {
+  const digest = createHash("sha256").update(buffer).digest("hex");
+  if (digest !== hash)
+    refuseUpload("content does not match its hash", "Content does not match its hash");
+}
+
+/** The files of a multipart content upload; each key is a valid hash and names its own bytes. */
+async function verifiedUploads(form: FormData): Promise<{ hash: string; buffer: Buffer }[]> {
+  return await Promise.all(
+    [...form.entries()].map(async ([hash, value]) => {
+      if (!(value instanceof File)) refuseUpload("not a file", "Only files can be uploaded");
+      refuseInvalidHash(hash);
+      const buffer = Buffer.from(await value.arrayBuffer());
+      refuseMismatch(hash, buffer);
+      return { hash, buffer };
+    }),
+  );
+}
+
+const contentHashSchema = z.string().regex(CONTENT_HASH_PATTERN, "Invalid content hash");
+const dedupHashesSchema = z.object({ hashes: z.array(contentHashSchema) });
 const dedupNeededSchema = z.object({ needed: z.array(z.string()) });
 const dedupRoute = createRoute({
   method: "post",
@@ -397,7 +425,7 @@ const contentUploadRoute = createRoute({
   },
 });
 
-const manifestFileSchema = z.object({ rel: z.string(), hash: z.string(), size: z.number() });
+const manifestFileSchema = z.object({ rel: z.string(), hash: contentHashSchema, size: z.number() });
 const manifestRoute = createRoute({
   method: "post",
   tags: ["Builds"],

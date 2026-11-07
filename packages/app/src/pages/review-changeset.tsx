@@ -15,9 +15,6 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 type Kind = "added" | "changed" | "removed";
@@ -34,7 +31,8 @@ export function ChangesetCard(props: { data: ReviewSectionData }): Rendered {
         {baseline
           ? `Compared with the accepted build ${baseline.gitSha.slice(0, 7)} on ${baseline.gitBranch}.`
           : "No accepted build to compare with: every component counts as new."}{" "}
-        A changed component has different stories, not necessarily a different look.
+        A changed component has different story-index metadata (stories added, removed or renamed),
+        not necessarily a different look. Changes to args or source alone do not show here.
       </Meta>
       {total === 0 ? (
         <EmptyState
@@ -59,7 +57,7 @@ function ChangesetTable(props: { data: ReviewSectionData }): Rendered {
         <Badge tone="danger">{changeset.removed.length} removed</Badge>
         <Meta as="span">{changeset.unchanged} unchanged</Meta>
       </HStack>
-      <Table>
+      <Table label="Components changed in this build">
         <table>
           <caption class="visually-hidden">Components that changed in this build</caption>
           <thead>

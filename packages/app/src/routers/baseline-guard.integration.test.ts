@@ -138,9 +138,16 @@ function testLifecycle(db: DatabaseAdapter, beforeWrite?: LifecycleHook): BuildR
       await beforeWrite?.(db);
       return { result: await run(write), generation: generation + 1 };
     },
-    replaceReferences: async (_owner, _ids, write) => await run(write),
-    replaceManyReferences: async (_changes, write) => await run(write),
     claimDeletion: async () => "missing",
+    listDeleting: async () => [],
+    releaseBuildContent: async () => "not-deleting",
+    markStorageDeleted: async () => "not-deleting",
+    completeDeletion: async () => "not-deleting",
+    recordContentUses: async () => [],
+    claimContent: async () => [],
+    holdsContentClaim: async () => false,
+    abandonContentClaim: async () => {},
+    finishContentCollection: async () => {},
   };
 }
 

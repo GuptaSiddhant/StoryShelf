@@ -204,6 +204,8 @@ function keyboardShortcuts(): string {
     }
     document.addEventListener('keydown',function(e){
       if(e.metaKey||e.ctrlKey||e.altKey||typing(e.target)) return;
+      // A focused image pane scrolls with the arrow keys: leave them to it (j and k still step snapshots).
+      if(e.key.indexOf('Arrow')===0&&e.target instanceof Element&&e.target.closest('.stage__pane')) return;
       var stage=document.querySelector('[data-compare-source]:not([hidden]) [data-compare]')||document.querySelector('[data-compare]');
       if(!stage||document.querySelector('dialog[open]')) return;
       if(handleKey(e.key,stage)){ e.preventDefault(); }

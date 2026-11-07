@@ -1,4 +1,5 @@
 import type { RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
+import type { RetentionPause } from "@storyshelf/core/adapter/database";
 import type { ShelfConfig } from "@storyshelf/core/config";
 import type { CredentialProbe } from "@storyshelf/core/models";
 import type { CaptureHostSummary } from "@storyshelf/core/utils";
@@ -18,13 +19,12 @@ import {
   SectionTitle,
   Stat,
   Table,
+  VStack,
 } from "../ui/components.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
+import { RetentionPausedNotice } from "./retention-paused.tsx";
 /** Data for the site-admin System page (adapters, health, safe config). */
 export interface AdminSystemData {
   report: HealthReport;
@@ -48,6 +48,27 @@ export interface AdminSystemData {
   publicOrigin?: PublicOriginView | undefined;
   /** Notifiers are wired but no public origin resolves, so nothing is sent (ADR 0014, decision 11). */
   notificationsPaused?: boolean | undefined;
+  /** The database withheld build retention at boot (a baseline's source build cannot be pinned). */
+  retentionPause?: RetentionPause | undefined;
+}
+
+/** What the deployment has paused and why: notifications (no public URL) and build retention. */
+function PausedNotices(props: {
+  data: AdminSystemData;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { notificationsPaused, retentionPause } = props.data;
+  if (!notificationsPaused && !retentionPause) {
+    return null;
+  }
+  // A stack keeps the alerts apart; the margin keeps the last one off the card below.
+  return (
+    <div class="mb-1">
+      <VStack>
+        <NotificationsPausedNotice paused={notificationsPaused} />
+        <RetentionPausedNotice pause={retentionPause} />
+      </VStack>
+    </div>
+  );
 }
 
 function healthTone(state: string): "success" | "info" | "danger" | "neutral" {
@@ -136,7 +157,7 @@ function AdapterTable(props: AdapterTableProps): HtmlEscapedString | Promise<Htm
     return <EmptyState description="No adapters wired." />;
   }
   return (
-    <Table>
+    <Table label="Adapters">
       <table>
         <thead>
           <tr>
@@ -327,7 +348,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
           </HStack>
         }
       />
-      <NotificationsPausedNotice paused={data.notificationsPaused} />
+      <PausedNotices data={data} />
       {data.testing === false ? (
         <HostingOnlyNotice hiddenSnapshots={data.hiddenSnapshots ?? 0} />
       ) : null}

@@ -3,19 +3,9 @@ import type { Build, Comment, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { csrfField } from "../shell/csrf-field.tsx";
-import {
-  Badge,
-  Button,
-  Card,
-  Meta,
-  SectionTitle,
-  TextareaField,
-  VStack,
-} from "../ui/components.tsx";
+import { Badge, Button, Card, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 import { CommentCard, RequestChangeField } from "./build-diff-comments.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
+import { CommentBodyField } from "./comment-body-field.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Comments on the build as a whole and on its stories, with a form for a build comment. */
@@ -99,15 +89,10 @@ function CommentForm(props: {
       {csrfField()}
       <VStack>
         {storyId ? <input type="hidden" name="storyId" value={storyId} /> : null}
-        <TextareaField
-          label={storyId ? "Add story comment" : "Add build comment"}
-          name="body"
-          id={storyId ? "story-comment-body" : "build-comment-body"}
-          rows={3}
-          required
-          placeholder={
-            storyId ? "Leave a comment on this story…" : "Leave a comment on this build…"
-          }
+        <CommentBodyField
+          slug={project.slug}
+          buildId={build.id}
+          kind={storyId ? "story" : "build"}
         />
         <RequestChangeField id={storyId ? "story-request-change" : "build-request-change"} />
         <div>

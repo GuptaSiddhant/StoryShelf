@@ -4,6 +4,7 @@ import { isTerminalJob, parseAttemptRowId } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { claimNext } from "./claim.ts";
 import { isoAt } from "./clock.ts";
+import { finishJob } from "./single-flight.ts";
 import type { DatabaseJob, QueueRuntime } from "./types.ts";
 
 /** Longest a nack may delay a retry; larger delays are clamped. */
@@ -37,11 +38,13 @@ export async function pollJob(
 /** The attempt succeeded: its row and the job row become `done` (a cancelled job stays cancelled). */
 export async function ackJob(rt: QueueRuntime, job: PollableJob): Promise<void> {
   const ref = attemptRef(job);
-  const now = isoAt(rt);
-  await rt.model.finishAttempt(ref.receipt, "done", now);
-  if ((await rt.model.get(ref.jobId))?.status !== "cancelled") {
-    await rt.model.finishJob(ref.jobId, "done", now);
+  const row = await rt.model.get(ref.jobId);
+  if (row !== null && row.status !== "cancelled") {
+    // The attempt ends with the job, in one commit: a failed end keeps the lease, so it is redelivered.
+    await finishJob(rt, row, "done", null, { id: ref.receipt });
+    return;
   }
+  await rt.model.finishAttempt(ref.receipt, "done", isoAt(rt));
 }
 
 /**
@@ -58,12 +61,39 @@ export async function nackJob(
   if ((await rt.model.get(ref.receipt))?.status !== "running") {
     return;
   }
-  await rt.model.finishAttempt(ref.receipt, "failed", isoAt(rt), options.error ?? null);
   const row = await rt.model.get(ref.jobId);
-  if (row === null || isTerminalJob(row) || row.attempt !== ref.attempt) {
+  const current = isCurrent(row, ref.attempt) ? row : null;
+  if (current !== null && endsForGood(current, options)) {
+    await failForGood(rt, current, ref.receipt, options);
     return;
   }
-  await settleFailure(rt, row, options);
+  await rt.model.finishAttempt(ref.receipt, "failed", isoAt(rt), options.error ?? null);
+  if (current !== null) await settleFailure(rt, current, options);
+}
+
+/** Whether `row` is open and still on `attempt`. */
+function isCurrent(row: CaptureJobRow | null, attempt: number): row is CaptureJobRow {
+  return row !== null && !isTerminalJob(row) && row.attempt === attempt;
+}
+
+/** The job fails for good: its attempt ends in the same commit, so a failed end keeps the lease. */
+async function failForGood(
+  rt: QueueRuntime,
+  row: CaptureJobRow,
+  receipt: string,
+  options: NackOptions,
+): Promise<void> {
+  await finishJob(rt, row, "failed", options.error ?? "failed", {
+    id: receipt,
+    error: options.error ?? null,
+  });
+}
+
+/** Whether a nack ends the job as `failed` (no cancel asked, and no retry left or wanted). */
+function endsForGood(row: CaptureJobRow, options: NackOptions): boolean {
+  return (
+    row.cancelRequestedAt === null && (options.requeue === false || row.attempt >= row.maxAttempts)
+  );
 }
 
 /** Cancelled, final, or retried after `delayMs` (clamped to `[0, MAX_NACK_DELAY_MS]`). */
@@ -79,7 +109,7 @@ async function settleFailure(
     return;
   }
   if (options.requeue === false || row.attempt >= row.maxAttempts) {
-    await rt.model.finishJob(row.jobId, "failed", now, error ?? "failed");
+    await finishJob(rt, row, "failed", error ?? "failed");
     return;
   }
   const delayMs = Math.min(Math.max(options.delayMs ?? 0, 0), MAX_NACK_DELAY_MS);

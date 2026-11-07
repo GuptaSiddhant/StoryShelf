@@ -123,6 +123,53 @@ describe("NotificationChannelModel", () => {
     expect(cleared?.lastErrorAt).toBeNull();
   });
 
+  it("writes nothing for an outcome whose attempt was abandoned", async () => {
+    const { db } = makeDatabase();
+    const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });
+    const controller = new AbortController();
+    controller.abort(new Error("job deadline exceeded"));
+
+    await expect(model(db).recordOutcome(created.id, "boom", controller.signal)).rejects.toThrow(
+      "job deadline exceeded",
+    );
+
+    expect((await model(db).get(created.id))?.lastError).toBeNull();
+  });
+
+  it("writes nothing when the attempt is abandoned while the channel is being looked up", async () => {
+    const { db } = makeDatabase();
+    const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });
+    const controller = new AbortController();
+    const list = db.list.bind(db);
+    db.list = async (...args) => {
+      const rows = await list(...args);
+      controller.abort(new Error("job deadline exceeded"));
+      return rows;
+    };
+
+    await expect(model(db).recordOutcome(created.id, "boom", controller.signal)).rejects.toThrow(
+      "job deadline exceeded",
+    );
+
+    db.list = list;
+    expect((await model(db).get(created.id))?.lastError).toBeNull();
+  });
+
+  it("stamps the last delivery on success and leaves it alone on failure", async () => {
+    const { db } = makeDatabase();
+    const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });
+    expect(created.lastDeliveredAt).toBeNull();
+
+    await model(db).recordOutcome(created.id);
+    const delivered = (await model(db).get(created.id))?.lastDeliveredAt;
+    expect(delivered).toEqual(expect.any(String));
+
+    await model(db).recordOutcome(created.id, "HTTP 502");
+    const failed = await model(db).get(created.id);
+    expect(failed?.lastDeliveredAt).toBe(delivered);
+    expect(failed?.lastError).toBe("HTTP 502");
+  });
+
   it("skips the write when a clean channel reports success", async () => {
     const { db } = makeDatabase();
     const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });

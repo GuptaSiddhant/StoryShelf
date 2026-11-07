@@ -31,7 +31,7 @@ export function renderSettingsTokens(
       <Card>
         <SectionTitle>API tokens</SectionTitle>
         <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
-        <Table>
+        <Table label="API tokens">
           <table>
             <thead>
               <tr>

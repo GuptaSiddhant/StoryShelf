@@ -73,14 +73,23 @@ export function decryptWithKey(
     return { plaintext: decryptWith(current, ciphertext), keyUsed: "current" };
   } catch (error) {
     const previous = typeof input === "object" ? input.previous : undefined;
-    if (!previous) {
-      throw error;
-    }
-    try {
-      return { plaintext: decryptWith(previous, ciphertext), keyUsed: "previous" };
-    } catch {
-      throw error;
-    }
+    return { plaintext: decryptWithPrevious(previous, ciphertext, error), keyUsed: "previous" };
+  }
+}
+
+/** The rotation fallback: the previous key's plaintext, or the current key's `failure` rethrown. */
+function decryptWithPrevious(
+  previous: string | undefined,
+  ciphertext: string,
+  failure: unknown,
+): string {
+  if (!previous) {
+    throw failure;
+  }
+  try {
+    return decryptWith(previous, ciphertext);
+  } catch {
+    throw failure;
   }
 }
 
@@ -101,18 +110,23 @@ export function decryptCredential(input: SecretInput, ciphertext: string): strin
 }
 
 function decryptWith(secret: string, ciphertext: string): string {
+  const { iv, tag, enc } = parsePayload(ciphertext);
+  const decipher = createDecipheriv("aes-256-gcm", deriveKey(secret), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
+}
+
+/** Split `iv:tag:ciphertext` (base64url) into its three buffers. */
+function parsePayload(ciphertext: string): { iv: Buffer; tag: Buffer; enc: Buffer } {
   const [ivB64, tagB64, encB64] = ciphertext.split(":");
   if (!ivB64 || !tagB64 || !encB64) {
     throw new Error("Invalid encrypted payload format");
   }
-  const key = deriveKey(secret);
-  const iv = Buffer.from(ivB64, "base64url");
-  const tag = Buffer.from(tagB64, "base64url");
-  const enc = Buffer.from(encB64, "base64url");
-  const decipher = createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(tag);
-  const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
-  return dec.toString("utf8");
+  return {
+    iv: Buffer.from(ivB64, "base64url"),
+    tag: Buffer.from(tagB64, "base64url"),
+    enc: Buffer.from(encB64, "base64url"),
+  };
 }
 
 /**

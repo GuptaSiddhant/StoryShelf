@@ -7,10 +7,45 @@
 export const COMMENT_CREATED = "comment:created";
 
 /**
+ * Raised once per member a comment mentions (#463), to that member only: a directed notification,
+ * never a webhook, and never delivered to a channel that others read.
+ */
+export const COMMENT_MENTIONED = "comment:mentioned";
+
+/**
  * `review:comment` is a filter alias, never an emitted event: a filter that lists it matches a
  * {@link COMMENT_CREATED} whose scope is `build` or `story`.
  */
 export const REVIEW_COMMENT_ALIAS = "review:comment";
+
+/** One topic a person can subscribe to: its event name and the label a settings page shows. */
+export interface NotificationEvent {
+  event: string;
+  label: string;
+}
+
+/**
+ * Every project event a person can subscribe to, in the order a settings page lists them: the one
+ * list the subscription form renders and compares against, so a new event shows up there without a
+ * second edit. Not here: `review:comment` (a filter alias, never emitted), `comment:mentioned`
+ * (addressed to one member, never a subscription) and the `sys:*` admin events.
+ */
+export const NOTIFICATION_EVENTS: readonly NotificationEvent[] = [
+  { event: "build:created", label: "Build created" },
+  { event: "build:reviewing", label: "Build is ready for review" },
+  { event: "build:approved", label: "Build approved" },
+  { event: "build:rejected", label: "Build rejected" },
+  { event: "build:pending", label: "Build sent back to pending" },
+  { event: "build:failed", label: "Build failed" },
+  { event: "build:cancelled", label: "Build cancelled" },
+  { event: "baseline:created", label: "Baseline created" },
+  { event: "baseline:updated", label: "Baseline updated" },
+  { event: COMMENT_CREATED, label: "Comment posted" },
+  { event: "review:requested", label: "Review requested" },
+  { event: "review:verdict", label: "Review verdict" },
+  { event: "design:changed", label: "Design changed" },
+  { event: "insight:ready", label: "Insight ready" },
+];
 
 /**
  * Whether a subscription list admits an event. An empty list admits everything; otherwise the

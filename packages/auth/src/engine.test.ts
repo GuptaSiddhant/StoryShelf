@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { baseAuthTables } from "./auth-tables.ts";
 import { ENGINE_PROVIDER_ID, createShelfAuth, type ShelfAuth } from "./engine.ts";
 import { githubPreset } from "./presets/index.ts";
@@ -162,6 +162,26 @@ function recordingSender(sent: { to: string; subject: string }[]): {
       metadata,
       send: async (message: { to: string; subject: string }): Promise<void> => {
         sent.push({ to: message.to, subject: message.subject });
+      },
+    },
+  };
+}
+
+/** A sender that keeps the text of each mail, to read the link out of it. */
+function textSender(bodies: { to: string; text: string }[]): {
+  sender: Parameters<typeof createShelfAuth>[0]["emailSender"];
+} {
+  const metadata = {
+    name: "text",
+    version: "0.0.0",
+    kind: "test",
+    category: "notifier" as const,
+  };
+  return {
+    sender: {
+      metadata,
+      send: async (message: { to: string; text?: string }): Promise<void> => {
+        bodies.push({ to: message.to, text: message.text ?? "" });
       },
     },
   };
@@ -647,5 +667,102 @@ describe("auth email sender", () => {
     const reset = await post(shelf, "/request-password-reset", { email: "carol@example.com" });
     expect(reset.status).toBe(200);
     expect(sent).toEqual([{ to: "carol@example.com", subject: "Reset your StoryShelf password" }]);
+  });
+
+  it("builds the invite link from the configured base URL alone, trailing slashes trimmed", async () => {
+    const bodies: { to: string; text: string }[] = [];
+    const { sender } = textSender(bodies);
+    const { shelf } = await testEngine(false, false, false, false, {
+      emailSender: sender,
+      baseURL: "https://shelf.acme.io//",
+    });
+    const issued = await shelf.adapter.issueInvite({
+      email: "ada@example.com",
+      name: "Ada",
+      role: "member",
+    });
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    const link = /https?:\/\/\S+/u.exec(bodies[0]?.text ?? "")?.[0];
+    const url = new URL(link ?? "about:blank");
+    expect(url.origin).toBe("https://shelf.acme.io");
+    expect(url.pathname).toBe(`/auth/invites/${issued.inviteId}`);
+    expect(url.searchParams.get("token")).toBe(issued.token);
+  });
+
+  it("builds the password-reset link on the configured base URL, whatever host the request names", async () => {
+    const bodies: { to: string; text: string }[] = [];
+    const { sender } = textSender(bodies);
+    const { shelf } = await testEngine(false, false, false, false, {
+      emailSender: sender,
+      baseURL: "https://shelf.acme.io",
+    });
+    await inviteUser(shelf, "carol@example.com", "Carol");
+    bodies.length = 0;
+    const reset = await shelf.auth.handler(
+      new Request("http://attacker.example/api/auth/request-password-reset", {
+        method: "POST",
+        headers: { ...json, host: "attacker.example" },
+        body: JSON.stringify({ email: "carol@example.com" }),
+      }),
+    );
+    expect(reset.status).toBeLessThan(500);
+    await vi.waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    const link = /https?:\/\/[^\s]+/u.exec(bodies[0]?.text ?? "")?.[0] ?? "";
+    expect(new URL(link).origin).toBe("https://shelf.acme.io");
+    expect(bodies[0]?.text).not.toContain("attacker.example");
+  });
+});
+
+/** Sign a freshly invited user in against `baseURL` and answer the session cookie's Set-Cookie line. */
+async function signInSetCookie(baseURL: string): Promise<string> {
+  const { shelf } = await testEngine(false, false, false, false, { baseURL });
+  await inviteUser(shelf, "ada@example.com", "Ada");
+  const res = await shelf.auth.handler(
+    new Request(`${baseURL}/api/auth/sign-in/email`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: baseURL },
+      body: JSON.stringify({ email: "ada@example.com", password: "hunter2hunter2" }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  const lines = res.headers.getSetCookie();
+  expect(lines).toHaveLength(1);
+  return lines[0] ?? "";
+}
+
+/** The attributes of a Set-Cookie line, lower-cased and without values, except SameSite's. */
+function attributesOf(line: string): { name: string; flags: string[]; sameSite: string } {
+  const [pair = "", ...rest] = line.split(";").map((part) => part.trim());
+  const flags = rest.map((part) => part.split("=")[0]?.toLowerCase() ?? "").toSorted();
+  const sameSite = rest.find((part) => part.toLowerCase().startsWith("samesite="))?.slice(9) ?? "";
+  return { name: pair.split("=")[0] ?? "", flags, sameSite: sameSite.toLowerCase() };
+}
+
+describe("the session cookie", () => {
+  it("is HttpOnly, SameSite=Lax and Path=/ over http, and not Secure", async () => {
+    const line = await signInSetCookie("http://localhost:3000");
+    const cookie = attributesOf(line);
+    expect(cookie.name).toBe("storyshelf_session");
+    expect(cookie.flags).toEqual(["httponly", "max-age", "path", "samesite"]);
+    expect(cookie.sameSite).toBe("lax");
+    expect(line).toMatch(/Path=\/(?:;|$)/u);
+  });
+
+  it("is also Secure when the public URL is https", async () => {
+    const line = await signInSetCookie("https://shelf.example.com");
+    const cookie = attributesOf(line);
+    expect(cookie.flags).toEqual(["httponly", "max-age", "path", "samesite", "secure"]);
+    expect(cookie.sameSite).toBe("lax");
+    expect(line).toMatch(/Path=\/(?:;|$)/u);
+    // Better Auth prefixes a Secure cookie's name with `__Secure-`; the name is part of the contract.
+    expect(cookie.name).toBe("__Secure-storyshelf_session");
+  });
+
+  it("never sets a Domain, so the cookie stays on the exact host", async () => {
+    expect(await signInSetCookie("https://shelf.example.com")).not.toMatch(/;\s*Domain=/iu);
   });
 });

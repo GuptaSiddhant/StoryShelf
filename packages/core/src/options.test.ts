@@ -3,7 +3,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { ShelfOptions } from "./config.ts";
-import { DEFAULT_SCRATCH_DIR, resolveShelfOptions } from "./options.ts";
+import {
+  DEFAULT_SCRATCH_DIR,
+  resolveShelfOptions,
+  sequentialTransactionsWarning,
+} from "./options.ts";
 
 const runner = { metadata: { kind: "r" } } as unknown as CaptureRunner;
 const base = {
@@ -103,6 +107,12 @@ function lease(leaseSeconds: number): () => void {
   };
 }
 
+function maxJob(maxJobSeconds: number): () => void {
+  return () => {
+    resolveShelfOptions({ ...base, testing: { runner, maxJobSeconds } });
+  };
+}
+
 function concurrent(concurrency: number): () => void {
   return () => {
     resolveShelfOptions({ ...base, testing: { runner, concurrency } });
@@ -155,6 +165,17 @@ describe("resolveShelfOptions testing process options", () => {
     expect(lease(Number.NaN)).toThrow(/leaseSeconds/u);
   });
 
+  it("validates maxJobSeconds as a positive number", () => {
+    expect(maxJob(7200)).not.toThrow();
+    expect(maxJob(0)).toThrow(
+      /testing\.maxJobSeconds must be a positive number of seconds, got 0/u,
+    );
+    expect(maxJob(Number.NaN)).toThrow(/maxJobSeconds/u);
+    // A timer past 2^31 - 1 ms fires after 1 ms in Node: refuse what it cannot hold.
+    expect(maxJob(2_147_483)).not.toThrow();
+    expect(maxJob(2_147_484)).toThrow(/at most 2147483 seconds/u);
+  });
+
   it('requires workerEntry for mode "fork"', () => {
     expect(() => resolveShelfOptions({ ...base, testing: { runner, mode: "fork" } })).toThrow(
       /requires testing\.workerEntry/u,
@@ -167,5 +188,28 @@ describe("resolveShelfOptions testing process options", () => {
         resolveShelfOptions({ ...base, testing: { runner, workerEntry: "/app/w.ts", mode } }),
       ).not.toThrow();
     }
+  });
+});
+
+describe("sequentialTransactionsWarning", () => {
+  const sequential = {
+    ...base,
+    database: { metadata: { name: "Neon HTTP", category: "database", transactions: "sequential" } },
+  } as unknown as ShelfOptions;
+
+  it("warns when testing runs on a database with only sequential transactions", () => {
+    expect(sequentialTransactionsWarning({ ...sequential, testing: { runner } })).toMatch(
+      /Neon HTTP database runs transactions one statement at a time/u,
+    );
+  });
+
+  it("is silent without testing, and for a database with real transactions", () => {
+    expect(sequentialTransactionsWarning(sequential)).toBeUndefined();
+    expect(sequentialTransactionsWarning({ ...base, testing: { runner } })).toBeUndefined();
+    const atomic = {
+      ...base,
+      database: { metadata: { name: "Fake", category: "database", transactions: "atomic" } },
+    } as unknown as ShelfOptions;
+    expect(sequentialTransactionsWarning({ ...atomic, testing: { runner } })).toBeUndefined();
   });
 });

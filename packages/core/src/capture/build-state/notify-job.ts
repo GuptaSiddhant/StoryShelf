@@ -1,15 +1,15 @@
 /**
  * The `notify` job kind (ADR 0014, decision 7; ADR 0006, decision 4): one job per `(channel,
  * build)` state change. The job names a channel and a build, never a status: the handler reads the
- * build when it runs, so a retried or reordered job cannot post a stale state, and a queued job
- * for the same pair already covers a newer request.
+ * build when it runs, so a retried or reordered job cannot post a stale state. The database keeps
+ * at most one non-terminal job per pair (`activeKey`), so a queued job covers a newer request and a
+ * request during a delivery earns one more pass.
  */
-import { CaptureJobModel } from "../../models/capture-job.ts";
+import type { Logger } from "../../logger.ts";
 import { NotificationChannelModel } from "../../models/notification-channel.ts";
 import { sanitizeErrorText } from "../../utils/redact.ts";
 import { isFinalAttempt } from "../consumer/retry.ts";
 import type { ConsumerJob, KindHandler } from "../consumer/types.ts";
-import { decodePayload } from "../db-queue/codec.ts";
 import type { QueueJobInput } from "../db-queue/types.ts";
 import { deliverBuildState } from "./deliver.ts";
 import type { BuildStateDeps } from "./types.ts";
@@ -58,21 +58,34 @@ export function createNotifyHandler(options: NotifyHandlerOptions): KindHandler 
     backoff: NOTIFY_BACKOFF,
     run: async (job, context) => {
       const channelId = channelIdOf(job);
+      context.signal.throwIfAborted();
       try {
-        const result = await deliverBuildState(deps, { buildId: job.buildId, channelId });
-        if (result === "delivered") {
-          await channelModel(deps).recordOutcome(channelId);
-        } else {
-          context.logger.info({ result }, "nothing to deliver");
-        }
+        await deliver(deps, { job, channelId }, context);
       } catch (error) {
-        if (isFinalAttempt(job)) {
-          await surfaceFailure(options, { channelId, buildId: job.buildId, error });
+        // Past its deadline the attempt records nothing: the redelivery, or `exhausted`, settles it.
+        if (!context.signal.aborted && isFinalAttempt(job)) {
+          await surfaceFailure(options, { channelId, buildId: job.buildId, error }, context.signal);
         }
         throw error;
       }
     },
   };
+}
+
+/** One delivery; the signal is checked before the host is told and before the outcome is recorded. */
+async function deliver(
+  deps: BuildStateDeps,
+  what: { job: ConsumerJob; channelId: string },
+  context: { logger: Logger; signal: AbortSignal },
+): Promise<void> {
+  const { job, channelId } = what;
+  const result = await deliverBuildState(deps, { buildId: job.buildId, channelId }, context.signal);
+  context.signal.throwIfAborted();
+  if (result === "delivered") {
+    await channelModel(deps).recordOutcome(channelId, undefined, context.signal);
+  } else {
+    context.logger.info({ result }, "nothing to deliver");
+  }
 }
 
 /**
@@ -91,6 +104,7 @@ export function notifyExhausted(
 async function surfaceFailure(
   options: NotifyHandlerOptions,
   failure: { channelId: string; buildId: string; error: unknown },
+  signal?: AbortSignal,
 ): Promise<void> {
   const { deps } = options;
   const text = sanitizeErrorText(errorText(failure.error), MAX_ERROR_LENGTH);
@@ -99,7 +113,7 @@ async function surfaceFailure(
     "state delivery given up",
   );
   try {
-    await recordAndAlert(options, { ...failure, error: text });
+    await recordAndAlert(options, { ...failure, error: text }, signal);
   } catch (error) {
     deps.logger.warn({ err: error, channelId: failure.channelId }, "failed to record the failure");
   }
@@ -109,13 +123,16 @@ async function surfaceFailure(
 async function recordAndAlert(
   options: NotifyHandlerOptions,
   failure: { channelId: string; buildId: string; error: string },
+  signal?: AbortSignal,
 ): Promise<void> {
   const model = channelModel(options.deps);
   const row = await model.get(failure.channelId);
+  signal?.throwIfAborted();
   if (row === null) {
     return;
   }
-  await model.recordOutcome(row.id, failure.error);
+  await model.recordOutcome(row.id, failure.error, signal);
+  signal?.throwIfAborted();
   await options.onFailed?.({
     channelId: row.id,
     projectId: row.projectId,
@@ -142,31 +159,29 @@ export interface NotifyJobQueue {
   enqueueJob(job: QueueJobInput): Promise<string>;
 }
 
+/** The single-flight key of a delivery: one active `notify` job per channel and build. */
+export function notifyActiveKey(channelId: string, buildId: string): string {
+  return `notify:${channelId}:${buildId}`;
+}
+
 /**
- * Enqueue a `notify` job for a channel and build, unless one is already waiting: it will read the
- * build's state when it runs, so a second would deliver the same thing. A job that is already
- * running may have read an older state, so a new one is queued behind it.
+ * Enqueue a `notify` job for a channel and build. The database keeps at most one non-terminal job
+ * per `(channel, build)` (`activeKey`), so concurrent requests cannot both insert: a request while
+ * a job is queued is covered by it (it reads the build's state when it runs), and one while a job
+ * is running marks it, so a state change during delivery always gets another pass once it ends.
  */
 export function createNotifyEnqueuer(
-  deps: Pick<BuildStateDeps, "db">,
+  // Kept for the callers' signature: the coalescing no longer reads the table from here.
+  _deps: Pick<BuildStateDeps, "db">,
   queue: NotifyJobQueue,
 ): (job: { channelId: string; buildId: string }) => Promise<void> {
   return async ({ channelId, buildId }) => {
-    // Built per call: a host that never enqueues must not touch `capture_jobs`.
-    const rows = await new CaptureJobModel(deps.db).listForBuild(buildId);
-    const waiting = rows.some(
-      (row) =>
-        row.kind === "notify" &&
-        row.status === "queued" &&
-        decodePayload(row.payload).data?.["channelId"] === channelId,
-    );
-    if (!waiting) {
-      await queue.enqueueJob({
-        kind: "notify",
-        buildId,
-        data: { channelId },
-        maxAttempts: NOTIFY_MAX_ATTEMPTS,
-      });
-    }
+    await queue.enqueueJob({
+      kind: "notify",
+      buildId,
+      data: { channelId },
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      activeKey: notifyActiveKey(channelId, buildId),
+    });
   };
 }

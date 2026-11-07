@@ -19,9 +19,6 @@ import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 import { UnstableBadge, UnstableNotice } from "./build-diff-unstable.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Viewer props for the selected snapshot. */
 export interface DiffViewerProps {
   project: Project;

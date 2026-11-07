@@ -50,6 +50,71 @@ export function rateLimitKey(prefix: string): (c: Context) => string {
 const MAX_BUCKETS = 10_000;
 const SWEEP_INTERVAL_MS = 60_000;
 
+function sweepExpired(stores: Map<string, RateLimitEntry>, now: number): void {
+  for (const [key, entry] of stores) {
+    if (now > entry.resetAt) {
+      stores.delete(key);
+    }
+  }
+}
+
+function evictOldest(stores: Map<string, RateLimitEntry>): void {
+  const oldest = stores.keys().next();
+  if (!oldest.done) {
+    stores.delete(oldest.value);
+  }
+}
+
+/** Start a fresh bucket for `key` that resets at `resetAt`, evicting the oldest one at the cap. */
+function openBucket(
+  stores: Map<string, RateLimitEntry>,
+  key: string,
+  resetAt: number,
+): RateLimitEntry {
+  const entry = { count: 0, resetAt };
+  if (stores.size >= MAX_BUCKETS) {
+    evictOldest(stores);
+  }
+  stores.set(key, entry);
+  return entry;
+}
+
+/** A bucket store with its own sweep clock: `bucketFor(key, now, windowMs)` is the live bucket of `key`. */
+function createBucketStore(): (key: string, now: number, windowMs: number) => RateLimitEntry {
+  const stores = new Map<string, RateLimitEntry>();
+  let lastSweep = Date.now();
+
+  // An expired or missing bucket is replaced (evicting the oldest at the cap).
+  return (key, now, windowMs) => {
+    if (now - lastSweep > SWEEP_INTERVAL_MS) {
+      lastSweep = now;
+      sweepExpired(stores, now);
+    }
+    const existing = stores.get(key);
+    if (existing && now <= existing.resetAt) {
+      return existing;
+    }
+    return openBucket(stores, key, now + windowMs);
+  };
+}
+
+/** Count this request and set the headers; the 429 answer when `entry` is over `max`, else undefined. */
+function applyLimit(
+  c: Context,
+  entry: RateLimitEntry,
+  max: number,
+  now: number,
+): Response | undefined {
+  entry.count += 1;
+  if (entry.count > max) {
+    c.header("Retry-After", String(Math.ceil((entry.resetAt - now) / 1000)));
+    return c.json({ error: "Too many requests" }, 429);
+  }
+  c.header("X-RateLimit-Limit", String(max));
+  c.header("X-RateLimit-Remaining", String(Math.max(0, max - entry.count)));
+  return undefined;
+}
+
 /**
  * Create a rate limiter with its own bucket store, so each app instance
  * counts independently. Limiters built from the same `rateLimit` factory that
@@ -57,45 +122,18 @@ const SWEEP_INTERVAL_MS = 60_000;
  * `/api/v1/tokens/*` both bill the caller's `api:` bucket).
  */
 export function createRateLimiter(): (options: RateLimitOptions) => MiddlewareHandler {
-  const stores = new Map<string, RateLimitEntry>();
-  let lastSweep = Date.now();
-
-  const sweep = (now: number): void => {
-    lastSweep = now;
-    for (const [key, entry] of stores) {
-      if (now > entry.resetAt) {
-        stores.delete(key);
-      }
-    }
-  };
+  const bucketFor = createBucketStore();
 
   return (options) => {
     const { windowMs, max, keyGenerator } = options;
     return async (c, next) => {
       const key = keyGenerator ? keyGenerator(c) : rateLimitKey("api")(c);
       const now = Date.now();
-      if (now - lastSweep > SWEEP_INTERVAL_MS) {
-        sweep(now);
+      const limited = applyLimit(c, bucketFor(key, now, windowMs), max, now);
+      if (!limited) {
+        await next();
       }
-      let entry = stores.get(key);
-      if (!entry || now > entry.resetAt) {
-        entry = { count: 0, resetAt: now + windowMs };
-        if (stores.size >= MAX_BUCKETS) {
-          const oldest = stores.keys().next();
-          if (!oldest.done) {
-            stores.delete(oldest.value);
-          }
-        }
-        stores.set(key, entry);
-      }
-      entry.count += 1;
-      if (entry.count > max) {
-        c.header("Retry-After", String(Math.ceil((entry.resetAt - now) / 1000)));
-        return c.json({ error: "Too many requests" }, 429);
-      }
-      c.header("X-RateLimit-Limit", String(max));
-      c.header("X-RateLimit-Remaining", String(Math.max(0, max - entry.count)));
-      return await next();
+      return limited;
     };
   };
 }

@@ -7,9 +7,6 @@ import { css } from "../ui/css.ts";
 import { Dropdown, DropdownDivider, DropdownItem } from "../ui/dropdown.tsx";
 import { Icon } from "../ui/icons/icon.tsx";
 import { csrfField } from "./csrf-field.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Styles for the account widgets that live in the sidebar footer. */
 const accountRoot = css`
   /* account */

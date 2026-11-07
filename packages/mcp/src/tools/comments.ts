@@ -8,8 +8,9 @@ export const listComments: ToolDef = {
   name: "list_comments",
   title: "List comments",
   description:
-    "List review comments on a build: build comments, story comments and per-snapshot threads. A project with review off has none (the call fails with 404).",
+    "List review comments on a build: build comments, story comments and per-snapshot threads. A project with review off has none (the call fails with 'review is off for this project').",
   readOnly: true,
+  routeClass: "review",
   input: { project, buildId },
   run: async (client, args) => await client.get(`${buildPath(client, args)}/comments`),
 };
@@ -18,8 +19,9 @@ export const addComment: ToolDef = {
   name: "add_comment",
   title: "Add comment",
   description:
-    "Add a review comment to a build, optionally on one story or one snapshot (not both) or as a reply. Needs a token with developer role or above. Visible to everyone on the project. There is no tool to approve or reject a build: a verdict is for people. Fails with 404 when the project has review off.",
+    "Add a review comment to a build, optionally on one story or one snapshot (not both) or as a reply. Needs a token with developer role or above. Visible to everyone on the project. There is no tool to approve or reject a build: a verdict is for people. Fails with 'review is off for this project' when the project has review off.",
   readOnly: false,
+  routeClass: "review",
   input: {
     project,
     buildId,
@@ -42,6 +44,7 @@ export const resolveComment: ToolDef = {
   title: "Resolve comment",
   description: "Mark a review comment as resolved. Needs developer role or above.",
   readOnly: false,
+  routeClass: "review",
   input: { project, buildId, commentId: z.string() },
   run: async (client, args) =>
     await client.post(

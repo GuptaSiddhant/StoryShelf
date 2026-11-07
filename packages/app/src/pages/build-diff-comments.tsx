@@ -1,7 +1,10 @@
-import type { Build } from "@storyshelf/core/schema";
+import { CommentModel } from "@storyshelf/core/models";
+import type { Build, CommentMention } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
+import { mentionSpans } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { mentionNamesOf } from "../mentions.ts";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Badge,
@@ -11,7 +14,6 @@ import {
   Meta,
   RelativeTime,
   SectionTitle,
-  TextareaField,
   VStack,
 } from "../ui/components.tsx";
 import {
@@ -19,10 +21,9 @@ import {
   reviewCommentActions,
   reviewCommentBody,
   reviewCommentHead,
+  reviewMention,
 } from "../ui/styles/review.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
+import { CommentBodyField } from "./comment-body-field.tsx";
 /** Snapshot comment thread props. */
 export interface DiffCommentsProps {
   project: Project;
@@ -49,6 +50,36 @@ export interface CommentCardProps {
   names?: ReadonlyMap<string, string>;
 }
 
+/** The body cut at each mention span, the mentions as highlighted names. */
+function highlighted(
+  body: string,
+  mentions: readonly CommentMention[],
+  names: ReadonlyMap<string, string>,
+): unknown[] {
+  const parts: unknown[] = [];
+  let at = 0;
+  for (const span of mentionSpans(body, mentions)) {
+    const name = names.get(span.userId);
+    const label = name === undefined ? body.slice(span.start, span.end) : `@${name}`;
+    parts.push(body.slice(at, span.start), <span class={reviewMention}>{label}</span>);
+    at = span.end;
+  }
+  parts.push(body.slice(at));
+  return parts;
+}
+
+/**
+ * A comment's text, the members it mentions highlighted (#463). The stored mentions are ids, so
+ * the highlight shows each member's current name; text that was plain when posted stays plain.
+ */
+async function CommentText(props: { comment: Comment }): Promise<HtmlEscapedString> {
+  const mentions = CommentModel.mentionsOf(props.comment);
+  if (mentions.length === 0) {
+    return <>{props.comment.body}</>;
+  }
+  return <>{highlighted(props.comment.body, mentions, await mentionNamesOf(mentions))}</>;
+}
+
 /** One comment; a change request carries a status badge and can be resolved and reopened. */
 export function CommentCard(
   props: CommentCardProps,
@@ -69,10 +100,14 @@ export function CommentCard(
           <summary>
             <ResolvedLine comment={comment} names={names} />
           </summary>
-          <p class={reviewCommentBody}>{comment.body}</p>
+          <p class={reviewCommentBody}>
+            <CommentText comment={comment} />
+          </p>
         </details>
       ) : (
-        <p class={reviewCommentBody}>{comment.body}</p>
+        <p class={reviewCommentBody}>
+          <CommentText comment={comment} />
+        </p>
       )}
       {props.canTriage ? <TriageAction {...props} who={who} /> : null}
     </div>
@@ -183,13 +218,7 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
       {csrfField()}
       <VStack>
         <input type="hidden" name="snapshotId" value={selectedId} />
-        <TextareaField
-          label="Add comment"
-          name="body"
-          rows={3}
-          required
-          placeholder="Leave feedback on this snapshot…"
-        />
+        <CommentBodyField slug={project.slug} buildId={build.id} kind="snapshot" />
         <RequestChangeField id="snapshot-request-change" />
         <div>
           <Button variant="primary" type="submit">
