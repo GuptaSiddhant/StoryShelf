@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
+import type { Build } from "../schema/build.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
@@ -193,6 +194,53 @@ describe("BuildModel latestApprovedDefault", () => {
     const feature = await model.create(project.id, { gitSha: "a", gitBranch: "feature/x" });
     await model.update(feature.id, { status: "approved" });
     expect(await model.latestApprovedDefault(project)).toBeNull();
+  });
+});
+
+/** A feature branch with one build per `[sha, status]`, created one day apart in order. */
+async function branchWith(statuses: [string, Build["status"]][]) {
+  const { model, project, db } = await setupApprovedDefault();
+  const builds = await Promise.all(
+    statuses.map(
+      async ([sha]) => await model.create(project.id, { gitSha: sha, gitBranch: "feature/x" }),
+    ),
+  );
+  await Promise.all(
+    builds.map(async (build, index) => {
+      const stamp = `2026-01-0${String(index + 1)}T00:00:00.000Z`;
+      await db.update(db.tables.builds, build.id, { createdAt: stamp });
+      await model.update(build.id, { status: statuses[index]?.[1] ?? "pending" });
+    }),
+  );
+  return { model, project };
+}
+
+describe("BuildModel newestComparableBuild", () => {
+  it("returns the newest approved build, passing over every other status", async () => {
+    const { model, project } = await branchWith([
+      ["a", "approved"],
+      ["b", "rejected"],
+      ["c", "failed"],
+      ["d", "cancelled"],
+      ["e", "reviewing"],
+    ]);
+    expect((await model.newestComparableBuild(project.id, "feature/x", "z"))?.gitSha).toBe("a");
+  });
+
+  it("skips the build's own commit", async () => {
+    const { model, project } = await branchWith([
+      ["a", "approved"],
+      ["b", "approved"],
+    ]);
+    expect((await model.newestComparableBuild(project.id, "feature/x", "b"))?.gitSha).toBe("a");
+  });
+
+  it("is null without an approved build, and ignores other branches", async () => {
+    const { model, project } = await branchWith([["a", "reviewing"]]);
+    expect(await model.newestComparableBuild(project.id, "feature/x", "z")).toBeNull();
+    const other = await model.create(project.id, { gitSha: "m", gitBranch: "main" });
+    await model.update(other.id, { status: "approved" });
+    expect(await model.newestComparableBuild(project.id, "feature/x", "z")).toBeNull();
   });
 });
 

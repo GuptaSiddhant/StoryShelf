@@ -14,6 +14,7 @@ import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { BuildStatus, SnapshotStatus } from "../types.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { mapLimit } from "../utils/map-limit.ts";
 import { diffPath } from "../utils/paths.ts";
 import { storeScreenshot } from "../utils/screenshot-store.ts";
@@ -103,6 +104,8 @@ export async function persistRendered(
         // Each diff is progress: a long, healthy persist phase must not read as a hung job.
         ctx.progress?.();
       } catch (error) {
+        // An abandoned run stops: it is not a failure of this story.
+        if (error instanceof JobAbortedError) throw error;
         // A failure in one story/viewport must not abort the other persists.
         // Flaky and a11y stories remain non-blocking even on persist failure.
         if (flakyIds.has(capture.story.id) || a11yIds.has(capture.story.id)) {
@@ -236,6 +239,7 @@ async function tryPersistInherited(
     await persistInheritedSnapshot(ctx, inherited);
     return null;
   } catch (error) {
+    if (error instanceof JobAbortedError) throw error;
     ctx.logger?.error(
       { storyId: inherited.story.id, viewport: inherited.viewport.name, err: error },
       "inherit failed for story",

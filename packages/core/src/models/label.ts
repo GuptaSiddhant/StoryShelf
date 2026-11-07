@@ -5,6 +5,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { BuildLabel, LabelType } from "../schema/label.ts";
 import { PERSISTENT_LABEL_KEY, RESERVED_LABEL_KEYS, SEEDED_LABEL_KEYS } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
+import { UserFacingError } from "../utils/user-facing-error.ts";
 import { col } from "./columns.ts";
 
 /** Tables required by {@link LabelModel}. */
@@ -75,20 +76,35 @@ export class LabelModel {
     return rows[0] ?? null;
   }
 
-  /** Create a custom label type for a project. */
+  /**
+   * Create a custom label type for a project. A key the project already has is refused with a
+   * {@link UserFacingError}, whether it was seen up front or lost a race: two requests can both pass
+   * the check and the unique index turns the second away, which any dialect reports differently, so a
+   * failed insert counts as the duplicate when the key now exists.
+   */
   async createType(
     projectId: string,
     input: { key: string; name: string; linkTemplate?: string; color?: string },
   ): Promise<LabelType> {
-    return (await this.db.insert(this.tables.labelTypes, {
-      id: ulid(),
-      projectId,
-      key: input.key,
-      name: input.name,
-      linkTemplate: input.linkTemplate,
-      color: input.color,
-      createdAt: new Date().toISOString(),
-    })) as unknown as LabelType;
+    if (await this.getType(projectId, input.key)) {
+      throw duplicateKey(input.key);
+    }
+    try {
+      return (await this.db.insert(this.tables.labelTypes, {
+        id: ulid(),
+        projectId,
+        key: input.key,
+        name: input.name,
+        linkTemplate: input.linkTemplate,
+        color: input.color,
+        createdAt: new Date().toISOString(),
+      })) as unknown as LabelType;
+    } catch (error) {
+      if (await this.getType(projectId, input.key)) {
+        throw duplicateKey(input.key, error);
+      }
+      throw error;
+    }
   }
 
   /** Update a custom label type's name, template or color. */
@@ -98,7 +114,7 @@ export class LabelModel {
     input: { name?: string; linkTemplate?: string | null; color?: string | null },
   ): Promise<LabelType | null> {
     if (key === PERSISTENT_LABEL_KEY || RESERVED_LABEL_KEYS.includes(key as never)) {
-      throw new Error(`Label type '${key}' cannot be updated.`);
+      throw new UserFacingError(`Label type '${key}' cannot be updated.`);
     }
     const existing = await this.getType(projectId, key);
     if (!existing) {
@@ -114,7 +130,7 @@ export class LabelModel {
   /** Remove a custom label type, rejecting reserved or persistent types. */
   async removeType(projectId: string, key: string): Promise<void> {
     if (key === PERSISTENT_LABEL_KEY || RESERVED_LABEL_KEYS.includes(key as never)) {
-      throw new Error(`Label type '${key}' cannot be removed.`);
+      throw new UserFacingError(`Label type '${key}' cannot be removed.`);
     }
     const existing = await this.getType(projectId, key);
     if (existing) {
@@ -202,3 +218,7 @@ const SEEDED_LINK_TEMPLATES: Record<string, string | undefined> = {
   pr: "https://github.com/{repo}/pull/{value}",
   mr: "https://gitlab.com/{repo}/-/merge_requests/{value}",
 };
+
+function duplicateKey(key: string, cause?: unknown): UserFacingError {
+  return new UserFacingError(`A label type with the key '${key}' already exists.`, { cause });
+}

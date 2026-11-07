@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { StateNotifierProvider } from "../../adapters/notifier/provider.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
-import { rig } from "../consumer/test-fixtures.ts";
+import { rig, stubLogger } from "../consumer/test-fixtures.ts";
+import type { ConsumerJob } from "../consumer/types.ts";
 import {
   createNotifyEnqueuer,
   createNotifyHandler,
@@ -25,6 +26,52 @@ async function setup(options: { onFailed?: (failure: NotifyFailure) => Promise<v
 async function lastError(w: World): Promise<string | null | undefined> {
   return (await w.channels.get(w.channelId))?.lastError;
 }
+
+describe("the notify job past its deadline", () => {
+  it("shows nothing and records nothing once its signal is aborted, even on its last attempt", async () => {
+    const onFailed = vi.fn(async () => {});
+    const { w, handler } = await setup({ onFailed });
+    const controller = new AbortController();
+    controller.abort(new Error("job deadline exceeded"));
+    const job = {
+      buildId: w.build.id,
+      attempt: NOTIFY_MAX_ATTEMPTS,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as unknown as ConsumerJob;
+
+    await expect(
+      handler.run(job, { logger: stubLogger().logger, touch: () => {}, signal: controller.signal }),
+    ).rejects.toThrow("job deadline exceeded");
+
+    expect(statusLog(w.git)).toEqual([]);
+    expect(await lastError(w)).toBeNull();
+    expect(onFailed).not.toHaveBeenCalled();
+  });
+
+  it("stops before the host is told when the deadline passes while the state is being read", async () => {
+    const { w, handler } = await setup();
+    const controller = new AbortController();
+    const origin = w.deps.publicOrigin;
+    w.deps.publicOrigin = async () => {
+      const resolved = await origin();
+      controller.abort(new Error("job deadline exceeded"));
+      return resolved;
+    };
+    const job = {
+      buildId: w.build.id,
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as unknown as ConsumerJob;
+
+    await expect(
+      handler.run(job, { logger: stubLogger().logger, touch: () => {}, signal: controller.signal }),
+    ).rejects.toThrow("job deadline exceeded");
+
+    expect(statusLog(w.git)).toEqual([]);
+  });
+});
 
 describe("the notify job", () => {
   it("delivers the build's state as it is when the job runs, not as it was when queued", async () => {

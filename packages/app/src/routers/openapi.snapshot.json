@@ -3959,6 +3959,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The project already has a label type with this key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "x-storyshelf-class": "hosting"
@@ -3989,6 +3999,16 @@
         "responses": {
           "204": {
             "description": "Deleted label type"
+          },
+          "400": {
+            "description": "A reserved label type cannot be removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "404": {
             "description": "Not found",
