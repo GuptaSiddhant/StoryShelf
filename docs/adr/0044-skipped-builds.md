@@ -63,11 +63,13 @@ changedFiles, entryIds, idempotencyKey, labels?, message?, author? }` creates th
      uploads normally only on a definite refusal or when retries run out. Because a lost response
      can still leave a skipped row behind, normal build creation **replaces** any skipped build of
      the same project, branch and commit: it sets that row's `superseded_by_build_id` (ADR 0045's
-     column), and `statusesForBuild` posts nothing for a superseded skipped build. Deliveries are
-     keyed per build, so a skipped build's delivery may already be in flight: it re-reads the
-     replacement immediately before each host write and drops the write if one exists, and the
-     replacing build requests its own state once the replacement commits and again on every later
-     transition, so the real build's newest state is always the last one written.
+     column). From then on `statusesForBuild` gives the replaced skipped build the **replacing
+     build's** statuses, read at delivery time, so the two `(channel, build)` delivery keys write
+     the same current truth whichever runs last. A skipped build's notify job that ends after the
+     replacement (in any outcome) requests the replacing build's state once more, so a stale
+     write that passed its read before the replacement is always followed by a pass of the real
+     state. A stale HTTP call that finishes after a lost lease is the same bounded case ADR 0014
+     decision 7 accepts for one build: the following pass rewrites it.
 5. **What the status says.** `statusesForBuild` (ADR 0014; one new case, no call-site status)
    gives a skipped build the **current** outcome of its source. For an `approved` source the
    `testing` (or `review`) gate is `success` with the description `No story changed since
