@@ -93,6 +93,18 @@ describe("withManualTransactions", () => {
     ).rejects.toThrow("constraint failed");
   });
 
+  it("rolls back and rethrows the error of a failing commit", async () => {
+    const statements: string[] = [];
+    const db = withManualTransactions(stubAdapter([]), (sql) => {
+      statements.push(sql);
+      if (sql === "COMMIT") throw new Error("deferred constraint failed");
+    });
+
+    await expect(transactOf(db)(async () => {})).rejects.toThrow("deferred constraint failed");
+
+    expect(statements).toEqual(["BEGIN", "COMMIT", "ROLLBACK"]);
+  });
+
   it("runs overlapping transactions one at a time", async () => {
     const statements: string[] = [];
     const db = withManualTransactions(stubAdapter([]), (sql) => {
@@ -100,16 +112,18 @@ describe("withManualTransactions", () => {
     });
     const transact = transactOf(db);
     const release = Promise.withResolvers<null>();
+    const started = Promise.withResolvers<null>();
 
     const first = transact(async () => {
       statements.push("first");
+      started.resolve(null);
       await release.promise;
     });
     const second = transact(async () => {
       statements.push("second");
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    // The second body cannot start until the first releases: wait for the first, not for a tick count.
+    await started.promise;
     expect(statements).toEqual(["BEGIN", "first"]);
 
     release.resolve(null);
