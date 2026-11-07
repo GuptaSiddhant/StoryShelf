@@ -78,6 +78,9 @@ jobs:
 
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
+        with:
+          # Pinned (#782): `latest` is nub 0.10, whose `nub ci` fails on the ignored protobufjs build script.
+          nub-version: "0.9.7"
 
       - name: Check npm version for OIDC
         run: node scripts/check-npm-oidc.mjs
@@ -148,6 +151,9 @@ jobs:
 
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
+        with:
+          # Pinned (#782): `latest` is nub 0.10, whose `nub ci` fails on the ignored protobufjs build script.
+          nub-version: "0.9.7"
 
       - name: Check npm version for OIDC
         # Before install: no project-state dependency, fails fast on a bad
