@@ -4,8 +4,10 @@ import { makeDatabase } from "@storyshelf/core/test-helpers";
 import {
   baselines,
   buildComponents,
+  buildLabels,
   builds,
   catalogEntries,
+  labelTypes,
   comments,
   otherProject,
   project,
@@ -48,6 +50,8 @@ async function insertBuilds(db: DatabaseAdapter): Promise<void> {
   await insertAll(db, db.tables.baselines, baselines);
   await insertAll(db, db.tables.buildComponents, buildComponents);
   await insertAll(db, db.tables.comments, comments);
+  await insertAll(db, db.tables.labelTypes, labelTypes);
+  await insertAll(db, db.tables.buildLabels, buildLabels);
 }
 
 /** What every populated build publishes. */

@@ -3,7 +3,9 @@ import type {
   Baseline,
   Build,
   BuildComponent,
+  BuildLabel,
   Comment,
+  LabelType,
   Project,
   Snapshot,
 } from "@storyshelf/core/schema";
@@ -293,3 +295,39 @@ export const buildComponents: BuildComponent[] = [BUILD_MAIN, BUILD_REVIEW].flat
     };
   }),
 );
+
+/** The label types the populated project configures: one links out to a tracker, one does not. */
+export const labelTypes: LabelType[] = [
+  {
+    id: id("LBT001"),
+    projectId: PROJECT_ID,
+    key: "ticket",
+    name: "Ticket",
+    linkTemplate: "https://tracker.example.com/browse/{value}",
+    color: null,
+    createdAt: hoursAgo(300),
+  },
+  {
+    id: id("LBT002"),
+    projectId: PROJECT_ID,
+    key: "release",
+    name: "Release",
+    linkTemplate: null,
+    color: null,
+    createdAt: hoursAgo(300),
+  },
+];
+
+/** Two builds carry the ticket label `DS-42`; the feature build also carries a release. */
+export const buildLabels: BuildLabel[] = [
+  { buildId: BUILD_REVIEW, typeKey: "ticket", value: "DS-42", n: 1 },
+  { buildId: BUILD_REJECTED, typeKey: "ticket", value: "DS-42", n: 2 },
+  { buildId: BUILD_REVIEW, typeKey: "release", value: "2026.1", n: 3 },
+].map(({ buildId, typeKey, value, n }) => ({
+  id: id(`LBL00${n}`),
+  projectId: PROJECT_ID,
+  buildId,
+  typeKey,
+  value,
+  createdAt: hoursAgo(10),
+}));
