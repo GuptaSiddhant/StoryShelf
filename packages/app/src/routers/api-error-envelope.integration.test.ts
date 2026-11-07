@@ -1,6 +1,6 @@
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 
@@ -53,6 +53,13 @@ const SAMPLES: Sample[] = [
   },
 ];
 
+/** Every app a test booted: each is torn down after the test, also when an assertion failed. */
+const booted: ReturnType<typeof createShelfApp>[] = [];
+
+afterEach(async () => {
+  await Promise.all(booted.splice(0).map(async (app) => await app.lifecycle.teardown()));
+});
+
 function boot() {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -62,6 +69,7 @@ function boot() {
     logger: pino({ level: "silent" }) as never,
     testing: { runner: stubRunner() },
   });
+  booted.push(app);
   const call = async (method: string, path: string, body?: unknown): Promise<Response> =>
     await app.request(path, {
       method,

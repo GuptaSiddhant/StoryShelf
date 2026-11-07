@@ -4,7 +4,9 @@ import {
   apiErrorText,
   createClient,
   normalizeBaseUrl,
+  postForm,
   postFormWithProgress,
+  postJson,
   RequestError,
 } from "./client.ts";
 
@@ -205,6 +207,38 @@ describe("server url forms", () => {
     });
     expect(cancel).toHaveBeenCalled();
   });
+});
+
+describe("failed posts show the server's message", () => {
+  const envelope = () =>
+    Response.json({ error: { message: "Project not found" } }, { status: 404 });
+  const plain = () => new Response("Project not found", { status: 404 });
+  const posts: [string, () => Promise<unknown>][] = [
+    ["postJson", async () => await postJson("https://shelf.test/x", { a: 1 })],
+    ["postForm", async () => await postForm("https://shelf.test/x", new FormData())],
+    [
+      "postFormWithProgress",
+      async () => await postFormWithProgress("https://shelf.test/x", new FormData()),
+    ],
+  ];
+
+  for (const [name, post] of posts) {
+    it(`${name}: a JSON envelope from a current server`, async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation(async () => envelope()),
+      );
+      await expect(post()).rejects.toThrow("Request failed (404): Project not found");
+    });
+
+    it(`${name}: the plain text of an older server`, async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation(async () => plain()),
+      );
+      await expect(post()).rejects.toThrow("Request failed (404): Project not found");
+    });
+  }
 });
 
 describe("apiErrorText", () => {
