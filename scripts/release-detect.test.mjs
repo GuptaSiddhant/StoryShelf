@@ -18,7 +18,9 @@ describe("chooseChannel", () => {
       channel: "stable",
     });
   });
+});
 
+describe("chooseChannel for next", () => {
   it("never publishes next on a push, even with changesets pending", () => {
     assert.deepEqual(chooseChannel({ ...push, pending: 1 }), { channel: "none" });
   });
@@ -57,7 +59,9 @@ describe("chooseChannel", () => {
       channel: "none",
     });
   });
+});
 
+describe("chooseChannel for a stable re-run", () => {
   it("re-runs the stable path for the version on main, tag or not", () => {
     const rerun = { ...push, event: "workflow_dispatch", requested: "0.9.0" };
     assert.deepEqual(chooseChannel(rerun), { channel: "stable" });

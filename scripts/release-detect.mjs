@@ -72,7 +72,7 @@ function dispatchChannel({ version, pending, requested, requestedChannel }) {
  * @returns {string | undefined} The short sha, or undefined when the version is not a snapshot.
  */
 export function nextShaOf(nextVersion) {
-  return /-next-([0-9a-f]{7,40})$/u.exec(nextVersion.trim())?.[1];
+  return /-next-(?<sha>[0-9a-f]{7,40})$/u.exec(nextVersion.trim())?.groups?.["sha"];
 }
 
 /**
