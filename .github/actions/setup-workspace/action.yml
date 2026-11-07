@@ -6,6 +6,9 @@ runs:
   steps:
     - name: Setup Nub
       uses: nubjs/setup-nub@v0
+      with:
+        # Pinned (#782): `latest` is nub 0.10, whose `nub ci` fails on the ignored protobufjs build script.
+        nub-version: "0.9.7"
 
     - name: Setup pnpm
       # Fixtures are independent pnpm installs, not nub workspaces.
