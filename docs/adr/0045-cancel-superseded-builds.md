@@ -35,22 +35,34 @@ Two traps decide the design:
    - When creating a build (or a skipped build, ADR 0044), the CLI first asks for the branch's
      in-flight builds: `GET /api/v1/projects/:slug/builds/in-flight?branch=`, which answers
      `{ id, sha }[]` for builds in `CANCELLABLE_BUILD_STATUSES`.
-   - For each one, the CLI checks local history. The build is **superseded** when its commit is an
+   - For each one, the CLI checks local history. A build of the **same commit** as `HEAD` is always
+     kept (`--is-ancestor` also succeeds for equal commits, and both builds post to the same
+     `(sha, context)` status). Otherwise the build is **superseded** when its commit is a strict
      ancestor of `HEAD` (`git merge-base --is-ancestor`, a normal push). It is also superseded when
-     its commit is missing from a clone that is not shallow (`git rev-parse --is-shallow-repository`
-     is false), because then it was force-pushed away.
-   - It is **kept** when its commit is a descendant of `HEAD` (a re-run of an old commit), or when
-     the clone is shallow and the commit is missing (unknown).
+     its commit is missing locally **and** `HEAD` is the branch's current tip on the remote
+     (`git ls-remote origin refs/heads/<branch>` answers `HEAD`), because then nothing newer exists
+     and the commit was force-pushed away. A clone that predates a newer push fails that check.
+   - It is **kept** in every other case: a descendant of `HEAD` (a re-run of an old commit), a
+     missing commit when the remote tip is not `HEAD` or cannot be read, or any git error.
    - The CLI sends the superseded ids as `supersedes: string[]` on build creation. It always sends
      them; the server ignores them when the setting is off.
-3. **The server checks each id before cancelling.** It must be in the same project and branch, in a
-   cancellable status at that moment, and created before the new build. Anything else is ignored,
-   never an error. Valid builds are cancelled through the existing path (`announceBuildStatus(id,
-"cancelled")`, the queue's `cancel(buildId)`), after the new build row exists. A failure to
-   cancel never fails the upload.
+3. **The server checks each id before cancelling.** It must be in the same project and branch, of a
+   different commit, in a cancellable status at that moment, and created before the new build.
+   Anything else is ignored, never an error. The ids are stored with the new build and acted on
+   only once the replacement is **viable**: its upload is accepted and published (the
+   `PublishCompleter.complete` success path), or, for a skipped build (ADR 0044), at creation. An
+   upload that never completes cancels nothing. A failure to cancel never fails the upload.
+   **Fenced against completion.** `BuildModel.supersede` moves the status with one conditional
+   write (`cancelled` only where the status is still cancellable, setting `superseded_by_build_id`
+   in the same statement); when it changes no row, the build finished first and is left alone.
+   Only after a row changed does it call the queue's `cancel(buildId)` and
+   `announceBuildStatus(id, "cancelled")`, the existing path, so a build cannot reach `reviewing`
+   and still be cancelled.
 4. **Only builds still working are cancelled.** A build in `reviewing` or later has snapshots,
    comments or verdicts that people may be using. It is never cancelled this way, whatever the
-   setting.
+   setting. The same holds for any build that is already published and waiting for verdicts with
+   testing off (still `pending`, ADR 0006), and for any build with a comment or a verdict: status
+   alone is not enough, so `supersede` checks publishing and `build_reviews`/comments too.
 5. **A superseded build records why.** The new column `builds.superseded_by_build_id` is nullable
    text, set in the same write that cancels. The build stays `cancelled`; there is no new status, so
    every rule about `cancelled` (ADR 0006, AGENTS.md) holds unchanged.
@@ -67,15 +79,17 @@ Two traps decide the design:
 
 ## Schema
 
-`projects.cancel_superseded` (boolean, not null, default `true`) and `builds.superseded_by_build_id`
-(nullable text), in every dialect's DDL, Drizzle schema and migration, plus the core row types (ADR
+`projects.cancel_superseded` (boolean, not null, default `true`), `builds.superseded_by_build_id`
+(nullable text) and `builds.supersedes` (nullable JSON text: the ids proposed at creation, acted on
+when the build becomes viable), in every dialect's DDL, Drizzle schema and migration, plus the core row types (ADR
 0041 is still proposed).
 
 ## Consequences
 
 - Fast pushes and force pushes cost one capture, not one per commit.
 - A shallow CI clone (the default `actions/checkout` depth) cancels nothing, because the CLI cannot
-  tell a force-pushed commit from history it did not fetch. Affected capture already asks for
+  tell a force-pushed commit from history it did not fetch. A force push is detected only by a job
+  that builds the branch's current tip. Affected capture already asks for
   history, and the docs say to fetch it.
 - The git-history check trusts the CLI, as affected capture and ADR 0044 already do. The server's
   checks in decision 3 keep a wrong list from touching another branch, a finished build or a newer

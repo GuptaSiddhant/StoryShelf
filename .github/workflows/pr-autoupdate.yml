@@ -55,9 +55,20 @@ jobs:
                 const { data: checks } = await github.rest.checks.listForRef({
                   owner, repo, ref: pr.head.sha, per_page: 100,
                 });
-                if (checks.check_runs.some((run) => run.conclusion === "failure")) {
-                  // A red PR needs its developer; don't let it hold the queue.
-                  core.info(`#${pr.number} is up to date but failing; skipping it.`);
+                // Only the newest run of each check counts: a re-run replaces a cancelled one.
+                const latest = new Map();
+                for (const run of checks.check_runs) {
+                  const seen = latest.get(run.name);
+                  if (!seen || run.id > seen.id) latest.set(run.name, run);
+                }
+                const passing = new Set(["success", "skipped", "neutral"]);
+                const blocked = [...latest.values()].some(
+                  (run) => run.status === "completed" && !passing.has(run.conclusion),
+                );
+                if (blocked) {
+                  // Failed, cancelled, timed out or waiting on an action: it needs its developer,
+                  // so don't let it hold the queue.
+                  core.info(`#${pr.number} is up to date but not passing; skipping it.`);
                   continue;
                 }
                 core.info(`#${pr.number} is up to date; waiting for its checks before updating another.`);

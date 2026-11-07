@@ -32,6 +32,9 @@ build creation.
    CLI asks the server for a skip source (decision 3) **before** creating a build, computes the
    affected set against the source's commit locally (the same `computeAffected` as today), and
    only when the result is an empty list, with no full-capture reason, asks for a skipped build.
+   An empty affected set says nothing about removed stories, so the request also carries the new
+   index's entry ids; the server refuses (`409`) unless they equal the source build's catalog
+   (`catalogOf`), so an added, renamed or deleted story always uploads.
    In every other case, including any error, it uploads normally. Skipping is an optimisation that
    may always be refused; it never fails an upload.
 3. **Which build may be skipped from.** The candidate is what affected capture already compares
@@ -42,16 +45,26 @@ build creation.
    not eligible: skipping from it would turn an open or failing check green without anyone looking.
    The first build on a branch has no candidate and is a normal build. Testing must be on (ADR
    0006); a hosting-only server never skips, because "no story changed" says nothing about the rest
-   of a published Storybook.
+   of a published Storybook. A project with `run_tests` on never skips either: every normal build
+   runs its Storybook tests, and a failing test is a blocking failure, so skipping would hide one.
 4. **Two endpoints, class `testing`** (classified in `api-routes.ts`, marked in OpenAPI, 404
    without `options.testing`):
    - `GET /api/v1/projects/:slug/builds/skip-source?branch=&sha=` answers
      `{ sourceBuildId, sha } | null`. It is a hint only.
    - `POST /api/v1/projects/:slug/builds/skipped` with `{ gitSha, gitBranch, sourceBuildId,
-changedFiles, message?, author? }` creates the skipped build. The server re-checks
-     eligibility in the same transaction as the insert, so a source whose verdict moved after the
-     hint answers `409` and the CLI uploads normally. It records `changedFiles` (bounded like the
-     affected post) so the build page can show what was compared.
+changedFiles, entryIds, idempotencyKey, labels?, message?, author? }` creates the skipped
+     build. The server re-checks eligibility in the same transaction as the insert, so a source
+     whose verdict moved after the hint answers `409` and the CLI uploads normally. It records
+     `changedFiles` (bounded like the affected post) so the build page can show what was compared.
+     `labels` are validated and attached exactly as on normal build creation, so `--label`
+     (including `persistent`) is never lost.
+   - **Ambiguous outcomes.** The CLI generates `idempotencyKey` once per run; a repeated key returns
+     the build it already created. After a network failure the CLI retries with the same key, and
+     uploads normally only on a definite refusal or when retries run out. Because a lost response
+     can still leave a skipped row behind, normal build creation **replaces** any skipped build of
+     the same project, branch and commit: it sets that row's `superseded_by_build_id` (ADR 0045's
+     column), and `statusesForBuild` posts nothing for a superseded skipped build, so a stale
+     queued notification cannot overwrite the real build's check.
 5. **What the status says.** `statusesForBuild` (ADR 0014; one new case, no call-site status)
    gives a skipped build the **current** outcome of its source. For an `approved` source the
    `testing` (or `review`) gate is `success` with the description `No story changed since
@@ -68,15 +81,24 @@ changedFiles, message?, author? }` creates the skipped build. The server re-chec
    never becomes a baseline source and never changes a baseline. The same-commit shortcut
    (`hasApprovedBuildForSha`) does not count a skipped build as an approved one.
 8. **Retention (ADR 0039).** A skipped build holds no storage, so it adds no build reference.
-   Deleting a source deletes the builds skipped from it in the same pass; they mean nothing without
-   it. This lands after the resumable deletion of #374.
-9. **UI.** The builds list hides skipped builds by default, with a "Show skipped" filter; the
-   branch and pull-request views show the newest build for a commit, skipped or not. A skipped
-   build's page shows the source build, the changed files, and no snapshot tabs.
+   Its source is **pinned**: retention resolves every skipped build it keeps (such as the latest
+   build on a branch) to its source and keeps that source, inside the fenced
+   `buildReferenceLifecycle` check, so a kept skipped build never loses its source. Deleting a
+   source that nothing keeps deletes the builds skipped from it in the same pass. This lands after
+   the resumable deletion of #374.
+9. **Reads resolve through the source.** A skipped build has no catalog or Storybook of its own.
+   `catalogOf`, the library's "latest build of the branch", and the skipped build's own Storybook
+   and preview URLs resolve to the source build (same project, so the caller's access to the
+   skipped build is the check). A build's own URLs therefore always answer; once the source is
+   unavailable they answer as an unavailable build does.
+10. **UI.** The builds list hides skipped builds by default, with a "Show skipped" filter; the
+    branch and pull-request views show the newest build for a commit, skipped or not. A skipped
+    build's page shows the source build, the changed files, and no snapshot tabs.
 
 ## Schema
 
-`builds.skipped_from_build_id` (nullable text, indexed), in every dialect's DDL, Drizzle schema and
+`builds.skipped_from_build_id` (nullable text, indexed) and `builds.idempotency_key` (nullable
+text, unique per project), plus `builds.superseded_by_build_id` from ADR 0045, in every dialect's DDL, Drizzle schema and
 migration, plus the core row type (ADR 0041 is still proposed). `status` is free text in every
 dialect, so the new value needs no constraint change.
 
@@ -102,9 +124,9 @@ dialect, so the new value needs no constraint change.
 
 1. Core: #548: The status, the column, `BuildModel` creation and lookup, every status consumer, and the
    status mapping (decisions 1, 5, 7).
-2. App: #549: The two endpoints, eligibility in one transaction, and follow-the-source state requests
-   (decisions 3, 4, 6).
+2. App: #549: The two endpoints, eligibility in one transaction, follow-the-source state requests, and
+   source resolution for reads (decisions 3, 4, 6, 9).
 3. CLI: #550: `--skip-unchanged` / `skipUnchanged` (decision 2), plus the website docs.
-4. UI: #551: Badge, hidden-by-default filter, skipped build page (decision 9; Designer spec first).
+4. UI: #551: Badge, hidden-by-default filter, skipped build page (decision 10; Designer spec first).
 5. Retention: #552: Cascade to skipped builds (decision 8), after #374.
 6. Demo: #553: `app-storybook.yml` passes `--skip-unchanged` once 1 to 3 ship in a release.
