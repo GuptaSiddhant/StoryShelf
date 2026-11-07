@@ -87,10 +87,11 @@ when the build becomes viable), in every dialect's DDL, Drizzle schema and migra
 ## Consequences
 
 - Fast pushes and force pushes cost one capture, not one per commit.
-- A shallow CI clone (the default `actions/checkout` depth) cancels nothing, because the CLI cannot
-  tell a force-pushed commit from history it did not fetch. A force push is detected only by a job
-  that builds the branch's current tip. Affected capture already asks for
-  history, and the docs say to fetch it.
+- A missing commit is judged only by the remote-tip check, never by clone depth: when `HEAD` is the
+  branch's current tip, every other commit built on the branch is either older history or
+  force-pushed away, so a shallow clone (the default `actions/checkout` depth) cancels correctly
+  too. A job building anything but the current tip cancels only strict ancestors it can see, so a
+  force push is detected only by the job for the new tip.
 - The git-history check trusts the CLI, as affected capture and ADR 0044 already do. The server's
   checks in decision 3 keep a wrong list from touching another branch, a finished build or a newer
   build.

@@ -301,9 +301,10 @@ The weekly usage quota is shared, so agents work in short, fresh sessions and ta
   don't push to the PR without telling the architect on the PR first.
 - **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
   Label those PRs `skip-review`, so CodeRabbit skips them.
-- **Schedules.** There is one scheduled run a day: the architect's triage. It answers
+- **Schedules.** Agents have one scheduled run a day: the architect's triage. It answers
   `architect` items, enables auto-merge, starts sessions for ready issues, archives finished
-  ones, and posts one digest comment on issue #370. Nothing else runs on a clock.
+  ones, and posts one digest comment on issue #370. No other agent session runs on a clock (CI's own
+  nightly workflows are unaffected).
 
 <!-- BEGIN:turborepo-agent-rules -->
 
