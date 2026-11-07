@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (architect, 2026-11-04; asked for by the owner, on by default). Amends ADR 0004 (affected
+Accepted (owner, 2026-11-07; proposed by the architect, 2026-11-04; on by default). Amends ADR 0004 (affected
 capture), ADR 0006 (cancellation) and ADR 0014 (git state). Implementation is split into issues
 listed under "Delivery". Depends on #757.
 
