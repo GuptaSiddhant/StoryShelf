@@ -109,6 +109,33 @@ describe("releaseBuildContent", () => {
     expect(await count("build_deletions", buildId)).toBe(0);
   });
 
+  it("rolls every write back when a later statement of the step fails", async () => {
+    const { projectId, buildId, hashes } = await seedBuild(true);
+    // The step ends by stamping its progress record: make that statement fail, after the release
+    // records, the use updates and the progress record itself have been written.
+    await client.exec(`
+      CREATE OR REPLACE FUNCTION fail_progress_update() RETURNS trigger AS $$
+      BEGIN RAISE EXCEPTION 'progress update refused'; END; $$ LANGUAGE plpgsql;
+      CREATE TRIGGER fail_progress_update BEFORE UPDATE ON build_deletions
+        FOR EACH ROW EXECUTE FUNCTION fail_progress_update();
+    `);
+    try {
+      // Drizzle reports the failing statement; the trigger's message is its cause.
+      await expect(releaseBuildContent(db, projectId, buildId, hashes)).rejects.toThrow(
+        /Failed query: UPDATE build_deletions/u,
+      );
+    } finally {
+      await client.exec("DROP TRIGGER fail_progress_update ON build_deletions");
+    }
+
+    expect(await count("build_content_releases", buildId)).toBe(0);
+    expect(await count("build_deletions", buildId)).toBe(0);
+    expect(await unreleasedUses(buildId)).toBe(3);
+    // Nothing was half done: the same call now succeeds from the start.
+    expect(await releaseBuildContent(db, projectId, buildId, hashes)).toBe("done");
+    expect(await count("build_content_releases", buildId)).toBe(3);
+  });
+
   it("records an empty manifest and still releases the uses", async () => {
     const { projectId, buildId } = await seedBuild(true);
 
