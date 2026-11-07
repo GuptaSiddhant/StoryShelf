@@ -209,10 +209,10 @@ describe("server url forms", () => {
   });
 });
 
+const envelope = () => Response.json({ error: { message: "Project not found" } }, { status: 404 });
+const plain = () => new Response("Project not found", { status: 404 });
+
 describe("failed posts show the server's message", () => {
-  const envelope = () =>
-    Response.json({ error: { message: "Project not found" } }, { status: 404 });
-  const plain = () => new Response("Project not found", { status: 404 });
   const posts: [string, () => Promise<unknown>][] = [
     ["postJson", async () => await postJson("https://shelf.test/x", { a: 1 })],
     ["postForm", async () => await postForm("https://shelf.test/x", new FormData())],
