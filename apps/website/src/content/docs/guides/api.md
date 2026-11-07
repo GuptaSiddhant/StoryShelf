@@ -169,7 +169,7 @@ The built-in `persistent` and `branch` label types are seeded and read-only — 
 - `404` — unknown project, build, snapshot, or comment
 - `202` — build accepted, capture queued (not done yet)
 
-Every error body is `{ "error": { "message": string } }`. Requests that an HTMX page makes (it sends `HX-Request: true`) keep the plain answers they always had, so the app's own pages are not affected. The one exception is the readiness probe, `GET /api/v1/health` (and `POST` for the full report): it answers its report, `{ "status", "adapters" }`, with `503` when degraded, because that is a status report, not an error.
+Every error body is `{ "error": { "message": string } }`. Requests that an HTMX page makes (it sends `HX-Request: true`) keep the plain answers they always had, so the app's own pages are not affected. The one exception is the readiness probe, `POST /api/v1/health` (site admins only): it answers its report, `{ "status", "adapters" }`, with `503` when degraded, because that is a status report, not an error.
 
 ## OpenAPI in your own tools
 
