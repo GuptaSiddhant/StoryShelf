@@ -163,13 +163,13 @@ The built-in `persistent` and `branch` label types are seeded and read-only — 
 
 ## Errors and status codes
 
-- `400` — request body failed Zod validation (fields in the response `message`)
+- `400` — request body failed Zod validation (fields in the response `error.message`)
 - `401` — missing or invalid bearer token
 - `403` — authenticated but the project role is insufficient
 - `404` — unknown project, build, snapshot, or comment
 - `202` — build accepted, capture queued (not done yet)
 
-Every error body is `{ "message": string }`.
+Every error body is `{ "error": { "message": string } }`. Requests that an HTMX page makes (it sends `HX-Request: true`) keep the plain answers they always had, so the app's own pages are not affected.
 
 ## OpenAPI in your own tools
 
