@@ -1,16 +1,34 @@
 name: Fly Deploy
 
-# Every push to main: deploys the workspace version of the demo
+# A push to main that touches the image or the demo data deploys the workspace version of the demo
 # (apps/fly-app, local adapters). Manual via workflow_dispatch.
 on:
   push:
     branches:
       - main
+    # Only what can change the image or the demo data: a docs, website, CI-only or ADR merge
+    # deploys nothing.
+    paths:
+      - "packages/**"
+      - "apps/fly-app/**"
+      - "fixtures/storybook-9/**"
+      - "package.json"
+      - "nub.lock"
+      - "nub.jsonc"
+      - "turbo.json"
+      - "tsconfig.json"
+      - "config/**"
+      - ".github/actions/**"
+      - ".github/workflows/fly.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Newest wins: while a deploy runs, at most one more waits, and a newer push replaces the waiting
+# one, so a burst of merges deploys the running commit and then only the latest. A running
+# deploy is never cancelled: stopping `flyctl deploy` mid-rollout can leave machines on
+# different versions.
 concurrency:
   group: fly
   cancel-in-progress: false
@@ -18,6 +36,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -67,6 +86,7 @@ jobs:
   seed:
     needs: deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       # Forks and fresh setups have no secret: skip the seeding instead of failing the run.
       - name: Check admin token

@@ -58,7 +58,8 @@ npx -y playwright@1.63.0 install chromium   # one-time browser install
 # Puppeteer: set PUPPETEER_EXECUTABLE_PATH to a Chrome binary
 ```
 
-CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs, `--force` on `main`) →
+CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs; full on `main`, cached unless a
+hash-wide file changed; forced nightly) →
 `scripts/smoke.sh` → built-artifact smoke, plus fixture/browser matrix jobs. Reproduce locally
 rather than pushing and waiting.
 

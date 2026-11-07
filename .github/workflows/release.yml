@@ -6,7 +6,7 @@ name: Release
 # - stable: a push to `main` whose shared version has no `v<version>` tag yet, which is what merging a
 #   release pull request (`nub run release:prepare`) produces. Validate, publish `latest` to npm,
 #   create tag `v<version>`, create the GitHub Release.
-# - next: any other push to `main` while changesets are pending. A throwaway `x.y.z-next-<sha>`
+# - next: any other push to `main` that touches a package or a changeset, while changesets are pending. A throwaway `x.y.z-next-<sha>`
 #   build of every package goes to npm under the `next` dist-tag; the version is never committed.
 # - none: nothing to publish.
 #
@@ -15,6 +15,18 @@ name: Release
 on:
   push:
     branches: [main]
+    # A push that touches no package, changeset or release tooling publishes nothing new (the
+    # `next` build would repeat the last one), so it starts no run. A release PR changes package
+    # manifests and `.changeset/`, so the stable path still runs.
+    paths:
+      - "packages/**"
+      - ".changeset/**"
+      - "package.json"
+      - "nub.lock"
+      - "scripts/release*.mjs"
+      - "scripts/version-packages.mjs"
+      - "scripts/changeset-lib.mjs"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
     inputs:
       version:
