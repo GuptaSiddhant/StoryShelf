@@ -53,6 +53,13 @@ what happened.
 3. **A refusal is a normal outcome, not an error.** Callers already handle "the build moved on"
    for `cancelled`. They handle every refusal the same way: the newer state stands. A refusal that
    indicates a bug (a move no writer should attempt) fails its test, not production.
+   **A derived status is also fenced on its inputs.** A status computed from other rows (a review
+   verdict's `approved`/`rejected`, from the newest `build_reviews` rows) is written with a fence on
+   the newest input it read (the newest verdict row id), not only on the from-state, because
+   `approved ↔ rejected` is an allowed move and the from-state fence alone lets a delayed approval
+   overwrite a later rejection. On refusal the writer recomputes from the current inputs and tries
+   again; it never keeps its stale result. The pair test gains this interleaving: an approval
+   computed before a rejection, written after it, leaves the build `rejected` (ADR 0013).
 4. **Lifecycles covered.**
    - **Build status:** first, before #548.
    - **Capture job and attempt status** (`queued`, `running`, `exhausting`, `done`, `failed`,
