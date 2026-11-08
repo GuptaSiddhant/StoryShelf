@@ -149,6 +149,22 @@ function baselineInsert(row: {
   };
 }
 
+/**
+ * Resolve once some backend is waiting on a lock, as seen from the observer connection. The
+ * blocked party is the only thing that can be waiting here, so this replaces a sleep: the flag
+ * is asserted only after the database says the wait has begun.
+ */
+async function untilLockWait(observer: ReturnType<typeof postgres>): Promise<void> {
+  for (;;) {
+    // oxlint-disable-next-line no-await-in-loop -- poll until the wait shows
+    const waiting = await observer`SELECT 1 FROM pg_stat_activity
+      WHERE datname = current_database() AND wait_event_type = 'Lock'`;
+    if (waiting.length > 0) return;
+    // oxlint-disable-next-line no-await-in-loop -- a short pause between polls
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 let pglite: Promise<{ client: PGlite; adapter: DatabaseAdapter }> | undefined;
 
 async function sharedPglite(): Promise<{ client: PGlite; adapter: DatabaseAdapter }> {
@@ -259,7 +275,7 @@ describe.skipIf(!LIVE)("real Postgres, one connection per party", () => {
       () => "won",
       (error: unknown) => (error as Error).constructor.name,
     );
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await untilLockWait(clients[2]);
     expect(finished).toBe(false);
 
     held.resolve();
@@ -289,7 +305,7 @@ describe.skipIf(!LIVE)("real Postgres, one connection per party", () => {
       prepared = true;
       return result;
     });
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await untilLockWait(clients[2]);
     expect(prepared).toBe(false);
 
     held.resolve();
