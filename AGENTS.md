@@ -296,10 +296,12 @@ The weekly usage quota is shared, so agents work in short, fresh sessions and ta
   anyone. Never send acknowledgements, "FYI" notes or progress reports.
 - **The owner talks to the architect** for priorities and decisions, or comments on a PR or issue.
   A comment on a PR wakes the session that owns it.
-- **Merging is native.** After review, the architect enables GitHub auto-merge on a PR.
-  `pr-autoupdate.yml` brings the oldest queued PR up to date with `main`, one at a time, and
-  GitHub merges it when `ci` passes and every conversation is resolved. Once auto-merge is on,
-  don't push to the PR without telling the architect on the PR first.
+- **Merging is native.** `auto-merge.yml` turns on GitHub auto-merge when a PR from a branch of
+  this repository opens or leaves draft (not forks, not `release/v*`). `pr-autoupdate.yml` brings
+  the oldest queued PR up to date with `main`, one at a time, and GitHub merges it when `ci` and
+  `changeset` pass and every conversation is resolved. So open a PR as a **draft** until it is
+  verified and complete, and answer every review thread: an unresolved thread is what holds a
+  green PR back.
 - **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
   Label those PRs `skip-review`, so CodeRabbit skips them.
 - **Schedules.** Agents have two scheduled runs a day, 12 hours apart: the architect's triage. It
