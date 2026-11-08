@@ -14,7 +14,7 @@ import {
   filmstripList,
   statusDots,
 } from "../ui/styles/review-layout.ts";
-import { a11yCarrierOf, a11yFindingsOf } from "./a11y-violations.tsx";
+import { a11yBaselineShaOf, a11yCarrierOf, a11yFindingsOf } from "./a11y-violations.tsx";
 import {
   diffPercent,
   groupSnapshots,
@@ -24,9 +24,6 @@ import {
   snapshotPageUrl,
   type SnapshotGroup,
 } from "./build-diff-model.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /**
  * The list filters purely in CSS off `data-filter`, so it works before the
  * review script runs. The selected snapshot always stays visible.
@@ -96,13 +93,20 @@ function FilmItem(props: {
           <span class={statusDots[statusTone(snap.status)]} aria-hidden="true" />
           {snap.status}
           {percent ? ` · ${percent}` : ""}
-          {a11yCount > 0
-            ? ` · a11y ${a11yCount}${carrier.browser ? ` (${carrier.browser})` : ""}`
-            : ""}
+          {a11yCount > 0 ? ` · a11y ${a11yCount} ${a11yOrigin(carrier)}` : ""}
         </span>
       </span>
     </a>
   );
+}
+
+/** Where a filmstrip item's findings were measured: "(chromium)", or "(baseline abc1234)" when inherited. */
+function a11yOrigin(carrier: Pick<Snapshot, "a11yViolations" | "browser">): string {
+  const sha = a11yBaselineShaOf(carrier);
+  if (sha !== undefined) {
+    return `(baseline ${sha})`;
+  }
+  return carrier.browser ? `(${carrier.browser})` : "";
 }
 
 /** Left filmstrip: filter chips plus a thumbnail per story/mode (browsers share one entry). */

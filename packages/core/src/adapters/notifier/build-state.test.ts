@@ -180,6 +180,57 @@ describe("statusesForBuild: storybook", () => {
   });
 });
 
+describe("statusesForBuild: no status waits forever (every build status x publishing result x gate)", () => {
+  const STATUSES = [
+    "pending",
+    "capturing",
+    "comparing",
+    "reviewing",
+    "approved",
+    "rejected",
+    "failed",
+    "cancelled",
+  ];
+  const PUBLISHING: PublishingState[] = ["pending", "success", "failure", "unavailable"];
+  const FLAGS: Partial<BuildStateFlags>[] = [
+    { testing: true, review: false },
+    { testing: false, review: true },
+    { testing: false, review: false },
+  ];
+
+  it.each(
+    STATUSES.flatMap((status) =>
+      PUBLISHING.flatMap((publishing) =>
+        FLAGS.map((flags) => [status, publishing, flags] as const),
+      ),
+    ),
+  )("%s, publishing %s, %o", (status, publishing, flags) => {
+    const storybook = run({ build: { status }, publishing, flags }).statuses.at(-1);
+
+    // The Storybook status only waits while publishing waits; every other result is final.
+    expect(storybook?.state === "pending").toBe(publishing === "pending");
+    if (publishing === "unavailable") {
+      expect(storybook).toMatchObject({
+        state: "failure",
+        informational: true,
+        description: "Storybook content unavailable, see build page",
+        url: "https://shelf.example.com/projects/web/builds/b1",
+      });
+    }
+  });
+
+  it("shows a capture that failed after a successful publish as the failure, not pending", () => {
+    const set = run({ build: { status: "failed" }, publishing: "success" });
+    expect(gate(set)).toMatchObject({ state: "failure", description: "Capture failed" });
+    expect(set.statuses.at(-1)).toMatchObject({ state: "success" });
+  });
+
+  it("does not link the Storybook from the comment while its content is unavailable", () => {
+    const set = run({ build: { status: "approved" }, publishing: "unavailable" });
+    expect(set.comment?.markdown).not.toContain("/storybook/build/");
+  });
+});
+
 const contexts = (prefix: string) => run({ prefix }).statuses.map((status) => status.context);
 
 describe("statusesForBuild: names and links", () => {
@@ -278,6 +329,31 @@ describe("statusesForBuild: progress and annotations", () => {
       },
     ]);
     expect(gate(set)?.omitted).toBeUndefined();
+  });
+
+  it.each(["a b&c=d#e", "100%", "ünï/日本", "x?y=1", "../up"])(
+    "links a snapshot id %s as one query value, so the link opens that snapshot",
+    (id) => {
+      const status = gate(run({ build: { status: "reviewing" }, changes: [change(1, { id })] }));
+      const url = status?.annotations?.[0]?.url ?? "";
+      const parsed = new URL(url);
+      expect(parsed.pathname).toBe("/projects/web/builds/b1/diff");
+      expect(parsed.searchParams.get("snapshot")).toBe(id);
+      expect(parsed.hash).toBe("");
+      expect(status?.annotations?.[0]?.message).toContain(url);
+    },
+  );
+
+  it("keeps a path prefix of the public origin in the build and snapshot links", () => {
+    const set = run({
+      base: "https://shelf.example.com/shelf/",
+      build: { status: "reviewing" },
+      changes: [change(1)],
+    });
+    expect(gate(set)?.url).toBe("https://shelf.example.com/shelf/projects/web/builds/b1");
+    expect(gate(set)?.annotations?.[0]?.url).toBe(
+      "https://shelf.example.com/shelf/projects/web/builds/b1/diff?snapshot=S1",
+    );
   });
 
   it("caps the annotations and counts the rest", () => {

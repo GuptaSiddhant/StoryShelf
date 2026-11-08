@@ -2,6 +2,7 @@ import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   DesignCredentialModel,
   DesignNodeModel,
+  MemberModel,
   NotificationSubscriptionModel,
 } from "@storyshelf/core/models";
 import type { DesignNode } from "@storyshelf/core/schema";
@@ -39,6 +40,7 @@ function recorder(kind: string, sent: unknown[]): NotifierProvider {
     version: "0.0.0",
     kind,
     category: "notifier" as const,
+    audience: (kind === "email" ? "person" : "room") as "person" | "room",
     schema: {} as never,
   };
   return {
@@ -68,6 +70,11 @@ async function setup(publicBaseUrl: string | null = "https://shelf.example.com")
           authProvider: "local",
           disabled: false,
         } as never),
+    ),
+  );
+  await Promise.all(
+    ["subscriber", "bystander"].map(
+      async (id) => await new MemberModel(db).set("p1", id, "developer"),
     ),
   );
   await new NotificationSubscriptionModel(db).upsert("p1", "subscriber", {

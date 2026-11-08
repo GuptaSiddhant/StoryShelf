@@ -1,9 +1,9 @@
 # Architecture Decision Records
 
-One ADR per concern, each stating the current decisions. `docs/architecture.md` remains the spec for
+One ADR per concern, each stating the current decisions. `docs/architecture/` remains the spec for
 entities and interfaces; ADRs record the decisions and the reasons. Keep an ADR a decision record:
 target 250 lines, hard cap 320 (enforced by `nub run docs:check`). Move interface and implementation
-detail to `docs/architecture.md`.
+detail to `docs/architecture/`.
 
 ## Numbering and references
 
@@ -45,5 +45,7 @@ Each current ADR below lists the archived ones it supersedes.
 | 0041 | Single Source of Truth for the Database Schema (proposed)                    | —                                  |
 | 0042 | Read-Only Storybook Addon (proposed)                                         | —                                  |
 | 0043 | Release Channels                                                             | —                                  |
+| 0044 | Skipped Builds for Commits That Change No Story (accepted)                   | — (amends 0004, 0014)              |
+| 0045 | Cancel Superseded Builds on a Branch (accepted)                              | — (amends 0004, 0006, 0014)        |
 
 Implementation work is tracked in GitHub issues; the ordered pickup list is issue #370.

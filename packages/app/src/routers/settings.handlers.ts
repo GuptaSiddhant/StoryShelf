@@ -20,7 +20,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { AuthUser } from "@storyshelf/core/types";
-import type { SecretInput } from "@storyshelf/core/utils";
+import { sanitizeErrorText, type SecretInput } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { credentialKeys } from "../credential-keys.ts";
 import { notificationsPaused } from "../notifications-pause.ts";
@@ -152,8 +152,9 @@ async function loadNotificationChannels(
     hasSecret: row.secretEncrypted !== null,
     events: NotificationChannelModel.eventsOf(row),
     enabled: row.enabled,
-    lastError: row.lastError,
+    lastError: row.lastError === null ? null : sanitizeErrorText(row.lastError, 500),
     lastErrorAt: row.lastErrorAt,
+    lastDeliveredAt: row.lastDeliveredAt,
   }));
 }
 
@@ -174,6 +175,7 @@ async function loadMySubscription(
     events: NotificationSubscriptionModel.eventsOf(row),
     via: NotificationSubscriptionModel.viaOf(row),
     enabled: row.enabled,
+    reviewRequests: row.reviewRequests,
   };
 }
 

@@ -24,7 +24,7 @@ Rationale: tsdown targets distributable ESM libraries (dts, per-entry outputs); 
 
 ## Export mechanism (not `tsdown-entry`)
 
-There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ source: ./src/..., default: ./dist/... }` (plus `publishConfig.exports` rewritten to dist-only on publish). `nub.jsonc → conditions: ["source"]` and `tsconfig.base.json → customConditions: ["source"]` resolve workspace imports to `.ts`/`.tsx` source in dev, editor, and `tsc`.
+There is no `tsdown-entry` key. Each library `package.json` `exports` map carries `{ source: ./src/..., default: ./dist/... }`, plus a dist-only `publishConfig.exports`. The release publishes with `npm publish`, which does not apply `publishConfig.exports`, so the published manifest still carries the `source` conditions (#393). `storyshelf` (cli) and `@storyshelf/mcp` have plain `dist` exports and no `source` condition. `nub.jsonc → conditions: ["source"]` and `tsconfig.base.json → customConditions: ["source"]` resolve workspace imports to `.ts`/`.tsx` source in dev, editor, and `tsc`.
 
 ## Public import surface
 
@@ -76,7 +76,10 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   document in a frame. It is a dev dependency only: `files` and `exports` are unchanged, nothing
   story-related is published, and `turbo verify` builds it (`build-storybook`).
 - UI primitives live in `ui/` by family (`buttons`, `feedback`, `forms`, `layout`)
-  behind the `ui/components.tsx` facade — import from the facade.
+  behind the `ui/components.tsx` facade — import from the facade. `ui/` is presentational (no
+  store, routers, middleware, pages or core models; `consistency.test.ts` enforces it). The
+  app-coupled chrome lives in `shell/`: `DocumentLayout`, `csrfField`, the sidebar and top bar,
+  and the boot and client scripts.
 
 ## Test placement
 
@@ -96,4 +99,4 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 | `config/tsdown.ts`                    | `libConfig` / `cliConfig`                                                                                                                                                                                                                                   |
 | `.github/workflows/app-storybook.yml` | Dogfood: builds `packages/app`'s Storybook and uploads it to the demo project `storyshelf-ui` with the published CLI, like a customer (`packages/app/.storybook/storyshelf.json` holds url, slug, `untraced`); separate from `ci.yml` and the Fly demo seed |
 | `.oxlintrc.json`                      | Rule-based lint (no per-file path exemptions)                                                                                                                                                                                                               |
-| `scripts/`                            | Repository automation and tooling (`release.mjs`, `release-detect.mjs`, `version-packages.mjs`, `changeset-check.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`)                                                                                          |
+| `scripts/`                            | Repository automation and tooling (`release.mjs`, `release-detect.mjs`, `version-packages.mjs`, `changeset-add.mjs`, `changeset-check.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`)                                                                     |

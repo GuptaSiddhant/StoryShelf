@@ -1,9 +1,17 @@
 /** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
-import { publishingOf, type Catalog } from "@storyshelf/core/capture";
-import { changesetOf, CommentModel, UserModel, type BuildChangeset } from "@storyshelf/core/models";
+import { publishingOf, publishingOfBuild, type Catalog } from "@storyshelf/core/capture";
+import {
+  changesetOf,
+  CommentModel,
+  SnapshotModel,
+  UserModel,
+  type BuildChangeset,
+} from "@storyshelf/core/models";
 import type { Build, Comment, Project } from "@storyshelf/core/schema";
+import { assignedReviewersOf, type AssignedReviewer } from "../review-assignment.ts";
 import { getStore } from "../store.ts";
 import { reviewStateOf, type ReviewState } from "./build-reviews.handlers.ts";
+import { isBuildAuthor } from "./comment-triage.ts";
 import { currentProjectRole } from "./helpers.ts";
 
 /** What the viewer may do in review. */
@@ -27,10 +35,18 @@ export interface ReviewSectionData extends ReviewCapabilities {
   comments: Comment[];
   /** Display names of the users behind verdicts and comments, by user id. */
   names: ReadonlyMap<string, string>;
+  /** Members the project's component owners assign to this build (#465); empty when none match. */
+  assigned: AssignedReviewer[];
+  /** Change requests of the build, on the build, a story or a snapshot (ADR 0013), newest first. */
+  changeRequests: Comment[];
+  /** Label of each snapshot a change request is anchored to ("Button / Primary"), by snapshot id. */
+  snapshotLabels: ReadonlyMap<string, string>;
+  /** Whether the viewer may resolve and reopen comments: developers and above, and the build's author. */
+  canTriage: boolean;
   /** Whether the snapshot rollup decides the build, so the verdict is a sign-off only. */
   testing: boolean;
   /** Whether the build's Storybook is published; a verdict waits for `success` (ADR 0013). */
-  publishing: Awaited<ReturnType<typeof publishingOf>>;
+  publishing: Awaited<ReturnType<typeof publishingOfBuild>>;
 }
 
 /** Whether review is on for the project (a row without the column counts as on). */
@@ -67,7 +83,15 @@ export async function loadReviewSection(
     reviewCapabilities(project),
     publishingOrPending(build),
   ]);
+  // A default-branch build is never put up for review, so nobody is assigned to it.
+  const assigned =
+    build.gitBranch === project.gitDefaultBranch
+      ? []
+      : await assignedReviewersOf(db, project, build, changeset.changeset).catch(() => []);
   const shown = comments.filter((comment) => comment.snapshotId === null);
+  const changeRequests = comments
+    .filter((comment) => comment.kind === "change_request")
+    .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
   return {
     project,
     build,
@@ -75,19 +99,40 @@ export async function loadReviewSection(
     changeset,
     firstStory: firstStoryOf(catalog),
     comments: shown,
-    names: await namesOf([...state.latest, ...shown].map((item) => item.userId)),
+    names: await namesOf([
+      ...state.latest.map((review) => review.userId),
+      ...assigned.map((reviewer) => reviewer.userId),
+      ...[...shown, ...changeRequests].flatMap((item) => [item.userId, item.resolvedBy]),
+    ]),
+    assigned,
+    changeRequests,
+    snapshotLabels: await snapshotLabelsOf(changeRequests),
+    canTriage: capabilities.canComment || isBuildAuthor(build),
     testing,
     publishing,
     ...capabilities,
   };
 }
 
+/** "Title / Name" of the snapshots change requests are anchored to. */
+async function snapshotLabelsOf(requests: readonly Comment[]): Promise<Map<string, string>> {
+  const model = new SnapshotModel(getStore().db);
+  const ids = [...new Set(requests.flatMap((item) => (item.snapshotId ? [item.snapshotId] : [])))];
+  const found = await Promise.all(ids.map(async (id) => await model.get(id)));
+  return new Map(
+    found.flatMap((snapshot) =>
+      snapshot ? [[snapshot.id, `${snapshot.storyTitle} / ${snapshot.storyName}`] as const] : [],
+    ),
+  );
+}
+
 /** How publishing stands; a storage probe that fails reads as the storage-independent state. */
 async function publishingOrPending(build: Build): Promise<ReviewSectionData["publishing"]> {
   try {
-    return await publishingOf(getStore().storage, build);
+    return await publishingOfBuild({ db: getStore().db, storage: getStore().storage }, build);
   } catch {
-    return await publishingOf(undefined, build);
+    // The storage-independent reading: no storage to probe and no job lookup to repeat.
+    return await publishingOf(undefined, build, { publishJobOpen: true });
   }
 }
 
@@ -114,6 +159,9 @@ function firstStoryOf(catalog: Catalog | null): Map<string, string> {
 export interface ComponentReview {
   comments: Comment[];
   canComment: boolean;
+  /** Whether the viewer may resolve and reopen comments. */
+  canTriage: boolean;
+  names: ReadonlyMap<string, string>;
 }
 
 /** Story comments of `build` for a component page; null when the project has review off. */
@@ -128,8 +176,11 @@ export async function loadComponentReview(
     new CommentModel(getStore().db).listByBuild(build.id),
     reviewCapabilities(project),
   ]);
+  const shown = comments.filter((comment) => comment.storyId !== null);
   return {
-    comments: comments.filter((comment) => comment.storyId !== null),
+    comments: shown,
     canComment: capabilities.canComment,
+    canTriage: capabilities.canComment || isBuildAuthor(build),
+    names: await namesOf(shown.flatMap((item) => [item.userId, item.resolvedBy])),
   };
 }

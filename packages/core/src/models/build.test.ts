@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
+import type { Build } from "../schema/build.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
@@ -196,6 +197,53 @@ describe("BuildModel latestApprovedDefault", () => {
   });
 });
 
+/** A feature branch with one build per `[sha, status]`, created one day apart in order. */
+async function branchWith(statuses: [string, Build["status"]][]) {
+  const { model, project, db } = await setupApprovedDefault();
+  const builds = await Promise.all(
+    statuses.map(
+      async ([sha]) => await model.create(project.id, { gitSha: sha, gitBranch: "feature/x" }),
+    ),
+  );
+  await Promise.all(
+    builds.map(async (build, index) => {
+      const stamp = `2026-01-0${String(index + 1)}T00:00:00.000Z`;
+      await db.update(db.tables.builds, build.id, { createdAt: stamp });
+      await model.update(build.id, { status: statuses[index]?.[1] ?? "pending" });
+    }),
+  );
+  return { model, project };
+}
+
+describe("BuildModel newestComparableBuild", () => {
+  it("returns the newest approved build, passing over every other status", async () => {
+    const { model, project } = await branchWith([
+      ["a", "approved"],
+      ["b", "rejected"],
+      ["c", "failed"],
+      ["d", "cancelled"],
+      ["e", "reviewing"],
+    ]);
+    expect((await model.newestComparableBuild(project.id, "feature/x", "z"))?.gitSha).toBe("a");
+  });
+
+  it("skips the build's own commit", async () => {
+    const { model, project } = await branchWith([
+      ["a", "approved"],
+      ["b", "approved"],
+    ]);
+    expect((await model.newestComparableBuild(project.id, "feature/x", "b"))?.gitSha).toBe("a");
+  });
+
+  it("is null without an approved build, and ignores other branches", async () => {
+    const { model, project } = await branchWith([["a", "reviewing"]]);
+    expect(await model.newestComparableBuild(project.id, "feature/x", "z")).toBeNull();
+    const other = await model.create(project.id, { gitSha: "m", gitBranch: "main" });
+    await model.update(other.id, { status: "approved" });
+    expect(await model.newestComparableBuild(project.id, "feature/x", "z")).toBeNull();
+  });
+});
+
 async function cancelled() {
   const { db } = makeDatabase();
   const model = new BuildModel(db, buildTables(db));
@@ -270,10 +318,143 @@ describe("BuildModel: a cancelled build is terminal", () => {
     });
     const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
 
-    await model.stampCaptureJob(id, "J1");
+    await model.stampCaptureJob(id, "J1", 0);
     expect((await model.get(id))?.captureJobId).toBe("J1");
     await model.resetStatus(id, "pending");
     expect((await model.get(id))?.captureJobId).toBeNull();
+  });
+
+  it("advances the run generation on reset and refuses a stamp from an older one", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    expect((await model.get(id))?.captureGeneration).toBe(0);
+
+    await model.resetStatus(id, "pending");
+    expect((await model.get(id))?.captureGeneration).toBe(1);
+    expect(await model.stampCaptureJob(id, "OLD", 0)).toEqual({ result: "stale" });
+    expect((await model.get(id))?.captureJobId ?? null).toBeNull();
+    expect(await model.stampCaptureJob(id, "NEW", 1)).toEqual({ result: "stamped", generation: 2 });
+    expect((await model.get(id))?.captureJobId).toBe("NEW");
+    expect(await model.stampCaptureJob("missing", "J", 0)).toEqual({ result: "ignored" });
+  });
+
+  it("retries a reset that lost the generation race to another reset", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const model = new BuildModel(db, buildTables(db));
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    // Another reset lands between this one's read and its write, once.
+    const rival = new BuildModel(db, buildTables(db));
+    const racing = Object.create(db) as typeof db;
+    let raced = false;
+    racing.updateWhere = async (table, rowId, values, where) => {
+      if (!raced) {
+        raced = true;
+        await rival.resetStatus(rowId, "pending");
+      }
+      return await db.updateWhere(table, rowId, values, where);
+    };
+    const reset = await new BuildModel(racing, buildTables(db)).resetStatus(id, "pending");
+
+    expect(reset.captureGeneration).toBe(2);
+    expect((await model.get(id))?.captureGeneration).toBe(2);
+  });
+
+  it("gives up after repeatedly losing the generation race", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await new BuildModel(db, buildTables(db)).create(project.id, {
+      gitSha: "abc",
+      gitBranch: "main",
+    });
+    const rival = new BuildModel(db, buildTables(db));
+    const racing = Object.create(db) as typeof db;
+    racing.updateWhere = async (table, rowId, values, where) => {
+      await rival.resetStatus(rowId, "pending");
+      return await db.updateWhere(table, rowId, values, where);
+    };
+
+    await expect(
+      new BuildModel(racing, buildTables(db)).resetStatus(id, "pending"),
+    ).rejects.toThrow("lost the race");
+  });
+
+  for (const verdict of ["approved", "rejected"] as const) {
+    it(`starts the next review cycle when a reset reopens a ${verdict} build`, async () => {
+      const { db } = makeDatabase();
+      const model = new BuildModel(db, buildTables(db));
+      const project = await new ProjectModel(db, projectTables(db)).create({
+        name: "Test",
+        gitRepository: "owner/repo",
+      });
+      const { id } = await model.create(project.id, { gitSha: verdict, gitBranch: "main" });
+      await model.update(id, { status: verdict });
+      const before = await model.get(id);
+
+      const reset = await model.resetStatus(id, "pending");
+
+      expect(reset.status).toBe("pending");
+      expect(reset.reviewCycle).toBe((before?.reviewCycle ?? 0) + 1);
+      expect(reset.captureGeneration).toBe((before?.captureGeneration ?? 0) + 1);
+      expect(reset.captureJobId ?? null).toBeNull();
+    });
+  }
+
+  it("leaves the review cycle alone when a reset reopens a build with no verdict", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await model.update(id, { status: "failed" });
+    const before = await model.get(id);
+
+    const reset = await model.resetStatus(id, "pending");
+
+    expect(reset.reviewCycle).toBe(before?.reviewCycle);
+    expect(reset.captureGeneration).toBe((before?.captureGeneration ?? 0) + 1);
+  });
+
+  it("reopens the review cycle of a verdict that lands between a reset's read and its write", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await model.update(id, { status: "failed" });
+    const before = await model.get(id);
+    // The verdict is written once, right before the reset's first write.
+    const racing = Object.create(db) as typeof db;
+    let verdictLanded = false;
+    racing.updateWhere = async (table, rowId, values, where) => {
+      if (!verdictLanded) {
+        verdictLanded = true;
+        await model.update(rowId, { status: "approved" });
+      }
+      return await db.updateWhere(table, rowId, values, where);
+    };
+
+    const reset = await new BuildModel(racing, buildTables(db)).resetStatus(id, "pending");
+
+    expect(verdictLanded).toBe(true);
+    expect(reset.status).toBe("pending");
+    expect(reset.reviewCycle).toBe((before?.reviewCycle ?? 0) + 1);
+    expect(reset.captureGeneration).toBe((before?.captureGeneration ?? 0) + 1);
   });
 
   it("does not stamp a cancelled build", async () => {
@@ -286,9 +467,32 @@ describe("BuildModel: a cancelled build is terminal", () => {
     const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
     await model.setStatus(id, "cancelled");
 
-    await model.stampCaptureJob(id, "J1");
+    await model.stampCaptureJob(id, "J1", 0);
 
     expect((await model.get(id))?.captureJobId ?? null).toBeNull();
+  });
+
+  it("sets a status only at the run generation it was read at, and never on a cancelled build", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await model.setStatus(id, "capturing");
+
+    await model.resetStatus(id, "pending");
+    const old = await model.setStatusAtGeneration(id, "approved", 0);
+    expect(old.applied).toBe(false);
+    expect((await model.get(id))?.status).toBe("pending");
+
+    expect((await model.setStatusAtGeneration(id, "approved", 1)).applied).toBe(true);
+    expect((await model.get(id))?.status).toBe("approved");
+
+    await model.setStatus(id, "cancelled");
+    expect((await model.setStatusAtGeneration(id, "approved", 1)).applied).toBe(false);
+    expect((await model.get(id))?.status).toBe("cancelled");
   });
 
   it("fails a build only for the job that owns it", async () => {
@@ -299,7 +503,7 @@ describe("BuildModel: a cancelled build is terminal", () => {
       gitRepository: "owner/repo",
     });
     const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
-    await model.stampCaptureJob(id, "J2");
+    await model.stampCaptureJob(id, "J2", 0);
 
     const stale = await model.failIfOwnedBy(id, "J1");
     expect(stale.applied).toBe(false);
@@ -319,7 +523,7 @@ describe("BuildModel: a cancelled build is terminal", () => {
     });
     const plain = new BuildModel(db, buildTables(db));
     const { id } = await plain.create(project.id, { gitSha: "abc", gitBranch: "main" });
-    await plain.stampCaptureJob(id, "J2");
+    await plain.stampCaptureJob(id, "J2", 0);
     // J2 failed the build in the same millisecond J1 stamped its write: the refused update of
     // J1 returns J2's row, whose updatedAt equals J1's stamp.
     const sameInstant: DatabaseAdapter = {
@@ -337,6 +541,41 @@ describe("BuildModel: a cancelled build is terminal", () => {
     expect(stale.applied).toBe(false);
     expect(stale.build?.captureJobId).toBe("J2");
   });
+
+  it("fails a build only while it is pending, and says whether its own write applied", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const model = new BuildModel(db, buildTables(db));
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+
+    const first = await model.failIfPending(id);
+    expect(first.applied).toBe(true);
+    expect(first.build?.status).toBe("failed");
+    // Already failed: a second call changes nothing and does not claim the write.
+    expect((await model.failIfPending(id)).applied).toBe(false);
+  });
+
+  it.each(["cancelled", "approved", "capturing"] as const)(
+    "leaves a %s build as it is when failIfPending finds it past pending",
+    async (status) => {
+      const { db } = makeDatabase();
+      const project = await new ProjectModel(db, projectTables(db)).create({
+        name: "Test",
+        gitRepository: "owner/repo",
+      });
+      const model = new BuildModel(db, buildTables(db));
+      const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+      await model.resetStatus(id, status);
+
+      const refused = await model.failIfPending(id);
+
+      expect(refused.applied).toBe(false);
+      expect(refused.build?.status).toBe(status);
+    },
+  );
 
   it("is left only by resetStatus (retry)", async () => {
     const { model, id } = await cancelled();

@@ -2,13 +2,14 @@
 
 ## Status
 
-Accepted. Implementation is partial. This ADR amends ADR 0009 decision 4 (Retention and purge) for
+Accepted. SQLite activated (#536); Postgres and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
 deployments with `testing`; hosting-only retention is unchanged.
 
 Merged: source-build provenance (#345), frozen comparison references and fail-closed testing purge
-(#354), SQLite lifecycle primitives (#382) and fenced baseline writers (#389). Open: preparation of
-legacy references (#397), sealing unfenced methods (#372), resumable deletion and SQLite activation
-(#374), Postgres and MySQL capability (#375, #376) and investigations (#377 to #381).
+(#354), SQLite lifecycle primitives (#382), fenced baseline writers (#389), preparation of legacy
+references (#397), sealing of the capability to fenced mutations (#372) and resumable deletion with
+exactly-once content release (#374), per-build content uses (#564) and SQLite activation (#536).
+Open: Postgres and MySQL capability (#375, #376) and investigations (#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -49,6 +50,47 @@ by preset, so it cannot by itself carry this guarantee.
   lease may expire; the tombstone does not. Build ids and storage prefixes are never reused.
 - Shared asset reference decrements are durable and exactly-once; an unrecorded decrement is never
   retried blindly. Content GC accounts for live manifests (ADR 0003).
+- **The deletion driver** (`packages/core/src/retention/build-deletion.ts`) finishes a claimed build
+  in three recorded steps: release its shared content, delete its storage objects (outside any
+  transaction), remove its rows (one transaction). The capability records each step
+  (`build_deletions`) and the release of each content hash once per build
+  (`build_content_releases`, unique on build and hash) in the same transaction that releases the
+  build's `content_uses` rows, so a retry skips what is recorded. Steps must run in order; a second
+  cleaner finds the work done. Purge uses the driver only when the capability is present.
+- **Shared content is counted as uses, not as a counter.** `content_uses` has one row per (build,
+  hash), written idempotently by the capability (`recordContentUses`) after the blobs are stored
+  and before the manifest that names them, by both upload paths, so a hash used at two paths
+  counts once. The caller then checks that each blob still exists: a recorded use cannot be
+  claimed, so a collector that finished between the caller's own check and the record is caught. A
+  counter read and updated through the generic adapter path would race across processes and cannot
+  be addressed by hash; the former `content_refs` table held per-hash counters on real SQLite
+  deployments (the upload route wrote them) and is dropped. That is safe: a blob without a use row
+  is never claimed and is protected by the manifest guard while its builds are live. Counters
+  cannot be turned into per-build uses, so a one-off backfill (`backfillContentUses`, run at boot
+  while the capability exists and a `site_settings` marker is unset) records the uses of every live
+  build's manifest, idempotently and without deleting anything; until it finishes, pre-upgrade
+  shared blobs only leak. A build that is gone or being deleted records
+  no use (the capability refuses it), so a late publish cannot pin blobs for good. A build's release marks all its rows released (kept for the grace period).
+  A collector **claims** a blob in the capability's domain (`claimContent`: every use released,
+  the grace passed, no live manifest names it) under a per-pass token. A claim is durable and
+  leased (30 minutes): it stays with its collector, so two collectors never delete one blob, and a
+  later pass takes over one the lease has outlived, re-stamping it with its own token. Right
+  before it deletes, a pass asks the capability whether its token still holds the claim
+  (`holdsContentClaim`) and skips the delete if not; giving a claim back and finishing it are
+  token-checked too, so a taken-over pass can do nothing. A recorded use also takes over a claim the
+  lease has outlived (`recordContentUses` with `staleBefore`), so a crashed pass cannot block
+  uploads until the next purge; the stalled collector then fails its `holdsContentClaim` check and
+  deletes nothing. A claimed hash refuses new uses, so a
+  use racing the delete ends in exactly one outcome: the claim fails because the use landed, or
+  the use is refused and its caller stores the content again and retries. A live manifest found
+  after the claim gives the claim back. A wrong use record can leak storage but never delete
+  served content. The token is not a full fence: object storage cannot refuse a late delete, so a
+  pass that stalls longer than the lease exactly between its check and its delete could still
+  remove a blob a successor collected and a new build stored again. That window is one delete wide
+  and needs a hung process, so it is accepted rather than fenced. An upload's record can now be the
+  taker of an expired claim; it re-checks that the blob exists after recording and answers 409
+  (store again) if not, so only a delete still in flight at that instant can win. Without the capability nothing
+  is recorded or collected.
 
 ### 3. Lifecycle is an explicit database capability
 
@@ -57,19 +99,51 @@ by preset, so it cannot by itself carry this guarantee.
   cross-process contract. Exposing `transact` is not evidence of it.
 - The capability serializes admissions, reference changes and deletion claims across processes,
   locks touched builds in a stable order, checks project ownership and availability, and commits
-  reference changes together with their domain writes (`replaceReferences`,
-  `replaceManyReferences`).
+  reference changes together with their domain writes, through the fenced methods only. There is no
+  unfenced replace: an unfenced write could release a newer owner's pin.
 - **Generations fence owners.** Each owner has a durable generation; fenced mutations
   (`replaceFencedReferences`, `replaceManyFencedReferences`) compare and advance it, and a stale
   generation rejects the whole transaction. Generations survive release, so an old worker cannot
   release a newer owner's pin.
-- Each implementation is proven with real multi-connection contract tests (promotion against purge,
-  pin against purge), not mocked transactions.
+- Each implementation is proven with real multi-connection contract tests, not mocked transactions:
+  `buildReferenceContractSuite` (`packages/core/src/test-helpers/build-reference-contract.ts`)
+  covers promotion and pin against purge, a stale generation (a typed `ReferenceGenerationConflict`)
+  rejecting a whole multi-owner transaction with its domain writes, exactly one of two updates that
+  saw the same generation winning, invalid generations, empty and partly failing multi-owner
+  batches, release keeping the generation, admission to a deleting or missing build, an admission
+  racing a claim ending in exactly one outcome, and opposite-order multi-build admission without
+  deadlock. `retentionActivationContractSuite` does the same for activation (baseline preparation and
+  the pause cases) through a per-dialect harness; activation itself is not part of the adapter
+  interface. Postgres and MySQL (#375, #376) must run both suites, unchanged.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
-  reference-sensitive path. Presets are enabled one at a time: SQLite first (#374), then Postgres
-  (#375) and MySQL (#376).
+  reference-sensitive path. Presets are enabled one at a time: SQLite first (#536, done), then
+  Postgres (#375) and MySQL (#376).
+- **Postgres lifecycle** (`db-postgres/src/build-reference-lifecycle.ts`, #375). Where SQLite
+  serializes through its write lock, Postgres takes row locks in one fixed order: each owner's
+  generation row `FOR UPDATE` (the fence), then the referenced builds `FOR SHARE`, which conflicts
+  with the tombstone's `FOR UPDATE` of the same build row, so an admission and a deletion claim of
+  one build end in exactly one outcome. A use of shared content and a collector's claim of the same
+  hash take a transaction-scoped advisory lock on the hash, in hash order, and re-read after it.
+  It is not yet exposed by any preset; activation (#375 step 2c) follows.
+- **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
+  adapter's setup has migrated the schema, it runs `prepareBaselineReferences` once and only then
+  exposes `buildReferenceLifecycle`. A shared file is required, so an in-memory database never has
+  it. If preparation stops with a `BaselineSourceIntegrityError` (a recorded source that is
+  tombstoned or belongs to another project), the capability stays off, the adapter reports
+  `retentionPause` (baseline, build, problem), the server logs it once at error level, and the
+  System page shows "Retention is paused" naming both ids. Retention is then fail closed as for any
+  adapter without the capability; an operator fixes the data and restarts. Any other preparation
+  failure fails the boot instead of guessing. With the capability, `POST /api/v1/admin/purge`
+  reports `{ removedBuilds, protected, resumed }` besides the branch figures, and the branch-GC
+  timer runs in a testing deployment; both answer or skip as before without it. The daily timer
+  purges builds only when `purgeTtlDays` is set explicitly (no default, so an upgrade never starts
+  deleting builds), runs only this capability's path, and does nothing without it; hosts map
+  `PURGE_TTL_DAYS`, core reads no environment.
+  A purge pass (the route, the timer) reads the capability once when it starts and hands that one
+  capability to every deletion of the pass (`PurgeOptions.lifecycle`); it never re-reads it, so one
+  cleared mid-pass cannot make the pass unfenced (#602).
 
 ### 4. Provenance is immutable and never guessed
 
@@ -88,17 +162,24 @@ by preset, so it cannot by itself carry this guarantee.
 
 All writers use the fenced capability when it is present:
 
-| Path | Mutation |
-| --- | --- |
-| `approveSnapshot` (`app/src/routers/builds.handlers.ts`) | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`) |
-| `core/src/capture/pipeline.ts` | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict |
-| `BaselineModel.upsert` (`core/src/models/baseline.ts`) | Explicit promotion and replacement, swapping the source reference atomically |
-| `core/src/models/baseline-transfer.ts` `import` | Archive replacement or insertion with identity, version and source rechecked |
-| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal |
-| `prepareBaselineReferences` (`db-sqlite`) | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; not invoked as production activation until #374 |
+| Path                                                      | Mutation                                                                                                                                                                          |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `approveSnapshot` (`app/src/routers/builds.handlers.ts`)  | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`)                                                                       |
+| `core/src/capture/pipeline.ts`                            | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict        |
+| `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                      |
+| `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                      |
+| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                     |
+| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; invoked once at every SQLite boot, before the capability is exposed (#536) |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check
 followed by an independent write is forbidden.
+
+`prepareBaselineReferences` pins only proven sources (#397). A recorded source whose build row is gone
+keeps its `source_build_id` and gets no pin (reported as `unavailable`). A source that is tombstoned or
+belongs to another project stops the whole run with `BaselineSourceIntegrityError` and rolls it back.
+It also releases the pins of baseline owners that cannot justify one (the baseline row is gone, or it
+records neither a source nor a snapshot): the unfenced path used while retention was off or paused
+could leave them, and they would keep an unrelated build protected.
 
 ### 6. Investigations (decision level)
 
@@ -115,7 +196,7 @@ followed by an independent write is forbidden.
   evidence expire after 30 days by default and do not pin source builds.
 - Replay is an optional runner capability (Playwright first) with fixed evidence limits and
   redaction; the limits and allowlists are specified in the #343 resolution and belong in
-  `docs/architecture.md` once implemented.
+  `docs/architecture/` once implemented.
 
 ## Consequences
 
@@ -128,8 +209,8 @@ followed by an independent write is forbidden.
 
 **Negative**
 
-- Until #374 activates SQLite, deployments with `testing` do not purge builds or garbage-collect
-  branches automatically; storage grows and operators must be told.
+- Postgres and MySQL deployments with `testing` still do not purge builds or garbage-collect
+  branches until #375 and #376; their storage grows and operators must be told.
 - Postgres and MySQL need their own capability implementation and multi-connection tests before
   they regain automatic retention.
 - Pinning whole builds keeps more storage than pinning artifacts would.
@@ -137,17 +218,18 @@ followed by an independent write is forbidden.
 
 ## Alternatives rejected
 
-| Option | Why not |
-| --- | --- |
-| Rely on `transact` | Optional, and its isolation differs by preset; it does not prove serialization with deletion claims. |
-| Check references, then delete | Races a concurrent promotion or investigation and can delete a live source build. |
-| Pin every build a historical diff touched | Unbounded retention of comparison graphs; frozen comparison images already keep history reviewable. |
-| Sequential fallback for unsupported adapters | Silently weakens the guarantee instead of failing closed. |
-| Guess legacy sources from the containing build | Wrong for inherited snapshots; presents false provenance. |
+| Option                                         | Why not                                                                                              |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Rely on `transact`                             | Optional, and its isolation differs by preset; it does not prove serialization with deletion claims. |
+| Check references, then delete                  | Races a concurrent promotion or investigation and can delete a live source build.                    |
+| Pin every build a historical diff touched      | Unbounded retention of comparison graphs; frozen comparison images already keep history reviewable.  |
+| Sequential fallback for unsupported adapters   | Silently weakens the guarantee instead of failing closed.                                            |
+| Guess legacy sources from the containing build | Wrong for inherited snapshots; presents false provenance.                                            |
 
 ## Open questions
 
-- Representative preparation time on large SQLite deployments; batching is designed only if a
-  measured startup budget is exceeded (#397).
-- Whether the SQLite-first activation (#374) ships before or with Postgres support for multi-instance
-  deployments.
+- Batching of the SQLite preparation, only if a deployment outgrows the startup budget. Measured
+  on a 10,000-baseline fixture (each with its own source build; `RUN_BENCH=1` in
+  `db-sqlite/src/retention-activation.test.ts`), preparation takes about 3.9 s and a whole boot
+  3.5 to 3.7 s, roughly 0.4 ms per baseline and linear, so it fits the 5 s budget up to about 12,000
+  baselines. Batching is not designed; the first deployment past that size designs it.

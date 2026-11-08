@@ -7,6 +7,7 @@
 export { BaselineModel } from "./baseline.ts";
 export { BaselineApprovalConflict } from "./baseline-approval.ts";
 export { BaselineWriteConflict } from "./baseline-conflict.ts";
+export { BaselinePromotionRefused } from "./baseline-promotion-refused.ts";
 export { resolveBaselineOrigin, type BaselineOriginReader } from "./baseline-origin.ts";
 export {
   BASELINE_ARCHIVE_FORMAT,
@@ -43,7 +44,13 @@ export {
 } from "./capture-job.ts";
 export { CaptureShardModel, type CaptureShardTables } from "./capture-shard.ts";
 export { AiBudgetAlertModel, type AiBudgetAlertTables } from "./ai-budget-alert.ts";
-export { AiUsageModel, type AiUsageInput, type AiUsageTables } from "./ai-usage.ts";
+export {
+  AiUsageModel,
+  type AiCallWindow,
+  type AiUsageInput,
+  type AiUsageReservation,
+  type AiUsageTables,
+} from "./ai-usage.ts";
 export {
   InsightModel,
   type InsightResultInput,
@@ -72,6 +79,19 @@ export {
   type ChangedComponent,
   type ChangesetComponent,
 } from "./changeset.ts";
+export {
+  assignOwners,
+  compileOwnerPattern,
+  matchesOwnerPattern,
+  ownerRulesText,
+  parseOwnerRules,
+  readOwnerRules,
+  serializeOwnerRules,
+  type AssignedOwner,
+  type OwnerProblem,
+  type OwnerRule,
+  type ParsedOwnerRules,
+} from "./component-owners.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export { acceptPendingWithoutWork } from "./review-switch-off.ts";
 export {
@@ -132,7 +152,6 @@ export { SnapshotModel, type SnapshotCreateInput } from "./snapshot.ts";
 export { TokenModel } from "./token.ts";
 export { UserModel } from "./user.ts";
 export { WebhookModel, type WebhookCreateInput } from "./webhook.ts";
-export { ContentRefModel } from "./content-ref.ts";
 export {
   probeCredentials,
   reencryptCredentials,

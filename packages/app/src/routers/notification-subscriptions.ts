@@ -2,10 +2,12 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { NotificationSubscriptionModel } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, unauthorized } from "./helpers.ts";
 import {
+  errorSchema,
   notFound as notFoundResponse,
   notificationSubscriptionPutSchema,
   notificationSubscriptionSchema,
@@ -22,6 +24,7 @@ function toPublic(row: NotificationSubscriptionRow): {
   events: string[];
   via: string[];
   enabled: boolean;
+  reviewRequests: boolean;
 } {
   return {
     projectId: row.projectId,
@@ -29,7 +32,24 @@ function toPublic(row: NotificationSubscriptionRow): {
     events: NotificationSubscriptionModel.eventsOf(row),
     via: NotificationSubscriptionModel.viaOf(row),
     enabled: row.enabled,
+    reviewRequests: row.reviewRequests,
   };
+}
+
+/**
+ * Refuse a subscription kind that posts to a room (Slack, Teams): a subscription is personal, so
+ * it may only name kinds that address one person. A room belongs to a project channel. Kinds that
+ * are not wired are left alone (nothing says what they address).
+ */
+function assertPersonalKinds(via: readonly string[] | undefined): void {
+  for (const kind of via ?? []) {
+    const provider = getStore().notifiers.find((candidate) => candidate.metadata.kind === kind);
+    if (provider !== undefined && provider.metadata.audience !== "person") {
+      throw new HTTPException(422, {
+        message: `${provider.metadata.name} (${kind}) posts to a room; add it as a project channel instead`,
+      });
+    }
+  }
 }
 
 /** Require a session user (subscriptions are meaningless without identity). */
@@ -39,6 +59,34 @@ function currentUserId(): string {
     unauthorized();
   }
   return user.id;
+}
+
+type SubscriptionPut = z.infer<typeof notificationSubscriptionPutSchema>;
+
+/**
+ * Save the caller's subscription. A PUT replaces it, except when it carries only
+ * `reviewRequests`: that flips the one switch and leaves the topics, channels and on/off state as
+ * stored. With no subscription to flip, the answer shows the defaults (nothing subscribed).
+ */
+async function saveSubscription(
+  projectId: string,
+  userId: string,
+  body: SubscriptionPut,
+): Promise<ReturnType<typeof toPublic>> {
+  const model = new NotificationSubscriptionModel(getStore().db);
+  const reviewOnly =
+    body.reviewRequests !== undefined &&
+    body.events === undefined &&
+    body.via === undefined &&
+    body.enabled === undefined;
+  if (!reviewOnly) {
+    return toPublic(await model.upsert(projectId, userId, body));
+  }
+  await model.setReviewRequests(projectId, userId, body.reviewRequests ?? true);
+  const row = await model.getFor(projectId, userId);
+  return row
+    ? toPublic(row)
+    : { projectId, userId, events: [], via: [], enabled: false, reviewRequests: true };
 }
 
 const getSubscriptionRoute = createRoute({
@@ -70,6 +118,10 @@ const putSubscriptionRoute = createRoute({
     200: {
       content: { "application/json": { schema: notificationSubscriptionSchema } },
       description: "Saved notification subscription",
+    },
+    422: {
+      content: { "application/json": { schema: errorSchema } },
+      description: "A listed delivery kind posts to a room; add it as a project channel",
     },
     ...notFoundResponse,
     ...unauthorizedResponse,
@@ -119,12 +171,8 @@ export function registerNotificationSubscriptions(app: ShelfRouter): void {
   app.openapi(putSubscriptionRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const body = c.req.valid("json");
-    const row = await new NotificationSubscriptionModel(getStore().db).upsert(
-      project.id,
-      currentUserId(),
-      body,
-    );
-    return c.json(toPublic(row));
+    assertPersonalKinds(body.via);
+    return c.json(await saveSubscription(project.id, currentUserId(), body), 200);
   });
 
   app.openapi(deleteSubscriptionRoute, async (c) => {

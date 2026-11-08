@@ -3,10 +3,10 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { testingEnabled } from "../store.ts";
 import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
 import { renderSettingsCapture } from "./settings-capture.tsx";
 import { renderSettingsDesign, type SettingsDesignData } from "./settings-design.tsx";
@@ -73,6 +73,9 @@ export interface SettingsFormState {
   secret?: string;
   /** Label type key whose edit form is open (labels tab). */
   editKey?: string;
+  /** Members tab: a refused component-owners submission, shown again as typed. */
+  ownerText?: string;
+  ownerProblems?: { line: number; message: string }[];
 }
 
 function tabHref(project: Project, tab: SettingsTab): string {

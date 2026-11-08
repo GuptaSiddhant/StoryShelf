@@ -1,5 +1,6 @@
 import { isCaptureTarget, type RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import type { Project } from "@storyshelf/core/schema";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
@@ -11,7 +12,6 @@ import {
   SectionTitle,
   SelectField,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 import { targetChoices } from "./target-choices.ts";
 
 /** Form state for the settings tabs (field errors and global error). */

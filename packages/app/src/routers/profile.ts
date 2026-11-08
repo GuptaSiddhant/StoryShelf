@@ -3,7 +3,7 @@ import { MIN_PASSWORD_LENGTH, unsignedToken } from "@storyshelf/core/auth";
 import { NotificationSubscriptionModel, ProjectModel, UserModel } from "@storyshelf/core/models";
 import { eq, getTableColumns } from "@storyshelf/core/orm";
 import type { Project } from "@storyshelf/core/schema";
-import { SESSION_COOKIE, type AuthUser } from "@storyshelf/core/types";
+import { readSessionCookie, type AuthUser } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { notificationsPaused } from "../notifications-pause.ts";
@@ -90,15 +90,8 @@ async function loadProfileData(userId: string): Promise<{
 }
 
 function readSessionToken(c: Context): string {
-  const header = c.req.header("cookie") ?? "";
-  for (const part of header.split(";")) {
-    const eqIndex = part.indexOf("=");
-    if (eqIndex !== -1 && part.slice(0, eqIndex).trim() === SESSION_COOKIE) {
-      // Engine cookies are signed (`token.signature`); the table holds the raw token.
-      return unsignedToken(part.slice(eqIndex + 1).trim());
-    }
-  }
-  return "";
+  // Engine cookies are signed (`token.signature`); the table holds the raw token.
+  return unsignedToken(readSessionCookie(c.req.header("cookie")) ?? "");
 }
 
 /** Engine security overview for the profile page. */
@@ -217,18 +210,24 @@ async function memberProject(slug: string, userId: string): Promise<Project | nu
   return isMember ? project : null;
 }
 
-/** Enable (opt-in email) or disable (remove) a subscription. */
+/**
+ * Enable or disable the viewer's email subscription. Disabling keeps the row (switched off), so
+ * it stays recorded and the person is not handed back to the default recipients; enabling an
+ * existing row keeps its topics and review-request choice.
+ */
 async function applyProfileToggle(
   projectId: string,
   userId: string,
   enable: boolean,
 ): Promise<void> {
   const model = new NotificationSubscriptionModel(getStore().db);
-  if (enable) {
-    await model.upsert(projectId, userId, { via: ["email"] });
+  if (await model.getFor(projectId, userId)) {
+    await model.setEnabled(projectId, userId, enable);
     return;
   }
-  await model.remove(projectId, userId);
+  if (enable) {
+    await model.upsert(projectId, userId, { via: ["email"] });
+  }
 }
 
 function registerPasswordRoute(app: ShelfRouter, auth: Auth): void {

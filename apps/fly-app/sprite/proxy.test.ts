@@ -159,6 +159,24 @@ describe("the browser proxy", () => {
     expect(seen).not.toContain(SECRET);
   });
 
+  it("presents the upstream's own address as Host, not the client's public name", async () => {
+    let host = "";
+    const server = createServer();
+    server.on("upgrade", (request, socket) => {
+      host = request.headers.host ?? "";
+      socket.end(
+        "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+      );
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    open.push({ close: () => server.close() });
+    const upstreamPort = (server.address() as AddressInfo).port;
+    const port = await proxyTo(upstreamPort);
+    await upgrade(port, { "x-storyshelf-secret": SECRET, host: "demo-abc.sprites.app" });
+    expect(host).toBe(`127.0.0.1:${upstreamPort}`);
+  });
+
   it("answers plain requests: 401 without the secret, /healthz with it, 404 elsewhere", async () => {
     const upstream = await echoUpstream();
     const port = await proxyTo(upstream.port);

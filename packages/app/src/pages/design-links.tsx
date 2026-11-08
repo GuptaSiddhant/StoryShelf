@@ -1,4 +1,5 @@
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
@@ -9,10 +10,6 @@ import {
   HStack,
   Meta,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** "Connect your own account" state for a provider whose project has no shared credential. */

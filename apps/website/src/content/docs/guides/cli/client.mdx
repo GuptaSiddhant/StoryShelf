@@ -98,7 +98,7 @@ The CLI does **not** run Playwright. It streams the zipped static build to the s
 
 **Large Storybooks on hosts without a job consumer.** A zip over the server's `maxInlineUnzipSize` is normally published by a background job. A serverless host runs no consumer, so it answers `413` with a message pointing to the file-by-file route (`/dedup`, `/content`, `/manifest`). `storyshelf upload` handles that by itself: it prints `Zip is over the server's inline publish limit; uploading file by file instead`, hashes the build directory, uploads only the files the server lacks, and posts the manifest, which completes publishing. A `413` for `maxUploadBytes` is not retried this way; raise the limit instead.
 
-**Rejected inline ZIPs.** A `422` means the server rejected an invalid, unsafe, or over-limit archive. The CLI prints the server's reason and the pending build's upload path; it does not retry file by file to bypass extraction limits. Fix the Storybook output or ask the server administrator to adjust `maxZipEntries` or `maxUnzippedBytes`. Run `storyshelf upload` again to create a new build, or send a corrected ZIP to the displayed upload path to reuse the pending build.
+**Rejected inline ZIPs.** A `422` means the server rejected an invalid, unsafe, or over-limit archive. The build ends `failed` and takes no further upload (a PUT to it answers `409`). The CLI prints the server's reason; it does not retry file by file to bypass extraction limits. Fix the Storybook output or ask the server administrator to adjust `maxZipEntries` or `maxUnzippedBytes`. Run `storyshelf upload` again to create a new build.
 
 ## `storyshelf doctor` / `whoami`
 
@@ -134,6 +134,6 @@ storyshelf protect --provider github --repo acme/widgets [--branch main] [--pref
 storyshelf protect --provider gitlab --repo group/project [--host https://gitlab.example.com] [--token $GITLAB_TOKEN] [--apply]
 ```
 
-It always prints the required check names (`<prefix>/testing`, or `<prefix>/review` with `--gate review`) and the manual steps. With a token (`--token`, or `GITHUB_TOKEN` / `GITLAB_TOKEN`) it also compares them with the branch's rule: the exit code is `1` when something is missing and nothing was written (dry run, the default). `--apply` adds only the missing part. See [Let StoryShelf set the rule](/guides/merge-gate/#let-storyshelf-set-the-rule) for what each host supports.
+It always prints the required check names (`<prefix>/testing`, or `<prefix>/review` with `--gate review`) and the manual steps. With a token (`--token`, or `GITHUB_TOKEN` / `GITLAB_TOKEN`) it also compares them with the branch's rule (on GitHub, a ruleset when one applies to the branch, else classic branch protection; the output says which, so a dry run shows the mechanism `--apply` would use): the exit code is `1` when something is missing and nothing was written (dry run, the default). `--apply` adds only the missing part. See [Let StoryShelf set the rule](/guides/merge-gate/#let-storyshelf-set-the-rule) for what each host supports.
 
 See [Configuration](/guides/config/) for file/env precedence and [Labels](/concepts/labels/) for `persistent` tagging.

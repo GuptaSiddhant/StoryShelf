@@ -15,16 +15,21 @@ import type { Build } from "../../schema/build.ts";
 import type { Project } from "../../schema/project.ts";
 import type { Snapshot } from "../../schema/snapshot.ts";
 import { createUrlBuilder } from "../../urls.ts";
-import { publishingOf } from "../publish/published.ts";
+import { publishingOfBuild } from "../publish/published.ts";
 import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
 
 /**
  * Show the build's current state on one channel. Throws when the host refuses a status, so the
  * caller can retry; resolves to why nothing was written when the build or channel is gone.
+ *
+ * With a `signal`, an aborted one (the attempt's deadline passed, so a redelivery may be running)
+ * stops the delivery before the status is written: the build is read again by that redelivery,
+ * and an old read must not overwrite what it showed. A request already sent is not recalled.
  */
 export async function deliverBuildState(
   deps: BuildStateDeps,
   ids: { buildId: string; channelId: string },
+  signal?: AbortSignal,
 ): Promise<"delivered" | SkipReason> {
   const loaded = await loadBuild(deps, ids.buildId);
   // The origin can disappear between queueing and running (a cleared setting): nothing is shown.
@@ -36,7 +41,7 @@ export async function deliverBuildState(
   if (typeof target === "string") {
     return target;
   }
-  await writeTo(deps, loaded, { target, origin });
+  await writeTo(deps, loaded, { target, origin, signal });
   return "delivered";
 }
 
@@ -54,7 +59,7 @@ export async function loadBuild(
 export async function writeTo(
   deps: BuildStateDeps,
   loaded: { build: Build; project: Project },
-  where: { target: StateTarget; origin: string },
+  where: { target: StateTarget; origin: string; signal?: AbortSignal | undefined },
 ): Promise<void> {
   const { build, project } = loaded;
   const { target, origin } = where;
@@ -64,7 +69,7 @@ export async function writeTo(
     prefix: channelPrefix(target.channel),
     urls: createUrlBuilder(origin, deps.config.publishedBaseDomain),
     flags: deps.flags(project),
-    publishing: await publishingOf(deps.storage, build),
+    publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
     approvals: await approvalsOf(deps, build, project),
     changes: await changesOf(deps, build, project),
   });
@@ -72,10 +77,13 @@ export async function writeTo(
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
     return;
   }
+  // The last checkpoint before the host is told: the reads above may have outlived the attempt.
+  where.signal?.throwIfAborted();
   await writeBuildState(target.provider, target.channel, {
     sha: build.gitSha,
     states,
     logger: deps.logger,
+    signal: where.signal,
   });
 }
 

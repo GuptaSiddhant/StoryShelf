@@ -156,3 +156,41 @@ export async function waitForBuild(
   }
   /* oxlint-enable eslint/no-await-in-loop */
 }
+
+/** The attempt fields the integration tests read. */
+export interface FinishedAttempt {
+  status: string;
+  failedCount: number;
+}
+
+/**
+ * Poll an attempt until it has left `queued`/`running`. `finalizeBuild` writes
+ * the build before `finishAttempt` writes the attempt's counts, so a build
+ * that reads terminal can still show the attempt's default counts. Throws on
+ * timeout.
+ */
+export async function waitForAttemptFinished(
+  app: ReturnType<typeof createShelfApp>,
+  slug: string,
+  buildId: string,
+  attemptNo: number,
+  timeoutMs = 150_000,
+): Promise<FinishedAttempt> {
+  const started = Date.now();
+  /* oxlint-disable eslint/no-await-in-loop -- poll loop must be sequential */
+  for (;;) {
+    const attempt = await readJson<FinishedAttempt>(
+      await app.request(`/api/v1/projects/${slug}/builds/${buildId}/attempts/${attemptNo}`),
+    );
+    if (attempt.status !== "queued" && attempt.status !== "running") {
+      return attempt;
+    }
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(`timed out waiting for attempt ${attemptNo} of build ${buildId} to finish`);
+    }
+    await new Promise<void>((done) => {
+      setTimeout(done, 250);
+    });
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
+}

@@ -1,5 +1,6 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { UsageReport } from "../insights/usage-report.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Card,
   EmptyState,
@@ -9,15 +10,11 @@ import {
   Stat,
   Table,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 function DaysTable(props: {
   days: UsageReport["days"];
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <Table dense>
+    <Table dense label="AI usage by day">
       <table>
         <thead>
           <tr>
@@ -46,7 +43,7 @@ function ProfilesTable(props: {
   profiles: UsageReport["profiles"];
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <Table dense>
+    <Table dense label="AI usage by profile">
       <table>
         <thead>
           <tr>

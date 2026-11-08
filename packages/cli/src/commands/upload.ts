@@ -10,7 +10,7 @@ import {
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
-import { createClient, RequestError, type BuildCreated } from "../client.ts";
+import { createClient, normalizeBaseUrl, RequestError, type BuildCreated } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
 import { isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
@@ -170,7 +170,7 @@ function collectUploadOptions(
 ): CollectedUploadOptions {
   const identity = resolveIdentity(cwd, options);
   return {
-    url: options.url ?? cfg?.url ?? envOf("STORYSHELF_URL"),
+    url: resolveServerUrl(options, cfg),
     slug: options.slug ?? cfg?.slug ?? envOf("STORYSHELF_SLUG"),
     token: options.token ?? envOf("STORYSHELF_TOKEN", "SHELF_TOKEN"),
     sha: identity.sha,
@@ -189,6 +189,12 @@ function collectUploadOptions(
     untraced: mergeUntraced(cfg?.untraced, options.untraced),
     statsFile: options.statsFile,
   };
+}
+
+/** The server URL from flag, config file or env, without a trailing slash. */
+function resolveServerUrl(options: UploadOptions, cfg: StorybookConfig | null): string | undefined {
+  const url = options.url ?? cfg?.url ?? envOf("STORYSHELF_URL");
+  return url === undefined ? undefined : normalizeBaseUrl(url);
 }
 
 /** Add `--stats-json` to the build script unless `--no-build-stats` or `buildStats: false`. */
@@ -394,7 +400,7 @@ async function uploadBuild(
       error.message +=
         `\nThe server rejected the Storybook archive. Check its contents and the server's ` +
         `maxZipEntries and maxUnzippedBytes limits, then run storyshelf upload again. ` +
-        `That creates a new build; to reuse build ${created.build.id}, PUT a corrected ZIP to ${created.uploadUrl}.`;
+        `That creates a new build; build ${created.build.id} failed and takes no further upload.`;
       throw error;
     }
     if (!isOverInlineLimit(error)) {

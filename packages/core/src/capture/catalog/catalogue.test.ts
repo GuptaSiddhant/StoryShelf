@@ -4,6 +4,9 @@ import { storybookDir } from "../../utils/paths.ts";
 import { catalogueBuild, readCatalog } from "./catalogue.ts";
 import { INDEX, seedPublished } from "./test-fixtures.ts";
 
+/** A well-formed content hash (64 lowercase hex digits). */
+const HASH = "1".repeat(64);
+
 describe("catalogueBuild", () => {
   it("writes catalog.json and one build_components row per component", async () => {
     const { db, storage, project, build, objects, catalogKey } = await seedPublished();
@@ -32,9 +35,9 @@ describe("catalogueBuild", () => {
     objects.delete(`${storybookDir(project.id, build.id)}/index.json`);
     objects.set(
       `${storybookDir(project.id, build.id)}/manifest.json`,
-      Buffer.from('{"index.json":"h"}'),
+      Buffer.from(`{"index.json":"${HASH}"}`),
     );
-    objects.set("content/h", Buffer.from(JSON.stringify(INDEX)));
+    objects.set(`content/${HASH}`, Buffer.from(JSON.stringify(INDEX)));
     expect((await catalogueBuild({ db, storage }, project.id, build.id))?.entries).toHaveLength(4);
   });
 

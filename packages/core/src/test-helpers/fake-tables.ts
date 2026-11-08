@@ -73,6 +73,7 @@ const projects = defineTable("projects", {
   reviewEnabled: "review_enabled",
   reviewApprovals: "review_approvals",
   storybookUrlTtlSeconds: "storybook_url_ttl_seconds",
+  componentOwners: "component_owners",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -150,6 +151,9 @@ const builds = defineTable("builds", {
   changedFiles: "changed_files",
   affectedImportPaths: "affected_import_paths",
   testResults: "test_results",
+  captureGeneration: "capture_generation",
+  reviewCycle: "review_cycle",
+  reviewRequestedCycle: "review_requested_cycle",
   captureJobId: "capture_job_id",
   createdAt: "created_at",
   updatedAt: "updated_at",
@@ -203,6 +207,8 @@ const captureJobs = defineTable("capture_jobs", {
   owner: "owner",
   payload: "payload",
   cancelRequestedAt: "cancel_requested_at",
+  activeKey: "active_key",
+  rerunRequestedAt: "rerun_requested_at",
   error: "error",
   startedAt: "started_at",
   finishedAt: "finished_at",
@@ -316,6 +322,10 @@ const comments = defineTable("comments", {
   createdAt: "created_at",
   updatedAt: "updated_at",
   storyId: "story_id",
+  mentions: "mentions",
+  kind: "kind",
+  resolvedAt: "resolved_at",
+  resolvedBy: "resolved_by",
 });
 
 const labelTypes = defineTable("label_types", {
@@ -468,6 +478,7 @@ const notificationChannels = defineTable("notification_channels", {
   enabled: "enabled",
   lastError: "last_error",
   lastErrorAt: "last_error_at",
+  lastDeliveredAt: "last_delivered_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -479,14 +490,18 @@ const notificationSubscriptions = defineTable("notification_subscriptions", {
   events: "events",
   via: "via",
   enabled: "enabled",
+  reviewRequests: "review_requests",
   createdAt: "created_at",
 });
 
-const contentRefs = defineTable("content_refs", {
-  hash: "hash",
-  refCount: "ref_count",
-  lastSeenAt: "last_seen_at",
+const contentUses = defineTable("content_uses", {
+  projectId: "project_id",
+  buildId: "build_id",
+  contentHash: "content_hash",
   createdAt: "created_at",
+  releasedAt: "released_at",
+  collectingAt: "collecting_at",
+  claimToken: "claim_token",
 });
 
 /** Stub schema bundled into the `Tables` map every fake serves. */
@@ -522,5 +537,5 @@ export const fakeSchema: Tables = {
   aiBudgetAlerts,
   notificationChannels,
   notificationSubscriptions,
-  contentRefs,
+  contentUses,
 };

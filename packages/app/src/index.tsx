@@ -5,7 +5,11 @@ import {
   adapterSourcesOf,
   validateBootAssembly,
 } from "@storyshelf/core/adapter/setup";
-import { assertServerless, resolveShelfOptions } from "@storyshelf/core/config";
+import {
+  assertServerless,
+  resolveShelfOptions,
+  sequentialTransactionsWarning,
+} from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
@@ -24,6 +28,7 @@ import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
+import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import {
   authGate,
   csrf,
@@ -77,7 +82,7 @@ import { resolveRuntime, type ServerRuntime } from "./runtime.ts";
 function throwOnInvalidAdapters(options: ShelfOptions): void {
   const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length > 0) {
-    throw new AdapterLifecycleError("setup", invalid);
+    throw new AdapterLifecycleError("setup", invalid, true);
   }
 }
 
@@ -107,6 +112,10 @@ function warnOnServerless(options: ShelfOptions, logger: Logger): void {
   if (warning) {
     logger.warn(warning);
   }
+  const sequential = sequentialTransactionsWarning(options);
+  if (sequential) {
+    logger.warn(sequential);
+  }
 }
 
 /** Attach lifecycle, queue, middleware, routes, and docs to the app. */
@@ -125,12 +134,17 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
     options: scoped,
     getReady: async () => await cell.ready,
   });
-  registerAllRoutes(app, options, {
-    sources: adapterSourcesOf(options),
-    getSettled: () => cell.settled,
-    bootTimeMs: Date.now(),
-    version: packageVersion(),
-  });
+  registerAllRoutes(
+    app,
+    options,
+    {
+      sources: adapterSourcesOf(options),
+      getSettled: () => cell.settled,
+      bootTimeMs: Date.now(),
+      version: packageVersion(),
+    },
+    runtime.logger,
+  );
   registerDocs(app);
 }
 
@@ -148,7 +162,9 @@ export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
     threads: options.testing?.compare?.threads,
   });
   throwOnInvalidAdapters(options);
-  const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
+  const app = new OpenAPIHono<{ Variables: ShelfContext }>({
+    defaultHook: rejectInvalidRequest,
+  }) as ShelfApp;
   assembleApp(app, options, instrumentedOptions(options));
 
   return app;
@@ -358,10 +374,16 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   registerInsightFragments(app);
 }
 
-/** Register every API router, page set, and optional auth flow. */
-function registerAllRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
+/** Register every API router and page set, then the error answers that cover them. */
+function registerAllRoutes(
+  app: ShelfRouter,
+  options: ShelfOptions,
+  health: HealthDeps,
+  logger: Logger,
+): void {
   registerApiRoutes(app, health);
   registerPageRoutes(app, options, health);
+  mountErrorHandlers(app, logger);
 }
 
 /** The OpenAPI document's info and tag catalog. */

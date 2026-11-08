@@ -13,8 +13,15 @@ function withoutUndefined(values: unknown): Record<string, unknown> {
 
 /** Column defaults real drivers apply on insert (the fake has no DDL). */
 const INSERT_DEFAULTS: Record<string, Record<string, unknown>> = {
+  builds: { reviewCycle: 0 },
+  comments: { kind: "comment" },
   snapshots: { browser: "chromium" },
   baselines: { browser: "chromium" },
+};
+
+/** Single-column unique indexes the fake enforces (null values never collide, as in SQL). */
+const UNIQUE_COLUMNS: Record<string, readonly string[]> = {
+  capture_jobs: ["activeKey"],
 };
 
 // The in-memory fake back-fills Drizzle's inferred row types from raw maps
@@ -41,6 +48,18 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     const key = (row["id"] ?? row["hash"]) as string;
     if (rowsOf(table).has(key)) {
       throw new Error(`UNIQUE constraint failed: duplicate key ${key}`);
+    }
+    for (const column of UNIQUE_COLUMNS[getTableName(table)] ?? []) {
+      const value = (row as Record<string, unknown>)[column];
+      const taken =
+        value !== undefined &&
+        value !== null &&
+        [...rowsOf(table).values()].some(
+          (other) => (other as Record<string, unknown>)[column] === value,
+        );
+      if (taken) {
+        throw new Error(`UNIQUE constraint failed: duplicate ${column}`);
+      }
     }
     rowsOf(table).set(key, row);
     return row as T["$inferSelect"];

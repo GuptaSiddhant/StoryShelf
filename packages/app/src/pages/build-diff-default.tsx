@@ -9,8 +9,6 @@ const comparisonImage = css`
   /* default-comparison-image */
   max-width: 100%;
 `;
-
-/* eslint-disable promise-function-async -- Hono JSX components may return HTML or a promise */
 export function DefaultComparisonView(props: {
   project: Project;
   build: Build;

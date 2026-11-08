@@ -82,12 +82,6 @@ function simplifyAsides(tree) {
   }
 }
 
-/** A bold label followed by the content of one tab. */
-const tabBlock = (label, children) => [
-  element("p", [element("strong", [text(label)])]),
-  ...children,
-];
-
 const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 
 /**

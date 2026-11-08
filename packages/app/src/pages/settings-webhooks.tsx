@@ -1,5 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Badge,
@@ -12,7 +13,6 @@ import {
   SectionTitle,
   Table,
 } from "../ui/components.tsx";
-import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
 export interface SettingsWebhook {
@@ -43,7 +43,7 @@ export function renderSettingsWebhooks(
           Notify external services when builds are created, updated, approved or rejected. Payloads
           are POSTed as JSON and signed with the webhook secret.
         </Meta>
-        <Table>
+        <Table label="Webhooks">
           <table>
             <thead>
               <tr>

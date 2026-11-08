@@ -6,6 +6,7 @@
 import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import { BuildModel } from "../../models/build.ts";
 import { ProjectModel } from "../../models/project.ts";
+import type { Project } from "../../schema/project.ts";
 import type { BuildStatus } from "../../types.ts";
 import type { BuildStateDeps, BuildStatePublisher } from "./types.ts";
 
@@ -15,27 +16,72 @@ const OPEN: ReadonlySet<BuildStatus> = new Set(["pending", "capturing", "compari
 /** Newest builds looked at per project. */
 const PER_PROJECT = 25;
 
-/** Ask `publisher` for the state of every open recent build; resolves to how many were asked. Never rejects. */
-export async function requestOpenBuildStates(
+/** Narrows {@link requestOpenBuildStates}: one project, and within it one git channel. */
+export interface OpenBuildScope {
+  projectId?: string;
+  /** Only this channel is asked (an operator retry); other channels keep what they show. */
+  channelId?: string;
+}
+
+/** How a request for open builds ended: how many were asked, or that the lookup itself failed. */
+export type OpenBuildRequest = { ok: true; asked: number } | { ok: false };
+
+/** The projects a request covers: the scoped one (read directly), or every project. */
+async function projectsOf(
+  deps: Pick<BuildStateDeps, "db">,
+  projectId: string | undefined,
+): Promise<Project[]> {
+  const model = new ProjectModel(deps.db);
+  if (projectId === undefined) {
+    return await model.list();
+  }
+  const project = await model.get(projectId);
+  return project === null ? [] : [project];
+}
+
+/**
+ * Ask `publisher` for the state of every open recent build (of `scope`, when given). Never rejects:
+ * a failed lookup is logged once and answered `{ ok: false }`, so a caller that reports to a person
+ * (an operator retry) can tell it from "nothing is open".
+ */
+export async function tryRequestOpenBuildStates(
   deps: Pick<BuildStateDeps, "db" | "logger">,
   publisher: BuildStatePublisher,
-): Promise<number> {
+  scope: OpenBuildScope = {},
+): Promise<OpenBuildRequest> {
   try {
-    const projects = await new ProjectModel(deps.db).list();
+    const projects = await projectsOf(deps, scope.projectId);
     const lists = await Promise.all(
       projects.map(async (project) => await openBuildIds(deps, project.id)),
     );
     const ids = lists.flat();
+    const { channelId } = scope;
     await Promise.all(
       ids.map(async (id) => {
-        await publisher.request(id);
+        await (channelId === undefined
+          ? publisher.request(id)
+          : publisher.request(id, { channelId }));
       }),
     );
-    return ids.length;
+    return { ok: true, asked: ids.length };
   } catch (error) {
     deps.logger.warn({ err: error }, "failed to re-request the state of open builds");
-    return 0;
+    return { ok: false };
   }
+}
+
+/**
+ * Ask `publisher` for the state of every open recent build (of `scope`, when given); resolves to
+ * how many builds were asked, 0 when the lookup failed. Never rejects: the boot replay and an
+ * origin change must not fail because of it.
+ */
+export async function requestOpenBuildStates(
+  deps: Pick<BuildStateDeps, "db" | "logger">,
+  publisher: BuildStatePublisher,
+  scope: OpenBuildScope = {},
+): Promise<number> {
+  const result = await tryRequestOpenBuildStates(deps, publisher, scope);
+  return result.ok ? result.asked : 0;
 }
 
 /** The newest builds of a project that have not reached a verdict. */

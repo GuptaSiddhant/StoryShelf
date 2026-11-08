@@ -71,8 +71,8 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
-      await runMigrations(async (sql) => (await pool.query(sql)).rows);
+    migrate: async ({ logger }) => {
+      await runMigrations(async (sql) => (await pool.query(sql)).rows, logger);
     },
     close: async () => {
       if (owned) {

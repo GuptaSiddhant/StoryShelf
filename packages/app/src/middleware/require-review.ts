@@ -1,5 +1,6 @@
 import type { Context, Next } from "hono";
 import { resolveAuthorizedProject } from "../routers/helpers.ts";
+import { jsonRefusal } from "./api-errors.ts";
 import { matchedRouteClass } from "./require-testing.ts";
 
 /** Body of the 404 a `review` route answers for a project with review off. */
@@ -29,7 +30,7 @@ export function requireReview() {
       return;
     }
     if (c.req.path.startsWith("/api/")) {
-      return c.json({ error: REVIEW_DISABLED_MESSAGE }, 404);
+      return jsonRefusal(c, 404, REVIEW_DISABLED_MESSAGE);
     }
     return c.text(REVIEW_DISABLED_MESSAGE, 404);
   };

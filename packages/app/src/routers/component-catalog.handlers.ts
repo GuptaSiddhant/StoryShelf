@@ -26,6 +26,8 @@ export interface CatalogHistoryRow extends ComponentBuildRow {
 export interface ComponentCatalogView {
   /** The build the Stories tab shows: newest on the default branch holding the file, else newest. */
   build: Build;
+  /** The build the page shows when none is requested; differs from `build` for `?build=`. */
+  defaultBuildId: string;
   title: string;
   /** The file's stories and docs entries in that build. */
   entries: CatalogEntry[];
@@ -49,6 +51,7 @@ export async function latestProjectBuild(project: Project): Promise<Build | unde
 export async function loadCatalogView(
   project: Project,
   importPath: string,
+  requested?: Build,
 ): Promise<ComponentCatalogView | null> {
   const latest = await latestProjectBuild(project);
   const latestRows = latest ? await catalogueLatest(project, latest) : [];
@@ -57,18 +60,33 @@ export async function loadCatalogView(
     importPath,
   );
   const history = componentBuildHistory(rows, await buildsOf(rows)).slice(0, HISTORY_LIMIT);
-  const shown =
-    history.find((entry) => entry.build.gitBranch === project.gitDefaultBranch) ?? history[0];
-  if (!shown) {
+  const [newest] = history;
+  const { byDefault, shown } = pickShown(history, project, requested);
+  const build = shown?.build ?? requested;
+  if (!newest || !build) {
     return null;
   }
   return {
-    build: shown.build,
-    title: shown.component.title,
-    entries: await entriesOf(project.id, shown.build.id, importPath),
+    build,
+    defaultBuildId: (byDefault ?? newest).build.id,
+    title: (shown ?? newest).component.title,
+    // A requested build that does not hold the file shows no stories, never another build's.
+    entries: shown ? await entriesOf(project.id, shown.build.id, importPath) : [],
     history: await withChanges(project.id, importPath, history),
     presence: catalogPresence(history, importPath, latestRows.length > 0 ? latestRows : null),
   };
+}
+
+/** The row the page shows: the requested build's, else the default branch's newest, else the newest. */
+function pickShown(
+  history: readonly ComponentBuildRow[],
+  project: Project,
+  requested: Build | undefined,
+): { byDefault: ComponentBuildRow | undefined; shown: ComponentBuildRow | undefined } {
+  const byDefault =
+    history.find((entry) => entry.build.gitBranch === project.gitDefaultBranch) ?? history[0];
+  const shown = requested ? history.find((entry) => entry.build.id === requested.id) : byDefault;
+  return { byDefault, shown };
 }
 
 /** Catalogue the latest build when it has no catalog yet; its component rows. */

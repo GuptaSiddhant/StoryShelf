@@ -1,4 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 /**
  * Bun preset for the SQLite database adapter.
  *
@@ -9,10 +10,20 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
+import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import {
+  execUnless,
+  isDuplicateColumn,
+  isMissingColumn,
+  reportSkippedIndex,
+  toleratedFor,
+} from "./migration-errors.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
+import { parseTableInfo } from "./table-info.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -60,8 +71,12 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
       category: "database",
     },
     tables: schema,
-    migrate: () => {
-      runMigrations(client);
+    migrate: async ({ logger }) => {
+      await assertReviewSchema(
+        async (table) =>
+          await Promise.resolve(parseTableInfo(client.query(`PRAGMA table_info(${table})`).all())),
+      );
+      runMigrations(client, logger);
     },
     close: () => {
       if (owned) {
@@ -99,14 +114,6 @@ function connectionOptions(options: BunSqliteDatabaseOptions): {
   return result;
 }
 
-function execIgnore(client: Database, sql: string): void {
-  try {
-    client.exec(sql);
-  } catch {
-    // idempotent — column already exists or other no-op
-  }
-}
-
 function migrateCommentsTable(client: Database): void {
   const row = client
     .query("SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'")
@@ -116,26 +123,33 @@ function migrateCommentsTable(client: Database): void {
   if (!row?.sql.includes("user_id TEXT NOT NULL REFERENCES users")) {
     return;
   }
+  swapCommentsTable(client);
+}
+
+/** Swap `comments` for a rebuilt table in one transaction, with foreign keys off for the swap. */
+function swapCommentsTable(client: Database): void {
   client.exec("PRAGMA foreign_keys = OFF");
-  client.exec(`
-    CREATE TABLE comments_new (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
-      snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
-      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-      body TEXT NOT NULL,
-      parent_id TEXT,
-      resolved INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
-  client.exec("INSERT INTO comments_new SELECT * FROM comments");
-  client.exec("DROP TABLE comments");
-  client.exec("ALTER TABLE comments_new RENAME TO comments");
-  client.exec("CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id)");
-  client.exec("PRAGMA foreign_keys = ON");
+  try {
+    client.exec("BEGIN");
+    rebuildComments(client);
+    client.exec("COMMIT");
+  } catch (error) {
+    try {
+      client.exec("ROLLBACK");
+    } catch {
+      // The transaction has already ended; the real failure is rethrown below.
+    }
+    throw error;
+  } finally {
+    client.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+/** Swap `comments` for the current table, whose `user_id` may be null (inside one transaction). */
+function rebuildComments(client: Database): void {
+  for (const statement of commentsRebuildStatements()) {
+    client.exec(statement);
+  }
 }
 
 /** Add any DDL column missing from a volume created before it shipped. */
@@ -146,35 +160,36 @@ function ensureColumns(client: Database, ddl: string): void {
     for (const column of columns) {
       const [name] = column.split(/\s+/u);
       if (name && !existing.has(name)) {
-        execIgnore(client, `ALTER TABLE ${table} ADD COLUMN ${column}`);
+        execUnless(client, `ALTER TABLE ${table} ADD COLUMN ${column}`, isDuplicateColumn);
       }
     }
   }
 }
 
 /** Swap in the browser-aware unique indexes (after `ensureColumns` added the column). */
-function applyIdentityStatements(client: Database): void {
+function applyIdentityStatements(client: Database, logger: Logger | undefined): void {
   for (const statement of IDENTITY_STATEMENTS) {
-    execIgnore(client, statement);
+    if (execUnless(client, statement, toleratedFor(statement))) {
+      reportSkippedIndex(
+        statement,
+        (sql) =>
+          Number(
+            (client.query(sql).get() as { duplicate_groups: number | bigint })["duplicate_groups"],
+          ),
+        logger,
+      );
+    }
   }
 }
 
-function runMigrations(client: Database): void {
+function runMigrations(client: Database, logger: Logger | undefined): void {
   client.exec("PRAGMA foreign_keys = ON");
   client.exec(DDL);
   ensureColumns(client, DDL);
-  applyIdentityStatements(client);
+  applyIdentityStatements(client, logger);
   client.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
-  try {
-    client.exec(WEBHOOK_SECRET_DROP);
-  } catch {
-    // already migrated — ignore
-  }
-  try {
-    migrateCommentsTable(client);
-  } catch {
-    execIgnore(client, "PRAGMA foreign_keys = ON");
-  }
+  execUnless(client, WEBHOOK_SECRET_DROP, isMissingColumn);
+  migrateCommentsTable(client);
 }
 
 /** Open the file-backed database, creating its directory first. */

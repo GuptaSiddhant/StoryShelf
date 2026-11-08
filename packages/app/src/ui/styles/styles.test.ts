@@ -16,6 +16,15 @@ describe("baseStyle", () => {
     }
   });
 
+  it("keeps a grid track from growing to its content (no sideways page scroll on a phone)", () => {
+    const css = baseStyle(LIGHT_THEME, DARK_THEME);
+    // An `auto` track is as wide as its widest child (a nowrap table header), so it must be minmax(0, 1fr).
+    expect(css).toContain(".grid { display: grid; grid-template-columns: minmax(0, 1fr);");
+    expect(css).toContain(
+      "@media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: minmax(0, 1fr); } }",
+    );
+  });
+
   it("no longer carries component styles (owned by hono/css)", () => {
     const css = baseStyle(LIGHT_THEME, DARK_THEME);
     expect(css).not.toContain(".btn--primary");

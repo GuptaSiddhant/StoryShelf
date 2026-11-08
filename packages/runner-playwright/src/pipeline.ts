@@ -21,6 +21,7 @@ import {
   describeSizing,
   createPageLimiter,
   detectCaptureEnvironment,
+  errorText,
   isTimeoutError,
   sessionGateFor,
   storybookBase,
@@ -31,6 +32,7 @@ import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } fr
 import { TransientCaptureError } from "./capture-retry.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
+import { RemoteBrowserLostError, browserLost } from "./remote-loss.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createStaticServer } from "./static-server.ts";
@@ -213,7 +215,7 @@ function assertStorybookRoot(target: CaptureTarget, storybookUrl: string): void 
   try {
     storybookBase(storybookUrl);
   } catch (error) {
-    throw new TargetLaunchError(target, error instanceof Error ? error.message : String(error));
+    throw new TargetLaunchError(target, error instanceof Error ? error.message : errorText(error));
   }
 }
 
@@ -326,6 +328,14 @@ async function runAllCaptures(
   });
   try {
     await runBatches(batches, pages, input, active, ctx, { captures, failures, relaunch });
+  } catch (error) {
+    if (error instanceof RemoteBrowserLostError) {
+      input.logger?.warn(
+        { target: input.target },
+        "remote browser lost; ending the pass so the job can be retried",
+      );
+    }
+    throw error;
   } finally {
     pages.dispose();
   }
@@ -384,13 +394,22 @@ async function captureOne(
   out: { captures: RenderedSnapshot[]; failures: RenderResult["failures"] },
 ): Promise<boolean> {
   if (active.cancelled) throw new Error("Capture cancelled");
+  // A lost remote browser ends the pass: nothing more is scheduled on it, and nothing after the
+  // drop is recorded as a story failure.
+  if (lost(input, active, ctx)) throw new RemoteBrowserLostError();
   try {
     await pushCapture(ctx, story, viewport, out.captures, out.failures, input, active);
     return false;
   } catch (error) {
+    if (lost(input, active, ctx)) throw new RemoteBrowserLostError();
     pushRenderFailure(out.failures, input, story.id, viewport.name, error);
     return isTimeoutError(error instanceof TransientCaptureError ? error.cause : error);
   }
+}
+
+/** Whether this run is remote and its current browser has disconnected (`retryRemoteCapture` marks a remote run). */
+function lost(input: RunInput, active: ActiveRun, ctx: CaptureContext): boolean {
+  return browserLost(input.retryRemoteCapture === true, active, () => ctx.browser.isConnected());
 }
 
 async function pushCapture(

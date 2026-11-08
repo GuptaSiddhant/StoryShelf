@@ -6,8 +6,15 @@
  * missing columns/indexes are found in `information_schema`, and only a
  * duplicate-index error from a repeated DDL statement is ignored.
  */
+import {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+} from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { DDL } from "./ddl.ts";
 import { FOREIGN_KEYS, type ForeignKeyMigration } from "./foreign-keys.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 
 /** Minimal row-query surface a migration runner needs. */
 export type MigrationRunner = (sql: string) => Promise<unknown[]>;
@@ -48,6 +55,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   { table: "projects", column: "review_approvals", definition: "INT NOT NULL DEFAULT 1" },
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
+  { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
@@ -91,7 +99,15 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "affected_import_paths", definition: "TEXT" },
   { table: "builds", column: "inherited_count", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "test_results", definition: "TEXT" },
+  { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
+  { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
+  { table: "builds", column: "capture_generation", definition: "INTEGER NOT NULL DEFAULT 0" },
+  {
+    table: "notification_subscriptions",
+    column: "review_requests",
+    definition: "BOOLEAN NOT NULL DEFAULT TRUE",
+  },
   { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
   { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
   {
@@ -100,6 +116,10 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'manual'",
   },
   { table: "comments", column: "story_id", definition: "TEXT" },
+  { table: "comments", column: "mentions", definition: "TEXT" },
+  { table: "comments", column: "kind", definition: "VARCHAR(32) NOT NULL DEFAULT 'comment'" },
+  { table: "comments", column: "resolved_at", definition: "DATETIME(3) NULL" },
+  { table: "comments", column: "resolved_by", definition: "VARCHAR(64) NULL" },
   // Auth columns the SQLite `users` table always had (access control: `disabled`).
   { table: "users", column: "password_hash", definition: "TEXT" },
   { table: "users", column: "display_name_override", definition: "TEXT" },
@@ -109,9 +129,13 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "VARCHAR(32) NOT NULL DEFAULT 'oidc'",
   },
   { table: "users", column: "disabled", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  // Single-flight jobs (ADR 0040); the unique index on active_key is in IDENTITY_INDEXES.
+  { table: "capture_jobs", column: "active_key", definition: "VARCHAR(191)" },
+  { table: "capture_jobs", column: "rerun_requested_at", definition: "DATETIME(3)" },
   { table: "design_nodes", column: "notified_version", definition: "TEXT" },
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
+  { table: "notification_channels", column: "last_delivered_at", definition: "DATETIME(3)" },
 ];
 
 /** A run in flight when `builds.capture_job_id` was added owns the build it was started for. */
@@ -129,14 +153,22 @@ const IDENTITY_INDEXES = [
     name: "baselines_project_story_mode_browser_branch_idx",
     sql: "CREATE UNIQUE INDEX baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
   },
+  {
+    table: "capture_jobs",
+    name: "capture_jobs_active_key_idx",
+    sql: "CREATE UNIQUE INDEX capture_jobs_active_key_idx ON capture_jobs (active_key)",
+  },
 ];
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner): Promise<void> {
+export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+  await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);
   await run(BUILD_CAPTURE_JOB_BACKFILL);
-  await migrateIndexes(run);
+  await migrateIndexes(run, logger);
+  // Replaced by content_uses (ADR 0039); its per-hash counters cannot become per-build uses.
+  await run("DROP TABLE IF EXISTS content_refs");
   await migrateLegacyColumns(run);
   await ensureForeignKeys(run);
 }
@@ -148,7 +180,7 @@ async function ensureColumns(run: MigrationRunner): Promise<void> {
   }
 }
 
-async function migrateIndexes(run: MigrationRunner): Promise<void> {
+async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<void> {
   await dropIndexIfExists(run, "snapshots", "snapshots_build_story_viewport_idx");
   await dropIndexIfExists(run, "baselines", "baselines_project_story_viewport_branch_idx");
   for (const index of IDENTITY_INDEXES) {
@@ -164,11 +196,12 @@ async function migrateIndexes(run: MigrationRunner): Promise<void> {
     "builds_project_gitsha_idx",
     "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)",
   );
-  await ensureIndex(
+  await ensureUniqueIndex(
     run,
     "design_links",
     "design_links_project_import_path_idx",
     "CREATE UNIQUE INDEX design_links_project_import_path_idx ON design_links (project_id, import_path)",
+    logger,
   );
 }
 
@@ -290,6 +323,41 @@ async function ensureIndex(
     return;
   }
   await run(sql);
+}
+
+/** MySQL's duplicate-entry error: a unique index over rows that already repeat its key. */
+const DUPLICATE_ENTRY = 1062;
+
+/**
+ * {@link ensureIndex} for a unique index that existing rows may already violate: that one error is
+ * skipped (the database runs without the index and says so once), every other failure stops the boot.
+ */
+async function ensureUniqueIndex(
+  run: MigrationRunner,
+  table: string,
+  name: string,
+  sql: string,
+  logger: Logger | undefined,
+): Promise<void> {
+  try {
+    await ensureIndex(run, table, name, sql);
+  } catch (error) {
+    const { errno, code } = error as { errno?: unknown; code?: unknown };
+    if (errno !== DUPLICATE_ENTRY && code !== "ER_DUP_ENTRY") {
+      throw error;
+    }
+    const parsed = parseUniqueIndex(sql);
+    if (parsed === null) {
+      throw error;
+    }
+    const rows = (await run(duplicateGroupsSql(parsed.table, parsed.columns))) as {
+      duplicate_groups?: unknown;
+    }[];
+    logSkippedIndex(logger, {
+      ...parsed,
+      duplicateGroups: Number(rows[0]?.duplicate_groups ?? 0),
+    });
+  }
 }
 
 async function hasIndex(run: MigrationRunner, table: string, name: string): Promise<boolean> {

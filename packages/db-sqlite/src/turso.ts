@@ -1,5 +1,6 @@
 import type { Client } from "@libsql/client";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import * as drizzleLibsqlCore from "drizzle-orm/libsql/driver-core";
 /**
  * Turso/libSQL preset for the SQLite database adapter.
@@ -11,9 +12,19 @@ import * as drizzleLibsqlCore from "drizzle-orm/libsql/driver-core";
  */
 import { createRequire } from "node:module";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
+import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
+import {
+  execUnlessAsync,
+  isDuplicateColumn,
+  isMissingColumn,
+  reportSkippedIndexAsync,
+  toleratedFor,
+} from "./migration-errors.ts";
+import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
+import { parseTableInfo } from "./table-info.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -60,8 +71,11 @@ export function createTursoDatabase(options: TursoDatabaseOptions): DatabaseAdap
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
-      await runMigrations(client);
+    migrate: async ({ logger }) => {
+      await assertReviewSchema(async (table) =>
+        parseTableInfo((await client.execute(`PRAGMA table_info(${table})`)).rows),
+      );
+      await runMigrations(client, logger);
     },
     close: () => {
       if (owned) {
@@ -124,15 +138,36 @@ function createNodeClient(config: Parameters<CreateClient>[0]): Client {
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
-async function runMigrations(client: LibsqlClient): Promise<void> {
+async function runMigrations(client: LibsqlClient, logger: Logger | undefined): Promise<void> {
   await client.executeMultiple(DDL);
   await ensureColumns(client, DDL);
   for (const statement of IDENTITY_STATEMENTS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
-    await execIgnore(client, statement);
+    const skipped = await execUnlessAsync(
+      async (sql) => await client.execute(sql),
+      statement,
+      toleratedFor(statement),
+    );
+    if (skipped) {
+      // oxlint-disable-next-line no-await-in-loop -- one report per skipped index, in order
+      await reportSkippedIndexAsync(
+        statement,
+        async (sql) => {
+          const rows = (await client.execute(sql)).rows as unknown as {
+            duplicate_groups?: unknown;
+          }[];
+          return Number(rows[0]?.duplicate_groups ?? 0);
+        },
+        logger,
+      );
+    }
   }
   await client.execute(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
-  await execIgnore(client, WEBHOOK_SECRET_DROP);
+  await execUnlessAsync(
+    async (sql) => await client.execute(sql),
+    WEBHOOK_SECRET_DROP,
+    isMissingColumn,
+  );
   await migrateCommentsTable(client);
 }
 
@@ -153,7 +188,11 @@ async function ensureColumns(client: LibsqlClient, ddl: string): Promise<void> {
   );
   await Promise.all(
     statements.map(async ([table, column]) => {
-      await execIgnore(client, `ALTER TABLE ${table} ADD COLUMN ${column}`);
+      await execUnlessAsync(
+        async (sql) => await client.execute(sql),
+        `ALTER TABLE ${table} ADD COLUMN ${column}`,
+        isDuplicateColumn,
+      );
     }),
   );
 }
@@ -163,48 +202,22 @@ function isMissing(column: string, existing: Set<string>): boolean {
   return name !== undefined && !existing.has(name);
 }
 
-async function execIgnore(client: LibsqlClient, sql: string): Promise<void> {
-  try {
-    await client.execute(sql);
-  } catch {
-    // idempotent — already migrated
-  }
-}
-
 async function migrateCommentsTable(client: LibsqlClient): Promise<void> {
-  try {
-    const result = await client.execute(
-      "SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'",
-    );
-    const sql = (result.rows[0] as unknown as { sql: string } | undefined)?.sql;
-    if (!sql?.includes("user_id TEXT NOT NULL REFERENCES users")) {
-      return;
-    }
-    await recreateCommentsTable(client);
-  } catch {
-    await execIgnore(client, "PRAGMA foreign_keys = ON");
+  const result = await client.execute(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'",
+  );
+  const sql = (result.rows[0] as unknown as { sql: string } | undefined)?.sql;
+  if (!sql?.includes("user_id TEXT NOT NULL REFERENCES users")) {
+    return;
   }
+  await recreateCommentsTable(client);
 }
 
+/**
+ * Swap `comments` for a table whose `user_id` may be null. A write `batch` is one transaction, so a
+ * failure leaves the old table as it was. Nothing references `comments`, so foreign keys need not
+ * be switched off for the swap.
+ */
 async function recreateCommentsTable(client: LibsqlClient): Promise<void> {
-  await client.execute("PRAGMA foreign_keys = OFF");
-  await client.execute(`
-    CREATE TABLE comments_new (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
-      snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
-      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-      body TEXT NOT NULL,
-      parent_id TEXT,
-      resolved INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
-  await client.execute("INSERT INTO comments_new SELECT * FROM comments");
-  await client.execute("DROP TABLE comments");
-  await client.execute("ALTER TABLE comments_new RENAME TO comments");
-  await client.execute("CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id)");
-  await client.execute("PRAGMA foreign_keys = ON");
+  await client.batch(commentsRebuildStatements(), "write");
 }

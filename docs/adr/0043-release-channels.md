@@ -15,18 +15,18 @@ URLs that npm clients cannot depend on durably.
 ## Decision
 
 1. **Changesets decides what releases.** A pull request that changes shipped behavior adds a
-   `.changeset/*.md` file (`nubx changeset`). Docs, test, CI and typo pull requests add none and release
+   `.changeset/*.md` file (`nub run changeset <patch|minor|major>`). Docs, test, CI and typo pull requests add none and release
    nothing.
-2. **One shared version.** All published packages (22 today) keep one version: a Changesets `fixed`
-   group. `scripts/release-validate.mjs` keeps enforcing it.
-3. **`next` channel, continuous.** A push to `main` that has pending changesets publishes a snapshot
+2. **One shared version.** All published packages (22 today) keep one version, raised by the largest
+   bump of all pending changesets. `scripts/release-validate.mjs` keeps enforcing it.
+3. **`next` channel, daily** (amended 2026-11-07, see below). A push to `main` that has pending changesets publishes a snapshot
    of every package to npm under the **`next`** dist-tag, versioned `<calculated next
 version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is made in the CI
    working tree and never committed. npm only. A push without a pending
    changeset publishes nothing, and `latest` is never touched.
 4. **Stable channel, by release pull request.** There is no standing version pull request and no
    tag pushed by hand. When the owner asks, `nub run release:prepare` (`scripts/release.mjs`) runs
-   `changeset version` on a new branch `release/v<version>`: one version for every package, the
+   `scripts/version-packages.mjs` on a new branch `release/v<version>`: one version for every package, the
    `CHANGELOG.md` section, the consumed changesets deleted, one commit `chore(release): v<version>`.
    It fails when no changeset is pending. The pull request goes through normal review and CI, so no
    ruleset bypass is needed. On the push to `main`, the `detect` job of `release.yml` reads the shared
@@ -42,7 +42,7 @@ version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is m
    gated by event and ref. No other workflow publishes to npm, and publishing is not moved into a
    reusable workflow without first confirming against npm's documentation that the publisher still
    matches.
-6. **One root `CHANGELOG.md`.** Per-package changelogs are off (`changelog: false`).
+6. **One root `CHANGELOG.md`.** There are no per-package changelogs.
    `scripts/version-packages.mjs` renders the consumed changesets into a section of the root file,
    largest bump first, so `scripts/release-notes.mjs` keeps working. A section already written for the
    calculated version is extended, not duplicated. The hand-written `## Unreleased` prose that existed
@@ -54,11 +54,31 @@ version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is m
 8. **Package previews only on epic branches.** `release-preview.yml` runs on `push` to `epic/**`
    and no longer on `main`, where the `next` channel replaces it.
 
+## Amendment, 2026-11-03 (#500)
+
+The Changesets file format stays; the Changesets CLI is gone. `scripts/version-packages.mjs` does the
+versioning itself (largest bump over the pending files, one shared version, the root `CHANGELOG.md`
+section, the consumed files deleted, and `--snapshot` for the `next` build), and `nub run changeset`
+writes a file. The CLI was removed because nub is not a workspace it can detect: it needed a
+`lerna.json` shim and `.changeset/config.json`, and added a dependency tree to `nub.lock`. A release
+pull request (head branch `release/v<version>`, changing only package versions, `CHANGELOG.md` and
+deleted changesets) passes the changeset check without a changeset; any other change on that branch
+fails it, so the branch name cannot skip the check.
+
+## Amendment, 2026-11-07 (#789)
+
+Decision 3 is narrowed: a push to `main` no longer publishes `next`, because every merged package
+change produced its own snapshot and most were superseded within hours. `release.yml` gains a daily
+`schedule` run that publishes `next` only while changesets are pending and a package, changeset,
+root `package.json` or `nub.lock` changed since the commit of the current `@storyshelf/core@next`
+(read from its `-next-<sha>` suffix; anything `detect` cannot establish counts as changed). A
+`workflow_dispatch` with channel `next` publishes one immediately. The push trigger keeps the stable
+path, and the daily run also retries an untagged stable version. The shared publish steps move into
+the composite action `.github/actions/npm-publish`, which runs inside the `release.yml` jobs, so the
+OIDC token and the trusted publisher still name `release.yml` (decision 5); it is used nowhere else.
+
 ## Operations
 
-- **Workspace detection.** Changesets recognises a monorepo only by a package manager's lockfile or a
-  `lerna.json`, and nub's `nub.lock` is neither. The root `lerna.json` (`packages/*`) exists for that
-  reason alone; nothing else reads it.
 - **Re-running.** `scripts/publish-npm.mjs` skips versions already on npm; the tag and the GitHub
   Release creation tolerate "already exists" (an existing tag is kept, even at another commit).
   Every stable job checks out, publishes and tags the release commit (the merged `chore(release): v<version>` commit, found by `detect`), not the
@@ -73,7 +93,7 @@ version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is m
 
 - Contributors write the changelog entry in the pull request that makes the change. `CHANGELOG.md` is
   no longer edited by hand.
-- Every merged change with a changeset is installable from npm as `@storyshelf/*@next`. A stable
+- Every merged change with a changeset is installable from npm as `@storyshelf/*@next` within a day. A stable
   version is a deliberate act with a dry run.
 - The choice of bump (patch, minor, major) is made per changeset and applies to the whole fixed group.
 
@@ -84,5 +104,5 @@ version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is m
 | A "Version Packages" pull request | A standing bot pull request: the owner wants a release pull request only on request.                   |
 | Release by `workflow_dispatch`    | Pushed the release commit and tag to `main` from CI, which needs a ruleset bypass; no review step.     |
 | Publish every push to `main`      | Docs, test and CI merges would publish identical builds; the changeset is what marks a shipped change. |
-| `0.0.0-<sha>` snapshot versions   | They do not say which release is coming; `useCalculatedVersion` gives `0.9.0-next-<sha>`.              |
+| `0.0.0-<sha>` snapshot versions   | They do not say which release is coming; the calculated version gives `0.9.0-next-<sha>`.              |
 | Publish from a new workflow file  | The npm trusted publisher is registered to `release.yml`.                                              |

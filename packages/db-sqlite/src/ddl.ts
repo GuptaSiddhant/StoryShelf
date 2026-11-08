@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_enabled INTEGER NOT NULL DEFAULT 1,
   review_approvals INTEGER NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INTEGER,
+  component_owners TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -49,6 +50,9 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_files TEXT,
   affected_import_paths TEXT,
   test_results TEXT,
+  capture_generation INTEGER NOT NULL DEFAULT 0,
+  review_cycle INTEGER NOT NULL DEFAULT 0,
+  review_requested_cycle INTEGER,
   capture_job_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -69,6 +73,20 @@ CREATE TABLE IF NOT EXISTS build_reference_generations (
   owner_id TEXT NOT NULL,
   generation INTEGER NOT NULL CHECK (generation >= 0),
   PRIMARY KEY (project_id, owner_type, owner_id)
+);
+CREATE TABLE IF NOT EXISTS build_deletions (
+  build_id TEXT PRIMARY KEY REFERENCES builds(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  content_released_at TEXT,
+  storage_deleted_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS build_content_releases (
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  content_hash TEXT NOT NULL,
+  released_at TEXT NOT NULL,
+  PRIMARY KEY (build_id, content_hash)
 );
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id TEXT PRIMARY KEY,
@@ -120,6 +138,8 @@ CREATE TABLE IF NOT EXISTS capture_jobs (
   owner TEXT,
   payload TEXT,
   cancel_requested_at TEXT,
+  active_key TEXT,
+  rerun_requested_at TEXT,
   error TEXT,
   started_at TEXT,
   finished_at TEXT,
@@ -226,7 +246,11 @@ CREATE TABLE IF NOT EXISTS comments (
   resolved INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  story_id TEXT
+  story_id TEXT,
+  mentions TEXT,
+  kind TEXT NOT NULL DEFAULT 'comment',
+  resolved_at TEXT,
+  resolved_by TEXT
 );
 CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id);
 CREATE TABLE IF NOT EXISTS build_reviews (
@@ -344,6 +368,7 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   enabled INTEGER NOT NULL DEFAULT 1,
   last_error TEXT,
   last_error_at TEXT,
+  last_delivered_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -355,6 +380,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   events TEXT,
   via TEXT,
   enabled INTEGER NOT NULL DEFAULT 1,
+  review_requests INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS notification_subscriptions_project_user_idx ON notification_subscriptions (project_id, user_id);
@@ -454,12 +480,17 @@ CREATE TABLE IF NOT EXISTS project_group_mappings (
   created_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS project_group_mappings_project_group_idx ON project_group_mappings (project_id, group_name);
-CREATE TABLE IF NOT EXISTS content_refs (
-  hash TEXT PRIMARY KEY,
-  ref_count INTEGER NOT NULL DEFAULT 1,
-  last_seen_at TEXT NOT NULL,
-  created_at TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS content_uses (
+  build_id TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  released_at TEXT,
+  collecting_at TEXT,
+  claim_token TEXT,
+  PRIMARY KEY (build_id, content_hash)
 );
+CREATE INDEX IF NOT EXISTS content_uses_hash_idx ON content_uses (content_hash);
 CREATE TABLE IF NOT EXISTS user (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -550,9 +581,13 @@ export const IDENTITY_STATEMENTS: string[] = [
   "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
   "CREATE INDEX IF NOT EXISTS snapshots_project_import_path_idx ON snapshots (project_id, story_import_path)",
   "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)",
+  // Single-flight job kinds (ADR 0040): at most one non-terminal job per active_key; NULLs never collide.
+  "CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx ON capture_jobs (active_key)",
   // Pre-adapter Figma tables, replaced by design_nodes / design_credentials (no data is carried over).
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",
+  // Replaced by content_uses (ADR 0039); its per-hash counters cannot become per-build uses.
+  "DROP TABLE IF EXISTS content_refs",
 ];
 
 const CONSTRAINT_PREFIX = /^(?:PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\s/iu;

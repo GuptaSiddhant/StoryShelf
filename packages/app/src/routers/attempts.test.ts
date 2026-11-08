@@ -45,6 +45,7 @@ const build: Build = {
   approvedCount: 0,
   rejectedCount: 0,
   inheritedCount: 0,
+  captureGeneration: 0,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };

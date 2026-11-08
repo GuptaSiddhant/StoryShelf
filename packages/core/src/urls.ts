@@ -1,3 +1,31 @@
+/** Options of {@link UrlBuilder.component}. */
+export interface ComponentUrlOptions {
+  /** Show this build's states, results and comments instead of the newest build that has the file. */
+  build?: string | undefined;
+  /** Open this tab of the component page. */
+  tab?: string | undefined;
+}
+
+/**
+ * The query string of a component page: `?build=` and `?tab=` when given, else nothing. `path`
+ * is the import path itself, for the one case that cannot travel in the URL path (see
+ * {@link hasDotSegment}).
+ */
+function componentQuery(options: ComponentUrlOptions | undefined, path?: string): string {
+  const params = new URLSearchParams();
+  if (path !== undefined) {
+    params.set("path", path);
+  }
+  if (options?.build) {
+    params.set("build", options.build);
+  }
+  if (options?.tab !== undefined) {
+    params.set("tab", options.tab);
+  }
+  const query = params.toString();
+  return query === "" ? "" : `?${query}`;
+}
+
 /** Type-safe URL builder for project pages and published Storybooks. */
 export interface UrlBuilder {
   projectsList(): string;
@@ -15,8 +43,8 @@ export interface UrlBuilder {
   jobs(slug: string): string;
   labels(slug: string): string;
   label(slug: string, key: string, value: string): string;
-  /** Stable component page, keyed by the story file's import path; `tab` selects one of its tabs. */
-  component(slug: string, importPath: string, tab?: string): string;
+  /** Stable component page, keyed by the story file's import path; `build` selects one build, `tab` one of its tabs. */
+  component(slug: string, importPath: string, options?: ComponentUrlOptions): string;
   storybook(slug: string): string;
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
@@ -48,12 +76,19 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     designCoverage: (slug) => `${root}/projects/${slug}/design/coverage`,
     jobs: (slug) => `${root}/projects/${slug}/jobs`,
     labels: (slug) => `${root}/projects/${slug}/labels`,
-    label: (slug, key, value) =>
-      `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodePath(value)}`,
-    component: (slug, importPath, tab) =>
-      `${root}/projects/${slug}/components/${encodePath(importPath.replace(/^(?:\.\/)+/u, ""))}${
-        tab === undefined ? "" : `?tab=${encodeURIComponent(tab)}`
-      }`,
+    label: (slug, key, value) => {
+      const page = `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/`;
+      return hasDotSegment(value)
+        ? `${page}?value=${encodeURIComponent(value)}`
+        : `${page}${encodePath(value)}`;
+    },
+    component: (slug, importPath, options) => {
+      const path = importPath.replace(/^(?:\.\/)+/u, "");
+      const page = `${root}/projects/${slug}/components/`;
+      return hasDotSegment(path)
+        ? `${page}${componentQuery(options, path)}`
+        : `${page}${encodePath(path)}${componentQuery(options)}`;
+    },
     storybook: (slug) =>
       publishedBaseDomain
         ? `https://${slug}.${publishedBaseDomain}`
@@ -97,4 +132,14 @@ function encodePath(value: string): string {
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
+}
+
+/**
+ * Whether a value has a path segment that is exactly `.` or `..`. A browser, and `new URL`,
+ * resolve such a segment (even as `%2E%2E`) before the request, so the link would open another
+ * page. These values travel in the query string of the same page instead (`?value=`, `?path=`);
+ * the routes accept both forms. Every other value keeps its path form.
+ */
+export function hasDotSegment(value: string): boolean {
+  return value.split("/").some((segment) => segment === "." || segment === "..");
 }

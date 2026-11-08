@@ -15,6 +15,7 @@ import {
   providerNameFor,
 } from "../routers/design.handlers.ts";
 import { loadReviewSection } from "../routers/review-section.handlers.ts";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { catalogOf, getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
@@ -30,7 +31,6 @@ import {
   VStack,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import {
   snapshotCard,
   snapshotCardBody,
@@ -44,6 +44,7 @@ import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { TestsCard } from "./build-tests.tsx";
 import { DesignButtons } from "./design-links.tsx";
+import { ChangeRequestsCard } from "./review-change-requests.tsx";
 import { ChangesetCard } from "./review-changeset.tsx";
 import { CommentsCard } from "./review-comments.tsx";
 import { VerdictCard } from "./review-verdict.tsx";
@@ -89,7 +90,6 @@ export async function renderBuildDetailPage(
   const staleCount = Object.keys(drifted).length;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const testing = testingEnabled();
-  const cancelled = build.status === "cancelled";
   const published = build.status === "approved" && attempts.length === 0;
   const [catalog, labels] = await Promise.all([
     catalogOf()
@@ -324,7 +324,8 @@ export async function renderBuildDetailPage(
       {review ? (
         <div class="mb-1">
           <VStack>
-            {testing || cancelled ? null : <VerdictCard data={review} />}
+            {testing ? null : <VerdictCard data={review} />}
+            <ChangeRequestsCard data={review} />
             <ChangesetCard data={review} />
           </VStack>
         </div>
@@ -391,7 +392,7 @@ export async function renderBuildDetailPage(
                     <Button
                       variant="ghost"
                       size="sm"
-                      href={`${urls.component(project.slug, snap.storyImportPath)}#${snap.storyId}`}
+                      href={`${urls.component(project.slug, snap.storyImportPath, { build: snap.buildId })}#${snap.storyId}`}
                     >
                       Component
                     </Button>
@@ -437,7 +438,7 @@ export async function renderBuildDetailPage(
       {review ? (
         <div class="mt-1">
           <VStack>
-            {testing && !cancelled ? <VerdictCard data={review} /> : null}
+            {testing ? <VerdictCard data={review} /> : null}
             <CommentsCard data={review} />
           </VStack>
         </div>

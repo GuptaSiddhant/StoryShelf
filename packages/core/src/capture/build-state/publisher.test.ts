@@ -40,6 +40,23 @@ describe("createBuildStatePublisher", () => {
     expect(w.git.calls).toHaveLength(0);
   });
 
+  it("queues only the asked channel for an operator retry", async () => {
+    const w = await world();
+    const second = await w.channels.create({
+      projectId: w.project.id,
+      provider: "fake-git",
+      config: { prefix: "alt" },
+      secret: "t",
+    });
+    const enqueue = vi.fn(async (_job: { channelId: string; buildId: string }) => {});
+    await createBuildStatePublisher({ deps: w.deps, enqueue }).request(w.build.id, {
+      channelId: second.id,
+    });
+    expect(enqueue.mock.calls.map(([job]) => job)).toEqual([
+      { channelId: second.id, buildId: w.build.id },
+    ]);
+  });
+
   it("falls back to inline delivery when queueing fails", async () => {
     const w = await world();
     const enqueue = vi.fn(async () => {

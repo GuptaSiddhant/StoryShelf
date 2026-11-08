@@ -1,6 +1,7 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -14,7 +15,6 @@ import {
   Table,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Build statuses the retry button of the jobs table offers. */
 const RETRYABLE: ReadonlySet<string> = new Set(["failed", "cancelled", "pending"]);
@@ -42,7 +42,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
       {queueView.length === 0 ? (
         <Meta>No captures are currently queued or running.</Meta>
       ) : (
-        <Table>
+        <Table label="Active queue">
           <table>
             <thead>
               <tr>
@@ -116,7 +116,7 @@ export async function renderComputeJobsPage(
       <Card>
         <SectionTitle>Recent builds</SectionTitle>
         <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
-        <Table>
+        <Table label="Recent builds">
           <table>
             <thead>
               <tr>

@@ -1,11 +1,18 @@
+import type { BuildReferenceOwner, TxStore } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BaselineModel, BaselineTransferModel, SnapshotModel } from "@storyshelf/core/models";
-import { buildReferenceContractSuite, makeStorage } from "@storyshelf/core/test-helpers";
+import {
+  buildReferenceContractSuite,
+  makeStorage,
+  retentionActivationContractSuite,
+} from "@storyshelf/core/test-helpers";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 import {
@@ -14,12 +21,77 @@ import {
   replaceFencedReferences,
 } from "./build-reference-lifecycle.ts";
 import { createSqliteDatabase } from "./index.ts";
+import { activateRetention, type RetentionActivation } from "./retention-activation.ts";
 import { schema } from "./schema/index.ts";
 
 const now = "2026-01-01T00:00:00.000Z";
 const owner = { projectId: "p", type: "baseline", id: "base" } as const;
 const childPollMs = 10;
 const childWaitMs = 15_000;
+
+const baselineRow = {
+  projectId: "p",
+  storyId: "story",
+  viewportName: "desktop",
+  branch: "main",
+  browser: "chromium",
+  screenshotPath: "shot",
+  snapshotId: "snap",
+  createdAt: now,
+  updatedAt: now,
+};
+
+/** Rows of `build_references`, optionally for one baseline, read through a separate connection. */
+function referenceRows(path: string, ownerId?: string): number {
+  const db = new DatabaseSync(path);
+  try {
+    const sql =
+      ownerId === undefined
+        ? "SELECT COUNT(*) FROM build_references"
+        : "SELECT COUNT(*) FROM build_references WHERE owner_id = ?";
+    const row = (ownerId === undefined ? db.prepare(sql).get() : db.prepare(sql).get(ownerId)) as
+      | Record<string, number>
+      | undefined;
+    return Number(Object.values(row ?? { count: 0 })[0]);
+  } finally {
+    db.close();
+  }
+}
+
+type Lifecycle = ReturnType<typeof createBuildReferenceLifecycle>;
+
+/** Read the owner's generation, then write fenced: the shape every caller of the contract now uses. */
+async function replaceFenced<T>(
+  lifecycle: Lifecycle,
+  target: BuildReferenceOwner,
+  ids: readonly string[],
+  write: (tx: TxStore) => Promise<T>,
+): Promise<T> {
+  const generation = await lifecycle.referenceGeneration(target);
+  return (await lifecycle.replaceFencedReferences(target, generation, ids, write)).result as T;
+}
+
+/** A promise the test opens by hand. */
+function gate(): { promise: Promise<void>; open: () => void } {
+  const holder = { open: () => {} };
+  const promise = new Promise<void>((resolve) => {
+    holder.open = resolve;
+  });
+  return { promise, open: () => holder.open() };
+}
+
+/** Committed marker projects, read through a separate connection. */
+function markerCount(path: string): number {
+  const db = new DatabaseSync(path);
+  try {
+    const row = db.prepare("SELECT COUNT(*) AS n FROM projects WHERE name = 'marker'").get() as
+      | { n: number }
+      | undefined;
+    return row?.n ?? 0;
+  } finally {
+    db.close();
+  }
+}
 
 async function waitForPath(path: string): Promise<boolean> {
   const deadline = Date.now() + childWaitMs;
@@ -68,7 +140,82 @@ buildReferenceContractSuite("SQLite", async (run) => {
       second: createBuildReferenceLifecycle(path),
       owner,
       buildIds: ["one", "two"],
+      marker: {
+        write: async (tx) => {
+          const id = randomUUID();
+          await tx.insert(schema.projects, {
+            id,
+            name: "marker",
+            slug: id,
+            createdAt: now,
+            updatedAt: now,
+          });
+        },
+        count: async () => await Promise.resolve(markerCount(path)),
+      },
     });
+  });
+});
+
+retentionActivationContractSuite("SQLite", async (run) => {
+  await withDatabase(async (path) => {
+    const db = createSqliteDatabase(path);
+    try {
+      await run({
+        lifecycle: createBuildReferenceLifecycle(path),
+        // The adapter's own boot step, so the pause it reports is the one that ships.
+        prepare: async () => {
+          const state: RetentionActivation = {};
+          await activateRetention(path, state);
+          return state.pause;
+        },
+        seed: {
+          baseline: async (row) => {
+            await db.insert(schema.baselines, {
+              ...baselineRow,
+              storyId: row.storyId ?? row.id,
+              ...row,
+              snapshotId: row.snapshotId === undefined ? "snap" : row.snapshotId,
+            });
+          },
+          snapshot: async (row) => {
+            await db.insert(schema.snapshots, {
+              projectId: "p",
+              storyName: "Story",
+              storyTitle: "Story",
+              viewportName: "desktop",
+              browser: "chromium",
+              screenshotPath: "shot",
+              createdAt: now,
+              updatedAt: now,
+              ...row,
+            });
+          },
+          foreignBuild: async (id) => {
+            await db.insert(schema.projects, {
+              id: "q",
+              name: "Other",
+              slug: "q",
+              createdAt: now,
+              updatedAt: now,
+            });
+            await db.insert(schema.builds, {
+              id,
+              projectId: "q",
+              gitSha: id,
+              gitBranch: "main",
+              createdAt: now,
+              updatedAt: now,
+            });
+          },
+        },
+        baselineSource: async (id) =>
+          ((await db.get(schema.baselines, id))?.["sourceBuildId"] as string | null | undefined) ??
+          null,
+      });
+    } finally {
+      await db.lifecycle?.teardown();
+    }
   });
 });
 
@@ -128,7 +275,11 @@ describe("SQLite reference lifecycle primitive", () => {
         }
         const lifecycle = createBuildReferenceLifecycle(path);
         expect(await lifecycle.referenceGeneration(owner)).toBe(0);
-        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 0 });
+        expect(await prepareBaselineReferences(path)).toEqual({
+          protected: 1,
+          unknown: 0,
+          unavailable: 0,
+        });
         expect(await lifecycle.referenceGeneration(owner)).toBe(1);
         expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
       } finally {
@@ -136,44 +287,48 @@ describe("SQLite reference lifecycle primitive", () => {
       }
     });
   }, 30_000);
-  it("recovers the renderer source of an inherited baseline without pinning its containing build", async () => {
+  it("loses no pin when a fenced writer races preparation of the same baseline", async () => {
     await withDatabase(async (path) => {
       const db = createSqliteDatabase(path);
       try {
-        await db.insert(schema.snapshots, {
-          id: "inherited",
-          projectId: "p",
-          buildId: "two",
-          storyId: "story",
-          storyName: "Story",
-          storyTitle: "Story",
-          viewportName: "desktop",
-          browser: "chromium",
-          screenshotPath: "shot",
-          inherited: true,
-          sourceBuildId: "one",
-          createdAt: now,
-          updatedAt: now,
+        await db.insert(schema.baselines, { ...baselineRow, id: "base", sourceBuildId: "one" });
+        const lifecycle = createBuildReferenceLifecycle(path);
+        const generation = await lifecycle.referenceGeneration(owner);
+        const holding = gate();
+        const released = gate();
+        // Preparation holds the write lock; the writer read generation 0 before it started.
+        const preparing = prepareBaselineReferences(path, async () => {
+          holding.open();
+          await released.promise;
         });
-        await db.insert(schema.baselines, {
-          id: "base",
-          projectId: "p",
-          storyId: "story",
-          viewportName: "desktop",
-          branch: "feature",
-          browser: "chromium",
-          screenshotPath: "shot",
-          snapshotId: "inherited",
-          sourceBuildId: null,
-          createdAt: now,
-          updatedAt: now,
-        });
-        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 0 });
-        expect((await db.get(schema.baselines, "base"))?.["sourceBuildId"]).toBe("one");
-        expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "one")).toBe(
-          "protected",
+        await holding.promise;
+        const writer = lifecycle.replaceFencedReferences(
+          owner,
+          generation,
+          ["two"],
+          async () => null,
         );
-        expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("claimed");
+        const outcome = writer.then(
+          () => "admitted",
+          (error: unknown) => error,
+        );
+        released.open();
+        expect(await preparing).toEqual({ protected: 1, unknown: 0, unavailable: 0 });
+
+        // The writer's fence is stale: it is rejected, and the pin preparation made is still there.
+        expect(await outcome).toMatchObject({ message: "Stale reference generation" });
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
+        expect(referenceRows(path, "base")).toBe(1);
+
+        // Retried at the new generation, it replaces the pin: no pin is lost or doubled.
+        await lifecycle.replaceFencedReferences(
+          owner,
+          await lifecycle.referenceGeneration(owner),
+          ["two"],
+          async () => null,
+        );
+        expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
+        expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
       } finally {
         await db.lifecycle?.teardown();
       }
@@ -262,7 +417,11 @@ describe("SQLite reference lifecycle primitive", () => {
       try {
         await db.insert(schema.baselines, { ...base, id: "main" });
         await db.insert(schema.baselines, { ...base, id: "feature", branch: "feature" });
-        expect(await prepareBaselineReferences(path)).toEqual({ protected: 2, unknown: 0 });
+        expect(await prepareBaselineReferences(path)).toEqual({
+          protected: 2,
+          unknown: 0,
+          unavailable: 0,
+        });
         const lifecycle = createBuildReferenceLifecycle(path);
         for (const id of ["main", "feature"]) {
           const ref = { type: "baseline" as const, id, projectId: "p" };
@@ -316,195 +475,6 @@ describe("SQLite reference lifecycle primitive", () => {
       }
     });
   });
-  it("prepares known baseline sources idempotently and clears missing sources", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      const baseline = {
-        projectId: "p",
-        storyId: "story",
-        viewportName: "desktop",
-        branch: "main",
-        browser: "chromium",
-        screenshotPath: "shot",
-        snapshotId: "snap",
-        createdAt: now,
-        updatedAt: now,
-      };
-      try {
-        await db.insert(schema.baselines, { ...baseline, id: "known", sourceBuildId: "one" });
-        await db.insert(schema.baselines, {
-          ...baseline,
-          id: "unknown",
-          storyId: "other",
-          sourceBuildId: "missing",
-        });
-        const unknownOwner = { type: "baseline" as const, projectId: "p", id: "unknown" };
-        await createBuildReferenceLifecycle(path).replaceFencedReferences(
-          unknownOwner,
-          0,
-          ["two"],
-          async () => null,
-        );
-        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
-        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 1 });
-        expect((await db.get(schema.baselines, "unknown"))?.["sourceBuildId"]).toBeNull();
-        const lifecycle = createBuildReferenceLifecycle(path);
-        expect(await lifecycle.referenceGeneration(unknownOwner)).toBe(2);
-        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
-        expect(
-          await lifecycle.referenceGeneration({ type: "baseline", id: "known", projectId: "p" }),
-        ).toBe(1);
-        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-  it("releases a stale baseline pin when preparation resolves a different source", async () => {
-    await withDatabase(async (path) => {
-      const db = createSqliteDatabase(path);
-      try {
-        await db.insert(schema.baselines, {
-          id: "base",
-          projectId: "p",
-          storyId: "story",
-          viewportName: "desktop",
-          branch: "main",
-          browser: "chromium",
-          screenshotPath: "shot",
-          snapshotId: "snap",
-          sourceBuildId: "one",
-          createdAt: now,
-          updatedAt: now,
-        });
-        const lifecycle = createBuildReferenceLifecycle(path);
-        const baselineOwner = { type: "baseline" as const, projectId: "p", id: "base" };
-        await lifecycle.replaceFencedReferences(baselineOwner, 0, ["two"], async () => null);
-
-        expect(await prepareBaselineReferences(path)).toEqual({ protected: 1, unknown: 0 });
-        expect(await lifecycle.referenceGeneration(baselineOwner)).toBe(2);
-        expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
-        expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
-      } finally {
-        await db.lifecycle?.teardown();
-      }
-    });
-  });
-  it("rejects invalid generations and unavailable builds without advancing the fence", async () => {
-    await withDatabase(async (path) => {
-      const lifecycle = createBuildReferenceLifecycle(path);
-      for (const invalid of [-1, 0.5, Number.MAX_SAFE_INTEGER]) {
-        // oxlint-disable-next-line no-await-in-loop -- verify each invalid boundary
-        await expect(
-          lifecycle.replaceFencedReferences(owner, invalid, [], async () => null),
-        ).rejects.toThrow("Invalid reference generation");
-      }
-      await expect(
-        lifecycle.replaceFencedReferences(owner, 0, ["missing"], async () => null),
-      ).rejects.toThrow("Referenced build is unavailable");
-      expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
-      await expect(
-        lifecycle.replaceFencedReferences(owner, 0, ["one"], async () => null),
-      ).rejects.toThrow("Referenced build is unavailable");
-      expect(await lifecycle.referenceGeneration(owner)).toBe(0);
-    });
-  });
-  it("handles empty batches and rolls back both owners when domain writes fail", async () => {
-    await withDatabase(async (path) => {
-      const lifecycle = createBuildReferenceLifecycle(path);
-      const other = { ...owner, id: "other" };
-      expect(await lifecycle.replaceManyFencedReferences([], async () => "empty")).toEqual({
-        result: "empty",
-        generations: [],
-      });
-      await expect(
-        lifecycle.replaceManyFencedReferences(
-          [
-            { owner, expectedGeneration: 0, buildIds: ["one"] },
-            { owner: other, expectedGeneration: 0, buildIds: ["two"] },
-          ],
-          async () => {
-            throw new Error("rollback");
-          },
-        ),
-      ).rejects.toThrow("rollback");
-      expect(await lifecycle.referenceGeneration(owner)).toBe(0);
-      expect(await lifecycle.referenceGeneration(other)).toBe(0);
-      expect(await lifecycle.claimDeletion("p", "one")).toBe("claimed");
-      expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
-    });
-  });
-  it("retains the generation after release and rejects a stale observed generation", async () => {
-    await withDatabase(async (path) => {
-      const first = createBuildReferenceLifecycle(path);
-      const second = createBuildReferenceLifecycle(path);
-      expect(await first.referenceGeneration(owner)).toBe(0);
-      await first.replaceFencedReferences(owner, 0, ["one"], async () => null);
-      const observed = await second.referenceGeneration(owner);
-      expect(observed).toBe(1);
-      await first.replaceFencedReferences(owner, observed, [], async () => null);
-      expect(await second.referenceGeneration(owner)).toBe(2);
-      await expect(
-        second.replaceFencedReferences(owner, observed, ["two"], async () => null),
-      ).rejects.toThrow("Stale reference generation");
-      expect(await first.claimDeletion("p", "two")).toBe("claimed");
-    });
-  });
-  it("rejects an entire multi-owner update when one generation is stale", async () => {
-    await withDatabase(async (path) => {
-      const lifecycle = createBuildReferenceLifecycle(path);
-      const other = { ...owner, id: "other" };
-      const created = await lifecycle.replaceManyFencedReferences(
-        [
-          { owner, expectedGeneration: 0, buildIds: ["one"] },
-          { owner: other, expectedGeneration: 0, buildIds: ["two"] },
-        ],
-        async () => "created",
-      );
-      expect(created.generations).toEqual([1, 1]);
-      let wrote = false;
-      await expect(
-        lifecycle.replaceManyFencedReferences(
-          [
-            { owner, expectedGeneration: 1, buildIds: [] },
-            { owner: other, expectedGeneration: 0, buildIds: [] },
-          ],
-          async () => {
-            wrote = true;
-          },
-        ),
-      ).rejects.toThrow("Stale reference generation");
-      expect(wrote).toBe(false);
-      expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
-      expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
-    });
-  });
-  it("admits only one competing update for the same owner generation", async () => {
-    await withDatabase(async (path) => {
-      const first = createBuildReferenceLifecycle(path);
-      const second = createBuildReferenceLifecycle(path);
-      const attempts = await Promise.allSettled([
-        first.replaceFencedReferences(owner, 0, ["one"], async () => "one"),
-        second.replaceFencedReferences(owner, 0, ["two"], async () => "two"),
-      ]);
-      const success = attempts.find((result) => result.status === "fulfilled");
-      expect(attempts.filter((result) => result.status === "fulfilled")).toHaveLength(1);
-      expect(attempts.filter((result) => result.status === "rejected")).toHaveLength(1);
-      if (success?.status !== "fulfilled") throw new Error("No successful admission");
-      expect(success.value.generation).toBe(1);
-      expect(await first.claimDeletion("p", success.value.result)).toBe("protected");
-    });
-  });
-  it("invalidates a fence when an older lifecycle entry point changes the owner", async () => {
-    await withDatabase(async (path) => {
-      await replaceFencedReferences(path, owner, 0, ["one"], async () => null);
-      await createBuildReferenceLifecycle(path).replaceReferences(owner, ["two"], async () => null);
-      await expect(replaceFencedReferences(path, owner, 1, [], async () => null)).rejects.toThrow(
-        "Stale reference generation",
-      );
-      expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("protected");
-    });
-  });
   it("fences stale releases across independent SQLite connections", async () => {
     await withDatabase(async (path) => {
       const first = await replaceFencedReferences(path, owner, 0, ["one"], async () => "first");
@@ -522,75 +492,6 @@ describe("SQLite reference lifecycle primitive", () => {
         replaceFencedReferences(path, owner, 2, [], async () => "repeat"),
       ).rejects.toThrow("Stale reference generation");
       expect(await createBuildReferenceLifecycle(path).claimDeletion("p", "two")).toBe("claimed");
-    });
-  });
-  it("protects referenced builds and leaves deletion tombstones irreversible across connections", async () => {
-    await withDatabase(async (path) => {
-      const first = createBuildReferenceLifecycle(path);
-      const second = createBuildReferenceLifecycle(path);
-      await first.replaceReferences(owner, ["one", "one"], async () => await Promise.resolve());
-      expect(await second.claimDeletion("p", "one")).toBe("protected");
-      await first.replaceReferences(owner, ["two"], async () => await Promise.resolve());
-      expect(await second.claimDeletion("p", "one")).toBe("claimed");
-      expect(await first.claimDeletion("p", "one")).toBe("deleting");
-      await expect(
-        first.replaceReferences(owner, ["one"], async () => await Promise.resolve()),
-      ).rejects.toThrow("unavailable");
-      expect(await second.claimDeletion("p", "two")).toBe("protected");
-      expect(await second.claimDeletion("p", "absent")).toBe("missing");
-    });
-  });
-  it("rolls back domain writes and reference changes together", async () => {
-    await withDatabase(async (path) => {
-      const lifecycle = createBuildReferenceLifecycle(path);
-      await lifecycle.replaceReferences(owner, ["one"], async () => await Promise.resolve());
-      await expect(
-        lifecycle.replaceReferences(owner, ["two"], async (tx) => {
-          await tx.update(schema.projects, "p", { name: "changed" });
-          throw new Error("rollback");
-        }),
-      ).rejects.toThrow("rollback");
-      const read = createSqliteDatabase(path);
-      try {
-        expect((await read.get(schema.projects, "p"))?.["name"]).toBe("Project");
-      } finally {
-        await read.lifecycle?.teardown();
-      }
-      expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
-      expect(await lifecycle.claimDeletion("p", "two")).toBe("claimed");
-    });
-  });
-  it("does not partially update owners when a multi-owner admission fails", async () => {
-    await withDatabase(async (path) => {
-      const lifecycle = createBuildReferenceLifecycle(path);
-      const other = { ...owner, id: "other" };
-      await lifecycle.replaceManyReferences(
-        [
-          { owner, buildIds: ["one"] },
-          { owner: other, buildIds: ["two"] },
-        ],
-        async () => await Promise.resolve(),
-      );
-      await expect(
-        lifecycle.replaceManyReferences(
-          [
-            { owner, buildIds: [] },
-            { owner: other, buildIds: ["missing"] },
-          ],
-          async () => await Promise.resolve(),
-        ),
-      ).rejects.toThrow("unavailable");
-      expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
-      expect(await lifecycle.claimDeletion("p", "two")).toBe("protected");
-      await expect(
-        lifecycle.replaceManyReferences(
-          [
-            { owner, buildIds: [] },
-            { owner, buildIds: [] },
-          ],
-          async () => await Promise.resolve(),
-        ),
-      ).rejects.toThrow("Duplicate reference owner");
     });
   });
   it("commits baseline promotions together with their source references", async () => {
@@ -712,7 +613,7 @@ describe("SQLite reference lifecycle primitive", () => {
       const second = createBuildReferenceLifecycle(path);
       const entered = Promise.withResolvers<boolean>();
       const release = Promise.withResolvers<boolean>();
-      const admission = first.replaceReferences(owner, ["one"], async () => {
+      const admission = replaceFenced(first, owner, ["one"], async () => {
         entered.resolve(true);
         await release.promise;
       });
@@ -730,7 +631,7 @@ describe("SQLite reference lifecycle primitive", () => {
       let child: ReturnType<typeof spawn> | undefined;
       let errors = "";
       let exited: Promise<unknown[]> | undefined;
-      await lifecycle.replaceReferences(owner, ["one"], async () => {
+      await replaceFenced(lifecycle, owner, ["one"], async () => {
         const script = `import('./src/build-reference-lifecycle.ts').then(async ({ createBuildReferenceLifecycle }) => {
           const { writeFileSync } = await import('node:fs');
           const result = await createBuildReferenceLifecycle(process.argv[1], () => writeFileSync(process.argv[1] + '.ready', 'blocked')).claimDeletion('p', 'one');
@@ -755,13 +656,14 @@ describe("SQLite reference lifecycle primitive", () => {
   it("rejects missing and cross-project builds without dropping existing references", async () => {
     await withDatabase(async (path) => {
       const lifecycle = createBuildReferenceLifecycle(path);
-      await lifecycle.replaceReferences(owner, ["one"], async () => await Promise.resolve());
+      await replaceFenced(lifecycle, owner, ["one"], async () => await Promise.resolve());
       await expect(
-        lifecycle.replaceReferences(owner, ["missing"], async () => await Promise.resolve()),
+        replaceFenced(lifecycle, owner, ["missing"], async () => await Promise.resolve()),
       ).rejects.toThrow("unavailable");
       expect(await lifecycle.claimDeletion("p", "one")).toBe("protected");
       await expect(
-        lifecycle.replaceReferences(
+        replaceFenced(
+          lifecycle,
           { ...owner, projectId: "other" },
           ["one"],
           async () => await Promise.resolve(),

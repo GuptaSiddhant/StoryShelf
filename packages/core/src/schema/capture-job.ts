@@ -18,8 +18,11 @@
 /** Which of the two row kinds of `capture_jobs` a row is. */
 export type CaptureJobEntry = "job" | "attempt";
 
-/** What a job does: render a build or shard, publish a zip, or deliver a notification. */
-export type CaptureJobKind = "capture" | "publish" | "notify";
+/**
+ * What a job does: render a build or shard, publish a zip, deliver a build state (`notify`) or
+ * deliver one review request to one recipient (`review-request`, ADR 0040).
+ */
+export type CaptureJobKind = "capture" | "publish" | "notify" | "review-request";
 
 /** Lifecycle of a job row. */
 export type CaptureJobStatus =
@@ -57,6 +60,14 @@ export interface CaptureJobRow {
   payload: string | null;
   /** Set once cancel was asked for; the holder turns it into `runner.cancel`. */
   cancelRequestedAt: string | null;
+  /**
+   * Job row of a single-flight kind: the key at most one non-terminal job may hold (unique), e.g.
+   * `notify:<channelId>:<buildId>`; cleared in the write that ends the job. Null otherwise, and
+   * always null on attempt rows.
+   */
+  activeKey: string | null;
+  /** Running job row: a request arrived for its key while it ran, so one more pass is owed. */
+  rerunRequestedAt: string | null;
   /** Job row: the last attempt's error. Attempt row: its own. */
   error: string | null;
   startedAt: string | null;

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_enabled TINYINT(1) NOT NULL DEFAULT true,
   review_approvals INT NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INT,
+  component_owners TEXT,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 );
@@ -48,6 +49,9 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_files TEXT,
   affected_import_paths TEXT,
   test_results TEXT,
+  capture_generation INTEGER NOT NULL DEFAULT 0,
+  review_cycle INT NOT NULL DEFAULT 0,
+  review_requested_cycle INT,
   capture_job_id VARCHAR(26),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
@@ -109,6 +113,8 @@ CREATE TABLE IF NOT EXISTS capture_jobs (
   owner TEXT,
   payload TEXT,
   cancel_requested_at DATETIME(3),
+  active_key VARCHAR(191),
+  rerun_requested_at DATETIME(3),
   error TEXT,
   started_at DATETIME(3),
   finished_at DATETIME(3),
@@ -251,6 +257,10 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   story_id TEXT,
+  mentions TEXT,
+  kind VARCHAR(32) NOT NULL DEFAULT 'comment',
+  resolved_at DATETIME(3) NULL,
+  resolved_by VARCHAR(64) NULL,
   CONSTRAINT fk_comments_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_build_id FOREIGN KEY (build_id) REFERENCES builds(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_snapshot_id FOREIGN KEY (snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE,
@@ -387,6 +397,7 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   last_error TEXT,
   last_error_at DATETIME(3),
+  last_delivered_at DATETIME(3),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_notification_channels_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -399,6 +410,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   events TEXT,
   via TEXT,
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  review_requests BOOLEAN NOT NULL DEFAULT TRUE,
   created_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_notification_subscriptions_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_notification_subscriptions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -481,12 +493,17 @@ CREATE TABLE IF NOT EXISTS project_group_mappings (
   CONSTRAINT fk_project_group_mappings_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX project_group_mappings_project_group_idx ON project_group_mappings (project_id, group_name);
-CREATE TABLE IF NOT EXISTS content_refs (
-  hash VARCHAR(128) PRIMARY KEY,
-  ref_count INTEGER NOT NULL DEFAULT 1,
-  last_seen_at DATETIME(3) NOT NULL,
-  created_at DATETIME(3) NOT NULL
+CREATE TABLE IF NOT EXISTS content_uses (
+  build_id VARCHAR(64) NOT NULL,
+  content_hash VARCHAR(128) NOT NULL,
+  project_id VARCHAR(64) NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  released_at DATETIME(3) NULL,
+  collecting_at DATETIME(3) NULL,
+  claim_token VARCHAR(64) NULL,
+  PRIMARY KEY (build_id, content_hash)
 );
+CREATE INDEX content_uses_hash_idx ON content_uses (content_hash);
 CREATE TABLE IF NOT EXISTS \`user\` (
   id VARCHAR(64) PRIMARY KEY,
   name TEXT NOT NULL,

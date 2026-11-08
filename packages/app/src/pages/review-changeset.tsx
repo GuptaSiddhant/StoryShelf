@@ -15,9 +15,6 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 type Kind = "added" | "changed" | "removed";
@@ -34,7 +31,8 @@ export function ChangesetCard(props: { data: ReviewSectionData }): Rendered {
         {baseline
           ? `Compared with the accepted build ${baseline.gitSha.slice(0, 7)} on ${baseline.gitBranch}.`
           : "No accepted build to compare with: every component counts as new."}{" "}
-        A changed component has different stories, not necessarily a different look.
+        A changed component has different story-index metadata (stories added, removed or renamed),
+        not necessarily a different look. Changes to args or source alone do not show here.
       </Meta>
       {total === 0 ? (
         <EmptyState
@@ -59,7 +57,7 @@ function ChangesetTable(props: { data: ReviewSectionData }): Rendered {
         <Badge tone="danger">{changeset.removed.length} removed</Badge>
         <Meta as="span">{changeset.unchanged} unchanged</Meta>
       </HStack>
-      <Table>
+      <Table label="Components changed in this build">
         <table>
           <caption class="visually-hidden">Components that changed in this build</caption>
           <thead>
@@ -100,15 +98,13 @@ function rows(
 
 const KIND_TONE = { added: "success", changed: "warning", removed: "danger" } as const;
 
+/** One row of the changeset table. */
 function ChangeRow(props: {
   data: ReviewSectionData;
   kind: Kind;
   item: ChangesetComponent & { previousStoryCount?: number };
 }): Rendered {
   const { data, kind, item } = props;
-  const { project, build } = data;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
-  const story = data.firstStory.get(item.importPath);
   return (
     <tr>
       <td>
@@ -126,23 +122,39 @@ function ChangeRow(props: {
           : item.storyCount}
       </td>
       <td>
-        <HStack>
-          {kind !== "removed" && story ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              href={`${urls.storybookBuild(project.slug, build.id)}/?path=/story/${encodeURIComponent(story)}`}
-            >
-              Story
-            </Button>
-          ) : null}
-          {item.importPath ? (
-            <Button variant="ghost" size="sm" href={urls.component(project.slug, item.importPath)}>
-              Component
-            </Button>
-          ) : null}
-        </HStack>
+        <RowLinks data={data} kind={kind} importPath={item.importPath} />
       </td>
     </tr>
+  );
+}
+
+/** The Story and Component links of a row; a removed file links without the build. */
+function RowLinks(props: { data: ReviewSectionData; kind: Kind; importPath: string }): Rendered {
+  const { data, kind, importPath } = props;
+  const { project, build } = data;
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const story = data.firstStory.get(importPath);
+  const componentBuild = kind === "removed" ? undefined : build.id;
+  return (
+    <HStack>
+      {kind !== "removed" && story ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          href={`${urls.storybookBuild(project.slug, build.id)}/?path=/story/${encodeURIComponent(story)}`}
+        >
+          Story
+        </Button>
+      ) : null}
+      {importPath ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          href={urls.component(project.slug, importPath, { build: componentBuild })}
+        >
+          Component
+        </Button>
+      ) : null}
+    </HStack>
   );
 }

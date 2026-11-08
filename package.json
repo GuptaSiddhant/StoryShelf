@@ -53,6 +53,7 @@
     "cli": "nub run --filter storyshelf start",
     "docs": "nub run --filter website start",
     "docs:check": "node ./scripts/check-adr-refs.mjs",
+    "lint:files": "node ./scripts/check-files.mjs",
     "deprecate": "nub ./scripts/deprecate-packages.mjs",
     "deprecate:dry": "nub ./scripts/deprecate-packages.mjs --dry-run",
     "serve": "nub run --filter dev-server serve",
@@ -72,12 +73,11 @@
     "screenshots:og": "nub ./scripts/screenshots.mjs og",
     "release:prepare": "node scripts/release.mjs",
     "release:dry": "node scripts/release.mjs --dry-run",
-    "changeset": "changeset",
+    "changeset": "node scripts/changeset-add.mjs",
     "version-packages": "node ./scripts/version-packages.mjs",
     "trust": "node ./scripts/npm-trust-all.mjs"
   },
   "devDependencies": {
-    "@changesets/cli": "3.0.3",
     "axe-core": "^4.13.0",
     "jsdom": "^30.0.1",
     "oxfmt": "catalog:",

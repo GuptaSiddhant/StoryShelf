@@ -4,7 +4,7 @@ import type {
   CaptureJobKind,
   CaptureJobStatus,
 } from "@storyshelf/core/schema";
-import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /**
  * Narrow `capture_jobs` table definition: the database queue's job rows and per-attempt claim rows.
@@ -26,6 +26,8 @@ export const captureJobs = pgTable(
     owner: text("owner"),
     payload: text("payload"),
     cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true, mode: "string" }),
+    activeKey: text("active_key"),
+    rerunRequestedAt: timestamp("rerun_requested_at", { withTimezone: true, mode: "string" }),
     error: text("error"),
     startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
     finishedAt: timestamp("finished_at", { withTimezone: true, mode: "string" }),
@@ -37,5 +39,6 @@ export const captureJobs = pgTable(
     index("capture_jobs_job_id_idx").on(table.jobId),
     index("capture_jobs_build_id_idx").on(table.buildId),
     index("capture_jobs_entry_created_idx").on(table.entry, table.createdAt),
+    uniqueIndex("capture_jobs_active_key_idx").on(table.activeKey),
   ],
 );

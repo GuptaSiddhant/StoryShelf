@@ -1,5 +1,6 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
+import type { Snapshot } from "@storyshelf/core/schema";
 import { pageStory } from "../../.storybook/page.tsx";
 import { NEW_STORY_ID, reviewData } from "../stories-fixtures/review.ts";
 import { renderBuildDiffPage } from "./build-diff.tsx";
@@ -49,5 +50,75 @@ export const DesignChangedAfterApproval = pageStory(() =>
 export const DesignDeleted = pageStory(() =>
   renderBuildDiffPage(
     reviewData({ design: [{ ...figma, state: "deleted", renderUrl: null, name: null }] }),
+  ),
+);
+
+/* The review stage in each comparison mode and zoom, as fixed states that can be captured. */
+
+/** Swipe between the baseline and the current screenshot. */
+export const ChangedSwipe = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { view: "swipe" },
+});
+
+/** Onion skin: the current screenshot over the baseline. */
+export const ChangedOnionSkin = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { view: "onion" },
+});
+
+/** Diff only: the changed pixels. */
+export const ChangedDiffOnly = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { view: "diff" },
+});
+
+/** Flip between the current screenshot and the baseline. */
+export const ChangedFlip = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { view: "flip" },
+});
+
+/** Zoomed to 200%: the images scroll inside their panes. */
+export const ChangedZoom200 = pageStory(() => renderBuildDiffPage(reviewData()), {
+  stage: { zoom: "200" },
+});
+
+/**
+ * The comparison controls work here: the shell's own client script runs in the page frame for
+ * this story only. Try the modes, the zoom levels, the sliders and the flip.
+ */
+export const Interactive = pageStory(() => renderBuildDiffPage(reviewData()), {
+  interactive: true,
+});
+
+/** The review data with the selected snapshot patched (a new object, the fixture is shared). */
+function withSelected(patch: Partial<Snapshot>): ReturnType<typeof reviewData> {
+  const data = reviewData();
+  return {
+    ...data,
+    snapshots: data.snapshots.map((snapshot) =>
+      snapshot.id === data.selectedId ? Object.assign({}, snapshot, patch) : snapshot,
+    ),
+  };
+}
+
+/** An inherited snapshot: its accessibility findings come from the baseline build and say so. */
+export const FindingsFromBaseline = pageStory(() =>
+  renderBuildDiffPage(
+    withSelected({
+      inherited: true,
+      a11yViolations: JSON.stringify([
+        "from baseline 3f9c2ab",
+        "color-contrast (serious): Elements must meet minimum color contrast ratio thresholds [button.primary] 1 node",
+      ]),
+    }),
+  ),
+);
+
+/** The story's a11y parameters could not be read (a cycle), so axe ran with its defaults. */
+export const ParametersNotApplied = pageStory(() =>
+  renderBuildDiffPage(
+    withSelected({
+      a11yViolations: JSON.stringify([
+        "a11y parameters not serializable: refers to itself (cyclic)",
+      ]),
+    }),
   ),
 );

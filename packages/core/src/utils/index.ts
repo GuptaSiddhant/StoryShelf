@@ -15,6 +15,21 @@ export {
 } from "./encrypt.ts";
 export { hmacSha256, randomToken, sha256, timingSafeEqualString } from "./hash.ts";
 export { HttpError } from "./http.ts";
+export {
+  COMMENT_CREATED,
+  COMMENT_MENTIONED,
+  NOTIFICATION_EVENTS,
+  REVIEW_COMMENT_ALIAS,
+  matchesEvent,
+  type NotificationEvent,
+} from "./event-match.ts";
+export {
+  mentionSpans,
+  resolveMentions,
+  type FoundMention,
+  type MentionCandidate,
+  type MentionSpan,
+} from "./mentions.ts";
 export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";
 export { httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";
 export {
@@ -23,8 +38,11 @@ export {
   designRenderPath,
   diffPath,
   modeSegment,
+  CONTENT_HASH_PATTERN,
   contentDir,
+  contentKey,
   contentPath,
+  isContentHash,
   isContentPath,
   screenshotPath,
   storybookDir,
@@ -96,6 +114,8 @@ export {
 export { MIME_TYPES, mimeFor } from "./mime.ts";
 export { detectPublicBaseUrl, normalizeOrigin, type Env } from "./public-origin.ts";
 export { isBlockedTarget, isPathSafe, isSafeSegment } from "./path-security.ts";
+export { errorMessage, errorText } from "./error-text.ts";
+export { UserFacingError, isUserFacingError } from "./user-facing-error.ts";
 export { redactSecrets, sanitizeErrorText } from "./redact.ts";
 export { addTiming, roundedTimings, runWithTimings, timed, type TimingMap } from "./timing.ts";
 export { slugify, ulid } from "./ulid.ts";

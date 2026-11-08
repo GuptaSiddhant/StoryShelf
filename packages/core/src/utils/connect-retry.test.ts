@@ -29,6 +29,28 @@ describe("isRetryableConnectError", () => {
   it("reads a thrown non-error as text", () => {
     expect(isRetryableConnectError("ECONNRESET")).toBe(true);
   });
+
+  it("retries a transient outage thrown as an event object, by what the event says", () => {
+    expect(
+      isRetryableConnectError({ type: "error", error: new Error("connect ECONNREFUSED 10.0.0.1") }),
+    ).toBe(true);
+    expect(isRetryableConnectError({ type: "error", message: "WebSocket error" })).toBe(true);
+    expect(
+      isRetryableConnectError({ type: "close", code: 1006, reason: "connection closed" }),
+    ).toBe(true);
+  });
+
+  it("does not retry a refused credential thrown as an object", () => {
+    expect(isRetryableConnectError({ message: "Unexpected server response: 401" })).toBe(false);
+    expect(isRetryableConnectError({ reason: "403 Forbidden" })).toBe(false);
+  });
+
+  it("does not retry a value that says nothing, and judges an Error by its message alone", () => {
+    expect(isRetryableConnectError({})).toBe(false);
+    expect(
+      isRetryableConnectError(new Error("something else entirely", { cause: "ECONNRESET" })),
+    ).toBe(false);
+  });
 });
 
 describe("retryConnect", () => {

@@ -26,17 +26,21 @@ semantics.
 - A **queue** in the app is a consumer over a set of kinds with its own retry limit, built by
   `createJobQueue(options, kinds, maxRetries)` in `packages/app/src/jobs-setup.ts`. Today:
 
-| Queue | Kinds | Retry limit | Where |
-| --- | --- | --- | --- |
-| Main | `capture` (when `testing.runner` is set), `publish` (long-running host) | `testing.retries` (default 2, three attempts) | `queuesFor`, `databaseConsumer` |
-| Notify | `notify` (long-running host) | `NOTIFY_MAX_ATTEMPTS` (5) minus one; handler retry delay 10 s doubling to 5 min | `queuesFor`, `notifyConsumer` |
+| Queue  | Kinds                                                                   | Retry limit                                                                     | Where                           |
+| ------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------- |
+| Main   | `capture` (when `testing.runner` is set), `publish` (long-running host) | `testing.retries` (default 2, three attempts)                                   | `queuesFor`, `databaseConsumer` |
+| Notify | `notify`, `review-request` (long-running host)                          | `NOTIFY_MAX_ATTEMPTS` (5) minus one; handler retry delay 10 s doubling to 5 min | `queuesFor`, `notifyConsumer`   |
 
 - A host with no consumer (serverless) runs neither queue: build state is delivered inline without
   durability (`packages/app/src/build-state-setup.ts`), and publishing follows ADR 0006 decision 10.
 - `notify` has its own consumer so that a git status never waits behind captures that hold every
-  slot for minutes. Queue views list every polled kind except `notify`.
+  slot for minutes. Queue views list every polled kind except `notify` and `review-request`.
+- `review-request` is one job per recipient of a build's review request, so a refused delivery is
+  retried for that recipient alone. It holds references only (project, `eventId`, a channel id or a
+  person and provider) and re-resolves recipient, origin and review cycle when it runs. The key is
+  `eventId` + target; a serverless host keeps direct delivery.
 - **Cancel spans kinds.** Because all kinds share the table, `cancel(buildId)` on the database queue
-  cancels capture, publish and notify jobs of the build (`packages/app/src/job-canceller.ts`).
+  cancels capture, publish, notify and review-request jobs of the build (`packages/app/src/job-canceller.ts`).
 - Forked capture is unchanged: the parent consumes; the child never reads the queue.
 
 ### 2. What every job kind must provide
@@ -49,7 +53,32 @@ semantics.
   up to five runs, then the job fails and `JobQueue.abandoned[kind]` alerts once (#432).
 - Lease renewal through `keepJobLease` for any phase that can run longer than a third of the lease.
 - Cancellation by build id, honored within the cancel latency of ADR 0006 decision 11.
+- A wall-clock bound: `testing.maxJobSeconds` (default 7200) applies to every kind. Past it
+  `keepJobLease` stops renewing, the `AbortSignal` in the handler's context fires, the run is
+  cancelled and the consumer's slot is freed; the job is not settled, so its lease runs out and the
+  normal exhausted or redelivery path takes over. A capture whose last attempt hit the bound ends
+  its build `failed` (through that path), never `cancelled`, and its attempt log records
+  `job deadline exceeded (<n>s)`. The abandoned invocation stops at its next checkpoint instead of
+  carrying on next to a redelivery that may already be running the same job: every attempt-log line
+  and progress report of a capture throws `JobAbortedError` (never swallowed or recorded as a story
+  failure), and a run that fails this way posts no status or build state of its own; publish checks
+  the signal before each file it extracts or persists, before recording content uses and before the
+  manifest, and leaves the shared scratch directory to the redelivery; a notify delivery checks it
+  before the status and comment are written and before its outcome is recorded. Checkpoints are
+  cooperative: a write or request already in flight is not recalled (an update already started
+  completes, and a capture whose abort lands during its last attempt-log append can still request
+  build state once), and storage and provider calls keep their SDK timeouts. Such a write or
+  request can complete after the lease expires and overlap a redelivery: an abort narrows that
+  window, it does not close it. A phase that never reports is bounded only by the lease. There is
+  no per-phase knob.
 - Its retry limit stated where the queue is built, not inferred from `testing.retries`.
+- Kinds that must be single-flight per key use `active_key` (a unique column, cleared in the write
+  that ends the job), never a check before the insert. A request that arrives while the holder
+  runs (or is `exhausting`) sets a marker on it, and the job's end and its successor are one
+  transaction (`CaptureJobModel.endJob`): a crash leaves the job unfinished, to be redelivered, or
+  the successor queued, never a lost request. A database without `transact`, or whose adapter
+  declares `metadata.transactions: "sequential"` (Neon over HTTP, whose `transact` cannot roll
+  back), keeps a two-step end and accepts that gap; booting `testing` on one logs a warning.
 
 ### 3. Precedence comes from separation and admission, not priorities (proposed rule)
 
@@ -96,9 +125,9 @@ A lost lease, a failed attempt and a child crash count against the same limit wi
 
 ## Alternatives rejected
 
-| Option | Why not |
-| --- | --- |
-| Priority column on `capture_jobs` | Needs fair-share and starvation rules across instances; separation already gives the isolation needed. |
-| Preempt investigations for capture | Kills work mid-replay and complicates pin release (ADR 0039). |
-| One consumer for every kind | A capture holding every slot delays git statuses; this is why `notify` has its own consumer. |
-| External queue per kind | Rejected in ADR 0006 decision 6; nothing here changes that. |
+| Option                             | Why not                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Priority column on `capture_jobs`  | Needs fair-share and starvation rules across instances; separation already gives the isolation needed. |
+| Preempt investigations for capture | Kills work mid-replay and complicates pin release (ADR 0039).                                          |
+| One consumer for every kind        | A capture holding every slot delays git statuses; this is why `notify` has its own consumer.           |
+| External queue per kind            | Rejected in ADR 0006 decision 6; nothing here changes that.                                            |

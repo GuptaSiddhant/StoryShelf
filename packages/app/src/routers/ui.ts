@@ -21,6 +21,7 @@ import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
 import { loadBaselineView } from "./baseline-guard.ts";
 import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
+import { isBuildAuthor } from "./comment-triage.ts";
 import { loadComponentPage } from "./component.handlers.ts";
 import { registerDesignCoverage } from "./design-coverage.ts";
 import {
@@ -30,9 +31,10 @@ import {
   returnPathOf,
 } from "./design.handlers.ts";
 import { flash } from "./flash.ts";
-import { currentProjectRole } from "./helpers.ts";
+import { currentProjectRole, publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { linkedUsageByStory, linkedUsageFor } from "./links.handlers.ts";
+import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
 import { registerSettingsPages } from "./settings.ts";
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
@@ -113,7 +115,7 @@ export function registerUiPages(app: ShelfRouter): void {
       flash(c, `Created ${project.name}`);
       return hxRedirect(c, `/projects/${project.slug}/library`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create project";
+      const message = publicMessage(error, "Failed to create project");
       return c.html(
         renderProjectCreatePage({
           values: { name, gitRepository, gitDefaultBranch },
@@ -181,6 +183,7 @@ export function registerUiPages(app: ShelfRouter): void {
     const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
     const { user, authEnabled } = getStore();
     const canReview = !authEnabled || Boolean(user);
+    const canTriage = (await reviewCapabilities(project)).canComment || isBuildAuthor(build);
     const selected = selectedSnapshot(snapshots, snapshotId);
     const design = selected
       ? await loadReviewDesign(
@@ -198,6 +201,8 @@ export function registerUiPages(app: ShelfRouter): void {
         comments,
         selectedId: snapshotId,
         canReview,
+        canTriage,
+        names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),
         hasBaseline,
         drifted,
         reference: selected ? await loadBaselineReference(project, build, selected) : undefined,
@@ -229,7 +234,10 @@ export function registerUiPages(app: ShelfRouter): void {
     // Hono's bare `/*` wildcard is not exposed through `param()`, so derive the
     // label value from the raw request path and decode it ourselves.
     const base = `/projects/${slug}/labels/${key}/`;
-    const value = c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "";
+    // A value with a `.` or `..` segment cannot travel in the path: it comes as `?value=`.
+    const value =
+      c.req.query("value") ??
+      (c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "");
     const html = await renderLabelDetailPage(slug, key, value);
     if (!html) {
       return c.notFound();
@@ -240,8 +248,18 @@ export function registerUiPages(app: ShelfRouter): void {
   app.get("/projects/:slug/components/*", async (c) => {
     const slug = c.req.param("slug");
     const base = `/projects/${slug}/components/`;
-    const path = c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "";
-    const data = await loadComponentPage(c, slug, path, c.req.query("tab"), c.req.query("story"));
+    // An import path with a `.` or `..` segment (`../ui/Button`) comes as `?path=`.
+    const path =
+      c.req.query("path") ??
+      (c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "");
+    const data = await loadComponentPage(
+      c,
+      slug,
+      path,
+      c.req.query("tab"),
+      c.req.query("story"),
+      c.req.query("build"),
+    );
     return data ? c.html(renderComponentPage(data)) : c.notFound();
   });
 

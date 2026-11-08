@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { handleError } from "./default.ts";
 import { runUpload, resolveIdentity, type GitIdentityProbe } from "./upload.ts";
 
 let dir: string;
@@ -128,6 +129,74 @@ describe("runUpload success", () => {
         .map((entry) => entry.entryName)
         .toSorted(),
     ).toEqual(["iframe.html", "index.json"]);
+  });
+
+  it.each(["flag", "env", "config"])(
+    "sends one slash before /api/v1 for a trailing-slash url from the %s",
+    async (source) => {
+      writeFixture(dir);
+      const urls: string[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init?: RequestInit) => {
+          await Promise.resolve();
+          urls.push(url);
+          if ((init?.method ?? "") === "PUT") {
+            await collectBody(init?.body);
+            return okJson({ id: "b1" });
+          }
+          return okJson({ build: { id: "b1" }, uploadUrl: "/api/v1/projects/demo/builds/b1/zip" });
+        }),
+      );
+      const options: Record<string, string | undefined> = {
+        ...baseOptions(),
+        buildDir: "storybook-static",
+        url: source === "flag" ? "https://shelf.example.com//" : undefined,
+      };
+      if (source === "env") vi.stubEnv("STORYSHELF_URL", "https://shelf.example.com/");
+      if (source === "config") {
+        mkdirSync(join(dir, ".storybook"), { recursive: true });
+        writeFileSync(
+          join(dir, ".storybook", "storyshelf.json"),
+          JSON.stringify({ slug: "demo", url: "https://shelf.example.com/" }),
+        );
+      }
+      await runUpload(options);
+      expect(urls[0]).toBe("https://shelf.example.com/api/v1/projects/demo/builds");
+      expect(urls.every((url) => !url.includes("//api"))).toBe(true);
+    },
+  );
+
+  it("prints an actionable message and exits non-zero when the server answers 422", async () => {
+    writeFixture(dir);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        await Promise.resolve();
+        if ((init?.method ?? "") === "PUT") {
+          await collectBody(init?.body);
+          return new Response(JSON.stringify({ message: "Invalid Storybook zip" }), {
+            status: 422,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return okJson({ build: { id: "b1" }, uploadUrl: "/api/v1/projects/demo/builds/b1/zip" });
+      }),
+    );
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const savedExitCode = process.exitCode;
+    try {
+      await runUpload({ ...baseOptions(), buildDir: "storybook-static" }).catch(handleError);
+      expect(process.exitCode).toBe(1);
+      const printed = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+      expect(printed).toContain("Invalid Storybook zip");
+      expect(printed).toMatch(/maxZipEntries[\s\S]*maxUnzippedBytes/u);
+      expect(printed).toContain("build b1 failed and takes no further upload");
+      expect(printed).not.toContain("reuse");
+    } finally {
+      stderr.mockRestore();
+      process.exitCode = savedExitCode;
+    }
   });
 
   it("throws on invalid --label flags", async () => {

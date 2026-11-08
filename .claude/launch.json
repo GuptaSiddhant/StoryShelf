@@ -4,7 +4,10 @@
     {
       "name": "website",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "export PATH=\"$HOME/.nub/bin:$PATH\" && cd apps/website && nub run dev -- --port 4321"],
+      "runtimeArgs": [
+        "-c",
+        "export PATH=\"$HOME/.nub/bin:$PATH\" && cd apps/website && nub run dev -- --port 4321"
+      ],
       "port": 4321
     },
     {

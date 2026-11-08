@@ -2,6 +2,7 @@ import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -13,7 +14,6 @@ import {
   Table,
   statusTone,
 } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
   template: string | null,
@@ -82,7 +82,7 @@ export async function renderLabelDetailPage(
           description={`No build currently bears the label ${key}: ${value}.`}
         />
       ) : (
-        <Table>
+        <Table label="Builds with this label">
           <table>
             <thead>
               <tr>
@@ -177,7 +177,7 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
           description="No label types are configured for this project."
         />
       ) : (
-        <Table>
+        <Table label="Label types">
           <table>
             <thead>
               <tr>

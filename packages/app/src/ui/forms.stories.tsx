@@ -71,6 +71,43 @@ export const Textarea = jsxStory(() => (
   </VStack>
 ));
 
+/** For patterns or code: the mono face and no spell-check, with content. */
+export const TextareaMonospace = jsxStory(() => (
+  <TextareaField
+    label="Component owners"
+    name="owners"
+    rows={4}
+    monospace
+    value={
+      "src/components/forms/**  user_01HFORMS  user_02JDESIGN\nsrc/components/charts/**  user_03KCHARTS"
+    }
+    hint="One rule per line: a glob, then the members who own it."
+  />
+));
+
+/** The mono face with an empty field and its placeholder. */
+export const TextareaMonospaceEmpty = jsxStory(() => (
+  <TextareaField
+    label="Component owners"
+    name="owners"
+    rows={3}
+    monospace
+    placeholder="src/components/forms/**  user_01H  user_02J"
+  />
+));
+
+/** The mono face in its error state. */
+export const TextareaMonospaceError = jsxStory(() => (
+  <TextareaField
+    label="Component owners"
+    name="owners"
+    rows={3}
+    monospace
+    value="src/components/charts/**  user_9Z"
+    error="Line 1: user_9Z is not a member of this project."
+  />
+));
+
 export const Select = jsxStory(() => (
   <VStack>
     <SelectField

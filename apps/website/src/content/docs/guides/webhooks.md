@@ -17,7 +17,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/webhooks \
 ```
 
 - `url` — HTTPS endpoint (must be reachable from the server).
-- `events` — JSON array filter or `null` for all events. Build events are `build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `build:pending` (a verdict sent a build back to pending, for example when a rejecting reviewer rewrites to an approval and too few approvals remain) and `build:cancelled` (a user cancelled the build, see [Builds](/concepts/builds/); the payload is `{ buildId, status: "cancelled" }`). Review adds `review:requested`, `review:comment` and `review:verdict` (see [Review](/guides/review/#events)). `design:changed` reports a linked design that changed after its baseline was approved (see [`design:changed`](#design-changes)).
+- `events` — JSON array filter or `null` for all events. Build events are `build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `build:pending` (a verdict sent a build back to pending, for example when a rejecting reviewer rewrites to an approval and too few approvals remain) and `build:cancelled` (a user cancelled the build, see [Builds](/concepts/builds/); the payload is `{ buildId, status: "cancelled" }`). Review adds `review:requested` and `review:verdict` (see [Review](/guides/review/#events)). Every comment, whatever it is anchored to, raises one `comment:created` whose `data.scope` is `build`, `story` or `snapshot`. `design:changed` reports a linked design that changed after its baseline was approved (see [`design:changed`](#design-changes)).
 - `secret` — HMAC secret; stored AES-256-GCM encrypted with server `SECRET`.
 
 Manage via `GET /api/v1/projects/:slug/webhooks` and `DELETE`. See `POST /api/v1/projects/:slug/webhooks` in the OpenAPI.
@@ -26,6 +26,8 @@ Manage via `GET /api/v1/projects/:slug/webhooks` and `DELETE`. See `POST /api/v1
 
 - Payload is JSON `{ event, project: { slug }, build: { id, gitSha, gitBranch, status } }`.
 - Header `X-StoryShelf-Signature: sha256=<hmac>` — verify with the shared `secret` (HMAC-SHA256 of the raw body).
+- Header `X-StoryShelf-Event: <event>` — the event name, for example `comment:created`. `review:comment` keeps working as a filter (in a webhook's `events`, a notification channel or a subscription): it matches build and story comments, and the delivered event name is `comment:created`.
+- A comment event carries `data.eventId`, the comment id, and a retried delivery repeats it. De-duplicate retries by that id.
 - Retries: transient 5xx / network errors are retried with backoff; 4xx is not retried. Delivery logs are not yet exposed beyond capture logs — track separately if you need audit.
 
 ## Design changes

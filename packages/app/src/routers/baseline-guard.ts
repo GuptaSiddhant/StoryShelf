@@ -55,11 +55,13 @@ export async function findDriftedSnapshots(
 /** 409 telling the client the diff is out of date; recompute it or force the approval. */
 export function baselineChanged(snapshotId: string, status: BaselineStatus): HTTPException {
   const body = {
-    code: "baseline_changed",
-    message:
-      "The baseline changed after this diff was computed. Re-diff the build, or approve with force.",
-    snapshotId,
-    baselineStatus: status,
+    error: {
+      code: "baseline_changed",
+      message:
+        "The baseline changed after this diff was computed. Re-diff the build, or approve with force.",
+      snapshotId,
+      baselineStatus: status,
+    },
   };
   return new HTTPException(409, {
     res: new Response(JSON.stringify(body), {

@@ -1,11 +1,36 @@
 /** Active-run tracking and best-effort cleanup helpers for Puppeteer. */
 
 import { RenderRuns, type RemoteLeaseOutcome } from "@storyshelf/core/adapter/capture-runner";
-import type { ActiveRun } from "./types.ts";
+import { errorText } from "@storyshelf/core/utils";
 import type { BrowserSession } from "./session.ts";
+import type { ActiveRun } from "./types.ts";
 
 /** Tracks in-flight renders, each by its own handle, so `cancel` aborts exactly the runs it names. */
 export const activeRuns = new RenderRuns<ActiveRun>();
+
+/** Registers the run so `cancel` can find it, and unregisters it however the work ends. */
+export async function trackRun<T>(
+  input: { buildId: string; runId?: string | undefined },
+  work: (active: ActiveRun) => Promise<T>,
+): Promise<T> {
+  const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
+  const remove = activeRuns.add(input.buildId, input.runId, active);
+  try {
+    return await work(active);
+  } finally {
+    remove();
+  }
+}
+
+export async function cancelRuns(buildId: string, runId?: string): Promise<void> {
+  await Promise.all(
+    activeRuns.matching(buildId, runId).map(async (active) => {
+      active.cancelled = true;
+      active.abort?.abort();
+      await active.session?.release("cancelled");
+    }),
+  );
+}
 
 /** The outcome a render's `finally` reports: a cancel wins over a failure, a failure over a finish. */
 export function outcomeOf(active: { cancelled: boolean }, failed: boolean): RemoteLeaseOutcome {
@@ -51,5 +76,5 @@ export async function abortIfCancelled(
 
 /** Normalize any thrown value to a string. */
 export function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return error instanceof Error ? error.message : errorText(error);
 }

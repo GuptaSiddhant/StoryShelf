@@ -9,9 +9,23 @@
 import type { SQL } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
+import type { MigrationContext } from "./skipped-index.ts";
 
 /** A fenced reference write lost its generation race and should be retried. */
 export class ReferenceGenerationConflict extends Error {}
+
+export {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+  type MigrationContext,
+  type SkippedIndex,
+} from "./skipped-index.ts";
+
+export {
+  BaselineSourceIntegrityError,
+  type BaselineSourceProblem,
+} from "./baseline-source-integrity-error.ts";
 
 /** Type-safe table map enforced on every DatabaseAdapter. */
 export interface Tables {
@@ -46,7 +60,7 @@ export interface Tables {
   userInviteTokens: Table;
   projectMembers: Table;
   projectGroupMappings: Table;
-  contentRefs: Table;
+  contentUses: Table;
 }
 
 /** Table keys every DatabaseAdapter must expose (contract + validation share this). */
@@ -132,6 +146,23 @@ export interface FencedBuildReferenceChange extends BuildReferenceChange {
   expectedGeneration: number;
 }
 
+/** A build tombstoned by `claimDeletion` whose cleanup has not finished, with the steps already recorded. */
+export interface DeletingBuild {
+  projectId: string;
+  buildId: string;
+  /** Its shared content was released: each hash decremented exactly once. */
+  contentReleased: boolean;
+  /** Its storage objects were deleted. */
+  storageDeleted: boolean;
+}
+
+/**
+ * How a recorded deletion step ended. `already-done` means an earlier run recorded it and nothing
+ * changed; `not-deleting` means the build is gone or was never claimed; `out-of-order` means an
+ * earlier step is not recorded yet.
+ */
+export type DeletionStepResult = "done" | "already-done" | "not-deleting" | "out-of-order";
+
 /**
  * An explicit database capability; an ordinary transaction does not establish this contract.
  * Implementations serialize admissions, reference changes, and deletion claims across processes.
@@ -156,21 +187,6 @@ export interface BuildReferenceLifecycle {
     writeDomain: (tx: TxStore) => Promise<T>,
   ): Promise<{ result: T; generation: number }>;
   /**
-   * Atomically replace one owner's complete reference set and make its domain writes. Both old and
-   * new builds must be locked in stable order, checked for project ownership and availability,
-   * and committed with the domain mutation. Unknown or tombstoned builds reject admission.
-   */
-  replaceReferences<T>(
-    owner: BuildReferenceOwner,
-    buildIds: readonly string[],
-    writeDomain: (tx: TxStore) => Promise<T>,
-  ): Promise<T>;
-  /** Atomically replace several owners' reference sets and the shared domain writes. */
-  replaceManyReferences<T>(
-    changes: readonly BuildReferenceChange[],
-    writeDomain: (tx: TxStore) => Promise<T>,
-  ): Promise<T>;
-  /**
    * In the same concurrency domain as admissions, irreversibly tombstone a build only if no
    * protecting reference remains. Existing tombstones are resumable and never become available.
    * Storage deletion must happen after this operation commits, outside database locks.
@@ -179,6 +195,81 @@ export interface BuildReferenceLifecycle {
     projectId: string,
     buildId: string,
   ): Promise<"claimed" | "protected" | "deleting" | "missing">;
+  /** Builds of the project that are `deleting`, oldest claim first: the list a cleaner resumes. */
+  listDeleting(projectId: string): Promise<DeletingBuild[]>;
+  /**
+   * Step 1 of a claimed build's cleanup. In one transaction, record a release for each distinct
+   * hash and mark the build's `content_uses` row of it released (the row stays for the grace
+   * period); a hash already recorded for the build is skipped, so a retry releases nothing twice.
+   * Marks the step done. Only a `deleting` build of the project qualifies.
+   */
+  releaseBuildContent(
+    projectId: string,
+    buildId: string,
+    hashes: readonly string[],
+  ): Promise<DeletionStepResult>;
+  /** Step 2: record that the build's storage objects are deleted (needs step 1). */
+  markStorageDeleted(projectId: string, buildId: string): Promise<DeletionStepResult>;
+  /**
+   * Step 3: in one transaction run `removeRows`, delete the build's row and its progress records
+   * (needs step 2). `not-deleting` when the build is already gone, which is how a second cleaner
+   * learns the work is finished.
+   */
+  completeDeletion<T>(
+    projectId: string,
+    buildId: string,
+    removeRows: (tx: TxStore) => Promise<T>,
+  ): Promise<{ result: T } | "not-deleting" | "out-of-order">;
+  /**
+   * Record that the build uses each hash of its stored content (`content_uses`): one row per
+   * (build, hash), however many paths name it, so a repeat is a no-op. Returns the hashes it
+   * refused because a collector has claimed them; none of the refused hashes is recorded, and the
+   * caller must store the content again and retry. Same concurrency domain as {@link claimContent}.
+   *
+   * A claim taken before `staleBefore` (an ISO instant) belongs to a collector that stopped: the
+   * record clears it in the same transaction and goes ahead, and the old collector, whose
+   * {@link holdsContentClaim} check then fails, deletes nothing. Omitted, every claim refuses. A
+   * build that is gone or not `available` records nothing (all its hashes are returned).
+   */
+  recordContentUses(
+    projectId: string,
+    buildId: string,
+    hashes: readonly string[],
+    staleBefore?: string,
+  ): Promise<string[]>;
+  /**
+   * Claim for deletion, under the pass's `token` (a fresh id per collector pass), every hash whose
+   * uses are all released, the latest release older than `idleBefore` (an ISO instant), and no
+   * collector holds yet. Also takes over, to resume, the hashes whose claim is older than
+   * `staleBefore` (a crashed collector's): they are re-stamped with the new token, which fences the
+   * old collector out of {@link holdsContentClaim}, {@link abandonContentClaim} and
+   * {@link finishContentCollection}. A fresh claim is returned to its claimer only, so two
+   * collectors never delete one blob. A claimed hash admits no new use. Resolves to the claimed
+   * hashes.
+   */
+  claimContent(token: string, idleBefore: string, staleBefore: string): Promise<string[]>;
+  /**
+   * Whether the hash is still claimed by this token with no unreleased use. A collector asks right
+   * before it deletes the blob and skips the delete when this is false, which narrows the window a
+   * taken-over collector could delete in to the time between this check and the delete itself.
+   */
+  holdsContentClaim(hash: string, token: string): Promise<boolean>;
+  /** Give a claim back (a live build still serves the blob); only its holder can; uses stay released. */
+  abandonContentClaim(hash: string, token: string): Promise<void>;
+  /** The blob of a claimed hash is deleted: drop its `content_uses` rows, if the token still holds it. */
+  finishContentCollection(hash: string, token: string): Promise<void>;
+}
+
+/**
+ * Why an adapter that could implement {@link BuildReferenceLifecycle} withholds it: preparing the
+ * baselines found a recorded source build it must not pin. Retention stays fail closed until the
+ * data is fixed and the deployment restarted; the System page shows this.
+ */
+export interface RetentionPause {
+  baselineId: string;
+  buildId: string;
+  /** `tombstoned`: the source build is being deleted; `other-project`: it belongs to another project. */
+  problem: "tombstoned" | "other-project";
 }
 
 /** Database-specific metadata: the family plus what the backing platform can carry. */
@@ -190,6 +281,13 @@ export interface DatabaseAdapterMetadata {
    * Unset means it can.
    */
   readonly supportsTesting?: boolean;
+  /**
+   * `"sequential"` when `transact` only runs its statements one after another and cannot roll back
+   * (Neon over HTTP). Code that relies on one transaction for crash safety, such as the queue's
+   * end-and-hand-over of a single-flight job, takes its ordered path instead. Unset means atomic,
+   * as `supportsTesting` reads.
+   */
+  readonly transactions?: "atomic" | "sequential";
 }
 
 /** Database abstraction over Drizzle tables, agnostic of dialect and driver. */
@@ -199,6 +297,11 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
    * `transact` by itself is not evidence of this capability.
    */
   readonly buildReferenceLifecycle?: BuildReferenceLifecycle;
+  /**
+   * Set when the adapter implements the capability but withheld it at boot because of a data
+   * integrity problem. Absent otherwise (including adapters that never implement it).
+   */
+  readonly retentionPause?: RetentionPause | undefined;
   /** Table handles for this adapter's dialect, enforced with type safety. */
   readonly tables: Tables;
   /** Insert a row and return the inserted record. */
@@ -240,7 +343,7 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
 export interface DrizzleAdapterOptions {
   metadata: AdapterMetadata & DatabaseAdapterMetadata;
   tables: Tables;
-  migrate: () => Promise<void> | void;
+  migrate: (context: MigrationContext) => Promise<void> | void;
   close: () => Promise<void> | void;
   /** Cheap liveness probe (e.g. `SELECT 1`); omitted when the driver has none. */
   ping?: () => Promise<void> | void;

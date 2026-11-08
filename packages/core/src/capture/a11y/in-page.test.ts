@@ -21,6 +21,10 @@ afterEach(() => {
   delete scope["__STORYBOOK_PREVIEW__"];
 });
 
+const preview = (a11y: unknown): void => {
+  scope["__STORYBOOK_PREVIEW__"] = { currentRender: { story: { parameters: { a11y } } } };
+};
+
 describe("inPageReadA11yParameters (as serialized)", () => {
   const read = asSerialized(inPageReadA11yParameters);
 
@@ -58,14 +62,57 @@ describe("inPageReadA11yParameters (as serialized)", () => {
     expect(read()).toEqual({ params: undefined, dropped: 1 });
   });
 
-  it("returns undefined without a preview, without a11y, or when unreadable", () => {
+  it("returns undefined without a preview or without an a11y parameter", () => {
     expect(read()).toBeUndefined();
     scope["__STORYBOOK_PREVIEW__"] = { currentRender: { story: { parameters: {} } } };
     expect(read()).toBeUndefined();
+  });
+
+  it("turns a Date into its ISO string, a Set into an array and a Map into pairs", () => {
+    preview({
+      config: {
+        when: new Date("2026-01-02T03:04:05.000Z"),
+        tags: new Set(["wcag2a", "wcag2aa"]),
+        rules: new Map([["color-contrast", { enabled: false }]]),
+      },
+    });
+    expect(read()).toEqual({
+      params: {
+        config: {
+          when: "2026-01-02T03:04:05.000Z",
+          tags: ["wcag2a", "wcag2aa"],
+          rules: [["color-contrast", { enabled: false }]],
+        },
+      },
+      dropped: 0,
+    });
+  });
+
+  it("drops an invalid Date and keeps a value shared twice without a cycle", () => {
+    const shared = { enabled: false };
+    preview({ bad: new Date("nope"), a: shared, b: shared });
+    expect(read()).toEqual({ params: { a: shared, b: shared }, dropped: 1 });
+  });
+
+  it("names a cyclic value instead of looking like no a11y parameter", () => {
     const cyclic: Record<string, unknown> = {};
     cyclic["self"] = cyclic;
-    scope["__STORYBOOK_PREVIEW__"] = { currentRender: { story: { parameters: { a11y: cyclic } } } };
-    expect(read()).toBeUndefined();
+    preview(cyclic);
+    expect(read()).toEqual({
+      params: undefined,
+      dropped: 0,
+      unserializable: "refers to itself (cyclic)",
+    });
+  });
+
+  it("names a value nested too deep", () => {
+    let deep: Record<string, unknown> = { leaf: true };
+    for (let level = 0; level < 40; level += 1) deep = { next: deep };
+    preview(deep);
+    expect(read()).toMatchObject({
+      params: undefined,
+      unserializable: "nested more than 32 levels deep",
+    });
   });
 });
 
@@ -136,6 +183,18 @@ describe("inPageRunAxe (as serialized, real axe in jsdom)", () => {
     expect(ids).not.toContain("landmark-one-main");
     // An explicit runOnly replaces the default set, best-practice rules included.
     expect(await run(html, { options: { runOnly: ["image-alt"] } })).toEqual([]);
+  });
+
+  it("reports the page-level rules when an explicit whole-document context is given", async () => {
+    const html =
+      '<div id="storybook-root"><h4>Skipped levels</h4><p>Text outside any landmark</p></div>';
+    // `context: "html"` puts the whole document in scope, so a page-level rule can fire (`region`
+    // here; `landmark-one-main` and `page-has-heading-one` need a real browser's document, not jsdom).
+    const ids = (await run(html, { context: "html" })).map((x) => x.id);
+    expect(ids).toContain("region");
+    // The default scan of the story root stays silent on them.
+    const rootIds = (await run(html)).map((x) => x.id);
+    expect(rootIds).not.toContain("region");
   });
 
   it("returns nothing when the context element is missing", async () => {

@@ -4,19 +4,19 @@ import {
   createTargetOffers,
   shutdownRemote,
   type CaptureRunner,
+  type RemoteTarget,
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
-import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { verifyLocalTargets } from "./availability.ts";
-import { activeRuns, closeBrowser } from "./browser.ts";
+import { cancelRuns, trackRun } from "./browser.ts";
 import { connectRemote } from "./connect.ts";
 import { launchLocal, loadPlaywright } from "./launch.ts";
 import { extractAll, renderAll } from "./pipeline.ts";
+import { resolveSettings } from "./settings.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
 import { runTestEntries } from "./tests.ts";
 import type {
-  ActiveRun,
   ExtractInput,
   PlaywrightRenderInput,
   PlaywrightTestsInput,
@@ -51,94 +51,71 @@ export function createPlaywrightCaptureRunner(
   const { declared, locals, remotes } = flattenBrowsers(options.browsers ?? ["chromium"]);
   // Until `lifecycle.setup` verifies them, every declared target reads as ready.
   const offers = createTargetOffers(declared);
-  const driver: TargetDriver = {
-    launch: offers.guard(async (target, logger, context) => {
-      const remote = remotes.find((entry) => entry.target === target);
-      return remote
-        ? await connectRemote(remote, context, logger)
-        : await launchLocal(locals.find((entry) => entry.target === target) as LocalTarget);
-    }),
-    remote: (target) => remotes.find((entry) => entry.target === target),
-  };
+  const driver = buildDriver(offers, locals, remotes);
   const defaultTarget = offers.defaultTarget;
-  const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
-  const navigationTimeoutMs =
-    options.navigationTimeoutMs ??
-    envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
-    recommendedNavigationTimeoutMs();
-  const recycleBrowserEvery =
-    options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0);
-  const reusePages =
-    options.reusePages ?? ["1", "true"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? "");
+  const settings = resolveSettings(options);
+  const { staticCompression } = options;
   return {
-    metadata: {
-      name: "Playwright",
-      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
-      description: "Playwright capture runner",
-      kind: "playwright",
-      category: "capture-runner",
-      get targets() {
-        return offers.current();
-      },
-    },
+    metadata: runnerMetadata(offers),
     lifecycle: withLeaseRelease(
       offers.lifecycle(async () => await verifyTargets(declared, locals)),
     ),
-    async render(input: PlaywrightRenderInput) {
-      const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
-      const remove = activeRuns.add(input.buildId, input.runId, active);
-      try {
+    render: async (input: PlaywrightRenderInput) =>
+      await trackRun(input, async (active) => {
         return await renderAll(
-          {
-            concurrency,
-            navigationTimeoutMs,
-            recycleBrowserEvery,
-            reusePages,
-            ...input,
-            staticCompression: options.staticCompression,
-          },
+          { ...settings, ...input, staticCompression },
           active,
           driver,
           defaultTarget,
         );
-      } finally {
-        remove();
-      }
-    },
-    async extractParameters(input: ExtractInput) {
-      return await extractAll(
-        { ...input, staticCompression: options.staticCompression },
-        driver,
-        defaultTarget,
-      );
-    },
-    async runTests(input: PlaywrightTestsInput) {
-      const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
-      const remove = activeRuns.add(input.buildId, input.runId, active);
-      try {
+      }),
+    extractParameters: async (input: ExtractInput) =>
+      await extractAll({ ...input, staticCompression }, driver, defaultTarget),
+    runTests: async (input: PlaywrightTestsInput) =>
+      await trackRun(input, async (active) => {
+        const { concurrency, navigationTimeoutMs } = settings;
         return await runTestEntries(
-          {
-            concurrency,
-            navigationTimeoutMs,
-            ...input,
-            staticCompression: options.staticCompression,
-          },
+          { concurrency, navigationTimeoutMs, ...input, staticCompression },
           active,
           driver,
           defaultTarget,
         );
-      } finally {
-        remove();
+      }),
+    cancel: cancelRuns,
+  };
+}
+
+/** Launches a local engine or leases a remote one, whichever the target names. */
+function buildDriver(
+  offers: ReturnType<typeof createTargetOffers>,
+  locals: readonly LocalTarget[],
+  remotes: readonly RemoteTarget[],
+): TargetDriver {
+  return {
+    launch: offers.guard(async (target, logger, context) => {
+      const remote = remotes.find((entry) => entry.target === target);
+      if (remote) {
+        return await connectRemote(remote, context, logger);
       }
-    },
-    async cancel(buildId, runId) {
-      await Promise.all(
-        activeRuns.matching(buildId, runId).map(async (active) => {
-          active.cancelled = true;
-          active.abort?.abort();
-          await closeBrowser(active.browser);
-        }),
-      );
+      const local = locals.find((entry) => entry.target === target);
+      if (!local) {
+        throw new Error(`No launchable target named ${target}`);
+      }
+      return await launchLocal(local);
+    }),
+    remote: (target) => remotes.find((entry) => entry.target === target),
+  };
+}
+
+function runnerMetadata(offers: ReturnType<typeof createTargetOffers>): CaptureRunner["metadata"] {
+  return {
+    name: "Playwright",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
+    description: "Playwright capture runner",
+    kind: "playwright",
+    category: "capture-runner",
+    get targets() {
+      return offers.current();
     },
   };
 }
@@ -163,15 +140,6 @@ async function verifyTargets(
     verifyLocalTargets(locals, await loadPlaywright()).map((entry) => [entry.target, entry]),
   );
   return declared.map((entry) => checked.get(entry.target) ?? entry);
-}
-
-function envPositiveInt(name: string): number | undefined {
-  return envInt(name, 1);
-}
-
-function envInt(name: string, min: number): number | undefined {
-  const parsed = Number.parseInt(process.env[name] ?? "", 10);
-  return parsed >= min ? parsed : undefined;
 }
 
 // Re-exports for backward compatibility (tests import these from capture-runner).

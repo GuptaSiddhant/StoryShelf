@@ -1,3 +1,4 @@
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 /**
  * Publishing wiring (ADR 0006, decision 10): the completer every upload route ends in, and the
  * `publish` job kind on the shared database queue. Its handler runs on every instance with a
@@ -21,6 +22,7 @@ import {
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import { BuildModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import type { JobQueue } from "./job-queue.ts";
 
@@ -70,7 +72,7 @@ export function setupPublishing(
     storage: options.storage,
     logger: logger.child({ component: "catalog" }),
   });
-  const afterPublish = publishHooks(catalog, captureWillRun, delivery);
+  const afterPublish = publishHooks(catalog, captureWillRun, delivery, options.database);
   const completer = createPublishCompleter({
     db: options.database,
     captureWillRun,
@@ -80,10 +82,7 @@ export function setupPublishing(
   if (!jobs.kinds.includes("publish")) {
     return { completer, afterPublish, catalog, enqueuePublish: undefined, handler: null };
   }
-  // A publish whose last attempt lost its lease has no running handler to fail the build.
-  jobs.exhausted.publish = async (job, error): Promise<void> => {
-    await completer.complete(job.buildId, { ok: false, error });
-  };
+  hookPublishJobs(jobs, completer, delivery.buildState);
   return {
     completer,
     afterPublish,
@@ -103,6 +102,28 @@ export function setupPublishing(
 }
 
 /**
+ * What happens to the build when its publish job ends without a handler to say so. The build's
+ * state is read from the job rows, and a publish job still counts as open while its handler (or
+ * exhausted hook) completes the build, so the state is asked for again once the job has ended.
+ */
+function hookPublishJobs(
+  jobs: JobQueue,
+  completer: PublishCompleter,
+  buildState: BuildStatePublisher,
+): void {
+  // A publish whose last attempt lost its lease has no running handler to fail the build. Every
+  // exhausted-job hook run failing (abandoned) ends it the same way, or a reviewed build would
+  // keep a pending Storybook check.
+  jobs.exhausted.publish = async (job, error): Promise<void> => {
+    await completer.complete(job.buildId, { ok: false, error });
+  };
+  jobs.abandoned.publish = jobs.exhausted.publish;
+  jobs.ended.publish = async (job): Promise<void> => {
+    await buildState.request(job.buildId);
+  };
+}
+
+/**
  * Hooks run after every publish: the catalog, the build's state on its git channels (the Storybook
  * status shows the end of publishing, a transition no build status change marks) and, without
  * `testing`, the request for a verdict on a build left `pending` (ADR 0013, decision 4).
@@ -111,6 +132,7 @@ function publishHooks(
   catalog: CatalogLoader,
   captureWillRun: boolean,
   delivery: Pick<Parameters<typeof setupPublishing>[4], "buildState" | "reviewRequested">,
+  db: DatabaseAdapter,
 ): AfterPublishHook[] {
   return [
     createCatalogHook(catalog),
@@ -119,7 +141,10 @@ function publishHooks(
     },
     async ({ build, project, outcome }) => {
       if (outcome.ok && !captureWillRun && build.status === "pending") {
-        await delivery.reviewRequested(project, build);
+        // One request per review cycle: the claim is the atomic check, so a repeated completion,
+        // a retried hook or a second instance finds the cycle taken (ADR 0013, decision 4).
+        const claimed = await new BuildModel(db).claimReviewRequest(build.id);
+        if (claimed) await delivery.reviewRequested(project, claimed);
       }
     },
   ];

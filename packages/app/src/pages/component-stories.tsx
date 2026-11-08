@@ -1,6 +1,6 @@
 /** The catalog's tabs of the component page: its stories with a click-to-load preview, and its builds. */
 import type { CatalogEntry } from "@storyshelf/core/capture";
-import { createUrlBuilder } from "@storyshelf/core/urls";
+import { createUrlBuilder, hasDotSegment } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { CatalogHistoryRow } from "../routers/component-catalog.handlers.ts";
 import { isSignedPreviewBase, PREVIEW_TOKEN_REFRESH } from "../routers/preview-base.ts";
@@ -18,9 +18,6 @@ import {
 } from "../ui/components.tsx";
 import type { ComponentPageData } from "./component-detail.tsx";
 import { StoryComments } from "./review-comments.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Stories tab: the selected story in a sandboxed preview, and every story and docs entry. */
@@ -46,10 +43,12 @@ export function StoriesTab(props: { data: ComponentPageData }): Rendered {
           storyId={selected.id}
           comments={data.review.comments}
           canComment={data.review.canComment}
+          canTriage={data.review.canTriage}
+          names={data.review.names}
         />
       ) : null}
       <Card padded={false}>
-        <Table>
+        <Table label="Stories in this build">
           <table>
             <thead>
               <tr>
@@ -140,7 +139,7 @@ function EntryRow(props: {
               variant="ghost"
               size="sm"
               icon="image"
-              href={`?tab=stories&story=${encodeURIComponent(entry.id)}#preview`}
+              href={`?tab=stories&story=${encodeURIComponent(entry.id)}${buildParam(data)}${pathParam(data)}#preview`}
             >
               Preview
             </Button>
@@ -164,7 +163,6 @@ function EntryRow(props: {
 /** Published builds that hold the component, and whether its stories changed since the build before. */
 export function ComponentBuilds(props: { data: ComponentPageData }): Rendered {
   const { data } = props;
-  const urls = createUrlBuilder("/", data.publishedBaseDomain);
   const { history } = data.catalog;
   if (history.length === 0) {
     return (
@@ -177,7 +175,7 @@ export function ComponentBuilds(props: { data: ComponentPageData }): Rendered {
   return (
     <Card>
       <SectionTitle>Published builds</SectionTitle>
-      <Table>
+      <Table label="Published builds">
         <table>
           <thead>
             <tr>
@@ -185,27 +183,42 @@ export function ComponentBuilds(props: { data: ComponentPageData }): Rendered {
               <th>Branch</th>
               <th>Stories</th>
               <th>Changes</th>
+              <th>
+                <span class="visually-hidden">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {history.map((row): Rendered => (
-              <tr key={row.build.id}>
-                <td>
-                  <a href={urls.build(data.project.slug, row.build.id)}>
-                    {row.build.gitSha.slice(0, 7)}
-                  </a>
-                </td>
-                <td>{row.build.gitBranch}</td>
-                <td>{row.component.storyCount}</td>
-                <td>
-                  <ChangeCell row={row} />
-                </td>
-              </tr>
+              <PublishedBuildRow key={row.build.id} data={data} row={row} />
             ))}
           </tbody>
         </table>
       </Table>
     </Card>
+  );
+}
+
+function PublishedBuildRow(props: { data: ComponentPageData; row: CatalogHistoryRow }): Rendered {
+  const { data, row } = props;
+  const urls = createUrlBuilder("/", data.publishedBaseDomain);
+  return (
+    <tr>
+      <td>
+        <a href={urls.build(data.project.slug, row.build.id)}>{row.build.gitSha.slice(0, 7)}</a>
+        <ShownBadge data={data} buildId={row.build.id} />
+      </td>
+      <td>{row.build.gitBranch}</td>
+      <td>{row.component.storyCount}</td>
+      <td>
+        <ChangeCell row={row} />
+      </td>
+      <td>
+        <Button variant="ghost" size="sm" href={showBuildHref(row.build.id, data)}>
+          Show
+        </Button>
+      </td>
+    </tr>
   );
 }
 
@@ -246,4 +259,37 @@ function storybookBase(data: ComponentPageData): string {
     data.project.slug,
     data.catalog.build.id,
   );
+}
+
+/** `&build=<id>` while a build is selected, so tabs and links never lose it. */
+export function buildParam(data: Pick<ComponentPageData, "selection">): string {
+  return data.selection ? `&build=${encodeURIComponent(data.selection.build.id)}` : "";
+}
+
+/**
+ * `&path=<import path>` when the page was opened through the query form (the path has a `.` or
+ * `..` segment and cannot sit in the URL path), so a relative `?tab=` link keeps the file.
+ */
+export function pathParam(data: Pick<ComponentPageData, "importPath">): string {
+  return hasDotSegment(data.importPath) ? `&path=${encodeURIComponent(data.importPath)}` : "";
+}
+
+/** The History link that shows one build of the file (stays on the History tab). */
+export function showBuildHref(
+  buildId: string,
+  data: Pick<ComponentPageData, "importPath">,
+): string {
+  return `?tab=history&build=${encodeURIComponent(buildId)}${pathParam(data)}`;
+}
+
+/** Marks the row of the build the page shows. */
+export function ShownBadge(props: { data: ComponentPageData; buildId: string }): Rendered | null {
+  const { data, buildId } = props;
+  const shown = data.captured?.shownBuild.id ?? data.catalog.build.id;
+  return shown === buildId ? (
+    <>
+      {" "}
+      <Badge tone="info">Shown</Badge>
+    </>
+  ) : null;
 }

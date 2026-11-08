@@ -1,7 +1,7 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
 import { storyContext } from "../../.storybook/context.ts";
-import { pageStory } from "../../.storybook/page.tsx";
+import { onAPhone, pageStory } from "../../.storybook/page.tsx";
 import { loadComponentPage } from "../routers/component.handlers.ts";
 import { renderComponentPage } from "./component-detail.tsx";
 
@@ -19,5 +19,8 @@ export const States = pageStory(() => page("states"));
 export const Stories = pageStory(() => page("stories"));
 
 export const History = pageStory(() => page("history"));
+
+/** The history tables are wider than a phone: the page must not scroll sideways. */
+export const HistoryOnAPhone = onAPhone(pageStory(() => page("history")));
 
 export const TestingOff = pageStory(() => page("stories"), { store: { testing: false } });
