@@ -14,9 +14,13 @@ name: CI
 # Website: the `website` job runs only when apps/website/ changed (manual runs always run it).
 # The `changes` job also skips `capture` and `fly` for PRs that only touch docs, the
 # website or the fixtures this run does not use.
+#
+# Labels do not start this workflow: adding or removing one used to re-run (and cancel) the whole
+# suite. The `changeset` check, which reads the `no-release` label, lives in changeset.yml. The
+# `ci:full` label is read on the next push (a re-run keeps the original event, labels included).
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
   push:
     # Epic branches collect the task PRs of one epic (AGENTS.md); each push to one runs the
     # full verify like main, without main's deploy and preview workflows.
@@ -43,6 +47,8 @@ jobs:
       full: ${{ steps.detect.outputs.full }}
       app: ${{ steps.detect.outputs.app }}
       postgres: ${{ steps.detect.outputs.postgres }}
+      force: ${{ steps.detect.outputs.force }}
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -70,6 +76,10 @@ jobs:
           full=true
           app=true
           postgres=true
+          # `--force` (no turbo cache) for a manual run, a diff that failed, or a change to the
+          # files that decide every task's hash. Otherwise a full run replays cached tasks; the
+          # nightly run (nightly.yml) is the forced full build that catches a wrong cache input.
+          force=true
           case "$EVENT" in
             pull_request)
               # HEAD is the PR merge commit: first parent is the base branch tip.
@@ -92,6 +102,7 @@ jobs:
             # The Postgres retention lifecycle: its package, the shared contract it must pass, and
             # the interface that contract exercises (a locking regression must not merge).
             if grep -qE '^(packages/db-postgres/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then postgres=true; else postgres=false; fi
+            if grep -qE "$FULL" changed.txt; then force=true; else force=false; fi
             if [ "$EVENT" = "pull_request" ]; then
               # An epic branch merging into main carries many tasks: always verify everything.
               if grep -qE "$FULL" changed.txt \
@@ -108,12 +119,14 @@ jobs:
           echo "full=$full" >> "$GITHUB_OUTPUT"
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "postgres=$postgres" >> "$GITHUB_OUTPUT"
-          echo "website=$website heavy=$heavy full=$full app=$app postgres=$postgres"
+          echo "force=$force" >> "$GITHUB_OUTPUT"
+          echo "website=$website heavy=$heavy full=$full app=$app postgres=$postgres force=$force"
 
   verify:
     name: verify
     needs: changes
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     permissions:
       contents: read
       actions: write # save-turbo-cache deletes main's older turbo caches
@@ -149,7 +162,8 @@ jobs:
         # `verify` builds the app's Storybook once (build-storybook), so a broken story fails the PR.
         # The website has its own job (below), so it runs in parallel and only when it changed.
         # PRs run only affected packages (plus their dependents); global/risky changes, pushes
-        # to main and manual runs use the full workspace. One test task at a time keeps
+        # to main and manual runs use the full workspace, with the turbo cache unless `force`
+        # (see the `changes` job). One test task at a time keeps
         # per-package vitest worker pools from oversubscribing a small runner.
         env:
           TURBO_CONCURRENCY: "1"
@@ -158,8 +172,10 @@ jobs:
           TURBO_SCM_BASE: origin/main
           TURBO_SCM_HEAD: HEAD
         run: |
-          if [ "${{ needs.changes.outputs.full }}" = "true" ]; then
+          if [ "${{ needs.changes.outputs.full }}" = "true" ] && [ "${{ needs.changes.outputs.force }}" = "true" ]; then
             nubx turbo verify --filter='!website' --force
+          elif [ "${{ needs.changes.outputs.full }}" = "true" ]; then
+            nubx turbo verify --filter='!website'
           else
             nubx turbo verify --filter='!website' --affected
           fi
@@ -260,6 +276,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.website == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -294,37 +311,16 @@ jobs:
     if: ${{ needs.changes.outputs.heavy == 'true' }}
     uses: ./.github/workflows/fly-dry-run.yml
 
-  # The one check to require in branch protection: `capture` and `fly` are skipped for
-  # docs-only PRs, and a skipped reusable-workflow job creates no child checks, so requiring
-  # those by name would wait forever. This passes when every job passed or was skipped.
-  # A pull request that changes the source of a package (or a published manifest) must add a
-  # changeset, so the change reaches the `next` build and the changelog (ADR 0043). The `no-release`
-  # label opts out for changes that ship nothing. Cheap: no install, and it re-runs when labelled.
-  changeset:
-    name: changeset
-    if: ${{ github.event_name == 'pull_request' && (github.base_ref == 'main' || startsWith(github.base_ref, 'epic/')) }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          # The PR's merge commit and its first parent (the base branch tip).
-          fetch-depth: 2
-
-      - name: Test the changeset helpers
-        run: node --test scripts/changeset-lib.test.mjs scripts/release-detect.test.mjs
-
-      - name: Require a changeset for shipped changes
-        env:
-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-          HEAD_REF: ${{ github.head_ref }}
-        run: node scripts/changeset-check.mjs --labels "$LABELS" --head-ref "$HEAD_REF"
-
+  # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
+  # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child
+  # checks, so requiring those by name would wait forever. This passes when every job passed or
+  # was skipped.
   ci:
     name: ci
     if: ${{ always() }}
-    needs: [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly, changeset]
+    needs: [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check results
         env:

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { chooseChannel, findReleaseCommit } from "./release-detect.mjs";
+import { chooseChannel, findReleaseCommit, nextShaOf } from "./release-detect.mjs";
 
 const push = { event: "push", version: "0.9.0", tagExists: true, pending: 0 };
 
@@ -18,9 +18,36 @@ describe("chooseChannel", () => {
       channel: "stable",
     });
   });
+});
 
-  it("publishes next when changesets are pending and the version is already released", () => {
-    assert.deepEqual(chooseChannel({ ...push, pending: 1 }), { channel: "next" });
+describe("chooseChannel for next", () => {
+  it("never publishes next on a push, even with changesets pending", () => {
+    assert.deepEqual(chooseChannel({ ...push, pending: 1 }), { channel: "none" });
+  });
+
+  it("publishes next from the daily run when a package changed since the last next build", () => {
+    const daily = { ...push, event: "schedule", pending: 1, changedSinceNext: true };
+    assert.deepEqual(chooseChannel(daily), { channel: "next" });
+  });
+
+  it("skips the daily next build when nothing changed or nothing is pending", () => {
+    const daily = { ...push, event: "schedule", pending: 1, changedSinceNext: false };
+    assert.deepEqual(chooseChannel(daily), { channel: "none" });
+    assert.deepEqual(chooseChannel({ ...daily, pending: 0, changedSinceNext: true }), {
+      channel: "none",
+    });
+  });
+
+  it("still publishes a merged stable release from the daily run", () => {
+    const daily = { ...push, event: "schedule", tagExists: false, pending: 1 };
+    assert.deepEqual(chooseChannel(daily), { channel: "stable" });
+  });
+
+  it("publishes next on demand while changesets are pending, changed or not", () => {
+    const manual = { ...push, event: "workflow_dispatch", requestedChannel: "next", pending: 1 };
+    assert.deepEqual(chooseChannel(manual), { channel: "next" });
+    const result = chooseChannel({ ...manual, pending: 0 });
+    assert.match(result.error, /no changeset is pending/u);
   });
 
   it("publishes nothing for a push with no pending changeset and a tagged version", () => {
@@ -32,7 +59,9 @@ describe("chooseChannel", () => {
       channel: "none",
     });
   });
+});
 
+describe("chooseChannel for a stable re-run", () => {
   it("re-runs the stable path for the version on main, tag or not", () => {
     const rerun = { ...push, event: "workflow_dispatch", requested: "0.9.0" };
     assert.deepEqual(chooseChannel(rerun), { channel: "stable" });
@@ -52,6 +81,17 @@ describe("chooseChannel", () => {
       requested: "0.9.0-rc.1",
     });
     assert.match(result.error, /prerelease/u);
+  });
+});
+
+describe("nextShaOf", () => {
+  it("reads the commit from a next version", () => {
+    assert.equal(nextShaOf("0.10.0-next-abc1234\n"), "abc1234");
+  });
+
+  it("is undefined for a stable version or nothing", () => {
+    assert.equal(nextShaOf("0.9.0"), undefined);
+    assert.equal(nextShaOf(""), undefined);
   });
 });
 

@@ -1,25 +1,49 @@
 name: Release
 
 # All npm publishing lives in THIS file: the npm trusted publisher of every package is registered
-# to this workflow file name (ADR 0043). A run picks one channel (`detect`):
+# to this workflow file name (ADR 0043). The publish steps live in `.github/actions/npm-publish`, a
+# composite action that runs inside these jobs, so the OIDC token still names this file. A run picks
+# one channel (`detect`):
 #
-# - stable: a push to `main` whose shared version has no `v<version>` tag yet, which is what merging a
-#   release pull request (`nub run release:prepare`) produces. Validate, publish `latest` to npm,
-#   create tag `v<version>`, create the GitHub Release.
-# - next: any other push to `main` while changesets are pending. A throwaway `x.y.z-next-<sha>`
-#   build of every package goes to npm under the `next` dist-tag; the version is never committed.
+# - stable: a push to `main` (or the daily run) whose shared version has no `v<version>` tag yet,
+#   which is what merging a release pull request (`nub run release:prepare`) produces. Validate,
+#   publish `latest` to npm, create tag `v<version>`, create the GitHub Release.
+# - next: once a day (`schedule`), while changesets are pending and a package changed since the last
+#   `next` build, a throwaway `x.y.z-next-<sha>` build of every package goes to npm under the `next`
+#   dist-tag; the version is never committed. A quiet day publishes nothing, and a push to `main`
+#   never publishes `next`.
 # - none: nothing to publish.
 #
-# `workflow_dispatch` (input: version) re-runs the stable path for the version already on `main`
-# after a failed publish. Pushing a tag starts nothing.
+# `workflow_dispatch` with channel `next` publishes a `next` build now. With channel `stable` (input:
+# version) it re-runs the stable path for the version already on `main` after a failed publish.
+# Pushing a tag starts nothing.
 on:
   push:
     branches: [main]
+    # Only the stable path runs on a push; a release PR changes package manifests and `.changeset/`.
+    paths:
+      - "packages/**"
+      - ".changeset/**"
+      - "package.json"
+      - "nub.lock"
+      - "scripts/release*.mjs"
+      - "scripts/version-packages.mjs"
+      - "scripts/changeset-lib.mjs"
+      - ".github/actions/npm-publish/**"
+      - ".github/workflows/release.yml"
+  schedule:
+    - cron: "23 2 * * *" # daily `next` build, debounced by `detect`
   workflow_dispatch:
     inputs:
-      version:
-        description: "Stable version already on main whose publish failed (for example 0.9.0)"
+      channel:
+        description: "next: publish a next build now. stable: re-run a failed stable publish."
         required: true
+        default: next
+        type: choice
+        options: [next, stable]
+      version:
+        description: "stable only: the version already on main whose publish failed (for example 0.9.0)"
+        required: false
         type: string
 
 # Read-only by default; each job that writes or publishes states what it needs.
@@ -47,7 +71,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # tags decide whether this version was released
+          fetch-depth: 0 # tags decide whether this version was released; history, what changed since next
           persist-credentials: false
 
       - name: Detect
@@ -55,7 +79,8 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           REQUESTED: ${{ inputs.version }}
-        run: node scripts/release-detect.mjs "$EVENT" "$REQUESTED"
+          CHANNEL: ${{ inputs.channel }}
+        run: node scripts/release-detect.mjs "$EVENT" "$REQUESTED" "$CHANNEL"
 
   # ---------------------------------------------------------------------------------------------
   # `next` channel
@@ -76,34 +101,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Setup Nub
-        uses: nubjs/setup-nub@v0
+      - name: Publish a snapshot under the next tag
+        uses: ./.github/actions/npm-publish
         with:
-          # Pinned (#782): `latest` is nub 0.10, whose `nub ci` fails on the ignored protobufjs build script.
-          nub-version: "0.9.7"
-
-      - name: Check npm version for OIDC
-        run: node scripts/check-npm-oidc.mjs
-
-      - name: Install dependencies
-        run: nub ci
-
-      - name: Version a snapshot (working tree only, never committed)
-        # `x.y.z-next-<sha>`: the version the pending changesets calculate, plus a suffix.
-        run: node scripts/version-packages.mjs --snapshot
-
-      - name: Validate the snapshot
-        id: guard
-        run: node scripts/release-validate.mjs --tree
-
-      - name: Build packages
-        run: nub run build --filter='./packages/*'
-
-      - name: Rewrite workspace protocol for npm manifest
-        run: node scripts/rewrite-workspace-protocol.mjs
-
-      - name: Publish to npm under the next tag (trusted / provenance)
-        run: node scripts/publish-npm.mjs "${{ steps.guard.outputs.version }}" next
+          snapshot: "true"
+          dist-tag: next
 
   # ---------------------------------------------------------------------------------------------
   # Stable channel (a merged release pull request)
@@ -149,33 +151,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Setup Nub
-        uses: nubjs/setup-nub@v0
+      - name: Publish the release
+        uses: ./.github/actions/npm-publish
         with:
-          # Pinned (#782): `latest` is nub 0.10, whose `nub ci` fails on the ignored protobufjs build script.
-          nub-version: "0.9.7"
-
-      - name: Check npm version for OIDC
-        # Before install: no project-state dependency, fails fast on a bad
-        # toolchain. After Setup Nub so the tested npm is the publishing one.
-        run: node scripts/check-npm-oidc.mjs
-
-      - name: Install dependencies
-        run: nub ci
-
-      - name: Build packages
-        # Not strictly required (prepublishOnly runs build), but fail-fast before provenance.
-        run: nub run build --filter='./packages/*'
-
-      - name: Rewrite workspace protocol for npm manifest
-        # Plain npm publish ships dependencies verbatim, so workspace:* must become caret ranges.
-        # Repo files keep workspace:*; only this CI working tree is rewritten.
-        run: node scripts/rewrite-workspace-protocol.mjs
-
-      - name: Publish to npm (trusted / provenance)
-        # OIDC trusted publishing: npm exchanges the workflow OIDC token automatically, no
-        # NODE_AUTH_TOKEN. Requires a trusted publisher per package on npmjs.com (one-time).
-        run: node scripts/publish-npm.mjs "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.dist_tag }}"
+          version: ${{ needs.validate.outputs.version }}
+          dist-tag: ${{ needs.validate.outputs.dist_tag }}
 
   # The tag and the GitHub Release. They follow a successful npm publish, and the tag is what marks
   # the version released: until it exists, every push to main (and a manual re-run) retries the
