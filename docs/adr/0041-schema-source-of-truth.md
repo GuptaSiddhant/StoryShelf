@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed (amended 2026-11-08: one neutral table definition in core, generated DDL, shared queries;
-adapter packages stay, thinner). Decision 1 (parity test) is recommended for immediate adoption;
-decisions 2 to 5 await owner decision. ADR 0002 describes current behavior until this is accepted.
+Accepted (owner, 2026-11-08; amended the same day: one neutral table definition in core, generated
+DDL, shared queries; adapter packages stay, thinner). Decision 2 onwards depends on the spike in
+follow-up task 2; until the neutral tables land, ADR 0002 describes current behavior.
 
 ## Context
 
