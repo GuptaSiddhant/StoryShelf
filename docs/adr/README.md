@@ -47,5 +47,6 @@ Each current ADR below lists the archived ones it supersedes.
 | 0043 | Release Channels                                                             | —                                  |
 | 0044 | Skipped Builds for Commits That Change No Story (accepted)                   | — (amends 0004, 0014)              |
 | 0045 | Cancel Superseded Builds on a Branch (accepted)                              | — (amends 0004, 0006, 0014)        |
+| 0046 | Explicit Lifecycle Transitions (accepted)                                    | — (amends 0006, 0040)              |
 
 Implementation work is tracked in GitHub issues; the ordered pickup list is issue #370.

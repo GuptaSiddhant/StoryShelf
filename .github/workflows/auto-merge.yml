@@ -41,16 +41,24 @@ jobs:
             const epicIntoMain = pr.head.ref.startsWith("epic/") && pr.base.ref === "main";
             const mergeMethod = epicIntoMain ? "MERGE" : "SQUASH";
             try {
+              // `method` is reserved by @octokit/graphql, so the variable is `mergeMethod`.
               await github.graphql(
-                `mutation ($id: ID!, $method: PullRequestMergeMethod!) {
-                  enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $method }) {
+                `mutation ($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+                  enablePullRequestAutoMerge(
+                    input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }
+                  ) {
                     clientMutationId
                   }
                 }`,
-                { id: pr.node_id, method: mergeMethod },
+                { pullRequestId: pr.node_id, mergeMethod },
               );
               core.info(`Auto-merge (${mergeMethod.toLowerCase()}) enabled on #${pr.number}.`);
             } catch (error) {
-              // Already mergeable ("clean status") or already enabled: nothing to do.
-              core.warning(`#${pr.number}: auto-merge not enabled: ${error.message}`);
+              // Already mergeable ("clean status") or already enabled: nothing to do. Anything else
+              // fails the run, so a broken call is not hidden behind a green check.
+              if (/clean status|already enabled/iu.test(error.message)) {
+                core.notice(`#${pr.number}: ${error.message}`);
+              } else {
+                core.setFailed(`#${pr.number}: auto-merge not enabled: ${error.message}`);
+              }
             }
