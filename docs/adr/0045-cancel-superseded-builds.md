@@ -81,8 +81,8 @@ Two traps decide the design:
 
 `projects.cancel_superseded` (boolean, not null, default `true`), `builds.superseded_by_build_id`
 (nullable text) and `builds.supersedes` (nullable JSON text: the ids proposed at creation, acted on
-when the build becomes viable), in every dialect's DDL, Drizzle schema and migration, plus the core row types (ADR
-0041 is still proposed).
+when the build becomes viable), in every dialect's DDL, Drizzle schema and migration, plus the core row types (until ADR
+0041 lands).
 
 ## Consequences
 
