@@ -2,14 +2,15 @@
 
 ## Status
 
-Accepted. SQLite activated (#536); Postgres and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
+Accepted. SQLite (#536) and the postgres.js preset (#375) activated; the other Postgres presets and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
 deployments with `testing`; hosting-only retention is unchanged.
 
 Merged: source-build provenance (#345), frozen comparison references and fail-closed testing purge
 (#354), SQLite lifecycle primitives (#382), fenced baseline writers (#389), preparation of legacy
 references (#397), sealing of the capability to fenced mutations (#372) and resumable deletion with
-exactly-once content release (#374), per-build content uses (#564) and SQLite activation (#536).
-Open: Postgres and MySQL capability (#375, #376) and investigations (#377 to #381).
+exactly-once content release (#374), per-build content uses (#564), SQLite activation (#536) and Postgres activation on the postgres.js
+preset (#375).
+Open: the `./neon` and `pg` presets (#375), MySQL (#376) and investigations (#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -126,7 +127,21 @@ by preset, so it cannot by itself carry this guarantee.
   with the tombstone's `FOR UPDATE` of the same build row, so an admission and a deletion claim of
   one build end in exactly one outcome. A use of shared content and a collector's claim of the same
   hash take a transaction-scoped advisory lock on the hash, in hash order, and re-read after it.
-  It is not yet exposed by any preset; activation (#375 step 2c) follows.
+  Activation follows.
+- **Postgres activation** (`createPostgresDatabase`, `db-postgres/src/retention-activation.ts`,
+  `baseline-preparation.ts`). Same sequence as SQLite: after the migration, `prepareBaselineReferences`
+  once, then expose the capability, or `retentionPause` on a `BaselineSourceIntegrityError`. One
+  transaction visits every baseline owner (those with provenance, plus those a pin still names) in
+  the order the fenced writers lock, locking each owner's generation row `FOR UPDATE` before it
+  reads the baseline, and the source build `FOR SHARE`. Preparation can therefore run beside live
+  traffic and beside another booting instance: a writer or a second instance waits on its locks, and
+  the second finds nothing to change. Unlike SQLite there is no global write lock, so a writer
+  that does not take the fence (an older release, before this one) is not excluded; upgrade every
+  instance before relying on it. Only the postgres.js preset exposes it. PGlite never does (one
+  session proves no locking); `./neon`, `pg` and `./neon-http` stay fail closed until each passes
+  both suites on its own (`./neon-http` cannot: `transactions: "sequential"`). The activation suite
+  runs unchanged on PGlite and on a real server; the race tests (interrupted preparation, a writer
+  in flight, two instances) need the real server.
 - **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
   adapter's setup has migrated the schema, it runs `prepareBaselineReferences` once and only then
   exposes `buildReferenceLifecycle`. A shared file is required, so an in-memory database never has
@@ -209,10 +224,10 @@ could leave them, and they would keep an unrelated build protected.
 
 **Negative**
 
-- Postgres and MySQL deployments with `testing` still do not purge builds or garbage-collect
-  branches until #375 and #376; their storage grows and operators must be told.
-- Postgres and MySQL need their own capability implementation and multi-connection tests before
-  they regain automatic retention.
+- MySQL, and Postgres on `./neon`, `pg` and `./neon-http`, still do not purge builds or
+  garbage-collect branches with `testing` (#375, #376); their storage grows and operators must be
+  told.
+- Each of those needs its own multi-connection proof before it regains automatic retention.
 - Pinning whole builds keeps more storage than pinning artifacts would.
 - Every baseline writer pays for a fenced transaction.
 
