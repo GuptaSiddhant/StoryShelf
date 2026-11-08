@@ -3,6 +3,11 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrations } from "./migrate.ts";
+import {
+  activateRetention,
+  attachRetention,
+  type RetentionActivation,
+} from "./retention-activation.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -71,8 +76,9 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
 
   // oxlint-disable-next-line typescript/no-unsafe-argument -- postgres instance may be from isolated store vs workspace
   const db = drizzle(client as never, { schema });
+  const retention: RetentionActivation = {};
 
-  return createDrizzlePgAdapter(db, {
+  const adapter = createDrizzlePgAdapter(db, {
     metadata: {
       name: "Postgres",
       version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
@@ -83,6 +89,8 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
     tables: schema,
     migrate: async ({ logger }) => {
       await runMigrations(async (sql: string) => await client.unsafe(sql), logger);
+      // postgres.js opens a real session per transaction, so row locks hold between processes.
+      await activateRetention(db, retention);
     },
     close: async () => {
       await client.end();
@@ -91,4 +99,5 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       await client.unsafe("SELECT 1");
     },
   });
+  return attachRetention(adapter, retention);
 }
