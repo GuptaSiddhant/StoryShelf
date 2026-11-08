@@ -217,8 +217,8 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   portability and whether a result accurately reports what was compared. ADR 0037 (portability) is
   proposed direction; ADR 0038 (environment migration/review) is accepted as the target but not yet
   implemented. ADRs 0003 and 0009 describe current behavior until that work lands. ADR 0041 (schema
-  source of truth) is proposed; until it is accepted, change a table in every dialect's DDL, Drizzle
-  schema and migration, plus the core row type.
+  source of truth) is accepted but not yet implemented; until its neutral tables land, change a
+  table in every dialect's DDL, Drizzle schema and migration, plus the core row type.
 
 ## Conventions
 
