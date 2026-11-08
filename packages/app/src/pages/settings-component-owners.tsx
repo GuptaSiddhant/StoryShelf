@@ -1,4 +1,3 @@
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 import { ownerRulesText, type OwnerProblem, type OwnerRule } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";

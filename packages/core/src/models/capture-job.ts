@@ -1,13 +1,14 @@
 /** Rows of the database queue (`capture_jobs`): job rows, per-attempt claim rows, and their views. */
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte } from "drizzle-orm";
 import type { Column, SQL, Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DatabaseAdapter, TxStore } from "../adapters/database.ts";
 import type {
   CaptureAttemptStatus,
   CaptureJobKind,
   CaptureJobRow,
   CaptureJobStatus,
 } from "../schema/capture-job.ts";
+import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
 
 /** Tables required by {@link CaptureJobModel}. */
@@ -115,16 +116,17 @@ export class CaptureJobModel {
 
   /**
    * A request arrived for the key of the running job `jobId`: record that one more pass is owed.
-   * One conditional write, applied only while the job is `running`. Returns the row as it stands,
-   * so the caller can tell whether the request is now covered (`running` with the marker set, or
-   * `queued`) or the job ended and the request must become a new job.
+   * One conditional write, applied only while the job is `running` or `exhausting`. Returns the row
+   * as it stands, so the caller can tell whether the request is now covered (unfinished with the
+   * marker set, or `queued`) or the job ended and the request must become a new job.
    */
   async requestRerun(jobId: string, now: string): Promise<CaptureJobRow | null> {
     return (await this.#db.updateWhere(
       this.#table,
       jobId,
       { rerunRequestedAt: now, updatedAt: now },
-      allOf(eq(this.#c.status, "running"), isNull(this.#c.rerunRequestedAt)),
+      // An `exhausting` job is still unfinished and its final settle hands over, like a running one.
+      allOf(inArray(this.#c.status, ["running", "exhausting"]), isNull(this.#c.rerunRequestedAt)),
     )) as unknown as CaptureJobRow | null;
   }
 
@@ -144,6 +146,54 @@ export class CaptureJobModel {
       isNotNull(this.#c.rerunRequestedAt),
     )) as unknown as CaptureJobRow | null;
     return row?.rerunRequestedAt === null && sameInstant(row.updatedAt, stamp);
+  }
+
+  /**
+   * End the job `jobId` and hand its key over in one transaction, so a crash leaves either the job
+   * still unfinished (its lease expires and it is redelivered) or its successor queued, never a job
+   * that ended with a request owed and no successor. The terminal write comes first: it takes the
+   * row, so a concurrent settler of the same job or a concurrent request for its key waits for this
+   * commit and then sees the job ended with the marker already taken. If the marker is set and the
+   * job `failed` or is `done`, it is cleared and a successor with the same key and payload is
+   * inserted in the same transaction; a throw anywhere (the insert included) rolls the end back.
+   *
+   * `onlyOpen` leaves a job that already ended as it is (a late `done` or a cancel keeps its
+   * outcome), as {@link finishOpenJob} does. Resolves to `null` when the database has no
+   * transactions, or only sequential ones (`metadata.transactions`): the caller then ends the job
+   * and starts the successor in two steps (a crash between them loses the request).
+   */
+  async endJob(
+    jobId: string,
+    end: {
+      status: Exclude<CaptureJobStatus, "queued" | "running" | "exhausting">;
+      error?: string | null;
+      onlyOpen?: boolean;
+      /**
+       * The attempt that ran the job, ended in the same transaction: its lease goes with the end,
+       * so a rollback leaves it running and the job is redelivered when the lease runs out.
+       */
+      attempt?: { id: string; status: "done" | "failed"; error?: string | null };
+    },
+    now: string,
+  ): Promise<JobEnd | null> {
+    if (this.#db.transact === undefined || this.#db.metadata.transactions === "sequential") {
+      return null;
+    }
+    return await this.#db.transact<JobEnd>(async (tx) => {
+      // A write first: it takes the row (and, on SQLite, the write lock, waiting for another process
+      // as a plain statement does). A transaction that reads first and then writes holds a read
+      // snapshot another process's commit makes stale, and SQLite refuses its upgrade at once.
+      await tx.update(this.#table, jobId, { updatedAt: now });
+      await settleAttemptIn(tx, this.#table, end.attempt, now);
+      const before = (await tx.get(this.#table, jobId)) as unknown as CaptureJobRow | null;
+      if (before === null) throw new Error("row not found");
+      if (end.onlyOpen === true && isTerminalJob(before)) {
+        return { applied: false, successor: null };
+      }
+      await tx.update(this.#table, jobId, endPatch(end, now));
+      const successor = await handOver(tx, this.#table, before, end.status, now);
+      return { applied: true, successor };
+    });
   }
 
   /**
@@ -575,4 +625,78 @@ function blankRow(now: string): BlankRow {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+/** What {@link CaptureJobModel.endJob} did: whether it wrote the end, and the successor it queued. */
+export interface JobEnd {
+  applied: boolean;
+  successor: CaptureJobRow | null;
+}
+
+/** The write that ends the job: frees its key and holds its row until the commit. */
+function endPatch(
+  end: { status: string; error?: string | null },
+  now: string,
+): Record<string, unknown> {
+  const patch = {
+    status: end.status,
+    visibleAt: null,
+    activeKey: null,
+    finishedAt: now,
+    updatedAt: now,
+  };
+  const error = end.error ?? null;
+  return error === null ? patch : { ...patch, error };
+}
+
+/** Ends the attempt that ran the job inside the end's transaction (a no-op without one). */
+async function settleAttemptIn(
+  tx: TxStore,
+  table: Table,
+  attempt: { id: string; status: "done" | "failed"; error?: string | null } | undefined,
+  now: string,
+): Promise<void> {
+  if (attempt === undefined) return;
+  await tx.update(table, attempt.id, {
+    status: attempt.status,
+    visibleAt: null,
+    error: attempt.error ?? null,
+    finishedAt: now,
+    updatedAt: now,
+  });
+}
+
+/**
+ * Inside the transaction that ended `jobId`: if a request is owed (the marker is set) and the job
+ * did not end `cancelled`, take the marker and queue the successor for the key the job just freed.
+ */
+async function handOver(
+  tx: TxStore,
+  table: Table,
+  before: CaptureJobRow,
+  status: string,
+  now: string,
+): Promise<CaptureJobRow | null> {
+  // `before` is the row as it was when the end was written; the key is gone from the row since.
+  const key = before.activeKey;
+  if (status === "cancelled" || key === null) return null;
+  // Read after the end: a request that set the marker first is seen, and none can set it later.
+  const ended = (await tx.get(table, before.jobId)) as unknown as CaptureJobRow | null;
+  if (!ended?.rerunRequestedAt) return null;
+  await tx.update(table, before.jobId, { rerunRequestedAt: null });
+  return (await tx.insert(
+    table,
+    jobRow(
+      {
+        id: ulid(),
+        kind: before.kind,
+        buildId: before.buildId,
+        shardId: before.shardId,
+        maxAttempts: before.maxAttempts,
+        payload: before.payload,
+        activeKey: key,
+      },
+      now,
+    ),
+  )) as unknown as CaptureJobRow;
 }

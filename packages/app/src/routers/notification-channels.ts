@@ -4,10 +4,12 @@ import type { NotificationChannelRow } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
+import { errorBody } from "../middleware/api-errors.ts";
 import { getStore } from "../store.ts";
 import { retryChannelState } from "./channel-retry.ts";
 import { notFound, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import {
+  errorSchema,
   notFound as notFoundResponse,
   notificationChannelCreateSchema,
   notificationChannelSchema,
@@ -78,7 +80,7 @@ const createChannelRoute = createRoute({
       description: "Created notification channel",
     },
     400: {
-      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      content: { "application/json": { schema: errorSchema } },
       description: "Bad request",
     },
     ...notFoundResponse,
@@ -113,16 +115,16 @@ const retryChannelRoute = createRoute({
       description: "Builds asked again",
     },
     400: {
-      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      content: { "application/json": { schema: errorSchema } },
       description: "Not a git channel",
     },
     409: {
-      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      content: { "application/json": { schema: errorSchema } },
       description:
         "The channel is disabled, or notifications are paused until a public URL is confirmed",
     },
     503: {
-      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      content: { "application/json": { schema: errorSchema } },
       description: "The open builds could not be looked up; try again",
     },
     ...notFoundResponse,
@@ -148,7 +150,7 @@ export function registerNotificationChannels(app: ShelfRouter): void {
       { projectId: project.id, hasSecret: body.secret !== undefined },
     );
     if (!valid.ok) {
-      return c.json({ message: valid.message }, 400);
+      return c.json(errorBody(valid.message), 400);
     }
     const row = await notificationChannelModel().create({ projectId: project.id, ...body });
     return c.json(toPublic(row), 201);
@@ -165,9 +167,9 @@ export function registerNotificationChannels(app: ShelfRouter): void {
       return c.json({ asked: result.asked }, 202);
     }
     if (result.status === 503) {
-      return c.json({ message: result.message }, 503);
+      return c.json(errorBody(result.message), 503);
     }
-    return c.json({ message: result.message }, result.status === 409 ? 409 : 400);
+    return c.json(errorBody(result.message), result.status === 409 ? 409 : 400);
   });
 
   app.openapi(deleteChannelRoute, async (c) => {
@@ -212,7 +214,7 @@ const createSystemRoute = createRoute({
       description: "Created site-wide notification channel",
     },
     400: {
-      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      content: { "application/json": { schema: errorSchema } },
       description: "Bad request",
     },
     ...unauthorized,
@@ -249,7 +251,7 @@ export function registerSystemChannels(app: ShelfRouter): void {
       { projectId: null, hasSecret: body.secret !== undefined },
     );
     if (!valid.ok) {
-      return c.json({ message: valid.message }, 400);
+      return c.json(errorBody(valid.message), 400);
     }
     const row = await notificationChannelModel().create({ projectId: null, ...body });
     return c.json(toPublic(row), 201);

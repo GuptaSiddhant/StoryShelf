@@ -716,3 +716,53 @@ describe("auth email sender", () => {
     expect(bodies[0]?.text).not.toContain("attacker.example");
   });
 });
+
+/** Sign a freshly invited user in against `baseURL` and answer the session cookie's Set-Cookie line. */
+async function signInSetCookie(baseURL: string): Promise<string> {
+  const { shelf } = await testEngine(false, false, false, false, { baseURL });
+  await inviteUser(shelf, "ada@example.com", "Ada");
+  const res = await shelf.auth.handler(
+    new Request(`${baseURL}/api/auth/sign-in/email`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: baseURL },
+      body: JSON.stringify({ email: "ada@example.com", password: "hunter2hunter2" }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  const lines = res.headers.getSetCookie();
+  expect(lines).toHaveLength(1);
+  return lines[0] ?? "";
+}
+
+/** The attributes of a Set-Cookie line, lower-cased and without values, except SameSite's. */
+function attributesOf(line: string): { name: string; flags: string[]; sameSite: string } {
+  const [pair = "", ...rest] = line.split(";").map((part) => part.trim());
+  const flags = rest.map((part) => part.split("=")[0]?.toLowerCase() ?? "").toSorted();
+  const sameSite = rest.find((part) => part.toLowerCase().startsWith("samesite="))?.slice(9) ?? "";
+  return { name: pair.split("=")[0] ?? "", flags, sameSite: sameSite.toLowerCase() };
+}
+
+describe("the session cookie", () => {
+  it("is HttpOnly, SameSite=Lax and Path=/ over http, and not Secure", async () => {
+    const line = await signInSetCookie("http://localhost:3000");
+    const cookie = attributesOf(line);
+    expect(cookie.name).toBe("storyshelf_session");
+    expect(cookie.flags).toEqual(["httponly", "max-age", "path", "samesite"]);
+    expect(cookie.sameSite).toBe("lax");
+    expect(line).toMatch(/Path=\/(?:;|$)/u);
+  });
+
+  it("is also Secure when the public URL is https", async () => {
+    const line = await signInSetCookie("https://shelf.example.com");
+    const cookie = attributesOf(line);
+    expect(cookie.flags).toEqual(["httponly", "max-age", "path", "samesite", "secure"]);
+    expect(cookie.sameSite).toBe("lax");
+    expect(line).toMatch(/Path=\/(?:;|$)/u);
+    // Better Auth prefixes a Secure cookie's name with `__Secure-`; the name is part of the contract.
+    expect(cookie.name).toBe("__Secure-storyshelf_session");
+  });
+
+  it("never sets a Domain, so the cookie stays on the exact host", async () => {
+    expect(await signInSetCookie("https://shelf.example.com")).not.toMatch(/;\s*Domain=/iu);
+  });
+});

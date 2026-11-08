@@ -1,0 +1,86 @@
+name: Publish to npm
+description: >-
+  Install, build and publish every package to npm with trusted publishing and provenance. Used only
+  by release.yml; run after checkout in a job with `id-token: write`.
+
+# The npm trusted publisher of every package is registered to `release.yml` (ADR 0043). A composite
+# action runs inside the calling job, so the OIDC token still names `release.yml`; never call this
+# from another workflow, and never turn it into a reusable workflow (that changes the workflow the
+# token names). No turbo cache is restored: a published build is always made from scratch.
+
+inputs:
+  dist-tag:
+    description: "npm dist-tag to publish under (next, latest, ...)"
+    required: true
+  version:
+    description: "Shared version on the checked-out tree (stable). Leave empty with snapshot."
+    required: false
+    default: ""
+  snapshot:
+    description: "true: version a throwaway `<next>-next-<sha>` snapshot in the working tree first"
+    required: false
+    default: "false"
+
+outputs:
+  version:
+    description: "The version that was published"
+    value: ${{ steps.version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Nub
+      uses: nubjs/setup-nub@v0
+      with:
+        # Pinned (#782): `latest` is nub 0.10, whose `nub ci` fails on the ignored protobufjs build script.
+        nub-version: "0.9.7"
+
+    - name: Check npm version for OIDC
+      # Before install: fails fast on a bad toolchain. After Setup Nub so the tested npm publishes.
+      shell: bash
+      run: node scripts/check-npm-oidc.mjs
+
+    - name: Install dependencies
+      shell: bash
+      run: nub ci
+
+    - name: Version a snapshot (working tree only, never committed)
+      # `x.y.z-next-<sha>`: the version the pending changesets calculate, plus a suffix.
+      if: inputs.snapshot == 'true'
+      shell: bash
+      run: node scripts/version-packages.mjs --snapshot
+
+    - name: Resolve the version
+      id: version
+      shell: bash
+      env:
+        SNAPSHOT: ${{ inputs.snapshot }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -e
+        if [ "$SNAPSHOT" = "true" ]; then
+          node scripts/release-validate.mjs --tree
+        elif [ -n "$VERSION" ]; then
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        else
+          echo "::error::a stable publish needs the version input"
+          exit 1
+        fi
+
+    - name: Build packages
+      shell: bash
+      run: nub run build --filter='./packages/*'
+
+    - name: Rewrite workspace protocol for npm manifest
+      # Plain npm publish ships dependencies verbatim, so workspace:* must become caret ranges.
+      # Repo files keep workspace:*; only this CI working tree is rewritten.
+      shell: bash
+      run: node scripts/rewrite-workspace-protocol.mjs
+
+    - name: Publish (trusted / provenance)
+      # npm exchanges the job's OIDC token itself; no NODE_AUTH_TOKEN. Skips versions already on npm.
+      shell: bash
+      env:
+        VERSION: ${{ steps.version.outputs.version }}
+        DIST_TAG: ${{ inputs.dist-tag }}
+      run: node scripts/publish-npm.mjs "$VERSION" "$DIST_TAG"

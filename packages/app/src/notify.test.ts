@@ -7,7 +7,7 @@ import {
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import { notifyAssignedWith, notifyProject, notifySystem } from "./notify.ts";
+import { notifyAssignedWith, notifyMentionWith, notifyProject, notifySystem } from "./notify.ts";
 import { runWithStore, type Store } from "./store.ts";
 
 const SECRET = "test-server-secret-32-chars-long!!";
@@ -241,6 +241,7 @@ describe("notifyProject", () => {
       authProvider: "local",
       disabled: false,
     });
+    await new MemberModel(db).set("p1", "u1", "developer");
     await new NotificationSubscriptionModel(db).upsert("p1", "u1", { via: ["email", "log"] });
     const emailed: unknown[] = [];
     const logged: unknown[] = [];
@@ -270,6 +271,7 @@ describe("notifyProject", () => {
       authProvider: "local",
       disabled: false,
     });
+    await new MemberModel(db).set("p1", "u1", "developer");
     await new NotificationSubscriptionModel(db).upsert("p1", "u1", { via: ["email"] });
     const emailed: unknown[] = [];
     const logged: unknown[] = [];
@@ -558,6 +560,73 @@ describe("notifyProject", () => {
     await runWithStore(storeFor(db, []), async () => {
       await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {});
     });
+  });
+});
+
+async function subscribed(): Promise<ReturnType<typeof makeDatabase>["db"]> {
+  const { db } = makeDatabase();
+  await seedUsers(db);
+  const subscriptions = new NotificationSubscriptionModel(db);
+  await subscriptions.upsert("p1", "dev1", { events: ["build:created"], via: ["email"] });
+  return db;
+}
+
+describe("people without project access (#750)", () => {
+  const SITE_ADMIN = {
+    id: "root",
+    email: "root@example.com",
+    name: "root",
+    avatarUrl: null,
+    role: "admin" as const,
+    lastLoginAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    passwordHash: null,
+    displayNameOverride: null,
+    authProvider: "local",
+    disabled: false,
+  };
+
+  it("stops a removed member's subscription, keeps the row, and restores delivery on re-adding", async () => {
+    const db = await subscribed();
+    const members = new MemberModel(db);
+    const before = await new NotificationSubscriptionModel(db).getFor("p1", "dev1");
+    expect(await recipients(db, "build:created")).toEqual(["dev1@example.com"]);
+    await members.remove("p1", "dev1");
+    expect(await recipients(db, "build:created")).toEqual([]);
+    await members.set("p1", "dev1", "developer");
+    expect(await recipients(db, "build:created")).toEqual(["dev1@example.com"]);
+    expect(await new NotificationSubscriptionModel(db).getFor("p1", "dev1")).toEqual(before);
+  });
+
+  it("keeps a site admin with no membership row", async () => {
+    const db = await subscribed();
+    await db.insert(db.tables.users, SITE_ADMIN);
+    await new NotificationSubscriptionModel(db).upsert("p1", "root", {
+      events: ["build:created"],
+      via: ["email"],
+    });
+    expect(await recipients(db, "build:created")).toEqual(["dev1@example.com", "root@example.com"]);
+  });
+
+  it("sends a mention to nobody once the member is removed", async () => {
+    const db = await subscribed();
+    await new MemberModel(db).remove("p1", "dev1");
+    const sent: unknown[] = [];
+    await notifyMentionWith(
+      storeFor(db, [recordingProvider("email", sent)]),
+      { id: "p1", slug: "test-project" },
+      "dev1",
+      { buildId: "b1" },
+      "/builds/b1",
+    );
+    expect(sent).toEqual([]);
+  });
+
+  it("sends an assigned owner who lost access nothing", async () => {
+    const db = await subscribed();
+    expect(await assignedEmails(db, "appr1")).toHaveLength(1);
+    await new MemberModel(db).remove("p1", "appr1");
+    expect(await assignedEmails(db, "appr1")).toEqual([]);
   });
 });
 

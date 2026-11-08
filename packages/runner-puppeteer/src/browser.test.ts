@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { finishing, messageOf, outcomeOf } from "./browser.ts";
+import { activeRuns, cancelRuns, finishing, messageOf, outcomeOf, trackRun } from "./browser.ts";
 
 describe("outcomeOf", () => {
   it("lets a cancel win over a failure, and a failure over a finish", () => {
@@ -38,5 +38,45 @@ describe("messageOf", () => {
 
   it("redacts secrets in a value that is not an Error", () => {
     expect(messageOf({ message: "refused, api_key=supersecret" })).not.toContain("supersecret");
+  });
+});
+
+describe("trackRun and cancelRuns", () => {
+  it("registers the run while it works, and removes it however it ends", async () => {
+    await trackRun({ buildId: "track-1", runId: "a" }, async () => {
+      expect(activeRuns.matching("track-1", "a")).toHaveLength(1);
+      return await Promise.resolve();
+    });
+    expect(activeRuns.matching("track-1")).toHaveLength(0);
+    await expect(
+      trackRun({ buildId: "track-1", runId: "a" }, () => Promise.reject(new Error("boom"))),
+    ).rejects.toThrow("boom");
+    expect(activeRuns.matching("track-1")).toHaveLength(0);
+  });
+
+  it("cancels exactly the runs it names, aborting and releasing their sessions", async () => {
+    const release = vi.fn(async () => await Promise.resolve());
+    let named: { cancelled: boolean; abort?: AbortController | undefined } | undefined;
+    let other: { cancelled: boolean } | undefined;
+    const started = Promise.withResolvers<boolean>();
+    const finish = Promise.withResolvers<boolean>();
+    const first = trackRun({ buildId: "track-2", runId: "a" }, async (active) => {
+      active.session = { release } as never;
+      named = active;
+      started.resolve(true);
+      await finish.promise;
+    });
+    const second = trackRun({ buildId: "track-2", runId: "b" }, async (active) => {
+      other = active;
+      await finish.promise;
+    });
+    await started.promise;
+    await cancelRuns("track-2", "a");
+    expect(named?.cancelled).toBe(true);
+    expect(named?.abort?.signal.aborted).toBe(true);
+    expect(release).toHaveBeenCalledWith("cancelled");
+    expect(other?.cancelled).toBe(false);
+    finish.resolve(true);
+    await Promise.all([first, second]);
   });
 });

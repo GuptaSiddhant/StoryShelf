@@ -84,11 +84,10 @@ describe("app.lifecycle", () => {
     const response = await app.request("/api/v1/projects");
     expect(response.status).toBe(503);
     const body = (await response.json()) as {
-      error: string;
-      failures: { category: string; kind: string }[];
+      error: { message: string; failures: { category: string; kind: string }[] };
     };
-    expect(body.error).toContain("setup");
-    expect(body.failures[0]?.category).toBe("database");
+    expect(body.error.message).toContain("setup");
+    expect(body.error.failures[0]?.category).toBe("database");
   });
 });
 

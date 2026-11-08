@@ -20,7 +20,7 @@ The touched timing-sensitive files have a `test:flake` script in their package: 
 ## CI selection tiers
 
 - **PR required gate:** `turbo verify --affected` includes changed packages and their dependents. Root/global files, package manifests, workflow/config changes, a missing diff, or the `ci:full` label force the full suite. Test tasks run at `TURBO_CONCURRENCY=1`: the Postgres/PGlite suite spawns many memory-heavy workers, and overlapping package suites have been OOM-killed on the runner.
-- **Push to `main`:** full, uncached `turbo verify --filter='!website' --force`.
+- **Push to `main`:** full `turbo verify --filter='!website'` with the turbo cache, so a task whose inputs did not change replays; `--force` (uncached) when the push changes a file that decides every task's hash (root manifests, lockfile, `turbo.json`, tsconfig, config, workflows, scripts, a package's manifest or build config). The nightly forced run backstops a wrong cache input.
 - **Nightly:** the same full uncached verify plus `turbo run test:flake`, every Storybook fixture, and the Fly dry run. It is the backstop for anything `--affected` could miss.
 - **Storybook dev smoke (`storybook-dev` job):** `nub run smoke:storybook` in `packages/app` starts `storybook dev`, opens every story once in Chrome and fails on a page error, a console error or Storybook's error display (`scripts/storybook-dev-smoke.mjs`). `turbo verify` only builds Storybook, and the production build tree-shakes code the dev server still runs, so a shim or story can build and still throw for anyone running `nub run storybook`. Runs only when `packages/app`, `packages/core`, the lockfile or `ci.yml` changed.
 - File-level `vitest --changed` is deliberately not a required gate: dynamic imports and cross-package resolution can miss a test. Use it only as an advisory experiment, with the nightly full run as the safety net.
@@ -71,6 +71,36 @@ Rules:
 - Prove conformance with the published suites: `storageContractSuite` /
   `databaseContractSuite` from `@storyshelf/core/test-helpers` (one line in
   the package's own test file). `queueContractSuite` covers the database queue; runner/git suites follow in later phases).
+- A database that implements `buildReferenceLifecycle` (build retention, ADR 0039) proves it with
+  `buildReferenceContractSuite` from `@storyshelf/core/test-helpers`, one call in the package's own
+  test file. The fixture hands the suite two lifecycles on **independent connections** (one
+  connection used twice proves nothing about locking), an owner, two `available` builds of its
+  project, and a `marker` (a domain write inside a mutation and a count of committed ones, read
+  through a connection other than the transaction). The suite also pins the typed
+  `ReferenceGenerationConflict` for a stale generation. A stand-in that serves every connection
+  from one session (an in-process Postgres such as PGlite) can run the suite but cannot prove
+  cross-connection row locking; say so where it is used, and prove locking against a real server
+  before enabling the capability on a preset.
+- Postgres (`db-postgres/src/build-reference-lifecycle.test.ts`) runs `buildReferenceContractSuite`
+  twice. On PGlite it always runs and proves the SQL, the constraints and the rollback of domain
+  writes, but both lifecycles share one session, so it does not prove locking (removing the row
+  locks leaves it green). On a real server (one connection per lifecycle) it does: removing the same
+  locks fails it. That half needs `LIVE_CLOUD=1`, `DATABASE_URL` and `POSTGRES_SCHEMA_MUTATION_TEST=1`;
+  the last says the database is disposable, because the suite clears `content_uses` and its
+  collector pass claims every idle hash. CI runs that half on every pull request that
+  touches `packages/db-postgres/`, `packages/core/src/test-helpers/` or
+  `packages/core/src/adapters/database.ts` (job `postgres-lifecycle`, a `postgres:16` service
+  container), and the nightly database workflow runs it with the rest of the live suite.
+- The boot step that prepares the baseline pins before a dialect exposes the capability (ADR 0039,
+  "activation") is proven with `retentionActivationContractSuite`. Activation stays each adapter's
+  own step (it is on neither `DatabaseAdapter` nor `BuildReferenceLifecycle`); the dialect hands
+  the suite a harness: its own `prepare()` (resolving to the pause, if any), a lifecycle on its own
+  connection, and seeding and reading of baselines. The suite pins what must hold in every dialect:
+  a source is never guessed, a recorded source whose build is gone is kept unpinned, a stale pin is
+  released, and a tombstoned or other-project source pauses retention and rolls back every pin.
+  What needs a dialect's own internals stays in that dialect's tests and must be mirrored for each
+  new one: the interrupted preparation that resumes after a restart, and the fenced writer racing
+  preparation.
 - Core validates untrusted input at the boundary: storage path segments
   (`paths.ts`), screenshot bytes (`capture/guards.ts`: PNG magic + 25 MiB cap),
   list limits (`clampListLimit`, max 1000).

@@ -74,7 +74,7 @@ describe("createForkedHandler", () => {
   const ECHO_CHILD = fileURLToPath(
     new URL("../../core/src/test-helpers/ipc-echo-child.ts", import.meta.url),
   );
-  const context = { logger: {} as never, touch: () => {} };
+  const context = { logger: {} as never, touch: () => {}, signal: new AbortController().signal };
 
   it("pushes jobs to a real child, and closes it", async () => {
     const handler = createForkedHandler({

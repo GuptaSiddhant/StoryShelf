@@ -5,9 +5,6 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { getStore } from "../store.ts";
 import { Card, Meta, SectionTitle, VStack } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Characters of the comment shown beside its anchor. */

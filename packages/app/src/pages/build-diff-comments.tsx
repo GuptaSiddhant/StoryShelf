@@ -24,9 +24,6 @@ import {
   reviewMention,
 } from "../ui/styles/review.ts";
 import { CommentBodyField } from "./comment-body-field.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Snapshot comment thread props. */
 export interface DiffCommentsProps {
   project: Project;

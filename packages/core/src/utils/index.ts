@@ -115,6 +115,7 @@ export { MIME_TYPES, mimeFor } from "./mime.ts";
 export { detectPublicBaseUrl, normalizeOrigin, type Env } from "./public-origin.ts";
 export { isBlockedTarget, isPathSafe, isSafeSegment } from "./path-security.ts";
 export { errorMessage, errorText } from "./error-text.ts";
+export { UserFacingError, isUserFacingError } from "./user-facing-error.ts";
 export { redactSecrets, sanitizeErrorText } from "./redact.ts";
 export { addTiming, roundedTimings, runWithTimings, timed, type TimingMap } from "./timing.ts";
 export { slugify, ulid } from "./ulid.ts";

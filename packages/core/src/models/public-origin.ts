@@ -14,6 +14,7 @@
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { ShelfConfig } from "../config.ts";
 import { detectPublicBaseUrl, normalizeOrigin, type Env } from "../utils/public-origin.ts";
+import { UserFacingError } from "../utils/user-facing-error.ts";
 import { SiteSettingsModel } from "./site-settings.ts";
 
 /** Key of the stored origin in `site_settings`. */
@@ -161,7 +162,7 @@ function requireOrigin(origin: string): string {
   const normalized = normalizeOrigin(origin);
   const url = normalized === undefined ? undefined : new URL(withScheme(origin));
   if (normalized === undefined || url?.pathname !== "/" || url.search || url.hash) {
-    throw new Error(
+    throw new UserFacingError(
       "The public origin must be an http(s) origin such as https://shelf.example.com",
     );
   }

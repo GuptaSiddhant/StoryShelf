@@ -15,9 +15,6 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 type Kind = "added" | "changed" | "removed";

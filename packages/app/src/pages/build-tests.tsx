@@ -1,9 +1,6 @@
 import { summarizeTests, type TestResult } from "@storyshelf/core/capture";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, Card, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** The line under the card title: counts, and what a failure means for the build. */

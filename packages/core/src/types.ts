@@ -57,6 +57,30 @@ export type SiteRole = (typeof SITE_ROLES)[number];
 /** Shared session cookie name used by auth (ADR 0008). */
 export const SESSION_COOKIE = "storyshelf_session";
 
+/**
+ * The name the auth engine gives the session cookie over https: the library adds the `__Secure-`
+ * prefix when the base URL is https, so the plain name never reaches the app there.
+ */
+export const SECURE_SESSION_COOKIE = `__Secure-${SESSION_COOKIE}`;
+
+/**
+ * The session cookie's value from a `Cookie` header, or `undefined` when there is none (or it is
+ * empty). The `__Secure-` name wins over the plain one; the one place that types either name.
+ */
+export function readSessionCookie(cookieHeader: string | null | undefined): string | undefined {
+  const values = new Map<string, string>();
+  for (const part of (cookieHeader ?? "").split(";")) {
+    const eqIndex = part.indexOf("=");
+    const name = part.slice(0, eqIndex).trim();
+    const value = part.slice(eqIndex + 1).trim();
+    // Empty values are skipped; the first of a repeated name wins, as the browser orders them.
+    if (eqIndex !== -1 && value !== "" && !values.has(name)) {
+      values.set(name, value);
+    }
+  }
+  return values.get(SECURE_SESSION_COOKIE) ?? values.get(SESSION_COOKIE);
+}
+
 /** An authenticated user of the platform. */
 export interface AuthUser {
   /** User ID. */

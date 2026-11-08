@@ -13,9 +13,6 @@ import {
   SelectField,
   Table,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** A package linked to the upstream project that publishes it. */
 export interface SettingsLink {
   packageName: string;

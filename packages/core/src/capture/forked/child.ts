@@ -59,19 +59,24 @@ export async function runCaptureChild(
   options: CaptureChildOptions,
   host: ChildHost = processHost(),
 ): Promise<void> {
-  const { send } = host;
-  if (!send) {
+  if (!host.send) {
     throw new Error("runCaptureChild must run in a forked process; set testing.workerEntry");
   }
   const logger = options.logger ?? createShelfLogger();
   applyImageSettings(options.images, options.compare);
   await ensureImageEngine(logger);
-  const child = new CaptureChild(buildHandler(options, host.env, logger), logger, (message) => {
-    send.call(host, message);
-  });
+  const forward = forwarder(host);
+  const child = new CaptureChild(buildHandler(options, host.env, logger, forward), logger, forward);
   const stopped = wireHost(host, child);
   await stopped;
   host.exit(0);
+}
+
+/** Send to the parent over the host's IPC channel (present: checked by the caller). */
+function forwarder(host: ChildHost): (message: ChildMessage) => void {
+  return (message) => {
+    host.send?.(message);
+  };
 }
 
 /** Feed the parent's messages to the child; resolves once a signal asked it to stop and it drained. */
@@ -99,6 +104,7 @@ function buildHandler(
   options: CaptureChildOptions,
   env: Record<string, string | undefined>,
   logger: Logger,
+  send: (message: ChildMessage) => void,
 ): KindHandler {
   const maxRetries = options.retries ?? positiveInt(env[CAPTURE_RETRIES_ENV], 0) ?? DEFAULT_RETRIES;
   const queue = createDatabaseCaptureQueue(options.db, {
@@ -121,6 +127,10 @@ function buildHandler(
     maxRetries,
     enqueue: async (job) => {
       await queue.enqueue(job);
+    },
+    // The counter lives in the parent: forward the counts over IPC.
+    onShardRepeated: (event) => {
+      send({ type: "shard-repeated", ...event });
     },
     logger,
   });
@@ -200,6 +210,8 @@ class CaptureChild {
         touch: throttled(() => {
           this.#send({ type: "progress", runId });
         }),
+        // The parent holds the lease and the deadline; it stops this run through its cancel path.
+        signal: new AbortController().signal,
       });
       this.#send({ type: "done", runId });
     } catch (error) {

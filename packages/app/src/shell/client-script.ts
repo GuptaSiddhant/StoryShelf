@@ -295,21 +295,25 @@ function previewRefreshPart(): string {
       var seconds=Number(host.getAttribute('data-preview-refresh-seconds'));
       if(!url||!path||!(seconds>0)) return;
       var RETRY_MS=60000, MAX_RETRIES=3;
-      function renew(tries){
+      // A manual reload bumps host.__previewGen; an older automatic renewal still in flight then
+      // changes neither the frame nor the notice when it settles.
+      function renew(tries,gen){
         var frame=host.querySelector('iframe');
         if(!host.isConnected||!frame) return;
         fetchPreviewBase(host).then(function(base){
+          if(gen!==(host.__previewGen||0)) return;
           if(!base) throw new Error('preview-token');
           frame.src=base+path;
           showPreviewFailure(host,false);
         }).catch(function(){
-          if(tries<MAX_RETRIES) setTimeout(function(){ renew(tries+1); },RETRY_MS);
+          if(gen!==(host.__previewGen||0)) return;
+          if(tries<MAX_RETRIES) setTimeout(function(){ renew(tries+1,gen); },RETRY_MS);
           else showPreviewFailure(host,true);
         });
       }
       var timer=setInterval(function(){
         if(!host.isConnected||!host.querySelector('iframe')){ clearInterval(timer); return; }
-        renew(0);
+        renew(0,host.__previewGen||0);
       },seconds*1000);
     }`;
 }
@@ -340,6 +344,7 @@ function previewNoticePart(): string {
       var path=host.getAttribute('data-preview-path');
       if(!notes||!notes.button||!notes.notice||!frame||!path) return;
       var label=notes.button.textContent;
+      host.__previewGen=(host.__previewGen||0)+1;
       notes.button.disabled=true;
       notes.button.textContent='Reloading\u2026';
       notes.notice.setAttribute('aria-busy','true');

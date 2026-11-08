@@ -2,6 +2,7 @@ import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
 import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
 import { SESSION_COOKIE } from "@storyshelf/core/types";
+import { UserFacingError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -9,7 +10,9 @@ import { notifySystem } from "../notify.ts";
 import { renderInviteInvalidPage, renderInvitePage } from "../pages/invite.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
 import { getStore } from "../store.ts";
+import { loginFailureOf } from "./auth-login-failure.ts";
 import { syncLoginMemberships } from "./auth-sync.ts";
+import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { safeReturnPath } from "./oauth-state.ts";
 
@@ -169,40 +172,16 @@ async function finishCredentialLogin(
 ): Promise<Response> {
   const res = await forwardToEngine(c, engine, "/api/auth/sign-in/email", { email, password });
   if (res.status !== 200) {
-    // Generic message either way (no user enumeration), but propagate
-    // rate-limit/upstream statuses instead of masking them as 401.
-    if (res.status === 429) {
-      return renderEngineLogin(c, engine, {
-        error: "Invalid credentials",
-        email,
-        status: 429,
-        returnTo,
-      });
+    const failure = loginFailureOf(res.status);
+    if (failure.notify) {
+      // Admins opted into sys:* see a login-attempt signal. Spray attempts can fan out
+      // here; the /auth/* rate-limit bucket bounds it.
+      await notifySystem("sys:auth-failed", { email });
     }
-    if (res.status >= 500) {
-      return renderEngineLogin(c, engine, {
-        error: "Invalid credentials",
-        email,
-        status: 502,
-        returnTo,
-      });
-    }
-    if (res.status === 400) {
-      return renderEngineLogin(c, engine, {
-        error: "Enter a valid email address",
-        email,
-        status: 400,
-        returnTo,
-      });
-    }
-    // Credential failures only (never rate-limit/upstream noise, never
-    // secrets): admins opted into sys:* see a login-attempt signal. Spray
-    // attempts can fan out here; the /auth/* rate-limit bucket bounds it.
-    await notifySystem("sys:auth-failed", { email });
     return renderEngineLogin(c, engine, {
-      error: "Invalid credentials",
+      error: failure.message,
       email,
-      status: 401,
+      status: failure.status,
       returnTo,
     });
   }
@@ -329,7 +308,7 @@ async function finishInviteAccept(
     password,
   });
   if (res.status !== 200) {
-    throw new Error("Sign in failed");
+    throw new UserFacingError("Sign in failed");
   }
   copySetCookies(c, res);
   await syncEngineUser({ id: user.id, email: user.email, name: user.name });
@@ -342,7 +321,7 @@ async function inviteAcceptError(
   token: string,
   error: unknown,
 ): Promise<Response> {
-  const message = error instanceof Error ? error.message : "Invalid or expired invite";
+  const message = publicMessage(error, "Invalid or expired invite");
   if (message.includes(`at least ${MIN_PASSWORD_LENGTH}`)) {
     return c.html(await renderInvitePage({ inviteId, token, error: message }), 400);
   }

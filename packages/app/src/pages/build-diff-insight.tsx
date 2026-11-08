@@ -12,9 +12,6 @@ import {
   SectionTitle,
   VStack,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 interface TriageItem {
   snapshotKey: string;
   note: string;

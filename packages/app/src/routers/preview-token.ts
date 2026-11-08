@@ -8,9 +8,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { ShelfRouter } from "../app-types.ts";
+import { errorBody } from "../middleware/api-errors.ts";
 import { getStore } from "../store.ts";
 import { isSignedPreviewBase, previewBaseOf } from "./preview-base.ts";
 import { SIGNED_URL_HEADERS } from "./published-files.ts";
+import { errorSchema } from "./schemas.ts";
 
 const previewTokenRoute = createRoute({
   method: "get",
@@ -24,7 +26,7 @@ const previewTokenRoute = createRoute({
       description: "The signed root (`/_s/<token>`) to frame the build's Storybook under",
     },
     404: {
-      content: { "text/plain": { schema: z.string() } },
+      content: { "application/json": { schema: errorSchema } },
       description: "Not found, or the build needs no signed URL",
     },
   },
@@ -39,7 +41,7 @@ export function registerPreviewToken(app: ShelfRouter): void {
     const base =
       project && build?.projectId === project.id ? await previewBaseOf(project, build) : null;
     if (base === null || !isSignedPreviewBase(base)) {
-      return c.text("Not found", 404, SIGNED_URL_HEADERS);
+      return c.json(errorBody("Not found"), 404, SIGNED_URL_HEADERS);
     }
     return c.json({ base }, 200, SIGNED_URL_HEADERS);
   });
