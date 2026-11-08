@@ -42,7 +42,7 @@ Each current ADR below lists the archived ones it supersedes.
 | 0038 | Environment Migration and Baseline Review (accepted target, not implemented) | —                                  |
 | 0039 | Build Retention Lifecycle and Build References                               | — (amends 0009)                    |
 | 0040 | Job Queues and Adding Queued Work                                            | — (amends 0006)                    |
-| 0041 | Single Source of Truth for the Database Schema (proposed)                    | —                                  |
+| 0041 | Single Source of Truth for the Database Schema (proposed, amended)           | —                                  |
 | 0043 | Release Channels                                                             | —                                  |
 | 0044 | Skipped Builds for Commits That Change No Story (accepted)                   | — (amends 0004, 0014)              |
 | 0045 | Cancel Superseded Builds on a Branch (accepted)                              | — (amends 0004, 0006, 0014)        |
