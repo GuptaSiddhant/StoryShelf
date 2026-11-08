@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("drizzle-orm/postgres-js", () => ({
-  drizzle: vi.fn(() => ({})),
+  // A transaction over a database with no baselines: every statement answers no rows.
+  drizzle: vi.fn(() => ({
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      await fn({ execute: () => Promise.resolve([]) }),
+  })),
 }));
 
 import { createPostgresDatabase } from "./index.ts";
@@ -22,8 +26,12 @@ describe("createPostgresDatabase", () => {
     expect(db.metadata.kind).toBe("postgres");
     expect(db.metadata.name).toBe("Postgres");
 
+    expect(db.buildReferenceLifecycle).toBeUndefined();
     await db.lifecycle?.setup({} as never);
     expect(client.unsafe).toHaveBeenCalled();
+    // Activation ran after the migration: nothing to prepare, so retention is on.
+    expect(db.buildReferenceLifecycle).toBeDefined();
+    expect(db.retentionPause).toBeUndefined();
 
     await db.lifecycle?.teardown();
     expect(client.end).toHaveBeenCalled();
