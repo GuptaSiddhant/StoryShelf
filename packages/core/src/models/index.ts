@@ -7,6 +7,7 @@
 export { BaselineModel } from "./baseline.ts";
 export { BaselineApprovalConflict } from "./baseline-approval.ts";
 export { BaselineWriteConflict } from "./baseline-conflict.ts";
+export { BaselinePromotionRefused } from "./baseline-promotion-refused.ts";
 export { resolveBaselineOrigin, type BaselineOriginReader } from "./baseline-origin.ts";
 export {
   BASELINE_ARCHIVE_FORMAT,
@@ -151,7 +152,6 @@ export { SnapshotModel, type SnapshotCreateInput } from "./snapshot.ts";
 export { TokenModel } from "./token.ts";
 export { UserModel } from "./user.ts";
 export { WebhookModel, type WebhookCreateInput } from "./webhook.ts";
-export { ContentRefModel } from "./content-ref.ts";
 export {
   probeCredentials,
   reencryptCredentials,

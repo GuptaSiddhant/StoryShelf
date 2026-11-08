@@ -1,0 +1,103 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`terraform generator output > is unchanged for aws full 1`] = `
+[
+  "terraform/README.md 4278 27e531ef45e5ecada7454932f2f095eb6e31924506696935e0d80033f2ce2b17",
+  "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
+  "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
+  "terraform/dns.tf 1879 57e77ea00724ea863c651c49a3997284f3649d7473e0c9459184f7f60fc68909",
+  "terraform/identity.tf 1213 4cb9a3f9e6db6205c6c0282a7a7c3ca77d37686f07e94bff146f1681b9befe91",
+  "terraform/network.tf 4290 213890530f8aed678507785611c5dbcc2a0861ceea2e5dfa17371d8a9be317fe",
+  "terraform/outputs.tf 586 ae2530ec0c6b199eece9e16049976eaaf39904f3695e2cd0cc35ed460adfab94",
+  "terraform/secrets.tf 1330 70b15b2d9ea3ca498d4725d7384ade8905309a30c6032e1845e94d0ebbfe83c2",
+  "terraform/storage.tf 1148 a7e79b5b49dd4928220ad33f378eecd5a3c54cbfbaa34145907b97ad0727af1c",
+  "terraform/terraform.tfvars.example 312 85ce7a55e1dfae761a8875521a434c0a3fafe4677eb679671c329c138394d6a4",
+  "terraform/variables.tf 843 1a7c333726bb9e867b84804097a06dc0da9fabb4a9d8eeb3ea5a54b3428ad97a",
+  "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
+]
+`;
+
+exports[`terraform generator output > is unchanged for aws minimal 1`] = `
+[
+  "terraform/README.md 4278 27e531ef45e5ecada7454932f2f095eb6e31924506696935e0d80033f2ce2b17",
+  "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
+  "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
+  "terraform/dns.tf 1879 57e77ea00724ea863c651c49a3997284f3649d7473e0c9459184f7f60fc68909",
+  "terraform/identity.tf 1213 4cb9a3f9e6db6205c6c0282a7a7c3ca77d37686f07e94bff146f1681b9befe91",
+  "terraform/network.tf 4290 213890530f8aed678507785611c5dbcc2a0861ceea2e5dfa17371d8a9be317fe",
+  "terraform/outputs.tf 586 ae2530ec0c6b199eece9e16049976eaaf39904f3695e2cd0cc35ed460adfab94",
+  "terraform/secrets.tf 1330 70b15b2d9ea3ca498d4725d7384ade8905309a30c6032e1845e94d0ebbfe83c2",
+  "terraform/storage.tf 1148 a7e79b5b49dd4928220ad33f378eecd5a3c54cbfbaa34145907b97ad0727af1c",
+  "terraform/terraform.tfvars.example 312 85ce7a55e1dfae761a8875521a434c0a3fafe4677eb679671c329c138394d6a4",
+  "terraform/variables.tf 843 1a7c333726bb9e867b84804097a06dc0da9fabb4a9d8eeb3ea5a54b3428ad97a",
+  "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
+]
+`;
+
+exports[`terraform generator output > is unchanged for azure full 1`] = `
+[
+  "terraform/README.md 1918 2580f6db30e03985554a233140c60f2874b8cad5b7410cbf8659c2863373219f",
+  "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
+  "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
+  "terraform/dns.tf 1248 2dc436b7e1ef3afb211fc22c529c11ed7d76043250ca6544c09798454f986961",
+  "terraform/identity.tf 601 75882c78c59a6653e8dbae4e8b117ecfb9a99b64f5935c4857f4f75024ef03bb",
+  "terraform/main.tf 487 7502b38fc54b0536ea784c00c5d3817faaf98383b6607b0e9e0102da5e186344",
+  "terraform/outputs.tf 918 a2cf72b2768eaddcb3e98ec3b6bca44ed2bbb35417404f402709477e5fc1c49b",
+  "terraform/secrets.tf 1337 eed50b518c20257bc33dd05304b902251cb79ad349d2c39cc4ce4b798ee5dea5",
+  "terraform/storage.tf 666 337a7743dcc0546fad3bcb8c52b5303ccc3cb6bb371fb23eff7e8af419685e26",
+  "terraform/terraform.tfvars.example 278 e9941daf32eb57f51201350e1f6b3b3528071eed9d8d3d9a0ed176a38b2a52d3",
+  "terraform/variables.tf 693 b1b6854bd4d2889535539d98a1668694b98391716011bc83414323fe5eb56c82",
+  "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
+]
+`;
+
+exports[`terraform generator output > is unchanged for azure minimal 1`] = `
+[
+  "terraform/README.md 1918 2580f6db30e03985554a233140c60f2874b8cad5b7410cbf8659c2863373219f",
+  "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
+  "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
+  "terraform/dns.tf 1248 2dc436b7e1ef3afb211fc22c529c11ed7d76043250ca6544c09798454f986961",
+  "terraform/identity.tf 601 75882c78c59a6653e8dbae4e8b117ecfb9a99b64f5935c4857f4f75024ef03bb",
+  "terraform/main.tf 487 7502b38fc54b0536ea784c00c5d3817faaf98383b6607b0e9e0102da5e186344",
+  "terraform/outputs.tf 918 a2cf72b2768eaddcb3e98ec3b6bca44ed2bbb35417404f402709477e5fc1c49b",
+  "terraform/secrets.tf 1337 eed50b518c20257bc33dd05304b902251cb79ad349d2c39cc4ce4b798ee5dea5",
+  "terraform/storage.tf 666 337a7743dcc0546fad3bcb8c52b5303ccc3cb6bb371fb23eff7e8af419685e26",
+  "terraform/terraform.tfvars.example 278 e9941daf32eb57f51201350e1f6b3b3528071eed9d8d3d9a0ed176a38b2a52d3",
+  "terraform/variables.tf 693 b1b6854bd4d2889535539d98a1668694b98391716011bc83414323fe5eb56c82",
+  "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
+]
+`;
+
+exports[`terraform generator output > is unchanged for gcp full 1`] = `
+[
+  "terraform/README.md 1735 76df9754d5476b44c146f655e52d391c0117c44487e0435c1a2c0c3641688617",
+  "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
+  "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
+  "terraform/dns.tf 1145 1c1fd9a3681b045f5ee5328d7408f1c2c0a126fe58b51c3ee3e19a97dc91bd4a",
+  "terraform/identity.tf 508 e58d0694a0b39491fbb4525fdd04c68db8de1190483f2f8e324da7c6cbf07353",
+  "terraform/main.tf 641 e8f076b3806740a09940320e7c5418e5337ebe092fdb98f5e3843ea5f4894670",
+  "terraform/outputs.tf 790 348ba1fb232ec49bfe60c26140e18d15e58624bcaaa44d0f2ad7f568f26e45e3",
+  "terraform/secrets.tf 1470 ba751c33e81bd5e0ffc7319b45e148cbd72e449bd0937de11cffc72272d96a7e",
+  "terraform/storage.tf 786 231407a3eca6f39124cd397ae9b93c0e420ac5cefca01aa04ef83218dd5c76ff",
+  "terraform/terraform.tfvars.example 323 7da5f64c5e3826ae47e9f7cbc803c8280a841bb1801b13377184e87a2b012c62",
+  "terraform/variables.tf 831 07be55482412023486810b54f8f52da751c8b836ac128bbe8b10a1a3323555f5",
+  "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
+]
+`;
+
+exports[`terraform generator output > is unchanged for gcp minimal 1`] = `
+[
+  "terraform/README.md 1735 76df9754d5476b44c146f655e52d391c0117c44487e0435c1a2c0c3641688617",
+  "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
+  "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
+  "terraform/dns.tf 1145 1c1fd9a3681b045f5ee5328d7408f1c2c0a126fe58b51c3ee3e19a97dc91bd4a",
+  "terraform/identity.tf 508 e58d0694a0b39491fbb4525fdd04c68db8de1190483f2f8e324da7c6cbf07353",
+  "terraform/main.tf 641 e8f076b3806740a09940320e7c5418e5337ebe092fdb98f5e3843ea5f4894670",
+  "terraform/outputs.tf 790 348ba1fb232ec49bfe60c26140e18d15e58624bcaaa44d0f2ad7f568f26e45e3",
+  "terraform/secrets.tf 1470 ba751c33e81bd5e0ffc7319b45e148cbd72e449bd0937de11cffc72272d96a7e",
+  "terraform/storage.tf 786 231407a3eca6f39124cd397ae9b93c0e420ac5cefca01aa04ef83218dd5c76ff",
+  "terraform/terraform.tfvars.example 323 7da5f64c5e3826ae47e9f7cbc803c8280a841bb1801b13377184e87a2b012c62",
+  "terraform/variables.tf 831 07be55482412023486810b54f8f52da751c8b836ac128bbe8b10a1a3323555f5",
+  "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
+]
+`;

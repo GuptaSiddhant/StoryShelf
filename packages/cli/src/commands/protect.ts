@@ -25,6 +25,11 @@ export interface ProtectOptions {
   fetch?: Fetch;
 }
 
+const MECHANISMS = {
+  rulesets: "GitHub rulesets (Settings → Rules → Rulesets)",
+  classic: "classic branch protection (Settings → Branches)",
+} as const;
+
 /** The check names a merge must wait for: the channel's gate status. */
 export function requiredChecks(prefix: string, gate: string): string[] {
   return [`${prefix}/${gate}`];
@@ -54,13 +59,20 @@ export async function runProtect(options: ProtectOptions): Promise<void> {
   }
 }
 
+/** The summary, then the mechanism it is about when the host has more than one. */
+function describe(result: ProtectionResult): string {
+  return result.mechanism === undefined
+    ? result.summary
+    : `${result.summary}\nMechanism: ${MECHANISMS[result.mechanism]}.`;
+}
+
 /** Print what the rule lacks; write it when `apply`, else say it was a dry run. */
 async function validateAndApply(
   inspected: Promise<ProtectionResult>,
   apply: boolean,
 ): Promise<void> {
   const result = await inspected;
-  printLine(`\n${result.summary}`);
+  printLine(`\n${describe(result)}`);
   if (result.satisfied) {
     return;
   }

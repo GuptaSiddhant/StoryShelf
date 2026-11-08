@@ -17,9 +17,6 @@ import {
   TextareaField,
 } from "../ui/components.tsx";
 import { targetChoices, type TargetChoices } from "./target-choices.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Primary engine select plus one checkbox per additional engine. */
 function BrowserFields(props: {
   primary: string;

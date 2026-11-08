@@ -3,9 +3,6 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, Button, Kbd, statusTone } from "../ui/components.tsx";
 import { actionBar, actionGroup, actionHints, actionPosition } from "../ui/styles/review-layout.ts";
 import { groupOf, neighbours, snapshotPageUrl, type SnapshotGroup } from "./build-diff-model.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Sticky bottom bar props. */
 export interface DiffActionBarProps {
   project: Project;

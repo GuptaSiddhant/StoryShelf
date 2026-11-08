@@ -4,6 +4,7 @@ import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 import type { JobsWiring } from "../jobs-setup.ts";
 import type { ServerRuntime } from "../runtime.ts";
+import { jsonRefusal } from "./api-errors.ts";
 
 export interface MiddlewareWiring extends ServerRuntime, Omit<JobsWiring, "consumer"> {
   options: ShelfOptions;
@@ -36,7 +37,7 @@ export function setupGate(getReady: () => Promise<AdapterSetupResult>) {
     }
     const result = await getReady();
     if (!result.ok) {
-      return c.json({ error: "Adapters failed setup", failures: publicFailures(result) }, 503);
+      return jsonRefusal(c, 503, "Adapters failed setup", { failures: publicFailures(result) });
     }
     await next();
   };

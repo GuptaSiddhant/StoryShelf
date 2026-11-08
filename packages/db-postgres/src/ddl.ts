@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS builds (
   message TEXT,
   public BOOLEAN NOT NULL DEFAULT false,
   status TEXT NOT NULL DEFAULT 'pending',
+  retention_state TEXT NOT NULL DEFAULT 'available',
   snapshot_count INTEGER NOT NULL DEFAULT 0,
   changed_count INTEGER NOT NULL DEFAULT 0,
   approved_count INTEGER NOT NULL DEFAULT 0,
@@ -58,6 +59,35 @@ CREATE TABLE IF NOT EXISTS builds (
 );
 CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha);
 CREATE INDEX IF NOT EXISTS builds_git_branch_idx ON builds (git_branch);
+CREATE TABLE IF NOT EXISTS build_references (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  owner_type TEXT NOT NULL CHECK (owner_type IN ('baseline', 'investigation')),
+  owner_id TEXT NOT NULL,
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE RESTRICT,
+  PRIMARY KEY (project_id, owner_type, owner_id, build_id)
+);
+CREATE INDEX IF NOT EXISTS build_references_build_idx ON build_references (build_id);
+CREATE TABLE IF NOT EXISTS build_reference_generations (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  owner_type TEXT NOT NULL CHECK (owner_type IN ('baseline', 'investigation')),
+  owner_id TEXT NOT NULL,
+  generation INTEGER NOT NULL CHECK (generation >= 0),
+  PRIMARY KEY (project_id, owner_type, owner_id)
+);
+CREATE TABLE IF NOT EXISTS build_deletions (
+  build_id TEXT PRIMARY KEY REFERENCES builds(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  content_released_at TIMESTAMPTZ,
+  storage_deleted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS build_content_releases (
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  content_hash TEXT NOT NULL,
+  released_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (build_id, content_hash)
+);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -450,12 +480,17 @@ CREATE TABLE IF NOT EXISTS project_group_mappings (
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS project_group_mappings_project_group_idx ON project_group_mappings (project_id, group_name);
-CREATE TABLE IF NOT EXISTS content_refs (
-  hash TEXT PRIMARY KEY,
-  ref_count INTEGER NOT NULL DEFAULT 1,
-  last_seen_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL
+CREATE TABLE IF NOT EXISTS content_uses (
+  build_id TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  released_at TIMESTAMPTZ,
+  collecting_at TIMESTAMPTZ,
+  claim_token TEXT,
+  PRIMARY KEY (build_id, content_hash)
 );
+CREATE INDEX IF NOT EXISTS content_uses_hash_idx ON content_uses (content_hash);
 CREATE TABLE IF NOT EXISTS "user" (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

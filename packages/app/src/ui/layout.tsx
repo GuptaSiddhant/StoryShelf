@@ -1,8 +1,5 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const cardBase = css`
   /* card */
   background: var(--surface-card);
@@ -121,7 +118,6 @@ const sectionTitleDanger = css`
 /** Card or section heading (h2 by default, h3 for subsections). */
 
 /** Card container, padded by default, with an optional danger tone. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const Card: FC<{
   children?: unknown;
   padded?: boolean;
@@ -152,7 +148,6 @@ export const Card: FC<{
 };
 
 /** Padded card section, with an optional bottom divider. */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const CardSection: FC<{ divider?: boolean; children?: unknown }> = ({
   divider = false,
   children,
@@ -161,7 +156,6 @@ export const CardSection: FC<{ divider?: boolean; children?: unknown }> = ({
 };
 
 /** Page header with title, description, meta line, and actions (breadcrumbs live in the top bar). */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const PageHeader: FC<{
   title: unknown;
   description?: unknown;
@@ -183,7 +177,6 @@ export const PageHeader: FC<{
 };
 
 /** Card or section heading (h2 by default, h3 for subsections). */
-// eslint-disable-next-line promise-function-async -- JSX component return type
 export const SectionTitle: FC<{
   level?: 2 | 3;
   tone?: "neutral" | "danger";

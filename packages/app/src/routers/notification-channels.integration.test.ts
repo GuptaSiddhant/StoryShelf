@@ -197,7 +197,7 @@ describe("notification channels", () => {
 
     const noToken = await post(project, { provider: "github", config });
     expect(noToken.status).toBe(400);
-    expect(((await noToken.json()) as { message: string }).message).toBe(
+    expect(((await noToken.json()) as { error: { message: string } }).error.message).toBe(
       "A git channel needs a token or private key",
     );
 

@@ -4,7 +4,7 @@ Guidance for AI agents (and humans) working in the StoryShelf monorepo.
 
 StoryShelf is a self-hosted visual-testing platform for Storybook (a Chromatic alternative): upload
 a built Storybook, render stories server-side with Playwright/Puppeteer, pixel-diff against per-branch
-baselines, then review and approve. `docs/architecture.md` is the current-state spec;
+baselines, then review and approve. `docs/architecture/` is the current-state spec;
 `docs/repo-structure.md` is the spatial index; `docs/adr/` records decisions.
 
 ## Toolchain
@@ -58,7 +58,8 @@ npx -y playwright@1.63.0 install chromium   # one-time browser install
 # Puppeteer: set PUPPETEER_EXECUTABLE_PATH to a Chrome binary
 ```
 
-CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs, `--force` on `main`) →
+CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs; full on `main`, cached unless a
+hash-wide file changed; forced nightly) →
 `scripts/smoke.sh` → built-artifact smoke, plus fixture/browser matrix jobs. Reproduce locally
 rather than pushing and waiting.
 
@@ -73,7 +74,7 @@ rather than pushing and waiting.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
 - `fixtures/storybook-{8,9,10}` — Storybook 8.6 / 9 / 10 (pnpm, built on demand).
-- `docs/` — `architecture.md`, `repo-structure.md`, `testing.md`, `adr/`.
+- `docs/` — `architecture/`, `repo-structure.md`, `testing.md`, `adr/`.
 
 Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public docs site
 (`apps/website`). They have different build, test and directory conventions.
@@ -249,7 +250,7 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   canary (`docs/testing.md`).
 - **ADRs.** Current ADRs are 0001-0018 plus 0037+; archived ADRs are 0001-0036 under `archive/`.
   A bare `ADR NNNN` means a current ADR. Do not edit `archive/`; new ADRs start at 0037. ADRs are
-  decision records (target 250 lines, hard cap 320); `docs/architecture.md` owns entities/interfaces.
+  decision records (target 250 lines, hard cap 320); `docs/architecture/` owns entities/interfaces.
   Run `nub run docs:check` after touching an ADR or a reference.
 - **Temp files:** use repo-local `.tmp/` (gitignored), not `/tmp`; local server data lives in
   `.dev-data/` (gitignored).
@@ -281,6 +282,30 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   rebase or force-push a shared branch); land an epic, or a coherent finished part of it, within
   about two weeks. P0/security fixes, standalone issues and docs/config changes still target `main`
   directly.
+
+## Agent operating model
+
+The weekly usage quota is shared, so agents work in short, fresh sessions and talk through GitHub.
+
+- **One session per issue.** The architect starts a developer session for one issue. It ends when
+  the PR merges, and is then archived. Don't pick up a second issue in the same session; a new
+  session reads the issue, AGENTS.md and the code, not old conversation.
+- **At most one open PR per developer.** Finish, or hand back, before starting the next.
+- **GitHub is the channel.** Questions go on the issue or PR with the `architect` label; status
+  goes in the PR body. Use `send_message` only when you are blocked and a comment would not reach
+  anyone. Never send acknowledgements, "FYI" notes or progress reports.
+- **The owner talks to the architect** for priorities and decisions, or comments on a PR or issue.
+  A comment on a PR wakes the session that owns it.
+- **Merging is native.** After review, the architect enables GitHub auto-merge on a PR.
+  `pr-autoupdate.yml` brings the oldest queued PR up to date with `main`, one at a time, and
+  GitHub merges it when `ci` passes and every conversation is resolved. Once auto-merge is on,
+  don't push to the PR without telling the architect on the PR first.
+- **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
+  Label those PRs `skip-review`, so CodeRabbit skips them.
+- **Schedules.** Agents have one scheduled run a day: the architect's triage. It answers
+  `architect` items, enables auto-merge, starts sessions for ready issues, archives finished
+  ones, and posts one digest comment on issue #370. No other agent session runs on a clock (CI's own
+  nightly workflows are unaffected).
 
 <!-- BEGIN:turborepo-agent-rules -->
 

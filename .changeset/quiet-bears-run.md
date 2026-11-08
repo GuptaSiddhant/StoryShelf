@@ -1,6 +1,6 @@
 ---
-"@storyshelf/observability": patch
 "@storyshelf/app": patch
+"@storyshelf/core": patch
 ---
 
-Count the snapshots a shard captures again after a redelivery as the `storyshelf.capture.shard.repeated_snapshots` OpenTelemetry counter; it is a no-op without an SDK.
+Affected capture now compares against the newest earlier build on the branch that was approved, instead of any earlier build: a build still in review, or cancelled, failed or rejected, no longer hides its changes from the next build. With no approved build the capture is full.

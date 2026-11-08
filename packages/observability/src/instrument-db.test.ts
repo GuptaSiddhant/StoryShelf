@@ -115,6 +115,10 @@ describe("createInstrumentedDatabase", () => {
     const db = createInstrumentedDatabase(fake);
 
     expect(db.buildReferenceLifecycle).toBe(lifecycle);
+    Object.assign(fake, {
+      retentionPause: { baselineId: "B", buildId: "S", problem: "tombstoned" },
+    });
+    expect(db.retentionPause).toEqual({ baselineId: "B", buildId: "S", problem: "tombstoned" });
     await expect(db.transact?.(async () => "ok")).resolves.toBe("ok");
     expect(transact).toHaveBeenCalledTimes(1);
     expect(telemetry.exporter.getFinishedSpans().map((span) => span.name)).toEqual(["db.transact"]);

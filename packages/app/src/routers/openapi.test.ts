@@ -1,6 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { stubTables } from "@storyshelf/core/test-helpers";
+import { readFileSync } from "node:fs";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -67,6 +68,20 @@ describe("OpenAPI spec", () => {
     expect(doc.paths["/api/v1/projects/{slug}/baselines/import"]).toHaveProperty("post");
   });
 
+  it("serves exactly the pinned OpenAPI document, byte for byte", async () => {
+    // Pins every key, value and key order of what the API sends, so moving schemas between modules
+    // cannot change what it publishes. The file is kept in the repo's formatting (the commit hook
+    // requires it), so it is compared as the compact text the endpoint serves.
+    // After a deliberate API change, regenerate it:
+    //   nub ./scripts/generate-openapi.ts --out src/routers/openapi.snapshot.json && nub run fmt
+    const pinned: unknown = JSON.parse(
+      readFileSync(new URL("openapi.snapshot.json", import.meta.url), "utf8"),
+    );
+    const served = await (await app().request("/api/v1/openapi.json")).text();
+    expect(JSON.parse(served)).toEqual(pinned);
+    expect(served).toBe(JSON.stringify(pinned));
+  });
+
   it("tags and summarises every operation so the API reference can group and label them", async () => {
     const doc = (await (await app().request("/api/v1/openapi.json")).json()) as {
       tags: { name: string; description: string }[];
@@ -108,6 +123,38 @@ describe("OpenAPI spec", () => {
         .map(([method]) => `${method.toUpperCase()} ${path}`),
     );
     expect(unmarked).toEqual([]);
+  });
+
+  it("declares the shared Error schema on every error response", async () => {
+    const doc = (await (await app().request("/api/v1/openapi.json")).json()) as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            responses?: Record<
+              string,
+              { content?: Record<string, { schema?: { $ref?: string } }> }
+            >;
+          }
+        >
+      >;
+    };
+    const allowed = new Set(["#/components/schemas/Error", "#/components/schemas/BaselineChanged"]);
+    const stray: string[] = [];
+    for (const [path, operations] of Object.entries(doc.paths)) {
+      for (const [method, operation] of Object.entries(operations)) {
+        for (const [status, response] of Object.entries(operation.responses ?? {})) {
+          const refs = Object.values(response.content ?? {}).map(
+            (media) => media.schema?.$ref ?? "",
+          );
+          if (/^[45]/u.test(status) && (refs.length !== 1 || !allowed.has(refs[0] ?? ""))) {
+            stray.push(`${method.toUpperCase()} ${path} ${status}`);
+          }
+        }
+      }
+    }
+    expect(stray).toEqual([]);
   });
 
   it("documents project paths with typed responses", async () => {

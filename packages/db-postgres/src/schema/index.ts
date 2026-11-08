@@ -20,7 +20,7 @@ import { captureJobs as captureJobsTable } from "./capture-job.ts";
 import { captureShards as captureShardsTable } from "./capture-shard.ts";
 import { comments as commentsTable } from "./comment.ts";
 import { userConnections as userConnectionsTable } from "./connection.ts";
-import { contentRefs as contentRefsTable } from "./content-refs.ts";
+import { contentUses as contentUsesTable } from "./content-uses.ts";
 import {
   designLinks as designLinksTable,
   designCredentials as designCredentialsTable,
@@ -73,7 +73,7 @@ export { users } from "./user.ts";
 export { webhooks } from "./webhook.ts";
 export { aiBudgetAlerts, aiUsage, insights } from "./insight.ts";
 export { notificationChannels, notificationSubscriptions } from "./notification.ts";
-export { contentRefs } from "./content-refs.ts";
+export { contentUses } from "./content-uses.ts";
 
 /** A capture attempt and its log lines for a single build run. */
 export type { CaptureAttempt, CaptureLog } from "./capture-attempt.ts";
@@ -113,7 +113,7 @@ export type { NotificationChannel, NotificationSubscription } from "./notificati
 /** Baseline row. */
 export type { Baseline } from "./baseline.ts";
 /** Content ref row for deduplicated assets. */
-export type { ContentRef } from "./content-refs.ts";
+export type { ContentUse } from "./content-uses.ts";
 
 /** Full Drizzle schema object passed to the database client. */
 export const schema: {
@@ -148,7 +148,7 @@ export const schema: {
   userInviteTokens: AnyPgTable;
   projectMembers: AnyPgTable;
   projectGroupMappings: AnyPgTable;
-  contentRefs: AnyPgTable;
+  contentUses: AnyPgTable;
 } = {
   projects: projectsTable,
   builds: buildsTable,
@@ -181,7 +181,7 @@ export const schema: {
   userInviteTokens: userInviteTokensTable,
   projectMembers: projectMembersTable,
   projectGroupMappings: projectGroupMappingsTable,
-  contentRefs: contentRefsTable,
+  contentUses: contentUsesTable,
 };
 
 /** The full database schema type. */

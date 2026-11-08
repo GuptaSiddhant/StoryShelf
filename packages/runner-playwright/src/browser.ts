@@ -84,3 +84,27 @@ export async function safeCloseServer(server: { close(): Promise<void> }): Promi
 export function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : errorText(error);
 }
+
+/** Registers the run so `cancel` can find it, and unregisters it however the work ends. */
+export async function trackRun<T>(
+  input: { buildId: string; runId?: string | undefined },
+  work: (active: ActiveRun) => Promise<T>,
+): Promise<T> {
+  const active: ActiveRun = { cancelled: false, browser: null, abort: new AbortController() };
+  const remove = activeRuns.add(input.buildId, input.runId, active);
+  try {
+    return await work(active);
+  } finally {
+    remove();
+  }
+}
+
+export async function cancelRuns(buildId: string, runId?: string): Promise<void> {
+  await Promise.all(
+    activeRuns.matching(buildId, runId).map(async (active) => {
+      active.cancelled = true;
+      active.abort?.abort();
+      await closeBrowser(active.browser);
+    }),
+  );
+}

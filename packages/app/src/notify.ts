@@ -13,7 +13,12 @@ import {
   type NotificationChannel,
   type SystemEventName,
 } from "@storyshelf/core/adapter/notifier";
-import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type {
+  NotificationsConfig,
+  ShelfConfig,
+  ShelfOptions,
+  UIConfig,
+} from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import {
   MemberModel,
@@ -22,12 +27,37 @@ import {
   UserModel,
   type PublicOriginResolver,
 } from "@storyshelf/core/models";
-import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
+import type { NotificationSubscriptionRow, User } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { COMMENT_MENTIONED, matchesEvent } from "@storyshelf/core/utils";
 import { credentialKeys } from "./credential-keys.ts";
 import { clearPaused, notificationOrigin, warnPaused } from "./notifications-pause.ts";
+import type { ServerRuntime } from "./runtime.ts";
 import { getStore } from "./store.ts";
+
+/** Why a person is a recipient of a review request: their subscription, the default, or an assignment. */
+export type ReviewRoute = "subscription" | "default" | "assigned";
+
+/**
+ * Who a queued review request is for, by reference: a stored channel by id, or a person through one
+ * provider kind. Never an address, URL or secret: the job row shows up in admin pages and logs.
+ */
+export type ReviewTarget =
+  | { kind: "channel"; channelId: string }
+  | { kind: "user"; userId: string; provider: string; route: ReviewRoute };
+
+/** One review request to one recipient, as queued: references only. */
+export interface ReviewRequestJob {
+  projectId: string;
+  /** `<buildId>:<cycle>`: the one request of a build's review cycle. */
+  eventId: string;
+  target: ReviewTarget;
+}
+
+/** A resolved recipient; a person's carries who they are and why they get the message. */
+interface Addressed extends NotificationChannel {
+  reviewer?: { userId: string; route: ReviewRoute };
+}
 
 /** Explicit dependencies for background fan-out (no request scope). */
 export interface NotifyDeps {
@@ -40,10 +70,28 @@ export interface NotifyDeps {
   notificationsConfig?: NotificationsConfig;
   /** The public origin resolver; absent ⇒ `config.publicBaseUrl` only. */
   publicOrigin?: Pick<PublicOriginResolver, "url"> | undefined;
+  /**
+   * Queues one review request for one recipient (ADR 0040). Set on a host that polls the `notify`
+   * queue; absent (serverless), review requests are delivered directly and best-effort.
+   */
+  reviewRequests?: ((job: ReviewRequestJob) => Promise<void>) | undefined;
+}
+
+/** The dependencies of a background fan-out, from the app's options and runtime. */
+export function notifyDepsFor(options: ShelfOptions, runtime: ServerRuntime): NotifyDeps {
+  return {
+    db: options.database,
+    config: runtime.config,
+    ui: runtime.ui,
+    logger: runtime.logger,
+    notifiers: runtime.notifiers,
+    notificationsConfig: options.notifications?.config,
+    publicOrigin: runtime.publicOrigin,
+  };
 }
 
 /** Absolute review URL for a project page under the resolved public origin. */
-function reviewUrlFor(origin: string, slug: string, suffix: string): string {
+export function reviewUrlFor(origin: string, slug: string, suffix: string): string {
   return `${origin}/projects/${slug}${suffix}`;
 }
 
@@ -51,7 +99,7 @@ function reviewUrlFor(origin: string, slug: string, suffix: string): string {
  * The origin notifications link to; `undefined` (after one log line per pause) while none is
  * resolved, which pauses every notification (ADR 0014, decision 11).
  */
-async function originOrPause(
+export async function originOrPause(
   deps: Pick<NotifyDeps, "config" | "publicOrigin" | "logger">,
   event: string,
 ): Promise<string | undefined> {
@@ -96,7 +144,7 @@ function channelModel(deps: Pick<NotifyDeps, "db" | "config">): NotificationChan
 }
 
 /** Record each delivery outcome on its channel row (the last error shown in settings). */
-function recordOutcomes(
+export function recordOutcomes(
   deps: Pick<NotifyDeps, "db" | "config" | "logger">,
 ): (outcome: ChannelOutcome) => Promise<void> {
   const model = channelModel(deps);
@@ -146,6 +194,8 @@ interface DeliveryKinds {
   personal: ReadonlySet<string>;
   /** Called for a subscription kind that is wired but not personal, so it can be logged. */
   skipped: (subscriptionId: string, kind: string) => void;
+  /** Called for a person dropped because they have no access to the project (debug log, no address). */
+  denied: (projectId: string, userId: string) => void;
 }
 
 /** Subscription kinds already logged as skipped, so each is reported once per process. */
@@ -160,6 +210,9 @@ function deliveryKindsOf(deps: Pick<NotifyDeps, "notifiers" | "logger">): Delive
         .filter((candidate) => candidate.metadata.audience === "person")
         .map((candidate) => candidate.metadata.kind),
     ),
+    denied: (projectId, userId) => {
+      deps.logger.debug({ projectId, userId, reason: "no-access" }, "notification target dropped");
+    },
     skipped: (subscriptionId, kind) => {
       const key = `${subscriptionId}:${kind}`;
       if (!reportedSkips.has(key)) {
@@ -174,6 +227,25 @@ function deliveryKindsOf(deps: Pick<NotifyDeps, "notifiers" | "logger">): Delive
 }
 
 /**
+ * Whether `user` may read the project: the rule the routers use (`effectiveRole`), so site admins
+ * and site-wide viewers keep working without a membership row. A subscription outlives the
+ * membership (it keeps the person's preferences for when they are added back), so every personal
+ * target is checked here, at delivery time, never when the subscription was made.
+ */
+async function hasAccess(
+  db: DatabaseAdapter,
+  user: Pick<User, "id" | "role">,
+  projectId: string,
+  kinds: Pick<DeliveryKinds, "denied">,
+): Promise<boolean> {
+  const role = await new MemberModel(db).effectiveRole(user.role, projectId, user.id);
+  if (role === null) {
+    kinds.denied(projectId, user.id);
+  }
+  return role !== null;
+}
+
+/**
  * Per-subscriber targets for one subscription: its personal kinds only. A kind that posts to a
  * room (or is not wired) is skipped, the former with one warning, and the rest still deliver.
  */
@@ -181,9 +253,10 @@ async function targetsForSub(
   db: DatabaseAdapter,
   sub: NotificationSubscriptionRow,
   kinds: DeliveryKinds,
-): Promise<NotificationChannel[]> {
+  route: ReviewRoute = "subscription",
+): Promise<Addressed[]> {
   const user = await new UserModel(db).get(sub.userId);
-  if (!user || user.disabled) {
+  if (!user || user.disabled || !(await hasAccess(db, user, sub.projectId, kinds))) {
     return [];
   }
   const via = NotificationSubscriptionModel.viaOf(sub);
@@ -201,6 +274,7 @@ async function targetsForSub(
       config: { to: user.email },
       events: [],
       enabled: true,
+      reviewer: { userId: user.id, route },
     }));
 }
 
@@ -224,7 +298,7 @@ async function defaultTargets(
   rows: NotificationSubscriptionRow[],
   kinds: DeliveryKinds,
   skipUsers: ReadonlySet<string>,
-): Promise<NotificationChannel[]> {
+): Promise<Addressed[]> {
   if (!kinds.personal.has("email")) {
     return [];
   }
@@ -236,7 +310,7 @@ async function defaultTargets(
       !skipUsers.has(member.userId),
   );
   const targets = await Promise.all(
-    members.map(async (member) => await emailTarget(db, projectId, member.userId)),
+    members.map(async (member) => await emailTarget(db, projectId, member.userId, kinds)),
   );
   return targets.flat();
 }
@@ -246,9 +320,11 @@ async function emailTarget(
   db: DatabaseAdapter,
   projectId: string,
   userId: string,
-): Promise<NotificationChannel[]> {
+  kinds: Pick<DeliveryKinds, "denied">,
+  route: ReviewRoute = "default",
+): Promise<Addressed[]> {
   const user = await new UserModel(db).get(userId);
-  return !user || user.disabled
+  return !user || user.disabled || !(await hasAccess(db, user, projectId, kinds))
     ? []
     : [
         {
@@ -258,6 +334,7 @@ async function emailTarget(
           config: { to: user.email },
           events: [],
           enabled: true,
+          reviewer: { userId: user.id, route },
         },
       ];
 }
@@ -270,7 +347,7 @@ async function subscriberTargets(
   data: Record<string, unknown>,
   kinds: DeliveryKinds,
   skipUsers: ReadonlySet<string>,
-): Promise<NotificationChannel[]> {
+): Promise<Addressed[]> {
   const all = await new NotificationSubscriptionModel(db).list(projectId);
   const rows = all.filter((row) => !skipUsers.has(row.userId));
   const nested = await Promise.all(
@@ -280,6 +357,76 @@ async function subscriberTargets(
     ? await defaultTargets(db, projectId, rows, kinds, skipUsers)
     : [];
   return [...nested.flat(), ...defaults];
+}
+
+/** What a queued job holds for one recipient: the channel by id, a person by who and why. */
+function referenceOf(channel: Addressed): ReviewTarget {
+  return channel.reviewer === undefined
+    ? { kind: "channel", channelId: channel.id }
+    : {
+        kind: "user",
+        userId: channel.reviewer.userId,
+        provider: channel.provider,
+        route: channel.reviewer.route,
+      };
+}
+
+/**
+ * Deliver a message now, or, for a review request on a host that polls the `notify` queue, queue
+ * one job per recipient so each is retried alone (ADR 0040). A recipient whose job could not be
+ * queued gets the direct, best-effort delivery rather than none.
+ */
+async function sendOrQueue(
+  deps: NotifyDeps,
+  project: Pick<Project, "id" | "slug">,
+  message: { event: string; data: Record<string, unknown>; reviewUrl: string | undefined },
+  channels: Addressed[],
+): Promise<void> {
+  const queue = deps.reviewRequests;
+  const eventId = message.data["eventId"];
+  if (message.event !== REVIEW_REQUESTED || queue === undefined || typeof eventId !== "string") {
+    await deliver(deps, project, message, channels);
+    return;
+  }
+  const queued = await Promise.all(
+    channels.map(async (channel) => {
+      try {
+        await queue({ projectId: project.id, eventId, target: referenceOf(channel) });
+        return null;
+      } catch (error) {
+        deps.logger.warn({ err: error, eventId }, "review request could not be queued");
+        return channel;
+      }
+    }),
+  );
+  const direct = queued.filter((channel) => channel !== null);
+  if (direct.length > 0) {
+    await deliver(deps, project, message, direct);
+  }
+}
+
+/**
+ * The recipient of a queued review request as it stands now, or `undefined` when it no longer
+ * applies (channel deleted or off, person disabled or opted out). Never reads the job for an address.
+ */
+export async function resolveReviewTarget(
+  deps: NotifyDeps,
+  projectId: string,
+  target: ReviewTarget,
+  data: Record<string, unknown>,
+): Promise<NotificationChannel | undefined> {
+  if (target.kind === "channel") {
+    const channels = admittedChannels(await loadChannels(deps, projectId), REVIEW_REQUESTED, data);
+    return channels.find((channel) => channel.id === target.channelId);
+  }
+  const kinds = deliveryKindsOf(deps);
+  const found =
+    target.route === "assigned"
+      ? await assignedTargets(deps.db, projectId, target.userId, kinds)
+      : await subscriberTargets(deps.db, projectId, REVIEW_REQUESTED, data, kinds, new Set());
+  return found.find(
+    (entry) => entry.reviewer?.userId === target.userId && entry.provider === target.provider,
+  );
 }
 
 /** Narrowing options of a project fan-out. */
@@ -292,11 +439,12 @@ export interface NotifyOptions {
 }
 
 /** Send one event to the given channels with the brand and a review link under `origin`. */
-async function deliver(
+export async function deliver(
   deps: NotifyDeps,
   project: Pick<Project, "id" | "slug">,
   message: { event: string; data: Record<string, unknown>; reviewUrl: string | undefined },
   channels: NotificationChannel[],
+  onOutcome: (outcome: ChannelOutcome) => Promise<void> = recordOutcomes(deps),
 ): Promise<void> {
   await emitNotifications(
     {
@@ -311,7 +459,7 @@ async function deliver(
       channels,
       brand: brandFor(deps.ui, deps.notificationsConfig, message.reviewUrl),
       logger: deps.logger,
-      onOutcome: recordOutcomes(deps),
+      onOutcome,
     },
   );
 }
@@ -346,7 +494,7 @@ export async function notifyProjectWith(
     kinds,
     options.skipUsers ?? new Set(),
   );
-  await deliver(deps, project, { event, data, reviewUrl }, [...channels, ...targets]);
+  await sendOrQueue(deps, project, { event, data, reviewUrl }, [...channels, ...targets]);
 }
 
 /**
@@ -367,7 +515,7 @@ async function mentionTargets(
   if (own !== undefined && !NotificationSubscriptionModel.isReviewOptOutOnly(own)) {
     return own.enabled ? await targetsForSub(db, own, kinds) : [];
   }
-  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId) : [];
+  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId, kinds) : [];
 }
 
 /**
@@ -381,16 +529,18 @@ async function assignedTargets(
   projectId: string,
   userId: string,
   kinds: DeliveryKinds,
-): Promise<NotificationChannel[]> {
+): Promise<Addressed[]> {
   const own = (await new NotificationSubscriptionModel(db).list(projectId)).find(
     (row) => row.userId === userId,
   );
   // `targetsForSub` keeps personal kinds only, so a state or room kind never counts as a target.
-  const chosen = own?.enabled ? await targetsForSub(db, own, kinds) : [];
+  const chosen = own?.enabled ? await targetsForSub(db, own, kinds, "assigned") : [];
   if (chosen.length > 0) {
     return chosen;
   }
-  return kinds.personal.has("email") ? await emailTarget(db, projectId, userId) : [];
+  return kinds.personal.has("email")
+    ? await emailTarget(db, projectId, userId, kinds, "assigned")
+    : [];
 }
 
 /**
@@ -414,7 +564,7 @@ export async function notifyAssignedWith(
   }
   const targets = await assignedTargets(deps.db, project.id, userId, deliveryKindsOf(deps));
   const reviewUrl = reviewUrlFor(origin, project.slug, reviewSuffix);
-  await deliver(deps, project, { event, data, reviewUrl }, targets);
+  await sendOrQueue(deps, project, { event, data, reviewUrl }, targets);
 }
 
 /** Notify one project member that a comment mentions them. Best-effort, like every fan-out. */

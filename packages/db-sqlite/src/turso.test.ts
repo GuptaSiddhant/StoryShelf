@@ -6,7 +6,7 @@ import { getTableColumns, sql } from "drizzle-orm";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { schema } from "./schema/index.ts";
 import { createTursoDatabase } from "./turso.ts";
 
@@ -52,6 +52,32 @@ async function tableNames(db: DatabaseAdapter): Promise<Set<string>> {
     sql`SELECT name FROM sqlite_master WHERE type = 'table'`,
   );
   return new Set(rows.map((row) => String(row.name)));
+}
+
+/** A Turso database whose `comments` table still requires a user, with one row in it. */
+async function legacyCommentsVolume() {
+  const { dir, db, client } = createTempTurso();
+  await initDb(db);
+  await client.execute("PRAGMA foreign_keys = OFF");
+  await client.executeMultiple(`INSERT INTO users (id, name, email, created_at) VALUES ('u', 'U', 'u@x', '2026-01-01T00:00:00.000Z');
+    INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+    INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at) VALUES ('b', 'p', 's', 'main', 'pending', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+    DROP TABLE comments;
+    CREATE TABLE comments (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+      snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      parent_id TEXT,
+      resolved INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    INSERT INTO comments (id, project_id, build_id, user_id, body, created_at, updated_at)
+      VALUES ('c1', 'p', 'b', 'u', 'kept', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');`);
+  return { dir, db, client };
 }
 
 describe("createTursoDatabase", () => {
@@ -188,6 +214,132 @@ describe("createTursoDatabase", () => {
     ).rejects.toThrow("boom");
     expect(await db.get(schema.projects, "p2")).toBeNull();
 
+    await cleanupTurso(dir, db, client);
+  });
+
+  it("rebuilds a comments table that still requires a user in one batch, keeping its rows", async () => {
+    const { dir, db, client } = await legacyCommentsVolume();
+
+    await initDb(createTursoDatabase({ client }));
+
+    const columns = (await client.execute("PRAGMA table_info(comments)")).rows as unknown as {
+      name: string;
+      notnull: number;
+    }[];
+    expect(columns.find((column) => column.name === "user_id")?.notnull).toBe(0);
+    expect(columns.map((column) => column.name)).toContain("story_id");
+    const rows = (await client.execute("SELECT id FROM comments")).rows as unknown as {
+      id: string;
+    }[];
+    expect(rows.map((row) => row.id)).toEqual(["c1"]);
+    await cleanupTurso(dir, db, client);
+  });
+
+  it("keeps the old comments table and its row when the rebuild batch fails, and rebuilds on a retry", async () => {
+    const { dir, db, client } = await legacyCommentsVolume();
+    // A failed write batch is rolled back whole: nothing of the rebuild lands.
+    const broken = new Proxy(client, {
+      get(target, property) {
+        if (property === "batch") {
+          return async () => {
+            throw new Error("SQLite error: boom");
+          };
+        }
+        const value: unknown = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+    await expect(initDb(createTursoDatabase({ client: broken }))).rejects.toThrow("boom");
+
+    const userNotNull = async (): Promise<number | undefined> =>
+      (
+        (await client.execute("PRAGMA table_info(comments)")).rows as unknown as {
+          name: string;
+          notnull: number;
+        }[]
+      ).find((column) => column.name === "user_id")?.notnull;
+    expect(await userNotNull()).toBe(1);
+    const rows = (await client.execute("SELECT id FROM comments")).rows as unknown as {
+      id: string;
+    }[];
+    expect(rows.map((row) => row.id)).toEqual(["c1"]);
+
+    await initDb(createTursoDatabase({ client }));
+    expect(await userNotNull()).toBe(0);
+    await cleanupTurso(dir, db, client);
+  });
+
+  it("fails the boot on a statement that errors, and skips only the already-done ones", async () => {
+    const { dir, db, client } = createTempTurso();
+    await initDb(db);
+    const failing = (error: Error): TestClient =>
+      new Proxy(client, {
+        get(target, property) {
+          if (property === "execute") {
+            return async (statement: string) => {
+              if (statement.startsWith("ALTER TABLE webhooks DROP COLUMN")) throw error;
+              return await target.execute(statement);
+            };
+          }
+          const value: unknown = Reflect.get(target, property);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+
+    await expect(
+      initDb(createTursoDatabase({ client: failing(new Error("SQLite error: boom")) })),
+    ).rejects.toThrow("boom");
+    await expect(
+      initDb(createTursoDatabase({ client: failing(new Error('no such column: "secret"')) })),
+    ).resolves.toBeUndefined();
+    await cleanupTurso(dir, db, client);
+  });
+
+  it("commits many overlapping transactions, one at a time", async () => {
+    const { dir, db, client } = createTempTurso();
+    await initDb(db);
+    const now = new Date().toISOString();
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 15 }, async (_unused, index) =>
+        db.transact?.(async (tx) => {
+          await tx.insert(schema.projects, {
+            id: `p${String(index)}`,
+            name: "Tx",
+            slug: `tx-${String(index)}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }),
+      ),
+    );
+
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+    expect(await db.count(schema.projects)).toBe(15);
+    await cleanupTurso(dir, db, client);
+  });
+
+  it("boots without the design-link index when rows repeat its key, and says so once", async () => {
+    const { dir, db, client } = createTempTurso();
+    await initDb(db);
+    await client.executeMultiple(`DROP INDEX design_links_project_import_path_idx;
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+      INSERT INTO design_links (id, project_id, import_path, url, created_at, updated_at)
+        VALUES ('d1', 'p', './A.tsx', 'u1', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'), ('d2', 'p', './A.tsx', 'u2', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');`);
+    const error = vi.fn();
+
+    await createTursoDatabase({ client }).lifecycle?.setup({
+      config: {},
+      logger: { error } as unknown as typeof silentLogger,
+    });
+
+    expect(error).toHaveBeenCalledOnce();
+    expect(error.mock.calls[0]?.[0]).toEqual({
+      table: "design_links",
+      index: "design_links_project_import_path_idx",
+      duplicateGroups: 1,
+    });
     await cleanupTurso(dir, db, client);
   });
 

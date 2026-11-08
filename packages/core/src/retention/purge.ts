@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Logger } from "pino";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildComponentModel } from "../models/build-component.ts";
@@ -12,8 +12,10 @@ import { LabelModel, type LabelTables } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
+import { collectUnreferencedContent } from "./content-gc.ts";
 import { pendingCandidates } from "./pending.ts";
 import { sweepPublishedGzip } from "./published-gzip-sweep.ts";
+import { purgeClaimedBuilds } from "./purge-claimed.ts";
 import { sweepScreenshotContent } from "./screenshot-sweep.ts";
 
 export {
@@ -24,8 +26,26 @@ export {
   type SweepTables,
 } from "./screenshot-sweep.ts";
 import { col } from "../models/columns.ts";
-import { publishedGzipPath } from "../utils/paths.ts";
 export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
+export {
+  deleteClaimedBuild,
+  type BuildDeletionDeps,
+  type BuildDeletionResult,
+  type DeletionStep,
+} from "./build-deletion.ts";
+export {
+  CONTENT_BACKFILL_KEY,
+  CONTENT_BACKFILL_PAGE,
+  backfillContentUses,
+  type ContentBackfillDeps,
+  type ContentBackfillResult,
+} from "./content-backfill.ts";
+export { CONTENT_GRACE_MS, collectUnreferencedContent, type ContentGcDeps } from "./content-gc.ts";
+export {
+  purgeClaimedBuilds,
+  type ClaimedPurgeDeps,
+  type ClaimedPurgeResult,
+} from "./purge-claimed.ts";
 
 /** Table handles for retention queries. */
 export interface RetentionTables {
@@ -54,8 +74,24 @@ export class Retention {
   }
 
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
+    // Resolved once, before anything is awaited: a capability that is cleared while the candidates
+    // are selected (a setup rerun) must not turn this pass into an unfenced one (ADR 0039).
+    // An explicit `lifecycle` (even `undefined`: the caller found none) is the pass's snapshot;
+    // only a caller that gave no option at all gets the database's capability read here.
+    const lifecycle = "lifecycle" in options ? options.lifecycle : this.db.buildReferenceLifecycle;
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const { buildIds, pending } = await this.selectBuilds(project, options, cutoff);
+    if (lifecycle) return await this.purgeClaimed(project, lifecycle, buildIds, pending, cutoff);
+    return await this.purgeUnfenced(project, buildIds, pending, cutoff);
+  }
+
+  /** Purge without the lifecycle capability: delete each build's files, then its rows. */
+  private async purgeUnfenced(
+    project: Project,
+    buildIds: readonly string[],
+    pending: number,
+    cutoff: string,
+  ): Promise<PurgeResult> {
     const results = await Promise.all(
       buildIds.map(async (buildId) => ({
         files: await this.deleteBuildFiles(project.id, buildId),
@@ -71,6 +107,37 @@ export class Retention {
       "build retention purge complete",
     );
     return { removedBuilds, removedFiles };
+  }
+
+  /**
+   * Purge through the lifecycle capability: claim each candidate (a protected one stays), then
+   * finish the deletions with durable progress (ADR 0039). Content is collected once at the end.
+   */
+  private async purgeClaimed(
+    project: Project,
+    lifecycle: BuildReferenceLifecycle,
+    buildIds: readonly string[],
+    pending: number,
+    cutoff: string,
+  ): Promise<PurgeResult> {
+    const deps = { db: this.db, storage: this.storage, lifecycle, logger: this.logger };
+    const claimed = await purgeClaimedBuilds(deps, project.id, buildIds);
+    await collectUnreferencedContent(deps).catch((error: unknown) => {
+      this.logger?.warn({ err: error, projectId: project.id }, "content collection failed");
+    });
+    await sweepPublishedGzip(this.storage).catch(() => {});
+    await this.sweepScreenshots(project);
+    const removedJobs = await this.purgeFinishedJobs(cutoff);
+    this.logger?.info(
+      { projectId: project.id, ...claimed, removedJobs, removedPending: pending },
+      "build retention purge complete",
+    );
+    return {
+      removedBuilds: claimed.removedBuilds,
+      removedFiles: claimed.removedFiles,
+      protectedBuilds: claimed.protectedBuilds,
+      resumedBuilds: claimed.resumedBuilds,
+    };
   }
 
   /**
@@ -170,88 +237,30 @@ export class Retention {
 
   private async deleteBuildFiles(projectId: string, buildId: string): Promise<number> {
     const prefix = `${projectId}/builds/${buildId}/`;
-    const manifestPath = `${prefix}storybook/manifest.json`;
-    let manifestFiles: string[] = [];
-    try {
-      if (await this.storage.exists(manifestPath)) {
-        const raw = await this.storage.read(manifestPath);
-        const manifest = JSON.parse(raw.toString("utf8")) as Record<string, string>;
-        manifestFiles = Object.values(manifest);
-      }
-    } catch {
-      // ignore — manifest may not exist for old builds
-    }
     const files = await this.storage.list(prefix);
     await Promise.all(
       files.map(async (file) => {
         await this.storage.delete(file);
       }),
     );
-    // Decrement content refs for this build's manifest
-    for (const hash of manifestFiles) {
-      try {
-        const contentRefs = this.db.tables.contentRefs;
-        const existing = (await this.db.get(contentRefs, hash)) as unknown as {
-          refCount: number;
-        } | null;
-        // oxlint-disable-next-line unicorn/prefer-ternary -- refCount check is clearer as if/else
-        if (existing) {
-          const refCount = existing.refCount;
-          // oxlint-disable-next-line unicorn/prefer-ternary -- grace logic is clearer as if/else
-          if (refCount <= 1) {
-            // Keep for 7-day grace: set refCount 0 and update lastSeenAt, don't delete yet
-            await this.db.update(contentRefs, hash, {
-              refCount: 0,
-              lastSeenAt: new Date().toISOString(),
-            });
-          } else {
-            await this.db.update(contentRefs, hash, {
-              refCount: refCount - 1,
-              lastSeenAt: new Date().toISOString(),
-            });
-          }
-        }
-      } catch {
-        // ignore — content_refs may not exist
-      }
-    }
-    // GC stale content_refs with 7-day grace
-    try {
-      const contentRefs = this.db.tables.contentRefs;
-      const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
-      const all = (await this.db.list(contentRefs)) as unknown as {
-        hash: string;
-        refCount: number;
-        lastSeenAt: string;
-      }[];
-      for (const row of all) {
-        if (row.refCount === 0 && row.lastSeenAt < cutoff) {
-          await this.storage.delete(`content/${row.hash}`).catch(() => {
-            // ignore storage delete failure
-          });
-          // Variants are disposable; never let their deletion affect authoritative data.
-          if (/^[a-f0-9]{64}$/u.test(row.hash)) {
-            await this.storage.delete(publishedGzipPath(row.hash)).catch(() => {});
-          }
-          await this.db.remove(contentRefs, row.hash);
-        }
-      }
-    } catch {
-      // ignore — content_refs may not exist
-    }
     await sweepPublishedGzip(this.storage).catch(() => {});
     return files.length;
+  }
+
+  /** The branches (never the default one) whose newest build is older than the window. */
+  private async staleBranches(project: Project, ttlDays: number): Promise<Set<string>> {
+    const cutoff = new Date(Date.now() - ttlDays * 86_400_000).toISOString();
+    const rows = (await this.db.list(this.tables.builds, {
+      where: eq(col(this.tables.builds, "projectId"), project.id),
+    })) as unknown as { gitBranch: string; updatedAt: string }[];
+    return collectStaleBranches(rows, project.gitDefaultBranch, cutoff);
   }
 
   async purgeStaleBranches(project: Project, ttlDays: number): Promise<BranchGcResult> {
     if (ttlDays <= 0) {
       return { removedBranches: 0, removedBaselines: 0 };
     }
-    const cutoff = new Date(Date.now() - ttlDays * 86_400_000).toISOString();
-    const rows = (await this.db.list(this.tables.builds, {
-      where: eq(col(this.tables.builds, "projectId"), project.id),
-    })) as unknown as { gitBranch: string; updatedAt: string }[];
-    const stale = collectStaleBranches(rows, project.gitDefaultBranch, cutoff);
+    const stale = await this.staleBranches(project, ttlDays);
     if (stale.size === 0) {
       return { removedBranches: 0, removedBaselines: 0 };
     }
@@ -270,12 +279,21 @@ export class Retention {
 export interface PurgeOptions {
   ttlDays: number;
   keepLatestPerBranch: boolean;
+  /**
+   * The capability the caller resolved at the start of its pass, shared by every project of that
+   * pass. Without it the purge reads the database's capability when it starts, and never again.
+   */
+  lifecycle?: BuildReferenceLifecycle | undefined;
 }
 
 /** Counts of builds and files removed by a retention purge. */
 export interface PurgeResult {
   removedBuilds: number;
   removedFiles: number;
+  /** With the lifecycle capability: candidates a baseline or investigation still protects. */
+  protectedBuilds?: number;
+  /** With the lifecycle capability: removed builds an earlier, unfinished run had claimed. */
+  resumedBuilds?: number;
 }
 
 /** Counts of stale branches and baselines removed. */

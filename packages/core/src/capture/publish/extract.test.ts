@@ -100,4 +100,45 @@ describe("extractZipStream", () => {
       extractZipStream(Readable.from([Buffer.from("definitely-not-a-zip")]), root, LIMITS),
     ).rejects.toBeInstanceOf(ZipInvalidError);
   });
+
+  it("stops at an aborted signal: no later entry is written and the reason is thrown", async () => {
+    const files = Object.fromEntries(
+      Array.from({ length: 40 }, (_unused, index) => [`f${String(index)}.txt`, "x".repeat(2000)]),
+    );
+    const controller = new AbortController();
+    const reason = new Error("job deadline exceeded");
+    const zip = await zipOf(files);
+    const parts = Array.from({ length: Math.ceil(zip.length / 512) }, (_unused, index) =>
+      zip.subarray(index * 512, (index + 1) * 512),
+    );
+    const source = Readable.from(
+      (async function* feed() {
+        for (const [index, part] of parts.entries()) {
+          if (index === 6) controller.abort(reason);
+          yield part;
+          // oxlint-disable-next-line no-await-in-loop -- let the parser consume each part
+          await new Promise((resolve) => setImmediate(resolve));
+        }
+      })(),
+    );
+
+    await expect(extractZipStream(source, root, LIMITS, controller.signal)).rejects.toBe(reason);
+
+    // In-flight writes settled before the rejection, so the listing is final: the later files
+    // the aborted stream never reached are not there.
+    const written = await readdir(root);
+    expect(written).not.toContain("f39.txt");
+    expect(written.length).toBeLessThan(40);
+  });
+
+  it("writes nothing for a signal that was aborted before it started", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("already over"));
+    const zip = await zipOf({ "a.txt": "a" });
+
+    await expect(extractZipStream(chunked(zip), root, LIMITS, controller.signal)).rejects.toThrow(
+      "already over",
+    );
+    expect(await readdir(root)).toEqual([]);
+  });
 });

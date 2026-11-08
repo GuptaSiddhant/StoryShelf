@@ -4,23 +4,19 @@ import {
   createTargetOffers,
   shutdownRemote,
   type CaptureRunner,
+  type RemoteTarget,
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
-import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { verifyLocalTargets } from "./availability.ts";
-import { activeRuns } from "./browser.ts";
+import { cancelRuns, trackRun } from "./browser.ts";
 import { connectRemote } from "./connect.ts";
 import { launchLocal } from "./launch.ts";
 import { renderAll } from "./pipeline.ts";
+import { resolveSettings } from "./settings.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
 import { runTestEntries } from "./tests.ts";
-import type {
-  ActiveRun,
-  PuppeteerRenderInput,
-  PuppeteerTestsInput,
-  TargetDriver,
-} from "./types.ts";
+import type { PuppeteerRenderInput, PuppeteerTestsInput, TargetDriver } from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -55,80 +51,63 @@ export function createPuppeteerCaptureRunner(
   );
   // Until `lifecycle.setup` verifies them, every declared target reads as ready.
   const offers = createTargetOffers(declared);
-  const driver: TargetDriver = {
-    launch: offers.guard(async (target, logger, context) => {
-      const remote = remotes.find((entry) => entry.target === target);
-      return remote
-        ? await connectRemote(remote, context, logger)
-        : {
-            browser: await launchLocal(
-              locals.find((entry) => entry.target === target) as LocalTarget,
-              options.args,
-            ),
-            ownership: "launched",
-          };
-    }),
-    remote: (target) => remotes.find((entry) => entry.target === target),
-  };
-  const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
-  const navigationTimeoutMs =
-    options.navigationTimeoutMs ??
-    envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
-    recommendedNavigationTimeoutMs();
-  const recycleBrowserEvery =
-    options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0);
-  const reusePages =
-    options.reusePages ?? ["1", "true"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? "");
+  const driver = buildDriver(offers, locals, remotes, options.args);
+  const settings = resolveSettings(options);
   return {
-    metadata: {
-      name: "Puppeteer",
-      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
-      description: "Puppeteer capture runner (chrome-headless-shell)",
-      kind: "puppeteer",
-      category: "capture-runner",
-      get targets() {
-        return offers.current();
-      },
-    },
+    metadata: runnerMetadata(offers),
     lifecycle: withShutdown(
       offers.lifecycle(async () => await Promise.resolve(verifyTargets(declared, locals))),
     ),
-    async render(input: PuppeteerRenderInput) {
-      const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
-      const remove = activeRuns.add(input.buildId, input.runId, active);
-      try {
-        return await renderAll(
-          { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
-          active,
-          driver,
-          offers.defaultTarget,
-        );
-      } finally {
-        remove();
-      }
-    },
-    async runTests(input: PuppeteerTestsInput) {
-      const active: ActiveRun = { cancelled: false, session: null, abort: new AbortController() };
-      const remove = activeRuns.add(input.buildId, input.runId, active);
-      try {
+    render: async (input: PuppeteerRenderInput) =>
+      await trackRun(input, async (active) => {
+        return await renderAll({ ...settings, ...input }, active, driver, offers.defaultTarget);
+      }),
+    runTests: async (input: PuppeteerTestsInput) =>
+      await trackRun(input, async (active) => {
+        const { concurrency, navigationTimeoutMs } = settings;
         return await runTestEntries(
           { concurrency, navigationTimeoutMs, ...input },
           active,
           driver,
           offers.defaultTarget,
         );
-      } finally {
-        remove();
+      }),
+    cancel: cancelRuns,
+  };
+}
+
+/** Launches a local engine or leases a remote one, whichever the target names. */
+function buildDriver(
+  offers: ReturnType<typeof createTargetOffers>,
+  locals: readonly LocalTarget[],
+  remotes: readonly RemoteTarget[],
+  args: string[] | undefined,
+): TargetDriver {
+  return {
+    launch: offers.guard(async (target, logger, context) => {
+      const remote = remotes.find((entry) => entry.target === target);
+      if (remote) {
+        return await connectRemote(remote, context, logger);
       }
-    },
-    async cancel(buildId, runId) {
-      await Promise.all(
-        activeRuns.matching(buildId, runId).map(async (active) => {
-          active.cancelled = true;
-          active.abort?.abort();
-          await active.session?.release("cancelled");
-        }),
-      );
+      const local = locals.find((entry) => entry.target === target);
+      if (!local) {
+        throw new Error(`No launchable target named ${target}`);
+      }
+      return { browser: await launchLocal(local, args), ownership: "launched" };
+    }),
+    remote: (target) => remotes.find((entry) => entry.target === target),
+  };
+}
+
+function runnerMetadata(offers: ReturnType<typeof createTargetOffers>): CaptureRunner["metadata"] {
+  return {
+    name: "Puppeteer",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
+    description: "Puppeteer capture runner (chrome-headless-shell)",
+    kind: "puppeteer",
+    category: "capture-runner",
+    get targets() {
+      return offers.current();
     },
   };
 }
@@ -151,15 +130,6 @@ function withShutdown(lifecycle: AdapterLifecycle): AdapterLifecycle {
       await lifecycle.teardown();
     },
   };
-}
-
-function envPositiveInt(name: string): number | undefined {
-  return envInt(name, 1);
-}
-
-function envInt(name: string, min: number): number | undefined {
-  const parsed = Number.parseInt(process.env[name] ?? "", 10);
-  return parsed >= min ? parsed : undefined;
 }
 
 // Re-exports for backward compatibility (tests import these from capture-runner).

@@ -74,6 +74,20 @@ CREATE TABLE IF NOT EXISTS build_reference_generations (
   generation INTEGER NOT NULL CHECK (generation >= 0),
   PRIMARY KEY (project_id, owner_type, owner_id)
 );
+CREATE TABLE IF NOT EXISTS build_deletions (
+  build_id TEXT PRIMARY KEY REFERENCES builds(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  content_released_at TEXT,
+  storage_deleted_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS build_content_releases (
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  content_hash TEXT NOT NULL,
+  released_at TEXT NOT NULL,
+  PRIMARY KEY (build_id, content_hash)
+);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -466,12 +480,17 @@ CREATE TABLE IF NOT EXISTS project_group_mappings (
   created_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS project_group_mappings_project_group_idx ON project_group_mappings (project_id, group_name);
-CREATE TABLE IF NOT EXISTS content_refs (
-  hash TEXT PRIMARY KEY,
-  ref_count INTEGER NOT NULL DEFAULT 1,
-  last_seen_at TEXT NOT NULL,
-  created_at TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS content_uses (
+  build_id TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  released_at TEXT,
+  collecting_at TEXT,
+  claim_token TEXT,
+  PRIMARY KEY (build_id, content_hash)
 );
+CREATE INDEX IF NOT EXISTS content_uses_hash_idx ON content_uses (content_hash);
 CREATE TABLE IF NOT EXISTS user (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -567,6 +586,8 @@ export const IDENTITY_STATEMENTS: string[] = [
   // Pre-adapter Figma tables, replaced by design_nodes / design_credentials (no data is carried over).
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",
+  // Replaced by content_uses (ADR 0039); its per-hash counters cannot become per-build uses.
+  "DROP TABLE IF EXISTS content_refs",
 ];
 
 const CONSTRAINT_PREFIX = /^(?:PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\s/iu;

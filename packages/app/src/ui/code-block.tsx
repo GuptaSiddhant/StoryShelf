@@ -1,9 +1,6 @@
 import type { FC } from "hono/jsx";
 import { Button } from "./buttons.tsx";
 import { css } from "./css.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const codeWrap = css`
   /* code-block */
   display: flex;

@@ -59,9 +59,6 @@ export interface NotificationsFormState {
   errors?: Record<string, string>;
   globalError?: string;
 }
-
-/* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */
-
 /** The one topic the "Send me review requests" switch controls, so it has no checkbox of its own. */
 export const REVIEW_REQUESTED_EVENT = "review:requested";
 
@@ -208,13 +205,14 @@ const HealthStatus: FC<{ channel: SettingsNotificationChannel }> = ({ channel })
   return (
     <>
       <Badge tone="danger">failing</Badge>
-      <Meta as="span">
-        Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
-        <span class="truncate max-w-cell" title={channel.lastError}>
-          {" "}
-          {channel.lastError}
-        </span>
-      </Meta>
+      <span class="truncate max-w-cell">
+        <Meta as="span">
+          Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
+        </Meta>
+      </span>
+      <span class="truncate max-w-cell" title={channel.lastError}>
+        <Meta as="span">{channel.lastError}</Meta>
+      </span>
     </>
   );
 };

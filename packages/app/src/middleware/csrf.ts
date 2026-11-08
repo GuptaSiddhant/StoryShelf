@@ -1,4 +1,4 @@
-import { SESSION_COOKIE } from "@storyshelf/core/types";
+import { readSessionCookie } from "@storyshelf/core/types";
 import { timingSafeEqualString } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 import { createHash, randomBytes } from "node:crypto";
@@ -11,11 +11,33 @@ function resolveSecret(secret?: string): string {
   return secret ?? FALLBACK_SECRET;
 }
 
+/** First part of a token. It names the format and carries nothing of the session (see below). */
+const TOKEN_TAG = "csrf";
+
+/**
+ * `csrf:<timestamp>:<signature>`. The session id is signed but never put in the token: the token is
+ * rendered into pages (meta tag, hidden fields) that scripts can read, and the id is the raw value
+ * of the HttpOnly session cookie. `verifyToken` recomputes the signature from the request's own
+ * session, and reads only the last two parts, so tokens issued before this format still verify.
+ */
 function generateToken(secret: string, sessionId: string): string {
   const timestamp = Date.now().toString(36);
-  const payload = `${sessionId}:${timestamp}`;
-  const signature = createHash("sha256").update(`${secret}:${payload}`).digest("hex").slice(0, 16);
-  return `${payload}:${signature}`;
+  return `${TOKEN_TAG}:${timestamp}:${signatureOf(secret, sessionId, timestamp)}`;
+}
+
+/** The signature of a token minted for `sessionId` at the base-36 `timestamp`. */
+function signatureOf(secret: string, sessionId: string, timestamp: string): string {
+  return createHash("sha256")
+    .update(`${secret}:${sessionId}:${timestamp}`)
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/** Whether a token minted at the base-36 `payloadTimestamp` is under a day old and not from the future. */
+function isFresh(payloadTimestamp: string): boolean {
+  const age = Date.now() - Number.parseInt(payloadTimestamp, 36);
+  // Same-millisecond tokens are fresh (>= 0), not from the future.
+  return age >= 0 && age < 24 * 60 * 60 * 1000;
 }
 
 function verifyToken(secret: string, token: string, sessionId: string): boolean {
@@ -27,17 +49,11 @@ function verifyToken(secret: string, token: string, sessionId: string): boolean 
   if (!payloadTimestamp || !signature) {
     return false;
   }
-  const expectedSignature = createHash("sha256")
-    .update(`${secret}:${sessionId}:${payloadTimestamp}`)
-    .digest("hex")
-    .slice(0, 16);
+  const expectedSignature = signatureOf(secret, sessionId, payloadTimestamp);
   if (!timingSafeEqualString(signature, expectedSignature)) {
     return false;
   }
-  const timestamp = Number.parseInt(payloadTimestamp, 36);
-  const age = Date.now() - timestamp;
-  // Same-millisecond tokens are fresh (>= 0), not from the future.
-  return age >= 0 && age < 24 * 60 * 60 * 1000;
+  return isFresh(payloadTimestamp);
 }
 
 /**
@@ -46,17 +62,7 @@ function verifyToken(secret: string, token: string, sessionId: string): boolean 
  * minted for one session never validates for another.
  */
 export function sessionIdFrom(c: Pick<Context, "req">): string {
-  const header = c.req.header("cookie") ?? "";
-  for (const part of header.split(";")) {
-    const eqIndex = part.indexOf("=");
-    if (eqIndex !== -1 && part.slice(0, eqIndex).trim() === SESSION_COOKIE) {
-      const value = part.slice(eqIndex + 1).trim();
-      if (value) {
-        return value;
-      }
-    }
-  }
-  return DEFAULT_SESSION;
+  return readSessionCookie(c.req.header("cookie")) ?? DEFAULT_SESSION;
 }
 
 /** Read a CSRF token from the request header or form body (never the URL: query tokens leak via logs, history, and Referer). */

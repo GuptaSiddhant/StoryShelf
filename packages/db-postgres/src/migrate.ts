@@ -5,6 +5,12 @@
  * runner so all drivers (`postgres.js`, `node-postgres`, Neon, …) share one
  * migration path instead of drifting per preset.
  */
+import {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+} from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { DDL } from "./ddl.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
 
@@ -61,12 +67,17 @@ const DESIGN_LINKS_UNIQUE_INDEX =
 const LEGACY_DESIGN_DROPS = [
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",
+  // Replaced by content_uses (ADR 0039); its per-hash counters cannot become per-build uses.
+  "DROP TABLE IF EXISTS content_refs",
 ];
 const BASELINE_FINGERPRINT_ALTER =
   "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS fingerprint TEXT";
 const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const BUILD_AFFECTED_ONLY_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
+/** Build retention (ADR 0039): `available` until the lifecycle capability tombstones the build. */
+const BUILD_RETENTION_STATE_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS retention_state TEXT NOT NULL DEFAULT 'available'";
 const BUILD_BASELINE_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS baseline_sha TEXT";
 const BUILD_CHANGED_FILES_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS changed_files TEXT";
 const BUILD_AFFECTED_PATHS_ALTER =
@@ -102,8 +113,8 @@ const MEMBER_SOURCE_ALTER =
  */
 /**
  * Single-flight jobs (ADR 0040): `capture_jobs.active_key` is unique while a job is non-terminal.
- * Not swallowed like the other follow-ups: without the index two notify jobs for one key could run
- * at once, so a failure must stop the boot. Every statement is idempotent.
+ * Without the index two notify jobs for one key could run at once, so a failure must stop the
+ * boot (as it must for every migration statement). Every statement is idempotent.
  */
 const CAPTURE_JOB_SINGLE_FLIGHT = [
   "ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS active_key TEXT",
@@ -158,56 +169,56 @@ const IDENTITY_STATEMENTS = [
   "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
 ];
 
-async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, SNAPSHOT_INFRA_HASH_ALTER);
-  await execIgnore(run, SNAPSHOT_INHERITED_ALTER);
-  await execIgnore(run, SNAPSHOT_BASELINE_ID_ALTER);
-  await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
+async function migrateSnapshotColumns(run: MigrationRunner, logger?: Logger): Promise<void> {
+  await run(SNAPSHOT_INFRA_HASH_ALTER);
+  await run(SNAPSHOT_INHERITED_ALTER);
+  await run(SNAPSHOT_BASELINE_ID_ALTER);
+  await run(SNAPSHOT_BASELINE_VERSION_ALTER);
   await migrateComparisonColumns(run);
-  await execIgnore(run, SNAPSHOT_DESIGN_URL_ALTER);
-  await execIgnore(run, SNAPSHOT_ENV_CHANGE_ALTER);
-  await execIgnore(run, SNAPSHOT_DURATION_ALTER);
-  await execIgnore(run, SNAPSHOT_A11Y_ALTER);
-  await migrateCaptureIdentityColumns(run);
+  await run(SNAPSHOT_DESIGN_URL_ALTER);
+  await run(SNAPSHOT_ENV_CHANGE_ALTER);
+  await run(SNAPSHOT_DURATION_ALTER);
+  await run(SNAPSHOT_A11Y_ALTER);
+  await migrateCaptureIdentityColumns(run, logger);
 }
 
 async function migrateComparisonColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, SNAPSHOT_SOURCE_BUILD_ALTER);
-  await execIgnore(run, SNAPSHOT_COMPARISON_IMAGE_ALTER);
-  await execIgnore(run, SNAPSHOT_COMPARISON_METADATA_ALTER);
+  await run(SNAPSHOT_SOURCE_BUILD_ALTER);
+  await run(SNAPSHOT_COMPARISON_IMAGE_ALTER);
+  await run(SNAPSHOT_COMPARISON_METADATA_ALTER);
 }
 
-async function migrateCaptureIdentityColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, SNAPSHOT_MODE_ALTER);
-  await execIgnore(run, SNAPSHOT_BROWSER_ALTER);
-  await execIgnore(run, BASELINE_MODE_ALTER);
-  await execIgnore(run, BASELINE_BROWSER_ALTER);
-  await execIgnore(run, PROJECT_BROWSERS_ALTER);
-  await execIgnore(run, PROJECT_MODES_ALLOWLIST_ALTER);
-  await execIgnore(run, DESIGN_LINKS_UNIQUE_INDEX);
+async function migrateCaptureIdentityColumns(run: MigrationRunner, logger?: Logger): Promise<void> {
+  await run(SNAPSHOT_MODE_ALTER);
+  await run(SNAPSHOT_BROWSER_ALTER);
+  await run(BASELINE_MODE_ALTER);
+  await run(BASELINE_BROWSER_ALTER);
+  await run(PROJECT_BROWSERS_ALTER);
+  await run(PROJECT_MODES_ALLOWLIST_ALTER);
+  await runUniqueIndex(run, DESIGN_LINKS_UNIQUE_INDEX, logger);
   await Promise.all(
     LEGACY_DESIGN_DROPS.map(async (statement) => {
-      await execIgnore(run, statement);
+      await run(statement);
     }),
   );
 }
 
 async function migrateBaselineColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, BASELINE_INFRA_HASH_ALTER);
-  await execIgnore(run, BASELINE_FINGERPRINT_ALTER);
-  await execIgnore(run, BASELINE_SOURCE_BUILD_ALTER);
+  await run(BASELINE_INFRA_HASH_ALTER);
+  await run(BASELINE_FINGERPRINT_ALTER);
+  await run(BASELINE_SOURCE_BUILD_ALTER);
 }
 
-async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, EXECUTE_PLAY_ALTER);
-  await execIgnore(run, PLAY_TIMEOUT_MS_ALTER);
-  await execIgnore(run, PROJECT_AUTOMIGRATE_ALTER);
-  await execIgnore(run, PROJECT_AI_PROFILE_ALTER);
+async function migrateProjectExtras(run: MigrationRunner, logger?: Logger): Promise<void> {
+  await run(EXECUTE_PLAY_ALTER);
+  await run(PLAY_TIMEOUT_MS_ALTER);
+  await run(PROJECT_AUTOMIGRATE_ALTER);
+  await run(PROJECT_AI_PROFILE_ALTER);
   await migrateProjectReviewColumns(run);
-  await migrateSnapshotColumns(run);
+  await migrateSnapshotColumns(run, logger);
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
-  await execIgnore(run, RUN_TESTS_ALTER);
+  await run(RUN_TESTS_ALTER);
   await migrateRecentColumns(run);
 }
 
@@ -218,30 +229,33 @@ async function migrateRecentColumns(run: MigrationRunner): Promise<void> {
 }
 
 async function migrateUnstableColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, SNAPSHOT_UNSTABLE_ALTER);
-  await execIgnore(run, DETECT_UNSTABLE_ALTER);
+  await run(SNAPSHOT_UNSTABLE_ALTER);
+  await run(DETECT_UNSTABLE_ALTER);
 }
 
 async function migrateDesignColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, DESIGN_NODE_NOTIFIED_ALTER);
+  await run(DESIGN_NODE_NOTIFIED_ALTER);
 }
 
 async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, PROJECT_REVIEW_ENABLED_ALTER);
-  await execIgnore(run, PROJECT_REVIEW_APPROVALS_ALTER);
-  await execIgnore(run, PROJECT_STORYBOOK_URL_TTL_ALTER);
-  await execIgnore(run, PROJECT_COMPONENT_OWNERS_ALTER);
+  await run(PROJECT_REVIEW_ENABLED_ALTER);
+  await run(PROJECT_REVIEW_APPROVALS_ALTER);
+  await run(PROJECT_STORYBOOK_URL_TTL_ALTER);
+  await run(PROJECT_COMPONENT_OWNERS_ALTER);
+}
+
+async function migrateBuildRetentionColumns(run: MigrationRunner): Promise<void> {
+  await run(BUILD_RETENTION_STATE_ALTER);
+  await run(BUILD_BASELINE_SHA_ALTER);
 }
 
 async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, BUILD_AFFECTED_ONLY_ALTER);
-  await execIgnore(run, BUILD_BASELINE_SHA_ALTER);
-  await execIgnore(run, BUILD_CHANGED_FILES_ALTER);
-  await execIgnore(run, BUILD_AFFECTED_PATHS_ALTER);
-  await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
-  await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
-  // Idempotent (IF NOT EXISTS), and the review gate and the capture fence read these columns: a
-  // real failure must stop the boot, not leave a column missing.
+  await run(BUILD_AFFECTED_ONLY_ALTER);
+  await migrateBuildRetentionColumns(run);
+  await run(BUILD_CHANGED_FILES_ALTER);
+  await run(BUILD_AFFECTED_PATHS_ALTER);
+  await run(BUILD_INHERITED_COUNT_ALTER);
+  await run(BUILD_TEST_RESULTS_ALTER);
   await run(BUILD_REVIEW_CYCLE_ALTER);
   await run(BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
   await run(BUILD_CAPTURE_JOB_ALTER);
@@ -249,25 +263,24 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
 }
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner): Promise<void> {
+export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await run(DDL);
   await migrateCoreColumns(run);
   await migrateUserAuthColumns(run);
   await migrateCaptureJobSingleFlight(run);
-  await migrateProjectExtras(run);
-  // Not swallowed: an unfenced build would let a late crash hook fail a newer run.
+  await migrateProjectExtras(run, logger);
+  // An unfenced build would let a late crash hook fail a newer run.
   await run(BUILD_CAPTURE_JOB_BACKFILL);
-  await applyIdentityStatements(run);
+  await applyIdentityStatements(run, logger);
   await migrateCommentsTable(run);
   await migrateNotificationColumns(run);
 }
 
 /**
- * Unlike the other follow-up ALTERs this one is not swallowed: if the columns cannot be added the
- * boot must fail loudly, because a missing `disabled` column means access control silently does
- * not work. `ADD COLUMN IF NOT EXISTS` is already idempotent, so there is no "already done" error
- * to ignore.
+ * If the columns cannot be added the boot must fail loudly, because a missing `disabled` column
+ * means access control silently does not work. `ADD COLUMN IF NOT EXISTS` is already idempotent,
+ * so there is no "already done" error to ignore.
  */
 async function migrateUserAuthColumns(run: MigrationRunner): Promise<void> {
   for (const statement of USER_AUTH_ALTERS) {
@@ -284,67 +297,88 @@ async function migrateCaptureJobSingleFlight(run: MigrationRunner): Promise<void
 }
 
 async function migrateRunA11yDefault(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, RUN_A11Y_ALTER);
-  await execIgnore(run, RUN_A11Y_DEFAULT_ALTER);
+  await run(RUN_A11Y_ALTER);
+  await run(RUN_A11Y_DEFAULT_ALTER);
 }
 
 async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, STORYBOOK_META_ALTER);
+  await run(STORYBOOK_META_ALTER);
   await migrateRunA11yDefault(run);
-  await execIgnore(run, PROJECT_BROWSER_ALTER);
-  await execIgnore(run, PROJECT_VIEWPORTS_ALTER);
-  await execIgnore(run, WEBHOOK_SECRET_ALTER);
-  await execIgnore(run, WEBHOOK_SECRET_DROP);
-  await execIgnore(run, TOKEN_USER_ALTER);
-  await execIgnore(run, MEMBER_SOURCE_ALTER);
-  await execIgnore(run, BUILDS_GITSHA_DEDUP);
-  await execIgnore(run, BUILDS_GITSHA_INDEX);
+  await run(PROJECT_BROWSER_ALTER);
+  await run(PROJECT_VIEWPORTS_ALTER);
+  await run(WEBHOOK_SECRET_ALTER);
+  await run(WEBHOOK_SECRET_DROP);
+  await run(TOKEN_USER_ALTER);
+  await run(MEMBER_SOURCE_ALTER);
+  await run(BUILDS_GITSHA_DEDUP);
+  await run(BUILDS_GITSHA_INDEX);
 }
 
-async function applyIdentityStatements(run: MigrationRunner): Promise<void> {
+async function applyIdentityStatements(run: MigrationRunner, logger?: Logger): Promise<void> {
   for (const statement of IDENTITY_STATEMENTS) {
     // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
-    await execIgnore(run, statement);
+    await (statement.startsWith("CREATE UNIQUE INDEX")
+      ? runUniqueIndex(run, statement, logger)
+      : run(statement));
   }
 }
 
-async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {
+/** SQLSTATE of a unique violation: a unique index over rows that already repeat its key. */
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * Create a unique index. Rows from before the index may already repeat its key, which fails the
+ * statement with a unique violation; that one error is skipped (the index is then not built) and
+ * every other failure stops the boot.
+ */
+async function runUniqueIndex(run: MigrationRunner, sql: string, logger?: Logger): Promise<void> {
   try {
     await run(sql);
-  } catch {
-    // idempotent — already migrated
+  } catch (error) {
+    if ((error as { code?: unknown }).code !== UNIQUE_VIOLATION) {
+      throw error;
+    }
+    await reportSkippedIndex(run, sql, logger);
   }
+}
+
+/** Say once that the index was skipped, with how many keys repeat (never a row). */
+async function reportSkippedIndex(
+  run: MigrationRunner,
+  sql: string,
+  logger: Logger | undefined,
+): Promise<void> {
+  const parsed = parseUniqueIndex(sql);
+  if (parsed === null) return;
+  const rows = (await run(duplicateGroupsSql(parsed.table, parsed.columns))) as {
+    duplicate_groups?: unknown;
+  }[];
+  logSkippedIndex(logger, { ...parsed, duplicateGroups: Number(rows[0]?.duplicate_groups ?? 0) });
 }
 
 async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, NOTIFICATION_LAST_ERROR_ALTER);
-  await execIgnore(run, NOTIFICATION_LAST_ERROR_AT_ALTER);
-  // IF NOT EXISTS makes it idempotent, so a real failure must surface rather than be ignored.
+  await run(NOTIFICATION_LAST_ERROR_ALTER);
+  await run(NOTIFICATION_LAST_ERROR_AT_ALTER);
   await run(NOTIFICATION_LAST_DELIVERED_ALTER);
 }
 
 /** The columns the comments table gained after it first shipped. */
 async function migrateCommentColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, COMMENT_STORY_ID_ALTER);
-  await execIgnore(run, COMMENT_MENTIONS_ALTER);
-  await execIgnore(run, SUBSCRIPTION_REVIEW_REQUESTS_ALTER);
-  await execIgnore(run, COMMENT_KIND_ALTER);
-  await execIgnore(run, COMMENT_RESOLVED_AT_ALTER);
-  await execIgnore(run, COMMENT_RESOLVED_BY_ALTER);
+  await run(COMMENT_STORY_ID_ALTER);
+  await run(COMMENT_MENTIONS_ALTER);
+  await run(SUBSCRIPTION_REVIEW_REQUESTS_ALTER);
+  await run(COMMENT_KIND_ALTER);
+  await run(COMMENT_RESOLVED_AT_ALTER);
+  await run(COMMENT_RESOLVED_BY_ALTER);
 }
 
 async function migrateCommentsTable(run: MigrationRunner): Promise<void> {
   await migrateCommentColumns(run);
-  try {
-    const rows = (await run(
-      "SELECT is_nullable FROM information_schema.columns WHERE table_name='comments' AND column_name='user_id'",
-    )) as { is_nullable: string }[];
-    const isNullable = rows[0]?.is_nullable;
-    if (isNullable === "YES" || isNullable === undefined) {
-      return;
-    }
+  const rows = (await run(
+    "SELECT is_nullable FROM information_schema.columns WHERE table_name='comments' AND column_name='user_id'",
+  )) as { is_nullable: string }[];
+  // Dropping NOT NULL on a nullable column is a no-op, so only a column that still has it needs the ALTER.
+  if (rows[0]?.is_nullable === "NO") {
     await run("ALTER TABLE comments ALTER COLUMN user_id DROP NOT NULL");
-  } catch {
-    // already nullable or table missing — ignore
   }
 }

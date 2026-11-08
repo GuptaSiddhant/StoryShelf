@@ -4,6 +4,9 @@ import { attemptRowId } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import type { DatabaseJob, QueueJobInput } from "./types.ts";
 
+/** The `data` field of a build's capture job holding the run generation it was queued for. */
+export const GENERATION_KEY = "generation";
+
 /** What the `payload` column holds. */
 interface StoredPayload {
   reqId?: string;

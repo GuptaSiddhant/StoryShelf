@@ -196,3 +196,47 @@ describe("profile page", () => {
     expect(response.status).toBe(400);
   });
 });
+
+describe("profile devices", () => {
+  const sessions = ["tok-a", "tok-b"].map((token) => ({
+    id: `id-${token}`,
+    token,
+    ipAddress: "10.0.0.1",
+    userAgent: `Agent ${token}`,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    expiresAt: "2026-02-01T00:00:00.000Z",
+  }));
+
+  /** The row of the page that is marked as this device, found by its user agent. */
+  async function thisDevice(cookie: string): Promise<string[]> {
+    const auth = stubAuth(null, {
+      check: async () => await Promise.resolve(accountUser),
+      listSessions: async () => await Promise.resolve(sessions),
+    });
+    const seeded = await seed();
+    const app = createShelfApp({
+      database: seeded.db,
+      storage: seeded.storage,
+      auth,
+      logger: silentLogger,
+      config: { secret },
+    });
+    const html = await (await app.request("/profile", { headers: { cookie } })).text();
+    const rows = html.split("<tr").filter((row) => row.includes("Agent tok-"));
+    return rows
+      .filter((row) => row.includes("This device"))
+      .map((row) => /Agent (tok-\w)/u.exec(row)?.[1] ?? "");
+  }
+
+  it("marks the device whose session cookie is sent over http", async () => {
+    expect(await thisDevice("storyshelf_session=tok-b.signature")).toEqual(["tok-b"]);
+  });
+
+  it("marks the device whose __Secure- session cookie is sent over https", async () => {
+    expect(await thisDevice("__Secure-storyshelf_session=tok-a.signature")).toEqual(["tok-a"]);
+  });
+
+  it("marks no device without a session cookie", async () => {
+    expect(await thisDevice("other=1")).toEqual([]);
+  });
+});
