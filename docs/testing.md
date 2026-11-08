@@ -91,6 +91,10 @@ Rules:
   touches `packages/db-postgres/`, `packages/core/src/test-helpers/` or
   `packages/core/src/adapters/database.ts` (job `postgres-lifecycle`, a `postgres:16` service
   container), and the nightly database workflow runs it with the rest of the live suite.
+- Postgres activation (`db-postgres/src/retention-activation.test.ts`) runs `retentionActivationContractSuite`
+  the same way: PGlite always, a real server (same gates, same CI job) for the rest. Only the real server
+  runs the mirrored race tests (an interrupted preparation that resumes, a fenced writer in flight, two
+  instances booting). The unit test pins that PGlite never exposes the capability.
 - The boot step that prepares the baseline pins before a dialect exposes the capability (ADR 0039,
   "activation") is proven with `retentionActivationContractSuite`. Activation stays each adapter's
   own step (it is on neither `DatabaseAdapter` nor `BuildReferenceLifecycle`); the dialect hands
