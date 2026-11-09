@@ -189,6 +189,30 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
   return null;
 }
 
+/** Pages that sit under Settings but are not tabs: the Labels overview, and Jobs when testing is on. */
+function linkedPages(
+  project: Project,
+): { label: string; href: string; icon: IconName; active: boolean }[] {
+  return [
+    {
+      label: "Browse labels",
+      href: `/projects/${project.slug}/labels`,
+      icon: "tag",
+      active: false,
+    },
+    ...(testingEnabled()
+      ? [
+          {
+            label: "Jobs",
+            href: `/projects/${project.slug}/jobs`,
+            icon: "activity" as const,
+            active: false,
+          },
+        ]
+      : []),
+  ];
+}
+
 /** Project settings shell: tab navigation plus the active settings tab. */
 export function renderProjectSettingsPage(
   data: ProjectSettingsData,
@@ -214,25 +238,15 @@ export function renderProjectSettingsPage(
 
       <SubNavLayout
         label="Settings sections"
-        items={SETTINGS_TABS.filter((tab) => settingsTabShown(tab, data))
-          .map((tab) => ({
+        items={[
+          ...SETTINGS_TABS.filter((tab) => settingsTabShown(tab, data)).map((tab) => ({
             label: TAB_LABELS[tab],
             href: tabHref(project, tab),
             icon: TAB_ICONS[tab],
             active: activeTab === tab,
-          }))
-          .concat(
-            testingEnabled()
-              ? [
-                  {
-                    label: "Jobs",
-                    href: `/projects/${project.slug}/jobs`,
-                    icon: "activity" as const,
-                    active: false,
-                  },
-                ]
-              : [],
-          )}
+          })),
+          ...linkedPages(project),
+        ]}
       >
         {renderActiveTab(data, formState)}
       </SubNavLayout>
