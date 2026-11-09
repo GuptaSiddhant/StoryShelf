@@ -61,6 +61,16 @@ export function combineConsumers(consumers: CaptureConsumer[]): CaptureConsumer 
   };
 }
 
+/**
+ * Count the snapshots a shard captured again after an earlier delivery had stored them. Shared by
+ * the consumer's metrics and the app's own capture handler, which is built outside the consumer.
+ */
+export function recordShardRepeated(
+  event: Parameters<NonNullable<ConsumerMetrics["shardRepeated"]>>[0],
+): void {
+  captureMetrics().shardRepeatedSnapshots.add(event.repeated);
+}
+
 /** Job counts and durations on the capture instruments, told apart by `job.kind`. */
 export function jobMetrics(): ConsumerMetrics {
   return {
@@ -74,5 +84,6 @@ export function jobMetrics(): ConsumerMetrics {
         instruments.jobsFailed.add(1, attributes);
       }
     },
+    shardRepeated: recordShardRepeated,
   };
 }
