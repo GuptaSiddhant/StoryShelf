@@ -79,8 +79,14 @@ Two facts decide the shape of the change:
    - `setup-vp` replaces `setup-nub` in `setup-workspace` and `npm-publish`.
    - npm publishing stays in `release.yml` (ADR 0043, decision 5).
 6. **What does not change:** turbo's role in CI ordering is only the `verify` graph, and that moves
-   whole. Fixtures stay independent pnpm installs outside the workspace. Release scripts keep their
-   behaviour; only their `nub` calls change.
+   whole. Release scripts keep their behaviour; only their `nub` calls change.
+7. **Fixtures stay outside the workspace.** `fixtures/storybook-{8,9,10}` remain independent pnpm
+   installs with their own lockfiles, so the capture suite installs Storybook the way a customer
+   does. The root `pnpm-workspace.yaml`, its catalog, overrides and build approvals, and the
+   root's pinned pnpm version must not reach them. If pnpm would otherwise treat a fixture as part
+   of the root workspace, each fixture gets its own `pnpm-workspace.yaml` and `packageManager`.
+   The only thing Vite+ may add is a cached `vp run` task that builds a fixture's Storybook
+   through its own install, if gate 5 shows it works.
 
 ### Gates (the spike, before any migration task)
 
@@ -95,6 +101,13 @@ commits. The epic goes ahead only if every gate passes, and the findings are pos
 3. **Coverage.** Every current CI step runs: package builds, the app's Storybook build, the website
    (uncached), the fly-app bundle and image, the capture integration job and the release scripts.
 4. **Time.** Warm and cold CI times are at most turbo's on the same commits.
+5. **Fixtures.** With the root on pnpm and Vite+, each fixture still installs with
+   `pnpm --dir fixtures/<name> install --frozen-lockfile` and builds its Storybook. Its
+   `pnpm-lock.yaml` stays byte-identical, and the root lockfile does not change. The pnpm version
+   a fixture runs is the one it pins (pnpm 10 today), not the root's or Vite+'s managed one.
+   Root `vp install`, `vp check` and `vp test` do not descend into `fixtures/`. The spike also
+   reports whether a cached `vp run` task can build a fixture's Storybook from outside the
+   workspace and replay it when nothing in the fixture changed.
 
 If a gate fails, the epic stops at the spike, and the findings say what would have to change.
 Only the nub → pnpm step may then be proposed on its own, as a separate owner decision.
