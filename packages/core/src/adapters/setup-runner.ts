@@ -147,9 +147,9 @@ function toResult(
     }
   }
   if (failures.length > 0) {
-    logger.error({ failures }, `adapter ${verb} failed`);
+    logger.error({ failures, phase: verb }, "adapter lifecycle failed");
   } else {
-    logger.info({ count: entries.length }, `adapters ${verb}d`);
+    logger.info({ count: entries.length, phase: verb }, "adapter lifecycle done");
   }
   return { ok: failures.length === 0, failures };
 }
@@ -165,7 +165,10 @@ async function runHooks(
   let settled = false;
   const timer = setTimeout(() => {
     if (!settled) {
-      logger.warn({ count: entries.length, slowMs }, `adapters ${verb} still running`);
+      logger.warn(
+        { count: entries.length, slowMs, phase: verb },
+        "adapter lifecycle still running",
+      );
     }
   }, slowMs);
   timer.unref?.();

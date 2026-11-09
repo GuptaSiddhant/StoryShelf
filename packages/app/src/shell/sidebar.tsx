@@ -11,9 +11,6 @@ import {
   type NavConfig,
   type NavItem,
 } from "./nav.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /**
  * Left rail. Collapses to icons only on desktop (`html[data-sidebar="rail"]`)
  * and becomes an off-canvas drawer on small screens.

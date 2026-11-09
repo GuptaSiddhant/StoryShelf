@@ -7,15 +7,27 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import type { ConsumerJob, JobRunContext } from "@storyshelf/core/capture";
+import * as capture from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import {
+  BuildModel,
+  CaptureAttemptModel,
+  CaptureLogModel,
+  ProjectModel,
+} from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { alreadyAlerted } from "./capture-alerts.ts";
 import { setupCapture } from "./capture-setup.ts";
+import { recordShardRepeated } from "./consumer-setup.ts";
 import { createJobQueue } from "./job-queue.ts";
+
+vi.mock("@storyshelf/core/capture", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@storyshelf/core/capture")>();
+  return { ...original, createCaptureHandler: vi.fn(original.createCaptureHandler) };
+});
 
 const ECHO_CHILD = fileURLToPath(
   new URL("../../core/src/test-helpers/ipc-echo-child.ts", import.meta.url),
@@ -57,7 +69,11 @@ function wire(testing?: ShelfOptions["testing"], config: { scratchDir?: string }
   };
 }
 
-const runContext = (): JobRunContext => ({ logger: {} as never, touch: () => {} });
+const runContext = (): JobRunContext => ({
+  logger: {} as never,
+  touch: () => {},
+  signal: new AbortController().signal,
+});
 
 describe("setupCapture", () => {
   it("wires nothing without testing", () => {
@@ -187,9 +203,44 @@ describe("the forked capture handler", () => {
     }
   }, 30_000);
 
+  it("keeps the superseded-run check of the in-process handler", async () => {
+    const { wiring } = forked();
+    // Queued for a generation of a build that is gone: superseded; a job without one is not judged.
+    expect(await wiring.handler?.superseded?.(job("ghost", { data: { generation: 1 } }))).toBe(
+      true,
+    );
+    expect(await wiring.handler?.superseded?.(job("ghost"))).toBe(false);
+  });
+
+  it("keeps the in-process handler's record of a passed deadline, in the log of the open attempt", async () => {
+    const { wiring, db } = forked();
+    const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
+    const build = await new BuildModel(db).create(project.id, { gitSha: "abc", gitBranch: "main" });
+    const attempts = new CaptureAttemptModel(db);
+    const attempt = await attempts.startAttempt(project.id, build.id);
+    await attempts.markRunning(attempt.id);
+
+    await wiring.handler?.deadlineExceeded?.(job(build.id), 7200);
+
+    const logs = await new CaptureLogModel(db).listByAttempt(attempt.id);
+    expect(logs.map((log) => [log.level, log.message])).toEqual([
+      ["error", "job deadline exceeded (7200s)"],
+    ]);
+    // A build with no open attempt has nothing to write to, and that is no failure.
+    await expect(wiring.handler?.deadlineExceeded?.(job("ghost"), 60)).resolves.toBeUndefined();
+  });
+
   it("keeps the in-process handler's own validation of what it accepts", () => {
     const { wiring } = forked();
     expect(wiring.handler?.accepts?.(job("b1"))).toBe(true);
     expect(wiring.handler?.accepts?.(job(""))).toBe(false);
+  });
+});
+
+describe("setupCapture and repeated shard work", () => {
+  it("gives the capture handler the metrics hook, since the consumer only wires its own handler", () => {
+    wire({ runner: runner() } as never);
+    const given = vi.mocked(capture.createCaptureHandler).mock.calls.at(-1)?.[0];
+    expect(given?.onShardRepeated).toBe(recordShardRepeated);
   });
 });

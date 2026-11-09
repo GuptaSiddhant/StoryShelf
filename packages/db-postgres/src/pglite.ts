@@ -49,12 +49,12 @@ export function createPgliteDatabase(options: PgliteDatabaseOptions = {}): Datab
       category: "database",
     },
     tables: schema,
-    migrate: async () => {
+    migrate: async ({ logger }) => {
       // `exec`, not `query`: the DDL is many statements, which PGlite's prepared `query` rejects.
       await runMigrations(async (sql) => {
         const results = await client.exec(sql);
         return results.flatMap((result) => result.rows as unknown[]);
-      });
+      }, logger);
     },
     close: async () => {
       if (owned) {

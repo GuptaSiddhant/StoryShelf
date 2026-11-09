@@ -1,0 +1,207 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`config resolution > builds schema references from version and module location 1`] = `
+{
+  "badModule": "https://unpkg.com/storyshelf@9.9.9/schema/storyshelf-config.json",
+  "unversioned": "https://unpkg.com/storyshelf/schema/storyshelf-config.json",
+  "versioned": "https://unpkg.com/storyshelf@1.2.3/schema/storyshelf-config.json",
+}
+`;
+
+exports[`config resolution > loads both build command and script 1`] = `null`;
+
+exports[`config resolution > loads build script name 1`] = `
+{
+  "buildScriptName": "sb:build",
+  "slug": "demo",
+}
+`;
+
+exports[`config resolution > loads empty slug 1`] = `null`;
+
+exports[`config resolution > loads empty string field 1`] = `null`;
+
+exports[`config resolution > loads every key 1`] = `
+{
+  "affectedOnly": true,
+  "buildCommand": "pnpm build-storybook",
+  "buildDir": "storybook-static",
+  "buildStats": false,
+  "skip": "no UI change",
+  "slug": "demo",
+  "untraced": [
+    "**/*.md",
+  ],
+  "url": "https://shelf.example.com",
+}
+`;
+
+exports[`config resolution > loads legacy affected object 1`] = `
+{
+  "slug": "demo",
+}
+`;
+
+exports[`config resolution > loads minimal 1`] = `
+{
+  "slug": "demo",
+}
+`;
+
+exports[`config resolution > loads missing slug 1`] = `null`;
+
+exports[`config resolution > loads non-array untraced 1`] = `null`;
+
+exports[`config resolution > loads non-boolean affectedOnly 1`] = `null`;
+
+exports[`config resolution > loads non-http url 1`] = `null`;
+
+exports[`config resolution > loads non-string untraced entry 1`] = `null`;
+
+exports[`config resolution > loads not an object 1`] = `null`;
+
+exports[`config resolution > loads null 1`] = `null`;
+
+exports[`config resolution > loads null for a missing file, for invalid JSON and from an explicit path 1`] = `
+{
+  "slug": "custom",
+}
+`;
+
+exports[`config resolution > loads slug that is not a string 1`] = `null`;
+
+exports[`config resolution > loads with $schema and an unknown key 1`] = `
+{
+  "slug": "demo",
+}
+`;
+
+exports[`config resolution > reads Storybook metadata from empty lists 1`] = `
+{
+  "packagePath": ".storybook",
+}
+`;
+
+exports[`config resolution > reads Storybook metadata from framework only 1`] = `
+{
+  "framework": {
+    "name": "@storybook/html-vite",
+  },
+  "packagePath": ".storybook",
+}
+`;
+
+exports[`config resolution > reads Storybook metadata from framework, addons, stories and staticDirs 1`] = `
+{
+  "addons": [
+    "@storybook/addon-a11y",
+    "@storybook/addon-docs",
+  ],
+  "framework": {
+    "name": "@storybook/react-vite",
+  },
+  "packagePath": ".storybook",
+  "staticDirs": [
+    "../public",
+  ],
+  "storiesGlobs": [
+    "../src/**/*.stories.tsx",
+    "../docs/*.mdx",
+  ],
+}
+`;
+
+exports[`config resolution > reads Storybook metadata from no lists 1`] = `
+{
+  "packagePath": ".storybook",
+}
+`;
+
+exports[`config resolution > writes keeps an existing $schema 1`] = `
+{
+  "path": "<dir>/.storybook/storyshelf.json",
+  "text": "{
+  "$schema": "./keep.json",
+  "slug": "demo"
+}
+",
+}
+`;
+
+exports[`config resolution > writes merges over an existing file 1`] = `
+{
+  "path": "<dir>/.storybook/storyshelf.json",
+  "text": "{
+  "slug": "demo",
+  "url": "https://s.example.com",
+  "buildDir": "out"
+}
+",
+}
+`;
+
+exports[`config resolution > writes new file 1`] = `
+{
+  "path": "<dir>/.storybook/storyshelf.json",
+  "text": "{
+  "slug": "demo"
+}
+",
+}
+`;
+
+exports[`config resolution > writes stamps a fresh $schema 1`] = `
+{
+  "path": "<dir>/.storybook/storyshelf.json",
+  "text": "{
+  "$schema": "<stamped>",
+  "slug": "demo"
+}
+",
+}
+`;
+
+exports[`git detection > normalizes the origin git@github.com:acme/shelf.git 1`] = `"acme/shelf"`;
+
+exports[`git detection > normalizes the origin git@gitlab.example.com:group/sub.git 1`] = `"group/sub"`;
+
+exports[`git detection > normalizes the origin https://github.com/acme/shelf 1`] = `"acme/shelf"`;
+
+exports[`git detection > normalizes the origin https://github.com/acme/shelf.git 1`] = `"acme/shelf"`;
+
+exports[`git detection > normalizes the origin ssh://git@github.com/acme/shelf.git 1`] = `"acme/shelf"`;
+
+exports[`package runner > has install and start commands for bun 1`] = `
+{
+  "install": "bun install",
+  "start": "bun run start",
+}
+`;
+
+exports[`package runner > has install and start commands for npm 1`] = `
+{
+  "install": "npm install",
+  "start": "npm start",
+}
+`;
+
+exports[`package runner > has install and start commands for nub 1`] = `
+{
+  "install": "nub install",
+  "start": "nub run start",
+}
+`;
+
+exports[`package runner > has install and start commands for pnpm 1`] = `
+{
+  "install": "pnpm install",
+  "start": "pnpm start",
+}
+`;
+
+exports[`package runner > has install and start commands for yarn 1`] = `
+{
+  "install": "yarn install",
+  "start": "yarn start",
+}
+`;

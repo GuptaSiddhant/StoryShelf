@@ -6,13 +6,19 @@ import type { NotifierProvider } from "../../adapters/notifier/provider.ts";
 import type { StorageAdapter } from "../../adapters/storage.ts";
 import type { ShelfConfig } from "../../config.ts";
 import type { Logger } from "../../logger.ts";
+import { BuildModel } from "../../models/build.ts";
+import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
+import { CaptureLogModel } from "../../models/capture-log.ts";
 import { createPublicOriginResolver } from "../../models/public-origin.ts";
 import type { SecretInput } from "../../utils/encrypt.ts";
 import { createBuildStatePublisher } from "../build-state/publisher.ts";
 import type { BuildStatePublisher } from "../build-state/types.ts";
+import { GENERATION_KEY } from "../db-queue/codec.ts";
 import { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "../dispatch.ts";
+import { abortableLease } from "../job-lease.ts";
 import type { CaptureJobOptions, ShardJob } from "../orchestrator.ts";
 import { extractionLimitsOf, resolvePublishLimits } from "../publish/limits.ts";
+import type { ConsumerMetrics } from "./metrics.ts";
 import { DEFAULT_MAX_RETRIES, retriesOf } from "./retry.ts";
 import type { ConsumerJob, KindHandler } from "./types.ts";
 
@@ -54,11 +60,29 @@ export interface CaptureHandlerOptions {
   shardSize?: number;
   /** Retries assumed for jobs that do not state `maxAttempts` (default 2). */
   maxRetries?: number;
+  /** Told when a shard re-captures work an earlier attempt had stored (the consumer's `metrics`). */
+  onShardRepeated?: ConsumerMetrics["shardRepeated"];
 }
 
 /** Whether a polled capture job carries the minimum shape to execute. */
 function isValidCaptureJob(job: ConsumerJob): boolean {
   return typeof job.buildId === "string" && job.buildId.length > 0;
+}
+
+/**
+ * Whether a build's capture job was queued for a run the build has left: its payload's generation
+ * is not the build's (a retry started a newer run), or the build is gone. A shard job and a job
+ * queued without a generation are never superseded here.
+ */
+async function isSuperseded(options: CaptureHandlerOptions, job: ConsumerJob): Promise<boolean> {
+  const queuedFor = job.data?.[GENERATION_KEY];
+  if (job.shard !== undefined || typeof queuedFor !== "number") {
+    return false;
+  }
+  const build = await new BuildModel(options.db, options.db.tables, options.logger).get(
+    job.buildId,
+  );
+  return build === null || (build.captureGeneration ?? 0) !== queuedFor;
 }
 
 /** The `capture` handler: runs `createDispatchJob`'s runner, cancels through `runner.cancel`. */
@@ -79,17 +103,57 @@ export function createCaptureHandler(options: CaptureHandlerOptions): KindHandle
   dispatchFor(fallbackRetries);
   return {
     accepts: isValidCaptureJob,
+    superseded: async (job) => await isSuperseded(options, job),
     run: async (job, context) => {
-      await dispatchFor(retriesOf(job, fallbackRetries))(toDispatchJob(job), {
-        touch: () => {
-          context.touch();
-        },
-      });
+      // The consumer checked before it claimed a slot; a job that waited for a forked child's slot,
+      // or was pushed to it again after a crash, is checked again right before it writes.
+      if (await isSuperseded(options, job)) {
+        options.logger.info(
+          { buildId: job.buildId, jobId: job.jobId },
+          "superseded capture skipped",
+        );
+        return;
+      }
+      await dispatchFor(retriesOf(job, fallbackRetries))(
+        toDispatchJob(job),
+        abortableLease(
+          {
+            touch: () => {
+              context.touch();
+            },
+          },
+          context.signal,
+        ),
+      );
+    },
+    deadlineExceeded: async (job, seconds) => {
+      await recordDeadline(options, job, seconds);
     },
     cancel: async (job) => {
       await options.runner.cancel(job.buildId, job.shard);
     },
   };
+}
+
+/** Put `job deadline exceeded (<n>s)` on the log of the build's open attempt, if it has one. */
+async function recordDeadline(
+  options: CaptureHandlerOptions,
+  job: ConsumerJob,
+  seconds: number,
+): Promise<void> {
+  const tables = options.db.tables;
+  const attempts = await new CaptureAttemptModel(options.db, tables).listByBuild(job.buildId);
+  const open = attempts.findLast((a) => a.status === "queued" || a.status === "running");
+  if (open === undefined) {
+    return;
+  }
+  await new CaptureLogModel(options.db, tables).append(
+    open.projectId,
+    job.buildId,
+    open.id,
+    "error",
+    `job deadline exceeded (${String(seconds)}s)`,
+  );
 }
 
 function toDispatchJob(job: ConsumerJob): CaptureDispatchJob {
@@ -146,6 +210,7 @@ export function captureDispatchDeps(
     buildState: options.buildState ?? inlineBuildState(options, publicOrigin),
     logger: options.logger,
     maxRetries,
+    ...(options.onShardRepeated === undefined ? {} : { onShardRepeated: options.onShardRepeated }),
   };
 }
 

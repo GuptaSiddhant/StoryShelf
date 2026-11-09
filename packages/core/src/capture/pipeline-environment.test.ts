@@ -58,13 +58,16 @@ function failingLifecycle(error: Error): BuildReferenceLifecycle {
     replaceFencedReferences: async () => {
       throw error;
     },
-    replaceReferences: async () => {
-      throw error;
-    },
-    replaceManyReferences: async () => {
-      throw error;
-    },
     claimDeletion: async () => "missing",
+    listDeleting: async () => [],
+    releaseBuildContent: async () => "not-deleting",
+    markStorageDeleted: async () => "not-deleting",
+    completeDeletion: async () => "not-deleting",
+    recordContentUses: async () => [],
+    claimContent: async () => [],
+    holdsContentClaim: async () => false,
+    abandonContentClaim: async () => {},
+    finishContentCollection: async () => {},
   };
 }
 

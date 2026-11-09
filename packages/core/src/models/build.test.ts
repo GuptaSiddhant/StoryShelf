@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
+import type { Build } from "../schema/build.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
@@ -196,6 +197,53 @@ describe("BuildModel latestApprovedDefault", () => {
   });
 });
 
+/** A feature branch with one build per `[sha, status]`, created one day apart in order. */
+async function branchWith(statuses: [string, Build["status"]][]) {
+  const { model, project, db } = await setupApprovedDefault();
+  const builds = await Promise.all(
+    statuses.map(
+      async ([sha]) => await model.create(project.id, { gitSha: sha, gitBranch: "feature/x" }),
+    ),
+  );
+  await Promise.all(
+    builds.map(async (build, index) => {
+      const stamp = `2026-01-0${String(index + 1)}T00:00:00.000Z`;
+      await db.update(db.tables.builds, build.id, { createdAt: stamp });
+      await model.update(build.id, { status: statuses[index]?.[1] ?? "pending" });
+    }),
+  );
+  return { model, project };
+}
+
+describe("BuildModel newestComparableBuild", () => {
+  it("returns the newest approved build, passing over every other status", async () => {
+    const { model, project } = await branchWith([
+      ["a", "approved"],
+      ["b", "rejected"],
+      ["c", "failed"],
+      ["d", "cancelled"],
+      ["e", "reviewing"],
+    ]);
+    expect((await model.newestComparableBuild(project.id, "feature/x", "z"))?.gitSha).toBe("a");
+  });
+
+  it("skips the build's own commit", async () => {
+    const { model, project } = await branchWith([
+      ["a", "approved"],
+      ["b", "approved"],
+    ]);
+    expect((await model.newestComparableBuild(project.id, "feature/x", "b"))?.gitSha).toBe("a");
+  });
+
+  it("is null without an approved build, and ignores other branches", async () => {
+    const { model, project } = await branchWith([["a", "reviewing"]]);
+    expect(await model.newestComparableBuild(project.id, "feature/x", "z")).toBeNull();
+    const other = await model.create(project.id, { gitSha: "m", gitBranch: "main" });
+    await model.update(other.id, { status: "approved" });
+    expect(await model.newestComparableBuild(project.id, "feature/x", "z")).toBeNull();
+  });
+});
+
 async function cancelled() {
   const { db } = makeDatabase();
   const model = new BuildModel(db, buildTables(db));
@@ -288,11 +336,11 @@ describe("BuildModel: a cancelled build is terminal", () => {
 
     await model.resetStatus(id, "pending");
     expect((await model.get(id))?.captureGeneration).toBe(1);
-    expect(await model.stampCaptureJob(id, "OLD", 0)).toBe("stale");
+    expect(await model.stampCaptureJob(id, "OLD", 0)).toEqual({ result: "stale" });
     expect((await model.get(id))?.captureJobId ?? null).toBeNull();
-    expect(await model.stampCaptureJob(id, "NEW", 1)).toBe("stamped");
+    expect(await model.stampCaptureJob(id, "NEW", 1)).toEqual({ result: "stamped", generation: 2 });
     expect((await model.get(id))?.captureJobId).toBe("NEW");
-    expect(await model.stampCaptureJob("missing", "J", 0)).toBe("ignored");
+    expect(await model.stampCaptureJob("missing", "J", 0)).toEqual({ result: "ignored" });
   });
 
   it("retries a reset that lost the generation race to another reset", async () => {
@@ -422,6 +470,29 @@ describe("BuildModel: a cancelled build is terminal", () => {
     await model.stampCaptureJob(id, "J1", 0);
 
     expect((await model.get(id))?.captureJobId ?? null).toBeNull();
+  });
+
+  it("sets a status only at the run generation it was read at, and never on a cancelled build", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const project = await new ProjectModel(db, projectTables(db)).create({
+      name: "Test",
+      gitRepository: "owner/repo",
+    });
+    const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    await model.setStatus(id, "capturing");
+
+    await model.resetStatus(id, "pending");
+    const old = await model.setStatusAtGeneration(id, "approved", 0);
+    expect(old.applied).toBe(false);
+    expect((await model.get(id))?.status).toBe("pending");
+
+    expect((await model.setStatusAtGeneration(id, "approved", 1)).applied).toBe(true);
+    expect((await model.get(id))?.status).toBe("approved");
+
+    await model.setStatus(id, "cancelled");
+    expect((await model.setStatusAtGeneration(id, "approved", 1)).applied).toBe(false);
+    expect((await model.get(id))?.status).toBe("cancelled");
   });
 
   it("fails a build only for the job that owns it", async () => {

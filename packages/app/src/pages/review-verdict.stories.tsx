@@ -1,6 +1,6 @@
 import type { Meta } from "@storybook/html-vite";
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
-import type { BuildReview } from "@storyshelf/core/schema";
+import type { Build, BuildReview } from "@storyshelf/core/schema";
 import { jsxStory } from "../../.storybook/render.tsx";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { BUILD_REVIEW, builds, project } from "../stories-fixtures/dataset.ts";
@@ -35,11 +35,16 @@ const NAMES = new Map([
 ]);
 
 /** The verdict card of a build under review, with the given verdicts and assigned reviewers. */
-function card(latest: BuildReview[], assigned: ReviewSectionData["assigned"]): ReviewSectionData {
+function card(
+  latest: BuildReview[],
+  assigned: ReviewSectionData["assigned"],
+  status: Build["status"] = build.status,
+  overrides: Partial<ReviewSectionData> = {},
+): ReviewSectionData {
   return {
     project,
-    build,
-    state: { status: build.status, approvalsRequired: 1, approvals: 0, latest, history: latest },
+    build: { ...build, status },
+    state: { status, approvalsRequired: 1, approvals: 0, latest, history: latest },
     changeset: {
       baseline: null,
       changeset: { added: [], removed: [], changed: [], unchanged: 0 },
@@ -55,6 +60,7 @@ function card(latest: BuildReview[], assigned: ReviewSectionData["assigned"]): R
     publishing: "success",
     canComment: true,
     canVerdict: true,
+    ...overrides,
   };
 }
 
@@ -84,3 +90,23 @@ export const AssignedMixed = jsxStory(() => (
     )}
   />
 ));
+
+/** A cancelled build has nothing to review: one line, and a retry for a viewer who may retry (capture on). */
+export const CancelledBuild = jsxStory(() => (
+  <VerdictCard data={card([], [], "cancelled", { testing: true })} />
+));
+
+/** The same, for a viewer who may not retry (a reader below developer): the line alone. */
+export const CancelledBuildNoRetry = jsxStory(() => (
+  <VerdictCard
+    data={card([], [], "cancelled", { testing: true, canComment: false, canVerdict: false })}
+  />
+));
+
+/** A failed capture has nothing to review: one line, and the retry. */
+export const FailedBuild = jsxStory(() => (
+  <VerdictCard data={card([], [], "failed", { testing: true })} />
+));
+
+/** A failed build on an instance that only hosts Storybooks (no capture): the line, no retry to offer. */
+export const FailedBuildHostingOnly = jsxStory(() => <VerdictCard data={card([], [], "failed")} />);

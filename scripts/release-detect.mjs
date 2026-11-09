@@ -5,12 +5,16 @@
  * the repository's tags, changes nothing, and emits `channel`, `version`, `tag` and `sha`
  * (stdout + GITHUB_OUTPUT when present), plus `sha`, the commit the stable jobs publish and tag.
  *
- * - `stable`: a push to `main` whose shared version is not a prerelease and has no `v<version>` tag
- *   yet (a release pull request was just merged), or a `workflow_dispatch` re-run of that version.
- * - `next`: any other push to `main` while changesets are pending.
+ * - `stable`: a push to `main` (or the daily run) whose shared version is not a prerelease and has
+ *   no `v<version>` tag yet (a release pull request was just merged), or a `workflow_dispatch`
+ *   re-run of that version.
+ * - `next`: the daily `schedule` run while changesets are pending and a package changed since the
+ *   last `next` build (debounced: a quiet day publishes nothing), or a `workflow_dispatch` with
+ *   channel `next` while changesets are pending (immediately, changed or not). A plain push to
+ *   `main` never publishes `next`.
  * - `none`: nothing to publish.
  *
- * Usage: node scripts/release-detect.mjs <event> [<dispatch-version>]
+ * Usage: node scripts/release-detect.mjs <event> [<dispatch-version>] [<dispatch-channel>]
  */
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
@@ -19,29 +23,76 @@ import { listPending } from "./changeset-lib.mjs";
 
 const root = join(import.meta.dirname, "..");
 
+/** What a `next` build is made from: a change outside these paths publishes nothing new. */
+const NEXT_INPUTS = ["packages", ".changeset", "package.json", "nub.lock"];
+
 /**
  * The channel for one run.
  *
- * @param {{ event: string, version: string, tagExists: boolean, pending: number, requested?: string }} state
- *   `requested` is the version a `workflow_dispatch` asked to publish.
+ * @param {{ event: string, version: string, tagExists: boolean, pending: number, requested?: string,
+ *   requestedChannel?: string, changedSinceNext?: boolean }} state
+ *   `requested` is the version a stable `workflow_dispatch` asked to publish; `requestedChannel` is
+ *   the dispatch's channel (`stable` by default, or `next`); `changedSinceNext` says whether a
+ *   package changed since the last `next` build (read only for the daily run).
  * @returns {{ channel: "stable" | "next" | "none" } | { error: string }} The channel, or why the run is refused.
  */
-export function chooseChannel({ event, version, tagExists, pending, requested }) {
-  const prerelease = version.includes("-");
-  if (event === "workflow_dispatch") {
-    if (requested !== version) {
-      return { error: `asked to publish ${requested}, but main is at ${version}` };
-    }
-    // A re-run publishes a stable version that is already on main; skipping what is on the
-    // registries and tolerating an existing tag make it safe to repeat.
-    return prerelease
-      ? { error: `${version} is a prerelease: only a stable version is published by hand` }
-      : { channel: "stable" };
+export function chooseChannel(state) {
+  if (state.event === "workflow_dispatch") {
+    return dispatchChannel(state);
   }
-  if (!prerelease && !tagExists) {
+  const { event, version, tagExists, pending, changedSinceNext } = state;
+  if (!version.includes("-") && !tagExists) {
     return { channel: "stable" };
   }
-  return { channel: pending > 0 ? "next" : "none" };
+  const due = event === "schedule" && pending > 0 && changedSinceNext === true;
+  return { channel: due ? "next" : "none" };
+}
+
+/** A manual run: publish `next` now, or re-run the stable path for the version on `main`. */
+function dispatchChannel({ version, pending, requested, requestedChannel }) {
+  if (requestedChannel === "next") {
+    return pending > 0
+      ? { channel: "next" }
+      : { error: "no changeset is pending, so there is nothing to publish under next" };
+  }
+  if (requested !== version) {
+    return { error: `asked to publish ${requested}, but main is at ${version}` };
+  }
+  // A re-run publishes a stable version that is already on main; skipping what is on the
+  // registries and tolerating an existing tag make it safe to repeat.
+  return version.includes("-")
+    ? { error: `${version} is a prerelease: only a stable version is published by hand` }
+    : { channel: "stable" };
+}
+
+/**
+ * The commit a `next` version was built from: `<version>-next-<short sha>`.
+ *
+ * @param {string} nextVersion A published `next` version, or "".
+ * @returns {string | undefined} The short sha, or undefined when the version is not a snapshot.
+ */
+export function nextShaOf(nextVersion) {
+  return /-next-(?<sha>[0-9a-f]{7,40})$/u.exec(nextVersion.trim())?.groups?.["sha"];
+}
+
+/**
+ * Whether anything a `next` build is made from changed since the last one. Anything it cannot
+ * establish (no `next` yet, npm unreachable, the commit no longer in history) counts as changed:
+ * publishing once too often is better than silently never publishing.
+ */
+function changedSinceLastNext() {
+  try {
+    const published = execFileSync("npm", ["view", "@storyshelf/core@next", "version"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    const sha = nextShaOf(published);
+    if (sha === undefined) return true;
+    execFileSync("git", ["diff", "--quiet", sha, "HEAD", "--", ...NEXT_INPUTS], { cwd: root });
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 function emit(key, value) {
@@ -82,24 +133,28 @@ function tagExistsFor(tag) {
 }
 
 /** The facts about this checkout that decide the channel. */
-function readState(event, requested) {
+function readState(event, requested, requestedChannel) {
   const { version } = JSON.parse(readFileSync(join(root, "packages/core/package.json"), "utf8"));
   return {
     event,
     requested,
+    requestedChannel,
     version,
     tagExists: tagExistsFor(`v${version}`),
     pending: listPending(join(root, ".changeset")).length,
+    changedSinceNext: event === "schedule" ? changedSinceLastNext() : undefined,
   };
 }
 
 function main() {
-  const [event, requested] = process.argv.slice(2);
+  const [event, requested, requestedChannel] = process.argv.slice(2);
   if (!event) {
-    console.error("usage: node scripts/release-detect.mjs <event> [<dispatch-version>]");
+    console.error(
+      "usage: node scripts/release-detect.mjs <event> [<dispatch-version>] [<dispatch-channel>]",
+    );
     process.exit(1);
   }
-  const state = readState(event, requested);
+  const state = readState(event, requested, requestedChannel);
   const result = chooseChannel(state);
   if ("error" in result) {
     console.error(`::error::${result.error}`);

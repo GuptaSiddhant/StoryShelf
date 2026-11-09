@@ -2,8 +2,6 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { BaselineReference } from "../routers/baseline-reference.ts";
 import { Alert, CompareStage, Segmented } from "../ui/components.tsx";
 import type { DesignSource } from "./build-diff-model.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HTML or a promise */
 export function BaselineReferenceNotice(props: {
   reference: BaselineReference;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {

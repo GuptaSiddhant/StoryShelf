@@ -136,6 +136,12 @@ export interface ShelfConfig {
    * `<os.tmpdir()>/storyshelf`; publishing and capture extract there.
    */
   scratchDir?: string;
+  /**
+   * Days after which the daily sweep purges terminal builds (and idle pending ones). Unset (the
+   * default) schedules no build purge, so an upgrade never starts deleting builds; a manual
+   * `POST /api/v1/admin/purge` without a `ttlDays` uses this value, else 30. Needs a database with safe build
+   * retention (ADR 0039).
+   */
   purgeTtlDays?: number;
   /** Branch baseline TTL, days; null disables branch GC (default 30). */
   branchTtlDays?: number | null;
@@ -342,6 +348,13 @@ export interface ShelfTestingOptions {
    */
   leaseSeconds?: number;
   /**
+   * Longest one job (capture, publish or notify) may run, in seconds (default 7200). Past it the
+   * job's lease is no longer renewed and its work is aborted; the lease then runs out and the job
+   * is redelivered or, on its last attempt, failed (a capture build ends `failed`, never
+   * `cancelled`). A hung phase can no longer hold a job, and its slot, forever.
+   */
+  maxJobSeconds?: number;
+  /**
    * Module run in a forked capture child (it calls `runCaptureChild` from `@storyshelf/core/capture`).
    * The app consumes the queue and pushes each job to the child over IPC. Needs `runner`, which
    * serves as the in-process fallback.
@@ -450,5 +463,9 @@ export interface ObservabilityHandle {
   /** Flush exporters and release SDK resources. Must be idempotent. */
   shutdown(): Promise<void>;
 }
-export { DEFAULT_SCRATCH_DIR, resolveShelfOptions } from "./options.ts";
+export {
+  DEFAULT_SCRATCH_DIR,
+  resolveShelfOptions,
+  sequentialTransactionsWarning,
+} from "./options.ts";
 export { ALLOW_SERVERLESS_ENV, assertServerless, isServerlessHost } from "./serverless.ts";

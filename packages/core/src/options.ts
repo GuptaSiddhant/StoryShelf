@@ -42,6 +42,22 @@ function assertTestingBackable(options: ShelfOptions): void {
   }
 }
 
+/**
+ * A warning to log when `testing` runs on a database whose transactions are only sequential (Neon
+ * over HTTP): the queue then ends a single-flight job and starts its successor in two steps, so a
+ * crash between them can lose a queued rerun. `undefined` when there is nothing to say.
+ */
+export function sequentialTransactionsWarning(options: ShelfOptions): string | undefined {
+  if (options.testing === undefined || options.database.metadata.transactions !== "sequential") {
+    return undefined;
+  }
+  return (
+    `The ${options.database.metadata.name} database runs transactions one statement at a time, ` +
+    `so a crash while a capture job ends can lose a queued rerun of its build. Use a database ` +
+    `with real transactions (Postgres over a socket, Turso, MySQL, SQLite on a volume) for testing.`
+  );
+}
+
 function assertTestingProcess(testing: ShelfOptions["testing"]): void {
   if (testing !== undefined && testing.runner === undefined) {
     throw new Error("testing requires testing.runner");
@@ -61,6 +77,7 @@ function assertTestingNumbers(testing: ShelfOptions["testing"]): void {
   assertConcurrency(testing?.concurrency);
   assertRetries(testing?.retries);
   assertLeaseSeconds(testing?.leaseSeconds);
+  assertMaxJobSeconds(testing?.maxJobSeconds);
   assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit);
 }
 
@@ -88,6 +105,24 @@ function assertLeaseSeconds(seconds: number | undefined): void {
     );
   }
 }
+
+/** A positive number of seconds; `0` would abandon every job at once. */
+function assertMaxJobSeconds(seconds: number | undefined): void {
+  if (seconds !== undefined && (!Number.isFinite(seconds) || seconds <= 0)) {
+    throw new Error(
+      `testing.maxJobSeconds must be a positive number of seconds, got ${String(seconds)}`,
+    );
+  }
+  // Node runs a timer longer than 2^31 - 1 ms after 1 ms, which would abandon every job at once.
+  if (seconds !== undefined && seconds * 1000 > MAX_TIMER_MS) {
+    throw new Error(
+      `testing.maxJobSeconds must be at most ${String(Math.floor(MAX_TIMER_MS / 1000))} seconds (about 24 days), got ${String(seconds)}`,
+    );
+  }
+}
+
+/** The longest delay Node's timers keep (2^31 - 1 ms). */
+const MAX_TIMER_MS = 2_147_483_647;
 
 /** `0` would deadlock the consumer. */
 function assertConcurrency(concurrency: number | undefined): void {

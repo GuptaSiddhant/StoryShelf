@@ -1,0 +1,42 @@
+name: Changeset
+
+# A pull request that changes the source of a package (or a published manifest) must add a
+# changeset, so the change reaches the `next` build and the changelog (ADR 0043). The `no-release`
+# label opts out for changes that ship nothing.
+#
+# This is its own workflow so that adding or removing a label re-runs only this cheap check, not
+# the whole CI suite (ci.yml no longer listens to label events). Require the `changeset` check in
+# branch protection next to `ci`.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches: ["main", "epic/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: changeset-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changeset:
+    name: changeset
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The PR's merge commit and its first parent (the base branch tip).
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Test the changeset helpers
+        run: node --test scripts/changeset-lib.test.mjs scripts/release-detect.test.mjs
+
+      - name: Require a changeset for shipped changes
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: node scripts/changeset-check.mjs --labels "$LABELS" --head-ref "$HEAD_REF"

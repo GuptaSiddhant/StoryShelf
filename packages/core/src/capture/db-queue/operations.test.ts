@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BuildModel } from "../../models/build.ts";
 import { ProjectModel } from "../../models/project.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
+import { decodePayload } from "./codec.ts";
 import { createDatabaseCaptureQueue } from "./index.ts";
 
 function queue() {
@@ -41,7 +42,7 @@ describe("database queue operations", () => {
     const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
     const builds = new BuildModel(db);
     const build = await builds.create(project.id, { gitSha: "abc", gitBranch: "main" });
-    // Hold the first enqueue between inserting its job row and stamping the build.
+    // Hold the first enqueue between claiming the build and inserting its job row.
     const reached = gate();
     const release = gate();
     let held = false;
@@ -69,8 +70,29 @@ describe("database queue operations", () => {
 
     expect((await builds.get(build.id))?.captureJobId).toBe(newer);
     const entries = await q.recent(10);
-    expect(entries.filter((entry) => entry.status === "cancelled")).toHaveLength(1);
-    expect(entries.filter((entry) => entry.status === "queued")).toHaveLength(1);
+    // The overtaken enqueue's job is queued, but it belongs to an older generation than the build:
+    // its worker ends it before running (see capture-handler's `superseded`).
+    expect(entries).toHaveLength(2);
+    const rows = await db.list(db.tables.captureJobs);
+    const generations = rows.map((row) => decodePayload(row.payload).data?.["generation"]);
+    expect(generations).toContain(1);
+    expect(generations).toContain(3);
+    expect((await builds.get(build.id))?.captureGeneration).toBe(3);
+  });
+
+  it("lets only one of two concurrent enqueues of a build claim it", async () => {
+    const { db } = makeDatabase();
+    const project = await new ProjectModel(db).create({ name: "P", gitRepository: "o/r" });
+    const builds = new BuildModel(db);
+    const build = await builds.create(project.id, { gitSha: "abc", gitBranch: "main" });
+    const q = createDatabaseCaptureQueue(db, { kinds: ["capture"] });
+
+    await Promise.all([q.enqueue({ buildId: build.id }), q.enqueue({ buildId: build.id })]);
+
+    const jobs = await db.list(db.tables.captureJobs);
+    expect(jobs).toHaveLength(1);
+    expect((await builds.get(build.id))?.captureJobId).toBe(jobs[0]?.jobId);
+    expect((await builds.get(build.id))?.captureGeneration).toBe(1);
   });
 
   it("stores request id, trace and shard on the job row", async () => {
@@ -81,9 +103,12 @@ describe("database queue operations", () => {
   });
 
   it("reports the build's own job, not its shards, as its status", async () => {
-    const { queue: q } = queue();
+    const { db, queue: q } = queue();
     await q.enqueue({ buildId: "b1" });
     await q.enqueue({ buildId: "b1", shard: "s1" });
+    // The build is missing, so nothing was claimed and the own job carries no generation.
+    const own = (await db.list(db.tables.captureJobs)).find((row) => row.shardId === null);
+    expect(decodePayload(own?.payload ?? null).data?.["generation"]).toBeUndefined();
     expect(await q.status("b1")).toMatchObject({ buildId: "b1", status: "queued" });
     expect((await q.status("b1"))?.shard).toBeUndefined();
     const shards = (await q.active()).map((entry) => entry.shard ?? "own");
@@ -103,6 +128,36 @@ describe("database queue operations", () => {
     const notify = [first, second].find((job) => job?.kind === "notify");
     expect(notify).toMatchObject({ maxAttempts: 5, data: { channelId: "c" } });
     expect([first, second].find((job) => job?.kind === "capture")?.maxAttempts).toBe(3);
+  });
+
+  it("keeps review-request jobs out of the views as well, and polls them with their data", async () => {
+    const { db } = makeDatabase();
+    const q = createDatabaseCaptureQueue(db, {
+      kinds: ["capture", "notify", "review-request"],
+      retries: 2,
+    });
+    await q.enqueueJob({ kind: "capture", buildId: "b1" });
+    await q.enqueueJob({
+      kind: "review-request",
+      buildId: "b1",
+      maxAttempts: 5,
+      data: { eventId: "b1:0", target: { kind: "channel", channelId: "c" } },
+    });
+    expect((await q.active()).map((entry) => entry.buildId)).toEqual(["b1"]);
+    expect(await q.recent(10)).toHaveLength(1);
+    expect(await q.status("b1")).toMatchObject({ status: "queued" });
+    const polled = [await q.poll(), await q.poll()];
+    expect(polled.find((job) => job?.kind === "review-request")).toMatchObject({
+      maxAttempts: 5,
+      data: { eventId: "b1:0", target: { kind: "channel", channelId: "c" } },
+    });
+  });
+
+  it("shows review-request jobs when they are the only kind polled", async () => {
+    const { db } = makeDatabase();
+    const q = createDatabaseCaptureQueue(db, { kinds: ["review-request"] });
+    await q.enqueueJob({ kind: "review-request", buildId: "b1" });
+    expect(await q.active()).toHaveLength(1);
   });
 
   it("shows notify jobs when they are the only kind polled", async () => {

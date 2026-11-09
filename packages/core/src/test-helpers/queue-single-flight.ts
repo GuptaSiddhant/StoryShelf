@@ -82,20 +82,29 @@ function enqueue(
 
 /**
  * Poll until the job of `buildId` comes (or the queue is empty). On a database shared with other
- * suites, leftover jobs of other builds are acked away, as the multi-instance suite does.
+ * suites, leftover jobs of other builds are acked away, as the multi-instance suite does. Instances
+ * polling together can lose every claim try to a faster one while leftovers are ahead of the job, so
+ * an empty answer is asked again a few times before it counts.
  */
 async function pollFor(queue: DatabaseCaptureQueue, buildId: string): Promise<DatabaseJob | null> {
-  for (let tries = 0; tries < 50; tries += 1) {
+  let empty = 0;
+  for (let tries = 0; tries < 50 && empty < EMPTY_POLLS; tries += 1) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- sequential polls are the point
     const job = await queue.poll();
-    if (job === null || job.buildId === buildId) {
+    if (job === null) {
+      empty += 1;
+    } else if (job.buildId === buildId) {
       return job;
+    } else {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- clear a leftover of another case
+      await queue.ack(job);
     }
-    // oxlint-disable-next-line eslint/no-await-in-loop -- clear a leftover of another case
-    await queue.ack(job);
   }
   return null;
 }
+
+/** Empty answers in a row that count as an empty queue. */
+const EMPTY_POLLS = 3;
 
 async function claimed(queues: DatabaseCaptureQueue[], buildId: string): Promise<DatabaseJob[]> {
   const jobs = await Promise.all(queues.map(async (queue) => await pollFor(queue, buildId)));

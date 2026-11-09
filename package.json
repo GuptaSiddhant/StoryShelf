@@ -100,7 +100,7 @@
   "devEngines": {
     "packageManager": {
       "name": "nub",
-      "version": "^0.9.5",
+      "version": "^0.10.0",
       "onFail": "ignore"
     },
     "runtime": {
@@ -110,6 +110,7 @@
     }
   },
   "allowScripts": {
-    "better-sqlite3": true
+    "better-sqlite3": true,
+    "protobufjs": false
   }
 }

@@ -1,4 +1,5 @@
 /** GitHub: the required status checks of a branch protection rule (REST API, admin token). */
+import { appliedRules, compareRules, type RulesCtx } from "./protect-github-rules.ts";
 import {
   HostError,
   hostJson,
@@ -36,6 +37,8 @@ function manualSteps(repo: string, target: ProtectionTarget): string[] {
     '2. Tick "Require status checks to pass before merging".',
     "3. Search for each check above and add it (it appears once a build has posted it).",
     "4. Save. Admin token scopes: repo (classic) or Administration: write (fine-grained).",
+    "",
+    `If the repository uses rulesets, open https://github.com/${repo}/settings/rules instead and add the checks to a ruleset that targets ${target.branch}.`,
   ];
 }
 
@@ -53,7 +56,42 @@ function headers(token: string): Record<string, string> {
   };
 }
 
+/**
+ * Rulesets first: when any ruleset applies to the branch, the check is confirmed or added through
+ * the rulesets API (unless classic protection already requires it, since both enforce together).
+ * With no ruleset on the branch, or an API without rulesets, the classic rule is used.
+ */
 async function inspect(ctx: Ctx, target: ProtectionTarget): Promise<ProtectionResult> {
+  const rules = await rulesOf(ctx, target.branch);
+  if (rules.length === 0) {
+    return { ...(await inspectClassic(ctx, target)), mechanism: "classic" };
+  }
+  const viaRulesets = compareRules(rulesCtx(ctx), rules, target);
+  if (viaRulesets.satisfied) {
+    return viaRulesets;
+  }
+  // Classic protection may satisfy it instead; if it cannot be read, the rulesets answer stands.
+  const classic = await inspectClassic(ctx, target).catch(() => null);
+  return classic?.satisfied === true ? { ...classic, mechanism: "classic" } : viaRulesets;
+}
+
+function rulesCtx(ctx: Ctx): RulesCtx {
+  return { repo: ctx.repo, fetchImpl: ctx.fetchImpl, headers: headers(ctx.token) };
+}
+
+/** The rules that apply to the branch; none when the host has no rulesets API (a 404). */
+async function rulesOf(ctx: Ctx, branch: string): ReturnType<typeof appliedRules> {
+  try {
+    return await appliedRules(rulesCtx(ctx), branch);
+  } catch (error) {
+    if (error instanceof HostError && error.status === 404) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+async function inspectClassic(ctx: Ctx, target: ProtectionTarget): Promise<ProtectionResult> {
   const base = `${API}/repos/${ctx.repo}/branches/${encodeURIComponent(target.branch)}/protection`;
   const existing = await readChecks(ctx, base);
   if (existing === "unprotected") {

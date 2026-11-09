@@ -11,7 +11,7 @@ timeline
     section Build Upload
     Day 0 : Build uploaded — capture starts
     Day 1 : reviewing / approved
-    section purgeTtlDays = 30
+    section purgeTtlDays (opt-in, e.g. 30)
     Day 30 : Build purged — screenshots, diffs, metadata gone
     section Baselines (outlive builds)
     Day 30+ : Baselines persist
@@ -21,13 +21,13 @@ timeline
 
 ## What survives purge
 
-| What                                                           | Retention key                                     | Survives?                                  |
-| -------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------ |
-| Build metadata, screenshots, diff overlays                     | `purgeTtlDays` (default 30)                       | No — deleted together in one transaction   |
-| Storybook `content/<hash>` (shared, `content_refs` `refCount`) | `content_refs` 7-day grace (`refCount 0` kept 7d) | Yes — shared, refCounted, GC’d after grace |
-| Branch baselines (`baselines/{branch}/**`)                     | `branchTtlDays` (default 30, `null` = disabled)   | Until branch GC                            |
-| Default-branch baselines (`baselines/main/**`)                 | Never                                             | Yes                                        |
-| Builds bearing `persistent` label (git tags → `v1.2.3`)        | Never                                             | Yes, and their snapshots as baselines      |
+| What                                                                                             | Retention key                                      | Survives?                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build metadata, screenshots, diff overlays                                                       | `purgeTtlDays` (opt-in; manual purge: 30 if unset) | No — files removed in recorded, resumable steps, then the rows in one transaction                                                                             |
+| Storybook `content/<hash>` (shared, one `content_uses` row for each build and content-hash pair) | 7-day grace after the last build releases it       | Yes — shared, collected after grace unless a live build's manifest names it (only where the database supports the build lifecycle; otherwise never collected) |
+| Branch baselines (`baselines/{branch}/**`)                                                       | `branchTtlDays` (default 30, `null` = disabled)    | Until branch GC                                                                                                                                               |
+| Default-branch baselines (`baselines/main/**`)                                                   | Never                                              | Yes                                                                                                                                                           |
+| Builds bearing `persistent` label (git tags → `v1.2.3`)                                          | Never                                              | Yes, and their snapshots as baselines                                                                                                                         |
 
 Retention keeps **the most recent build per branch** even past TTL — it’s the branch’s “current state” and powers label/PR links.
 
@@ -46,9 +46,10 @@ Turning a project's review off accepts its pending builds that no capture worked
 
 ## Triggers
 
-- **Scheduled:** one in-server timer, the daily branch GC. Build purge is not scheduled.
-- **With testing enabled**, branch GC is skipped and admin purge answers `503` (builds are retained) until lifecycle-aware retention lands; hosting-only deployments are unaffected.
-- **Manual:** `storyshelf purge --url $SHELF_URL --token $STORYSHELF_ADMIN_TOKEN` or `POST /api/v1/admin/purge` (admin) — runs both sweeps and returns `{ removedBuilds, removedBranches, removedBaselines }`.
+- **Scheduled:** one in-server timer runs the daily branch GC and, **only if you set `purgeTtlDays`**, the build purge too (there is no default, so upgrading never starts deleting builds). The scheduled purge needs retention to be active on the database (SQLite or Postgres via `createPostgresDatabase` today) and does nothing otherwise. The built-in servers read `PURGE_TTL_DAYS`; in code, set `config.purgeTtlDays`.
+- **With testing enabled**, retention works on **SQLite** (a database file) and on **Postgres through the default `postgres.js` preset** (`createPostgresDatabase`): the server prepares the baseline pins at boot, and then purge and branch GC run, keeping any build a baseline still needs. Upgrade every server instance that shares a Postgres database before relying on it. The other Postgres presets (`./neon`, `pg`, `./neon-http`, PGlite) and **MySQL** deployments with testing do not purge yet: branch GC is skipped and admin purge answers `503` (builds are retained, and storage grows) until they gain the same support. Hosting-only deployments are unaffected.
+- **Retention paused:** if a baseline's recorded source build is being deleted or belongs to another project, SQLite and Postgres keep retention off and the **System** page says "Retention is paused", naming the baseline and the build. Remove or repoint that baseline and restart the server; retention turns on at the next boot.
+- **Manual:** `storyshelf purge --url $SHELF_URL --token $STORYSHELF_ADMIN_TOKEN` or `POST /api/v1/admin/purge` (admin) — runs both sweeps and returns `{ removedBuilds, removedBranches, removedBaselines }`, plus `protected` (builds kept because a baseline still needs them) and `resumed` (builds an earlier interrupted run had started removing) on a database with testing retention.
 
 Configure via `ShelfConfig` or env:
 

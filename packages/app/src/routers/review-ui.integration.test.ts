@@ -239,7 +239,7 @@ describe("the review gate", () => {
     );
     for (const { key, status, body } of responses) {
       expect(status, key).toBe(404);
-      expect(body).toEqual({ error: REVIEW_DISABLED_MESSAGE });
+      expect(body).toEqual({ error: { message: REVIEW_DISABLED_MESSAGE } });
     }
   });
 

@@ -3,6 +3,11 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrations } from "./migrate.ts";
+import {
+  activateRetention,
+  attachRetention,
+  type RetentionActivation,
+} from "./retention-activation.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -39,6 +44,26 @@ export interface PostgresDatabaseOptions {
   client?: ReturnType<typeof postgres>;
 }
 
+/** The caller's client, or a new one from the connection string (the options must give one of them). */
+function openClient(options: PostgresDatabaseOptions): ReturnType<typeof postgres> {
+  if (options.client) {
+    return options.client;
+  }
+  const connectionString = options.connectionString ?? options.url;
+  if (!connectionString) {
+    throw new Error(
+      "createPostgresDatabase: provide `url` (or `connectionString`) or a preconfigured `client`",
+    );
+  }
+  return postgres(connectionString, {
+    ssl: options.ssl as never,
+    prepare: options.prepare,
+    max: options.max,
+    idle_timeout: options.idleTimeout,
+    connect_timeout: options.connectTimeout,
+  });
+}
+
 /**
  * Create a Postgres-backed DatabaseAdapter using postgres.js and Drizzle ORM.
  *
@@ -47,27 +72,13 @@ export interface PostgresDatabaseOptions {
  * For provider-specific TLS and pooling notes, see the deployment guide.
  */
 export function createPostgresDatabase(options: PostgresDatabaseOptions): DatabaseAdapter {
-  const connectionString = options.connectionString ?? options.url;
-  if (!options.client && !connectionString) {
-    throw new Error(
-      "createPostgresDatabase: provide `url` (or `connectionString`) or a preconfigured `client`",
-    );
-  }
-
-  const client =
-    options.client ??
-    postgres(connectionString as string, {
-      ssl: options.ssl as never,
-      prepare: options.prepare,
-      max: options.max,
-      idle_timeout: options.idleTimeout,
-      connect_timeout: options.connectTimeout,
-    });
+  const client = openClient(options);
 
   // oxlint-disable-next-line typescript/no-unsafe-argument -- postgres instance may be from isolated store vs workspace
   const db = drizzle(client as never, { schema });
+  const retention: RetentionActivation = {};
 
-  return createDrizzlePgAdapter(db, {
+  const adapter = createDrizzlePgAdapter(db, {
     metadata: {
       name: "Postgres",
       version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
@@ -75,9 +86,11 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       kind: "postgres",
       category: "database",
     },
-    tables: schema as unknown as DatabaseAdapter["tables"],
-    migrate: async () => {
-      await runMigrations(async (sql: string) => await client.unsafe(sql));
+    tables: schema,
+    migrate: async ({ logger }) => {
+      await runMigrations(async (sql: string) => await client.unsafe(sql), logger);
+      // postgres.js opens a real session per transaction, so row locks hold between processes.
+      await activateRetention(db, retention);
     },
     close: async () => {
       await client.end();
@@ -86,4 +99,5 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       await client.unsafe("SELECT 1");
     },
   });
+  return attachRetention(adapter, retention);
 }

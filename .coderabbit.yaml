@@ -39,6 +39,9 @@ reviews:
     ignore_title_keywords:
       - "WIP"
       - "DO NOT MERGE"
+    # Mechanical sweeps (lint, stories, renames) opt out with this label (AGENTS.md "Agent operating model").
+    labels:
+      - "!skip-review"
   finishing_touches:
     docstrings:
       enabled: false
@@ -407,7 +410,7 @@ reviews:
     - path: "docs/**"
       instructions: |
         Documentation review. Verify:
-        - Claims match the implementation and the frozen ADRs; `docs/architecture.md` owns entities/interfaces and ADRs record decisions, not duplicated schemas.
+        - Claims match the implementation and the frozen ADRs; `docs/architecture/` owns entities/interfaces and ADRs record decisions, not duplicated schemas.
         - ADR numbering is respected: current ADRs are 0001-0018; new ADRs start at 0037; never edit `archive/`.
         - ADRs stay within the 250-line target/320-line hard cap and references resolve.
         - Commands use the real toolchain (`nub`, `nubx turbo`, `export PATH="$HOME/.nub/bin:$PATH"` where needed).
@@ -471,7 +474,7 @@ knowledge_base:
     filePatterns:
       - "AGENTS.md"
       - "CLAUDE.md"
-      - "docs/architecture.md"
+      - "docs/architecture/**/*.md"
       - "docs/testing.md"
       - "docs/adr/*.md"
       - ".agents/skills/**/SKILL.md"

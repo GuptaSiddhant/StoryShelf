@@ -38,6 +38,7 @@ export function createPublishHandler(options: PublishHandlerOptions): KindHandle
         context.logger.warn("build is gone; dropping publish job");
         return;
       }
+      context.signal.throwIfAborted();
       await publishOnce(options, job, context, build.projectId);
     },
   };
@@ -46,26 +47,61 @@ export function createPublishHandler(options: PublishHandlerOptions): KindHandle
 async function publishOnce(
   options: PublishHandlerOptions,
   job: ConsumerJob,
-  context: { logger: Logger; touch: () => void },
+  context: { logger: Logger; touch: () => void; signal: AbortSignal },
   projectId: string,
 ): Promise<void> {
   const { completer, storage, scratchDir, limits, db } = options;
   try {
     await publishStoredZip(
-      { storage, scratchDir, limits, db, logger: context.logger, touch: context.touch },
+      {
+        storage,
+        scratchDir,
+        limits,
+        db,
+        logger: context.logger,
+        touch: touchUnlessAborted(context),
+        signal: context.signal,
+      },
       { projectId, buildId: job.buildId },
     );
   } catch (error) {
-    const permanent = error instanceof ZipLimitError;
-    if (permanent || (job.attempt ?? 1) >= (job.maxAttempts ?? 1)) {
-      await completer.complete(job.buildId, { ok: false, error: messageOf(error) });
-    }
-    if (permanent) {
-      return;
-    }
+    // Resolves only for a cap breach (final); every other outcome throws.
+    await settleFailure(options, job, { error, signal: context.signal });
+    return;
+  }
+  context.signal.throwIfAborted();
+  await completer.complete(job.buildId, { ok: true });
+}
+
+/**
+ * A failed publication: a cap breach is final, the last attempt fails the build, any other error is
+ * rethrown for a retry. Past its deadline the attempt writes nothing: the lease lapses and the
+ * redelivery (or the `exhausted` hook, when none is left) settles the build.
+ */
+async function settleFailure(
+  options: PublishHandlerOptions,
+  job: ConsumerJob,
+  failure: { error: unknown; signal: AbortSignal },
+): Promise<void> {
+  const { error, signal } = failure;
+  const permanent = error instanceof ZipLimitError;
+  if (signal.aborted) {
     throw error;
   }
-  await completer.complete(job.buildId, { ok: true });
+  if (permanent || (job.attempt ?? 1) >= (job.maxAttempts ?? 1)) {
+    await options.completer.complete(job.buildId, { ok: false, error: messageOf(error) });
+  }
+  if (!permanent) {
+    throw error;
+  }
+}
+
+/** Publishing reports progress after extraction and after persisting: past the deadline the next report stops it. */
+function touchUnlessAborted(context: { touch: () => void; signal: AbortSignal }): () => void {
+  return () => {
+    context.signal.throwIfAborted();
+    context.touch();
+  };
 }
 
 function messageOf(error: unknown): string {

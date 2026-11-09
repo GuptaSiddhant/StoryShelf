@@ -1,0 +1,13 @@
+{
+  "version": "1.9.12",
+  "upstream": {
+    "package": "htmx.org@1.9.12",
+    "file": "dist/htmx.min.js",
+    "sha256": "449317ade7881e949510db614991e195c3a099c4c791c24dacec55f9f4a2a452",
+    "bytes": 48101
+  },
+  "embedded": {
+    "sha256": "b0a6ad95c8f388718afa07d9e2fdc4bb4a1e769d91e3f26aef86ce3395e94492",
+    "bytes": 84765
+  }
+}

@@ -13,6 +13,7 @@ jobs:
   fly:
     name: fly (image + demo seed dry run)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       STORYSHELF_URL: http://127.0.0.1:3000
       STORYSHELF_ADMIN_TOKEN: ci-admin-token
