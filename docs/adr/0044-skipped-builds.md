@@ -104,7 +104,7 @@ changedFiles, entryIds, idempotencyKey, labels?, message?, author? }` creates th
 
 `builds.skipped_from_build_id` (nullable text, indexed) and `builds.idempotency_key` (nullable
 text, unique per project), plus `builds.superseded_by_build_id` from ADR 0045, in every dialect's DDL, Drizzle schema and
-migration, plus the core row type (ADR 0041 is still proposed). `status` is free text in every
+migration, plus the core row type (until ADR 0041 lands). `status` is free text in every
 dialect, so the new value needs no constraint change.
 
 ## Consequences

@@ -26,6 +26,7 @@ import {
   type CaptureAlerts,
   type CaptureHandler,
 } from "./capture-handlers.ts";
+import { recordShardRepeated } from "./consumer-setup.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import type { JobQueue } from "./job-queue.ts";
 
@@ -121,5 +122,6 @@ function captureHandlerOptions(
     config,
     enqueue: parts.enqueue,
     maxRetries: options.testing?.retries,
+    onShardRepeated: recordShardRepeated,
   };
 }
