@@ -19,7 +19,7 @@ URLs that npm clients cannot depend on durably.
    nothing.
 2. **One shared version.** All published packages (22 today) keep one version, raised by the largest
    bump of all pending changesets. `scripts/release-validate.mjs` keeps enforcing it.
-3. **`next` channel, continuous.** A push to `main` that has pending changesets publishes a snapshot
+3. **`next` channel, daily** (amended 2026-11-07, see below). A push to `main` that has pending changesets publishes a snapshot
    of every package to npm under the **`next`** dist-tag, versioned `<calculated next
 version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is made in the CI
    working tree and never committed. npm only. A push without a pending
@@ -65,6 +65,18 @@ pull request (head branch `release/v<version>`, changing only package versions, 
 deleted changesets) passes the changeset check without a changeset; any other change on that branch
 fails it, so the branch name cannot skip the check.
 
+## Amendment, 2026-11-07 (#789)
+
+Decision 3 is narrowed: a push to `main` no longer publishes `next`, because every merged package
+change produced its own snapshot and most were superseded within hours. `release.yml` gains a daily
+`schedule` run that publishes `next` only while changesets are pending and a package, changeset,
+root `package.json` or `nub.lock` changed since the commit of the current `@storyshelf/core@next`
+(read from its `-next-<sha>` suffix; anything `detect` cannot establish counts as changed). A
+`workflow_dispatch` with channel `next` publishes one immediately. The push trigger keeps the stable
+path, and the daily run also retries an untagged stable version. The shared publish steps move into
+the composite action `.github/actions/npm-publish`, which runs inside the `release.yml` jobs, so the
+OIDC token and the trusted publisher still name `release.yml` (decision 5); it is used nowhere else.
+
 ## Operations
 
 - **Re-running.** `scripts/publish-npm.mjs` skips versions already on npm; the tag and the GitHub
@@ -81,7 +93,7 @@ fails it, so the branch name cannot skip the check.
 
 - Contributors write the changelog entry in the pull request that makes the change. `CHANGELOG.md` is
   no longer edited by hand.
-- Every merged change with a changeset is installable from npm as `@storyshelf/*@next`. A stable
+- Every merged change with a changeset is installable from npm as `@storyshelf/*@next` within a day. A stable
   version is a deliberate act with a dry run.
 - The choice of bump (patch, minor, major) is made per changeset and applies to the whole fixed group.
 

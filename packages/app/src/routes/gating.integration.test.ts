@@ -94,7 +94,7 @@ describe("testing gate", () => {
 
     const api = await app.request("/api/v1/projects/demo/builds/b1/snapshots");
     expect(api.status).toBe(404);
-    expect(await api.json()).toEqual({ error: TESTING_DISABLED_MESSAGE });
+    expect(await api.json()).toEqual({ error: { message: TESTING_DISABLED_MESSAGE } });
     const page = await app.request("/projects/demo/jobs");
     expect(page.status).toBe(404);
     expect(await page.text()).toBe(TESTING_DISABLED_MESSAGE);
@@ -135,12 +135,12 @@ describe("testing gate and authentication", () => {
 
     const api = await app.request("/api/v1/projects/demo/builds/b1/snapshots");
     expect(api.status).toBe(404);
-    expect(await api.json()).toEqual({ error: TESTING_DISABLED_MESSAGE });
+    expect(await api.json()).toEqual({ error: { message: TESTING_DISABLED_MESSAGE } });
     const withBadToken = await app.request("/api/v1/projects/demo/builds/b1/snapshots", {
       headers: { authorization: "Bearer not-a-token" },
     });
     expect(withBadToken.status).toBe(404);
-    expect(await withBadToken.json()).toEqual({ error: TESTING_DISABLED_MESSAGE });
+    expect(await withBadToken.json()).toEqual({ error: { message: TESTING_DISABLED_MESSAGE } });
   });
 
   it("answers a testing page with the gate's 404 instead of a login redirect", async () => {

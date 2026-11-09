@@ -58,7 +58,8 @@ npx -y playwright@1.63.0 install chromium   # one-time browser install
 # Puppeteer: set PUPPETEER_EXECUTABLE_PATH to a Chrome binary
 ```
 
-CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs, `--force` on `main`) →
+CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs; full on `main`, cached unless a
+hash-wide file changed; forced nightly) →
 `scripts/smoke.sh` → built-artifact smoke, plus fixture/browser matrix jobs. Reproduce locally
 rather than pushing and waiting.
 
@@ -216,8 +217,8 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   portability and whether a result accurately reports what was compared. ADR 0037 (portability) is
   proposed direction; ADR 0038 (environment migration/review) is accepted as the target but not yet
   implemented. ADRs 0003 and 0009 describe current behavior until that work lands. ADR 0041 (schema
-  source of truth) is proposed; until it is accepted, change a table in every dialect's DDL, Drizzle
-  schema and migration, plus the core row type.
+  source of truth) is accepted but not yet implemented; until its neutral tables land, change a
+  table in every dialect's DDL, Drizzle schema and migration, plus the core row type.
 
 ## Conventions
 
@@ -281,6 +282,33 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   rebase or force-push a shared branch); land an epic, or a coherent finished part of it, within
   about two weeks. P0/security fixes, standalone issues and docs/config changes still target `main`
   directly.
+
+## Agent operating model
+
+The weekly usage quota is shared, so agents work in short, fresh sessions and talk through GitHub.
+
+- **One session per issue.** The architect starts a developer session for one issue. It ends when
+  the PR merges, and is then archived. Don't pick up a second issue in the same session; a new
+  session reads the issue, AGENTS.md and the code, not old conversation.
+- **At most one open PR per developer.** Finish, or hand back, before starting the next.
+- **GitHub is the channel.** Questions go on the issue or PR with the `architect` label; status
+  goes in the PR body. Use `send_message` only when you are blocked and a comment would not reach
+  anyone. Never send acknowledgements, "FYI" notes or progress reports.
+- **The owner talks to the architect** for priorities and decisions, or comments on a PR or issue.
+  A comment on a PR wakes the session that owns it.
+- **Merging is native.** `auto-merge.yml` turns on GitHub auto-merge when a PR from a branch of
+  this repository opens or leaves draft (not forks, not `release/v*`). `pr-autoupdate.yml` brings
+  the oldest queued PR up to date with `main`, one at a time, and GitHub merges it when `ci` and
+  `changeset` pass and every conversation is resolved. So open a PR as a **draft** until it is
+  verified and complete, and answer every review thread: an unresolved thread is what holds a
+  green PR back.
+- **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
+  Label those PRs `skip-review`, so CodeRabbit skips them.
+- **Schedules.** Agents have two scheduled runs a day, 12 hours apart: the architect's triage. It
+  answers `architect` items, enables auto-merge, revives open PRs that lost their session, starts
+  sessions for ready issues (at most one per lane in #370), archives finished ones, and posts one
+  digest comment on issue #370 when something happened. No other agent session runs on a clock (CI's
+  own nightly workflows are unaffected).
 
 <!-- BEGIN:turborepo-agent-rules -->
 

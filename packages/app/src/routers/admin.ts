@@ -5,6 +5,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import { Retention } from "@storyshelf/core/retention";
 import type { ShelfRouter } from "../app-types.ts";
 import { reencryptWithCurrent } from "../credentials.ts";
+import { errorBody } from "../middleware/api-errors.ts";
 import { notifySystem } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { requireSiteAdmin } from "./helpers.ts";
@@ -50,7 +51,7 @@ const reencryptRoute = createRoute({
       description: "Credentials re-encrypted with the current secret",
     },
     409: {
-      content: { "application/json": { schema: z.object({ error: z.string() }) } },
+      content: { "application/json": { schema: errorSchema } },
       description: "No previousSecret configured",
     },
     ...forbiddenResponse,
@@ -63,7 +64,7 @@ export function registerAdmin(app: ShelfRouter): void {
     requireSiteAdmin(c);
     const { db, config } = getStore();
     if (!config.previousSecret) {
-      return c.json({ error: "No previousSecret is configured; nothing to re-encrypt" }, 409);
+      return c.json(errorBody("No previousSecret is configured; nothing to re-encrypt"), 409);
     }
     const result = await reencryptWithCurrent(db, config);
     return c.json(
@@ -79,7 +80,7 @@ export function registerAdmin(app: ShelfRouter): void {
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin(c);
     const pass = startPurgePass();
-    if (pass.refusal) return c.json({ message: pass.refusal }, 503);
+    if (pass.refusal) return c.json(errorBody(pass.refusal), 503);
     const body = c.req.valid("json");
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
     const builds = await purgeBuilds(ttlDays, pass.lifecycle);

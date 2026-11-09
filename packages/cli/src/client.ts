@@ -20,6 +20,20 @@ export function createClient(serverUrl: string, token?: string): Client {
   };
 }
 
+/**
+ * The message of an error body. A current server answers `{ error: { message } }`; an older one
+ * answered plain text, which is shown as it is, as is any JSON of another shape.
+ */
+export function apiErrorText(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: unknown } } | null;
+    const message = parsed?.error?.message;
+    return typeof message === "string" && message !== "" ? message : body;
+  } catch {
+    return body;
+  }
+}
+
 /** A non-2xx answer from the server; `status` is the HTTP status. */
 export class RequestError extends Error {
   override readonly name = "RequestError";
@@ -156,7 +170,7 @@ async function failedRequest(
   contentType: string,
 ): Promise<RequestError> {
   if (!/html/iu.test(contentType)) {
-    return new RequestError(res.status, await res.text());
+    return new RequestError(res.status, apiErrorText(await res.text()));
   }
   await res.body?.cancel().catch(() => {});
   return new RequestError(res.status, notJsonMessage(url, contentType));
@@ -347,7 +361,7 @@ export async function postJson<TData>(
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status}): ${await response.text()}`);
+    throw new Error(`Request failed (${response.status}): ${apiErrorText(await response.text())}`);
   }
   return (await response.json()) as TData;
 }
@@ -367,7 +381,7 @@ export async function postForm<TData>(
 ): Promise<TData> {
   const response = await fetch(url, { method: "POST", headers, body: form });
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status}): ${await response.text()}`);
+    throw new Error(`Request failed (${response.status}): ${apiErrorText(await response.text())}`);
   }
   return (await response.json()) as TData;
 }
@@ -389,7 +403,7 @@ export async function postFormWithProgress<TData>(
 ): Promise<TData> {
   const response = await fetch(url, { method: "POST", headers, body: form });
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status}): ${await response.text()}`);
+    throw new Error(`Request failed (${response.status}): ${apiErrorText(await response.text())}`);
   }
   return (await response.json()) as TData;
 }

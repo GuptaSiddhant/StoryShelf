@@ -28,6 +28,7 @@ import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
+import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import {
   authGate,
   csrf,
@@ -133,12 +134,17 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
     options: scoped,
     getReady: async () => await cell.ready,
   });
-  registerAllRoutes(app, options, {
-    sources: adapterSourcesOf(options),
-    getSettled: () => cell.settled,
-    bootTimeMs: Date.now(),
-    version: packageVersion(),
-  });
+  registerAllRoutes(
+    app,
+    options,
+    {
+      sources: adapterSourcesOf(options),
+      getSettled: () => cell.settled,
+      bootTimeMs: Date.now(),
+      version: packageVersion(),
+    },
+    runtime.logger,
+  );
   registerDocs(app);
 }
 
@@ -156,7 +162,9 @@ export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
     threads: options.testing?.compare?.threads,
   });
   throwOnInvalidAdapters(options);
-  const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
+  const app = new OpenAPIHono<{ Variables: ShelfContext }>({
+    defaultHook: rejectInvalidRequest,
+  }) as ShelfApp;
   assembleApp(app, options, instrumentedOptions(options));
 
   return app;
@@ -366,10 +374,16 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   registerInsightFragments(app);
 }
 
-/** Register every API router, page set, and optional auth flow. */
-function registerAllRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
+/** Register every API router and page set, then the error answers that cover them. */
+function registerAllRoutes(
+  app: ShelfRouter,
+  options: ShelfOptions,
+  health: HealthDeps,
+  logger: Logger,
+): void {
   registerApiRoutes(app, health);
   registerPageRoutes(app, options, health);
+  mountErrorHandlers(app, logger);
 }
 
 /** The OpenAPI document's info and tag catalog. */

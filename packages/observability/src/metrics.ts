@@ -19,6 +19,8 @@ export interface CaptureInstruments {
   jobsCompleted: Counter;
   /** Failed jobs (`capture.job.status = failed`). */
   jobsFailed: Counter;
+  /** Snapshots an earlier delivery of a rerun shard had stored, removed after it renders and before it stores its own. */
+  shardRepeatedSnapshots: Counter;
 }
 
 /** Database-operation instruments. */
@@ -45,6 +47,7 @@ export function captureMetrics(): CaptureInstruments {
       jobDuration: meter.createHistogram("capture.job.duration", { unit: "ms" }),
       jobsCompleted: meter.createCounter("capture.jobs.completed"),
       jobsFailed: meter.createCounter("capture.jobs.failed"),
+      shardRepeatedSnapshots: meter.createCounter("storyshelf.capture.shard.repeated_snapshots"),
     };
   }
   return capture;
