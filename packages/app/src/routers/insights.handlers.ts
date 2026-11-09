@@ -5,7 +5,7 @@ import { insightDepsFromStore, type InsightDeps } from "../insights/deps.ts";
 import { failWith } from "../insights/errors.ts";
 import { getStore } from "../store.ts";
 import { APPROVER_ROLES, VIEW_ROLES } from "./builds.handlers.ts";
-import { assertRole, requestHasAdminToken, resolveAuthorizedProject } from "./helpers.ts";
+import { requestHasAdminToken, resolveAuthorizedProject } from "./helpers.ts";
 
 /** AI deps or `501 ai-disabled` when the site has no AI configured. */
 export function requireAi(): InsightDeps {
@@ -47,7 +47,9 @@ export async function projectForRegenerate(
   const { deps, project } = await projectForView(c, slug);
   requireProjectAi(project);
   if (!requestHasAdminToken(c)) {
-    await assertRole(project.id, ...APPROVER_ROLES);
+    // Resolves the caller the same way as the view check (a project token or the session), so a
+    // token holder with too low a role gets 403 and a caller with no role at all gets 404.
+    await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
   }
   return { deps, project };
 }

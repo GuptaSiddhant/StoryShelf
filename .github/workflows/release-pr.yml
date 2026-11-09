@@ -1,0 +1,91 @@
+# Opens the stable release pull request when a release is due (ADR 0043, owner decisions
+# 2026-11-09). `scripts/release-due.mjs` decides:
+#
+# - a P0 pull request (label `p0-critical`) merged into `main`;
+# - an epic branch (`epic/…`) merged into `main`;
+# - otherwise, the daily run: the last minor release (`vX.Y.0`) is 7 or more days old.
+#
+# Nothing happens without pending changesets or while a `release/v*` pull request is open. The bump
+# (minor or patch) comes from the changesets; a `major` is refused before 1.0 (no v1 until the owner
+# has dogfood proof). The job runs `nub run release:prepare` on `main`, pushes `release/v<version>`
+# and opens the pull request. Only the owner merges it; merging is what publishes (`release.yml`).
+#
+# pull_request_target runs this file from `main` and checks out `main`, never the pull request's
+# code. The branch is pushed with AUTOUPDATE_TOKEN when it is set, so CI runs on the release pull
+# request; with GITHUB_TOKEN the pull request opens but its checks need a push or a re-run.
+name: release-pr
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+  schedule:
+    - cron: "37 6 * * *" # daily check for the 7-day minor rule
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-pr
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.merged
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.AUTOUPDATE_TOKEN || github.token }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0 # tags date the last minor release
+          token: ${{ secrets.AUTOUPDATE_TOKEN || github.token }}
+
+      - name: Is a release due?
+        id: due
+        env:
+          EVENT: ${{ github.event_name }}
+          MERGED: ${{ github.event.pull_request.merged }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -e
+          OPEN_RELEASE_PRS=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            --jq '[.[] | select(.head.ref | startswith("release/v"))] | length')
+          export OPEN_RELEASE_PRS
+          node scripts/release-due.mjs "$EVENT"
+
+      - name: Setup workspace
+        if: steps.due.outputs.due == 'true'
+        uses: ./.github/actions/setup-workspace
+
+      - name: Prepare the release branch
+        if: steps.due.outputs.due == 'true'
+        id: prepare
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          nub run release:prepare
+          version=$(node -p "require('./packages/core/package.json').version")
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          git push -u origin "release/v${version}"
+
+      - name: Open the release pull request
+        if: steps.due.outputs.due == 'true'
+        env:
+          VERSION: ${{ steps.prepare.outputs.version }}
+          REASON: ${{ steps.due.outputs.reason }}
+        run: |
+          set -e
+          printf 'Release v%s, opened because %s.\n\nThe bump comes from the pending changesets. Merging this pull request publishes `latest` to npm, tags `v%s` and creates the GitHub Release (`release.yml`). Only the owner merges it (ADR 0043).\n' \
+            "$VERSION" "$REASON" "$VERSION" > body.md
+          gh pr create --base main --head "release/v${VERSION}" \
+            --title "chore(release): v${VERSION}" --body-file body.md

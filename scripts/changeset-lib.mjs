@@ -7,6 +7,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+/**
+ * No 1.0 until the owner has dogfood proof that everything works (owner decision 2026-11-09): before
+ * 1.0 a breaking change is a `minor`. Lifting this is an owner decision recorded in ADR 0043.
+ */
+export const NO_V1 =
+  "no major bump before 1.0: the owner has not approved v1 (ADR 0043, 2026-11-09); use minor for a breaking change";
+
 /** Bump sizes, largest first. */
 export const BUMPS = ["major", "minor", "patch"];
 
@@ -117,6 +124,9 @@ export function bumpVersion(version, bump) {
     Number,
   );
   if (bump === "major") {
+    if (major === 0) {
+      throw new Error(NO_V1);
+    }
     return `${major + 1}.0.0`;
   }
   return bump === "minor" ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
@@ -327,15 +337,25 @@ export function malformedChangesets(added, read, known) {
   for (const path of added.filter((entry) => CHANGESET_FILE.test(entry))) {
     try {
       const parsed = parseChangeset(read(path), path);
-      if (parsed.body === PLACEHOLDER_BODY) {
-        problems.push(`${path}: replace the placeholder text with the CHANGELOG entry`);
-      }
-      if (known !== undefined) {
-        problems.push(...unknownReleases([parsed], known));
-      }
+      problems.push(...changesetProblems(parsed, path, known));
     } catch (error) {
       problems.push(error.message);
     }
+  }
+  return problems;
+}
+
+/** The problems in one parsed changeset: the placeholder text, a major bump, unknown packages. */
+function changesetProblems(parsed, path, known) {
+  const problems = [];
+  if (parsed.body === PLACEHOLDER_BODY) {
+    problems.push(`${path}: replace the placeholder text with the CHANGELOG entry`);
+  }
+  if (parsed.releases.some((release) => release.bump === "major")) {
+    problems.push(`${path}: ${NO_V1}`);
+  }
+  if (known !== undefined) {
+    problems.push(...unknownReleases([parsed], known));
   }
   return problems;
 }

@@ -39,6 +39,9 @@ reviews:
     ignore_title_keywords:
       - "WIP"
       - "DO NOT MERGE"
+      # Release PRs only bump versions and render CHANGELOG.md from already-reviewed changesets;
+      # the changeset check (`releaseProblems`) guards them (ADR 0043).
+      - "chore(release):"
     # Mechanical sweeps (lint, stories, renames) opt out with this label (AGENTS.md "Agent operating model").
     labels:
       - "!skip-review"

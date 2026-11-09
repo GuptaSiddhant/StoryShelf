@@ -194,6 +194,7 @@ describe("malformedChangesets", () => {
     ".changeset/good.md": '---\n"@storyshelf/core": patch\n---\n\n**Fixed: x.** Y.\n',
     ".changeset/bad.md": "no front matter here\n",
     ".changeset/odd.md": '---\n"@storyshelf/core": huge\n---\n\nBody.\n',
+    ".changeset/major.md": '---\n"@storyshelf/core": major\n---\n\n**Breaking: x.** Y.\n',
   };
   const read = (path) => files[path];
 
@@ -205,6 +206,12 @@ describe("malformedChangesets", () => {
     assert.equal(problems.length, 2);
     assert.match(problems[0], /bad\.md: a changeset starts with a --- front matter block/u);
     assert.match(problems[1], /odd\.md: cannot read/u);
+  });
+
+  it("refuses a major changeset until the owner approves v1", () => {
+    const problems = malformedChangesets([".changeset/major.md"], read);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /major\.md: no major bump before 1\.0/u);
   });
 
   it("looks only at changeset files, not the README or other paths", () => {
@@ -233,8 +240,12 @@ describe("highestBump and bumpVersion", () => {
     assert.equal(bumpVersion("0.8.0", "minor"), "0.9.0");
     assert.equal(bumpVersion("0.8.3", "minor"), "0.9.0");
     assert.equal(bumpVersion("0.8.3", "patch"), "0.8.4");
-    assert.equal(bumpVersion("0.8.3", "major"), "1.0.0");
     assert.equal(bumpVersion("1.9.12", "minor"), "1.10.0");
+    assert.equal(bumpVersion("1.9.12", "major"), "2.0.0");
+  });
+
+  it("refuses to cross 1.0 until the owner approves v1", () => {
+    assert.throws(() => bumpVersion("0.8.3", "major"), /no major bump before 1\.0/u);
   });
 
   it("refuses a version or a bump it cannot apply", () => {

@@ -236,10 +236,11 @@ describe.each(CHANNELS)("a session user through the %s", (channel) => {
     expect(await statusOf(booted, id)).toBe("approved");
   });
 
-  it("refuses a caller who is no member (403) and an unknown build (404)", async () => {
+  it("answers 404 to a caller with no role, as for a project that does not exist, and to an unknown build", async () => {
     const booted = await boot();
     const id = await createBuild(booted);
-    expect((await give(booted, channel, id, { user: "outsider" })).status).toBe(403);
+    // No role on the project: the answer for a project that does not exist (#497), not 403.
+    expect((await give(booted, channel, id, { user: "outsider" })).status).toBe(404);
     expect((await give(booted, channel, "ghost", { user: "alice" })).status).toBe(404);
     expect(await statusOf(booted, id)).toBe("pending");
   });

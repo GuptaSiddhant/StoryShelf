@@ -52,6 +52,25 @@ export function notFound(message = "Not found"): never {
   throw new HTTPException(404, { message });
 }
 
+/**
+ * The answer for a project the caller has no role on. It is the answer for a slug that does not
+ * exist (`Project not found`), so a signed-in user cannot tell which project slugs exist. `403`
+ * is only for a caller who can see the project but lacks the role for the action.
+ */
+export function projectHidden(): never {
+  notFound("Project not found");
+}
+
+/** Pass when `role` is one of `minRoles`; 404 for no role at all, 403 for too little. */
+function enforceRole(role: ProjectRole | null, minRoles: readonly ProjectRole[]): void {
+  if (!role) {
+    projectHidden();
+  }
+  if (!minRoles.includes(role)) {
+    forbidden();
+  }
+}
+
 /** Resolve the current session user's effective role on a project. */
 export async function currentProjectRole(projectId: string): Promise<ProjectRole | null> {
   const { db, user } = getStore();
@@ -143,16 +162,14 @@ export function requestHasAdminToken(c: Context): boolean {
  * - No auth adapter configured -> all operations permitted (development mode).
  * - Bootstrap admin token -> grants access as admin (see `requestHasAdminToken`).
  * - Bearer token (CLI) -> grants access to its own project regardless of role.
- * - Session user -> must have an effective role in `minRoles`.
+ * - Session user -> must have an effective role in `minRoles`: no role at all answers 404 (as for
+ *   an unknown project), a role that is too low answers 403.
  */
 export async function assertRole(projectId: string, ...minRoles: ProjectRole[]): Promise<void> {
   if (!getStore().authEnabled) {
     return;
   }
-  const role = await currentProjectRole(projectId);
-  if (!role || !minRoles.includes(role)) {
-    forbidden();
-  }
+  enforceRole(await currentProjectRole(projectId), minRoles);
 }
 
 /** Resolve a project by slug and enforce the caller's minimum role. */
