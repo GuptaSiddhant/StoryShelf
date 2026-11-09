@@ -141,6 +141,7 @@ function DiffReviewGrid(
 function reviewNav(project: Project, build: Build): NavConfig {
   return {
     active: "builds",
+    sidebarDefault: "rail",
     projectSlug: project.slug,
     projectName: project.name,
     trail: [

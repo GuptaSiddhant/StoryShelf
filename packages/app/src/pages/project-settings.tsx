@@ -214,12 +214,25 @@ export function renderProjectSettingsPage(
 
       <SubNavLayout
         label="Settings sections"
-        items={SETTINGS_TABS.filter((tab) => settingsTabShown(tab, data)).map((tab) => ({
-          label: TAB_LABELS[tab],
-          href: tabHref(project, tab),
-          icon: TAB_ICONS[tab],
-          active: activeTab === tab,
-        }))}
+        items={SETTINGS_TABS.filter((tab) => settingsTabShown(tab, data))
+          .map((tab) => ({
+            label: TAB_LABELS[tab],
+            href: tabHref(project, tab),
+            icon: TAB_ICONS[tab],
+            active: activeTab === tab,
+          }))
+          .concat(
+            testingEnabled()
+              ? [
+                  {
+                    label: "Jobs",
+                    href: `/projects/${project.slug}/jobs`,
+                    icon: "activity" as const,
+                    active: false,
+                  },
+                ]
+              : [],
+          )}
       >
         {renderActiveTab(data, formState)}
       </SubNavLayout>

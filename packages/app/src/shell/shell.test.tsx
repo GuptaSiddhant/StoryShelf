@@ -46,26 +46,43 @@ describe("app shell", () => {
     const html = await page("/projects");
     expect(html).toMatch(/sidebar__link--active[^>]*href="\/projects"/u);
     expect(html).not.toContain(">Library<");
-    expect(html).toContain(">Developer<");
+    expect(html).not.toContain(">Developer<");
   });
+});
 
-  it("shows project nav and a switcher listing every project inside a project", async () => {
+describe("sidebar groups", () => {
+  it("groups a project's entries by task, one sidebar entry per page", async () => {
     const html = await page("/projects/alpha/builds", twoProjects);
-    for (const label of ["Library", "Builds", "Jobs", "Labels", "Settings"]) {
+    for (const label of ["Builds", "Library", "Settings"]) {
       expect(html).toContain(`<span class="sidebar__label">${label}</span>`);
     }
+    for (const gone of ["Jobs", "Labels", "API docs", "OpenAPI spec"]) {
+      expect(html).not.toContain(`<span class="sidebar__label">${gone}</span>`);
+    }
+    expect(html).toContain('data-nav-fold="project"');
     expect(html).toContain('aria-label="Project: Alpha"');
     expect(html).toContain(">Beta<");
-    expect(html).toContain('aria-current="true"');
     expect(html).toContain("All projects");
   });
 
-  it("hides the Jobs entry on a hosting-only instance", async () => {
-    const html = await page("/projects/alpha/builds", twoProjects, undefined, false);
-    for (const label of ["Library", "Builds", "Labels", "Settings"]) {
-      expect(html).toContain(`<span class="sidebar__label">${label}</span>`);
-    }
-    expect(html).not.toContain('<span class="sidebar__label">Jobs</span>');
+  it("gives every sidebar link an accessible name and tooltip for the icon rail", async () => {
+    const html = await page("/projects/alpha/builds", twoProjects);
+    expect(html).toContain('aria-label="Builds" data-tooltip="Builds"');
+  });
+
+  it("keeps Jobs and Labels under Settings", async () => {
+    const jobs = await page("/projects/alpha/jobs", twoProjects);
+    expect(jobs).toMatch(/sidebar__link--active[^>]*href="\/projects\/alpha\/settings"/u);
+    const labels = await page("/projects/alpha/labels", twoProjects);
+    expect(labels).toMatch(/sidebar__link--active[^>]*href="\/projects\/alpha\/settings"/u);
+  });
+
+  it("puts API docs and the OpenAPI spec in a help menu in the sidebar footer", async () => {
+    const html = await page("/projects");
+    const footer = html.slice(html.indexOf('class="sidebar__footer'), html.indexOf("</aside>"));
+    expect(footer).toContain('aria-label="Help"');
+    expect(footer).toContain('href="/api/v1/docs"');
+    expect(footer).toContain('href="/api/v1/openapi.json"');
   });
 
   it("offers Light, Dark, and System in the theme menu", async () => {

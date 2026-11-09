@@ -116,6 +116,7 @@ export async function renderBuildDetailPage(
       title={`Build ${build.gitBranch}`}
       nav={{
         active: "builds",
+        sidebarDefault: "rail",
         projectSlug: project.slug,
         projectName: project.name,
         trail: [{ label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}` }],

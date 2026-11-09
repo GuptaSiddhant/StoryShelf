@@ -99,7 +99,12 @@ export async function renderComputeJobsPage(
   return (
     <DocumentLayout
       title={`${project.name} · Compute jobs`}
-      nav={{ active: "jobs", projectSlug: project.slug, projectName: project.name }}
+      nav={{
+        active: "settings",
+        projectSlug: project.slug,
+        projectName: project.name,
+        trail: [{ label: "Jobs" }],
+      }}
     >
       <PageHeader
         title="Compute jobs"

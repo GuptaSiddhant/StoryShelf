@@ -4,6 +4,18 @@ import { describe, expect, it, vi } from "vitest";
 import { bootScript } from "./boot-script.ts";
 import { clientScript } from "./client-script.ts";
 
+/** Run a boot script in a page with `cookie` set; the sidebar state it applied. */
+function sidebarAfterBoot(source: string, cookie: string): string | undefined {
+  const dom = new JSDOM("<body></body>", {
+    runScripts: "outside-only",
+    url: "https://shelf.test/",
+  });
+  // oxlint-disable-next-line unicorn/no-document-cookie -- the boot script reads document.cookie
+  dom.window.document.cookie = cookie;
+  dom.window.eval(source);
+  return dom.window.document.documentElement.dataset["sidebar"];
+}
+
 function compiles(source: string): boolean {
   // Syntax check only: compiling a vm.Script parses the source without running it.
   return new Script(source) instanceof Script;
@@ -20,6 +32,57 @@ describe("shell scripts", () => {
     expect(source).toContain("storyshelf_theme");
     expect(source).toContain("storyshelf_sidebar");
     expect(source).toContain("data-sidebar");
+  });
+
+  it("boot script opens a build page collapsed until the viewer expands it there", () => {
+    expect(sidebarAfterBoot(bootScript("rail"), "")).toBe("rail");
+    expect(sidebarAfterBoot(bootScript("rail"), "storyshelf_sidebar_build=full")).toBeUndefined();
+    // The other pages' choice neither affects nor is affected by the build page.
+    expect(sidebarAfterBoot(bootScript("rail"), "storyshelf_sidebar=full")).toBe("rail");
+    expect(sidebarAfterBoot(bootScript(), "storyshelf_sidebar_build=rail")).toBeUndefined();
+    expect(sidebarAfterBoot(bootScript(), "storyshelf_sidebar=rail")).toBe("rail");
+  });
+
+  it("folds a sidebar group on its own and remembers it, rendering the same without storage", () => {
+    const page = `<body><button data-nav-fold="project" aria-expanded="true"></button>
+      <div data-nav-group="project"></div></body>`;
+    const run = (storage: "ok" | "throws") => {
+      const dom = new JSDOM(page, { runScripts: "outside-only", url: "https://shelf.test/" });
+      const { window } = dom;
+      if (storage === "throws") {
+        Object.defineProperty(window, "localStorage", {
+          get: () => {
+            throw new Error("blocked");
+          },
+        });
+      }
+      Object.assign(window, {
+        __storyshelfShell: {
+          readCookie: () => null,
+          writeCookie: () => {},
+          applyTheme: () => {},
+          applySidebar: () => {},
+        },
+      });
+      window.eval(clientScript());
+      return window;
+    };
+    const window = run("ok");
+    const head = window.document.querySelector<HTMLElement>("[data-nav-fold]");
+    const group = window.document.querySelector<HTMLElement>("[data-nav-group]");
+    head?.click();
+    expect(group?.dataset["folded"] !== undefined).toBe(true);
+    expect(head?.getAttribute("aria-expanded")).toBe("false");
+    expect(window.localStorage.getItem("storyshelf_nav_folded")).toBe('["project"]');
+    head?.click();
+    expect(group?.dataset["folded"] !== undefined).toBe(false);
+    expect(window.localStorage.getItem("storyshelf_nav_folded")).toBe("[]");
+    const blocked = run("throws");
+    blocked.document.querySelector<HTMLElement>("[data-nav-fold]")?.click();
+    expect(
+      blocked.document.querySelector<HTMLElement>("[data-nav-group]")?.dataset["folded"] !==
+        undefined,
+    ).toBe(true);
   });
 
   it("client script wires every shell behavior", () => {

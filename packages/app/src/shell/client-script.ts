@@ -59,6 +59,33 @@ function themePart(): string {
     });`;
 }
 
+/** Sidebar group folding, remembered per browser; without storage every group stays open. */
+function foldPart(): string {
+  return `
+    var foldKey='storyshelf_nav_folded';
+    function readFolded(){
+      try{ var v=JSON.parse(localStorage.getItem(foldKey)||'[]'); return Array.isArray(v)?v:[]; }
+      catch(_){ return []; }
+    }
+    function showFolded(id,folded){
+      var group=document.querySelector('[data-nav-group="'+id+'"]');
+      var head=document.querySelector('[data-nav-fold="'+id+'"]');
+      if(group){ if(folded){ group.setAttribute('data-folded',''); } else { group.removeAttribute('data-folded'); } }
+      if(head){ head.setAttribute('aria-expanded',folded?'false':'true'); }
+    }
+    function toggleGroup(id){
+      var group=document.querySelector('[data-nav-group="'+id+'"]');
+      if(!group) return;
+      var folded=!group.hasAttribute('data-folded');
+      showFolded(id,folded);
+      var list=readFolded().filter(function(x){ return x!==id; });
+      if(folded) list.push(id);
+      try{ localStorage.setItem(foldKey,JSON.stringify(list)); }catch(_){}
+    }
+    inits.push(function(){ readFolded().forEach(function(id){ showFolded(id,true); }); });
+  `;
+}
+
 /** Desktop rail collapse (persisted) and the mobile drawer. */
 function sidebarPart(): string {
   return `
@@ -79,6 +106,8 @@ function sidebarPart(): string {
         setDrawer(!(sidebar&&sidebar.classList.contains('sidebar--open')));
       } else if(t.closest('[data-sidebar-backdrop]')){
         setDrawer(false);
+      } else if(t.closest('[data-nav-fold]')){
+        toggleGroup(t.closest('[data-nav-fold]').getAttribute('data-nav-fold'));
       } else if(t.closest('[data-sidebar-collapse]')){
         var next=document.documentElement.getAttribute('data-sidebar')==='rail' ? 'full' : 'rail';
         shell.applySidebar(next);
@@ -405,6 +434,7 @@ export function clientScript(): string {
     originPart(),
     themePart(),
     sidebarPart(),
+    foldPart(),
     dropdownPart(),
     toastPart(),
     formPart(),
