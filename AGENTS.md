@@ -227,7 +227,9 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   Fix with `nub run fmt` and re-stage; do not bypass hooks.
 - **Changesets.** A pull request that changes shipped behavior (the source of `packages/*`, or a
   published `package.json`) adds a changeset: `nub run changeset <patch|minor|major>`, one Markdown file in `.changeset/`
-  written like a `CHANGELOG.md` entry. Never edit `CHANGELOG.md` by hand and never bump versions;
+  whose body starts with one line `<Kind>: <summary>` (≤ 100 characters; Kind `Breaking`, `Added`,
+  `Changed`, `Fixed`, `Security` or `Internal`), then a blank line and the details. The summary is
+  the release note; mark stories, tests and groundwork `Internal`. Never edit `CHANGELOG.md` by hand and never bump versions;
   `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
   tells the CI check so. Task PRs on an epic branch add theirs there.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
