@@ -32,8 +32,8 @@ runs:
     - name: Setup Nub
       uses: nubjs/setup-nub@v0
       with:
-        # Pinned (#782): `latest` is nub 0.10, whose `nub ci` fails on the ignored protobufjs build script.
-        nub-version: "0.9.7"
+        # Pinned (#782, now 0.10.0): exact, so no job drifts to a new nub. protobufjs's build script is denied in package.json `allowScripts`.
+        nub-version: "0.10.0"
 
     - name: Check npm version for OIDC
       # Before install: fails fast on a bad toolchain. After Setup Nub so the tested npm publishes.
