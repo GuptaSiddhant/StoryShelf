@@ -193,8 +193,9 @@ jobs:
           fi
 
       - name: Generate release notes
-        # CHANGELOG.md is the source of truth (minor releases roll up the previous minor line);
-        # fall back to the git log when the tag has no section.
+        # CHANGELOG.md is the source of truth: the tag's section in short form (one-line summaries by
+        # kind, internal entries counted) with links to the full section and the diff; fall back to
+        # the git log when the tag has no section.
         run: |
           set -e
           if node scripts/release-notes.mjs "$RELEASE_TAG" > release-body.md; then
