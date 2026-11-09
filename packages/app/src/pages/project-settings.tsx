@@ -3,8 +3,9 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { testingEnabled } from "../store.ts";
+import { getStore, testingEnabled } from "../store.ts";
 import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
@@ -193,10 +194,11 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
 function linkedPages(
   project: Project,
 ): { label: string; href: string; icon: IconName; active: boolean }[] {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return [
     {
       label: "Browse labels",
-      href: `/projects/${project.slug}/labels`,
+      href: urls.labels(project.slug),
       icon: "tag",
       active: false,
     },
@@ -204,7 +206,7 @@ function linkedPages(
       ? [
           {
             label: "Jobs",
-            href: `/projects/${project.slug}/jobs`,
+            href: urls.jobs(project.slug),
             icon: "activity" as const,
             active: false,
           },

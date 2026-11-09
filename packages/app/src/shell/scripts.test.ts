@@ -16,6 +16,19 @@ function sidebarAfterBoot(source: string, cookie: string): string | undefined {
   return dom.window.document.documentElement.dataset["sidebar"];
 }
 
+/** Boot a page, click the collapse control, and return the cookies the script wrote. */
+function collapseAndRead(boot: string): string {
+  const dom = new JSDOM("<body><button data-sidebar-collapse></button></body>", {
+    runScripts: "outside-only",
+    url: "https://shelf.test/",
+  });
+  dom.window.eval(boot);
+  dom.window.eval(clientScript());
+  dom.window.document.querySelector<HTMLElement>("[data-sidebar-collapse]")?.click();
+  // oxlint-disable-next-line unicorn/no-document-cookie -- reading back what the script wrote
+  return dom.window.document.cookie;
+}
+
 function compiles(source: string): boolean {
   // Syntax check only: compiling a vm.Script parses the source without running it.
   return new Script(source) instanceof Script;
@@ -41,6 +54,11 @@ describe("shell scripts", () => {
     expect(sidebarAfterBoot(bootScript("rail"), "storyshelf_sidebar=full")).toBe("rail");
     expect(sidebarAfterBoot(bootScript(), "storyshelf_sidebar_build=rail")).toBeUndefined();
     expect(sidebarAfterBoot(bootScript(), "storyshelf_sidebar=rail")).toBe("rail");
+  });
+
+  it("the collapse control saves the choice under the page's own cookie", () => {
+    expect(collapseAndRead(bootScript("rail"))).toBe("storyshelf_sidebar_build=full");
+    expect(collapseAndRead(bootScript())).toBe("storyshelf_sidebar=rail");
   });
 
   it("folds a sidebar group on its own and remembers it, rendering the same without storage", () => {
