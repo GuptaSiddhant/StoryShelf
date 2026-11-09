@@ -82,11 +82,15 @@ Two facts decide the shape of the change:
    whole. Release scripts keep their behaviour; only their `nub` calls change.
 7. **Fixtures stay outside the workspace.** `fixtures/storybook-{8,9,10}` remain independent pnpm
    installs with their own lockfiles, so the capture suite installs Storybook the way a customer
-   does. The root `pnpm-workspace.yaml`, its catalog, overrides and build approvals, and the
-   root's pinned pnpm version must not reach them. If pnpm would otherwise treat a fixture as part
-   of the root workspace, each fixture gets its own `pnpm-workspace.yaml` and `packageManager`.
-   The only thing Vite+ may add is a cached `vp run` task that builds a fixture's Storybook
-   through its own install, if gate 5 shows it works.
+   does. The root `pnpm-workspace.yaml`, its catalog, overrides and build approvals must not reach
+   them, and a root install must never change their dependencies. They may run the same pnpm as
+   the root (owner, 2026-11-09): what matters is isolation, so a fixture's test run is
+   deterministic. That means its own lockfile, installed frozen, and resolving the same
+   dependencies on every run. If pnpm would otherwise treat a fixture as part of the root
+   workspace, each fixture gets its own `pnpm-workspace.yaml`. A pnpm upgrade that changes the
+   lockfile format regenerates the fixtures' lockfiles once, in its own pull request, with no
+   change to the resolved versions. The only thing Vite+ may add is a cached `vp run` task that
+   builds a fixture's Storybook through its own install, if gate 5 shows it works.
 
 ### Gates (the spike, before any migration task)
 
@@ -103,13 +107,14 @@ commits. The epic goes ahead only if every gate passes, and the findings are pos
 4. **Time.** Warm and cold CI times are at most turbo's on the same commits.
 5. **Fixtures.** With the root on pnpm and Vite+, each fixture still installs with
    `pnpm --dir fixtures/<name> install --frozen-lockfile` and builds its Storybook. Its
-   `pnpm-lock.yaml` stays byte-identical, and the root lockfile does not change. The pnpm version
-   a fixture runs is the one it pins, not the root's or Vite+'s managed one. Today the fixtures pin
-   none and CI selects pnpm 10 (`pnpm/action-setup` in `setup-workspace`), so the spike adds a
-   `packageManager` pin to each fixture first.
-   Root `vp install`, `vp check` and `vp test` do not descend into `fixtures/`. The spike also
-   reports whether a cached `vp run` task can build a fixture's Storybook from outside the
-   workspace and replay it when nothing in the fixture changed.
+   `pnpm-lock.yaml` resolves the same package versions as today, and the root lockfile does not
+   change. The fixture may run the root's pnpm (today CI selects pnpm 10 for the fixtures through
+   `pnpm/action-setup`): if that pnpm rewrites the lockfile format, the resolved versions must
+   still match, and a second frozen install must leave the lockfile untouched. No root setting
+   (catalog, overrides, build approvals, hoisting) changes what a fixture installs. Root
+   `vp install`, `vp check` and `vp test` do not descend into `fixtures/`. The spike also reports
+   whether a cached `vp run` task can build a fixture's Storybook from outside the workspace and
+   replay it when nothing in the fixture changed.
 
 If a gate fails, the epic stops at the spike, and the findings say what would have to change.
 Only the nub → pnpm step may then be proposed on its own, as a separate owner decision.
