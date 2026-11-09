@@ -104,7 +104,9 @@ commits. The epic goes ahead only if every gate passes, and the findings are pos
 5. **Fixtures.** With the root on pnpm and Vite+, each fixture still installs with
    `pnpm --dir fixtures/<name> install --frozen-lockfile` and builds its Storybook. Its
    `pnpm-lock.yaml` stays byte-identical, and the root lockfile does not change. The pnpm version
-   a fixture runs is the one it pins (pnpm 10 today), not the root's or Vite+'s managed one.
+   a fixture runs is the one it pins, not the root's or Vite+'s managed one. Today the fixtures pin
+   none and CI selects pnpm 10 (`pnpm/action-setup` in `setup-workspace`), so the spike adds a
+   `packageManager` pin to each fixture first.
    Root `vp install`, `vp check` and `vp test` do not descend into `fixtures/`. The spike also
    reports whether a cached `vp run` task can build a fixture's Storybook from outside the
    workspace and replay it when nothing in the fixture changed.
