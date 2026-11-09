@@ -100,9 +100,15 @@ function runPreset(preset: Preset): void {
     }
   };
 
-  /** The adapter on pool one, set up, with an empty seed project. */
-  async function booted() {
+  /**
+   * An adapter on its own pool, set up. A baseline an earlier test left behind (a recorded source
+   * that is missing or foreign) would pause retention at boot, so the seed projects are emptied
+   * first and the adapter is set up again on the clean database.
+   */
+  async function booted(): Promise<DatabaseAdapter> {
     const adapter = preset.adapter(open());
+    await adapter.lifecycle?.setup({ config: {}, logger: silent });
+    await freshProject(adapter);
     await adapter.lifecycle?.setup({ config: {}, logger: silent });
     return adapter;
   }

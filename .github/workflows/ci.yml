@@ -279,9 +279,13 @@ jobs:
           POSTGRES_SCHEMA_MUTATION_TEST: "1"
           DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
           NEON_WSPROXY: 127.0.0.1:5433/v1
-        # One file at a time: each runs the migrations, and two first migrations on a fresh database
-        # collide ("duplicate key value violates unique constraint pg_type_typname_nsp_index").
-        run: nubx vitest run --no-file-parallelism src/build-reference-lifecycle.test.ts src/retention-activation.test.ts src/retention-pool-presets.test.ts
+        # One file per run, in order: each runs the migrations, and two first migrations on a fresh database
+        # collide ("duplicate key value violates unique constraint pg_type_typname_nsp_index"); a file
+        # that fails must not leave its connections open under the next.
+        run: |
+          nubx vitest run src/build-reference-lifecycle.test.ts
+          nubx vitest run src/retention-activation.test.ts
+          nubx vitest run src/retention-pool-presets.test.ts
 
   website:
     name: website
