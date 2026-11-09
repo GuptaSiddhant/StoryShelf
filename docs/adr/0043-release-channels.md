@@ -96,6 +96,24 @@ merges it, as before.
 Work that changes behaviour across several pull requests lands on an epic branch, so `main` never
 ships half of a feature in a weekly release (AGENTS.md "Epic branches").
 
+## Amendment, 2026-11-09 (short release notes)
+
+The v0.10.0 release notes ran to 48 KB: 96 paragraph-long entries, many of them internal (stories,
+tests, adapter groundwork), and decision 6's minor-release roll-up repeated all of 0.9.0 below them.
+The owner asked for short notes, with the detail kept in `CHANGELOG.md`.
+
+- **Every changeset leads with a summary.** Its body starts with one line `<Kind>: <summary>`, at
+  most 100 characters, then a blank line and the details. Kind is one of `Breaking`, `Added`,
+  `Changed`, `Fixed`, `Security` or `Internal` (stories, tests, groundwork a user does not see).
+  The changeset check and `nub run changeset --message` refuse anything else
+  (`scripts/changelog-entry.mjs`).
+- **`CHANGELOG.md` is grouped.** A release section has one `### <Kind>` block per kind, each entry a
+  bullet with its summary and its details indented below it. Older sections are left as written.
+- **The GitHub Release is short.** `scripts/release-notes.mjs` prints the section's summaries by
+  kind without details, counts the internal entries instead of listing them, and links the full
+  section and the diff from the previous release. The roll-up of the previous minor line is
+  dropped: with a release every week each version's own notes are enough.
+
 ## Operations
 
 - **Re-running.** `scripts/publish-npm.mjs` skips versions already on npm; the tag and the GitHub
