@@ -44,9 +44,23 @@ export function verifyState(secret: string, state: string, now = Date.now()): OA
   }
 }
 
-/** A same-site path (never an absolute or protocol-relative URL), else the fallback. */
+/** Whether `value` holds a control character (a header or line break must never ride a path). */
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.codePointAt(index) ?? 0;
+    if (code < 0x20 || code === 0x7f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * A same-site path (never an absolute or protocol-relative URL, and none with a control character),
+ * else the fallback.
+ */
 export function safeReturnPath(value: string | undefined, fallback: string): string {
-  return value && /^\/(?![/\\])/u.test(value) ? value : fallback;
+  return value && /^\/(?![/\\])/u.test(value) && !hasControlCharacter(value) ? value : fallback;
 }
 
 function mac(secret: string, payload: string): string {
