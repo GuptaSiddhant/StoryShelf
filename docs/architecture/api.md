@@ -74,9 +74,9 @@ POST   /api/v1/admin/purge                          # manual retention purge
 
 # Auth (Better Auth engine, mounted at /api/auth/*; see https://www.better-auth.com/docs/integrations/hono)
 ALL    /api/auth/*                     # Better Auth handler (email+password, social, SSO, passkey, sessions)
-GET    /auth/login                     # descriptor-driven method list, or redirect for sole oauth/sso
-GET    /auth/engine/:providerId        # start one oauth/sso flow
-POST   /auth/engine/login              # local account login (email + password → engine)
+GET    /auth/login                     # descriptor-driven method list, or redirect for sole oauth/sso (?return_to=<same-site path>)
+GET    /auth/engine/:providerId        # start one oauth/sso flow (?return_to= is the callback path)
+POST   /auth/engine/login              # local account login (email + password → engine; `return_to` field)
 GET    /auth/invites/:inviteId         # set-password form for an invite link (?token=…)
 POST   /auth/invites/:inviteId         # accept invite, set credential, land on /profile
 POST   /auth/logout                    # destroy session (plus engine sign-out)
