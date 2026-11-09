@@ -56,7 +56,7 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
 ## Schema layout (0.2.0 target, R2)
 
 - `packages/core/src/schema/` — one module per entity, mirroring `packages/core/src/models/` 1:1 (`project.ts`, `build.ts`, `snapshot.ts`, `baseline.ts`, `comment.ts`, `label.ts`, `token.ts`, `webhook.ts`, `member.ts`, `user.ts`).
-- The DDL is hand-written per dialect in `packages/db-{sqlite,postgres,mysql}/src/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (proposed).
+- The DDL is hand-written per dialect in `packages/db-{sqlite,postgres,mysql}/src/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (accepted, not yet implemented).
 - `@storyshelf/db-sqlite` owns the SQLite schema/DDL/shared factory; `./turso`, `./better-sqlite3`, `./bun-sqlite`, `./d1` are driver presets over it (R3).
 
 ## App convention (lives in `packages/app/src/`)
