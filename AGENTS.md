@@ -281,7 +281,12 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   PR into `main`, runs the full `verify`. Keep the branch current by merging `main` into it (never
   rebase or force-push a shared branch); land an epic, or a coherent finished part of it, within
   about two weeks. P0/security fixes, standalone issues and docs/config changes still target `main`
-  directly.
+  directly. Any epic whose tasks change behaviour across several PRs gets an epic branch, because
+  `main` is released weekly (ADR 0043).
+- **Releases** (ADR 0043). `release-pr.yml` opens the release PR when a P0 PR (label `p0-critical`)
+  or an epic merges into `main`, and otherwise once the last minor release is 7 days old; only the
+  owner merges it. Label a P0 fix's PR `p0-critical`. There is no 1.0 yet: a breaking change is a
+  `minor`, and a `major` changeset fails the changeset check.
 
 ## Agent operating model
 

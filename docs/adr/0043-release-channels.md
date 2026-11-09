@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (owner decisions, 2026-11-02; stable releases by pull request, 2026-11-03). Implemented by #473. It replaces the stopgap that published a
+Accepted (owner decisions, 2026-11-02; stable releases by pull request, 2026-11-03; release cadence and no v1 yet, 2026-11-09). Implemented by #473. It replaces the stopgap that published a
 pkg.pr.new preview for every push to `main`.
 
 ## Context
@@ -76,6 +76,25 @@ root `package.json` or `nub.lock` changed since the commit of the current `@stor
 path, and the daily run also retries an untagged stable version. The shared publish steps move into
 the composite action `.github/actions/npm-publish`, which runs inside the `release.yml` jobs, so the
 OIDC token and the trusted publisher still name `release.yml` (decision 5); it is used nowhere else.
+
+## Amendment, 2026-11-09 (release cadence)
+
+Decision 4 gains a schedule. The release pull request is no longer opened only when the owner asks:
+`release-pr.yml` opens it when `scripts/release-due.mjs` says a release is due, and only the owner
+merges it, as before.
+
+- **A P0 is released.** Merging a pull request labelled `p0-critical` into `main` opens a release.
+- **An epic is released.** Merging an `epic/…` branch into `main` opens a release.
+- **Standalones are released weekly.** The daily run opens a release once the last minor release
+  (`vX.Y.0`) is 7 or more days old.
+- **Guards.** Nothing opens without pending changesets or while a `release/v*` pull request is open.
+  The bump, minor or patch, always comes from the changesets, never from the trigger.
+- **No v1 yet.** There is no 1.0 until the owner has dogfood proof that everything works. Until then
+  a breaking change is a `minor`: the changeset check refuses a `major` changeset, and
+  `bumpVersion` refuses to cross 1.0. Lifting this is an owner decision recorded here.
+
+Work that changes behaviour across several pull requests lands on an epic branch, so `main` never
+ships half of a feature in a weekly release (AGENTS.md "Epic branches").
 
 ## Operations
 
