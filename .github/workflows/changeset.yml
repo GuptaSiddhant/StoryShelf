@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: Test the changeset helpers
-        run: node --test scripts/changeset-lib.test.mjs scripts/release-detect.test.mjs
+        run: node --test scripts/changeset-lib.test.mjs scripts/release-detect.test.mjs scripts/release-due.test.mjs
 
       - name: Require a changeset for shipped changes
         env:
