@@ -2,9 +2,10 @@
 
 ## Status
 
-Proposed (draft, 2026-11-03), for owner decision. Part of #455; it narrows the deferred #352 to a
-read-only addon and leaves local comparison (#346-#350) out. No code is written until this ADR is
-accepted; the implementation issue is filed after that.
+Accepted (2026-11-09). The owner answered questions 1 to 4 on 2026-11-08, and the architect
+decided question 5 on the owner's delegation. Part of #455; it narrows the deferred #352 to a
+read-only addon and leaves local comparison (#346-#350) out. The implementation issue is filed
+next.
 
 ## Context
 
@@ -59,7 +60,7 @@ developer's local `storybook dev`, a Storybook hosted elsewhere, and a project s
   `IndexedDB`, and never accepts one through its options.
 - No CORS change. Same-origin needs none, so `publishedCorsHeaders` stays as it is and the addon
   adds no credentialed cross-origin read.
-- A project subdomain is not supported in the first release (open question 1). Making the cookie
+- A project subdomain is not supported in the first release (question 1 below). Making the cookie
   reach it (`Domain=`) or answering with `Allow-Credentials` would remove the isolation that gives
   uploaded code on that origin no access to the session.
 - Anonymous viewers get no badges: the endpoint needs a signed-in viewer of the project, or an
@@ -85,7 +86,7 @@ developer's local `storybook dev`, a Storybook hosted elsewhere, and a project s
   omission. The envelope is the build's own status and a relative `reviewPath`: the path and query
   of the store's `UrlBuilder` URL with the scheme and host removed, which the addon resolves against
   its own origin. Issue #461 asked for per-story state only; the envelope is a deliberate addition
-  (open question 5). The body never carries images, image keys, signed URLs, comments, reviewer
+  (question 5 below). The body never carries images, image keys, signed URLs, comments, reviewer
   identities or absolute links.
 - Read-only by construction: no other method on the path, no write elsewhere in the addon, and no
   verdicts from Storybook.
@@ -127,14 +128,15 @@ but it belongs with the local-comparison work, not here.
 
 - Badges appear only in Storybooks opened from StoryShelf. That is the smallest surface that adds no
   credential, no CORS rule and no change to published files.
-- A deployment that uses `publishedBaseDomain` gets no badges until open question 1 is settled.
+- A deployment that uses `publishedBaseDomain` gets no badges (question 1); a read grant for this endpoint needs its own decision.
 - One new `testing` route needs an OpenAPI entry, a classification row and tests, per AGENTS.md.
 - The endpoint returns only what the review pages already show to the same viewer, so it reveals
   nothing new; it adds an API shape to keep stable. A change to it is a change to the addon contract.
 
-## Open questions for owner
+## Decisions on the open questions
 
-The architect's recommendation (2026-11-03) is given for each, so the owner only has to confirm.
+Questions 1 to 4 follow the architect's recommendation of 2026-11-03, confirmed by the owner on
+2026-11-08. Question 5 was decided by the architect on 2026-11-09.
 
 1. **Subdomain-published Storybooks.** Ship without badges first. A separate short-lived read grant
    for this endpoint would widen what a token grants, which AGENTS.md forbids without a decision, so
@@ -148,5 +150,5 @@ The architect's recommendation (2026-11-03) is given for each, so the owner only
    costs nothing extra, and it shows only for stories with a linked design (ADR 0018).
 5. **Build envelope.** #461 asked for per-story state only. The ADR adds the build's status and a
    `reviewPath` so the addon links to the review without building URLs itself, which keeps URL
-   construction in the server's `UrlBuilder`. Recommended: accept the envelope. The alternative is
-   per-story state only, with the addon deriving the link from its own pathname.
+   construction in the server's `UrlBuilder`. Decided: accept the envelope. Per-story state alone
+   would make the addon derive the link from its own pathname, which duplicates URL rules.
