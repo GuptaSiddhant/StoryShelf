@@ -91,12 +91,12 @@ function runPreset(preset: Preset): void {
   };
   /** Run `fn`, then end every pool it opened: a test leaves no connection behind. */
   const scoped = async <R>(fn: () => Promise<R>): Promise<R> => {
+    const mine: { end(): Promise<void> }[] = [];
+    pools = mine;
     try {
       return await fn();
     } finally {
-      const opened = pools;
-      pools = [];
-      await Promise.all(opened.map(async (pool) => await pool.end()));
+      await Promise.all(mine.map(async (pool) => await pool.end()));
     }
   };
 
@@ -148,7 +148,8 @@ function runPreset(preset: Preset): void {
       await recordsManyHashes(adapter, lifecycle);
       await claimsManyIdleHashes(adapter, lifecycle);
     });
-  });
+    // Tens of thousands of hashes cross the WebSocket proxy on `./neon`: allow it more than the default.
+  }, 240_000);
 
   retentionActivationContractSuite(`${preset.name} (real server)`, async (run) => {
     await scoped(async () => {
