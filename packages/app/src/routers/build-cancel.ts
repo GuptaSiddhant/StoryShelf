@@ -60,6 +60,10 @@ async function cancelBuild(buildId: string): Promise<Build> {
   await cancelBuildJobs?.(buildId);
   await new CaptureAttemptModel(db).closeOthers(buildId, null, "Cancelled by a user");
   const updated = await new BuildModel(db).setStatus(buildId, "cancelled");
+  // The build reached a verdict between the check and the write: the lifecycle refused the cancel.
+  if (updated.status !== "cancelled") {
+    throw new HTTPException(409, { message: `A ${updated.status} build cannot be cancelled` });
+  }
   await announceBuildStatus(buildId, "cancelled");
   return updated;
 }

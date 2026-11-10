@@ -5,6 +5,7 @@ import type { Logger } from "pino";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { col } from "../models/columns.ts";
+import { CANCELLABLE_BUILD_STATUSES } from "../types.ts";
 import { contentDir } from "../utils/paths.ts";
 import { CLAIMS_DIR } from "../utils/screenshot-store.ts";
 
@@ -18,7 +19,7 @@ const MARKER = ".sweep.json";
  * Build statuses during which a capture may have reused an existing object (the "already exists,
  * skip the write" path) without yet writing the snapshot rows that reference it.
  */
-const ACTIVE_BUILD_STATUSES = ["pending", "capturing", "comparing"];
+const ACTIVE_BUILD_STATUSES = [...CANCELLABLE_BUILD_STATUSES];
 
 /** Tables the sweep reads references and in-flight builds from. */
 export interface SweepTables {
