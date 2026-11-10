@@ -25,10 +25,14 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Revert the migration commit (back to nub + turbo on the same sources)
+      - name: Restore main's toolchain files (back to nub + turbo on the same sources)
         run: |
-          git config user.email spike@example.invalid && git config user.name spike
-          git revert --no-commit "$MIGRATION_SHA"
+          # Later spike commits edit files the migration added (vite.config.ts), so a plain
+          # `git revert` would conflict: put back every path the migration touched instead.
+          git diff --name-status "$MIGRATION_SHA^" "$MIGRATION_SHA" | while IFS=$'\t' read -r st path; do
+            if [ "$st" = "A" ]; then git rm -rqf --ignore-unmatch -- "$path"; else git checkout "$MIGRATION_SHA^" -- "$path"; fi
+          done
+          git status --short | wc -l
       - uses: ./.github/actions/setup-workspace
       - uses: hashicorp/setup-terraform@v3
         with:
