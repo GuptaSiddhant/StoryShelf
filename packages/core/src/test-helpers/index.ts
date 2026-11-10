@@ -36,6 +36,10 @@ export { storageContractSuite } from "./storage-contract.ts";
 export { makeFakeStateNotifier, type FakeStateNotifier } from "./fake-notifier.ts";
 
 export {
+  buildLifecycleContractSuite,
+  type BuildLifecycleDatabaseFactory,
+} from "./build-lifecycle-contract.ts";
+export {
   buildReferenceContractSuite,
   type BuildReferenceContractFixture,
   type BuildReferenceContractFixtureRunner,
