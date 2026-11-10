@@ -1,0 +1,16 @@
+name: Setup Vite+ (spike)
+description: SPIKE (#821). Node 24, vp 1.5.1 from npm (setup-vp's release tags could not be read when this was written), pnpm 12.18.0 through vp, frozen install.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "24"
+    - name: Install vp
+      shell: bash
+      run: npm i -g vite-plus@1.5.1 pnpm@12.18.0 && vp --version
+    - name: Install dependencies (frozen)
+      shell: bash
+      run: |
+        mkdir -p .tmp
+        s=$(date +%s); vp install --frozen-lockfile; echo "install: $(( $(date +%s) - s ))s" | tee -a "$GITHUB_STEP_SUMMARY"

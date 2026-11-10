@@ -4,6 +4,21 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   run: {
     cache: { scripts: true, tasks: true },
+    tasks: {
+      // ADR 0047 decision 7: a fixture's Storybook built through its own install, from outside the workspace.
+      'fixture-storybook-9': {
+        command:
+          'pnpm --dir fixtures/storybook-9 install --frozen-lockfile && pnpm --dir fixtures/storybook-9 run build-storybook',
+        cache: {
+          input: [
+            { pattern: 'fixtures/storybook-9/**', base: 'workspace' },
+            '!fixtures/storybook-9/node_modules/**',
+            '!fixtures/storybook-9/storybook-static/**',
+          ],
+          output: [{ pattern: 'fixtures/storybook-9/storybook-static/**', base: 'workspace' }],
+        },
+      },
+    },
   },
   fmt: {
     ignorePatterns: ["fixtures/**", "**/storybook-static/**", "**/dist/**"],
