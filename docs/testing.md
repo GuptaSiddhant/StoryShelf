@@ -266,3 +266,5 @@ timeout 60 sh -c 'until docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -pp
 
 Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not
 pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job uses `--env-mode=loose`).
+
+<!-- spike #821: docs-only probe -->
