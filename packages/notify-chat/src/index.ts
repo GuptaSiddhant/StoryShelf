@@ -21,3 +21,5 @@ export { chatTogglesSchema } from "./types.ts";
 export { logConfigSchema } from "./log.ts";
 export { slackWebhookConfigSchema } from "./slack.ts";
 export { teamsWorkflowConfigSchema } from "./teams.ts";
+
+// spike #821: one-package probe
