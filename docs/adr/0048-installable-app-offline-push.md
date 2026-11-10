@@ -102,7 +102,8 @@ controls only its build's path and can never take over the app.
 
 ### 4. Web push
 
-- **Adapter.** A new adapter package, `@storyshelf/notify-push`: a `message` notifier with
+- **Adapter.** A built-in integration in core, `integrations/push/` (ADR 0049; first planned as a
+  `@storyshelf/notify-push` package): a `message` notifier with
   `audience: "person"`.
   - It implements Web Push with node's own crypto: VAPID (RFC 8292) and `aes128gcm` payload
     encryption (RFC 8291), tested against the RFCs' test vectors. It adds no new third-party
