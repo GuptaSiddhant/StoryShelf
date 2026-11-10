@@ -114,7 +114,7 @@ jobs:
       - name: Build packages
         run: vp run -r build
       - name: App smoke test
-        env: { SMOKE_RUN: "vpx tsx@4.20.6 --conditions=source" }
+        env: { SMOKE_RUN: "vpx tsx@4.20.6 --conditions=source", TSX_TSCONFIG_PATH: packages/app/tsconfig.json }
         run: bash scripts/smoke.sh
       - name: Built-artifact smoke
         if: ${{ !cancelled() }}
