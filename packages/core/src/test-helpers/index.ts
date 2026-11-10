@@ -47,3 +47,16 @@ export {
   type SeededBaseline,
   type SeededSnapshot,
 } from "./retention-activation-contract.ts";
+export {
+  compareCoreRowsWithDrizzle,
+  compareRequiredWithDdl,
+  compareDdlWithDrizzle,
+  CORE_ROW_TABLES,
+  indexStatementsIn,
+  parseDdl,
+  readCoreRowFields,
+  typeFamily,
+  type GetTableConfig,
+  type ParityAllowance,
+  type ParsedDdl,
+} from "./schema-parity.ts";
