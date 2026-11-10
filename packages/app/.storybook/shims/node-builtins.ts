@@ -47,6 +47,14 @@ export const crc32 = fn("zlib.crc32");
 export const inflateRawSync = fn("zlib.inflateRawSync");
 export const setImmediate = fn("timers/promises.setImmediate");
 
+// node:dns/promises, node:net: core's outbound guard builds its block list when it loads, so the
+// list is a no-op stand-in; a story never sends a request.
+export const lookup = fn("dns/promises.lookup");
+export const isIP = fn("net.isIP");
+export function BlockList(): { addSubnet: () => void; check: () => boolean } {
+  return { addSubnet: (): void => {}, check: (): boolean => true };
+}
+
 // node:os
 export const totalmem = (): number => 0;
 export const availableParallelism = (): number => 1;

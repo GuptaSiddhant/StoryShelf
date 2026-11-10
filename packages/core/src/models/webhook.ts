@@ -5,6 +5,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Webhook } from "../schema/webhook.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { randomToken } from "../utils/hash.ts";
+import { checkOutboundUrl, outboundReasonText } from "../utils/outbound.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
 
@@ -49,6 +50,19 @@ export class WebhookModel {
       return "Enter a valid URL";
     }
     return protocol === "https:" || protocol === "http:" ? null : "URL must use http or https";
+  }
+
+  /**
+   * Full save-time check: {@link WebhookModel.urlError}, then the outbound guard (https, public
+   * address, operator allowlist). The guard runs again at send time, which is the real check.
+   */
+  static async urlRefusal(url: string | undefined): Promise<string | null> {
+    const syntax = WebhookModel.urlError(url);
+    if (syntax || !url) {
+      return syntax;
+    }
+    const reason = await checkOutboundUrl(url);
+    return reason === null ? null : outboundReasonText(reason);
   }
 
   /**

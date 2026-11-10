@@ -13,7 +13,7 @@ import {
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
-import { STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
+import { configureOutbound, STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and notifier
  * adapters into a complete self-hosted visual-testing Hono app.
@@ -163,6 +163,7 @@ export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
     engine: options.testing?.images?.engine,
     threads: options.testing?.compare?.threads,
   });
+  configureOutbound(options.config?.outbound);
   throwOnInvalidAdapters(options);
   const app = new OpenAPIHono<{ Variables: ShelfContext }>({
     defaultHook: rejectInvalidRequest,

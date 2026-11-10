@@ -65,7 +65,7 @@ function createTeamsAdapter(options: TeamsAdapterOptions): MessageNotifierAdapte
         ],
       };
       logger?.debug({ channelId: input.channel.id }, "posting teams message");
-      await httpText(url, { method: "POST", json: payload, logger });
+      await httpText(url, { method: "POST", json: payload, logger, destination: "project" });
       logger?.info({ channelId: input.channel.id }, "teams message posted");
     },
   };

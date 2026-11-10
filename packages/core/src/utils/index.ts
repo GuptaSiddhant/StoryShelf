@@ -31,6 +31,15 @@ export {
   type MentionSpan,
 } from "./mentions.ts";
 export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";
+export {
+  assertOutboundUrl,
+  checkOutboundUrl,
+  configureOutbound,
+  OutboundRefusedError,
+  outboundReasonText,
+  type OutboundPolicy,
+  type OutboundReason,
+} from "./outbound.ts";
 export { httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";
 export {
   baselinePath,
