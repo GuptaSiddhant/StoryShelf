@@ -21,6 +21,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { databaseQueueMultiInstanceSuite } from "@storyshelf/core/test-helpers";
 import { randomUUID } from "node:crypto";
+import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { createPostgresDatabase } from "./index.ts";
 import { projects, type Project } from "./schema/index.ts";
@@ -115,4 +116,27 @@ describe.skipIf(!LIVE)("postgres live: database capture queue", () => {
     },
     { timeoutMs: 120_000 },
   );
+});
+
+describe.skipIf(!LIVE)("postgres live: concurrent first migrations", () => {
+  it("lets two setups on an empty schema both succeed", async () => {
+    const schemaName = `mig_${randomUUID().replaceAll("-", "")}`;
+    const admin = postgres(liveUrl(), { max: 1 });
+    await admin.unsafe(`CREATE SCHEMA ${schemaName}`);
+    const open = () =>
+      createPostgresDatabase({
+        client: postgres(liveUrl(), { max: 2, connection: { search_path: schemaName } }),
+      });
+    const [first, second] = [open(), open()];
+    try {
+      const setup = async (db: DatabaseAdapter) =>
+        await db.lifecycle?.setup({ config: {}, logger: silentLogger });
+      await Promise.all([setup(first), setup(second)]);
+    } finally {
+      await first.lifecycle?.teardown();
+      await second.lifecycle?.teardown();
+      await admin.unsafe(`DROP SCHEMA ${schemaName} CASCADE`);
+      await admin.end();
+    }
+  }, 120_000);
 });

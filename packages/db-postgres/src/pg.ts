@@ -12,7 +12,8 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type Client, type PoolClient } from "pg";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
-import { runMigrations } from "./migrate.ts";
+import { runMigrationsLocked, type MigrationSession } from "./migrate.ts";
+import { pooledSession, singleSession } from "./migration-session.ts";
 import {
   activateRetention,
   attachRetention,
@@ -81,7 +82,7 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
     },
     tables: schema,
     migrate: async ({ logger }) => {
-      await runMigrations(async (sql) => (await pool.query(sql)).rows, logger);
+      await runMigrationsLocked(sessionFor(pool), logger);
       if (pooled) {
         await activateRetention(db, retention);
       }
@@ -103,4 +104,9 @@ async function endClient(pool: Pool | Client | PoolClient): Promise<void> {
   if ("end" in pool && typeof pool.end === "function") {
     await (pool as Pool).end();
   }
+}
+
+/** A pool gives the migration a dedicated connection; an injected client is already one session. */
+function sessionFor(pool: Pool | Client | PoolClient): MigrationSession {
+  return pool instanceof Pool ? pooledSession(pool) : singleSession(pool);
 }
