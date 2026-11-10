@@ -36,6 +36,9 @@ jobs:
           git diff --name-status "$MIGRATION_SHA^" "$MIGRATION_SHA" | while IFS=$'\t' read -r st path; do
             if [ "$st" = "A" ]; then git rm -rqf --ignore-unmatch -- "$path"; else git checkout "$MIGRATION_SHA^" -- "$path"; fi
           done
+          # Files that main changed after the migration (merged in later) carry `vite-plus/test`
+          # imports from my merge fixes; put the plain vitest import back everywhere.
+          grep -rlE "vite-plus/test" --include='*.ts' --include='*.tsx' packages apps scripts 2>/dev/null | grep -v node_modules | xargs -r sed -i 's#"vite-plus/test"#"vitest"#g'
           git status --short | wc -l
       - uses: ./.github/actions/setup-workspace
       - uses: hashicorp/setup-terraform@v3
