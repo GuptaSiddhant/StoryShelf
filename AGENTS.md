@@ -220,7 +220,9 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   source of truth) is accepted but not yet implemented; until its neutral tables land, change a
   table in every dialect's DDL, Drizzle schema and migration, plus the core row type. ADR 0047
   (toolchain on Vite+ and pnpm) is accepted, gated by a spike; until its epic merges, nub and turbo
-  as described here stay the toolchain.
+  as described here stay the toolchain. ADR 0048 (installable app, offline Storybooks, web push)
+  is accepted: the one service worker caches only opted-in default-branch Storybooks and the
+  offline home page, never app HTML or `/api/v1` answers.
 
 ## Conventions
 
