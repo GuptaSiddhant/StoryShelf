@@ -126,6 +126,32 @@ These are documented, and tested in CI or nightly:
 Kubernetes (a Helm chart) and Cloudflare Workers (#396) are not supported until a user asks and, for
 Workers, until #396 reports its blockers.
 
+### 6. Database, capture and scaling in the modules
+
+Amended by the owner on 2026-11-10.
+
+- **Postgres only.** Every module creates a managed Postgres:
+  - RDS for PostgreSQL;
+  - Cloud SQL for PostgreSQL;
+  - Azure Database for PostgreSQL, Flexible Server.
+
+  Postgres has the fenced retention lifecycle (ADR 0039) and runs in the nightly cloud jobs. MySQL
+  is not offered by the modules; an operator can still wire it up by hand. Each module also accepts
+  an existing database URL instead of creating one.
+
+- **Capture runs in the app's container.** The image includes Playwright's Chromium, and the default
+  module runs capture there.
+  - Remote browsers (`defineRemote` presets, ADR 0006) are optional, configured from environment
+    variables, with endpoints and tokens kept in the cloud's secret store.
+  - The Azure module can attach an Azure Playwright Workspace through the existing `azurePlaywright`
+    preset. The nightly Azure run verifies it, because the preset is still marked experimental.
+  - No module builds a browser farm.
+- **Scaling is more identical copies.** Every copy serves the app and consumes the database queue, as
+  ADR 0006 decision 5 settled when the separate worker package was retired. The modules take
+  `min_instances` and `max_instances`, plus the database pool size. The per-copy limits are
+  documented with them (#874): remote-browser connections, rate limits and the AI budget (#573).
+  Separate web and worker roles are not pursued.
+
 ## Consequences
 
 - A company built on one cloud uses the generic adapters (with that cloud's preset) or the published
