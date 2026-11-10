@@ -114,6 +114,23 @@ The owner asked for short notes, with the detail kept in `CHANGELOG.md`.
   section and the diff from the previous release. The roll-up of the previous minor line is
   dropped: with a release every week each version's own notes are enough.
 
+## Amendment, 2026-11-10 (website and demo follow releases)
+
+The owner decided that readers and demo visitors see only released behaviour.
+
+- **Website.**
+  - `/` is built from the latest stable release tag. `/next/` is built from `main`, carries an
+    "unreleased" banner and is kept out of search engines (`noindex`, canonical links to stable).
+  - One Pages workflow builds both, with separate search indexes, on every push to `main` and every
+    stable release. A version switcher links the two.
+  - There are no per-release archives before 1.0. After 1.0, one copy is kept per major version.
+  - A docs-only fix reaches `/` with the next release, or a P0 patch release when urgent.
+- **Fly demo.** It deploys only after a stable release publishes, from that release's tag. Once the
+  official image exists (#887), it runs that image at the released version.
+  - There is no `next` demo for now. The owner may host one on another cloud later.
+  - The app's own Storybook upload (`app-storybook.yml`) still runs on every push to `main`: it uses
+    the demo as a CI tool, not as release documentation.
+
 ## Operations
 
 - **Re-running.** `scripts/publish-npm.mjs` skips versions already on npm; the tag and the GitHub
