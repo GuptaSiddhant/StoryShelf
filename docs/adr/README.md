@@ -50,5 +50,6 @@ Each current ADR below lists the archived ones it supersedes.
 | 0046 | Explicit Lifecycle Transitions (accepted)                                    | — (amends 0006, 0040)              |
 | 0047 | Toolchain on Vite+ (accepted, gated by a spike)                              | —                                  |
 | 0048 | Installable App, Offline Storybooks and Web Push (accepted)                  | —                                  |
+| 0049 | Built-in Integrations and Fewer Packages (accepted)                          | —                                  |
 
 Implementation work is tracked in GitHub issues; the ordered pickup list is issue #370.
