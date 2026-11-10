@@ -3,7 +3,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 const silentLogger = pino({ level: "silent" });
 
@@ -198,6 +198,78 @@ describe("PATCH label-type endpoint", () => {
       body: JSON.stringify({ name: "X" }),
     });
     expect(response.status).toBe(404);
+  });
+
+  it("answers 409 with the model's message when the project already has the key", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, localProject);
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const create = async () =>
+      await app.request("/api/v1/projects/test-project/label-types", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key: "jira", name: "Jira" }),
+      });
+
+    expect((await create()).status).toBe(201);
+    const again = await create();
+
+    expect(again.status).toBe(409);
+    expect(await again.text()).toContain("A label type with the key 'jira' already exists.");
+  });
+
+  it("answers 409, not 500, to the create that loses a race for the key", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, localProject);
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const insert = db.insert.bind(db);
+    // The other request lands between this one's check and its insert; the unique index turns this one away.
+    vi.spyOn(db, "insert").mockImplementationOnce(async (table, values) => {
+      await insert(table, { ...values, id: "winner" } as never);
+      throw new Error("UNIQUE constraint failed: label_types.project_id, label_types.key");
+    });
+
+    const response = await app.request("/api/v1/projects/test-project/label-types", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: "jira", name: "Jira" }),
+    });
+
+    expect(response.status).toBe(409);
+    const text = await response.text();
+    expect(text).toContain("A label type with the key 'jira' already exists.");
+    expect(text).not.toContain("UNIQUE");
+  });
+
+  it("answers 400 with the reason when a reserved label type is deleted", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, localProject);
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+
+    const response = await app.request("/api/v1/projects/test-project/label-types/persistent", {
+      method: "DELETE",
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("Label type 'persistent' cannot be removed.");
+  });
+
+  it("deletes a custom label type", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, localProject);
+    await new LabelModel(db).createType("p1", { key: "custom", name: "Custom" });
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+
+    const response = await app.request("/api/v1/projects/test-project/label-types/custom", {
+      method: "DELETE",
+    });
+
+    expect(response.status).toBe(204);
+    expect(await new LabelModel(db).listTypes("p1")).toHaveLength(0);
   });
 
   it("rejects patching a reserved label type", async () => {

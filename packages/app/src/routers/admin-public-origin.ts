@@ -10,7 +10,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { requestOpenBuildStatesNow } from "../git-status.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
-import { requireSiteAdmin } from "./helpers.ts";
+import { publicMessage, requireSiteAdmin } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 
 /** Register the public-origin routes of the System page. */
@@ -89,7 +89,7 @@ async function storeTyped(c: Context): Promise<string> {
     await resumeIfChanged(resolvedBefore);
     return "Public origin saved";
   } catch (error) {
-    return error instanceof Error ? error.message : "Invalid origin";
+    return publicMessage(error, "Invalid origin");
   }
 }
 

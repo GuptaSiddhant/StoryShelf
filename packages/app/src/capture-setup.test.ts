@@ -7,6 +7,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import type { ConsumerJob, JobRunContext } from "@storyshelf/core/capture";
+import * as capture from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
@@ -20,7 +21,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { alreadyAlerted } from "./capture-alerts.ts";
 import { setupCapture } from "./capture-setup.ts";
+import { recordShardRepeated } from "./consumer-setup.ts";
 import { createJobQueue } from "./job-queue.ts";
+
+vi.mock("@storyshelf/core/capture", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@storyshelf/core/capture")>();
+  return { ...original, createCaptureHandler: vi.fn(original.createCaptureHandler) };
+});
 
 const ECHO_CHILD = fileURLToPath(
   new URL("../../core/src/test-helpers/ipc-echo-child.ts", import.meta.url),
@@ -227,5 +234,13 @@ describe("the forked capture handler", () => {
     const { wiring } = forked();
     expect(wiring.handler?.accepts?.(job("b1"))).toBe(true);
     expect(wiring.handler?.accepts?.(job(""))).toBe(false);
+  });
+});
+
+describe("setupCapture and repeated shard work", () => {
+  it("gives the capture handler the metrics hook, since the consumer only wires its own handler", () => {
+    wire({ runner: runner() } as never);
+    const given = vi.mocked(capture.createCaptureHandler).mock.calls.at(-1)?.[0];
+    expect(given?.onShardRepeated).toBe(recordShardRepeated);
   });
 });

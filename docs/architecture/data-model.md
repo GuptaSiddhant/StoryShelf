@@ -88,6 +88,7 @@ baselines (
   browser             text NOT NULL DEFAULT 'chromium',
   branch              text NOT NULL,           -- "main", "feature/xyz"
   snapshot_id         text,                    -- accepted snapshot (informational; may be purged)
+  source_build_id     text,                    -- build that rendered this image; null for legacy or imported rows. Affected capture inherits a baseline whose source is the comparison build or older, and also one with a null source
   screenshot_path     text NOT NULL,           -- canonical baseline file (independent of builds)
   created_at          text NOT NULL,
   updated_at          text NOT NULL,

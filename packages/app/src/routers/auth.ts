@@ -2,6 +2,7 @@ import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
 import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
 import { SESSION_COOKIE } from "@storyshelf/core/types";
+import { UserFacingError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -9,8 +10,11 @@ import { notifySystem } from "../notify.ts";
 import { renderInviteInvalidPage, renderInvitePage } from "../pages/invite.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
 import { getStore } from "../store.ts";
+import { loginFailureOf } from "./auth-login-failure.ts";
 import { syncLoginMemberships } from "./auth-sync.ts";
+import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
+import { safeReturnPath } from "./oauth-state.ts";
 
 /** Provider ids are URL path segments: strict charset, bounded length. */
 function validProviderId(value: string): boolean {
@@ -18,6 +22,18 @@ function validProviderId(value: string): boolean {
 }
 
 const ENGINE_PASSWORD_ACTION = "/auth/engine/login";
+/** The query and form field that carries the page to land on after signing in. */
+const RETURN_FIELD = "return_to";
+
+/** The page to land on after signing in: a same-site path, else the home page. */
+function returnToOf(value: unknown): string {
+  return safeReturnPath(typeof value === "string" ? value : undefined, "/");
+}
+
+/** `url` with the return path appended, unless it is the home page (the default). */
+function withReturnTo(url: string, returnTo: string): string {
+  return returnTo === "/" ? url : `${url}?${RETURN_FIELD}=${encodeURIComponent(returnTo)}`;
+}
 
 /** Forward a request to the mounted engine, preserving origin and cookies. */
 export async function forwardToEngine(
@@ -80,31 +96,36 @@ function splitSetCookie(header: string | null): string[] {
 
 function loginLinks(
   methods: EngineLoginMethod[],
+  returnTo: string,
 ): { kind: "password" | "oauth" | "passkey" | "sso"; id: string; label: string; url: string }[] {
   return methods.map((method) => ({
     ...method,
     // Passkey sign-in is JS-driven on the page; the url is an unused fallback.
     url:
       method.kind === "oauth" || method.kind === "sso"
-        ? `/auth/engine/${method.id}`
+        ? withReturnTo(`/auth/engine/${method.id}`, returnTo)
         : ENGINE_PASSWORD_ACTION,
   }));
 }
 
-async function renderEngineLogin(
-  c: Context,
-  engine: Auth,
-  error?: string,
-  email?: string,
-  status?: 200 | 400 | 401 | 429 | 500 | 502,
-): Promise<Response> {
+/** What the sign-in page shows beyond the login methods. */
+interface LoginView {
+  error?: string;
+  email?: string;
+  status?: 200 | 400 | 401 | 429 | 500 | 502;
+  /** The page to land on after signing in (a same-site path). */
+  returnTo: string;
+}
+
+async function renderEngineLogin(c: Context, engine: Auth, view: LoginView): Promise<Response> {
   return c.html(
     await renderLoginPage({
-      error,
-      email,
-      engineMethods: loginLinks(engine.loginMethods()),
+      error: view.error,
+      email: view.email,
+      returnTo: view.returnTo,
+      engineMethods: loginLinks(engine.loginMethods(), view.returnTo),
     }),
-    status ?? 200,
+    view.status ?? 200,
   );
 }
 
@@ -126,50 +147,52 @@ async function syncEngineUser(user: { id: string; email: string; name: string })
   );
 }
 
-async function readCredentials(c: Context): Promise<{ email: string; password: string }> {
+interface Credentials {
+  email: string;
+  password: string;
+  /** The page to land on after signing in (a same-site path). */
+  returnTo: string;
+}
+
+async function readCredentials(c: Context): Promise<Credentials> {
   const form = await c.req.formData();
   const rawEmail = form.get("email");
   const rawPassword = form.get("password");
   return {
     email: typeof rawEmail === "string" ? rawEmail : "",
     password: typeof rawPassword === "string" ? rawPassword : "",
+    returnTo: returnToOf(form.get(RETURN_FIELD)),
   };
 }
 
 async function finishCredentialLogin(
   c: Context,
   engine: Auth,
-  email: string,
-  password: string,
+  { email, password, returnTo }: Credentials,
 ): Promise<Response> {
   const res = await forwardToEngine(c, engine, "/api/auth/sign-in/email", { email, password });
   if (res.status !== 200) {
-    // Generic message either way (no user enumeration), but propagate
-    // rate-limit/upstream statuses instead of masking them as 401.
-    if (res.status === 429) {
-      return renderEngineLogin(c, engine, "Invalid credentials", email, 429);
+    const failure = loginFailureOf(res.status);
+    if (failure.notify) {
+      // Admins opted into sys:* see a login-attempt signal. Spray attempts can fan out
+      // here; the /auth/* rate-limit bucket bounds it.
+      await notifySystem("sys:auth-failed", { email });
     }
-    if (res.status >= 500) {
-      return renderEngineLogin(c, engine, "Invalid credentials", email, 502);
-    }
-    if (res.status === 400) {
-      return renderEngineLogin(c, engine, "Enter a valid email address", email, 400);
-    }
-    // Credential failures only (never rate-limit/upstream noise, never
-    // secrets): admins opted into sys:* see a login-attempt signal. Spray
-    // attempts can fan out here; the /auth/* rate-limit bucket bounds it.
-    await notifySystem("sys:auth-failed", { email });
-    return renderEngineLogin(c, engine, "Invalid credentials", email, 401);
+    return renderEngineLogin(c, engine, {
+      error: failure.message,
+      email,
+      status: failure.status,
+      returnTo,
+    });
   }
   copySetCookies(c, res);
   const body = (await res.json()) as { user: { id: string; email: string; name: string } };
   await syncEngineUser(body.user);
-  return hxRedirect(c, "/");
+  return hxRedirect(c, returnTo);
 }
 
 async function handleEngineLogin(c: Context, engine: Auth): Promise<Response> {
-  const { email, password } = await readCredentials(c);
-  return finishCredentialLogin(c, engine, email, password);
+  return finishCredentialLogin(c, engine, await readCredentials(c));
 }
 
 function resolveEngineMethod(c: Context, engine: Auth): EngineLoginMethod | null {
@@ -182,10 +205,15 @@ function resolveEngineMethod(c: Context, engine: Auth): EngineLoginMethod | null
   );
 }
 
-async function finishOAuthStart(c: Context, engine: Auth, id: string): Promise<Response> {
+async function finishOAuthStart(
+  c: Context,
+  engine: Auth,
+  id: string,
+  returnTo: string,
+): Promise<Response> {
   const res = await forwardToEngine(c, engine, "/api/auth/sign-in/social", {
     provider: id,
-    callbackURL: "/",
+    callbackURL: returnTo,
     disableRedirect: true,
   });
   if (res.status !== 200) {
@@ -199,10 +227,15 @@ async function finishOAuthStart(c: Context, engine: Auth, id: string): Promise<R
   return c.redirect(body.url);
 }
 
-async function finishSSOStart(c: Context, engine: Auth, id: string): Promise<Response> {
+async function finishSSOStart(
+  c: Context,
+  engine: Auth,
+  id: string,
+  returnTo: string,
+): Promise<Response> {
   const res = await forwardToEngine(c, engine, "/api/auth/sign-in/sso", {
     providerId: id,
-    callbackURL: "/",
+    callbackURL: returnTo,
   });
   if (res.status !== 200) {
     throw new HTTPException(502, { message: "Sign in failed" });
@@ -220,10 +253,11 @@ async function handleEngineStart(c: Context, engine: Auth): Promise<Response> {
   if (!method || method.kind === "passkey") {
     return c.notFound();
   }
+  const returnTo = returnToOf(c.req.query(RETURN_FIELD));
   if (method.kind === "sso") {
-    return await finishSSOStart(c, engine, method.id);
+    return await finishSSOStart(c, engine, method.id, returnTo);
   }
-  return await finishOAuthStart(c, engine, method.id);
+  return await finishOAuthStart(c, engine, method.id, returnTo);
 }
 
 async function handleInvitePage(c: Context, engine: Auth): Promise<Response> {
@@ -274,7 +308,7 @@ async function finishInviteAccept(
     password,
   });
   if (res.status !== 200) {
-    throw new Error("Sign in failed");
+    throw new UserFacingError("Sign in failed");
   }
   copySetCookies(c, res);
   await syncEngineUser({ id: user.id, email: user.email, name: user.name });
@@ -287,7 +321,7 @@ async function inviteAcceptError(
   token: string,
   error: unknown,
 ): Promise<Response> {
-  const message = error instanceof Error ? error.message : "Invalid or expired invite";
+  const message = publicMessage(error, "Invalid or expired invite");
   if (message.includes(`at least ${MIN_PASSWORD_LENGTH}`)) {
     return c.html(await renderInvitePage({ inviteId, token, error: message }), 400);
   }
@@ -317,12 +351,13 @@ export function registerEngineAuth(app: ShelfRouter, engine: Auth): void {
   app.all("/api/auth/*", async (c) => await engine.handler(c.req.raw));
 
   app.get("/auth/login", async (c) => {
+    const returnTo = returnToOf(c.req.query(RETURN_FIELD));
     const methods = engine.loginMethods();
     const sole = methods.length === 1 ? methods.at(0) : undefined;
     if (sole?.kind === "oauth" || sole?.kind === "sso") {
-      return c.redirect(`/auth/engine/${sole.id}`);
+      return c.redirect(withReturnTo(`/auth/engine/${sole.id}`, returnTo));
     }
-    return await renderEngineLogin(c, engine);
+    return await renderEngineLogin(c, engine, { returnTo });
   });
 
   // A failed POST leaves the browser on this URL; a reload must not 404.

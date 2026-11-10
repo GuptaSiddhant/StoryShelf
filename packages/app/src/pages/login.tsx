@@ -18,6 +18,8 @@ export interface LoginPageState {
   engineMethods?: EngineMethodLink[];
   /** Pre-filled email for the password form (e.g. after failed login). */
   email?: string;
+  /** The same-site page to land on after signing in; the home page when absent. */
+  returnTo?: string;
 }
 
 /** Resolve auth UI text with defaults. */
@@ -56,6 +58,9 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
 
           {state.engineMethods?.some((method) => method.kind === "password") ? (
             <form method="post" action="/auth/engine/login" novalidate>
+              {state.returnTo && state.returnTo !== "/" ? (
+                <input type="hidden" name="return_to" value={state.returnTo} />
+              ) : null}
               <VStack>
                 <Field
                   label="Email"
@@ -95,7 +100,12 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
             <div class="mt-1">
               <VStack>
                 <Meta center>or</Meta>
-                <Button variant="secondary" type="button" data-passkey-login="true">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  data-passkey-login="true"
+                  data-return-to={state.returnTo ?? "/"}
+                >
                   Sign in with a passkey
                 </Button>
                 <p class="login__help" data-passkey-login-status="true" aria-live="polite">

@@ -2,14 +2,15 @@
 
 ## Status
 
-Accepted. SQLite activated (#536); Postgres and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
+Accepted. SQLite (#536) and the postgres.js preset (#375) activated; the other Postgres presets and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
 deployments with `testing`; hosting-only retention is unchanged.
 
 Merged: source-build provenance (#345), frozen comparison references and fail-closed testing purge
 (#354), SQLite lifecycle primitives (#382), fenced baseline writers (#389), preparation of legacy
 references (#397), sealing of the capability to fenced mutations (#372) and resumable deletion with
-exactly-once content release (#374), per-build content uses (#564) and SQLite activation (#536).
-Open: Postgres and MySQL capability (#375, #376) and investigations (#377 to #381).
+exactly-once content release (#374), per-build content uses (#564), SQLite activation (#536) and Postgres activation on the postgres.js
+preset, then on the `pg` and `./neon` presets (#375).
+Open: MySQL (#376) and investigations (#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -107,15 +108,44 @@ by preset, so it cannot by itself carry this guarantee.
   release a newer owner's pin.
 - Each implementation is proven with real multi-connection contract tests, not mocked transactions:
   `buildReferenceContractSuite` (`packages/core/src/test-helpers/build-reference-contract.ts`)
-  covers promotion and pin against purge, a stale generation rejecting a whole multi-owner
-  transaction with its domain writes, release keeping the generation, admission to a deleting or
-  missing build, an admission racing a claim ending in exactly one outcome, and opposite-order
-  multi-build admission without deadlock. Postgres and MySQL (#375, #376) must run the same suite.
+  covers promotion and pin against purge, a stale generation (a typed `ReferenceGenerationConflict`)
+  rejecting a whole multi-owner transaction with its domain writes, exactly one of two updates that
+  saw the same generation winning, invalid generations, empty and partly failing multi-owner
+  batches, release keeping the generation, admission to a deleting or missing build, an admission
+  racing a claim ending in exactly one outcome, and opposite-order multi-build admission without
+  deadlock. `retentionActivationContractSuite` does the same for activation (baseline preparation and
+  the pause cases) through a per-dialect harness; activation itself is not part of the adapter
+  interface. Postgres and MySQL (#375, #376) must run both suites, unchanged.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
   reference-sensitive path. Presets are enabled one at a time: SQLite first (#536, done), then
   Postgres (#375) and MySQL (#376).
+- **Postgres lifecycle** (`db-postgres/src/build-reference-lifecycle.ts`, #375). Where SQLite
+  serializes through its write lock, Postgres takes row locks in one fixed order: each owner's
+  generation row `FOR UPDATE` (the fence), then the referenced builds `FOR SHARE`, which conflicts
+  with the tombstone's `FOR UPDATE` of the same build row, so an admission and a deletion claim of
+  one build end in exactly one outcome. A use of shared content and a collector's claim of the same
+  hash take a transaction-scoped advisory lock on the hash, in hash order, and re-read after it.
+  Activation follows.
+- **Postgres activation** (`createPostgresDatabase`, `db-postgres/src/retention-activation.ts`,
+  `baseline-preparation.ts`). Same sequence as SQLite: after the migration, `prepareBaselineReferences`
+  once, then expose the capability, or `retentionPause` on a `BaselineSourceIntegrityError`. One
+  transaction visits every baseline owner (those with provenance, plus those a pin still names) in
+  the order the fenced writers lock, locking each owner's generation row `FOR UPDATE` before it
+  reads the baseline, and the source build `FOR SHARE`. Preparation can therefore run beside live
+  traffic and beside another booting instance: a writer or a second instance waits on its locks, and
+  the second finds nothing to change. Unlike SQLite there is no global write lock, so a writer
+  that does not take the fence (an older release, before this one) is not excluded; upgrade every
+  instance before relying on it. Per preset: postgres.js, `pg` and `./neon` expose it, each
+  only after both suites passed on it with every party on its own pool (`retention-pool-presets.test.ts`;
+  `./neon` through a `wsproxy` service in the `postgres-lifecycle` job). The pooled presets enable it
+  only when the driver object is a `Pool` (an owned pool, or an injected one): an injected single
+  `Client` or `PoolClient` shares one session, row locks would prove nothing, so it stays fail closed.
+  PGlite never exposes it (one session proves no locking); `./neon-http` cannot pass
+  (`transactions: "sequential"`) and stays fail closed. The activation suite
+  runs unchanged on PGlite and on a real server; the race tests (interrupted preparation, a writer
+  in flight, two instances) need the real server.
 - **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
   adapter's setup has migrated the schema, it runs `prepareBaselineReferences` once and only then
   exposes `buildReferenceLifecycle`. A shared file is required, so an in-memory database never has
@@ -198,10 +228,10 @@ could leave them, and they would keep an unrelated build protected.
 
 **Negative**
 
-- Postgres and MySQL deployments with `testing` still do not purge builds or garbage-collect
-  branches until #375 and #376; their storage grows and operators must be told.
-- Postgres and MySQL need their own capability implementation and multi-connection tests before
-  they regain automatic retention.
+- MySQL, and Postgres on `./neon-http`, PGlite and a single injected connection, still do not purge
+  builds or garbage-collect branches with `testing` (#375, #376); their storage grows and operators must be
+  told.
+- Each of those needs its own multi-connection proof before it regains automatic retention.
 - Pinning whole builds keeps more storage than pinning artifacts would.
 - Every baseline writer pays for a fenced transaction.
 

@@ -56,6 +56,9 @@ jobs:
 
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
+        with:
+          # Pinned (#782, now 0.10.0): exact, so no job drifts to a new nub. protobufjs's build script is denied in package.json `allowScripts`.
+          nub-version: "0.10.0"
 
       - name: Install dependencies
         run: nub ci

@@ -155,11 +155,17 @@
       "Error": {
         "type": "object",
         "properties": {
-          "message": {
-            "type": "string"
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": ["message"]
           }
         },
-        "required": ["message"]
+        "required": ["error"]
       },
       "ProjectCreateInput": {
         "type": "object",
@@ -593,22 +599,28 @@
       "BaselineChanged": {
         "type": "object",
         "properties": {
-          "code": {
-            "type": "string",
-            "enum": ["baseline_changed"]
-          },
-          "message": {
-            "type": "string"
-          },
-          "snapshotId": {
-            "type": "string"
-          },
-          "baselineStatus": {
-            "type": "string",
-            "enum": ["stale", "removed"]
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": ["baseline_changed"]
+              },
+              "message": {
+                "type": "string"
+              },
+              "snapshotId": {
+                "type": "string"
+              },
+              "baselineStatus": {
+                "type": "string",
+                "enum": ["stale", "removed"]
+              }
+            },
+            "required": ["code", "message", "snapshotId", "baselineStatus"]
           }
         },
-        "required": ["code", "message", "snapshotId", "baselineStatus"]
+        "required": ["error"]
       },
       "ApproveAllResult": {
         "type": "object",
@@ -2283,13 +2295,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["message"]
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -2307,9 +2313,9 @@
           "422": {
             "description": "The inline zip is invalid, unsafe, or exceeds the extraction limits. The build ends `failed`; upload again to create a new build.",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -3959,6 +3965,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The project already has a label type with this key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "x-storyshelf-class": "hosting"
@@ -3989,6 +4005,16 @@
         "responses": {
           "204": {
             "description": "Deleted label type"
+          },
+          "400": {
+            "description": "A reserved label type cannot be removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "404": {
             "description": "Not found",
@@ -5660,13 +5686,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["message"]
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -5730,13 +5750,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["message"]
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -5766,13 +5780,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["message"]
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -5782,13 +5790,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["message"]
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -5939,7 +5941,14 @@
             }
           },
           "422": {
-            "description": "A listed delivery kind posts to a room; add it as a project channel"
+            "description": "A listed delivery kind posts to a room; add it as a project channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "x-storyshelf-class": "hosting"
@@ -6096,13 +6105,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["message"]
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -6195,13 +6198,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"]
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -6300,9 +6297,9 @@
           "404": {
             "description": "Not found, or the build needs no signed URL",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

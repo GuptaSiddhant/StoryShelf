@@ -7,6 +7,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, unauthorized } from "./helpers.ts";
 import {
+  errorSchema,
   notFound as notFoundResponse,
   notificationSubscriptionPutSchema,
   notificationSubscriptionSchema,
@@ -118,7 +119,10 @@ const putSubscriptionRoute = createRoute({
       content: { "application/json": { schema: notificationSubscriptionSchema } },
       description: "Saved notification subscription",
     },
-    422: { description: "A listed delivery kind posts to a room; add it as a project channel" },
+    422: {
+      content: { "application/json": { schema: errorSchema } },
+      description: "A listed delivery kind posts to a room; add it as a project channel",
+    },
     ...notFoundResponse,
     ...unauthorizedResponse,
   },
@@ -168,7 +172,7 @@ export function registerNotificationSubscriptions(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const body = c.req.valid("json");
     assertPersonalKinds(body.via);
-    return c.json(await saveSubscription(project.id, currentUserId(), body));
+    return c.json(await saveSubscription(project.id, currentUserId(), body), 200);
   });
 
   app.openapi(deleteSubscriptionRoute, async (c) => {

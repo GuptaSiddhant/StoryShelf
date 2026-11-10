@@ -5,7 +5,7 @@ import { UserModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
-import { sha256, timingSafeEqualString } from "@storyshelf/core/utils";
+import { isUserFacingError, sha256, timingSafeEqualString } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -13,6 +13,28 @@ import { getStore } from "../store.ts";
 /** Send a JSON response with the given status code. */
 export function json(c: Context, data: unknown, status: ContentfulStatusCode = 200): Response {
   return c.json(data, status);
+}
+
+/**
+ * Whether the text of `error` was written for the person who sees it: a `UserFacingError`
+ * (a deliberate refusal) or an `HTTPException` (its message is the answer). Anything else is a
+ * driver, storage or library failure whose text is internal.
+ */
+function isClientSafe(error: unknown): error is Error {
+  return isUserFacingError(error) || error instanceof HTTPException;
+}
+
+/**
+ * The text a handler may answer with for a caught `error`: its own message when it is
+ * {@link isClientSafe}, otherwise `fallback`, with the original logged (never sent). Use this
+ * wherever a `catch` turns an error into response text; never read `error.message` for a response.
+ */
+export function publicMessage(error: unknown, fallback: string): string {
+  if (isClientSafe(error)) {
+    return error.message;
+  }
+  getStore().logger.error({ err: error }, "unexpected error answered with a generic message");
+  return fallback;
 }
 
 /** Throw a 401 Unauthorized error for unauthenticated requests. */
@@ -28,6 +50,25 @@ export function forbidden(): never {
 /** Throw a 404 Not Found error with a custom message. */
 export function notFound(message = "Not found"): never {
   throw new HTTPException(404, { message });
+}
+
+/**
+ * The answer for a project the caller has no role on. It is the answer for a slug that does not
+ * exist (`Project not found`), so a signed-in user cannot tell which project slugs exist. `403`
+ * is only for a caller who can see the project but lacks the role for the action.
+ */
+export function projectHidden(): never {
+  notFound("Project not found");
+}
+
+/** Pass when `role` is one of `minRoles`; 404 for no role at all, 403 for too little. */
+function enforceRole(role: ProjectRole | null, minRoles: readonly ProjectRole[]): void {
+  if (!role) {
+    projectHidden();
+  }
+  if (!minRoles.includes(role)) {
+    forbidden();
+  }
 }
 
 /** Resolve the current session user's effective role on a project. */
@@ -121,16 +162,14 @@ export function requestHasAdminToken(c: Context): boolean {
  * - No auth adapter configured -> all operations permitted (development mode).
  * - Bootstrap admin token -> grants access as admin (see `requestHasAdminToken`).
  * - Bearer token (CLI) -> grants access to its own project regardless of role.
- * - Session user -> must have an effective role in `minRoles`.
+ * - Session user -> must have an effective role in `minRoles`: no role at all answers 404 (as for
+ *   an unknown project), a role that is too low answers 403.
  */
 export async function assertRole(projectId: string, ...minRoles: ProjectRole[]): Promise<void> {
   if (!getStore().authEnabled) {
     return;
   }
-  const role = await currentProjectRole(projectId);
-  if (!role || !minRoles.includes(role)) {
-    forbidden();
-  }
+  enforceRole(await currentProjectRole(projectId), minRoles);
 }
 
 /** Resolve a project by slug and enforce the caller's minimum role. */

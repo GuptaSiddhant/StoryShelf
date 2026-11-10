@@ -31,7 +31,7 @@ import {
   returnPathOf,
 } from "./design.handlers.ts";
 import { flash } from "./flash.ts";
-import { currentProjectRole } from "./helpers.ts";
+import { currentProjectRole, publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { linkedUsageByStory, linkedUsageFor } from "./links.handlers.ts";
 import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
@@ -115,7 +115,7 @@ export function registerUiPages(app: ShelfRouter): void {
       flash(c, `Created ${project.name}`);
       return hxRedirect(c, `/projects/${project.slug}/library`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create project";
+      const message = publicMessage(error, "Failed to create project");
       return c.html(
         renderProjectCreatePage({
           values: { name, gitRepository, gitDefaultBranch },
