@@ -5,6 +5,7 @@ import {
 } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import { backfillContentUses } from "@storyshelf/core/retention";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
 import { logHostingOnlyMode } from "./hidden-data.ts";
 import { startConsumer, trackBackground, type LifecycleCell } from "./lifecycle.ts";
@@ -28,6 +29,7 @@ export function runBootTasks(
   checkCredentialsAfterSetup(cell, scoped.database, runtime.config, runtime.logger);
   logHostingOnlyAfterSetup(cell, scoped, runtime.logger);
   logPausedAfterSetup(cell, runtime);
+  backfillContentUsesAfterSetup(cell, scoped, runtime.logger);
   if (buildState) {
     replayGitStateAfterSetup(cell, scoped, runtime, buildState);
   }
@@ -62,6 +64,36 @@ function replayGitStateAfterSetup(
       })
       .catch((error: unknown) => {
         runtime.logger.warn({ err: error }, "could not replay the git state of open builds");
+      }),
+  );
+}
+
+/**
+ * Once adapters are ready and the database exposes the lifecycle capability, record the content
+ * uses of builds published before `content_uses` existed (ADR 0039), unless an earlier boot
+ * finished that. It deletes nothing and keeps its progress, so a restart resumes it; teardown
+ * waits for it (bounded) through the background tracker.
+ */
+function backfillContentUsesAfterSetup(
+  cell: LifecycleCell,
+  scoped: ShelfOptions,
+  logger: Logger,
+): void {
+  trackBackground(
+    cell,
+    cell.ready
+      .then(async (setup) => {
+        const lifecycle = scoped.database.buildReferenceLifecycle;
+        if (!setup.ok || lifecycle === undefined) return;
+        await backfillContentUses({
+          db: scoped.database,
+          storage: scoped.storage,
+          lifecycle,
+          logger,
+        });
+      })
+      .catch((error: unknown) => {
+        logger.warn({ err: error }, "content uses backfill failed; it will run again at next boot");
       }),
   );
 }

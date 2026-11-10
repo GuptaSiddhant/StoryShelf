@@ -20,34 +20,17 @@ import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
 
 /**
  * Show the build's current state on one channel. Throws when the host refuses a status, so the
- * caller can retry; resolves to why nothing was written when the build or channel is gone, or when
- * `stopped` answered true before the request was made.
+ * caller can retry; resolves to why nothing was written when the build or channel is gone.
+ *
+ * With a `signal`, an aborted one (the attempt's deadline passed, so a redelivery may be running)
+ * stops the delivery before the status is written: the build is read again by that redelivery,
+ * and an old read must not overwrite what it showed. A request already sent is not recalled.
  */
 export async function deliverBuildState(
   deps: BuildStateDeps,
   ids: { buildId: string; channelId: string },
-  stopped: () => boolean = () => false,
+  signal?: AbortSignal,
 ): Promise<"delivered" | SkipReason> {
-  const ready = await resolveDelivery(deps, ids);
-  if (typeof ready === "string") {
-    return ready;
-  }
-  // A job told to stop (a cancel, a lost lease) while it loaded the build starts no request.
-  if (stopped()) {
-    return "cancelled";
-  }
-  await writeTo(deps, ready.loaded, { target: ready.target, origin: ready.origin });
-  return "delivered";
-}
-
-/** What a delivery writes and where, or why there is nothing to write. */
-async function resolveDelivery(
-  deps: BuildStateDeps,
-  ids: { buildId: string; channelId: string },
-): Promise<
-  | Exclude<SkipReason, "cancelled">
-  | { loaded: { build: Build; project: Project }; target: StateTarget; origin: string }
-> {
   const loaded = await loadBuild(deps, ids.buildId);
   // The origin can disappear between queueing and running (a cleared setting): nothing is shown.
   const origin = loaded === null ? undefined : await deps.publicOrigin();
@@ -55,7 +38,11 @@ async function resolveDelivery(
     return loaded === null ? "no-build" : "no-origin";
   }
   const target = await loadTarget(deps, ids.channelId, loaded.project.id);
-  return typeof target === "string" ? target : { loaded, target, origin };
+  if (typeof target === "string") {
+    return target;
+  }
+  await writeTo(deps, loaded, { target, origin, signal });
+  return "delivered";
 }
 
 /** The build and its project, or null when either is gone. */
@@ -72,7 +59,7 @@ export async function loadBuild(
 export async function writeTo(
   deps: BuildStateDeps,
   loaded: { build: Build; project: Project },
-  where: { target: StateTarget; origin: string },
+  where: { target: StateTarget; origin: string; signal?: AbortSignal | undefined },
 ): Promise<void> {
   const { build, project } = loaded;
   const { target, origin } = where;
@@ -90,10 +77,13 @@ export async function writeTo(
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
     return;
   }
+  // The last checkpoint before the host is told: the reads above may have outlived the attempt.
+  where.signal?.throwIfAborted();
   await writeBuildState(target.provider, target.channel, {
     sha: build.gitSha,
     states,
     logger: deps.logger,
+    signal: where.signal,
   });
 }
 

@@ -12,9 +12,6 @@ import {
 } from "../ui/styles/review-layout.ts";
 import { a11ySummaryOf, a11yUnavailableNote } from "./a11y-violations.tsx";
 import { reviewProgress } from "./build-diff-model.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Header props for the diff review page. */
 export interface DiffHeaderProps {
   project: Project;

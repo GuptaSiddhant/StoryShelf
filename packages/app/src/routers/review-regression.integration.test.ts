@@ -236,10 +236,11 @@ describe.each(CHANNELS)("a session user through the %s", (channel) => {
     expect(await statusOf(booted, id)).toBe("approved");
   });
 
-  it("refuses a caller who is no member (403) and an unknown build (404)", async () => {
+  it("answers 404 to a caller with no role, as for a project that does not exist, and to an unknown build", async () => {
     const booted = await boot();
     const id = await createBuild(booted);
-    expect((await give(booted, channel, id, { user: "outsider" })).status).toBe(403);
+    // No role on the project: the answer for a project that does not exist (#497), not 403.
+    expect((await give(booted, channel, id, { user: "outsider" })).status).toBe(404);
     expect((await give(booted, channel, "ghost", { user: "alice" })).status).toBe(404);
     expect(await statusOf(booted, id)).toBe("pending");
   });
@@ -428,5 +429,11 @@ describe.each(CHANNELS)("sign-offs through the %s (testing on)", (channel) => {
     expect((await give(booted, channel, id, { user: "alice" })).status).toBe(409);
     expect(await statusOf(booted, id)).toBe(status);
     expect(await booted.db.list(booted.db.tables.buildReviews)).toHaveLength(0);
+    // The build page says there is nothing to review, in words.
+    const html = await page(booted, "alice", `/builds/${id}`);
+    expect(html).toContain(
+      `Nothing to review: this build ${status === "failed" ? "failed" : "was cancelled"}.`,
+    );
+    expect(html).not.toContain("approval given");
   });
 });

@@ -3,9 +3,6 @@ import { Button } from "./buttons.tsx";
 import { css } from "./css.ts";
 import { Alert, Meta } from "./feedback.tsx";
 import { HStack, VStack } from "./stacks.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /**
  * Sandbox of the embedded story frame (ADR 0006, decision 9). Scripts only: no `allow-same-origin`,
  * so a customer's Storybook never runs with the app's origin and its cookies, and no top navigation,

@@ -65,16 +65,16 @@ describe("parseChangeset", () => {
 const make = (file, bump, body) => ({ file, releases: [{ name: "p", bump }], body });
 
 describe("renderEntries", () => {
-  it("orders by the largest bump, then by file name, and drops empty bodies", () => {
+  it("groups by kind, orders by the largest bump then file name, and drops empty bodies", () => {
     assert.deepEqual(
       renderEntries([
-        make("b.md", "patch", "B"),
-        make("a.md", "patch", "A"),
-        make("c.md", "major", "C"),
+        make("b.md", "patch", "Fixed: B"),
+        make("a.md", "patch", "Fixed: A"),
+        make("c.md", "major", "Fixed: C"),
         make("d.md", "minor", ""),
-        make("e.md", "minor", "E"),
+        make("e.md", "minor", "Added: E"),
       ]),
-      ["C", "E", "A", "B"],
+      ["### Added\n\n- E", "### Fixed\n\n- C\n- A\n- B"],
     );
   });
 });
@@ -191,9 +191,13 @@ describe("manifestPublished", () => {
 
 describe("malformedChangesets", () => {
   const files = {
-    ".changeset/good.md": '---\n"@storyshelf/core": patch\n---\n\n**Fixed: x.** Y.\n',
+    ".changeset/good.md": '---\n"@storyshelf/core": patch\n---\n\nFixed: x.\n\nY.\n',
+    ".changeset/prose.md": '---\n"@storyshelf/core": patch\n---\n\n**Fixed: x.** Y.\n',
+    ".changeset/long.md": `---\n"@storyshelf/core": patch\n---\n\nFixed: ${"x".repeat(101)}\n`,
     ".changeset/bad.md": "no front matter here\n",
     ".changeset/odd.md": '---\n"@storyshelf/core": huge\n---\n\nBody.\n',
+    ".changeset/major.md": '---\n"@storyshelf/core": major\n---\n\nBreaking: x.\n',
+    ".changeset/empty.md": "---\n---\n",
   };
   const read = (path) => files[path];
 
@@ -205,6 +209,19 @@ describe("malformedChangesets", () => {
     assert.equal(problems.length, 2);
     assert.match(problems[0], /bad\.md: a changeset starts with a --- front matter block/u);
     assert.match(problems[1], /odd\.md: cannot read/u);
+  });
+
+  it("refuses a major changeset until the owner approves v1", () => {
+    const problems = malformedChangesets([".changeset/major.md"], read);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /major\.md: no major bump before 1\.0/u);
+  });
+
+  it("wants a one-line `<Kind>: <summary>` of at most 100 characters first", () => {
+    const [prose, long] = malformedChangesets([".changeset/prose.md", ".changeset/long.md"], read);
+    assert.match(prose ?? "", /prose\.md: start with one line "<Kind>: <summary>"/u);
+    assert.match(long ?? "", /long\.md: the summary is 101 characters; keep it to 100/u);
+    assert.deepEqual(malformedChangesets([".changeset/empty.md"], read), []);
   });
 
   it("looks only at changeset files, not the README or other paths", () => {
@@ -233,8 +250,12 @@ describe("highestBump and bumpVersion", () => {
     assert.equal(bumpVersion("0.8.0", "minor"), "0.9.0");
     assert.equal(bumpVersion("0.8.3", "minor"), "0.9.0");
     assert.equal(bumpVersion("0.8.3", "patch"), "0.8.4");
-    assert.equal(bumpVersion("0.8.3", "major"), "1.0.0");
     assert.equal(bumpVersion("1.9.12", "minor"), "1.10.0");
+    assert.equal(bumpVersion("1.9.12", "major"), "2.0.0");
+  });
+
+  it("refuses to cross 1.0 until the owner approves v1", () => {
+    assert.throws(() => bumpVersion("0.8.3", "major"), /no major bump before 1\.0/u);
   });
 
   it("refuses a version or a bump it cannot apply", () => {
@@ -272,18 +293,18 @@ describe("renderChangeset", () => {
     const text = renderChangeset({
       packages: ["@storyshelf/core", "storyshelf"],
       bump: "minor",
-      message: "  **Added: a thing (#1)**  ",
+      message: "  Added: a thing (#1)  ",
     });
     assert.equal(
       text,
-      '---\n"@storyshelf/core": minor\n"storyshelf": minor\n---\n\n**Added: a thing (#1)**\n',
+      '---\n"@storyshelf/core": minor\n"storyshelf": minor\n---\n\nAdded: a thing (#1)\n',
     );
     const parsed = parseChangeset(text, "x.md");
     assert.deepEqual(parsed.releases, [
       { name: "@storyshelf/core", bump: "minor" },
       { name: "storyshelf", bump: "minor" },
     ]);
-    assert.equal(parsed.body, "**Added: a thing (#1)**");
+    assert.equal(parsed.body, "Added: a thing (#1)");
   });
 
   it("uses the placeholder without a message, and CI refuses a file that keeps it", () => {
@@ -294,7 +315,7 @@ describe("renderChangeset", () => {
     assert.match(problems[0], /replace the placeholder/u);
     assert.deepEqual(
       malformedChangesets([".changeset/new.md"], () =>
-        text.replace(PLACEHOLDER_BODY, "**Fixed: x (#1)**"),
+        text.replace(PLACEHOLDER_BODY, "Fixed: x (#1)"),
       ),
       [],
     );
@@ -450,7 +471,7 @@ describe("releaseProblems, every published manifest", () => {
   });
 });
 
-const read = (name) => () => `---\n"${name}": patch\n---\n\nFixed a thing.\n`;
+const read = (name) => () => `---\n"${name}": patch\n---\n\nFixed: a thing.\n`;
 
 describe("malformedChangesets, unknown packages", () => {
   const file = ".changeset/typo.md";

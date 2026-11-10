@@ -94,22 +94,9 @@ export class BuildModel {
   }
 
   async list(projectId: string, filter: BuildListFilter = {}): Promise<Build[]> {
-    const conditions = [eq(col(this.tables.builds, "projectId"), projectId)];
-    if (filter.status) {
-      conditions.push(eq(col(this.tables.builds, "status"), filter.status));
-    }
-    if (filter.branch) {
-      conditions.push(eq(col(this.tables.builds, "gitBranch"), filter.branch));
-    }
+    const conditions = this.listConditions(projectId, filter);
     if (filter.labelKey && filter.labelValue) {
-      const labels = (await this.db.list(this.tables.buildLabels, {
-        where: and(
-          eq(col(this.tables.buildLabels, "projectId"), projectId),
-          eq(col(this.tables.buildLabels, "typeKey"), filter.labelKey),
-          eq(col(this.tables.buildLabels, "value"), filter.labelValue),
-        ),
-      })) as unknown as { buildId: string }[];
-      const ids = labels.map((l) => l.buildId);
+      const ids = await this.buildIdsWithLabel(projectId, filter.labelKey, filter.labelValue);
       if (ids.length === 0) {
         return [];
       }
@@ -120,6 +107,34 @@ export class BuildModel {
       orderBy: desc(col(this.tables.builds, "createdAt")),
       ...(filter.limit === undefined ? {} : { limit: filter.limit }),
     })) as unknown as Build[];
+  }
+
+  /** The status and branch conditions of a listing, after the project's own. */
+  private listConditions(projectId: string, filter: BuildListFilter): SQL[] {
+    const conditions = [eq(col(this.tables.builds, "projectId"), projectId)];
+    if (filter.status) {
+      conditions.push(eq(col(this.tables.builds, "status"), filter.status));
+    }
+    if (filter.branch) {
+      conditions.push(eq(col(this.tables.builds, "gitBranch"), filter.branch));
+    }
+    return conditions;
+  }
+
+  private async buildIdsWithLabel(
+    projectId: string,
+    typeKey: string,
+    value: string,
+  ): Promise<string[]> {
+    const { buildLabels } = this.tables;
+    const labels = (await this.db.list(buildLabels, {
+      where: allOf(
+        eq(col(buildLabels, "projectId"), projectId),
+        eq(col(buildLabels, "typeKey"), typeKey),
+        eq(col(buildLabels, "value"), value),
+      ),
+    })) as unknown as { buildId: string }[];
+    return labels.map((l) => l.buildId);
   }
 
   /**
@@ -140,6 +155,40 @@ export class BuildModel {
     return rows[0] ?? null;
   }
 
+  /** The newest approved build of commit `sha` on `branch`: the build affected capture compared against. */
+  async comparisonBuild(projectId: string, branch: string, sha: string): Promise<Build | null> {
+    const approved = await this.list(projectId, { branch, status: "approved" });
+    return approved.find((build) => build.gitSha === sha) ?? null;
+  }
+
+  /** When each of the given builds was created, by id (a build that is gone is left out). */
+  async createdAtOf(ids: readonly string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) {
+      return new Map();
+    }
+    const rows = (await this.db.list(this.tables.builds, {
+      where: inArray(col(this.tables.builds, "id"), [...ids]),
+    })) as unknown as Build[];
+    return new Map(rows.map((row) => [row.id, row.createdAt]));
+  }
+
+  /**
+   * The newest build on `branch` whose outcome reached the baselines, other than one of commit
+   * `excludeSha`: the comparison point of affected capture, which inherits every story it does not
+   * render from the baselines. Only an `approved` build counts today; a build still being reviewed,
+   * cancelled, failed or rejected is passed over, because its changes were never accepted and
+   * inheriting past it would show them as unchanged. A planned `skipped` build (resolved to its
+   * source) joins this rule here, so affected capture and skipping cannot drift apart.
+   */
+  async newestComparableBuild(
+    projectId: string,
+    branch: string,
+    excludeSha: string,
+  ): Promise<Build | null> {
+    const approved = await this.list(projectId, { branch, status: "approved" });
+    return approved.find((build) => build.gitSha !== excludeSha) ?? null;
+  }
+
   /**
    * Patch a build. A `cancelled` build is terminal (ADR 0006): a patch that carries another status
    * is refused, the row is returned as it is, so a capture that ends after a cancel cannot move
@@ -158,22 +207,31 @@ export class BuildModel {
       if (reopened) return reopened;
     }
     if (patch.status !== undefined && patch.status !== "cancelled" && options.reset !== true) {
-      const current = (await this.db.updateWhere(
-        this.tables.builds,
-        id,
-        values,
-        ne(col(this.tables.builds, "status"), "cancelled"),
-      )) as unknown as Build | null;
-      if (!current) throw new Error("Build not found");
-      if (current.status === "cancelled") {
-        this.logger?.debug(
-          { buildId: id, refused: patch.status },
-          "build is cancelled; status write refused",
-        );
-      }
-      return current;
+      return await this.updateUnlessCancelled(id, values, patch.status);
     }
     return (await this.db.update(this.tables.builds, id, values)) as unknown as Build;
+  }
+
+  /** A status write that a `cancelled` build refuses: the row comes back as it is. */
+  private async updateUnlessCancelled(
+    id: string,
+    values: Record<string, unknown>,
+    status: BuildStatus,
+  ): Promise<Build> {
+    const current = (await this.db.updateWhere(
+      this.tables.builds,
+      id,
+      values,
+      ne(col(this.tables.builds, "status"), "cancelled"),
+    )) as unknown as Build | null;
+    if (!current) throw new Error("Build not found");
+    if (current.status === "cancelled") {
+      this.logger?.debug(
+        { buildId: id, refused: status },
+        "build is cancelled; status write refused",
+      );
+    }
+    return current;
   }
 
   /**
@@ -197,11 +255,8 @@ export class BuildModel {
     const written = (await this.db.updateWhere(
       builds,
       id,
-      { ...values, reviewCycle: cycle + 1 } as never,
-      and(
-        inArray(col(builds, "status"), [...REVIEWED]),
-        eq(col(builds, "reviewCycle"), cycle),
-      ) as never,
+      { ...values, reviewCycle: cycle + 1 },
+      allOf(inArray(col(builds, "status"), [...REVIEWED]), eq(col(builds, "reviewCycle"), cycle)),
     )) as unknown as Build | null;
     if (written?.status === "pending") return written;
     return attempts > 1 ? await this.reopen(id, values, attempts - 1) : null;
@@ -230,14 +285,14 @@ export class BuildModel {
     const written = (await this.db.updateWhere(
       builds,
       id,
-      { reviewRequestedCycle: cycle, updatedAt: stamp } as never,
-      and(
+      { reviewRequestedCycle: cycle, updatedAt: stamp },
+      allOf(
         eq(col(builds, "status"), "pending"),
         eq(col(builds, "reviewCycle"), cycle),
         requested === null
           ? isNull(col(builds, "reviewRequestedCycle"))
           : eq(col(builds, "reviewRequestedCycle"), requested),
-      ) as never,
+      ),
     )) as unknown as Build | null;
     return written && sameInstant(written.updatedAt, stamp) ? written : null;
   }
@@ -275,7 +330,7 @@ export class BuildModel {
     const row = (await this.db.updateWhere(
       this.tables.builds,
       id,
-      values as never,
+      values,
       where,
     )) as unknown as Build | null;
     // Only our own write carries our stamp (see `failIfOwnedBy`).
@@ -327,36 +382,65 @@ export class BuildModel {
   }
 
   /**
-   * Record `jobId` as the capture job whose run owns the build (called once its job row exists),
-   * only while the build is still at `generation`, the value the enqueue read before inserting the
-   * job: one conditional write, so a stale enqueue never overwrites a newer run. `stale` means a
-   * retry superseded this run (the caller cancels its job); `ignored` is a cancelled or missing
-   * build, left alone.
+   * Claim the build for capture job `jobId` and start its run: one conditional write that records
+   * the owner and advances the run generation from `generation` (the value the enqueue read). Of two
+   * enqueues that read the same generation only one applies; the other comes back `stale` and must
+   * not insert its job. `stamped` carries the new generation, which the job's payload holds so its
+   * worker can tell a superseded run. `ignored` is a cancelled or missing build, left alone.
    */
   async stampCaptureJob(
     id: string,
     jobId: string,
     generation: number,
-  ): Promise<"stamped" | "stale" | "ignored"> {
+  ): Promise<{ result: "stamped"; generation: number } | { result: "stale" | "ignored" }> {
     const stamp = nextStamp();
     const columns = this.tables.builds;
     const row = (await this.db.updateWhere(
       columns,
       id,
-      { captureJobId: jobId, updatedAt: stamp },
-      // `and` of two conditions is never undefined.
-      and(
+      { captureJobId: jobId, captureGeneration: generation + 1, updatedAt: stamp },
+      allOf(
         ne(col(columns, "status"), "cancelled"),
         eq(col(columns, "captureGeneration"), generation),
-      ) as SQL,
+      ),
     )) as unknown as Build | null;
     if (row === null) {
-      return "ignored";
+      return { result: "ignored" };
     }
     if (row.captureJobId === jobId && instantOf(row.updatedAt) === instantOf(stamp)) {
-      return "stamped";
+      return { result: "stamped", generation: generation + 1 };
     }
-    return (row.captureGeneration ?? 0) === generation ? "ignored" : "stale";
+    return { result: (row.captureGeneration ?? 0) === generation ? "ignored" : "stale" };
+  }
+
+  /**
+   * Set the build's status only while it is still at run `generation` and not cancelled: one
+   * conditional write, so a worker of a superseded run (a retry started a newer one) writes nothing.
+   * Resolves to whether it applied and the row as it stands.
+   */
+  async setStatusAtGeneration(
+    id: string,
+    status: BuildStatus,
+    generation: number,
+  ): Promise<{ applied: boolean; build: Build | null }> {
+    const stamp = nextStamp();
+    const columns = this.tables.builds;
+    const build = (await this.db.updateWhere(
+      columns,
+      id,
+      { status, updatedAt: stamp },
+      allOf(
+        ne(col(columns, "status"), "cancelled"),
+        eq(col(columns, "captureGeneration"), generation),
+      ),
+    )) as unknown as Build | null;
+    // A refused write returns the row another writer left, whose stamp can equal ours in the same
+    // millisecond: it only counts as ours if it also holds the status and generation we wrote.
+    const applied =
+      build?.status === status &&
+      (build.captureGeneration ?? 0) === generation &&
+      instantOf(build.updatedAt) === instantOf(stamp);
+    return { applied, build };
   }
 
   /**
@@ -374,11 +458,10 @@ export class BuildModel {
       columns,
       id,
       { status: "failed", updatedAt: stamp },
-      // `and` of two conditions is never undefined.
-      and(
+      allOf(
         inArray(col(columns, "status"), ["pending", "capturing"]),
         eq(col(columns, "captureJobId"), jobId),
-      ) as SQL,
+      ),
     )) as unknown as Build | null;
     // `updateWhere` returns the row either way; only our own write carries our stamp. Compared as
     // instants: Postgres hands the column back as `2026-11-03 19:46:04.101+00`, not as the ISO we wrote.
@@ -528,7 +611,7 @@ function parsePaths(raw: string | null): string[] | null {
   try {
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) && parsed.every((entry) => typeof entry === "string")
-      ? (parsed as string[])
+      ? parsed
       : null;
   } catch {
     return null;

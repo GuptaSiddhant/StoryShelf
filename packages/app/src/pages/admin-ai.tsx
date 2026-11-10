@@ -10,9 +10,6 @@ import {
   Stat,
   Table,
 } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 function DaysTable(props: {
   days: UsageReport["days"];
 }): HtmlEscapedString | Promise<HtmlEscapedString> {

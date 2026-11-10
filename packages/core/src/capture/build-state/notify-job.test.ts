@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { StateNotifierProvider } from "../../adapters/notifier/provider.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { deferred } from "../../test-helpers/index.ts";
-import { rig } from "../consumer/test-fixtures.ts";
+import { rig, stubLogger } from "../consumer/test-fixtures.ts";
+import type { ConsumerJob } from "../consumer/types.ts";
 import {
   createNotifyEnqueuer,
   createNotifyHandler,
@@ -26,6 +27,52 @@ async function setup(options: { onFailed?: (failure: NotifyFailure) => Promise<v
 async function lastError(w: World): Promise<string | null | undefined> {
   return (await w.channels.get(w.channelId))?.lastError;
 }
+
+describe("the notify job past its deadline", () => {
+  it("shows nothing and records nothing once its signal is aborted, even on its last attempt", async () => {
+    const onFailed = vi.fn(async () => {});
+    const { w, handler } = await setup({ onFailed });
+    const controller = new AbortController();
+    controller.abort(new Error("job deadline exceeded"));
+    const job = {
+      buildId: w.build.id,
+      attempt: NOTIFY_MAX_ATTEMPTS,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as unknown as ConsumerJob;
+
+    await expect(
+      handler.run(job, { logger: stubLogger().logger, touch: () => {}, signal: controller.signal }),
+    ).rejects.toThrow("job deadline exceeded");
+
+    expect(statusLog(w.git)).toEqual([]);
+    expect(await lastError(w)).toBeNull();
+    expect(onFailed).not.toHaveBeenCalled();
+  });
+
+  it("stops before the host is told when the deadline passes while the state is being read", async () => {
+    const { w, handler } = await setup();
+    const controller = new AbortController();
+    const origin = w.deps.publicOrigin;
+    w.deps.publicOrigin = async () => {
+      const resolved = await origin();
+      controller.abort(new Error("job deadline exceeded"));
+      return resolved;
+    };
+    const job = {
+      buildId: w.build.id,
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as unknown as ConsumerJob;
+
+    await expect(
+      handler.run(job, { logger: stubLogger().logger, touch: () => {}, signal: controller.signal }),
+    ).rejects.toThrow("job deadline exceeded");
+
+    expect(statusLog(w.git)).toEqual([]);
+  });
+});
 
 describe("the notify job", () => {
   it("delivers the build's state as it is when the job runs, not as it was when queued", async () => {
@@ -206,10 +253,14 @@ describe("the notify job", () => {
       maxAttempts: NOTIFY_MAX_ATTEMPTS,
       data: { channelId: w.channelId },
     } as never;
-    const context = { logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }, touch: () => {} };
+    const context = {
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      touch: () => {},
+      signal: new AbortController().signal,
+    };
     const running = handler.run(job, context as never);
     await handler.cancel?.(job);
-    await expect(running).resolves.toBeUndefined();
+    await expect(running).rejects.toThrow("notify cancelled");
     expect(onFailed).not.toHaveBeenCalled();
     expect(await lastError(w)).toBeFalsy();
   });
@@ -231,11 +282,12 @@ describe("the notify job", () => {
     };
     const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
-    await expect(handler.run(job, { logger, touch: () => {} } as never)).resolves.toBeUndefined();
+    await expect(
+      handler.run(job, { logger, touch: () => {}, signal: new AbortController().signal } as never),
+    ).rejects.toThrow("notify cancelled");
 
     expect(statusLog(w.git)).toEqual([]);
     expect(await lastError(w)).toBeFalsy();
-    expect(logger.info).toHaveBeenCalledWith("notify job was cancelled; outcome not recorded");
   });
 
   it("keeps a cancel for an older invocation when the job is reclaimed and starts again", async () => {
@@ -263,19 +315,26 @@ describe("the notify job", () => {
     const olderLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const newerLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
-    const older = handler.run(job, { logger: olderLog, touch: () => {} } as never);
+    const older = handler.run(job, {
+      logger: olderLog,
+      touch: () => {},
+      signal: new AbortController().signal,
+    } as never);
     await entered.promise;
     await handler.cancel?.(job);
     // The job is claimed again (its lease was lost) and starts a second invocation.
-    await handler.run(job, { logger: newerLog, touch: () => {} } as never);
+    await handler.run(job, {
+      logger: newerLog,
+      touch: () => {},
+      signal: new AbortController().signal,
+    } as never);
     const writtenByNewer = statusLog(w.git).length;
     expect(writtenByNewer).toBeGreaterThan(0);
     gate.resolve();
-    await older;
+    await expect(older).rejects.toThrow("notify cancelled");
 
     // The older invocation stayed stopped: it wrote nothing more after the newer one's delivery.
     expect(statusLog(w.git)).toHaveLength(writtenByNewer);
-    expect(olderLog.info).toHaveBeenCalledWith("notify job was cancelled; outcome not recorded");
   });
 
   it("a cancel for a lost attempt does not stop the reclaimed attempt that runs now", async () => {
@@ -297,7 +356,11 @@ describe("the notify job", () => {
       return await origin();
     };
     const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
-    const running = handler.run(reclaimed, { logger, touch: () => {} } as never);
+    const running = handler.run(reclaimed, {
+      logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    } as never);
     await entered.promise;
     await handler.cancel?.(lost);
     gate.resolve();
@@ -315,7 +378,11 @@ describe("the notify job", () => {
       data: { channelId: w.channelId },
     } as never;
     const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
-    await handler.run(job, { logger, touch: () => {} } as never);
+    await handler.run(job, {
+      logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    } as never);
     expect(statusLog(w.git).length).toBeGreaterThan(0);
   });
 
@@ -330,7 +397,11 @@ describe("the notify job", () => {
       maxAttempts: NOTIFY_MAX_ATTEMPTS,
       data: { channelId: w.channelId },
     } as never;
-    const context = { logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }, touch: () => {} };
+    const context = {
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      touch: () => {},
+      signal: new AbortController().signal,
+    };
     await expect(handler.run(job, context as never)).rejects.toThrow("Bad credentials");
     expect(onFailed).toHaveBeenCalledTimes(1);
   });

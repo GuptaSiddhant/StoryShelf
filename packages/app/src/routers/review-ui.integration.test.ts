@@ -239,7 +239,7 @@ describe("the review gate", () => {
     );
     for (const { key, status, body } of responses) {
       expect(status, key).toBe(404);
-      expect(body).toEqual({ error: REVIEW_DISABLED_MESSAGE });
+      expect(body).toEqual({ error: { message: REVIEW_DISABLED_MESSAGE } });
     }
   });
 
@@ -270,8 +270,14 @@ describe("the review gate", () => {
   it("tells nothing about a project to someone who cannot view it", async () => {
     const booted = await boot({ project: { reviewEnabled: false } });
     const response = await booted.api("outsider", "/builds/b1/comments");
-    expect(response.status).toBe(403);
-    expect(await response.text()).not.toContain(REVIEW_DISABLED_MESSAGE);
+    // 404 as for an unknown project, not the 403 that would show the project exists (#497).
+    expect(response.status).toBe(404);
+    const unknown = await booted.app.request("/api/v1/projects/ghost/builds/b1/comments", {
+      headers: { cookie: "storyshelf_session=outsider" },
+    });
+    const body = await response.text();
+    expect(body).toBe(await unknown.text());
+    expect(body).not.toContain(REVIEW_DISABLED_MESSAGE);
   });
 
   it("does not touch the pages of the build when review is off: they still render", async () => {
@@ -311,7 +317,8 @@ describe("the review gate", () => {
           cookie: "storyshelf_session=outsider",
           "x-csrf-token": getCsrfToken("s", "outsider"),
         });
-        expect(outsider.status, `outsider ${path}`).toBe(403);
+        // No role at all: the answer for a project that does not exist (#497), not a 403.
+        expect(outsider.status, `outsider ${path}`).toBe(404);
         expect(await outsider.text()).not.toContain(REVIEW_DISABLED_MESSAGE);
       };
       await Promise.all(FORM_ROUTES.map(async (path) => await probe(path)));

@@ -18,11 +18,6 @@ export interface PublishHandlerOptions {
   logger: Logger;
 }
 
-/** The key a running job is tracked under: its row (else its build) and its attempt. */
-function keyOf(job: ConsumerJob): string {
-  return `${job.jobId ?? job.buildId}#${job.attempt ?? 1}`;
-}
-
 /** A `publish` job needs the build to publish. */
 function hasBuild(job: ConsumerJob): boolean {
   return typeof job.buildId === "string" && job.buildId.length > 0;
@@ -35,7 +30,7 @@ function hasBuild(job: ConsumerJob): boolean {
  * (same keys) and leaves an already accepted build alone.
  */
 export function createPublishHandler(options: PublishHandlerOptions): KindHandler {
-  // One abort controller per running job: `cancel` (a cancel or a lost lease) stops its extraction.
+  // One abort controller per running attempt: a cancel aborts it, like a passed deadline does.
   const running = new Map<string, AbortController>();
   return {
     accepts: hasBuild,
@@ -44,12 +39,8 @@ export function createPublishHandler(options: PublishHandlerOptions): KindHandle
       const controller = new AbortController();
       running.set(keyOf(job), controller);
       try {
-        const build = await new BuildModel(options.db).get(job.buildId);
-        if (!build) {
-          context.logger.warn("build is gone; dropping publish job");
-          return;
-        }
-        await publishOnce(options, job, { ...context, signal: controller.signal }, build.projectId);
+        const signal = AbortSignal.any([context.signal, controller.signal]);
+        await runPublish(options, job, { ...context, signal });
       } finally {
         // Only this run's own controller: a reclaimed attempt may have registered a newer one.
         if (running.get(keyOf(job)) === controller) running.delete(keyOf(job));
@@ -62,29 +53,32 @@ export function createPublishHandler(options: PublishHandlerOptions): KindHandle
   };
 }
 
+async function runPublish(
+  options: PublishHandlerOptions,
+  job: ConsumerJob,
+  context: { logger: Logger; touch: () => void; signal: AbortSignal },
+): Promise<void> {
+  const build = await new BuildModel(options.db).get(job.buildId);
+  if (!build) {
+    context.logger.warn("build is gone; dropping publish job");
+    return;
+  }
+  context.signal.throwIfAborted();
+  await publishOnce(options, job, context, build.projectId);
+}
+
+/** The key a job is tracked under while it runs: its row (else its build) and its attempt. */
+function keyOf(job: ConsumerJob): string {
+  return `${job.jobId ?? job.buildId}#${job.attempt ?? 1}`;
+}
+
 async function publishOnce(
   options: PublishHandlerOptions,
   job: ConsumerJob,
   context: { logger: Logger; touch: () => void; signal: AbortSignal },
   projectId: string,
 ): Promise<void> {
-  if ((await attemptPublish(options, job, context, projectId)) === "stored") {
-    await options.completer.complete(job.buildId, { ok: true });
-  }
-}
-
-/**
- * Store the zip's files. Answers "stored" only for a run that finished and was not told to stop;
- * a cancelled run, a lost lease and a failure (settled here) all answer "stopped", and the build is
- * not completed by them.
- */
-async function attemptPublish(
-  options: PublishHandlerOptions,
-  job: ConsumerJob,
-  context: { logger: Logger; touch: () => void; signal: AbortSignal },
-  projectId: string,
-): Promise<"stored" | "stopped"> {
-  const { storage, scratchDir, limits, db } = options;
+  const { completer, storage, scratchDir, limits, db } = options;
   try {
     await publishStoredZip(
       {
@@ -93,40 +87,49 @@ async function attemptPublish(
         limits,
         db,
         logger: context.logger,
-        touch: context.touch,
+        touch: touchUnlessAborted(context),
         signal: context.signal,
       },
       { projectId, buildId: job.buildId },
     );
   } catch (error) {
-    if (context.signal.aborted) return stopped(context.logger);
-    await settleFailure(options.completer, job, error);
-    return "stopped";
+    // Resolves only for a cap breach (final); every other outcome throws.
+    await settleFailure(options, job, { error, signal: context.signal });
+    return;
   }
-  // The cancel (or the lost lease) may land after the last file: the run finished, but it was told
-  // to stop, so it does not complete the build or run the success hooks.
-  return context.signal.aborted ? stopped(context.logger) : "stored";
+  context.signal.throwIfAborted();
+  await completer.complete(job.buildId, { ok: true });
 }
 
-/** A run told to stop (cancelled, or its lease lost): the consumer settles the job. */
-function stopped(logger: Logger): "stopped" {
-  logger.info("publish stopped by a cancel");
-  return "stopped";
-}
-
-/** A permanent failure (a cap) or the last attempt fails the build; anything else is retried. */
+/**
+ * A failed publication: a cap breach is final, the last attempt fails the build, any other error is
+ * rethrown for a retry. Past its deadline the attempt writes nothing: the lease lapses and the
+ * redelivery (or the `exhausted` hook, when none is left) settles the build.
+ */
 async function settleFailure(
-  completer: PublishCompleter,
+  options: PublishHandlerOptions,
   job: ConsumerJob,
-  error: unknown,
+  failure: { error: unknown; signal: AbortSignal },
 ): Promise<void> {
+  const { error, signal } = failure;
   const permanent = error instanceof ZipLimitError;
+  if (signal.aborted) {
+    throw error;
+  }
   if (permanent || (job.attempt ?? 1) >= (job.maxAttempts ?? 1)) {
-    await completer.complete(job.buildId, { ok: false, error: messageOf(error) });
+    await options.completer.complete(job.buildId, { ok: false, error: messageOf(error) });
   }
   if (!permanent) {
     throw error;
   }
+}
+
+/** Publishing reports progress after extraction and after persisting: past the deadline the next report stops it. */
+function touchUnlessAborted(context: { touch: () => void; signal: AbortSignal }): () => void {
+  return () => {
+    context.signal.throwIfAborted();
+    context.touch();
+  };
 }
 
 function messageOf(error: unknown): string {

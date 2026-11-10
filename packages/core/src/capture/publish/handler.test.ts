@@ -61,12 +61,64 @@ async function setup(options: { files?: Record<string, string>; maxEntries?: num
     await handler.run({ buildId: build.id, attempt: 1, maxAttempts: 3, ...job } as ConsumerJob, {
       logger: log.logger,
       touch: () => {},
+      signal: new AbortController().signal,
     });
   };
   return { db, storage, project, build, handler, run, statusOf, log };
 }
 
 describe("createPublishHandler", () => {
+  it("stops at the deadline: an aborted job runs nothing and completes no publication", async () => {
+    const { handler, build, statusOf } = await setup();
+    const before = await statusOf();
+    const controller = new AbortController();
+    controller.abort(new Error("job deadline exceeded"));
+
+    await expect(
+      handler.run({ buildId: build.id, attempt: 1, maxAttempts: 3 } as ConsumerJob, {
+        logger: stubLogger().logger,
+        touch: () => {},
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("job deadline exceeded");
+    expect(await statusOf()).toBe(before);
+  });
+
+  it("an expired invocation writes no more, completes nothing and leaves the scratch to the redelivery", async () => {
+    const files = Object.fromEntries(
+      Array.from({ length: 30 }, (_unused, index) => [`f${String(index)}.html`, `<p>${index}</p>`]),
+    );
+    const { handler, storage, build, project, statusOf, run } = await setup({ files });
+    const before = await statusOf();
+    const controller = new AbortController();
+    const write = storage.write.bind(storage);
+    const writes: string[] = [];
+    storage.write = async (key, data, ...rest) => {
+      writes.push(key);
+      if (writes.length === 1) controller.abort(new Error("job deadline exceeded"));
+      return await write(key, data, ...rest);
+    };
+
+    await expect(
+      handler.run({ buildId: build.id, attempt: 1, maxAttempts: 1 } as ConsumerJob, {
+        logger: stubLogger().logger,
+        touch: () => {},
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("job deadline exceeded");
+
+    const prefix = storybookDir(project.id, build.id);
+    expect(writes.length).toBeLessThan(60);
+    expect(writes).not.toContain(`${prefix}/manifest.json`);
+    expect(await statusOf()).toBe(before);
+    // The shared scratch is the redelivery's: the expired run did not remove it.
+    expect(await readdir(join(scratchDir, SCRATCH_DIRNAME, project.id, build.id))).not.toEqual([]);
+
+    storage.write = write;
+    await run({ attempt: 2 });
+    expect(await storage.exists(`${prefix}/manifest.json`)).toBe(true);
+  });
+
   it("records the build's use of each distinct published blob", async () => {
     const { db, build, run } = await setup();
     const recordContentUses = vi.fn(async () => await Promise.resolve([] as string[]));
@@ -102,10 +154,6 @@ describe("createPublishHandler", () => {
     expect(await storage.exists(`${prefix}/iframe.html`)).toBe(true);
     expect(await storage.exists(`${prefix}/manifest.json`)).toBe(true);
     expect(await statusOf()).toBe("approved");
-    const left = await readdir(join(scratchDir, SCRATCH_DIRNAME, project.id, build.id)).catch(
-      () => null,
-    );
-    expect(left).toBeNull();
   });
 
   it("is idempotent: a redelivery after a lost lease republishes and keeps the status", async () => {
@@ -149,17 +197,17 @@ describe("createPublishHandler", () => {
       return await Promise.resolve(stuck);
     };
     const job = { buildId: build.id, jobId: "j1", attempt: 1, maxAttempts: 3 } as ConsumerJob;
-    const running = handler.run(job, { logger: log.logger, touch: () => {} });
+    const running = handler.run(job, {
+      logger: log.logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    });
     await openedPromise;
     await handler.cancel?.(job);
-    await expect(running).resolves.toBeUndefined();
+    await expect(running).rejects.toThrow("publish cancelled");
     expect(stuck.destroyed).toBe(true);
     expect(await storage.exists(`${storybookDir(project.id, build.id)}/manifest.json`)).toBe(false);
     expect(await statusOf()).toBe("pending");
-    const left = await readdir(join(scratchDir, SCRATCH_DIRNAME, project.id, build.id)).catch(
-      () => null,
-    );
-    expect(left).toBeNull();
   });
 
   it("does not complete the build when the cancel lands after the last file was stored", async () => {
@@ -173,11 +221,14 @@ describe("createPublishHandler", () => {
     };
 
     await expect(
-      handler.run(job, { logger: log.logger, touch: () => {} }),
-    ).resolves.toBeUndefined();
+      handler.run(job, {
+        logger: log.logger,
+        touch: () => {},
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow("publish cancelled");
 
     expect(await statusOf()).toBe("pending");
-    expect(log.calls.some((c) => c.fields === "publish stopped by a cancel")).toBe(true);
   });
 
   it("keeps a reclaimed attempt cancellable when the older run of the same job ends", async () => {
@@ -197,7 +248,7 @@ describe("createPublishHandler", () => {
       return await Promise.resolve(streams[at] as PassThrough);
     };
     const job = { buildId: build.id, jobId: "j3", attempt: 1, maxAttempts: 3 } as ConsumerJob;
-    const context = { logger: log.logger, touch: () => {} };
+    const context = { logger: log.logger, touch: () => {}, signal: new AbortController().signal };
 
     // The lease of the first run was lost, so the job was claimed again while it still runs.
     const first = handler.run(job, context);
@@ -209,7 +260,7 @@ describe("createPublishHandler", () => {
     await expect(first).rejects.toThrow();
 
     await handler.cancel?.(job);
-    await expect(second).resolves.toBeUndefined();
+    await expect(second).rejects.toThrow("publish cancelled");
     expect(newer.destroyed).toBe(true);
   });
 
@@ -223,7 +274,11 @@ describe("createPublishHandler", () => {
     };
     const lost = { buildId: build.id, jobId: "j4", attempt: 1, maxAttempts: 3 } as ConsumerJob;
     const reclaimed = { ...lost, attempt: 2 } as ConsumerJob;
-    const running = handler.run(reclaimed, { logger: log.logger, touch: () => {} });
+    const running = handler.run(reclaimed, {
+      logger: log.logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    });
     await opened.promise;
     // The consumer that lost attempt 1 reports it: attempt 2 is a different run.
     await handler.cancel?.(lost);

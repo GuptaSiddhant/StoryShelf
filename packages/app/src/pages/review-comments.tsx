@@ -6,9 +6,6 @@ import { csrfField } from "../shell/csrf-field.tsx";
 import { Badge, Button, Card, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 import { CommentCard, RequestChangeField } from "./build-diff-comments.tsx";
 import { CommentBodyField } from "./comment-body-field.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Comments on the build as a whole and on its stories, with a form for a build comment. */

@@ -35,14 +35,21 @@ function encodeRandom(bytes: Buffer): string {
   for (const byte of bytes) {
     buffer = (buffer << 8) | byte;
     bits += 8;
-    while (bits >= 5) {
-      out += CROCKFORD.charAt((buffer >>> (bits - 5)) & 31);
-      bits -= 5;
-    }
+    const drained = drainGroups(buffer, bits);
+    out += drained.text;
+    bits = drained.bits;
   }
-  if (bits > 0) {
-    out += CROCKFORD.charAt((buffer << (5 - bits)) & 31);
+  return out + (bits > 0 ? CROCKFORD.charAt((buffer << (5 - bits)) & 31) : "");
+}
+
+/** Every complete 5-bit group held in the low `bits` bits of `buffer`, and the bits left over. */
+function drainGroups(buffer: number, bits: number): { text: string; bits: number } {
+  let text = "";
+  let left = bits;
+  while (left >= 5) {
+    text += CROCKFORD.charAt((buffer >>> (left - 5)) & 31);
+    left -= 5;
   }
-  return out;
+  return { text, bits: left };
 }
 /* eslint-enable no-bitwise, no-non-null-assertion */

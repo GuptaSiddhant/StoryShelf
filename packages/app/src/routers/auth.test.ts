@@ -1,15 +1,21 @@
 import { createShelfAuth, samlPreset, type ShelfAuth } from "@storyshelf/auth";
 import { baseAuthTables } from "@storyshelf/auth";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { BuildModel, MemberModel } from "@storyshelf/core/models";
 import { makeStorage } from "@storyshelf/core/test-helpers";
 import { ulid } from "@storyshelf/core/utils";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 
 const silentLogger = pino({ level: "silent" });
+
+// A spy made with `vi.spyOn` must not outlive its test, whether or not the test got to the end.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 const SECRET = "test-secret";
 const FAKE_ISSUER = "https://idp.example.com";
 const BASE_URL = "http://localhost:3000";
@@ -376,6 +382,52 @@ describe("engine auth routes", () => {
     const spent = await app.request(`/auth/invites/nope?token=${issued.token}`);
     expect(spent.status).toBe(400);
   });
+
+  it("shows the password policy and an invalid invite, but never an internal failure's text", async () => {
+    const { db, shelf } = await testEngine();
+    const app = testApp(db, shelf);
+    const issued = await shelf.adapter.issueInvite({
+      email: "gus@example.com",
+      name: "Gus",
+      role: "member",
+    });
+    const accept = async (inviteId: string, token: string, password: string) => {
+      const body = new FormData();
+      body.set("token", token);
+      body.set("password", password);
+      body.set("confirm", password);
+      body.set("csrf_token", getCsrfToken(SECRET));
+      return await app.request(`/auth/invites/${inviteId}`, {
+        method: "POST",
+        headers: { origin: BASE_URL },
+        body,
+      });
+    };
+
+    const short = await accept(issued.inviteId, issued.token, "short");
+    expect(short.status).toBe(400);
+    const shortHtml = await short.text();
+    expect(shortHtml).toContain("Password must be at least 12 characters");
+
+    const wrongToken = await accept(issued.inviteId, "not-the-token", "correct-horse-12");
+    expect(wrongToken.status).toBe(400);
+    expect(await wrongToken.text()).toContain("Invalid or expired invite");
+
+    vi.spyOn(shelf.adapter, "acceptInvite").mockRejectedValue(
+      new Error("SQLITE_BUSY: database is locked (/var/data/shelf.db)"),
+    );
+    const logged = vi.spyOn(silentLogger, "error");
+    const failed = await accept(issued.inviteId, issued.token, "correct-horse-12");
+    const html = await failed.text();
+    expect(logged).toHaveBeenCalledWith(
+      { err: expect.objectContaining({ message: expect.stringContaining("SQLITE_BUSY") }) },
+      "unexpected error answered with a generic message",
+    );
+    expect(failed.status).toBe(400);
+    expect(html).toContain("Invalid or expired invite");
+    expect(html).not.toContain("SQLITE_BUSY");
+    expect(html).not.toContain("shelf.db");
+  });
 });
 
 async function loginCookie(
@@ -564,5 +616,126 @@ describe("engine profile page", () => {
     const html = await after.text();
     expect(html).not.toContain(">Laptop<");
     expect(html).toContain("2nd key");
+  });
+});
+
+describe("signing in to come back to a page", () => {
+  const RETURN = /name="return_to" value="([^"]*)"/u;
+  const EVIL = ["https://evil.example", "//evil.example", "/\\evil.example", "evil"];
+
+  it("carries a same-site return path through every way of signing in", async () => {
+    const { db, shelf } = await testEngine();
+    const html = await (
+      await testApp(db, shelf).request("/auth/login?return_to=%2Fprojects%2Fa%3Fx%3D1")
+    ).text();
+    expect(RETURN.exec(html)?.[1]).toBe("/projects/a?x=1");
+    expect(html).toContain('data-return-to="/projects/a?x=1"');
+    expect(html).toContain("/auth/engine/acme-saml?return_to=%2Fprojects%2Fa%3Fx%3D1");
+  });
+
+  it("leaves the return path out when there is none, and when it leaves the site", async () => {
+    const { db, shelf } = await testEngine();
+    const app = testApp(db, shelf);
+    for (const bad of ["", ...EVIL.map((value) => `?return_to=${encodeURIComponent(value)}`)]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one request at a time keeps failures readable
+      const html = await (await app.request(`/auth/login${bad}`)).text();
+      expect(RETURN.test(html), bad).toBe(false);
+      expect(html, bad).toContain('data-return-to="/"');
+      expect(html, bad).not.toContain("evil.example");
+    }
+  });
+
+  it("sends the visitor to the page after signing in, and keeps it after a failed try", async () => {
+    const { db, shelf } = await testEngine();
+    const app = testApp(db, shelf);
+    await signup(shelf, "ada@example.com");
+    const attempt = async (password: string, returnTo: string): Promise<Response> => {
+      const form = new FormData();
+      form.set("email", "ada@example.com");
+      form.set("password", password);
+      form.set("return_to", returnTo);
+      return await app.request("/auth/engine/login", {
+        method: "POST",
+        headers: { origin: BASE_URL },
+        body: form,
+      });
+    };
+
+    const failed = await attempt("wrongpassword12", "/projects/a?x=1");
+    expect(failed.status).toBe(401);
+    expect(RETURN.exec(await failed.text())?.[1]).toBe("/projects/a?x=1");
+
+    const ok = await attempt("hunter2hunter2", "/projects/a?x=1");
+    expect(ok.status).toBe(302);
+    expect(ok.headers.get("location")).toBe("/projects/a?x=1");
+
+    for (const evil of [...EVIL, "/a\r\nSet-Cookie: x=1"]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      const landed = await attempt("hunter2hunter2", evil);
+      expect(landed.headers.get("location"), evil).toBe("/");
+    }
+  });
+
+  it("goes from a private link's not-found page, through sign-in, to the Storybook", async () => {
+    const { db, shelf } = await testEngine();
+    const app = testApp(db, shelf);
+    await signup(shelf, "ada@example.com");
+    const NOW = "2026-01-01T00:00:00.000Z";
+    await db.insert(db.tables.projects, {
+      id: "p1",
+      name: "Hidden",
+      slug: "hidden",
+      gitRepository: "acme/widgets",
+      gitDefaultBranch: "main",
+      reviewEnabled: true,
+      reviewApprovals: 1,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const builds = new BuildModel(db);
+    const build = await builds.create("p1", {
+      gitSha: "a".repeat(40),
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await builds.update(build.id, { status: "approved" });
+
+    // A teammate opens the private link: the page says nothing about whether the project exists.
+    const landing = await app.request("/projects/hidden/storybook", {
+      headers: { accept: "text/html" },
+    });
+    expect(landing.status).toBe(404);
+    const signInHref = /href="(\/auth\/login\?return_to=[^"]+)"/u.exec(await landing.text())?.[1];
+    expect(signInHref).toBe("/auth/login?return_to=%2Fprojects%2Fhidden%2Fstorybook");
+
+    // The link opens the sign-in page, which remembers where they were going.
+    const loginPage = await (await app.request(signInHref ?? "")).text();
+    const returnTo = RETURN.exec(loginPage)?.[1];
+    expect(returnTo).toBe("/projects/hidden/storybook");
+
+    // Signing in lands them back on the link.
+    const form = new FormData();
+    form.set("email", "ada@example.com");
+    form.set("password", "hunter2hunter2");
+    form.set("return_to", returnTo ?? "");
+    const signedIn = await app.request("/auth/engine/login", {
+      method: "POST",
+      headers: { origin: BASE_URL },
+      body: form,
+    });
+    expect(signedIn.headers.get("location")).toBe("/projects/hidden/storybook");
+    const cookie = sessionOf(signedIn);
+
+    // Signing in alone reveals nothing: without a role the link still answers 404.
+    expect((await app.request("/projects/hidden/storybook", { headers: { cookie } })).status).toBe(
+      404,
+    );
+
+    // Once they are a member, the same link opens the Storybook.
+    const user = await shelf.adapter.check(new Request(BASE_URL, { headers: { cookie } }));
+    await new MemberModel(db).set("p1", user?.id ?? "", "viewer");
+    const opened = await app.request("/projects/hidden/storybook", { headers: { cookie } });
+    expect(opened.status).toBe(302);
+    expect(opened.headers.get("location")).toBe(`/projects/hidden/storybook/build/${build.id}/`);
   });
 });

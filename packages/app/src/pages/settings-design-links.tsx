@@ -1,9 +1,6 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import { csrfField } from "../shell/csrf-field.tsx";
 import { Button, Card, Field, FormActions, Meta, SectionTitle, Table } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Field-level and page-level errors of the Design settings forms. */

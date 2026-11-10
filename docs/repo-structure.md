@@ -24,7 +24,7 @@ Rationale: tsdown targets distributable ESM libraries (dts, per-entry outputs); 
 
 ## Export mechanism (not `tsdown-entry`)
 
-There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ source: ./src/..., default: ./dist/... }` (plus `publishConfig.exports` rewritten to dist-only on publish). `nub.jsonc → conditions: ["source"]` and `tsconfig.base.json → customConditions: ["source"]` resolve workspace imports to `.ts`/`.tsx` source in dev, editor, and `tsc`.
+There is no `tsdown-entry` key. Each library `package.json` `exports` map carries `{ source: ./src/..., default: ./dist/... }`, plus a dist-only `publishConfig.exports`. The release publishes with `npm publish`, which does not apply `publishConfig.exports`, so the published manifest still carries the `source` conditions (#393). `storyshelf` (cli) and `@storyshelf/mcp` have plain `dist` exports and no `source` condition. `nub.jsonc → conditions: ["source"]` and `tsconfig.base.json → customConditions: ["source"]` resolve workspace imports to `.ts`/`.tsx` source in dev, editor, and `tsc`.
 
 ## Public import surface
 
@@ -56,7 +56,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 ## Schema layout (0.2.0 target, R2)
 
 - `packages/core/src/schema/` — one module per entity, mirroring `packages/core/src/models/` 1:1 (`project.ts`, `build.ts`, `snapshot.ts`, `baseline.ts`, `comment.ts`, `label.ts`, `token.ts`, `webhook.ts`, `member.ts`, `user.ts`).
-- The DDL is hand-written per dialect in `packages/db-{sqlite,postgres,mysql}/src/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (proposed).
+- The DDL is hand-written per dialect in `packages/db-{sqlite,postgres,mysql}/src/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (accepted, not yet implemented).
 - `@storyshelf/db-sqlite` owns the SQLite schema/DDL/shared factory; `./turso`, `./better-sqlite3`, `./bun-sqlite`, `./d1` are driver presets over it (R3).
 
 ## App convention (lives in `packages/app/src/`)

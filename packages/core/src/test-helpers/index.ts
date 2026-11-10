@@ -40,3 +40,10 @@ export {
   type BuildReferenceContractFixture,
   type BuildReferenceContractFixtureRunner,
 } from "./build-reference-contract.ts";
+export {
+  retentionActivationContractSuite,
+  type RetentionActivationHarness,
+  type RetentionActivationHarnessRunner,
+  type SeededBaseline,
+  type SeededSnapshot,
+} from "./retention-activation-contract.ts";

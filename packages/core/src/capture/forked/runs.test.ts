@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { JobRunContext } from "../consumer/types.ts";
 import { jobKey, RunBook } from "./runs.ts";
 
-const context: JobRunContext = { logger: {} as never, touch: () => {} };
+const context: JobRunContext = {
+  logger: {} as never,
+  touch: () => {},
+  signal: new AbortController().signal,
+};
 
 describe("RunBook", () => {
   it("lets ordinary runs start side by side", () => {

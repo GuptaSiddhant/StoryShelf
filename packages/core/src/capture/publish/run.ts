@@ -19,7 +19,11 @@ export interface PublishZipOptions {
   logger: Logger;
   /** Called between stages (renews a job's lease). */
   touch?: () => void;
-  /** A cancel: aborting it stops the extraction and the persisting, and no manifest is written. */
+  /**
+   * The attempt's signal. Once aborted (its deadline passed, so a redelivery may be running),
+   * extraction and persistence write nothing more, and the shared scratch directory is left to the
+   * redelivery, which resets it before it extracts.
+   */
   signal?: AbortSignal | undefined;
 }
 
@@ -49,6 +53,9 @@ export async function publishStoredZip(
     await persistStorybookStatics(storage, dir, projectId, buildId, options.db, options.signal);
     options.touch?.();
   } finally {
-    await removeShardScratch(scratchDir, projectId, buildId, PUBLISH_SCRATCH_ID, logger);
+    // An expired invocation shares the directory with the redelivery: it must not remove its files.
+    if (options.signal?.aborted !== true) {
+      await removeShardScratch(scratchDir, projectId, buildId, PUBLISH_SCRATCH_ID, logger);
+    }
   }
 }

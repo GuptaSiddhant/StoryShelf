@@ -12,9 +12,6 @@ import {
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { healthTone } from "./health-panel.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const thumbStrip = css`
   /* project-thumbs */
   display: grid;

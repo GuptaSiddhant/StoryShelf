@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: Architecture docs
-    url: https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/architecture.md
+    url: https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/architecture/README.md
     about: Read the canonical architecture spec before filing architecture-related tasks.
   - name: Task board (archived)
     url: https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/TASKS.md

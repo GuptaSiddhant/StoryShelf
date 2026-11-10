@@ -21,6 +21,9 @@ export interface ExtractionResult {
 /**
  * Extract `source` (a zip stream) under `root`, which must exist.
  *
+ * With a `signal`, an abort stops the extraction like a failed cap does: the source is destroyed,
+ * no further entry is written, in-flight writes are settled, and the signal's reason is thrown.
+ *
  * @throws {ZipLimitError} When a cap is exceeded or an entry path escapes `root`; the source is
  *   destroyed at once, and the files written so far are left for the caller's scratch cleanup.
  */
@@ -28,8 +31,9 @@ export async function extractZipStream(
   source: Readable,
   root: string,
   limits: ExtractionLimits,
+  signal?: AbortSignal,
 ): Promise<ExtractionResult> {
-  const run = new Extraction(resolve(root), limits);
+  const run = new Extraction(resolve(root), limits, signal);
   const failure = await run.parse(source);
   // Writes may still be in flight after a failure; settle them before anyone removes the files.
   const outcomes = await Promise.allSettled(run.writes);
@@ -54,12 +58,14 @@ class Extraction {
   readonly writes: Promise<void>[] = [];
   readonly root: string;
   readonly limits: ExtractionLimits;
+  readonly #signal: AbortSignal | undefined;
   #failed = false;
   #fail: (error: unknown) => void = ignore;
 
-  constructor(root: string, limits: ExtractionLimits) {
+  constructor(root: string, limits: ExtractionLimits, signal?: AbortSignal) {
     this.root = root;
     this.limits = limits;
+    this.#signal = signal;
   }
 
   /** Resolves with the first failure, or null once the archive was read to its end. */
@@ -85,8 +91,28 @@ class Extraction {
         settle(null);
       });
       source.on("error", this.#fail);
+      this.#stopOnAbort();
       source.pipe(parser);
     });
+  }
+
+  /** An aborted signal fails the extraction with its reason, now or when it fires. */
+  #stopOnAbort(): void {
+    const signal = this.#signal;
+    if (signal === undefined) {
+      return;
+    }
+    if (signal.aborted) {
+      this.#fail(signal.reason);
+      return;
+    }
+    signal.addEventListener(
+      "abort",
+      () => {
+        this.#fail(signal.reason);
+      },
+      { once: true },
+    );
   }
 
   #entry(entry: Entry): void {
@@ -116,7 +142,10 @@ class Extraction {
     const target = join(this.root, entry.path);
     const done = (async (): Promise<void> => {
       await mkdir(dirname(target), { recursive: true });
-      await pipeline(entry, this.#counter(), createWriteStream(target));
+      const stages = [entry, this.#counter(), createWriteStream(target)] as const;
+      await (this.#signal === undefined
+        ? pipeline(...stages)
+        : pipeline(...stages, { signal: this.#signal }));
     })();
     this.writes.push(done);
     done.catch(ignore); // Aggregated through allSettled by the caller

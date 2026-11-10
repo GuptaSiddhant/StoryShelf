@@ -85,7 +85,7 @@ ${SUPPORT_CHECK}
           var payload={id:cred.id,rawId:b64enc(cred.rawId),type:cred.type,response:authenticatorResponse};
           return fetch('/api/auth/passkey/verify-authentication',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({response:payload})});
         })
-        .then(function(r){if(!r.ok){throw new Error('verify '+r.status);}window.location.href='/';})
+        .then(function(r){if(!r.ok){throw new Error('verify '+r.status);}window.location.href=btn.getAttribute('data-return-to')||'/';})
         .catch(function(){say('Passkey sign-in failed — try again.');btn.disabled=false;});
     });
   })();

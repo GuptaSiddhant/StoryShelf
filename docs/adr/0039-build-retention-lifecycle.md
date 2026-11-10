@@ -2,14 +2,15 @@
 
 ## Status
 
-Accepted. SQLite activated (#536); Postgres and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
+Accepted. SQLite (#536) and the postgres.js preset (#375) activated; the other Postgres presets and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
 deployments with `testing`; hosting-only retention is unchanged.
 
 Merged: source-build provenance (#345), frozen comparison references and fail-closed testing purge
 (#354), SQLite lifecycle primitives (#382), fenced baseline writers (#389), preparation of legacy
 references (#397), sealing of the capability to fenced mutations (#372) and resumable deletion with
-exactly-once content release (#374), per-build content uses (#564) and SQLite activation (#536).
-Open: Postgres and MySQL capability (#375, #376) and investigations (#377 to #381).
+exactly-once content release (#374), per-build content uses (#564), SQLite activation (#536) and Postgres activation on the postgres.js
+preset, then on the `pg` and `./neon` presets (#375).
+Open: MySQL (#376) and investigations (#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -66,8 +67,10 @@ by preset, so it cannot by itself carry this guarantee.
   be addressed by hash; the former `content_refs` table held per-hash counters on real SQLite
   deployments (the upload route wrote them) and is dropped. That is safe: a blob without a use row
   is never claimed and is protected by the manifest guard while its builds are live. Counters
-  cannot be turned into per-build uses, so pre-upgrade shared blobs leak until a backfill records
-  uses from the live builds' manifests (a follow-up). A build that is gone or being deleted records
+  cannot be turned into per-build uses, so a one-off backfill (`backfillContentUses`, run at boot
+  while the capability exists and a `site_settings` marker is unset) records the uses of every live
+  build's manifest, idempotently and without deleting anything; until it finishes, pre-upgrade
+  shared blobs only leak. A build that is gone or being deleted records
   no use (the capability refuses it), so a late publish cannot pin blobs for good. A build's release marks all its rows released (kept for the grace period).
   A collector **claims** a blob in the capability's domain (`claimContent`: every use released,
   the grace passed, no live manifest names it) under a per-pass token. A claim is durable and
@@ -75,14 +78,19 @@ by preset, so it cannot by itself carry this guarantee.
   later pass takes over one the lease has outlived, re-stamping it with its own token. Right
   before it deletes, a pass asks the capability whether its token still holds the claim
   (`holdsContentClaim`) and skips the delete if not; giving a claim back and finishing it are
-  token-checked too, so a taken-over pass can do nothing. A claimed hash refuses new uses, so a
+  token-checked too, so a taken-over pass can do nothing. A recorded use also takes over a claim the
+  lease has outlived (`recordContentUses` with `staleBefore`), so a crashed pass cannot block
+  uploads until the next purge; the stalled collector then fails its `holdsContentClaim` check and
+  deletes nothing. A claimed hash refuses new uses, so a
   use racing the delete ends in exactly one outcome: the claim fails because the use landed, or
   the use is refused and its caller stores the content again and retries. A live manifest found
   after the claim gives the claim back. A wrong use record can leak storage but never delete
   served content. The token is not a full fence: object storage cannot refuse a late delete, so a
   pass that stalls longer than the lease exactly between its check and its delete could still
   remove a blob a successor collected and a new build stored again. That window is one delete wide
-  and needs a hung process, so it is accepted rather than fenced. Without the capability nothing
+  and needs a hung process, so it is accepted rather than fenced. An upload's record can now be the
+  taker of an expired claim; it re-checks that the blob exists after recording and answers 409
+  (store again) if not, so only a delete still in flight at that instant can win. Without the capability nothing
   is recorded or collected.
 
 ### 3. Lifecycle is an explicit database capability
@@ -100,15 +108,44 @@ by preset, so it cannot by itself carry this guarantee.
   release a newer owner's pin.
 - Each implementation is proven with real multi-connection contract tests, not mocked transactions:
   `buildReferenceContractSuite` (`packages/core/src/test-helpers/build-reference-contract.ts`)
-  covers promotion and pin against purge, a stale generation rejecting a whole multi-owner
-  transaction with its domain writes, release keeping the generation, admission to a deleting or
-  missing build, an admission racing a claim ending in exactly one outcome, and opposite-order
-  multi-build admission without deadlock. Postgres and MySQL (#375, #376) must run the same suite.
+  covers promotion and pin against purge, a stale generation (a typed `ReferenceGenerationConflict`)
+  rejecting a whole multi-owner transaction with its domain writes, exactly one of two updates that
+  saw the same generation winning, invalid generations, empty and partly failing multi-owner
+  batches, release keeping the generation, admission to a deleting or missing build, an admission
+  racing a claim ending in exactly one outcome, and opposite-order multi-build admission without
+  deadlock. `retentionActivationContractSuite` does the same for activation (baseline preparation and
+  the pause cases) through a per-dialect harness; activation itself is not part of the adapter
+  interface. Postgres and MySQL (#375, #376) must run both suites, unchanged.
 - **Fail closed.** An adapter without the capability exposes investigations as unavailable, and a
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
   reference-sensitive path. Presets are enabled one at a time: SQLite first (#536, done), then
   Postgres (#375) and MySQL (#376).
+- **Postgres lifecycle** (`db-postgres/src/build-reference-lifecycle.ts`, #375). Where SQLite
+  serializes through its write lock, Postgres takes row locks in one fixed order: each owner's
+  generation row `FOR UPDATE` (the fence), then the referenced builds `FOR SHARE`, which conflicts
+  with the tombstone's `FOR UPDATE` of the same build row, so an admission and a deletion claim of
+  one build end in exactly one outcome. A use of shared content and a collector's claim of the same
+  hash take a transaction-scoped advisory lock on the hash, in hash order, and re-read after it.
+  Activation follows.
+- **Postgres activation** (`createPostgresDatabase`, `db-postgres/src/retention-activation.ts`,
+  `baseline-preparation.ts`). Same sequence as SQLite: after the migration, `prepareBaselineReferences`
+  once, then expose the capability, or `retentionPause` on a `BaselineSourceIntegrityError`. One
+  transaction visits every baseline owner (those with provenance, plus those a pin still names) in
+  the order the fenced writers lock, locking each owner's generation row `FOR UPDATE` before it
+  reads the baseline, and the source build `FOR SHARE`. Preparation can therefore run beside live
+  traffic and beside another booting instance: a writer or a second instance waits on its locks, and
+  the second finds nothing to change. Unlike SQLite there is no global write lock, so a writer
+  that does not take the fence (an older release, before this one) is not excluded; upgrade every
+  instance before relying on it. Per preset: postgres.js, `pg` and `./neon` expose it, each
+  only after both suites passed on it with every party on its own pool (`retention-pool-presets.test.ts`;
+  `./neon` through a `wsproxy` service in the `postgres-lifecycle` job). The pooled presets enable it
+  only when the driver object is a `Pool` (an owned pool, or an injected one): an injected single
+  `Client` or `PoolClient` shares one session, row locks would prove nothing, so it stays fail closed.
+  PGlite never exposes it (one session proves no locking); `./neon-http` cannot pass
+  (`transactions: "sequential"`) and stays fail closed. The activation suite
+  runs unchanged on PGlite and on a real server; the race tests (interrupted preparation, a writer
+  in flight, two instances) need the real server.
 - **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
   adapter's setup has migrated the schema, it runs `prepareBaselineReferences` once and only then
   exposes `buildReferenceLifecycle`. A shared file is required, so an in-memory database never has
@@ -178,7 +215,7 @@ could leave them, and they would keep an unrelated build protected.
   evidence expire after 30 days by default and do not pin source builds.
 - Replay is an optional runner capability (Playwright first) with fixed evidence limits and
   redaction; the limits and allowlists are specified in the #343 resolution and belong in
-  `docs/architecture.md` once implemented.
+  `docs/architecture/` once implemented.
 
 ## Consequences
 
@@ -191,10 +228,10 @@ could leave them, and they would keep an unrelated build protected.
 
 **Negative**
 
-- Postgres and MySQL deployments with `testing` still do not purge builds or garbage-collect
-  branches until #375 and #376; their storage grows and operators must be told.
-- Postgres and MySQL need their own capability implementation and multi-connection tests before
-  they regain automatic retention.
+- MySQL, and Postgres on `./neon-http`, PGlite and a single injected connection, still do not purge
+  builds or garbage-collect branches with `testing` (#375, #376); their storage grows and operators must be
+  told.
+- Each of those needs its own multi-connection proof before it regains automatic retention.
 - Pinning whole builds keeps more storage than pinning artifacts would.
 - Every baseline writer pays for a fenced transaction.
 

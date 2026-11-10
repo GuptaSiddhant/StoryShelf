@@ -52,36 +52,45 @@ function channelIdOf(job: Pick<ConsumerJob, "data">): string {
  * attempt records the error on the channel and raises `onFailed`.
  */
 export function createNotifyHandler(options: NotifyHandlerOptions): KindHandler {
-  // The running invocations of each job, each with its own stop flag. A cancel (or a lost lease)
-  // marks the ones running now; an attempt reclaimed later has a flag of its own and cannot clear
-  // an older one's. A request already on the wire finishes (the HTTP helper bounds it); what stops
-  // is everything after it: no outcome recorded, no failure surfaced.
-  const active = new Map<string, Set<StopToken>>();
+  // One controller per running attempt: a cancel aborts it, which stops the delivery like a deadline.
+  const running = new Map<string, AbortController>();
   return {
     accepts: (job) => job.buildId.length > 0 && channelIdOf(job).length > 0,
     backoff: NOTIFY_BACKOFF,
     run: async (job, context) => {
-      const token: StopToken = { stopped: false };
-      const key = keyOf(job);
-      active.set(key, (active.get(key) ?? new Set()).add(token));
+      const controller = new AbortController();
+      running.set(keyOf(job), controller);
       try {
-        await deliverOnce(options, job, { logger: context.logger, token });
+        const signal = AbortSignal.any([context.signal, controller.signal]);
+        await runAttempt(options, job, { logger: context.logger, signal });
       } finally {
-        const rest = active.get(key);
-        rest?.delete(token);
-        if (rest?.size === 0) active.delete(key);
+        // Only this run's own controller: a reclaimed attempt may have registered a newer one.
+        if (running.get(keyOf(job)) === controller) running.delete(keyOf(job));
       }
     },
-    // oxlint-disable-next-line eslint/require-await -- the interface is async; marking is synchronous
+    // oxlint-disable-next-line eslint/require-await -- the interface is async; aborting is synchronous
     cancel: async (job) => {
-      for (const token of active.get(keyOf(job)) ?? []) token.stopped = true;
+      running.get(keyOf(job))?.abort(new Error("notify cancelled"));
     },
   };
 }
 
-/** One invocation's stop flag. */
-interface StopToken {
-  stopped: boolean;
+/** One attempt; past its deadline or cancelled it records nothing and surfaces no failure. */
+async function runAttempt(
+  options: NotifyHandlerOptions,
+  job: ConsumerJob,
+  context: { logger: Logger; signal: AbortSignal },
+): Promise<void> {
+  const channelId = channelIdOf(job);
+  try {
+    context.signal.throwIfAborted();
+    await deliver(options.deps, { job, channelId }, context);
+  } catch (error) {
+    if (!context.signal.aborted && isFinalAttempt(job)) {
+      await surfaceFailure(options, { channelId, buildId: job.buildId, error }, context.signal);
+    }
+    throw error;
+  }
 }
 
 /** The key a job is tracked under while it runs: its row (else its channel and build) and its attempt. */
@@ -89,58 +98,19 @@ function keyOf(job: ConsumerJob): string {
   return `${job.jobId ?? `${job.buildId}:${channelIdOf(job)}`}#${job.attempt ?? 1}`;
 }
 
-/** One delivery attempt; a cancel (checked after the request) suppresses its outcome and failure. */
-async function deliverOnce(
-  options: NotifyHandlerOptions,
-  job: ConsumerJob,
-  run: { logger: Logger; token: StopToken },
+/** One delivery; the signal is checked before the host is told and before the outcome is recorded. */
+async function deliver(
+  deps: BuildStateDeps,
+  what: { job: ConsumerJob; channelId: string },
+  context: { logger: Logger; signal: AbortSignal },
 ): Promise<void> {
-  const channelId = channelIdOf(job);
-  try {
-    const result = await deliverBuildState(
-      options.deps,
-      { buildId: job.buildId, channelId },
-      () => run.token.stopped,
-    );
-    if (run.token.stopped) {
-      run.logger.info("notify job was cancelled; outcome not recorded");
-      return;
-    }
-    await recordResult(options, { channelId, result, logger: run.logger });
-  } catch (error) {
-    await failDelivery(options, job, { run, error });
-  }
-}
-
-/** A failed attempt: silent after a cancel, surfaced on the last attempt, else retried. */
-async function failDelivery(
-  options: NotifyHandlerOptions,
-  job: ConsumerJob,
-  what: { run: { logger: Logger; token: StopToken }; error: unknown },
-): Promise<void> {
-  if (what.run.token.stopped) {
-    what.run.logger.info("notify job was cancelled; its failure is not surfaced");
-    return;
-  }
-  if (isFinalAttempt(job)) {
-    await surfaceFailure(options, {
-      channelId: channelIdOf(job),
-      buildId: job.buildId,
-      error: what.error,
-    });
-  }
-  throw what.error;
-}
-
-/** A delivered state clears the channel's error; anything else is only logged. */
-async function recordResult(
-  options: NotifyHandlerOptions,
-  what: { channelId: string; result: string; logger: Logger },
-): Promise<void> {
-  if (what.result === "delivered") {
-    await channelModel(options.deps).recordOutcome(what.channelId);
+  const { job, channelId } = what;
+  const result = await deliverBuildState(deps, { buildId: job.buildId, channelId }, context.signal);
+  context.signal.throwIfAborted();
+  if (result === "delivered") {
+    await channelModel(deps).recordOutcome(channelId, undefined, context.signal);
   } else {
-    what.logger.info({ result: what.result }, "nothing to deliver");
+    context.logger.info({ result }, "nothing to deliver");
   }
 }
 
@@ -160,6 +130,7 @@ export function notifyExhausted(
 async function surfaceFailure(
   options: NotifyHandlerOptions,
   failure: { channelId: string; buildId: string; error: unknown },
+  signal?: AbortSignal,
 ): Promise<void> {
   const { deps } = options;
   const text = sanitizeErrorText(errorText(failure.error), MAX_ERROR_LENGTH);
@@ -168,7 +139,7 @@ async function surfaceFailure(
     "state delivery given up",
   );
   try {
-    await recordAndAlert(options, { ...failure, error: text });
+    await recordAndAlert(options, { ...failure, error: text }, signal);
   } catch (error) {
     deps.logger.warn({ err: error, channelId: failure.channelId }, "failed to record the failure");
   }
@@ -178,13 +149,16 @@ async function surfaceFailure(
 async function recordAndAlert(
   options: NotifyHandlerOptions,
   failure: { channelId: string; buildId: string; error: string },
+  signal?: AbortSignal,
 ): Promise<void> {
   const model = channelModel(options.deps);
   const row = await model.get(failure.channelId);
+  signal?.throwIfAborted();
   if (row === null) {
     return;
   }
-  await model.recordOutcome(row.id, failure.error);
+  await model.recordOutcome(row.id, failure.error, signal);
+  signal?.throwIfAborted();
   await options.onFailed?.({
     channelId: row.id,
     projectId: row.projectId,

@@ -17,6 +17,30 @@ async function initDb(db: DatabaseAdapter): Promise<void> {
 }
 
 describe.skipIf(!HAS_BUN)("createBunSqliteDatabase (bun runtime)", () => {
+  it("commits many overlapping transactions, one at a time", async () => {
+    const { createBunSqliteDatabase } = await import("./bun-sqlite.ts");
+    const db = createBunSqliteDatabase({ path: ":memory:" });
+    await initDb(db);
+    const now = new Date().toISOString();
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 25 }, async (_unused, index) =>
+        db.transact?.(async (tx) => {
+          await tx.insert(schema.projects, {
+            id: `p${String(index)}`,
+            name: "Tx",
+            slug: `tx-${String(index)}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }),
+      ),
+    );
+
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+    expect(await db.count(schema.projects)).toBe(25);
+  });
+
   it("throws without path or client", async () => {
     const { createBunSqliteDatabase } = await import("./bun-sqlite.ts");
     expect(() => createBunSqliteDatabase({})).toThrow("provide `path`");
@@ -41,6 +65,35 @@ describe.skipIf(!HAS_BUN)("createBunSqliteDatabase (bun runtime)", () => {
     expect(found?.slug).toBe("demo");
 
     await db.lifecycle?.teardown();
+  });
+
+  it("keeps a plain insert from another context when the open transaction rolls back", async () => {
+    const { createBunSqliteDatabase } = await import("./bun-sqlite.ts");
+    const db = createBunSqliteDatabase({ path: ":memory:" });
+    await initDb(db);
+    const now = new Date().toISOString();
+    const project = (id: string) => ({ id, name: id, slug: id, createdAt: now, updatedAt: now });
+    const opened = Promise.withResolvers<null>();
+    const release = Promise.withResolvers<null>();
+
+    const failing = db.transact?.(async (tx) => {
+      await tx.insert(schema.projects, project("doomed"));
+      opened.resolve(null);
+      await release.promise;
+      throw new Error("abort");
+    });
+    await opened.promise;
+    const outside = db.insert(schema.projects, project("outside"));
+    await Promise.resolve();
+    release.resolve(null);
+
+    await expect(failing).rejects.toThrow("abort");
+    await outside;
+    expect(await db.get(schema.projects, "doomed")).toBeNull();
+    expect(await db.get(schema.projects, "outside")).not.toBeNull();
+    await expect(
+      db.transact?.(async () => await db.get(schema.projects, "outside")),
+    ).rejects.toThrow("use `tx`");
   });
 
   it("commits transact writes and rolls back on throw", async () => {

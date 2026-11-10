@@ -33,4 +33,24 @@ describe("leaseProgress", () => {
     progress?.();
     expect(touches).toBe(3);
   });
+
+  it("asks the lease to check on every report, even those the throttle skips", () => {
+    let checks = 0;
+    const progress = leaseProgress(
+      {
+        touch: () => {},
+        check: () => {
+          checks += 1;
+        },
+      },
+      1000,
+      () => 0,
+    );
+
+    progress?.();
+    progress?.();
+    progress?.();
+
+    expect(checks).toBe(3);
+  });
 });

@@ -1,10 +1,20 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
+import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { rollbackQuietly } from "./lifecycle-transaction.ts";
+import {
+  execUnless,
+  isDuplicateColumn,
+  isMissingColumn,
+  reportSkippedIndex,
+  toleratedFor,
+} from "./migration-errors.ts";
 import {
   activateRetention,
   attachRetention,
@@ -31,27 +41,32 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   const db = drizzle(callback, { schema });
   const retention: RetentionActivation = {};
 
-  const adapter = createDrizzleAdapter(db, {
-    metadata: {
-      name: "SQLite",
-      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
-      description: "SQLite database adapter (node:sqlite + Drizzle)",
-      kind: "sqlite",
-      category: "database",
+  const adapter = createDrizzleAdapter(
+    db,
+    {
+      metadata: {
+        name: "SQLite",
+        version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
+        description: "SQLite database adapter (node:sqlite + Drizzle)",
+        kind: "sqlite",
+        category: "database",
+      },
+      tables: schema,
+      migrate: async ({ logger }) => {
+        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
+        runMigrations(sqlite, logger);
+        await activateRetention(path, retention);
+      },
+      close: () => {
+        sqlite.close();
+      },
+      ping: () => {
+        sqlite.prepare("SELECT 1").get();
+      },
     },
-    tables: schema,
-    migrate: async () => {
-      await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
-      runMigrations(sqlite);
-      await activateRetention(path, retention);
-    },
-    close: () => {
-      sqlite.close();
-    },
-    ping: () => {
-      sqlite.prepare("SELECT 1").get();
-    },
-  });
+    // One connection: plain statements take their turn behind an open transaction.
+    { isolateStatements: true },
+  );
   return attachRetention(adapter, retention);
 }
 
@@ -103,41 +118,38 @@ export function createCallback(sqlite: DatabaseSync): AsyncRemoteCallback {
   return callback;
 }
 
-function execIgnore(sqlite: DatabaseSync, sql: string): void {
+function migrateCommentsTable(sqlite: DatabaseSync): void {
+  // The connection opens with `returnArrays`: a row is `[sql]`, not `{ sql }`. (Reading it as an
+  // object threw here on every boot, and the catch-all around the call hid that the rebuild never ran.)
+  const row = sqlite
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'")
+    .get() as unknown as [string] | undefined;
+  if (!row?.[0].includes("user_id TEXT NOT NULL REFERENCES users")) {
+    return;
+  }
+  swapCommentsTable(sqlite);
+}
+
+/** Swap `comments` for a rebuilt table in one transaction, with foreign keys off for the swap. */
+function swapCommentsTable(sqlite: DatabaseSync): void {
+  sqlite.exec("PRAGMA foreign_keys = OFF");
   try {
-    sqlite.exec(sql);
-  } catch {
-    // idempotent — column already exists or other no-op
+    sqlite.exec("BEGIN");
+    rebuildComments(sqlite);
+    sqlite.exec("COMMIT");
+  } catch (error) {
+    rollbackQuietly(sqlite);
+    throw error;
+  } finally {
+    sqlite.exec("PRAGMA foreign_keys = ON");
   }
 }
 
-function migrateCommentsTable(sqlite: DatabaseSync): void {
-  const row = sqlite
-    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'")
-    .get() as { sql: string } | undefined;
-  if (!row?.sql.includes("user_id TEXT NOT NULL REFERENCES users")) {
-    return;
+/** Swap `comments` for the current table, whose `user_id` may be null (inside one transaction). */
+function rebuildComments(sqlite: DatabaseSync): void {
+  for (const statement of commentsRebuildStatements()) {
+    sqlite.exec(statement);
   }
-  sqlite.exec("PRAGMA foreign_keys = OFF");
-  sqlite.exec(`
-    CREATE TABLE comments_new (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
-      snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
-      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-      body TEXT NOT NULL,
-      parent_id TEXT,
-      resolved INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
-  sqlite.exec("INSERT INTO comments_new SELECT * FROM comments");
-  sqlite.exec("DROP TABLE comments");
-  sqlite.exec("ALTER TABLE comments_new RENAME TO comments");
-  sqlite.exec("CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id)");
-  sqlite.exec("PRAGMA foreign_keys = ON");
 }
 
 /** Add any DDL column missing from a volume created before it shipped. */
@@ -148,32 +160,35 @@ function ensureColumns(sqlite: DatabaseSync, ddl: string): void {
     for (const column of columns) {
       const [name] = column.split(/\s+/u);
       if (name && !existing.has(name)) {
-        execIgnore(sqlite, `ALTER TABLE ${table} ADD COLUMN ${column}`);
+        execUnless(sqlite, `ALTER TABLE ${table} ADD COLUMN ${column}`, isDuplicateColumn);
       }
     }
   }
 }
 
 /** Swap in the browser-aware unique indexes (after `ensureColumns` added the column). */
-function applyIdentityStatements(sqlite: DatabaseSync): void {
+function applyIdentityStatements(sqlite: DatabaseSync, logger: Logger | undefined): void {
   for (const statement of IDENTITY_STATEMENTS) {
-    execIgnore(sqlite, statement);
+    if (execUnless(sqlite, statement, toleratedFor(statement))) {
+      // The connection opens with `returnArrays`: the count is the first value of the row.
+      reportSkippedIndex(
+        statement,
+        (sql) => Number((sqlite.prepare(sql).get() as unknown as [number | bigint])[0]),
+        logger,
+      );
+    }
   }
   sqlite.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
 }
 
-function runMigrations(sqlite: DatabaseSync): void {
+function runMigrations(sqlite: DatabaseSync, logger: Logger | undefined): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
   sqlite.exec(DDL);
   ensureColumns(sqlite, DDL);
-  applyIdentityStatements(sqlite);
+  applyIdentityStatements(sqlite, logger);
   dropWebhookSecret(sqlite);
   migrateBuildsGitShaIndex(sqlite);
-  try {
-    migrateCommentsTable(sqlite);
-  } catch {
-    execIgnore(sqlite, "PRAGMA foreign_keys = ON");
-  }
+  migrateCommentsTable(sqlite);
 }
 
 /** The columns of a table, from `PRAGMA table_info` (rows are arrays: the adapter opens with `returnArrays`). */
@@ -183,19 +198,11 @@ function tableInfo(sqlite: DatabaseSync, table: string): TableColumns {
 
 /** Drop the retired `webhooks.secret` column; a database that no longer has it is already migrated. */
 function dropWebhookSecret(sqlite: DatabaseSync): void {
-  try {
-    sqlite.exec(WEBHOOK_SECRET_DROP);
-  } catch {
-    // already migrated — ignore
-  }
+  execUnless(sqlite, WEBHOOK_SECRET_DROP, isMissingColumn);
 }
 
 /** Downgrade a legacy UNIQUE project/sha index to a plain lookup index. */
 function migrateBuildsGitShaIndex(sqlite: DatabaseSync): void {
-  try {
-    sqlite.exec(BUILDS_GITSHA_DEDUP);
-    sqlite.exec(BUILDS_GITSHA_INDEX);
-  } catch {
-    // already migrated — ignore
-  }
+  sqlite.exec(BUILDS_GITSHA_DEDUP);
+  sqlite.exec(BUILDS_GITSHA_INDEX);
 }

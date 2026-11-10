@@ -15,9 +15,6 @@ import {
 } from "../ui/components.tsx";
 import type { LibraryGroup } from "./library-model.ts";
 import { SnapshotCards, type SnapshotLayer } from "./library-snapshots.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** The component cards of a build; `layer` is present only with `testing` and captured snapshots. */

@@ -14,7 +14,7 @@ import { attemptRowId, isTerminalJob } from "../../models/capture-job.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { isoAt } from "./clock.ts";
 import { toDatabaseJob } from "./codec.ts";
-import { finishJob, notifyEnded, startSuccessor } from "./single-flight.ts";
+import { announceSuccessor, finishJob, notifyEnded, startSuccessor } from "./single-flight.ts";
 import type { QueueRuntime } from "./types.ts";
 
 /** Error recorded on a job whose last allowed attempt lost its lease. */
@@ -158,12 +158,33 @@ async function settle(
   const current = await rt.model.get(jobId);
   if (current !== null && !isTerminalJob(current)) {
     const outcome = current.cancelRequestedAt === null ? status : "cancelled";
-    // Conditional: a `done` that lands after the read above is not overwritten.
-    await rt.model.finishOpenJob(jobId, outcome, isoAt(rt), LEASE_EXHAUSTED_ERROR);
-    await successorAfter(rt, current, outcome);
+    await endOpenJob(rt, current, outcome);
   }
   await rt.model.finishAttempt(own, "done", isoAt(rt));
   await endedAfter(rt, jobId);
+}
+
+/**
+ * End the job unless it already ended (a `done` that lands after the read keeps its outcome); a
+ * failed job hands its key over to the request that came in while it ran, in the same commit
+ * where the database has transactions.
+ */
+async function endOpenJob(
+  rt: QueueRuntime,
+  current: CaptureJobRow,
+  outcome: "failed" | "cancelled",
+): Promise<void> {
+  const ended = await rt.model.endJob(
+    current.jobId,
+    { status: outcome, error: LEASE_EXHAUSTED_ERROR, onlyOpen: true },
+    isoAt(rt),
+  );
+  if (ended !== null) {
+    announceSuccessor(rt, ended.successor);
+    return;
+  }
+  await rt.model.finishOpenJob(current.jobId, outcome, isoAt(rt), LEASE_EXHAUSTED_ERROR);
+  await successorAfter(rt, current, outcome);
 }
 
 /**

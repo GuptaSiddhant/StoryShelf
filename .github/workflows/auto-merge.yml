@@ -1,0 +1,64 @@
+# Turns on GitHub auto-merge for every pull request opened from a branch of this repository
+# (owner decision, 2026-11-08; AGENTS.md "Agent operating model"). GitHub then merges it once the
+# required checks (`ci`, `changeset`) pass and every review conversation is resolved, and
+# pr-autoupdate.yml keeps the queue up to date with `main`.
+#
+# Excluded, so they still need a person:
+# - pull requests from forks: anyone can open one, and the ruleset requires no approval;
+# - drafts, until they are marked ready for review;
+# - `release/v*` pull requests: only the owner merges a release (ADR 0043).
+#
+# An epic branch into `main` merges with a merge commit, so each task commit survives; everything
+# else is squashed. No checkout and no pull request code runs here, so pull_request_target is safe.
+#
+# Uses AUTOUPDATE_TOKEN when it is set (see pr-autoupdate.yml), so enabling auto-merge also wakes
+# pr-autoupdate; with GITHUB_TOKEN the queue still moves on the next push to `main`.
+name: auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+    branches: [main, "epic/**"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft &&
+      !startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          github-token: ${{ secrets.AUTOUPDATE_TOKEN || github.token }}
+          script: |
+            const pr = context.payload.pull_request;
+            const epicIntoMain = pr.head.ref.startsWith("epic/") && pr.base.ref === "main";
+            const mergeMethod = epicIntoMain ? "MERGE" : "SQUASH";
+            try {
+              // `method` is reserved by @octokit/graphql, so the variable is `mergeMethod`.
+              await github.graphql(
+                `mutation ($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+                  enablePullRequestAutoMerge(
+                    input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }
+                  ) {
+                    clientMutationId
+                  }
+                }`,
+                { pullRequestId: pr.node_id, mergeMethod },
+              );
+              core.info(`Auto-merge (${mergeMethod.toLowerCase()}) enabled on #${pr.number}.`);
+            } catch (error) {
+              // Already mergeable ("clean status") or already enabled: nothing to do. Anything else
+              // fails the run, so a broken call is not hidden behind a green check.
+              if (/clean status|already enabled/iu.test(error.message)) {
+                core.notice(`#${pr.number}: ${error.message}`);
+              } else {
+                core.setFailed(`#${pr.number}: auto-merge not enabled: ${error.message}`);
+              }
+            }

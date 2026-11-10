@@ -116,7 +116,7 @@ function checkAdrSizes() {
     const lines = readFileSync(file.path, "utf8").split("\n").length;
     if (lines > MAX_ADR_LINES) {
       errors.push(
-        `docs/adr/${file.name}: ${lines} lines (max ${MAX_ADR_LINES}); move implementation detail to docs/architecture.md`,
+        `docs/adr/${file.name}: ${lines} lines (max ${MAX_ADR_LINES}); move implementation detail to docs/architecture/`,
       );
     }
   }

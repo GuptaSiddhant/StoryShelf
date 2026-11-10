@@ -33,6 +33,10 @@ IdP group sync (site/project roles from group claims) is deferred — there is n
 
 Site `admin` bypasses all project checks. `GET /api/v1/projects/:slug/members` lists members; `POST/PATCH/DELETE` is project-admin or site-admin only.
 
+### Projects you cannot see
+
+With sign-in on, a project you have no role on does not exist as far as you can tell: its API routes and pages answer `404 Project not found`, byte for byte the answer for a slug that was never created, so nobody can probe which projects exist. `403` is only for a project you can see when your role is too low for the action (a viewer trying to approve, for example). The published Storybook of a build that is public stays readable, as before. A visitor who is not signed in gets the same `404` for a private project's Storybook, so a shared private link opens a not-found page; every not-found page for a visitor who is not signed in has a **Sign in** link that returns to the page you were opening, and it is the same page for a project that does not exist, so it tells no one which one they hit.
+
 ### IdP group mappings
 
 Each project's **Members** tab can map an IdP group name to a project role. Mappings evaluate on every SSO sign-in against the groups carried by the login identity (configure `groupsClaim`/`groupsAttribute` on the recipe). Highest matched role wins (recorded as `sso:<group>`); stale synced grants are revoked while manual grants are never touched. Social and generic-OAuth logins never sync groups.

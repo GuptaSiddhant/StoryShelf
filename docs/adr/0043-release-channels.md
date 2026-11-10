@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (owner decisions, 2026-11-02; stable releases by pull request, 2026-11-03). Implemented by #473. It replaces the stopgap that published a
+Accepted (owner decisions, 2026-11-02; stable releases by pull request, 2026-11-03; release cadence and no v1 yet, 2026-11-09). Implemented by #473. It replaces the stopgap that published a
 pkg.pr.new preview for every push to `main`.
 
 ## Context
@@ -19,7 +19,7 @@ URLs that npm clients cannot depend on durably.
    nothing.
 2. **One shared version.** All published packages (22 today) keep one version, raised by the largest
    bump of all pending changesets. `scripts/release-validate.mjs` keeps enforcing it.
-3. **`next` channel, continuous.** A push to `main` that has pending changesets publishes a snapshot
+3. **`next` channel, daily** (amended 2026-11-07, see below). A push to `main` that has pending changesets publishes a snapshot
    of every package to npm under the **`next`** dist-tag, versioned `<calculated next
 version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is made in the CI
    working tree and never committed. npm only. A push without a pending
@@ -65,6 +65,55 @@ pull request (head branch `release/v<version>`, changing only package versions, 
 deleted changesets) passes the changeset check without a changeset; any other change on that branch
 fails it, so the branch name cannot skip the check.
 
+## Amendment, 2026-11-07 (#789)
+
+Decision 3 is narrowed: a push to `main` no longer publishes `next`, because every merged package
+change produced its own snapshot and most were superseded within hours. `release.yml` gains a daily
+`schedule` run that publishes `next` only while changesets are pending and a package, changeset,
+root `package.json` or `nub.lock` changed since the commit of the current `@storyshelf/core@next`
+(read from its `-next-<sha>` suffix; anything `detect` cannot establish counts as changed). A
+`workflow_dispatch` with channel `next` publishes one immediately. The push trigger keeps the stable
+path, and the daily run also retries an untagged stable version. The shared publish steps move into
+the composite action `.github/actions/npm-publish`, which runs inside the `release.yml` jobs, so the
+OIDC token and the trusted publisher still name `release.yml` (decision 5); it is used nowhere else.
+
+## Amendment, 2026-11-09 (release cadence)
+
+Decision 4 gains a schedule. The release pull request is no longer opened only when the owner asks:
+`release-pr.yml` opens it when `scripts/release-due.mjs` says a release is due, and only the owner
+merges it, as before.
+
+- **A P0 is released.** Merging a pull request labelled `p0-critical` into `main` opens a release.
+- **An epic is released.** Merging an `epic/…` branch into `main` opens a release.
+- **Standalones are released weekly.** The daily run opens a release once the last minor release
+  (`vX.Y.0`) is 7 or more days old.
+- **Guards.** Nothing opens without pending changesets or while a `release/v*` pull request is open.
+  The bump, minor or patch, always comes from the changesets, never from the trigger.
+- **No v1 yet.** There is no 1.0 until the owner has dogfood proof that everything works. Until then
+  a breaking change is a `minor`: the changeset check refuses a `major` changeset, and
+  `bumpVersion` refuses to cross 1.0. Lifting this is an owner decision recorded here.
+
+Work that changes behaviour across several pull requests lands on an epic branch, so `main` never
+ships half of a feature in a weekly release (AGENTS.md "Epic branches").
+
+## Amendment, 2026-11-09 (short release notes)
+
+The v0.10.0 release notes ran to 48 KB: 96 paragraph-long entries, many of them internal (stories,
+tests, adapter groundwork), and decision 6's minor-release roll-up repeated all of 0.9.0 below them.
+The owner asked for short notes, with the detail kept in `CHANGELOG.md`.
+
+- **Every changeset leads with a summary.** Its body starts with one line `<Kind>: <summary>`, at
+  most 100 characters, then a blank line and the details. Kind is one of `Breaking`, `Added`,
+  `Changed`, `Fixed`, `Security` or `Internal` (stories, tests, groundwork a user does not see).
+  The changeset check and `nub run changeset --message` refuse anything else
+  (`scripts/changelog-entry.mjs`).
+- **`CHANGELOG.md` is grouped.** A release section has one `### <Kind>` block per kind, each entry a
+  bullet with its summary and its details indented below it. Older sections are left as written.
+- **The GitHub Release is short.** `scripts/release-notes.mjs` prints the section's summaries by
+  kind without details, counts the internal entries instead of listing them, and links the full
+  section and the diff from the previous release. The roll-up of the previous minor line is
+  dropped: with a release every week each version's own notes are enough.
+
 ## Operations
 
 - **Re-running.** `scripts/publish-npm.mjs` skips versions already on npm; the tag and the GitHub
@@ -81,7 +130,7 @@ fails it, so the branch name cannot skip the check.
 
 - Contributors write the changelog entry in the pull request that makes the change. `CHANGELOG.md` is
   no longer edited by hand.
-- Every merged change with a changeset is installable from npm as `@storyshelf/*@next`. A stable
+- Every merged change with a changeset is installable from npm as `@storyshelf/*@next` within a day. A stable
   version is a deliberate act with a dry run.
 - The choice of bump (patch, minor, major) is made per changeset and applies to the whole fixed group.
 

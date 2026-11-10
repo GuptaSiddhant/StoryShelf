@@ -2,9 +2,6 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Alert, Button, HStack, Meta, VStack } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 /** Props for the build-level notice about diffs computed against an outdated baseline. */
 export interface StaleBaselineNoticeProps {
   project: Project;

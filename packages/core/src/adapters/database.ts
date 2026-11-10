@@ -9,9 +9,18 @@
 import type { SQL } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
+import type { MigrationContext } from "./skipped-index.ts";
 
 /** A fenced reference write lost its generation race and should be retried. */
 export class ReferenceGenerationConflict extends Error {}
+
+export {
+  duplicateGroupsSql,
+  logSkippedIndex,
+  parseUniqueIndex,
+  type MigrationContext,
+  type SkippedIndex,
+} from "./skipped-index.ts";
 
 export {
   BaselineSourceIntegrityError,
@@ -216,11 +225,17 @@ export interface BuildReferenceLifecycle {
    * (build, hash), however many paths name it, so a repeat is a no-op. Returns the hashes it
    * refused because a collector has claimed them; none of the refused hashes is recorded, and the
    * caller must store the content again and retry. Same concurrency domain as {@link claimContent}.
+   *
+   * A claim taken before `staleBefore` (an ISO instant) belongs to a collector that stopped: the
+   * record clears it in the same transaction and goes ahead, and the old collector, whose
+   * {@link holdsContentClaim} check then fails, deletes nothing. Omitted, every claim refuses. A
+   * build that is gone or not `available` records nothing (all its hashes are returned).
    */
   recordContentUses(
     projectId: string,
     buildId: string,
     hashes: readonly string[],
+    staleBefore?: string,
   ): Promise<string[]>;
   /**
    * Claim for deletion, under the pass's `token` (a fresh id per collector pass), every hash whose
@@ -266,6 +281,13 @@ export interface DatabaseAdapterMetadata {
    * Unset means it can.
    */
   readonly supportsTesting?: boolean;
+  /**
+   * `"sequential"` when `transact` only runs its statements one after another and cannot roll back
+   * (Neon over HTTP). Code that relies on one transaction for crash safety, such as the queue's
+   * end-and-hand-over of a single-flight job, takes its ordered path instead. Unset means atomic,
+   * as `supportsTesting` reads.
+   */
+  readonly transactions?: "atomic" | "sequential";
 }
 
 /** Database abstraction over Drizzle tables, agnostic of dialect and driver. */
@@ -321,7 +343,7 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
 export interface DrizzleAdapterOptions {
   metadata: AdapterMetadata & DatabaseAdapterMetadata;
   tables: Tables;
-  migrate: () => Promise<void> | void;
+  migrate: (context: MigrationContext) => Promise<void> | void;
   close: () => Promise<void> | void;
   /** Cheap liveness probe (e.g. `SELECT 1`); omitted when the driver has none. */
   ping?: () => Promise<void> | void;

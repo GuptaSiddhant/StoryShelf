@@ -44,9 +44,6 @@ import {
   showBuildHref,
 } from "./component-stories.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Tabs of the component page. */

@@ -39,7 +39,7 @@ const warned = new WeakSet<object>();
 export function warnPaused(logger: Logger, event: string): void {
   if (!warned.has(logger)) {
     warned.add(logger);
-    logger.warn({ event }, `${NOTIFICATIONS_PAUSED_TEXT} Skipping notifications.`);
+    logger.warn({ event, reason: NOTIFICATIONS_PAUSED_TEXT }, "notification skipped while paused");
   }
 }
 

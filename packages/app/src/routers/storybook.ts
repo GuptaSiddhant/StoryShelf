@@ -10,7 +10,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
-import { publishedAccess } from "./published-access.ts";
+import { hiddenFrom, publishedAccess } from "./published-access.ts";
 import { publishedRelativePath, servePublishedFile } from "./published-files.ts";
 
 /** Check whether a build's extracted statics are available for serving. */
@@ -49,12 +49,12 @@ async function resolveShortLink(id: string): Promise<{ project: Project; build: 
 }
 
 /**
- * The answer for a short link that names nothing the caller may open: a missing build or project
- * and a private one look the same, so the link never confirms that a private id exists. Without
- * sign-in every build is open, so a missing id is a plain 404.
+ * The answer for a short link that names nothing: the plain 404. A private build or project
+ * answers the same to a caller with no role (see `hiddenFrom`), so a link never confirms that a
+ * private id exists (#497).
  */
 function unreachable(c: Context): Response | Promise<Response> {
-  return getStore().authEnabled ? c.redirect("/auth/login", 302) : c.notFound();
+  return c.notFound();
 }
 
 /** Register the published Storybook resolver and static-asset routes. */
@@ -69,12 +69,13 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!project) {
       notFound("Project not found");
     }
+    const hidden = await hiddenFrom(project);
     const build = await new BuildModel(getStore().db).latestApprovedDefault(project);
     if (!build) {
-      notFound("No approved build on the default branch yet");
+      notFound(hidden ? "Project not found" : "No approved build on the default branch yet");
     }
     if (!(await publishedAccess(build, project))) {
-      return c.redirect("/auth/login", 302);
+      return hidden ? notFound("Project not found") : c.redirect("/auth/login", 302);
     }
     return c.redirect(`/projects/${slug}/storybook/build/${build.id}/`, 302);
   });
@@ -83,13 +84,10 @@ export function registerStorybook(app: ShelfRouter): void {
   // 26-char ULID → that exact build, whatever its status (visibility check only).
   // Any other id → project slug → latest approved build on the default branch, else 404
   // (no fallback to feature-branch or unreviewed builds). No fall-through on ULID.
-  app.get("/_/:id", async (c) => {
-    const id = c.req.param("id");
-    const target = await resolveShortLink(id);
-    // The same access check as the canonical form, so an id the caller may not open answers like
-    // one that does not exist (no private id is confirmed by a redirect).
-    if (!target || !(await publishedAccess(target.build, target.project))) return unreachable(c);
-    return c.redirect(`/_/${id}/`, 302);
+  app.get("/_/:id", (c) => {
+    // Always redirect, whether or not the id exists: the checks (and the 404) belong to the
+    // trailing-slash route, so a caller without a role cannot tell a project from a missing one (#497).
+    return c.redirect(`/_/${encodeURIComponent(c.req.param("id"))}/`, 302);
   });
 
   app.get("/_/:id/*", async (c) => {
@@ -101,7 +99,10 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!target) return unreachable(c);
     const { project, build } = target;
     const access = await publishedAccess(build, project);
-    if (!access) return c.redirect("/auth/login", 302);
+    if (!access) {
+      // A caller with no role gets what a build that does not exist gets (#497).
+      return (await hiddenFrom(project)) ? c.notFound() : c.redirect("/auth/login", 302);
+    }
     if (rest === "" && !(await staticsReady(project.id, build.id))) {
       return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
     }
@@ -133,13 +134,14 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!project) {
       notFound("Project not found");
     }
+    const hidden = await hiddenFrom(project);
     const build = await new BuildModel(getStore().db).get(buildId);
     if (!build || build.projectId !== project.id) {
-      notFound("Build not found");
+      notFound(hidden ? "Project not found" : "Build not found");
     }
     const access = await publishedAccess(build, project);
     if (!access) {
-      return c.redirect("/auth/login", 302);
+      return hidden ? notFound("Project not found") : c.redirect("/auth/login", 302);
     }
 
     if (rest === "") {
@@ -180,13 +182,14 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!project) {
       notFound("Project not found");
     }
+    const hidden = await hiddenFrom(project);
     const buildId = await new LabelModel(getStore().db).latestBuildId(project.id, key, value);
     if (!buildId) {
-      notFound("No build carries that label");
+      notFound(hidden ? "Project not found" : "No build carries that label");
     }
     const build = await new BuildModel(getStore().db).get(buildId);
     if (!build || !(await publishedAccess(build, project))) {
-      return c.redirect("/auth/login", 302);
+      return hidden ? notFound("Project not found") : c.redirect("/auth/login", 302);
     }
     return c.redirect(`/projects/${slug}/storybook/build/${buildId}/`, 302);
   });

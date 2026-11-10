@@ -2,9 +2,6 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
 import type { IconName } from "./icons/paths.ts";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 const layout = css`
   /* subnav-layout */
   display: grid;

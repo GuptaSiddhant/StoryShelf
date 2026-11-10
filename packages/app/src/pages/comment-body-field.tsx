@@ -7,9 +7,6 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { MentionSuggestion } from "../mentions.ts";
 import { Meta, Option, OptionList, TextareaField, VStack } from "../ui/components.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** What a comment box is for: the whole build, one story, or one snapshot. */

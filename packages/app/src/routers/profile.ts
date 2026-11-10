@@ -3,7 +3,7 @@ import { MIN_PASSWORD_LENGTH, unsignedToken } from "@storyshelf/core/auth";
 import { NotificationSubscriptionModel, ProjectModel, UserModel } from "@storyshelf/core/models";
 import { eq, getTableColumns } from "@storyshelf/core/orm";
 import type { Project } from "@storyshelf/core/schema";
-import { SESSION_COOKIE, type AuthUser } from "@storyshelf/core/types";
+import { readSessionCookie, type AuthUser } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { notificationsPaused } from "../notifications-pause.ts";
@@ -90,15 +90,8 @@ async function loadProfileData(userId: string): Promise<{
 }
 
 function readSessionToken(c: Context): string {
-  const header = c.req.header("cookie") ?? "";
-  for (const part of header.split(";")) {
-    const eqIndex = part.indexOf("=");
-    if (eqIndex !== -1 && part.slice(0, eqIndex).trim() === SESSION_COOKIE) {
-      // Engine cookies are signed (`token.signature`); the table holds the raw token.
-      return unsignedToken(part.slice(eqIndex + 1).trim());
-    }
-  }
-  return "";
+  // Engine cookies are signed (`token.signature`); the table holds the raw token.
+  return unsignedToken(readSessionCookie(c.req.header("cookie")) ?? "");
 }
 
 /** Engine security overview for the profile page. */

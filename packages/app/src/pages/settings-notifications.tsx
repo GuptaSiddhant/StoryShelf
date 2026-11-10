@@ -59,9 +59,6 @@ export interface NotificationsFormState {
   errors?: Record<string, string>;
   globalError?: string;
 }
-
-/* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */
-
 /** The one topic the "Send me review requests" switch controls, so it has no checkbox of its own. */
 export const REVIEW_REQUESTED_EVENT = "review:requested";
 

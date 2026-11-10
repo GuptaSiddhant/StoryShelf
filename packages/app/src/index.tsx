@@ -5,7 +5,11 @@ import {
   adapterSourcesOf,
   validateBootAssembly,
 } from "@storyshelf/core/adapter/setup";
-import { assertServerless, resolveShelfOptions } from "@storyshelf/core/config";
+import {
+  assertServerless,
+  resolveShelfOptions,
+  sequentialTransactionsWarning,
+} from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
@@ -24,10 +28,13 @@ import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
+import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import {
   authGate,
+  notFoundPage,
   csrf,
   createRateLimiter,
+  requireProjectVisible,
   requireReview,
   requireTesting,
   rateLimitKey,
@@ -107,6 +114,10 @@ function warnOnServerless(options: ShelfOptions, logger: Logger): void {
   if (warning) {
     logger.warn(warning);
   }
+  const sequential = sequentialTransactionsWarning(options);
+  if (sequential) {
+    logger.warn(sequential);
+  }
 }
 
 /** Attach lifecycle, queue, middleware, routes, and docs to the app. */
@@ -125,12 +136,17 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
     options: scoped,
     getReady: async () => await cell.ready,
   });
-  registerAllRoutes(app, options, {
-    sources: adapterSourcesOf(options),
-    getSettled: () => cell.settled,
-    bootTimeMs: Date.now(),
-    version: packageVersion(),
-  });
+  registerAllRoutes(
+    app,
+    options,
+    {
+      sources: adapterSourcesOf(options),
+      getSettled: () => cell.settled,
+      bootTimeMs: Date.now(),
+      version: packageVersion(),
+    },
+    runtime.logger,
+  );
   registerDocs(app);
 }
 
@@ -148,7 +164,9 @@ export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
     threads: options.testing?.compare?.threads,
   });
   throwOnInvalidAdapters(options);
-  const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
+  const app = new OpenAPIHono<{ Variables: ShelfContext }>({
+    defaultHook: rejectInvalidRequest,
+  }) as ShelfApp;
   assembleApp(app, options, instrumentedOptions(options));
 
   return app;
@@ -192,8 +210,26 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("*", requireTesting(wiring.options.testing !== undefined));
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
+  mountAccessGates(app);
+}
+
+/**
+ * What the request is allowed to see, inside the request store: the not-found page (it needs to
+ * know who is asking) wraps the sign-in gate and the project gates, whose 404s it dresses.
+ */
+function mountAccessGates(app: ShelfRouter): void {
+  app.use("*", notFoundPage());
   app.use("*", authGate());
-  // Routes classified `review` answer 404 for a project with review off (ADR 0013, decision 10).
+  mountProjectGates(app);
+}
+
+/**
+ * Gates on what a project's routes tell a caller: pages answer 404 to a caller with no role on the
+ * project, as for an unknown slug (#497); routes classified `review` answer 404 for a project with
+ * review off (ADR 0013, decision 10).
+ */
+function mountProjectGates(app: ShelfRouter): void {
+  app.use("*", requireProjectVisible());
   app.use("*", requireReview());
 }
 
@@ -358,10 +394,16 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   registerInsightFragments(app);
 }
 
-/** Register every API router, page set, and optional auth flow. */
-function registerAllRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
+/** Register every API router and page set, then the error answers that cover them. */
+function registerAllRoutes(
+  app: ShelfRouter,
+  options: ShelfOptions,
+  health: HealthDeps,
+  logger: Logger,
+): void {
   registerApiRoutes(app, health);
   registerPageRoutes(app, options, health);
+  mountErrorHandlers(app, logger);
 }
 
 /** The OpenAPI document's info and tag catalog. */

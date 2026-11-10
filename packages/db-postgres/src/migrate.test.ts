@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runMigrations } from "./migrate.ts";
 
 /** Run SQL through PGlite as the shared migration runner does (multi-statement allowed). */
@@ -510,5 +510,238 @@ describe("runMigrations: builds.capture_generation", () => {
       "SELECT capture_generation FROM builds WHERE id = 'b'",
     );
     expect(rows.rows).toEqual([{ capture_generation: 0 }]);
+  }, 60_000);
+});
+
+/** Every distinct statement a clean run issues, in order. */
+async function statementsOfARun(): Promise<string[]> {
+  const seen: string[] = [];
+  await runMigrations(async (sql) => {
+    seen.push(sql);
+    return await Promise.resolve([]);
+  });
+  return [...new Set(seen)];
+}
+
+/** A runner that fails the statement `target` with `error` and does nothing else. */
+const failing = (target: string, error: unknown) => async (sql: string) => {
+  if (sql === target) throw error;
+  return await Promise.resolve([] as unknown[]);
+};
+
+describe("runMigrations: a failing statement stops the boot", () => {
+  it("fails on any statement that errors, whichever column or index it adds", async () => {
+    const statements = await statementsOfARun();
+    expect(statements.length).toBeGreaterThan(80);
+
+    const outcomes = await Promise.all(
+      statements.map(
+        async (target) =>
+          await runMigrations(failing(target, new Error("boom"))).then(
+            () => `${target} did not fail the boot`,
+            () => "failed",
+          ),
+      ),
+    );
+
+    expect(outcomes.filter((outcome) => outcome !== "failed")).toEqual([]);
+  });
+
+  it("drops the user_id NOT NULL of an old comments table, and stops the boot when that fails", async () => {
+    const alter = "ALTER TABLE comments ALTER COLUMN user_id DROP NOT NULL";
+    const required = (fail: boolean) => {
+      const issued: string[] = [];
+      const run = async (sql: string): Promise<unknown[]> => {
+        issued.push(sql);
+        if (sql.includes("information_schema.columns") && sql.includes("'comments'")) {
+          return await Promise.resolve([{ is_nullable: "NO" }]);
+        }
+        if (fail && sql === alter) throw new Error("permission denied for table comments");
+        return await Promise.resolve([]);
+      };
+      return { issued, run };
+    };
+
+    const ok = required(false);
+    await runMigrations(ok.run);
+    expect(ok.issued).toContain(alter);
+
+    await expect(runMigrations(required(true).run)).rejects.toThrow("permission denied");
+  });
+
+  it("skips a unique index that existing duplicates prevent, and only for that error", async () => {
+    const statements = await statementsOfARun();
+    const uniqueIndexes = statements.filter(
+      (sql) =>
+        sql.startsWith("CREATE UNIQUE INDEX") && !sql.includes("capture_jobs_active_key_idx"),
+    );
+    expect(uniqueIndexes.length).toBeGreaterThanOrEqual(3);
+
+    for (const target of uniqueIndexes) {
+      // oxlint-disable-next-line no-await-in-loop -- one statement at a time
+      await expect(
+        runMigrations(failing(target, Object.assign(new Error("duplicate"), { code: "23505" }))),
+      ).resolves.toBeUndefined();
+      // oxlint-disable-next-line no-await-in-loop -- see above
+      await expect(
+        runMigrations(failing(target, Object.assign(new Error("denied"), { code: "42501" }))),
+      ).rejects.toThrow("denied");
+    }
+  });
+
+  it("never skips the single-flight index, even for a unique violation", async () => {
+    const index = (await statementsOfARun()).find((sql) =>
+      sql.includes("capture_jobs_active_key_idx ON"),
+    );
+
+    await expect(
+      runMigrations(failing(index ?? "", Object.assign(new Error("dup"), { code: "23505" }))),
+    ).rejects.toThrow("dup");
+  });
+
+  it("builds the design-link index when the rows allow it and leaves it out when they repeat", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      DROP INDEX design_links_project_import_path_idx;
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO design_links (id, project_id, import_path, url, created_at, updated_at)
+        VALUES ('d1', 'p', './A.tsx', 'u1', now(), now()), ('d2', 'p', './A.tsx', 'u2', now(), now());
+    `);
+
+    const error = vi.fn();
+
+    await expect(runMigrations(run, { error } as never)).resolves.toBeUndefined();
+
+    const indexes = await client.query<{ indexname: string }>(
+      "SELECT indexname FROM pg_indexes WHERE tablename = 'design_links'",
+    );
+    expect(indexes.rows.map((row) => row.indexname)).not.toContain(
+      "design_links_project_import_path_idx",
+    );
+    // Said once, with the table, index and number of repeated keys, never a row's contents.
+    expect(error).toHaveBeenCalledOnce();
+    const [fields, message] = error.mock.calls[0] as [Record<string, unknown>, string];
+    expect(fields).toEqual({
+      table: "design_links",
+      index: "design_links_project_import_path_idx",
+      duplicateGroups: 1,
+    });
+    expect(message).toContain("created on the next boot");
+    expect(message).not.toContain("u1");
+
+    // Clean the data: the next boot creates the index and says nothing more.
+    await client.exec("DELETE FROM design_links WHERE id = 'd2'");
+    error.mockClear();
+    await runMigrations(run, { error } as never);
+    const after = await client.query<{ indexname: string }>(
+      "SELECT indexname FROM pg_indexes WHERE tablename = 'design_links'",
+    );
+    expect(after.rows.map((row) => row.indexname)).toContain(
+      "design_links_project_import_path_idx",
+    );
+    expect(error).not.toHaveBeenCalled();
+    await client.close();
+  }, 60_000);
+});
+
+const RETENTION_TABLES = [
+  "build_content_releases",
+  "build_deletions",
+  "build_reference_generations",
+  "build_references",
+];
+
+async function downgradeRetention(client: PGlite): Promise<void> {
+  await client.exec(`
+    DROP TABLE build_content_releases, build_deletions, build_reference_generations, build_references;
+    ALTER TABLE builds DROP COLUMN retention_state;
+    INSERT INTO projects (id, name, slug, created_at, updated_at)
+      VALUES ('p', 'P', 'p', now(), now());
+    INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at)
+      VALUES ('b1', 'p', 'sha', 'main', 'approved', now(), now());
+  `);
+}
+
+async function retentionShape(client: PGlite): Promise<unknown[]> {
+  const columns = await client.query(
+    `
+    SELECT table_name, column_name, data_type, column_default, is_nullable
+    FROM information_schema.columns
+    WHERE table_name = ANY($1) OR (table_name = 'builds' AND column_name = 'retention_state')
+    ORDER BY table_name, column_name
+  `,
+    [RETENTION_TABLES],
+  );
+  const indexes = await client.query(
+    `
+    SELECT indexdef FROM pg_indexes WHERE tablename = ANY($1) ORDER BY indexname
+  `,
+    [RETENTION_TABLES],
+  );
+  return [...columns.rows, ...indexes.rows];
+}
+
+describe("runMigrations: build retention schema", () => {
+  it("creates the tables and enforces their constraints on a fresh database", async () => {
+    const client = new PGlite();
+    await runMigrations(runnerFor(client));
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, status, created_at, updated_at)
+        VALUES ('b1', 'p', 'sha', 'main', 'approved', now(), now());
+      INSERT INTO build_references (project_id, owner_type, owner_id, build_id)
+        VALUES ('p', 'baseline', 'a', 'b1');
+    `);
+    const state = await client.query("SELECT retention_state FROM builds");
+    expect(state.rows).toEqual([{ retention_state: "available" }]);
+    await expect(client.exec("DELETE FROM builds WHERE id = 'b1'")).rejects.toThrow(
+      /foreign key|violates/iu,
+    );
+    await expect(
+      client.exec(
+        "INSERT INTO build_references (project_id, owner_type, owner_id, build_id) VALUES ('p', 'other', 'a', 'b1')",
+      ),
+    ).rejects.toThrow(/check/iu);
+    await expect(
+      client.exec(
+        "INSERT INTO build_reference_generations (project_id, owner_type, owner_id, generation) VALUES ('p', 'baseline', 'a', -1)",
+      ),
+    ).rejects.toThrow(/check/iu);
+    await client.close();
+  }, 60_000);
+
+  it("adds the column and tables to an existing database, keeping builds available", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await downgradeRetention(client);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const state = await client.query("SELECT id, retention_state FROM builds");
+    expect(state.rows).toEqual([{ id: "b1", retention_state: "available" }]);
+    const tables = await client.query<{ table_name: string }>(
+      "SELECT table_name FROM information_schema.tables WHERE table_name = ANY($1) ORDER BY table_name",
+      [RETENTION_TABLES],
+    );
+    expect(tables.rows.map((row) => row.table_name)).toEqual(RETENTION_TABLES);
+    await client.close();
+  }, 60_000);
+
+  it("gives an upgraded database the same retention shape as a fresh one", async () => {
+    const fresh = new PGlite();
+    await runMigrations(runnerFor(fresh));
+    const upgraded = new PGlite();
+    const run = runnerFor(upgraded);
+    await runMigrations(run);
+    await downgradeRetention(upgraded);
+    await runMigrations(run);
+
+    expect(await retentionShape(upgraded)).toEqual(await retentionShape(fresh));
+    await fresh.close();
+    await upgraded.close();
   }, 60_000);
 });

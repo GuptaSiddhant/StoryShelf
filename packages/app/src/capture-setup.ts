@@ -1,36 +1,36 @@
 /**
  * Capture wiring (ADR 0006, decisions 4 to 6): where uploads queue their capture, and the handler
- * of `capture` jobs. Captures queue on the shared database queue. The handler runs them in this process, or in a forked child the parent pushes jobs
- * to (`testing.workerEntry`). The consumer that polls the queue and calls the handler is built
- * in `jobs-setup.ts`.
+ * of `capture` jobs. Captures queue on the shared database queue. The handler runs them in this
+ * process, or in a forked child the parent pushes jobs to (`testing.workerEntry`). The consumer
+ * that polls the queue and calls the handler is built in `jobs-setup.ts`. The hooks, the choice
+ * of process and the alerting wrapper live in `capture-handlers.ts`.
  */
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   captureDispatchDeps,
-  createCaptureHandler,
   DEFAULT_RETRIES,
-  failCrashedCapture,
-  isFinalAttempt,
   type BuildStatePublisher,
   type CaptureHandlerOptions,
-  type ConsumerJob,
-  type KindHandler,
 } from "@storyshelf/core/capture";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { currentTraceparent } from "@storyshelf/observability";
 import { notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
-import { createForkedHandler, shouldForkCapture } from "./capture-process.ts";
+import {
+  alerting,
+  handlerFor,
+  registerCrashHooks,
+  type CaptureAlerts,
+  type CaptureHandler,
+} from "./capture-handlers.ts";
+import { recordShardRepeated } from "./consumer-setup.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import type { JobQueue } from "./job-queue.ts";
 
-/** The `capture` handler, with a way to stop a forked child once the consumer has drained. */
-export interface CaptureHandler extends KindHandler {
-  close?: () => Promise<void>;
-}
+export type { CaptureHandler };
 
 /** What uploads and the consumer need of capture. */
 export interface CaptureWiring {
@@ -74,7 +74,6 @@ export function setupCapture(
     return { queue: null, enqueueCapture: undefined, handler: null };
   }
   const queue = jobs.view;
-  const enqueueCapture = enqueuerFor(queue);
   const handlerOptions = captureHandlerOptions(options, config, delivery, logger, {
     runner: testing.runner,
     enqueue: async (job) => {
@@ -82,25 +81,20 @@ export function setupCapture(
     },
   });
   const retries = options.testing?.retries ?? DEFAULT_RETRIES;
-  const dispatch = captureDispatchDeps(handlerOptions, retries);
-  const failed = async (job: ConsumerJob, error: string): Promise<void> => {
-    await failCrashedCapture(dispatch, job, error);
-    await notifyCaptureFailed(options, config, logger, job.buildId, delivery.publicOrigin);
+  const alert: CaptureAlerts = {
+    failed: async (buildId: string): Promise<void> => {
+      await notifyCaptureFailed(options, config, logger, buildId, delivery.publicOrigin);
+    },
+    stuck: async (buildId: string): Promise<void> => {
+      await notifyCaptureStuck(options, config, logger, buildId, delivery.publicOrigin);
+    },
   };
-  jobs.exhausted.capture = failed;
-  jobs.abandoned.capture = async (job): Promise<void> => {
-    await notifyCaptureStuck(options, config, logger, job.buildId, delivery.publicOrigin);
-  };
-  const inProcess = createCaptureHandler(handlerOptions);
-  const handler = shouldForkCapture(testing, logger)
-    ? forkedHandler(options, { fallback: inProcess, retries, onCrashed: failed, logger })
-    : inProcess;
+  const failed = registerCrashHooks(jobs, captureDispatchDeps(handlerOptions, retries), alert);
+  const handler = handlerFor(options, handlerOptions, { retries, onCrashed: failed, logger });
   return {
     queue,
-    enqueueCapture,
-    handler: alerting(handler, retries, async (buildId) => {
-      await notifyCaptureFailed(options, config, logger, buildId, delivery.publicOrigin);
-    }),
+    enqueueCapture: enqueuerFor(queue),
+    handler: alerting(handler, retries, alert.failed),
   };
 }
 
@@ -128,54 +122,6 @@ function captureHandlerOptions(
     config,
     enqueue: parts.enqueue,
     maxRetries: options.testing?.retries,
-  };
-}
-
-function forkedHandler(
-  options: ShelfOptions,
-  parts: {
-    fallback: KindHandler;
-    retries: number;
-    onCrashed: (job: ConsumerJob, error: string) => Promise<void>;
-    logger: Logger;
-  },
-): CaptureHandler {
-  const testing = options.testing;
-  return createForkedHandler({
-    workerEntry: testing?.workerEntry ?? "",
-    shardSize: testing?.shardSize,
-    imageEngine: testing?.images?.engine,
-    diffThreads: testing?.compare?.threads,
-    ...parts,
-  });
-}
-
-/**
- * Alert admins when a capture left its build failed: after a run that ended, and after a final
- * attempt that threw (the build may then already be failed by a crash hook). Alerts stay in this
- * process whichever process rendered.
- */
-function alerting(
-  inner: CaptureHandler,
-  retries: number,
-  alert: (buildId: string) => Promise<void>,
-): CaptureHandler {
-  return {
-    accepts: (job) => inner.accepts?.(job) !== false,
-    run: async (job, context) => {
-      try {
-        await inner.run(job, context);
-      } catch (error) {
-        if (isFinalAttempt(job, retries)) {
-          await alert(job.buildId);
-        }
-        throw error;
-      }
-      await alert(job.buildId);
-    },
-    cancel: async (job) => {
-      await inner.cancel?.(job);
-    },
-    ...(inner.close ? { close: inner.close } : {}),
+    onShardRepeated: recordShardRepeated,
   };
 }

@@ -22,6 +22,11 @@ describe("createNeonHttpDatabase", () => {
     expect(() => createNeonHttpDatabase({})).toThrow("provide `url`");
   });
 
+  it("declares its transactions sequential: the emulated transact cannot roll back", () => {
+    const { sql } = createRecordingSql();
+    expect(createNeonHttpDatabase({ client: sql }).metadata.transactions).toBe("sequential");
+  });
+
   it("runs the shared DDL on setup", async () => {
     const { sql, queries } = createRecordingSql();
     const db = createNeonHttpDatabase({ client: sql });

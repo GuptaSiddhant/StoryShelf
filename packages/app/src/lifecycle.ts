@@ -104,7 +104,7 @@ async function firstBootFailure(
     // eslint-disable-next-line no-await-in-loop -- boot checks run in order and stop at the first failure
     const failed = await run(options);
     if (failed) {
-      logger.error({ failures: failed.failures }, `${label} setup failed`);
+      logger.error({ failures: failed.failures, step: label }, "boot check setup failed");
       return failed;
     }
   }

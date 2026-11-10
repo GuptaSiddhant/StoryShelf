@@ -18,9 +18,6 @@ import {
 } from "../ui/components.tsx";
 import type { ComponentPageData } from "./component-detail.tsx";
 import { StoryComments } from "./review-comments.tsx";
-
-/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Stories tab: the selected story in a sandboxed preview, and every story and docs entry. */
