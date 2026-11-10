@@ -120,7 +120,7 @@ describe("storybook routes", () => {
     },
   );
 
-  it("redirects an unauthenticated visitor from a private label", async () => {
+  it("answers an unauthenticated visitor to a private label as for a project that does not exist", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     await db.insert(db.tables.projects, mockProject());
@@ -134,8 +134,8 @@ describe("storybook routes", () => {
     });
     const url = createUrlBuilder("").storybookLabel("test-project", "branch", "feature/login");
     const response = await app.request(url);
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/auth/login");
+    expect(response.status).toBe(404);
+    expect(response.headers.get("location")).toBeNull();
   });
 
   it("returns 404 when no approved default-branch build exists", async () => {
@@ -398,10 +398,15 @@ describe("storybook routes", () => {
   it("short link returns 404 for unknown build and slug", async () => {
     const { app } = await seededApp();
     const badUlid = "01ARZ3NDEKTSV4RRFFQ69G5FAV"; // valid 26-char ULID, not a build
-    const r1 = await app.request(`/_/${badUlid}`);
-    expect(r1.status).toBe(404);
-    const r2 = await app.request("/_/nope");
-    expect(r2.status).toBe(404);
+    // The bare form always redirects (so it tells nothing about the id); the 404 is one step on.
+    for (const id of [badUlid, "nope"]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one request at a time keeps failures readable
+      const bare = await app.request(`/_/${id}`);
+      expect(bare.status, id).toBe(302);
+      expect(bare.headers.get("location"), id).toBe(`/_/${id}/`);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      expect((await app.request(`/_/${id}/`)).status, id).toBe(404);
+    }
   });
 
   it("short link serves static assets and rejects traversal", async () => {
@@ -416,8 +421,13 @@ describe("storybook routes", () => {
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
     const js = await app.request(`/_/${ulid}/iframe.js`);
     expect(js.status).toBe(200);
-    const bad = await app.request(`/_/${ulid}/../secrets.txt`);
+    // A traversal that survives URL parsing is refused by the route itself.
+    const bad = await app.request(`/_/${ulid}/..%2Fsecrets.txt`);
     expect(bad.status).toBe(404);
+    // One the URL parser flattens (`/_/secrets.txt`) names no project, so it ends in a 404 too.
+    const flattened = await app.request(`/_/${ulid}/../secrets.txt`);
+    expect(flattened.headers.get("location")).toBe("/_/secrets.txt/");
+    expect((await app.request("/_/secrets.txt/")).status).toBe(404);
   });
 });
 
@@ -464,17 +474,21 @@ describe("short links for a signed-out visitor (auth on)", () => {
     expect(response.headers.get("location")).toBe(`/_/${PUBLIC_ID}/`);
   });
 
-  it("answers a private build and an unknown id with the same login redirect", async () => {
+  it("answers a private build and an unknown id with the same 404", async () => {
     const app = await signedOutApp();
-    const paths = [PRIVATE_ID, UNKNOWN_ID].flatMap((id) => [
-      `/_/${id}`,
-      `/_/${id}/`,
-      `/_/${id}/iframe.js`,
+    // The bare form redirects for every id; the trailing-slash route does the checks (#497).
+    const bare = await Promise.all(
+      [PRIVATE_ID, UNKNOWN_ID].map(async (id) => await app.request(`/_/${id}`)),
+    );
+    expect(bare.map((response) => [response.status, response.headers.get("location")])).toEqual([
+      [302, `/_/${PRIVATE_ID}/`],
+      [302, `/_/${UNKNOWN_ID}/`],
     ]);
+    const paths = [PRIVATE_ID, UNKNOWN_ID].flatMap((id) => [`/_/${id}/`, `/_/${id}/iframe.js`]);
     const responses = await Promise.all(paths.map(async (path) => await app.request(path)));
     expect(
       responses.map((response) => [response.status, response.headers.get("location")]),
-    ).toEqual(paths.map(() => [302, "/auth/login"]));
+    ).toEqual(paths.map(() => [404, null]));
   });
 
   it("treats a project slug the same way: public opens, private and unknown look alike", async () => {
@@ -482,16 +496,11 @@ describe("short links for a signed-out visitor (auth on)", () => {
     const open = await app.request("/_/test-project/");
     expect(open.status).toBe(200);
     expect((await app.request("/_/test-project")).headers.get("location")).toBe("/_/test-project/");
-    const paths = [
-      "/_/private-project",
-      "/_/private-project/",
-      "/_/no-such-project",
-      "/_/no-such-project/",
-    ];
+    const paths = ["/_/private-project/", "/_/no-such-project/"];
     const responses = await Promise.all(paths.map(async (path) => await app.request(path)));
     expect(
       responses.map((response) => [response.status, response.headers.get("location")]),
-    ).toEqual(paths.map(() => [302, "/auth/login"]));
+    ).toEqual(paths.map(() => [404, null]));
   });
 
   it("does not open the gate for other paths under /_", async () => {

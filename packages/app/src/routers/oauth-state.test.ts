@@ -35,4 +35,10 @@ describe("safeReturnPath", () => {
       expect(safeReturnPath(bad, "/home")).toBe("/home");
     }
   });
+
+  it("refuses a path that carries a control character", () => {
+    for (const bad of ["/a\r\nSet-Cookie: x=1", "/a\nb", "/a\u0000b", "/a\u007Fb"]) {
+      expect(safeReturnPath(bad, "/home")).toBe("/home");
+    }
+  });
 });

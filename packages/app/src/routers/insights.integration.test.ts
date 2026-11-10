@@ -4,10 +4,12 @@ import {
   AiUsageModel,
   BuildModel,
   InsightModel,
+  TokenModel,
 } from "@storyshelf/core/models";
 import type { InsightRow } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
+import { sha256 } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
@@ -111,6 +113,30 @@ function appWith(db: unknown, storage: unknown, ai?: Ai) {
 const path = (buildId: string) => `/api/v1/projects/p/builds/${buildId}/insights`;
 
 describe("insights API guards", () => {
+  it("answers 403 to a project token whose owner may view but not regenerate", async () => {
+    const { db, storage, buildId } = await seed();
+    const app = appWith(db, storage, fakeAi());
+    await new TokenModel(db).create("p1", {
+      name: "ci",
+      hash: sha256("viewer-token"),
+      userId: viewer.id,
+    });
+    await new TokenModel(db).create("p1", {
+      name: "ci",
+      hash: sha256("approver-token"),
+      userId: approver.id,
+    });
+    const post = (token: string) =>
+      app.request(path(buildId), {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: "{}",
+      });
+    expect((await post("viewer-token")).status).toBe(403);
+    expect((await post("approver-token")).status).toBe(202);
+    await settleInsightJobs();
+  });
+
   it("returns 501 ai-disabled when AI is not configured", async () => {
     const { db, storage, buildId } = await seed();
     const res = await appWith(db, storage).request(`${path(buildId)}/latest`, {

@@ -250,6 +250,15 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=12
+      # Neon's WebSocket proxy in front of the same server, so `./neon` runs both suites for real.
+      wsproxy:
+        image: ghcr.io/neondatabase/wsproxy:latest
+        env:
+          APPEND_PORT: postgres:5432
+          ALLOW_ADDR_REGEX: ".*"
+          LOG_TRAFFIC: "false"
+        ports:
+          - 5433:80
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -269,9 +278,14 @@ jobs:
           # The suite clears and claims shared content rows: this service container is disposable.
           POSTGRES_SCHEMA_MUTATION_TEST: "1"
           DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
-        # One file at a time: each runs the migrations, and two first migrations on a fresh database
-        # collide ("duplicate key value violates unique constraint pg_type_typname_nsp_index").
-        run: nubx vitest run --no-file-parallelism src/build-reference-lifecycle.test.ts src/retention-activation.test.ts
+          NEON_WSPROXY: 127.0.0.1:5433/v1
+        # One file per run, in order: each runs the migrations, and two first migrations on a fresh database
+        # collide ("duplicate key value violates unique constraint pg_type_typname_nsp_index"); a file
+        # that fails must not leave its connections open under the next.
+        run: |
+          nubx vitest run src/build-reference-lifecycle.test.ts
+          nubx vitest run src/retention-activation.test.ts
+          nubx vitest run src/retention-pool-presets.test.ts
 
   website:
     name: website

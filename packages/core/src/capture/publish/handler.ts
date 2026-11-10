@@ -30,18 +30,46 @@ function hasBuild(job: ConsumerJob): boolean {
  * (same keys) and leaves an already accepted build alone.
  */
 export function createPublishHandler(options: PublishHandlerOptions): KindHandler {
+  // One abort controller per running attempt: a cancel aborts it, like a passed deadline does.
+  const running = new Map<string, AbortController>();
   return {
     accepts: hasBuild,
     run: async (job, context) => {
-      const build = await new BuildModel(options.db).get(job.buildId);
-      if (!build) {
-        context.logger.warn("build is gone; dropping publish job");
-        return;
+      // Registered first: a cancel that arrives while the build is being read still stops the run.
+      const controller = new AbortController();
+      running.set(keyOf(job), controller);
+      try {
+        const signal = AbortSignal.any([context.signal, controller.signal]);
+        await runPublish(options, job, { ...context, signal });
+      } finally {
+        // Only this run's own controller: a reclaimed attempt may have registered a newer one.
+        if (running.get(keyOf(job)) === controller) running.delete(keyOf(job));
       }
-      context.signal.throwIfAborted();
-      await publishOnce(options, job, context, build.projectId);
+    },
+    // oxlint-disable-next-line eslint/require-await -- the interface is async; aborting is synchronous
+    cancel: async (job) => {
+      running.get(keyOf(job))?.abort(new Error("publish cancelled"));
     },
   };
+}
+
+async function runPublish(
+  options: PublishHandlerOptions,
+  job: ConsumerJob,
+  context: { logger: Logger; touch: () => void; signal: AbortSignal },
+): Promise<void> {
+  const build = await new BuildModel(options.db).get(job.buildId);
+  if (!build) {
+    context.logger.warn("build is gone; dropping publish job");
+    return;
+  }
+  context.signal.throwIfAborted();
+  await publishOnce(options, job, context, build.projectId);
+}
+
+/** The key a job is tracked under while it runs: its row (else its build) and its attempt. */
+function keyOf(job: ConsumerJob): string {
+  return `${job.jobId ?? job.buildId}#${job.attempt ?? 1}`;
 }
 
 async function publishOnce(

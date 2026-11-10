@@ -1,6 +1,8 @@
 /** How a connect failure is classified (ADR 0007, decision 4): retried or not, and what it does to the target. */
 import { isRetryableConnectError } from "../utils/connect-retry.ts";
 import { errorText } from "../utils/error-text.ts";
+import { redactUrlForLog } from "../utils/http.ts";
+import { redactSecrets } from "../utils/redact.ts";
 
 /** What a connect failure means for the retry loop and for the target. */
 export interface RemoteConnectErrorOptions {
@@ -51,20 +53,47 @@ export function classify(error: unknown): { retry: boolean; unavailable: boolean
   return { retry, unavailable: !retry };
 }
 
-/** A provider's thrown value as a {@link RemoteConnectError}: transient unless it says `transient: false`. */
+/** Longest provider text kept in a connect error. */
+const PROVIDER_TEXT_MAX = 300;
+/** A URL runs to the next space or angle bracket, quotes included: a quoted query value is part of it. */
+const URL_IN_TEXT = /\b[a-z][a-z0-9+.-]*:\/\/[^\s<>]+/giu;
+/** The value of an `Authorization` header, whatever its length: the header names it as a credential. */
+const AUTH_HEADER_IN_TEXT = /\b(?<header>authorization\W{0,3}(?:bearer|basic))\s+[^\s,;]+/giu;
+/**
+ * A Bearer/Basic value with no header around it: only when it looks like a credential (eight or more
+ * characters, or any digit, `=`, `+` or `/`), so prose such as "Basic auth is off" is left alone.
+ */
+const AUTH_VALUE_IN_TEXT =
+  /\b(?<scheme>bearer|basic)\s+(?:(?=[\w.~+/=-]{8,})|(?=[\w.~+/=-]*[\d=+/]))[\w.~+/=-]+/giu;
+
+/**
+ * Provider text without its secrets, in an order that matters. A URL is cut to its origin first,
+ * while it is still a whole URL (the shared patterns would otherwise rewrite its userinfo and leave
+ * a path behind). The shared `key=value` patterns run next, while a word such as `password:` still
+ * sits next to its value. The Bearer/Basic rewrite comes last, because it would hide that key.
+ */
+function withoutSecrets(text: string): string {
+  return redactSecrets(text.replaceAll(URL_IN_TEXT, (url) => redactUrlForLog(url)))
+    .replaceAll(AUTH_HEADER_IN_TEXT, "$<header> [redacted]")
+    .replaceAll(AUTH_VALUE_IN_TEXT, "$<scheme> [redacted]");
+}
+
+/**
+ * A provider's thrown value as a {@link RemoteConnectError}: transient unless it says `transient: false`.
+ * Its text is all the error keeps of the provider's: URLs cut to their origin, header values and
+ * known secret shapes redacted, bounded. The thrown value is not kept as `cause`, because a cause
+ * would carry the raw text to whatever walks it.
+ */
 export function connectErrorOf(error: unknown): RemoteConnectError {
   const flags = (typeof error === "object" && error !== null ? error : {}) as {
     transient?: unknown;
     scope?: unknown;
     lease?: unknown;
   };
-  return new RemoteConnectError(
-    `acquire failed: ${error instanceof Error ? error.message : errorText(error)}`,
-    {
-      cause: error,
-      transient: flags.transient !== false,
-      scope: flags.scope === "job" ? "job" : "target",
-      lease: flags.lease,
-    },
-  );
+  const text = errorText(error, { maxLength: PROVIDER_TEXT_MAX, scrub: withoutSecrets });
+  return new RemoteConnectError(`acquire failed: ${text}`, {
+    transient: flags.transient !== false,
+    scope: flags.scope === "job" ? "job" : "target",
+    lease: flags.lease,
+  });
 }

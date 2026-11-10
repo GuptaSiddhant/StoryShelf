@@ -11,6 +11,11 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrations } from "./migrate.ts";
+import {
+  activateRetention,
+  attachRetention,
+  type RetentionActivation,
+} from "./retention-activation.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -47,8 +52,12 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
   const owned = !options.client;
   const pool = options.client ?? new Pool({ connectionString });
   const db = drizzle(pool, { schema });
+  const retention: RetentionActivation = {};
+  // Only a pool hands each transaction its own session; one injected connection shares them all,
+  // so row locks would prove nothing and the capability stays off.
+  const pooled = owned || pool instanceof Pool;
 
-  return createDrizzlePgAdapter(db, {
+  const adapter = createDrizzlePgAdapter(db, {
     metadata: {
       name: "Neon",
       version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
@@ -59,6 +68,9 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
     tables: schema,
     migrate: async ({ logger }) => {
       await runMigrations(async (sql) => (await pool.query(sql)).rows as unknown[], logger);
+      if (pooled) {
+        await activateRetention(db, retention);
+      }
     },
     close: async () => {
       if (owned) {
@@ -69,6 +81,7 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
       await pool.query("SELECT 1");
     },
   });
+  return attachRetention(adapter, retention);
 }
 
 /** Close an owned client: pools end, checked-out clients release. */

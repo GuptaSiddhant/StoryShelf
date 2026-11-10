@@ -1,0 +1,305 @@
+import { BuildModel, MemberModel } from "@storyshelf/core/models";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pino } from "pino";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { createShelfApp } from "../index.tsx";
+import { getCsrfToken } from "../middleware/csrf.ts";
+import { API_ROUTE_CLASSES } from "../routes/api-routes.ts";
+import { PAGE_ROUTE_CLASSES } from "../routes/page-routes.ts";
+import { stubAuth } from "../stub-auth.ts";
+import { stubRunner } from "../test-runner.ts";
+
+/**
+ * A caller with no role on a project gets the answer for a project that does not exist (404), on
+ * every project-scoped route; 403 is only for a caller who can see the project but lacks the role.
+ */
+
+const NOW = "2026-01-01T00:00:00.000Z";
+const users = ["admin", "viewer", "outsider"].map((id) => ({
+  id,
+  email: `${id}@example.com`,
+  name: id,
+  role: id === "admin" ? ("admin" as const) : ("member" as const),
+}));
+const auth = stubAuth(null, {
+  check: async (request: Request) => {
+    const cookie = request.headers.get("cookie") ?? "";
+    const id = /storyshelf_session=(?<id>\w+)/u.exec(cookie)?.groups?.["id"];
+    return await Promise.resolve(users.find((user) => user.id === id) ?? null);
+  },
+});
+
+let scratchDir = "";
+let privateBuildId = "";
+let openBuildId = "";
+/** A well-formed build id that no build has. */
+const UNKNOWN_BUILD_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+let booted: { lifecycle: { teardown: () => Promise<void> } } | undefined;
+beforeEach(async () => {
+  scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-visibility-"));
+});
+afterEach(async () => {
+  try {
+    await booted?.lifecycle.teardown();
+  } finally {
+    booted = undefined;
+    await rm(scratchDir, { recursive: true, force: true });
+  }
+});
+
+async function boot() {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  await db.insert(db.tables.projects, {
+    id: "p1",
+    name: "Hidden",
+    slug: "hidden",
+    gitRepository: "acme/widgets",
+    gitDefaultBranch: "main",
+    reviewEnabled: true,
+    reviewApprovals: 1,
+    createdAt: NOW,
+    updatedAt: NOW,
+  });
+  await Promise.all(
+    users.map(async (user) => {
+      await db.insert(db.tables.users, {
+        ...user,
+        avatarUrl: null,
+        lastLoginAt: null,
+        createdAt: NOW,
+      });
+    }),
+  );
+  await new MemberModel(db).set("p1", "viewer", "viewer");
+  const builds = new BuildModel(db);
+  const build = await builds.create("p1", {
+    gitSha: "a".repeat(40),
+    gitBranch: "main",
+    isDefault: true,
+  });
+  await builds.update(build.id, { status: "approved" });
+  privateBuildId = build.id;
+  await db.insert(db.tables.projects, {
+    id: "p2",
+    name: "Open",
+    slug: "open",
+    gitRepository: "acme/open",
+    gitDefaultBranch: "main",
+    publicBranchRegex: "^main$",
+    reviewEnabled: true,
+    reviewApprovals: 1,
+    createdAt: NOW,
+    updatedAt: NOW,
+  });
+  const open = await builds.create("p2", {
+    gitSha: "b".repeat(40),
+    gitBranch: "main",
+    isDefault: true,
+  });
+  await builds.update(open.id, { status: "approved" });
+  openBuildId = open.id;
+  const app = createShelfApp({
+    database: db,
+    storage,
+    auth,
+    testing: { runner: stubRunner() },
+    config: { secret: "s", scratchDir, publicBaseUrl: "https://shelf.example" },
+    logger: pino({ level: "silent" }),
+  });
+  booted = app;
+  await app.lifecycle.setup();
+  return app;
+}
+
+type Booted = Awaited<ReturnType<typeof boot>>;
+
+/** What a caller can observe of an answer. */
+async function observed(response: Response): Promise<Record<string, unknown>> {
+  return {
+    status: response.status,
+    body: (await response.text())
+      .replaceAll(/hidden|ghost/gu, ":slug")
+      .replaceAll(privateBuildId, ":id")
+      .replaceAll(UNKNOWN_BUILD_ID, ":id")
+      // Every page carries a fresh CSRF token, whatever the request.
+      .replaceAll(/name="csrf-token" content="[^"]*"/gu, 'name="csrf-token" content=":token"'),
+    cacheControl: response.headers.get("cache-control"),
+    contentType: response.headers.get("content-type"),
+    location: response.headers
+      .get("location")
+      ?.replaceAll(/hidden|ghost/gu, ":slug")
+      .replaceAll(privateBuildId, ":id")
+      .replaceAll(UNKNOWN_BUILD_ID, ":id"),
+  };
+}
+
+/** Project-scoped routes (a `:slug` segment) with every other parameter filled in. */
+function projectRoutes(): { key: string; method: string; path: string }[] {
+  return Object.keys({ ...API_ROUTE_CLASSES, ...PAGE_ROUTE_CLASSES })
+    .filter((key) => key.includes("/:slug"))
+    .map((key) => {
+      const [method = "GET", pattern = ""] = key.split(" ");
+      return { key, method, path: pattern.replaceAll(/:[a-zA-Z]+/gu, "x").replaceAll("*", "x") };
+    });
+}
+
+let requests = 0;
+
+async function ask(
+  app: Booted,
+  as: string,
+  route: { method: string; path: string },
+  slug: string,
+): Promise<Record<string, unknown>> {
+  requests += 1;
+  const path = route.path.replace("/projects/x", `/projects/${slug}`);
+  const write = route.method !== "GET" && route.method !== "HEAD";
+  const response = await app.request(path, {
+    method: route.method,
+    headers: {
+      cookie: `storyshelf_session=${as}`,
+      // A fresh client address per request keeps the rate limiter from answering for the routes.
+      "x-forwarded-for": `10.1.${Math.floor(requests / 250)}.${requests % 250}`,
+      "x-csrf-token": getCsrfToken("s", as),
+      ...(write ? { "content-type": "application/json" } : {}),
+    },
+    ...(write ? { body: "{}" } : {}),
+  });
+  return await observed(response);
+}
+
+describe("a project the caller cannot see", () => {
+  it("answers exactly as for a slug that does not exist, on every project-scoped route", async () => {
+    const app = await boot();
+    const statuses = new Map<string, number>();
+    for (const route of projectRoutes()) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one route at a time keeps failures readable
+      const hidden = await ask(app, "outsider", route, "hidden");
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      const unknown = await ask(app, "outsider", route, "ghost");
+      expect(hidden, route.key).toEqual(unknown);
+      statuses.set(route.key, hidden["status"] as number);
+    }
+    // Not a vacuous pass: the routes that decide on the project answer 404 (not 400, 429 or 501).
+    for (const key of [
+      "GET /api/v1/projects/:slug",
+      "GET /api/v1/projects/:slug/builds",
+      "GET /api/v1/projects/:slug/tokens",
+      "GET /api/v1/projects/:slug/members",
+      "GET /projects/:slug/settings",
+      "GET /projects/:slug/labels",
+      "GET /projects/:slug/storybook",
+    ]) {
+      expect(statuses.get(key), key).toBe(404);
+    }
+  });
+
+  it("still answers 403 to a member whose role is too low", async () => {
+    const app = await boot();
+    const asViewer = async (method: string, path: string): Promise<number> =>
+      (
+        await app.request(path, {
+          method,
+          headers: {
+            cookie: "storyshelf_session=viewer",
+            "x-csrf-token": getCsrfToken("s", "viewer"),
+            "content-type": "application/json",
+          },
+          ...(method === "GET" ? {} : { body: "{}" }),
+        })
+      ).status;
+    expect(await asViewer("GET", "/api/v1/projects/hidden/tokens")).toBe(403);
+    expect(await asViewer("DELETE", "/api/v1/projects/hidden/tokens/t1")).toBe(403);
+    expect(await asViewer("GET", "/api/v1/projects/hidden/builds")).toBe(200);
+  });
+
+  it("shows a site admin every project", async () => {
+    const app = await boot();
+    const response = await app.request("/api/v1/projects/hidden/builds", {
+      headers: { cookie: "storyshelf_session=admin" },
+    });
+    expect(response.status).toBe(200);
+  });
+});
+
+/** Every way to reach a build's published Storybook, for a project slug and a build id. */
+const storybookPaths: ((slug: string, id: string) => string)[] = [
+  (slug) => `/projects/${slug}/storybook`,
+  (slug, id) => `/projects/${slug}/storybook/build/${id}/`,
+  (slug, id) => `/projects/${slug}/storybook/build/${id}/index.html`,
+  (slug) => `/projects/${slug}/storybook/branch/main`,
+  (_slug, id) => `/_/${id}/`,
+  (_slug, id) => `/_/${id}/index.html`,
+  (slug) => `/_/${slug}/`,
+  // The bare short links redirect to the form with a trailing slash.
+  (slug) => `/_/${slug}`,
+  (_slug, id) => `/_/${id}`,
+];
+
+async function getAs(
+  app: Booted,
+  path: string,
+  cookie?: string,
+  accept = "*/*",
+): Promise<Record<string, unknown>> {
+  requests += 1;
+  return await observed(
+    await app.request(path, {
+      headers: {
+        accept,
+        ...(cookie ? { cookie } : {}),
+        "x-forwarded-for": `10.2.${Math.floor(requests / 250)}.${requests % 250}`,
+      },
+    }),
+  );
+}
+
+describe("a private project's published Storybook", () => {
+  it.each([
+    ["an anonymous caller", undefined, "*/*"],
+    ["a signed-in caller with no role", "storyshelf_session=outsider", "*/*"],
+    ["an anonymous browser", undefined, "text/html"],
+    ["a signed-in browser with no role", "storyshelf_session=outsider", "text/html"],
+  ])("answers %s exactly as for a project that does not exist", async (_name, cookie, accept) => {
+    const app = await boot();
+    for (const path of storybookPaths) {
+      const where = path("hidden", privateBuildId);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one route at a time keeps failures readable
+      const hidden = await getAs(app, where, cookie, accept);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      const unknown = await getAs(app, path("ghost", UNKNOWN_BUILD_ID), cookie, accept);
+      expect(hidden, where).toEqual(unknown);
+      // A bare short link (`/_/<id>`) redirects to the trailing-slash form for any id; the checks
+      // (and the 404) belong to the trailing-slash route, for every caller (#497, #681).
+      const redirects = /^\/_\/[^/]+$/u.test(where);
+      expect(hidden["status"], where).toBe(redirects ? 302 : 404);
+      expect(hidden["location"] === undefined, where).toBe(!redirects);
+    }
+  });
+
+  it("still opens a public build to an anonymous caller", async () => {
+    const app = await boot();
+    const resolver = await app.request("/projects/open/storybook");
+    expect(resolver.status).toBe(302);
+    expect(resolver.headers.get("location")).toBe(`/projects/open/storybook/build/${openBuildId}/`);
+    // The canonical build route opens for an anonymous caller: no 404, no redirect to sign-in.
+    const opened = await app.request(`/projects/open/storybook/build/${openBuildId}/`);
+    expect(opened.status).toBe(200);
+    expect(opened.headers.get("location")).toBeNull();
+  });
+
+  it("shows a signed-in viewer the Storybook", async () => {
+    const app = await boot();
+    const response = await app.request("/projects/hidden/storybook", {
+      headers: { cookie: "storyshelf_session=viewer" },
+    });
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      `/projects/hidden/storybook/build/${privateBuildId}/`,
+    );
+  });
+});

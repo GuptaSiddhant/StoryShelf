@@ -91,6 +91,9 @@ Rules:
   touches `packages/db-postgres/`, `packages/core/src/test-helpers/` or
   `packages/core/src/adapters/database.ts` (job `postgres-lifecycle`, a `postgres:16` service
   container), and the nightly database workflow runs it with the rest of the live suite.
+- The `pg` and `./neon` presets (`db-postgres/src/retention-pool-presets.test.ts`) run both suites on a
+  real server with every party on its own pool; `./neon` goes through a `ghcr.io/neondatabase/wsproxy`
+  service (`NEON_WSPROXY`), and the file skips without the gates. A single injected connection staying off is hermetic.
 - Postgres activation (`db-postgres/src/retention-activation.test.ts`) runs `retentionActivationContractSuite`
   the same way: PGlite always, a real server (same gates, same CI job) for the rest. Only the real server
   runs the mirrored race tests (an interrupted preparation that resumes, a fenced writer in flight, two

@@ -6,16 +6,16 @@ export default defineConfig({
     cache: { scripts: true, tasks: true },
     tasks: {
       // ADR 0047 decision 7: a fixture's Storybook built through its own install, from outside the workspace.
-      'fixture-storybook-9': {
+      "fixture-storybook-9": {
         command:
-          'pnpm --dir fixtures/storybook-9 install --frozen-lockfile && pnpm --dir fixtures/storybook-9 run build-storybook',
+          "pnpm --dir fixtures/storybook-9 install --frozen-lockfile && pnpm --dir fixtures/storybook-9 run build-storybook",
         cache: {
           input: [
-            { pattern: 'fixtures/storybook-9/**', base: 'workspace' },
-            '!fixtures/storybook-9/node_modules/**',
-            '!fixtures/storybook-9/storybook-static/**',
+            { pattern: "fixtures/storybook-9/**", base: "workspace" },
+            "!fixtures/storybook-9/node_modules/**",
+            "!fixtures/storybook-9/storybook-static/**",
           ],
-          output: [{ pattern: 'fixtures/storybook-9/storybook-static/**', base: 'workspace' }],
+          output: [{ pattern: "fixtures/storybook-9/storybook-static/**", base: "workspace" }],
         },
       },
     },
@@ -232,7 +232,6 @@ export default defineConfig({
           "packages/app/src/routers/builds.handlers.ts",
           "packages/app/src/routers/builds.ts",
           "packages/app/src/routers/helpers.ts",
-          "packages/app/src/routers/labels.ts",
           "packages/app/src/routers/snapshots.ts",
           "packages/app/src/routers/storybook.ts",
           "packages/app/src/routers/ui.ts",

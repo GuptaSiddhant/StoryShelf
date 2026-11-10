@@ -218,7 +218,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   proposed direction; ADR 0038 (environment migration/review) is accepted as the target but not yet
   implemented. ADRs 0003 and 0009 describe current behavior until that work lands. ADR 0041 (schema
   source of truth) is accepted but not yet implemented; until its neutral tables land, change a
-  table in every dialect's DDL, Drizzle schema and migration, plus the core row type.
+  table in every dialect's DDL, Drizzle schema and migration, plus the core row type. ADR 0047
+  (toolchain on Vite+ and pnpm) is accepted, gated by a spike; until its epic merges, nub and turbo
+  as described here stay the toolchain.
 
 ## Conventions
 
@@ -227,7 +229,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   Fix with `nub run fmt` and re-stage; do not bypass hooks.
 - **Changesets.** A pull request that changes shipped behavior (the source of `packages/*`, or a
   published `package.json`) adds a changeset: `nub run changeset <patch|minor|major>`, one Markdown file in `.changeset/`
-  written like a `CHANGELOG.md` entry. Never edit `CHANGELOG.md` by hand and never bump versions;
+  whose body starts with one line `<Kind>: <summary>` (≤ 100 characters; Kind `Breaking`, `Added`,
+  `Changed`, `Fixed`, `Security` or `Internal`), then a blank line and the details. The summary is
+  the release note; mark stories, tests and groundwork `Internal`. Never edit `CHANGELOG.md` by hand and never bump versions;
   `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
   tells the CI check so. Task PRs on an epic branch add theirs there.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
@@ -281,7 +285,12 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   PR into `main`, runs the full `verify`. Keep the branch current by merging `main` into it (never
   rebase or force-push a shared branch); land an epic, or a coherent finished part of it, within
   about two weeks. P0/security fixes, standalone issues and docs/config changes still target `main`
-  directly.
+  directly. Any epic whose tasks change behaviour across several PRs gets an epic branch, because
+  `main` is released weekly (ADR 0043).
+- **Releases** (ADR 0043). `release-pr.yml` opens the release PR when a P0 PR (label `p0-critical`)
+  or an epic merges into `main`, and otherwise once the last minor release is 7 days old; only the
+  owner merges it. Label a P0 fix's PR `p0-critical`. There is no 1.0 yet: a breaking change is a
+  `minor`, and a `major` changeset fails the changeset check.
 
 ## Agent operating model
 

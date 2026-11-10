@@ -22,9 +22,9 @@ import { createPostgresDatabase } from "./index.ts";
 import { createPgliteDatabase } from "./pglite.ts";
 import { activateRetention, type RetentionActivation } from "./retention-activation.ts";
 import { schema } from "./schema/index.ts";
+import { freshProject, seeding } from "./test-fixtures/retention-support.ts";
 
 const silent = createShelfLogger({ level: "silent" });
-const now = "2026-01-01T00:00:00.000Z";
 const LIVE =
   process.env["LIVE_CLOUD"] === "1" &&
   process.env["POSTGRES_SCHEMA_MUTATION_TEST"] === "1" &&
@@ -35,118 +35,6 @@ vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
 function deferred(): { promise: Promise<null>; resolve: () => void } {
   const { promise, resolve } = Promise.withResolvers<null>();
   return { promise, resolve: () => resolve(null) };
-}
-
-const baselineRow = {
-  projectId: "p",
-  storyId: "story",
-  viewportName: "desktop",
-  branch: "main",
-  browser: "chromium",
-  screenshotPath: "shot",
-  createdAt: now,
-  updatedAt: now,
-};
-
-/**
- * Remove the projects this suite seeds (`p`, `q`) and everything under them, then seed `p` with
- * builds `one` and `two`. Scoped by id, never a truncate: other files share the database.
- */
-async function freshProject(adapter: DatabaseAdapter): Promise<void> {
-  for (const table of [
-    "build_references",
-    "build_reference_generations",
-    "baselines",
-    "snapshots",
-  ]) {
-    // oxlint-disable-next-line no-await-in-loop -- a few deletes, in order
-    await adapter.all(sql`DELETE FROM ${sql.identifier(table)} WHERE project_id IN ('p', 'q')`);
-  }
-  await adapter.all(sql`DELETE FROM builds WHERE project_id IN ('p', 'q')`);
-  await adapter.all(sql`DELETE FROM projects WHERE id IN ('p', 'q')`);
-  await adapter.insert(schema.projects, {
-    id: "p",
-    name: "Project",
-    slug: "p",
-    createdAt: now,
-    updatedAt: now,
-  });
-  for (const id of ["one", "two"]) {
-    // oxlint-disable-next-line no-await-in-loop -- two rows, in order
-    await adapter.insert(schema.builds, {
-      id,
-      projectId: "p",
-      gitSha: id,
-      gitBranch: "main",
-      status: "approved",
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-}
-
-/** The suite's seeding and reading, over any adapter on the database being prepared. */
-function seeding(adapter: DatabaseAdapter) {
-  return {
-    seed: {
-      baseline: async (row: Parameters<typeof baselineInsert>[0]) => {
-        await adapter.insert(schema.baselines, baselineInsert(row));
-      },
-      snapshot: async (row: {
-        id: string;
-        buildId: string;
-        storyId: string;
-        inherited: boolean;
-        sourceBuildId: string | null;
-      }) => {
-        await adapter.insert(schema.snapshots, {
-          projectId: "p",
-          storyName: "Story",
-          storyTitle: "Story",
-          viewportName: "desktop",
-          browser: "chromium",
-          screenshotPath: "shot",
-          createdAt: now,
-          updatedAt: now,
-          ...row,
-        });
-      },
-      foreignBuild: async (id: string) => {
-        await adapter.insert(schema.projects, {
-          id: "q",
-          name: "Other",
-          slug: "q",
-          createdAt: now,
-          updatedAt: now,
-        });
-        await adapter.insert(schema.builds, {
-          id,
-          projectId: "q",
-          gitSha: id,
-          gitBranch: "main",
-          createdAt: now,
-          updatedAt: now,
-        });
-      },
-    },
-    baselineSource: async (id: string) =>
-      ((await adapter.get(schema.baselines, id))?.["sourceBuildId"] as string | null | undefined) ??
-      null,
-  };
-}
-
-function baselineInsert(row: {
-  id: string;
-  storyId?: string;
-  sourceBuildId?: string | null;
-  snapshotId?: string | null;
-}) {
-  return {
-    ...baselineRow,
-    storyId: row.storyId ?? row.id,
-    ...row,
-    snapshotId: row.snapshotId === undefined ? "snap" : row.snapshotId,
-  };
 }
 
 /**
