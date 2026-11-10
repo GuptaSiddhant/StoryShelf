@@ -114,21 +114,25 @@ jobs:
       - name: Build packages
         run: vp run -r build
       - name: App smoke test
-        env: { SMOKE_RUN: "node --conditions=source" }
+        env: { SMOKE_RUN: "vpx tsx@4.20.6 --conditions=source" }
         run: bash scripts/smoke.sh
       - name: Built-artifact smoke
+        if: ${{ !cancelled() }}
         working-directory: packages/cli
         env: { RUN_SMOKE: "1", SMOKE_NODE_MAJOR: "24" }
         run: vp test run src/smoke.integration.test.ts
       - name: docs:check
+        if: ${{ !cancelled() }}
         run: node ./scripts/check-adr-refs.mjs
       - name: Release dry run
+        if: ${{ !cancelled() }}
         env: { RELEASE_PUBLISH_CMD: "pnpm publish -r --dry-run --no-git-checks" }
         run: |
           git config user.email spike@example.invalid && git config user.name spike
           git add -A && git commit -q -m wip --no-verify || true
           node scripts/release.mjs --dry-run
       - name: Fly image (pnpm install --filter fly-app...)
+        if: ${{ !cancelled() }}
         run: docker build -f apps/fly-app/Dockerfile.vp -t storyshelf-fly-vp .
 
   vp-capture:
