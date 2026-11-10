@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: vp-spike-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   MIGRATION_SHA: a9073913d4e13ae5fb7529e4914ecfe3d9daa205
 
