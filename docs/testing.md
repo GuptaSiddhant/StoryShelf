@@ -268,3 +268,4 @@ Run vitest directly, as above. `nub run test` goes through turbo, whose strict e
 pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job uses `--env-mode=loose`).
 
 <!-- spike #821: docs-only probe -->
+<!-- spike #821: docs-only probe 2 -->
