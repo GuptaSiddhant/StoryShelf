@@ -93,9 +93,7 @@ function BuildActions({
       <Button
         variant={needsReview ? "primary" : "secondary"}
         size="sm"
-        href={
-          needsReview ? urls.buildDiff(project.slug, build.id) : urls.build(project.slug, build.id)
-        }
+        href={urls.buildDiff(project.slug, build.id)}
       >
         {needsReview ? "Review" : "View"}
       </Button>

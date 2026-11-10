@@ -184,8 +184,8 @@ describe("design surfaces", () => {
     // Button ×2 states + Tag; Card has none.
     expect(html.match(/>Figma</gu)).toHaveLength(3);
 
-    const detail = await (await app.request("/projects/app/builds/b1")).text();
-    expect(detail.match(/>Figma</gu)).toHaveLength(3);
+    const detail = await (await app.request("/projects/app/builds/b1/diff?snapshot=s1")).text();
+    expect(detail).toContain("Open in");
   });
 
   it("shows nothing on the review page without a link", async () => {
@@ -589,7 +589,7 @@ describe("without a design provider", () => {
     expect(library).not.toContain(">Figma<");
     const review = await (await app.request("/projects/app/builds/b1/diff?snapshot=s1")).text();
     expect(review).not.toContain("Open in");
-    const card = await (await app.request("/projects/app/builds/b1")).text();
+    const card = await (await app.request("/projects/app/builds/b1/diff")).text();
     expect(card).not.toContain(">Figma<");
   });
 

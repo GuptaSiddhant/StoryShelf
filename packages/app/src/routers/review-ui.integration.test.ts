@@ -283,7 +283,7 @@ describe("the review gate", () => {
   it("does not touch the pages of the build when review is off: they still render", async () => {
     const booted = await boot({ project: { reviewEnabled: false } });
     const id = await publish(booted, "feature/x");
-    const response = await booted.page("alice", `/builds/${id}`);
+    const response = await booted.page("alice", `/builds/${id}/diff`);
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).not.toContain("Approve build");
@@ -460,7 +460,7 @@ describe("the build page without testing", () => {
     });
     expect(commented.status).toBe(201);
 
-    const html = await (await booted.page("alice", `/builds/${id}`)).text();
+    const html = await (await booted.page("alice", `/builds/${id}/diff`)).text();
     expect(html).toContain("Approve build");
     expect(html).toContain("Reject build");
     expect(html).toContain("waiting for review");
@@ -477,10 +477,10 @@ describe("the build page without testing", () => {
   it("gives developers and viewers no verdict controls, and viewers no comment form", async () => {
     const booted = await boot();
     const id = await publish(booted, "feature/x");
-    const dev = await (await booted.page("dev", `/builds/${id}`)).text();
+    const dev = await (await booted.page("dev", `/builds/${id}/diff`)).text();
     expect(dev).not.toContain("Approve build");
     expect(dev).toContain("Add build comment");
-    const viewer = await (await booted.page("view", `/builds/${id}`)).text();
+    const viewer = await (await booted.page("view", `/builds/${id}/diff`)).text();
     expect(viewer).not.toContain("Approve build");
     expect(viewer).not.toContain("Add build comment");
     expect(viewer).toContain("Changes in this build");
@@ -498,7 +498,7 @@ describe("the build page without testing", () => {
     expect(posted.headers.get("hx-refresh")).toBe("true");
     expect((await new BuildModel(booted.db).get(id))?.status).toBe("approved");
 
-    const html = await (await booted.page("view", `/builds/${id}`)).text();
+    const html = await (await booted.page("view", `/builds/${id}/diff`)).text();
     expect(html).toContain("Alice Reviewer");
     expect(html).toContain("Looks good");
     expect(html).toContain("1 of 1 approval given");
@@ -519,7 +519,7 @@ describe("the build page without testing", () => {
     expect(posted.status).toBe(409);
     expect(await posted.text()).toContain("still publishing");
     expect((await new BuildModel(booted.db).get(build.id))?.status).toBe("pending");
-    const html = await (await booted.page("alice", `/builds/${build.id}`)).text();
+    const html = await (await booted.page("alice", `/builds/${build.id}/diff`)).text();
     expect(html).toContain("Waiting for the Storybook to publish");
     expect(html).toMatch(/<button[^>]*disabled[^>]*value="approved"/u);
     expect(html).toMatch(/<button[^>]*disabled[^>]*value="rejected"/u);
@@ -529,7 +529,7 @@ describe("the build page without testing", () => {
     const booted = await boot();
     const id = await publish(booted, "feature/x");
     vi.spyOn(booted.storage, "exists").mockRejectedValue(new Error("storage down"));
-    const response = await booted.page("alice", `/builds/${id}`);
+    const response = await booted.page("alice", `/builds/${id}/diff`);
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("Waiting for the Storybook to publish");
   });
@@ -573,7 +573,7 @@ describe("the build page without testing", () => {
       },
       body: new URLSearchParams({ body: "Cross-site referer" }).toString(),
     });
-    expect(away.headers.get("location")).toBe(`/projects/gate/builds/${id}`);
+    expect(away.headers.get("location")).toBe(`/projects/gate/builds/${id}/diff`);
     const empty = await booted.page("dev", `/builds/${id}/comments`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -590,16 +590,16 @@ describe("the build page without testing", () => {
 });
 
 describe("the build page with testing", () => {
-  it("puts the changeset above the snapshots and the verdict below them", async () => {
+  it("keeps the changeset and the verdict in the details, above the stage", async () => {
     const booted = await boot({ testing: true });
     const id = await publish(booted, "feature/z");
-    const html = await (await booted.page("alice", `/builds/${id}`)).text();
+    const html = await (await booted.page("alice", `/builds/${id}/diff`)).text();
     const changes = html.indexOf("Changes in this build");
-    const empty = html.indexOf("No snapshots yet");
+    const empty = html.indexOf("No snapshots");
     const verdict = html.indexOf("Approve build");
     expect(changes).toBeGreaterThan(-1);
-    expect(empty).toBeGreaterThan(changes);
-    expect(verdict).toBeGreaterThan(empty);
+    expect(verdict).toBeGreaterThan(changes);
+    expect(empty).toBeGreaterThan(verdict);
     expect(html).toContain("a verdict is a sign-off");
   });
 });
@@ -1111,7 +1111,7 @@ describe("mention suggestions and highlights (#463)", () => {
   it("wires the comment boxes to the suggestions", async () => {
     const booted = await boot();
     const id = await publish(booted, "feature/x");
-    const html = await (await booted.page("dev", `/builds/${id}`)).text();
+    const html = await (await booted.page("dev", `/builds/${id}/diff`)).text();
     expect(html).toContain(`/projects/gate/builds/${id}/mention-suggest`);
     expect(html).toContain("build-comment-body-mentions");
   });
@@ -1121,12 +1121,12 @@ describe("mention suggestions and highlights (#463)", () => {
     const id = await publish(booted, "feature/x");
     await postComment(booted, id, { body: "please check, @alice, and mail ops@example.com" });
 
-    const before = await (await booted.page("dev", `/builds/${id}`)).text();
+    const before = await (await booted.page("dev", `/builds/${id}/diff`)).text();
     expect(before).toMatch(/ss-review-mention-[^"]*">@Alice Reviewer</u);
     expect(before).toContain("mail ops@example.com");
 
     await booted.db.update(booted.db.tables.users, "alice", { displayNameOverride: "Al R." });
-    const after = await (await booted.page("dev", `/builds/${id}`)).text();
+    const after = await (await booted.page("dev", `/builds/${id}/diff`)).text();
     expect(after).toMatch(/ss-review-mention-[^"]*">@Al R\.</u);
     expect(after).not.toContain("@Alice Reviewer");
   });
@@ -1135,7 +1135,7 @@ describe("mention suggestions and highlights (#463)", () => {
     const booted = await boot();
     const id = await publish(booted, "feature/x");
     await postComment(booted, id, { body: "ping @outsider about this" });
-    const html = await (await booted.page("dev", `/builds/${id}`)).text();
+    const html = await (await booted.page("dev", `/builds/${id}/diff`)).text();
     expect(html).toContain("ping @outsider about this");
     expect(html).not.toMatch(/ss-review-mention-[^"]*">@outsider</u);
   });

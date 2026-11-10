@@ -81,7 +81,6 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "ALL /api/auth/*": "hosting",
   // testing
   "GET /projects/:slug/jobs": "testing",
-  "GET /projects/:slug/builds/:buildId/diff": "testing",
   "GET /projects/:slug/settings/tests": "testing",
   "POST /projects/:slug/settings/tests": "testing",
   "GET /projects/:slug/settings/capture": "testing",
@@ -104,6 +103,7 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "GET /projects/:slug": "both",
   "GET /projects/:slug/builds": "both",
   "GET /projects/:slug/builds/:buildId": "both",
+  "GET /projects/:slug/builds/:buildId/diff": "both",
   "GET /projects/:slug/library": "both",
   "GET /projects/:slug/components/*": "both",
 };

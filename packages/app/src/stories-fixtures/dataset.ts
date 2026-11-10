@@ -24,6 +24,7 @@ export const BUILD_REVIEW = id("BLD002");
 export const BUILD_FAILED = id("BLD003");
 export const BUILD_CAPTURING = id("BLD004");
 export const BUILD_REJECTED = id("BLD005");
+export const BUILD_CANCELLED = id("BLD006");
 
 export const project: Project = {
   id: PROJECT_ID,
@@ -124,6 +125,17 @@ export const builds: Build[] = [
     approvedCount: 11,
     createdAt: hoursAgo(48),
     updatedAt: hoursAgo(47),
+  }),
+  build({
+    id: BUILD_CANCELLED,
+    gitSha: "2d1c0b9",
+    gitBranch: "feature/tooltip-arrow",
+    status: "cancelled",
+    authorName: "Alan Turing",
+    authorEmail: "alan@example.com",
+    message: "feat(tooltip): arrow placement",
+    createdAt: hoursAgo(30),
+    updatedAt: hoursAgo(29.9),
   }),
   build({
     id: BUILD_REJECTED,

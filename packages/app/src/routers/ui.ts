@@ -4,11 +4,9 @@ import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
-import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadInsightPanel } from "../insights/panel.ts";
-import { renderBuildDetailPage } from "../pages/build-detail.tsx";
-import type { LinkedUsageItem } from "../pages/build-diff-usage.tsx";
+import { loadBuildDetails } from "../pages/build-detail.tsx";
 import { renderBuildDiffPage, selectedSnapshot } from "../pages/build-diff.tsx";
 import { renderComponentPage } from "../pages/component-detail.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
@@ -33,7 +31,7 @@ import {
 import { flash } from "./flash.ts";
 import { currentProjectRole, publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
-import { linkedUsageByStory, linkedUsageFor } from "./links.handlers.ts";
+import { linkedUsageFor } from "./links.handlers.ts";
 import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
 import { registerSettingsPages } from "./settings.ts";
 function asString(value: FormDataEntryValue | null): string | undefined {
@@ -139,13 +137,13 @@ export function registerUiPages(app: ShelfRouter): void {
     return c.html(html);
   });
 
-  app.get("/projects/:slug/builds/:buildId", async (c) => {
-    const buildId = c.req.param("buildId");
-    const html = await renderBuildDetailPage(buildId, await loadBuildUsage(c, buildId));
-    if (!html) {
-      return c.notFound();
-    }
-    return c.html(html);
+  // The overview is gone: a build has one page, the review stage (keeps the query string).
+  app.get("/projects/:slug/builds/:buildId", (c) => {
+    const query = new URL(c.req.url).search;
+    return c.redirect(
+      `/projects/${c.req.param("slug")}/builds/${c.req.param("buildId")}/diff${query}`,
+      302,
+    );
   });
 
   app.get("/projects/:slug/jobs", async (c) => {
@@ -208,6 +206,7 @@ export function registerUiPages(app: ShelfRouter): void {
         reference: selected ? await loadBaselineReference(project, build, selected) : undefined,
         defaultComparison: selected ? await loadDefaultComparison(project, build, selected) : null,
         insight: await loadInsightPanel(project, build),
+        details: await loadBuildDetails(project, build),
         design,
         usage: await linkedUsageFor(
           c,
@@ -273,18 +272,4 @@ export function registerUiPages(app: ShelfRouter): void {
 
   registerDesignCoverage(app);
   registerSettingsPages(app);
-}
-
-/** Linked-package usage for every story of a build; empty on any failure so the page still renders. */
-async function loadBuildUsage(
-  c: Context,
-  buildId: string,
-): Promise<Map<string, LinkedUsageItem[]>> {
-  try {
-    const build = await new BuildModel(getStore().db).get(buildId);
-    const project = build ? await new ProjectModel(getStore().db).get(build.projectId) : null;
-    return build && project ? await linkedUsageByStory(c, project, build.id) : new Map();
-  } catch {
-    return new Map();
-  }
 }
