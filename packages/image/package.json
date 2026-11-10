@@ -49,7 +49,7 @@
     "dev": "vp pack -w",
     "fmt": "vp fmt ./src",
     "lint": "vp lint --type-aware --type-check ./src",
-    "prepublishOnly": "nub run build",
+    "prepublishOnly": "vp run build",
     "test": "vp test run",
     "test:coverage": "vp test run --coverage",
     "bench": "node --conditions=source bench/run.ts",

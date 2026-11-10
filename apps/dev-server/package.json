@@ -7,7 +7,7 @@
     "serve": "nub watch ./src/server.ts",
     "lint": "vp lint --type-aware --type-check ./src",
     "fmt": "vp fmt ./src",
-    "build": "nubx tsc --noEmit -p tsconfig.json"
+    "build": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",

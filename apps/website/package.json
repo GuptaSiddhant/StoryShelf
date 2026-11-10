@@ -4,16 +4,16 @@
   "type": "module",
   "scripts": {
     "sync": "node scripts/sync-changelog.mjs",
-    "openapi": "nub ../../packages/app/scripts/generate-openapi.ts --out ./public/openapi.json",
-    "prebuild": "nub run openapi && nub run sync",
-    "predev": "nub run openapi && nub run sync",
+    "openapi": "node --conditions=source ../../packages/app/scripts/generate-openapi.ts --out ./public/openapi.json",
+    "prebuild": "vp run openapi && vp run sync",
+    "predev": "vp run openapi && vp run sync",
     "dev": "astro dev",
     "start": "astro preview",
     "build": "astro build && node scripts/markdown-export.mjs",
     "check": "astro check",
     "check:links": "node scripts/check-links.mjs",
     "check:a11y": "node scripts/check-a11y.mjs",
-    "verify": "nub run check:links"
+    "verify": "vp run check:links"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "^7.3.0",

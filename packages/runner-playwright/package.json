@@ -55,7 +55,7 @@
     "lint": "vp lint --type-aware --type-check ./src",
     "test": "vp test run",
     "test:integration": "RUN_INTEGRATION=1 vp test run integration.test.ts passkey.integration.test.ts remote.integration.test.ts",
-    "prepublishOnly": "nub run build",
+    "prepublishOnly": "vp run build",
     "test:flake": "vp test run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts"
   },
   "dependencies": {

@@ -45,7 +45,7 @@
     "fmt": "vp fmt ./src",
     "lint": "vp lint --type-aware --type-check ./src",
     "start": "nub --watch ./dist/index.js",
-    "prepublishOnly": "nub run build",
+    "prepublishOnly": "vp run build",
     "test:flake": "vp test run --repeats=20 --maxWorkers=1 --no-file-parallelism src/output.test.ts"
   },
   "dependencies": {

@@ -83,7 +83,7 @@
     "fmt": "vp fmt ./src",
     "lint": "vp lint --type-aware --type-check ./src",
     "test": "vp test run",
-    "prepublishOnly": "nub run build"
+    "prepublishOnly": "vp run build"
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",

@@ -48,7 +48,7 @@
     "fmt": "vp fmt ./src",
     "lint": "vp lint --type-aware --type-check ./src",
     "test": "vp test run",
-    "prepublishOnly": "nub run build",
+    "prepublishOnly": "vp run build",
     "test:flake": "vp test run --repeats=10 --maxWorkers=1 --no-file-parallelism src/engine.test.ts"
   },
   "dependencies": {
