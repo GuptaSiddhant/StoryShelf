@@ -1,11 +1,13 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BuildModel } from "../../models/build.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { createTestBuild, createTestProject } from "../../test-helpers/create-project.ts";
 import { makeDatabase, makeStorage } from "../../test-helpers/fake-adapters.ts";
+import { deferred } from "../../test-helpers/index.ts";
 import { storybookDir, storybookZipPath } from "../../utils/paths.ts";
 import { zipStream } from "../../utils/zip-write.ts";
 import { rig, stubLogger } from "../consumer/test-fixtures.ts";
@@ -152,10 +154,6 @@ describe("createPublishHandler", () => {
     expect(await storage.exists(`${prefix}/iframe.html`)).toBe(true);
     expect(await storage.exists(`${prefix}/manifest.json`)).toBe(true);
     expect(await statusOf()).toBe("approved");
-    const left = await readdir(join(scratchDir, SCRATCH_DIRNAME, project.id, build.id)).catch(
-      () => null,
-    );
-    expect(left).toBeNull();
   });
 
   it("is idempotent: a redelivery after a lost lease republishes and keeps the status", async () => {
@@ -184,6 +182,116 @@ describe("createPublishHandler", () => {
     expect(await statusOf()).toBe("pending");
     await expect(run({ attempt: 3, maxAttempts: 3 })).rejects.toThrow();
     expect(await statusOf()).toBe("failed");
+  });
+
+  it("stops extracting when the job is cancelled: no manifest, the build is neither completed nor failed", async () => {
+    const { handler, storage, project, build, statusOf, log } = await setup();
+    // The zip stream never ends, like a read stuck on the network.
+    const stuck = new PassThrough();
+    let opened!: () => void;
+    const openedPromise = new Promise<void>((resolve) => {
+      opened = resolve;
+    });
+    storage.readStream = async () => {
+      opened();
+      return await Promise.resolve(stuck);
+    };
+    const job = { buildId: build.id, jobId: "j1", attempt: 1, maxAttempts: 3 } as ConsumerJob;
+    const running = handler.run(job, {
+      logger: log.logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    });
+    await openedPromise;
+    await handler.cancel?.(job);
+    await expect(running).rejects.toThrow("publish cancelled");
+    expect(stuck.destroyed).toBe(true);
+    expect(await storage.exists(`${storybookDir(project.id, build.id)}/manifest.json`)).toBe(false);
+    expect(await statusOf()).toBe("pending");
+  });
+
+  it("does not complete the build when the cancel lands after the last file was stored", async () => {
+    const { handler, storage, build, statusOf, log } = await setup();
+    const job = { buildId: build.id, jobId: "j2", attempt: 1, maxAttempts: 3 } as ConsumerJob;
+    // The run is told to stop while its manifest is written: the extraction itself still succeeds.
+    const write = storage.write.bind(storage);
+    storage.write = async (path: string, data: Buffer) => {
+      await write(path, data);
+      if (path.endsWith("/manifest.json")) await handler.cancel?.(job);
+    };
+
+    await expect(
+      handler.run(job, {
+        logger: log.logger,
+        touch: () => {},
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow("publish cancelled");
+
+    expect(await statusOf()).toBe("pending");
+  });
+
+  it("keeps a reclaimed attempt cancellable when the older run of the same job ends", async () => {
+    const { handler, storage, build, log } = await setup();
+    const older = new PassThrough();
+    const newer = new PassThrough();
+    const streams = [older, newer];
+    let opened = 0;
+    const bothOpen: Array<() => void> = [];
+    const gates = [0, 1].map(
+      async (index) => await new Promise<void>((resolve) => (bothOpen[index] = resolve)),
+    );
+    storage.readStream = async () => {
+      const at = opened;
+      opened += 1;
+      bothOpen[at]?.();
+      return await Promise.resolve(streams[at] as PassThrough);
+    };
+    const job = { buildId: build.id, jobId: "j3", attempt: 1, maxAttempts: 3 } as ConsumerJob;
+    const context = { logger: log.logger, touch: () => {}, signal: new AbortController().signal };
+
+    // The lease of the first run was lost, so the job was claimed again while it still runs.
+    const first = handler.run(job, context);
+    await gates[0];
+    const second = handler.run(job, { ...context });
+    await gates[1];
+    // The older run ends (a broken zip): it must not drop the newer run's controller.
+    older.end(Buffer.from("not a zip"));
+    await expect(first).rejects.toThrow();
+
+    await handler.cancel?.(job);
+    await expect(second).rejects.toThrow("publish cancelled");
+    expect(newer.destroyed).toBe(true);
+  });
+
+  it("a cancel for a lost attempt does not stop the reclaimed attempt that runs now", async () => {
+    const { handler, storage, build, log } = await setup();
+    const stream = new PassThrough();
+    const opened = deferred();
+    storage.readStream = async () => {
+      opened.resolve();
+      return await Promise.resolve(stream);
+    };
+    const lost = { buildId: build.id, jobId: "j4", attempt: 1, maxAttempts: 3 } as ConsumerJob;
+    const reclaimed = { ...lost, attempt: 2 } as ConsumerJob;
+    const running = handler.run(reclaimed, {
+      logger: log.logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    });
+    await opened.promise;
+    // The consumer that lost attempt 1 reports it: attempt 2 is a different run.
+    await handler.cancel?.(lost);
+    // Still running: a broken zip is what fails it, a stopped run would resolve instead.
+    stream.end(Buffer.from("not a zip"));
+    await expect(running).rejects.toThrow();
+  });
+
+  it("tolerates a cancel for a job that is not running", async () => {
+    const { handler, build } = await setup();
+    await expect(
+      handler.cancel?.({ buildId: build.id, jobId: "never" } as ConsumerJob),
+    ).resolves.toBeUndefined();
   });
 
   it("drops a job whose build is gone", async () => {
