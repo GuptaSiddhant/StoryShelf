@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "sync": "node scripts/sync-changelog.mjs",
-    "openapi": "node --conditions=source ../../packages/app/scripts/generate-openapi.ts --out ./public/openapi.json",
+    "openapi": "vpx tsx@4.20.6 --conditions=source ../../packages/app/scripts/generate-openapi.ts --out ./public/openapi.json",
     "prebuild": "vp run openapi && vp run sync",
     "predev": "vp run openapi && vp run sync",
     "dev": "astro dev",
