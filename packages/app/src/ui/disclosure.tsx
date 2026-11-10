@@ -33,6 +33,13 @@ const disclosureBody = css`
   border-top: 1px solid var(--border-subtle);
 `;
 
+const disclosureHint = css`
+  /* disclosure-hint */
+  font-weight: 400;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+`;
+
 /** Collapsible panel on native `<details>`; collapsed unless `open`. */
 export const Disclosure: FC<{
   title: string;
@@ -52,13 +59,6 @@ export const Disclosure: FC<{
     </details>
   );
 };
-
-const disclosureHint = css`
-  /* disclosure-hint */
-  font-weight: 400;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-`;
 
 const definitionList = css`
   /* definition-list */

@@ -602,6 +602,15 @@ describe("the build page with testing", () => {
     expect(empty).toBeGreaterThan(verdict);
     expect(html).toContain("a verdict is a sign-off");
   });
+
+  it("offers Retry capture in the menu to developers, not to viewers", async () => {
+    const booted = await boot({ testing: true });
+    const id = await publish(booted, "feature/menu");
+    const dev = await (await booted.page("dev", `/builds/${id}/diff`)).text();
+    const viewer = await (await booted.page("view", `/builds/${id}/diff`)).text();
+    expect(dev).toContain("Retry capture");
+    expect(viewer).not.toContain("Retry capture");
+  });
 });
 
 describe("the component page", () => {

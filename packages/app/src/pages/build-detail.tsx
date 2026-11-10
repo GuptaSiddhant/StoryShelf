@@ -44,15 +44,18 @@ export interface BuildDetailsData {
 export async function loadBuildDetails(project: Project, build: Build): Promise<BuildDetailsData> {
   const { db } = getStore();
   const logs = new CaptureLogModel(db);
-  const attempts = await new CaptureAttemptModel(db).listByBuild(build.id);
+  const attempts = await new CaptureAttemptModel(db).listByBuild(build.id).catch(() => []);
   const withLogs = await Promise.all(
-    attempts.map(async (attempt) => ({ attempt, logs: await logs.listByAttempt(attempt.id) })),
+    attempts.map(async (attempt) => ({
+      attempt,
+      logs: await logs.listByAttempt(attempt.id).catch(() => []),
+    })),
   );
   const [catalog, labels] = await Promise.all([
     catalogOf()
       .load(project.id, build.id)
       .catch(() => null),
-    new LabelModel(db).listForBuild(build.id),
+    new LabelModel(db).listForBuild(build.id).catch(() => []),
   ]);
   return {
     testing: testingEnabled(),
@@ -61,7 +64,7 @@ export async function loadBuildDetails(project: Project, build: Build): Promise<
     components: catalog ? groupComponents(catalog.entries).length : null,
     stories: catalog ? catalog.entries.filter((entry) => entry.type === "story").length : null,
     attempts: withLogs,
-    review: await loadReviewSection(project, build, catalog),
+    review: await loadReviewSection(project, build, catalog).catch(() => null),
   };
 }
 

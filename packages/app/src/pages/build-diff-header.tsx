@@ -33,6 +33,8 @@ export interface DiffHeaderProps {
   snapshots: Snapshot[];
   pendingCount: number;
   canReview: boolean;
+  /** Whether the viewer may retry or cancel the build (developer role and above). */
+  canManage?: boolean;
   /** Loaded build details; without them the header assumes capture is on. */
   details?: BuildDetailsData;
 }
@@ -187,7 +189,7 @@ function MoreMenu(props: {
 
 /** Branch, status, author, summary and the build's actions. */
 export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, snapshots, pendingCount, canReview, details } = props;
+  const { project, build, snapshots, pendingCount, canReview, canManage = false, details } = props;
   const testing = details?.testing ?? true;
   const reviewOn = project.reviewEnabled !== false;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
@@ -205,7 +207,7 @@ export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<
           <Button variant="secondary" size="sm" href={urls.short(build.id)}>
             Open Storybook ↗
           </Button>
-          {testing && canReview ? <MoreMenu project={project} build={build} /> : null}
+          {testing && canManage ? <MoreMenu project={project} build={build} /> : null}
         </div>
       </div>
     </header>

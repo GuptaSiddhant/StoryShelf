@@ -31,6 +31,8 @@ export interface BuildDiffData {
   comments: Comment[];
   selectedId?: string;
   canReview: boolean;
+  /** Whether the viewer may retry or cancel the build; omitted, the header hides the menu. */
+  canManage?: boolean;
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
   /** Display names of the users behind comments, by user id. */
@@ -218,6 +220,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         snapshots={snapshots}
         pendingCount={pendingGroups}
         canReview={canReview}
+        canManage={data.canManage}
         details={data.details}
       />
       <ReviewNotices

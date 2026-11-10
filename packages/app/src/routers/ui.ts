@@ -181,7 +181,8 @@ export function registerUiPages(app: ShelfRouter): void {
     const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
     const { user, authEnabled } = getStore();
     const canReview = !authEnabled || Boolean(user);
-    const canTriage = (await reviewCapabilities(project)).canComment || isBuildAuthor(build);
+    const canManage = (await reviewCapabilities(project)).canComment;
+    const canTriage = canManage || isBuildAuthor(build);
     const selected = selectedSnapshot(snapshots, snapshotId);
     const design = selected
       ? await loadReviewDesign(
@@ -200,6 +201,7 @@ export function registerUiPages(app: ShelfRouter): void {
         selectedId: snapshotId,
         canReview,
         canTriage,
+        canManage,
         names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),
         hasBaseline,
         drifted,

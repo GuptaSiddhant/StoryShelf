@@ -184,8 +184,11 @@ describe("design surfaces", () => {
     // Button ×2 states + Tag; Card has none.
     expect(html.match(/>Figma</gu)).toHaveLength(3);
 
-    const detail = await (await app.request("/projects/app/builds/b1/diff?snapshot=s1")).text();
-    expect(detail).toContain("Open in");
+    const detail = await (
+      await app.request("/projects/app/builds/b1/diff?snapshot=tag-default")
+    ).text();
+    expect(detail).toContain("Open in Figma");
+    expect(detail).toContain("https://www.figma.com/design/MANUAL/Tag");
   });
 
   it("shows nothing on the review page without a link", async () => {
