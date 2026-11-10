@@ -23,7 +23,8 @@ for f in storybook-8 storybook-9 storybook-10; do
 done
 [ "$root_before" = "$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)" ] && note "root lockfile" "unchanged" || { note "root lockfile" "CHANGED"; fail=1; }
 # Root commands must not descend into fixtures/.
-vp check 2>&1 | grep -c "fixtures/" | xargs -I{} sh -c '[ {} -eq 0 ] && echo ok' >/dev/null && note "vp check" "does not list fixtures/" || { note "vp check" "DESCENDS into fixtures/"; fail=1; }
+vp check >".tmp/check.log" 2>&1
+if grep -q "fixtures/" ".tmp/check.log"; then note "vp check" "DESCENDS into fixtures/: $(grep -m3 'fixtures/' .tmp/check.log | tr '\n' ' ')"; fail=1; else note "vp check" "does not list fixtures/"; fi
 vp test list --filesOnly 2>/dev/null | grep -q "fixtures/" && { note "vp test" "DESCENDS into fixtures/"; fail=1; } || note "vp test" "does not list fixtures/ (fixtures have no test files; weak check)"
 # Cached vp task over a fixture (decision 7).
 vp run -w fixture-storybook-9 >".tmp/fx-task1.log" 2>&1; vp run -w fixture-storybook-9 2>&1 | tee ".tmp/fx-task2.log" | tail -2

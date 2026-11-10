@@ -14,3 +14,7 @@ runs:
       run: |
         mkdir -p .tmp
         s=$(date +%s); vp install --frozen-lockfile; echo "install: $(( $(date +%s) - s ))s" | tee -a "$GITHUB_STEP_SUMMARY"
+    - name: Use the workspace-local vp
+      shell: bash
+      # The global npm copy resolves no `typescript` for `vp pack` (dts); the local one finds the workspace's.
+      run: echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
