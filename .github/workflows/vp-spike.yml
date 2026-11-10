@@ -46,19 +46,21 @@ jobs:
         env: { TURBO_CONCURRENCY: "1", RUN_TERRAFORM: "1" }
         run: |
           s=$(date +%s)
-          nubx turbo verify --filter='!website' 2>&1 | tee .tmp-turbo-warm.log | tail -n 12
+          nubx turbo verify --filter='!website' --continue 2>&1 | tee .tmp-turbo-warm.log | tail -n 12
+          grep -nE 'ERROR|Failed:|✗|FAIL' .tmp-turbo-warm.log | head -20 || true
           echo "## turbo warm verify: $(( $(date +%s) - s ))s" >> "$GITHUB_STEP_SUMMARY"
           grep -E "Tasks:|Cached:|Time:" .tmp-turbo-warm.log >> "$GITHUB_STEP_SUMMARY" || true
       - name: Cold verify (--force)
         env: { TURBO_CONCURRENCY: "1", RUN_TERRAFORM: "1" }
         run: |
           s=$(date +%s)
-          nubx turbo verify --filter='!website' --force 2>&1 | tee .tmp-turbo-cold.log | tail -n 12
+          nubx turbo verify --filter='!website' --force --continue 2>&1 | tee .tmp-turbo-cold.log | tail -n 12
+          grep -nE 'ERROR|Failed:|✗|FAIL' .tmp-turbo-cold.log | head -20 || true
           echo "## turbo cold verify: $(( $(date +%s) - s ))s" >> "$GITHUB_STEP_SUMMARY"
           grep -E "Tasks:|Cached:|Time:" .tmp-turbo-cold.log >> "$GITHUB_STEP_SUMMARY" || true
       - name: Website (uncached)
         run: |
-          s=$(date +%s); nubx turbo verify --filter=website --force 2>&1 | tail -n 5
+          s=$(date +%s); nubx turbo verify --filter=website --force 2>&1 | tail -n 25
           echo "## turbo website: $(( $(date +%s) - s ))s" >> "$GITHUB_STEP_SUMMARY"
 
   vp:
