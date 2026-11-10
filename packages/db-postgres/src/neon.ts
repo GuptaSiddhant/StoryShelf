@@ -10,7 +10,8 @@ import { Pool, type PoolClient } from "@neondatabase/serverless";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
-import { runMigrations } from "./migrate.ts";
+import { runMigrationsLocked, type MigrationSession } from "./migrate.ts";
+import { pooledSession, singleSession } from "./migration-session.ts";
 import {
   activateRetention,
   attachRetention,
@@ -67,7 +68,7 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
     },
     tables: schema,
     migrate: async ({ logger }) => {
-      await runMigrations(async (sql) => (await pool.query(sql)).rows as unknown[], logger);
+      await runMigrationsLocked(sessionFor(pool), logger);
       if (pooled) {
         await activateRetention(db, retention);
       }
@@ -91,4 +92,9 @@ async function endClient(pool: Pool | PoolClient): Promise<void> {
   } else if ("release" in pool && typeof pool.release === "function") {
     pool.release();
   }
+}
+
+/** A pool gives the migration a dedicated connection; an injected client is already one session. */
+function sessionFor(pool: Pool | PoolClient): MigrationSession {
+  return pool instanceof Pool ? pooledSession(pool) : singleSession(pool);
 }

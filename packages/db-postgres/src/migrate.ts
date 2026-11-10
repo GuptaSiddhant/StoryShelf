@@ -262,6 +262,33 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_CAPTURE_GENERATION_ALTER);
 }
 
+/** Runs `use` with one dedicated connection's row-query runner, then releases the connection. */
+export type MigrationSession = <T>(use: (run: MigrationRunner) => Promise<T>) => Promise<T>;
+
+/** Arbitrary constant naming the migration lock ("StoryShelf" as hex-ish digits). */
+const MIGRATION_LOCK_KEY = 5_370_011_001;
+
+/**
+ * Run `runMigrations` under a session-level advisory lock on one dedicated connection, so two
+ * first migrations on an empty database take turns instead of racing `CREATE TABLE IF NOT EXISTS`
+ * (which fails with a `pg_type` unique violation). The lock is session-level, not
+ * transaction-level, because `runUniqueIndex` catches a statement failure and a transaction would
+ * be aborted by it. It is released explicitly; a dropped connection releases it too.
+ */
+export async function runMigrationsLocked(
+  session: MigrationSession,
+  logger?: Logger,
+): Promise<void> {
+  await session(async (run) => {
+    await run(`SELECT pg_advisory_lock(${MIGRATION_LOCK_KEY})`);
+    try {
+      await runMigrations(run, logger);
+    } finally {
+      await run(`SELECT pg_advisory_unlock(${MIGRATION_LOCK_KEY})`);
+    }
+  });
+}
+
 /** Run the full migration set through any row-query runner. */
 export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
