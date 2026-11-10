@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { WebhookModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
 import {
@@ -76,6 +77,10 @@ export function registerWebhooks(app: ShelfRouter): void {
   app.openapi(createWebhookRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
+    const refusal = await WebhookModel.urlRefusal(body.url);
+    if (refusal) {
+      throw new HTTPException(400, { message: refusal });
+    }
     const { webhook, secret } = await webhookModel().issue(project.id, body);
     return c.json({ id: webhook.id, url: webhook.url, events: body.events ?? [], secret }, 201);
   });

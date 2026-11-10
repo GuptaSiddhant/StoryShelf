@@ -59,7 +59,7 @@ function createSlackAdapter(options: SlackAdapterOptions): MessageNotifierAdapte
         ],
       };
       logger?.debug({ channelId: input.channel.id }, "posting slack message");
-      await httpText(url, { method: "POST", json: payload, logger });
+      await httpText(url, { method: "POST", json: payload, logger, destination: "project" });
       logger?.info({ channelId: input.channel.id }, "slack message posted");
     },
   };
