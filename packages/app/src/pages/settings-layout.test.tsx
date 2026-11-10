@@ -41,6 +41,12 @@ describe("project settings layout", () => {
     expect(html.match(/aria-current="page"/gu)?.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("links the Labels overview and Jobs from Settings, so they stay reachable", async () => {
+    const html = await get("/projects/docs/settings");
+    expect(html).toContain('href="/projects/docs/labels"');
+    expect(html).toContain('href="/projects/docs/jobs"');
+  });
+
   it("renders tables through the shared Table surface", async () => {
     const pages = await Promise.all(
       ["tokens", "labels", "webhooks"].map(

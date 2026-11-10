@@ -51,10 +51,13 @@ export async function renderLabelDetailPage(
     <DocumentLayout
       title={`${key}: ${value}`}
       nav={{
-        active: "labels",
+        active: "settings",
         projectSlug: project.slug,
         projectName: project.name,
-        trail: [{ label: `${labelType ? labelType.name : key}: ${value}` }],
+        trail: [
+          { label: "Labels", href: `/projects/${project.slug}/labels` },
+          { label: `${labelType ? labelType.name : key}: ${value}` },
+        ],
       }}
     >
       <PageHeader
@@ -164,7 +167,12 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
   return (
     <DocumentLayout
       title={`Labels · ${project.name}`}
-      nav={{ active: "labels", projectSlug: project.slug, projectName: project.name }}
+      nav={{
+        active: "settings",
+        projectSlug: project.slug,
+        projectName: project.name,
+        trail: [{ label: "Labels" }],
+      }}
     >
       <PageHeader
         title="Labels"

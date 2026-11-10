@@ -157,7 +157,7 @@ function Previews({
 /** One project in the overview grid: previews, latest build, review state, actions. */
 export function ProjectCard(props: {
   summary: ProjectSummary;
-  urls: { library: string; settings: string; storybook: string; review: string };
+  urls: { library: string; storybook: string; review: string };
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { summary, urls } = props;
   const { project, latest, previews, pending } = summary;
@@ -197,9 +197,6 @@ export function ProjectCard(props: {
         </Button>
         <Button variant="ghost" size="sm" icon="external-link" href={urls.storybook}>
           Storybook
-        </Button>
-        <Button variant="ghost" size="sm" icon="settings" href={urls.settings}>
-          Settings
         </Button>
       </div>
     </Card>

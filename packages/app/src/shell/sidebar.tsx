@@ -2,13 +2,15 @@ import { createUrlBuilder, safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
 import { getStore } from "../store.ts";
 import { css } from "../ui/css.ts";
+import { Dropdown, DropdownItem } from "../ui/dropdown.tsx";
 import { Icon } from "../ui/icons/icon.tsx";
 import { ThemeMenu, UserMenu } from "./account.tsx";
 import {
   adminNavItems,
-  developerNavItems,
-  projectNavItems,
+  helpNavItems,
+  projectNavGroups,
   type NavConfig,
+  type NavGroup,
   type NavItem,
 } from "./nav.ts";
 /**
@@ -108,6 +110,41 @@ const shellSidebar = css`
   .sidebar__link--active svg {
     color: var(--accent);
   }
+  .sidebar__group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sidebar__group[data-folded] {
+    display: none;
+  }
+  button.sidebar__section {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: calc(100% - 2 * var(--space-1));
+    margin-inline: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+  }
+  button.sidebar__section:hover {
+    background: var(--surface-muted);
+    color: var(--text-primary);
+  }
+  .sidebar__fold {
+    flex: none;
+    transition: transform var(--dur-fast) var(--ease);
+  }
+  button.sidebar__section[aria-expanded="false"] .sidebar__fold {
+    transform: rotate(-90deg);
+  }
+  .sidebar__link {
+    position: relative;
+  }
   .sidebar__ext {
     margin-left: auto;
     opacity: 0.6;
@@ -156,6 +193,32 @@ const shellSidebar = css`
     html[data-sidebar="rail"] & .sidebar__ext {
       display: none;
     }
+    html[data-sidebar="rail"] & .sidebar__group[data-folded] {
+      display: flex;
+    }
+    html[data-sidebar="rail"] & .sidebar__link::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: calc(100% + var(--space-2));
+      top: 50%;
+      z-index: 70;
+      transform: translateY(-50%);
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-sm);
+      background: var(--text-primary);
+      color: var(--surface-base);
+      font-size: var(--text-sm);
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+    }
+    html[data-sidebar="rail"] & .sidebar__link:hover::after,
+    html[data-sidebar="rail"] & .sidebar__link:focus-visible::after {
+      opacity: 1;
+    }
+    html[data-sidebar="rail"] & .sidebar__nav {
+      overflow: visible;
+    }
     html[data-sidebar="rail"] & .sidebar__link,
     html[data-sidebar="rail"] & .sidebar__collapse,
     html[data-sidebar="rail"] & .sidebar__brand {
@@ -201,7 +264,8 @@ const NavLink: FC<{ item: NavItem; active?: string }> = ({ item, active }) => {
     <a
       class={`sidebar__link${current ? " sidebar__link--active" : ""}`}
       href={item.href}
-      title={item.label}
+      aria-label={item.label}
+      data-tooltip={item.label}
       aria-current={current ? "page" : undefined}
       target={item.external ? "_blank" : undefined}
       rel={item.external ? "noopener" : undefined}
@@ -217,20 +281,48 @@ const NavLink: FC<{ item: NavItem; active?: string }> = ({ item, active }) => {
   );
 };
 
-const NavSection: FC<{ title: string; items: NavItem[]; active?: string }> = ({
-  title,
-  items,
-  active,
-}) => {
+/** A group heading that folds its entries; the choice is remembered by the client script. */
+const NavSection: FC<{ group: NavGroup; active?: string }> = ({ group, active }) => {
+  const panel = `nav-group-${group.id}`;
   return (
     <>
-      <div class="sidebar__section">{title}</div>
-      {items.map((item) => (
-        <NavLink key={item.key} item={item} active={active} />
-      ))}
+      <button
+        type="button"
+        class="sidebar__section"
+        aria-expanded="true"
+        aria-controls={panel}
+        data-nav-fold={group.id}
+      >
+        <span>{group.title}</span>
+        <span class="sidebar__fold">
+          <Icon name="chevron-down" size="sm" />
+        </span>
+      </button>
+      <div class="sidebar__group" id={panel} data-nav-group={group.id}>
+        {group.items.map((item) => (
+          <NavLink key={item.key} item={item} active={active} />
+        ))}
+      </div>
     </>
   );
 };
+
+/** Help menu (API docs, OpenAPI spec) beside the theme toggle. */
+const HelpMenu: FC = () => (
+  <Dropdown iconOnly placement="above" ariaLabel="Help" label={<Icon name="help-circle" />}>
+    {helpNavItems().map((item) => (
+      <DropdownItem
+        key={item.key}
+        href={item.href}
+        icon={item.icon}
+        target={item.external ? "_blank" : undefined}
+        rel={item.external ? "noopener" : undefined}
+      >
+        {item.label}
+      </DropdownItem>
+    ))}
+  </Dropdown>
+);
 
 const Brand: FC<{ name: string; logo?: string; href: string }> = ({ name, logo, href }) => {
   const safeLogo = safeImageUrl(logo);
@@ -248,13 +340,34 @@ const Brand: FC<{ name: string; logo?: string; href: string }> = ({ name, logo, 
   );
 };
 
+/** Account, theme and help menus, and the collapse toggle. */
+const SidebarFooter: FC = () => (
+  <div class="sidebar__footer">
+    <UserMenu />
+    <div class="sidebar__tools">
+      <ThemeMenu />
+      <HelpMenu />
+      <button
+        class="sidebar__collapse"
+        type="button"
+        data-sidebar-collapse
+        aria-label="Collapse or expand sidebar"
+        title="Collapse or expand sidebar"
+      >
+        <Icon name="chevrons-left" />
+        <span class="sidebar__label">Collapse</span>
+      </button>
+    </div>
+  </div>
+);
+
 /** Primary navigation: brand, workspace, project, developer, and admin entries. */
 export const Sidebar: FC<{ nav?: NavConfig; name: string; logo?: string }> = ({
   nav,
   name,
   logo,
 }) => {
-  const { user, authEnabled, config, testing } = getStore();
+  const { user, authEnabled, config } = getStore();
   const urls = createUrlBuilder("/", config.publishedBaseDomain);
   const showAdmin = !authEnabled || user?.role === "admin";
   const projects: NavItem = {
@@ -268,34 +381,19 @@ export const Sidebar: FC<{ nav?: NavConfig; name: string; logo?: string }> = ({
       <Brand name={name} logo={logo} href={urls.projects()} />
       <nav class="sidebar__nav">
         <NavLink item={projects} active={nav?.active} />
-        {nav?.projectSlug ? (
+        {nav?.projectSlug
+          ? projectNavGroups(urls, nav.projectSlug).map((group) => (
+              <NavSection key={group.id} group={group} active={nav.active} />
+            ))
+          : null}
+        {showAdmin ? (
           <NavSection
-            title="Project"
-            items={projectNavItems(urls, nav.projectSlug, testing)}
-            active={nav.active}
+            group={{ id: "admin", title: "Administration", items: adminNavItems() }}
+            active={nav?.active}
           />
         ) : null}
-        <NavSection title="Developer" items={developerNavItems()} active={nav?.active} />
-        {showAdmin ? (
-          <NavSection title="Administration" items={adminNavItems()} active={nav?.active} />
-        ) : null}
       </nav>
-      <div class="sidebar__footer">
-        <UserMenu />
-        <div class="sidebar__tools">
-          <ThemeMenu />
-          <button
-            class="sidebar__collapse"
-            type="button"
-            data-sidebar-collapse
-            aria-label="Collapse or expand sidebar"
-            title="Collapse or expand sidebar"
-          >
-            <Icon name="chevrons-left" />
-            <span class="sidebar__label">Collapse</span>
-          </button>
-        </div>
-      </div>
+      <SidebarFooter />
     </aside>
   );
 };

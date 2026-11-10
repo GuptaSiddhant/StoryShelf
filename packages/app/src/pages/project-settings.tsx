@@ -3,8 +3,9 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { testingEnabled } from "../store.ts";
+import { getStore, testingEnabled } from "../store.ts";
 import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
@@ -189,6 +190,31 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
   return null;
 }
 
+/** Pages that sit under Settings but are not tabs: the Labels overview, and Jobs when testing is on. */
+function linkedPages(
+  project: Project,
+): { label: string; href: string; icon: IconName; active: boolean }[] {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  return [
+    {
+      label: "Browse labels",
+      href: urls.labels(project.slug),
+      icon: "tag",
+      active: false,
+    },
+    ...(testingEnabled()
+      ? [
+          {
+            label: "Jobs",
+            href: urls.jobs(project.slug),
+            icon: "activity" as const,
+            active: false,
+          },
+        ]
+      : []),
+  ];
+}
+
 /** Project settings shell: tab navigation plus the active settings tab. */
 export function renderProjectSettingsPage(
   data: ProjectSettingsData,
@@ -214,12 +240,15 @@ export function renderProjectSettingsPage(
 
       <SubNavLayout
         label="Settings sections"
-        items={SETTINGS_TABS.filter((tab) => settingsTabShown(tab, data)).map((tab) => ({
-          label: TAB_LABELS[tab],
-          href: tabHref(project, tab),
-          icon: TAB_ICONS[tab],
-          active: activeTab === tab,
-        }))}
+        items={[
+          ...SETTINGS_TABS.filter((tab) => settingsTabShown(tab, data)).map((tab) => ({
+            label: TAB_LABELS[tab],
+            href: tabHref(project, tab),
+            icon: TAB_ICONS[tab],
+            active: activeTab === tab,
+          })),
+          ...linkedPages(project),
+        ]}
       >
         {renderActiveTab(data, formState)}
       </SubNavLayout>

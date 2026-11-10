@@ -126,11 +126,6 @@ export async function renderProjectBuildsPage(
             <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
           </>
         }
-        actions={
-          <Button variant="secondary" icon="settings" href={urls.settings(project.slug)}>
-            Settings
-          </Button>
-        }
       />
       <VStack>
         <HealthSlot project={project} data={health} />
