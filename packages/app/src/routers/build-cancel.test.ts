@@ -64,6 +64,8 @@ async function seed(status: string, testing = true, sent: string[] = []) {
   const { storage } = makeStorage();
   const project = await createTestProject(db, db.tables, { name: "app" });
   const created = await createTestBuild(db, db.tables, project.id);
+  // `reviewing` is only reached from `capturing`, as a run finalizes.
+  if (status === "reviewing") await new BuildModel(db).setStatus(created.id, "capturing");
   await new BuildModel(db).setStatus(created.id, status as never);
   const app = createShelfApp({
     database: db,

@@ -1,149 +1,20 @@
-import {
-  BaselineModel,
-  DesignCredentialModel,
-  DesignNodeModel,
-  baselineStatus,
-} from "@storyshelf/core/models";
-import { BuildModel } from "@storyshelf/core/models";
-import { SnapshotModel } from "@storyshelf/core/models";
-import type { Snapshot } from "@storyshelf/core/schema";
-import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
-import { credentialKeys } from "../credential-keys.ts";
-import { getStore } from "../store.ts";
-import { readComparisonImage, validFrozenReference } from "./comparison-image.ts";
-import { notFound, resolveAuthorizedProject } from "./helpers.ts";
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
+import {
+  serveBaseline,
+  serveDesignRender,
+  serveSnapshotDiff,
+  serveSnapshotImage,
+} from "./media.handlers.ts";
 
-const PNG = "image/png";
-
-function imageResponse(buffer: Buffer, cacheControl = "private, max-age=3600"): Response {
-  return new Response(new Uint8Array(buffer), {
-    headers: { "content-type": PNG, "cache-control": cacheControl },
-  });
-}
-
-/** A render fetched with a member's own connection: the browser must not keep it past the session. */
-const RENDER_MEMBER = "private, no-store";
-
-/** Design renders are addressed by file version (`?v=`): immutable once the version matches the row. */
-const RENDER_IMMUTABLE = "private, max-age=31536000, immutable";
+const SNAPSHOT = "/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId";
 
 /** Register the PNG image, diff, and baseline media endpoints for snapshots. */
 export function registerMedia(app: ShelfRouter): void {
-  app.get("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/image", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const snapshot = await findSnapshot(
-      c.req.param("buildId"),
-      c.req.param("snapshotId"),
-      project.id,
-    );
-    return imageResponse(await getStore().storage.read(snapshot.screenshotPath));
-  });
-
-  app.get("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/diff", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const snapshot = await findSnapshot(
-      c.req.param("buildId"),
-      c.req.param("snapshotId"),
-      project.id,
-    );
-    if (!snapshot.diffPath) {
-      notFound("No diff for this snapshot");
-    }
-    return imageResponse(await getStore().storage.read(snapshot.diffPath));
-  });
-
-  // `:renderId` is the internal design_nodes row id (a ULID), not a provider node id.
-  app.get("/api/v1/projects/:slug/design/renders/:renderId", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const { db, config, storage, design } = getStore();
-    const credentials = new DesignCredentialModel(db, credentialKeys(config));
-    const nodes = new DesignNodeModel(db, credentials, design, { storage });
-    const found = await nodes.get(project.id, c.req.param("renderId"));
-    // A render fetched with a member's own connection is theirs alone (it may show files others cannot open).
-    const node =
-      found && (found.viewerId === "" || found.viewerId === getStore().user?.id) ? found : null;
-    const png = node ? await nodes.readRender(node) : null;
-    if (!png) {
-      notFound("No design render");
-    }
-    const versioned = node?.renderVersion && c.req.query("v") === node.renderVersion;
-    const cacheControl = node?.viewerId ? RENDER_MEMBER : versioned ? RENDER_IMMUTABLE : undefined;
-    return imageResponse(png, cacheControl);
-  });
-
-  app.get("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/baseline", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const snapshot = await findSnapshot(
-      c.req.param("buildId"),
-      c.req.param("snapshotId"),
-      project.id,
-    );
-    const build = await new BuildModel(getStore().db).get(snapshot.buildId);
-    if (!build) {
-      notFound("Build not found");
-    }
-    if (
-      c.req.query("reference") !== "default" &&
-      (snapshot.comparisonImagePath || snapshot.comparisonMetadata)
-    ) {
-      const frozen = validFrozenReference(snapshot, project.id, build.id);
-      if (!frozen) {
-        notFound("Original baseline is unavailable");
-      }
-      const image = await readComparisonImage(frozen.path, frozen.reference.imageSha256);
-      if (!image) {
-        notFound("Original baseline image is unavailable");
-      }
-      return imageResponse(image, "private, no-store");
-    }
-    const baselines = new BaselineModel(getStore().db, undefined, getStore().storage);
-    const baseline =
-      c.req.query("reference") === "default"
-        ? await baselines.getFor(
-            project.id,
-            snapshot.storyId,
-            snapshot.viewportName,
-            project.gitDefaultBranch,
-            snapshot.browser,
-          )
-        : await baselines.resolve(
-            project.id,
-            snapshot.storyId,
-            snapshot.viewportName,
-            build.gitBranch,
-            project.gitDefaultBranch,
-            snapshot.browser,
-          );
-    if (
-      c.req.query("reference") === "default" &&
-      (baseline?.id !== c.req.query("id") || baseline?.updatedAt !== c.req.query("version"))
-    ) {
-      notFound("Default baseline changed; reload the comparison");
-    }
-    if (!baseline) {
-      notFound("No baseline for this snapshot");
-    }
-    if (
-      c.req.query("reference") !== "default" &&
-      snapshot.baselineVersion !== null &&
-      baselineStatus(snapshot, baseline) !== "current"
-    ) {
-      notFound("Original baseline is no longer available");
-    }
-    return imageResponse(await baselines.read(baseline), "private, no-store");
-  });
-}
-
-async function findSnapshot(
-  buildId: string,
-  snapshotId: string,
-  projectId: string,
-): Promise<Snapshot> {
-  const snapshot = await new SnapshotModel(getStore().db).get(snapshotId);
-  if (!snapshot || snapshot.buildId !== buildId || snapshot.projectId !== projectId) {
-    notFound("Snapshot not found");
-  }
-  return snapshot;
+  app.get(`${SNAPSHOT}/image`, async (c) => await serveSnapshotImage(c));
+  app.get(`${SNAPSHOT}/diff`, async (c) => await serveSnapshotDiff(c));
+  app.get(
+    "/api/v1/projects/:slug/design/renders/:renderId",
+    async (c) => await serveDesignRender(c),
+  );
+  app.get(`${SNAPSHOT}/baseline`, async (c) => await serveBaseline(c));
 }

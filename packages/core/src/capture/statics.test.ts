@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { persistStorybookStatics } from "./statics.ts";
 
@@ -105,5 +106,35 @@ describe("persistStorybookStatics", () => {
 
     expect(await readFile(join(source, "index.html"), "utf8")).toBe("<html>real</html>");
     expect(await readFile(join(source, "assets", "app.js"), "utf8")).toBe("console.log(1)");
+  });
+
+  it("writes no manifest when the abort lands while the content uses are recorded", async () => {
+    await writeFile(join(dir, "index.html"), "<html></html>");
+    const { storage, files } = memoryStorage();
+    const controller = new AbortController();
+    const db = {
+      buildReferenceLifecycle: {
+        recordContentUses: async (): Promise<string[]> => {
+          controller.abort(new Error("publish cancelled"));
+          return await Promise.resolve([]);
+        },
+      },
+    } as unknown as DatabaseAdapter;
+
+    await expect(
+      persistStorybookStatics(storage, dir, "p1", "b1", db, controller.signal),
+    ).rejects.toThrow("publish cancelled");
+
+    expect([...files.keys()].some((key) => key.endsWith("manifest.json"))).toBe(false);
+  });
+
+  it("writes the manifest when nothing aborts, with the same lifecycle", async () => {
+    await writeFile(join(dir, "index.html"), "<html></html>");
+    const { storage, files } = memoryStorage();
+    const db = {
+      buildReferenceLifecycle: { recordContentUses: async () => await Promise.resolve([]) },
+    } as unknown as DatabaseAdapter;
+    await persistStorybookStatics(storage, dir, "p1", "b1", db, new AbortController().signal);
+    expect([...files.keys()].some((key) => key.endsWith("manifest.json"))).toBe(true);
   });
 });

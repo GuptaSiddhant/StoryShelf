@@ -123,23 +123,36 @@ async function assertReviewable(
   }
 }
 
-/** Move the build to the status its verdicts give it; the new status, or null when it did not move. */
+/** Attempts at a status that a newer verdict keeps outdating before the newest one is left to win. */
+const DECIDE_ATTEMPTS = 3;
+
+/**
+ * Move the build to the status its verdicts give it; the new status, or null when it did not move.
+ * The status is derived, so the write is fenced on the newest verdict it was computed from (ADR 0046):
+ * a refusal means a later verdict (or another writer) got there first, and the status is computed
+ * again from the current verdicts instead of keeping the stale result.
+ */
 async function decideBuild(
   project: Project,
   build: Build,
+  attempts = DECIDE_ATTEMPTS,
 ): Promise<"approved" | "rejected" | "pending" | null> {
   const { db, testing } = getStore();
+  const reviewModel = new BuildReviewModel(db);
+  const reviews = await reviewModel.listByBuild(build.id);
   const status = deriveReviewStatus({
     testing,
     review: true,
     approvalsRequired: approvalsRequired(project),
-    reviews: await new BuildReviewModel(db).listByBuild(build.id),
+    reviews,
   });
   if (status === null || !VERDICT_STATUSES.has(build.status) || status === build.status) {
     return null;
   }
-  await new BuildModel(db).setStatus(build.id, status);
-  return status;
+  const fence = reviewModel.newestVerdictIs(build.id, reviews.at(-1)?.id ?? null);
+  const written = await new BuildModel(db).setStatus(build.id, status, fence);
+  if (written.status === status) return status;
+  return attempts > 1 ? await decideBuild(project, written, attempts - 1) : null;
 }
 
 function approvalsRequired(project: Project): number {
