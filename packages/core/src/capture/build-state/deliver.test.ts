@@ -153,6 +153,7 @@ describe("deliverBuildState", () => {
 
     it("is unavailable when no publish job ever existed (inline publish, then lost content)", async () => {
       const w = await world();
+      await w.builds.setStatus(w.build.id, "capturing");
       await w.builds.setStatus(w.build.id, "reviewing");
       await deliver(w);
       expect(storybook(w)).toEqual(["storyshelf/storybook", "failure"]);
@@ -240,6 +241,7 @@ describe("deliverBuildState: annotations", () => {
     });
     await snapshots.setStatus(changed.id, "changed");
     await w.builds.updateCounts(w.build.id);
+    await w.builds.setStatus(w.build.id, "capturing");
     await w.builds.setStatus(w.build.id, "reviewing");
     await deliverBuildState(w.deps, { buildId: w.build.id, channelId: w.channelId });
     const target = w.git.calls[0]?.target;

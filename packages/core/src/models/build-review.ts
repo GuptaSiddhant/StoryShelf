@@ -1,6 +1,6 @@
 /** Build-level review verdicts (ADR 0013, decision 3). */
-import { asc, eq } from "drizzle-orm";
-import type { Table } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
+import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { BuildReview } from "../schema/build-review.ts";
 import type { ReviewVerdict } from "../types.ts";
@@ -53,6 +53,21 @@ export class BuildReviewModel {
     return rows.toSorted(
       (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
     );
+  }
+
+  /**
+   * A condition for `BuildModel.setStatus`: the build's newest verdict row is `reviewId` (or, for
+   * `null`, it has none). A status derived from the verdicts is written with it (ADR 0046), so a
+   * result computed before a later verdict landed is refused instead of overwriting that verdict's
+   * outcome. "Newest" is the order {@link BuildReviewModel.listByBuild} gives.
+   */
+  newestVerdictIs(buildId: string, reviewId: string | null): SQL {
+    const table = this.#table;
+    const [id, build, created] = [col(table, "id"), col(table, "buildId"), col(table, "createdAt")];
+    if (reviewId === null) {
+      return sql`not exists (select 1 from ${table} where ${build} = ${buildId})`;
+    }
+    return sql`(select ${id} from ${table} where ${build} = ${buildId} order by ${created} desc, ${id} desc limit 1) = ${reviewId}`;
   }
 
   /** Each reviewer's latest verdict on a build. */

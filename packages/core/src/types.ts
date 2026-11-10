@@ -1,17 +1,10 @@
-/** All lifecycle statuses a build can carry. */
-export const BUILD_STATUSES = [
-  "pending",
-  "capturing",
-  "comparing",
-  "reviewing",
-  "approved",
-  "rejected",
-  "failed",
-  "cancelled",
-] as const;
-
-/** Lifecycle status of a build. */
-export type BuildStatus = (typeof BUILD_STATUSES)[number];
+export {
+  BUILD_STATUSES,
+  CANCELLABLE_BUILD_STATUSES,
+  OPEN_BUILD_STATUSES,
+  TERMINAL_BUILD_STATUSES,
+  type BuildStatus,
+} from "./lifecycle/build-lifecycle.ts";
 
 /** All review statuses a snapshot can carry. */
 export const SNAPSHOT_STATUSES = [
@@ -25,28 +18,6 @@ export const SNAPSHOT_STATUSES = [
 
 /** Review status of a snapshot. */
 export type SnapshotStatus = (typeof SNAPSHOT_STATUSES)[number];
-
-/**
- * Build statuses considered terminal for retention purging.
- * Only builds that have finished review (`approved`, `rejected`, `failed`, `cancelled`)
- * are eligible for TTL-based cleanup; `pending`/`reviewing` builds are kept.
- */
-export const TERMINAL_BUILD_STATUSES: readonly BuildStatus[] = [
-  "approved",
-  "rejected",
-  "failed",
-  "cancelled",
-];
-
-/**
- * Statuses of a build whose capture or compare work may still run: a user may cancel it (the build
- * then ends `cancelled`, a terminal status no capture write moves it out of again).
- */
-export const CANCELLABLE_BUILD_STATUSES: readonly BuildStatus[] = [
-  "pending",
-  "capturing",
-  "comparing",
-];
 
 /** All site-wide user roles. */
 export const SITE_ROLES = ["admin", "member", "viewer"] as const;

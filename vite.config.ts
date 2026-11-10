@@ -228,12 +228,8 @@ export default defineConfig({
           "packages/app/src/pages/settings-tests.tsx",
           "packages/app/src/pages/settings-tokens.tsx",
           "packages/app/src/pages/settings-webhooks.tsx",
-          "packages/app/src/routers/media.ts",
           "packages/app/src/routers/builds.handlers.ts",
           "packages/app/src/routers/builds.ts",
-          "packages/app/src/routers/helpers.ts",
-          "packages/app/src/routers/snapshots.ts",
-          "packages/app/src/routers/storybook.ts",
           "packages/app/src/routers/ui.ts",
         ],
         rules: {
