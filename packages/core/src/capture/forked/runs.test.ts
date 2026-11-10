@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { JobRunContext } from "../consumer/types.ts";
 import { jobKey, RunBook } from "./runs.ts";
 

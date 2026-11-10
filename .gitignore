@@ -31,7 +31,6 @@ storybook-static
 fixtures/**/node_modules
 fixtures/**/storybook-static
 fixtures/**/dist
-fixtures/**/pnpm-workspace.yaml
 .test-results
 test-report
 coverage
@@ -39,7 +38,7 @@ openapi.json
 
 # turbo prune emits the pruned pnpm-format lock as pnpm-lock.yaml (renamed to
 # nub.lock in Docker); never commit a root-level copy (nub.lock is source of truth)
-pnpm-lock.yaml
+!/pnpm-lock.yaml
 !fixtures/**/pnpm-lock.yaml
 
 # StoryShelf local data
@@ -55,3 +54,6 @@ nub.lock.bak
 # opencode state
 .opencode/
 .ocx/
+# vitest 5 / Vite+ task cache
+.vitest/
+node_modules/.vite/

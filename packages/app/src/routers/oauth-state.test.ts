@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { safeReturnPath, signState, verifyState } from "./oauth-state.ts";
 
 const SECRET = "state-secret-0000";

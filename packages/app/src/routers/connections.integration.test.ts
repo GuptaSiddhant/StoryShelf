@@ -2,7 +2,7 @@ import { ConnectionModel, DesignCredentialModel } from "@storyshelf/core/models"
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { stubAuth } from "../stub-auth.ts";

@@ -12,7 +12,7 @@
  * Every instance reads one shared manual clock, so lease expiry and retry delays are exact and no
  * case sleeps. Build ids are unique per run, so a shared live database needs no cleanup between runs.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import {
   createDatabaseCaptureQueue,

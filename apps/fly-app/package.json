@@ -4,10 +4,9 @@
   "description": "StoryShelf Fly demo server (local adapters, workspace versions).",
   "type": "module",
   "scripts": {
-    "build": "rolldown -c rolldown.config.ts",
     "start": "node dist/server.mjs",
-    "lint": "oxlint --type-aware --type-check server.ts ai.ts ai.test.ts vitest.config.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts && oxlint sprite",
-    "test": "vitest run",
+    "lint": "vp lint --type-aware --type-check server.ts ai.ts ai.test.ts vitest.config.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts && vp lint sprite",
+    "test": "vp test run",
     "dev": "node --conditions=source --experimental-transform-types server.ts"
   },
   "dependencies": {
@@ -32,6 +31,7 @@
     "@types/node": "catalog:",
     "rolldown": "*",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   }
 }

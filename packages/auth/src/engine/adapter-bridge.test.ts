@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { UserModel } from "@storyshelf/core/models";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { baseAuthTables } from "../auth-tables.ts";
 import { buildAdapter, mirrorUser } from "./adapter-bridge.ts";
 import type { ShelfAuthInstance, ShelfAuthOptions } from "./types.ts";

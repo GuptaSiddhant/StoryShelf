@@ -1,5 +1,5 @@
 import { HttpError } from "@storyshelf/core/utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { withSpan } from "./telemetry.ts";
 import { installTestTelemetry } from "./test-support.ts";
 

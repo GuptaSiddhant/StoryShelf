@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { DEFAULT_VIEWPORTS } from "./adapter.ts";
 import { STORYBOOK_BUILTIN_VIEWPORTS, resolveStoryViewports } from "./storybook.ts";

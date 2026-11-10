@@ -2,7 +2,7 @@ import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { Retention } from "@storyshelf/core/retention";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";

@@ -3,7 +3,7 @@ import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Logger } from "@storyshelf/core/logger";
 import { Buffer } from "node:buffer";
 import { Readable } from "node:stream";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createInstrumentedStorage } from "./instrument-storage.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 

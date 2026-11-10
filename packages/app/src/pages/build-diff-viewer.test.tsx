@@ -1,6 +1,6 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { DiffViewer } from "./build-diff-viewer.tsx";
 import type { DesignItem } from "./design-links.tsx";
 

@@ -268,10 +268,10 @@ committed on this branch:
   secret, profile no-store, Secure clear-cookie, drift refresh, token-based
   `destroySession`) and LIKE-escaping follow-up.
 - S1 `refactor: rename auth-betterauth to auth`; S2 `refactor: slim core
-slot, standalone Auth singleton` (`Auth` lives in `core/auth` — the
+  slot, standalone Auth singleton` (`Auth` lives in `core/auth` — the
   prescribed core→auth edge cycles turbo, so the interface moved down and
   the engine implements + re-exports it); S3+S4 `refactor: collapse app
-routing to single engine path` (legacy router deleted, `asEngineAuth`
+  routing to single engine path` (legacy router deleted, `asEngineAuth`
   gone, profile engine-only, auth routes gated when disabled; async lazy
   loading declined — needs async `createShelfApp`).
 - `feat(auth-engine): IdP group sync for SSO providers` (per-recipe

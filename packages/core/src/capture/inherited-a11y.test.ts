@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { SnapshotModel } from "../models/snapshot.ts";
 import { makeDatabase } from "../test-helpers/index.ts";
 import { inheritedA11yJson } from "./inherited-a11y.ts";

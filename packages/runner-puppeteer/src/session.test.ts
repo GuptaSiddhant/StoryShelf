@@ -1,5 +1,5 @@
 import type { Browser, BrowserContext, Page } from "puppeteer-core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { RELEASE_TIMEOUT_MS, createBrowserSession, type ReleaseOutcome } from "./session.ts";
 
 afterEach(() => {

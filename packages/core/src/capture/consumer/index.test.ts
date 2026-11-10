@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { DEADLINE_CLEANUP_MS } from "./run-job.ts";
 import { gate, rig, recordingHandler } from "./test-fixtures.ts";

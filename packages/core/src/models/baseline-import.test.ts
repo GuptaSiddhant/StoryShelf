@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { zipStream } from "../utils/zip-write.ts";
 import { BaselineArchiveError, type BaselineManifestEntry } from "./baseline-archive.ts";
 import { planBaselineImport } from "./baseline-import.ts";

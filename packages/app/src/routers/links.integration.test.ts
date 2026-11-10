@@ -2,7 +2,7 @@ import { PackageUsageModel } from "@storyshelf/core/models";
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 

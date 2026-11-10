@@ -1,5 +1,5 @@
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import {
   AdapterLifecycleError,

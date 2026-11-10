@@ -1,5 +1,5 @@
 import { PNG } from "pngjs";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { CaptureTarget, RenderedSnapshot } from "../adapters/capture-runner.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";

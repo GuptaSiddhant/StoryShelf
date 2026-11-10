@@ -1,6 +1,6 @@
 import { metrics } from "@opentelemetry/api";
 import { triageEnvelopeSchema } from "@storyshelf/core/insights";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAi } from "./index.ts";
 import { resetMetricsForTests } from "./metrics.ts";
 import { TRIAGE_JSON, mockModel } from "./test-support.ts";

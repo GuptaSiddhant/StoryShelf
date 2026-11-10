@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { ulid } from "@storyshelf/core/utils";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { baseAuthTables } from "./auth-tables.ts";
 import { hasPasswordCredential, listUserPasskeys } from "./passkeys.ts";
 

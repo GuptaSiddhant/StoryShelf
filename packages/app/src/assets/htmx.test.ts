@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { assetManifest } from "../asset-manifest.ts";
 import { htmxSource, htmxVersion } from "./htmx.ts";
 import { markSource } from "./mark.ts";

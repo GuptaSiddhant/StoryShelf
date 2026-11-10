@@ -1,7 +1,7 @@
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { pino } from "pino";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 import { stubRunner } from "../test-runner.ts";

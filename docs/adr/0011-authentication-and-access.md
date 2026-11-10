@@ -192,7 +192,7 @@ admins manage their project's tokens.
   valid signature, the same service, the same signed-in user and the matching cookie; the return path
   must be a same-site path.
 - **Per-user storage.** `user_connections(user_id, service, token_encrypted,
-refresh_token_encrypted, expires_at, status)`, unique on `(user_id, service)`. Tokens are encrypted
+  refresh_token_encrypted, expires_at, status)`, unique on `(user_id, service)`. Tokens are encrypted
   with the credential keys and included in secret rotation. `ConnectionModel.accessToken` refreshes
   lazily, once per connection per process, when the token is within a minute of expiry; a failed
   refresh sets `status = expired` until the user reconnects.

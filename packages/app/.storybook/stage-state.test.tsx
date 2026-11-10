@@ -1,5 +1,5 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { CompareStage } from "../src/ui/components.tsx";
 import { baselineShot, currentShot, designShot, diffShot } from "./assets/screens.ts";
 import { renderJsx } from "./render.tsx";

@@ -12,7 +12,7 @@ Amended in part by ADR 0034 (there is no separate worker package).
 
 The layering was already approximated by convention: every adapter package imports `@storyshelf/core/*` subpaths, never the barrel, and no domain module imports from `routers/`, `pages/`, `ui/`, `middleware/`, or `store.ts` (verified by inspection; only two wiring tests crossed the boundary). The split makes the boundary structural instead of conventional.
 
-The opposite direction was considered and rejected: #57 proposed collapsing zero-dependency adapters *into* core. Consolidation would grow the very bundle workers must avoid, so #57 is closed as superseded by this decision.
+The opposite direction was considered and rejected: #57 proposed collapsing zero-dependency adapters _into_ core. Consolidation would grow the very bundle workers must avoid, so #57 is closed as superseded by this decision.
 
 ## Decision
 

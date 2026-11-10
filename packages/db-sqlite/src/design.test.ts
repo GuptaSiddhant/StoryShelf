@@ -2,7 +2,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { DesignCredentialModel, DesignModel, DesignNodeModel } from "@storyshelf/core/models";
 import { fakeUrl, makeFakeDesign } from "@storyshelf/core/test-helpers";
 import { sql } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 
 const URL_A = fakeUrl("AAA", "1:2");

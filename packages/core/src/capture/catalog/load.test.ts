@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { BuildComponentModel } from "../../models/build-component.ts";
 import { createTestBuild } from "../../test-helpers/create-project.ts";
 import { catalogPath } from "../../utils/paths.ts";

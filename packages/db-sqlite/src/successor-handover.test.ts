@@ -6,7 +6,7 @@ import type { DatabaseAdapter, TxStore } from "@storyshelf/core/adapter/database
 import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { CaptureJobModel } from "@storyshelf/core/models";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 
 const silent = createShelfLogger({ level: "silent" });

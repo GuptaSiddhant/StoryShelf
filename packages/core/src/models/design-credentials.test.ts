@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { DesignCredentialModel } from "./design-credentials.ts";
 

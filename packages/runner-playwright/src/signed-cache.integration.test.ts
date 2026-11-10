@@ -18,7 +18,7 @@ import { signStorybookToken, storybookDir } from "@storyshelf/core/utils";
 import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { chromium, type Browser, type BrowserContext } from "playwright-core";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
 const SECRET = "signed-cache-secret-signed-cache-secret";

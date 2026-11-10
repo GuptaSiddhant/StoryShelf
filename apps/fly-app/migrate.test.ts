@@ -1,5 +1,5 @@
 import { makeStorage } from "@storyshelf/core/test-helpers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { isStoredObject, migrateStorage } from "./migrate.ts";
 
 function seeded() {

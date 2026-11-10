@@ -3,7 +3,7 @@ import { UserModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 

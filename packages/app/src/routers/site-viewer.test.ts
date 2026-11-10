@@ -1,7 +1,7 @@
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { Writable } from "node:stream";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 

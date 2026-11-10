@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { buildStateFlags } from "./build-state-flags.ts";
 
 it("takes testing from the instance and review from the project switch", () => {

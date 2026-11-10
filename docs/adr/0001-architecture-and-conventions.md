@@ -114,8 +114,8 @@ selection of `server init` only. The scaffold generates only the single-deployab
 import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createLocalStorage } from "@storyshelf/storage-local";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createLocalStorage } from "@storyshelf/storage-local";
 
 const database = createSqliteDatabase("./data/shelf.db");
 const storage = createLocalStorage("./data");

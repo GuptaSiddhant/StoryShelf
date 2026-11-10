@@ -3,7 +3,7 @@ import { publishedGzipPath, signStorybookToken, storybookDir } from "@storyshelf
 import { createHash } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 import { stubRunner } from "../test-runner.ts";

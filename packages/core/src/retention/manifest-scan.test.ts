@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
 import { deferred, makeDatabase, makeStorage } from "../test-helpers/index.ts";

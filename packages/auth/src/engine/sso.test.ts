@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 // Capture what the engine hands to the SSO plugin instead of running it.
 vi.mock("@better-auth/sso", () => ({

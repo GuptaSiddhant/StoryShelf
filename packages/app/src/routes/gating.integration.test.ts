@@ -1,5 +1,5 @@
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { REVIEW_DISABLED_MESSAGE } from "../middleware/require-review.ts";

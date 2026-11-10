@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { BuildModel } from "../../models/build.ts";
 import { ProjectModel } from "../../models/project.ts";
 import { createTestBuild, createTestProject } from "../../test-helpers/create-project.ts";

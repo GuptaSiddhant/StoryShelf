@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { beforeAll, afterAll, describe, expect, it } from "vite-plus/test";
 import { generateGcpTerraformFiles, type GcpTerraformOptions } from "./terraform-gcp.ts";
 import { terraformGate } from "./test-helpers/terraform-gate.ts";
 

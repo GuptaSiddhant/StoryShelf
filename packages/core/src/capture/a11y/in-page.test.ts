@@ -1,5 +1,5 @@
 import { JSDOM } from "jsdom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { loadAxeSource } from "./axe-source.ts";
 import { inPageReadA11yParameters, inPageRunAxe } from "./in-page.ts";
 import { resolveA11yRun } from "./options.ts";

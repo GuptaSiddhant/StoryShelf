@@ -1,7 +1,7 @@
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { countHiddenSnapshots } from "./hidden-data.ts";
 import { createShelfApp } from "./index.tsx";
 import { stubRunner } from "./test-runner.ts";

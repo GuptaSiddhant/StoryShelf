@@ -8,7 +8,7 @@ import {
 import type { DesignNode } from "@storyshelf/core/schema";
 import { fakeUrl, makeDatabase, makeFakeDesign, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   announceDesignChangesWith,
   DESIGN_CHANGED_EVENT,

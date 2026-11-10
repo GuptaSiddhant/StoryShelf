@@ -1,5 +1,5 @@
 /** Key join/split tests for S3 object keys. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { s3Key, s3Rel } from "./keys.ts";
 
 describe("s3Key", () => {

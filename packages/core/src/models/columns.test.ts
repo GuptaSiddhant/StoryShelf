@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { col } from "./columns.ts";
 

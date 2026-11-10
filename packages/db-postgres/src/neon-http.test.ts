@@ -1,5 +1,5 @@
 import type { NeonQueryFunction } from "@neondatabase/serverless";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createNeonHttpDatabase } from "./neon-http.ts";
 
 /** Recording stand-in for a `neon()` query function. */

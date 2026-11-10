@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ADVANCED_DATABASE_CHOICES,
   CURATED_DATABASE_CHOICES,

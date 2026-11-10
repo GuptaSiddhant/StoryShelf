@@ -1,6 +1,6 @@
 import { AiError } from "@storyshelf/core/ai";
 import { triageEnvelopeSchema } from "@storyshelf/core/insights";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { runStructured, toAiError, toUsage } from "./codec.ts";
 import { TRIAGE_JSON, mockModel } from "./test-support.ts";
 

@@ -13,7 +13,7 @@
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { databaseContractSuite } from "@storyshelf/core/test-helpers";
-import { afterAll, describe } from "vitest";
+import { afterAll, describe } from "vite-plus/test";
 import { createMysqlDatabase } from "./index.ts";
 
 const url = process.env["MYSQL_URL"];

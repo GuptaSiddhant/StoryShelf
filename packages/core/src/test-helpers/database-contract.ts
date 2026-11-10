@@ -12,7 +12,7 @@
  */
 import { getTableColumns, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { REQUIRED_TABLE_KEYS } from "../adapters/database.ts";
 import { createShelfLogger } from "../logger.ts";

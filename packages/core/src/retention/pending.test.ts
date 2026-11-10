@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { BuildReviewModel } from "../models/build-review.ts";
 import { CommentModel } from "../models/comment.ts";
 import { LabelModel } from "../models/label.ts";

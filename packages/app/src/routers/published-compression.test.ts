@@ -2,7 +2,7 @@ import { makeStorage } from "@storyshelf/core/test-helpers";
 import { publishedGzipPath } from "@storyshelf/core/utils";
 import { createHash, randomBytes } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { acceptsGzip, publishedGzip } from "./published-compression.ts";
 
 const hashOf = (data: Buffer): string => createHash("sha256").update(data).digest("hex");

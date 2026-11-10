@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { BuildReferenceLifecycle } from "../adapters/database.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { BaselineModel } from "./baseline.ts";

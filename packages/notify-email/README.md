@@ -51,9 +51,9 @@ Log and HTTP presets work without it.
 Each preset is importable on its own (root aggregates all):
 
 ```ts
-import { smtpPreset, smtpPresetFromEnv } from "@storyshelf/notify-email/smtp";
-import { mailpitPreset } from "@storyshelf/notify-email/mailpit";
-import { logPreset } from "@storyshelf/notify-email/log";
-import { httpPreset } from "@storyshelf/notify-email/http";
 import { createEmailNotifier } from "@storyshelf/notify-email/email";
+import { httpPreset } from "@storyshelf/notify-email/http";
+import { logPreset } from "@storyshelf/notify-email/log";
+import { mailpitPreset } from "@storyshelf/notify-email/mailpit";
+import { smtpPreset, smtpPresetFromEnv } from "@storyshelf/notify-email/smtp";
 ```

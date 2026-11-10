@@ -3,7 +3,7 @@ import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 

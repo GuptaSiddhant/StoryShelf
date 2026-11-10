@@ -1,6 +1,6 @@
 import type { RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { measureRemote } from "./remote-environment.ts";
 import type { BrowserSession } from "./session.ts";
 

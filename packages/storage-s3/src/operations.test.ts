@@ -8,7 +8,7 @@ import {
   S3ServiceException,
   type S3Client,
 } from "@aws-sdk/client-s3";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createS3Storage } from "./index.ts";
 
 /** Minimal stand-in for the S3 response `Body` with the shape the SDK uses. */

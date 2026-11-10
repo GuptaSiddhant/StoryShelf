@@ -13,7 +13,7 @@
  * the adapter itself.
  */
 import { Readable } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { StorageAdapter } from "../adapters/storage.ts";
 
 /** Build the adapter under test (sync or async factories both work). */

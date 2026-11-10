@@ -11,7 +11,7 @@ import {
   databaseQueueSingleFlightSuite,
   queueContractSuite,
 } from "@storyshelf/core/test-helpers";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vite-plus/test";
 import { createPgliteDatabase } from "./pglite.ts";
 
 const silent = createShelfLogger({ level: "silent" });

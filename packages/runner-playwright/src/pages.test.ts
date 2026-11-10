@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { PagePool, clearBrowserState } from "./pages.ts";
 
 const VIEWPORT = { name: "desktop", width: 800, height: 600 };

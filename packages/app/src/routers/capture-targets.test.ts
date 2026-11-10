@@ -1,7 +1,7 @@
 import type { CaptureRunner, RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { stubRunner } from "../test-runner.ts";

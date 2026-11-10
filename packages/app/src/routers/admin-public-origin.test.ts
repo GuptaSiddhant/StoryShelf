@@ -12,7 +12,7 @@ import {
   makeStorage,
 } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { requestOpenBuildStatesNow } from "../git-status.ts";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";

@@ -1,7 +1,7 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { alreadyAlerted, notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
 
 describe("alreadyAlerted", () => {

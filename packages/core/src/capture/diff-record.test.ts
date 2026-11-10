@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { makeStorage } from "../test-helpers/fake-adapters.ts";
 import { diffStoredScreenshots, resolvePixelThreshold } from "./diff-record.ts";
 

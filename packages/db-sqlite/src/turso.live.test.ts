@@ -22,7 +22,7 @@ import type { Project } from "@storyshelf/core/schema";
 import { databaseQueueMultiInstanceSuite } from "@storyshelf/core/test-helpers";
 import { sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { schema } from "./schema/index.ts";
 import { createTursoDatabase } from "./turso.ts";
 

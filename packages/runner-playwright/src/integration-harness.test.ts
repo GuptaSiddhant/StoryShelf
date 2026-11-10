@@ -1,5 +1,5 @@
 import type { createShelfApp } from "@storyshelf/app";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { waitForAttemptFinished } from "./integration-harness.ts";
 
 type App = ReturnType<typeof createShelfApp>;

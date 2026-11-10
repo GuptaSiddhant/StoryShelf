@@ -70,7 +70,7 @@ const version = coreVersion();
 run(`node scripts/release-validate.mjs v${version}`); // one shared version
 
 log("packaging check: nub publish -r --dry-run");
-run("nub publish -r --dry-run --no-git-checks");
+run(process.env["RELEASE_PUBLISH_CMD"] ?? "nub publish -r --dry-run --no-git-checks");
 
 if (dryRun) {
   log(`dry run: ${previous} → ${version} in the working tree, nothing committed`);

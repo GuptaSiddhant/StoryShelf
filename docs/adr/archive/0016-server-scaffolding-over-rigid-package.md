@@ -31,8 +31,8 @@ The adapter composition pattern (ADR 0001) already supports this: `createShelfAp
 import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createLocalStorage } from "@storyshelf/storage-local";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createLocalStorage } from "@storyshelf/storage-local";
 
 const database = createSqliteDatabase("./data/shelf.db");
 const storage = createLocalStorage("./data");
@@ -60,22 +60,24 @@ $ storyshelf server init
 
 ## Alternatives considered
 
-| Approach | Why rejected |
-|----------|--------------|
-| Config-driven server | Combinatorial explosion; conditional imports obscure dependencies |
-| Multiple server packages | Maintenance burden scales with adapter count |
-| Framework switch (oclif/inquirer) | Rewrite existing commands for marginal benefit |
-| Recipe docs only | No "one command" convenience; users still copy-paste |
+| Approach                          | Why rejected                                                      |
+| --------------------------------- | ----------------------------------------------------------------- |
+| Config-driven server              | Combinatorial explosion; conditional imports obscure dependencies |
+| Multiple server packages          | Maintenance burden scales with adapter count                      |
+| Framework switch (oclif/inquirer) | Rewrite existing commands for marginal benefit                    |
+| Recipe docs only                  | No "one command" convenience; users still copy-paste              |
 
 ## Consequences
 
 **Positive:**
+
 - Users own their server file — modify freely, no package upgrade friction
 - New adapters don't require server package changes
 - CLI scaffolds correct imports + package.json deps automatically
 - Existing commands (`init`, `upload`, `retry`, `purge`) unaffected
 
 **Negative:**
+
 - Two dependencies in CLI (commander + prompts) instead of one
 - Users must run `npm install` after scaffolding
 - Templates need maintenance as new adapters are added

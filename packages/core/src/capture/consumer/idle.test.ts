@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { idleDelayMs, isFastEmptyPoll, MIN_BLOCKING_POLL_MS } from "./idle.ts";
 
 describe("idle backoff", () => {

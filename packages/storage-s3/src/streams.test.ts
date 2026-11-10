@@ -6,7 +6,7 @@ import {
   type S3Client,
 } from "@aws-sdk/client-s3";
 import { Readable } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createS3Storage } from "./index.ts";
 
 /** A fake S3 response handler keyed by the command constructor name. */

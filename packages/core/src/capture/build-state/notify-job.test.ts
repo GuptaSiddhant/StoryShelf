@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { StateNotifierProvider } from "../../adapters/notifier/provider.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { rig, stubLogger } from "../consumer/test-fixtures.ts";

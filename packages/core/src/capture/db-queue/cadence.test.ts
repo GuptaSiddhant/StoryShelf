@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ACTIVE_POLL_MS,
   ACTIVE_WINDOW_MS,

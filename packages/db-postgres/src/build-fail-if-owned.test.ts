@@ -1,5 +1,5 @@
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createPgliteDatabase } from "./pglite.ts";
 
 describe("BuildModel.failIfOwnedBy on Postgres", () => {

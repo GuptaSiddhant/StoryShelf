@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vite-plus/test";
 import { baseAuthTables } from "./auth-tables.ts";
 import { ENGINE_PROVIDER_ID, createShelfAuth, type ShelfAuth } from "./engine.ts";
 import { githubPreset } from "./presets/index.ts";

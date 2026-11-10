@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { Baseline, Build, Snapshot } from "../schema/index.ts";
 import { resolveBaselineOrigin, type BaselineOriginReader } from "./baseline-origin.ts";
 

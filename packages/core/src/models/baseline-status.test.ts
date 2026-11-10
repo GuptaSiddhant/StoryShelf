@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { Baseline } from "../schema/baseline.ts";
 import { baselineStatus, isBaselineDrifted, NO_BASELINE } from "./baseline-status.ts";
 

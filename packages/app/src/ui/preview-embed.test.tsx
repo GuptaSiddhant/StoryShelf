@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { clientScript } from "../shell/client-script.ts";
 import { PREVIEW_SANDBOX, PreviewEmbed } from "./preview-embed.tsx";
 

@@ -8,7 +8,7 @@ import { maxPageConcurrency, recommendedPageConcurrency } from "@storyshelf/core
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { activeRuns } from "./browser.ts";
 import {
   createPlaywrightCaptureRunner,

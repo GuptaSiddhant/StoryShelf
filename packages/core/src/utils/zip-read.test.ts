@@ -1,5 +1,5 @@
 import AdmZip from "adm-zip";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { isUnsafeEntryName, readZip, ZipFormatError, type ZipReadLimits } from "./zip-read.ts";
 import { zipStream } from "./zip-write.ts";
 

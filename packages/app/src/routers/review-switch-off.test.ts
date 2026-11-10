@@ -2,7 +2,7 @@ import { BuildModel, CaptureAttemptModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import { createTestBuild, createTestProject, makeDatabase } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const requested = vi.hoisted(() => [] as string[]);
 const store = vi.hoisted(() => ({ current: null as unknown }));

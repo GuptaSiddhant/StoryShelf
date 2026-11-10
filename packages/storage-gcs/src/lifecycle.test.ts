@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createGcsStorage } from "./index.ts";
 
 function makeGcsClient(): { client: unknown; calls: string[] } {

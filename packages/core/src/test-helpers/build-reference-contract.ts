@@ -1,5 +1,5 @@
 /** Shared lifecycle conformance tests. Each fixture must use independent connections. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ReferenceGenerationConflict,
   type BuildReferenceLifecycle,

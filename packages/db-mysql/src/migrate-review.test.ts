@@ -4,7 +4,7 @@
  * adds nothing, and a table or column made by hand fails with its table and column named. The
  * same upgrade on a real server is `migrate-review.live.test.ts` (gated).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { runMigrations } from "./migrate.ts";
 
 const REVIEW_COLUMNS = [

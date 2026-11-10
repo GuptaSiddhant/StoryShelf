@@ -13,7 +13,7 @@
  */
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { createAzureStorage } from "./index.ts";
 
 const LIVE = process.env["LIVE_CLOUD"] === "1";

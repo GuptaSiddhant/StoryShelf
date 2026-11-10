@@ -11,8 +11,8 @@ Storybook stories can carry a `play` function — `play: async ({canvasElement})
 Users asked for StoryShelf to **be the CI gate** for interaction tests so they can drop separate `storybook test`/`vitest` runs. Requirements consolidated over design iterations:
 
 1. `play` failure must **block** the build (`failed`) — no reviewer waive in the build review UI.
-2. A *flaky* story must **not** block — `tags: ['flaky-test']` (case-insensitive, whole-story) or `parameters.flakyTest: true` (both `chromatic` and `storyshelf` keys, `storyshelf` wins) marks the whole story non-blocking; failures show warnings + GitHub success-with-warning comment.
-3. `disableSnapshot: true` (same dual-key) *just disables* — skip capture + play, not counted, no `failed`.
+2. A _flaky_ story must **not** block — `tags: ['flaky-test']` (case-insensitive, whole-story) or `parameters.flakyTest: true` (both `chromatic` and `storyshelf` keys, `storyshelf` wins) marks the whole story non-blocking; failures show warnings + GitHub success-with-warning comment.
+3. `disableSnapshot: true` (same dual-key) _just disables_ — skip capture + play, not counted, no `failed`.
 4. `storeStoriesJson`/`buildStoriesJson` must not require `.storybook/main.ts` edits — CLI should inject `STORYBOOK_BUILD_STORIES_JSON=true` when it builds.
 5. Interaction testing is **opt-in per project** — a project setting feature flag, default `false` (existing 500ms behaviour preserved).
 
@@ -25,9 +25,10 @@ Add `projects.execute_play boolean DEFAULT 0` and `play_timeout_ms integer DEFAU
 - `executePlay === false` (default): runner ignores `play`, keeps `waitForTimeout(500)` + `networkidle`.
 - `executePlay === true`: runner executes `play` for each story before screenshot.
 
-Exposed in the project settings UI as a new **Tests** tab (`GET/POST /projects/:slug/settings/tests`, `pages/settings-tests.tsx`), gated by `isAdmin`, between *General* and *Labels*. Shows:
-- checkbox *Enable interaction tests (play)* (default off, hint explains blocking behaviour)
-- number *Play timeout (ms)* (1000-30000, default 10000)
+Exposed in the project settings UI as a new **Tests** tab (`GET/POST /projects/:slug/settings/tests`, `pages/settings-tests.tsx`), gated by `isAdmin`, between _General_ and _Labels_. Shows:
+
+- checkbox _Enable interaction tests (play)_ (default off, hint explains blocking behaviour)
+- number _Play timeout (ms)_ (1000-30000, default 10000)
 - read-only doc block for `flaky-test` tag and `flakyTest`/`disableSnapshot` via `parameters`.
 
 Project-scoped; global `ShelfConfig.viewports` stays the default for viewports.
@@ -40,7 +41,7 @@ Project-scoped; global `ShelfConfig.viewports` stays the default for viewports.
 
 Flaky detection: `isFlaky = tags?.some(t => t.toLowerCase() === 'flaky-test') || merged?.flakyTest === true`. Whole-story, case-insensitive, no custom tag name (single `flaky-test`).
 
-`orchestrator` filters `disableSnapshot` *before* render; `flaky` stories are still rendered.
+`orchestrator` filters `disableSnapshot` _before_ render; `flaky` stories are still rendered.
 
 ### 3. `storeStoriesJson` injection
 
@@ -63,24 +64,26 @@ Per review, UI waive is not a good use of resources — flaky should be marked `
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|-------------|--------------|
-| Full `parameters.chromatic` passthrough (modes/themes per story) | Scope creep; modes/themes deferred. Per-story **viewports** shipped separately (issue #82): `parameters.viewport` default resolves against the built-in MINIMAL_VIEWPORTS, captured in addition to the project's global list (union, deduped by name) |
-| Custom `flaky` tag name per project | Unneeded complexity; single `flaky-test` (case-insensitive) covers both `chromatic` and `storyshelf` users |
-| Per-viewport flaky (one viewport flaky, one blocking) | Tags are story-level; viewport-level would require `parameters` per viewport, deferred |
-| Host externally-generated JUnit/coverage reports | Orthogonal report-hub feature; interaction testing is the higher-leverage complement to visual diff |
-| Execute `play` unconditionally (no opt-in) | Would break existing builds that have `play` for dev-only interaction tests not intended to block |
-| Keep `play` out of the visual diff baseline (separate test report table) | Adds new table + retention; visual diff after `play` is the desired baseline for most teams |
-| Derive `parameters` only from `index.json` | SB 8 `index.json` omits `parameters`; would silently ignore `disableSnapshot`/`flakyTest` |
+| Alternative                                                              | Why rejected                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full `parameters.chromatic` passthrough (modes/themes per story)         | Scope creep; modes/themes deferred. Per-story **viewports** shipped separately (issue #82): `parameters.viewport` default resolves against the built-in MINIMAL_VIEWPORTS, captured in addition to the project's global list (union, deduped by name) |
+| Custom `flaky` tag name per project                                      | Unneeded complexity; single `flaky-test` (case-insensitive) covers both `chromatic` and `storyshelf` users                                                                                                                                            |
+| Per-viewport flaky (one viewport flaky, one blocking)                    | Tags are story-level; viewport-level would require `parameters` per viewport, deferred                                                                                                                                                                |
+| Host externally-generated JUnit/coverage reports                         | Orthogonal report-hub feature; interaction testing is the higher-leverage complement to visual diff                                                                                                                                                   |
+| Execute `play` unconditionally (no opt-in)                               | Would break existing builds that have `play` for dev-only interaction tests not intended to block                                                                                                                                                     |
+| Keep `play` out of the visual diff baseline (separate test report table) | Adds new table + retention; visual diff after `play` is the desired baseline for most teams                                                                                                                                                           |
+| Derive `parameters` only from `index.json`                               | SB 8 `index.json` omits `parameters`; would silently ignore `disableSnapshot`/`flakyTest`                                                                                                                                                             |
 
 ## Consequences
 
 **Positive:**
+
 - One gate for visual + interaction: users can drop separate `storybook test` CI.
 - Migration is zero-touch for Chromatic users (`chromatic` key still works) and for new users (`storyshelf` key).
 - Opt-in preserves existing `500ms` behaviour; no file patches.
 
 **Negative:**
+
 - One extra project migration (`execute_play`, `play_timeout_ms`) needed for `db-sqlite`/`db-turso`.
 - Runtime `page.evaluate` fallback adds ~1 evaluate **per run** (cached, not per story) when `stories.json`/`index.json` carries no parameters — negligible but an extra round-trip.
 - Flaky stories still charge capture time + storage (unlike `disableSnapshot`).

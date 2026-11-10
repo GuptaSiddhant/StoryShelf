@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import { PER_CAPTURE_BUDGET_MS } from "../utils/storybook-token.ts";
 import { enrichStories } from "./enrich.ts";

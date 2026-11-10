@@ -2,7 +2,7 @@ import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { createPuppeteerCaptureRunner } from "./capture-runner.ts";
 import { cdp } from "./remote/cdp.ts";
 import { createStaticServer, type StaticServer } from "./static-server.ts";

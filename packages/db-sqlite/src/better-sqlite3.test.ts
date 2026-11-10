@@ -5,7 +5,7 @@ import Database from "better-sqlite3";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createBetterSqlite3Database } from "./better-sqlite3.ts";
 import { schema } from "./schema/index.ts";
 

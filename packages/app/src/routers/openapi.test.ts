@@ -3,7 +3,7 @@ import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { stubTables } from "@storyshelf/core/test-helpers";
 import { readFileSync } from "node:fs";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 
 const silentLogger = pino({ level: "silent" });

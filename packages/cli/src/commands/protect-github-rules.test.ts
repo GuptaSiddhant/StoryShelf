@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { compareRules, requiredByRules, rulesetName } from "./protect-github-rules.ts";
 
 const ctx = { repo: "acme/widgets", fetchImpl: fetch, headers: {} };

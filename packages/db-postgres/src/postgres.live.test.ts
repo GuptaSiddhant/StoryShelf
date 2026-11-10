@@ -21,7 +21,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { databaseQueueMultiInstanceSuite } from "@storyshelf/core/test-helpers";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { createPostgresDatabase } from "./index.ts";
 import { projects, type Project } from "./schema/index.ts";
 

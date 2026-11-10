@@ -1,5 +1,5 @@
 // oxlint-disable typescript/no-deprecated -- this file exists to cover the deprecated alias
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { configureDiffPool, diffImagesAsync, shutdownDiffPool } from "./index.ts";
 
 afterEach(async () => {

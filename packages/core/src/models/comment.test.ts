@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { CommentModel } from "./comment.ts";

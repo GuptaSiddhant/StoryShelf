@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { Baseline } from "../schema/baseline.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { BASELINE_ARCHIVE_LIMITS, BaselineArchiveError } from "./baseline-archive.ts";

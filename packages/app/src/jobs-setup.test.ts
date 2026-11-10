@@ -11,7 +11,7 @@ import {
   makeDatabase,
   makeStorage,
 } from "@storyshelf/core/test-helpers";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { z } from "zod";
 import { setupJobs } from "./jobs-setup.ts";
 import { resolveRuntime } from "./runtime.ts";

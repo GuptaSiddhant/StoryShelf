@@ -1,5 +1,5 @@
 import { PNG } from "pngjs";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { CaptureEnvironment, RenderedSnapshot } from "../adapters/capture-runner.ts";
 import { ReferenceGenerationConflict, type BuildReferenceLifecycle } from "../adapters/database.ts";
 import { BaselineWriteConflict } from "../models/baseline-conflict.ts";

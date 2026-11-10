@@ -60,8 +60,8 @@ All providers speak the standard Postgres wire protocol. Pick the connection str
 When `client` is supplied, all other connection options are ignored and the caller owns the client lifecycle. Use this for IAM token refresh or pre-configured TLS:
 
 ```ts
-import postgres from "postgres";
 import { createPostgresDatabase } from "@storyshelf/db-postgres";
+import postgres from "postgres";
 
 // Example: IAM — fetch a fresh token before connecting (RDS, Azure Entra ID, etc.)
 const client = postgres(process.env.DATABASE_URL!, {

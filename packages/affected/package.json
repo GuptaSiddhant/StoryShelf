@@ -44,22 +44,19 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown -w",
-    "fmt": "oxfmt ./src",
-    "lint": "oxlint --type-aware --type-check ./src",
-    "test": "vitest run",
+    "build": "vp pack",
+    "dev": "vp pack -w",
+    "fmt": "vp fmt ./src",
+    "lint": "vp lint --type-aware --type-check ./src",
+    "test": "vp test run",
     "prepublishOnly": "nub run build"
   },
   "dependencies": {},
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {

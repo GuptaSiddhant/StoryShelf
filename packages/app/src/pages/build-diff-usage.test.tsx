@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { upstreamPreviewUrl, type LinkedUsageItem } from "./build-diff-usage.tsx";
 
 const item: LinkedUsageItem = {

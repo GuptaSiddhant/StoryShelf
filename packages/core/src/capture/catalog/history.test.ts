@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { BuildComponent } from "../../schema/build-component.ts";
 import type { Build } from "../../schema/build.ts";
 import { catalogPresence, componentBuildHistory } from "./history.ts";

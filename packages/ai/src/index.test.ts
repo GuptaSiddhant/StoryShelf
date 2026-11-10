@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createAi } from "./index.ts";
 import { unsupportedModels } from "./lifecycle.ts";
 import { TRIAGE_JSON, mockModel } from "./test-support.ts";

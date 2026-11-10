@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { verifyLocalTargets } from "./availability.ts";
 import { flattenBrowsers, local } from "./targets.ts";
 

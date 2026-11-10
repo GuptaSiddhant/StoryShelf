@@ -1,6 +1,6 @@
 import type { Build } from "@storyshelf/core/schema";
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { BaselineReference } from "../routers/baseline-reference.ts";
 import { CompareStage } from "../ui/components.tsx";
 import type { DesignSource } from "./build-diff-model.ts";

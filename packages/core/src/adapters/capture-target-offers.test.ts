@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createTargetOffers } from "./capture-target-offers.ts";
 import { TargetLaunchError, type RunnerTarget } from "./capture-target.ts";
 

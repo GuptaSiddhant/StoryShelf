@@ -1,7 +1,7 @@
 /** `projects.run_a11y` (on by default) and `snapshots.a11y_violations` on embedded Postgres (PGlite). */
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { ProjectModel, SnapshotModel } from "@storyshelf/core/models";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { createPgliteDatabase } from "./pglite.ts";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });

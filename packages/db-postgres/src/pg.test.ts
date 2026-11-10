@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createPgDatabase } from "./pg.ts";
 
 /** Recording stand-in for a `pg` pool (migrate/ping/close delegation only). */

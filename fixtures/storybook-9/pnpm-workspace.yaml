@@ -1,0 +1,3 @@
+# Isolates this fixture from the root workspace; pnpm 12 fails an install with unreviewed build scripts.
+allowBuilds:
+  esbuild: false

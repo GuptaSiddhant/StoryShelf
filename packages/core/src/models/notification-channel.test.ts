@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import type { NotifierProvider } from "../adapters/notifier/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";

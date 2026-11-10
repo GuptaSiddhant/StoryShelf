@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 // A fake postgres.js: records how the adapter opens a connection from a URL, never connects.
 const postgresMock = vi.hoisted(() =>

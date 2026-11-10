@@ -1,5 +1,5 @@
 import { PNG } from "pngjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { downscalePng } from "./downscale.ts";
 
 function png(width: number, height: number): Uint8Array {

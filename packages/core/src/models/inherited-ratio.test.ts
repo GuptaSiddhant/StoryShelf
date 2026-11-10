@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { averageInheritedRatio } from "./inherited-ratio.ts";
 
 const build = (createdAt: string, snapshotCount: number, inheritedCount: number) => ({

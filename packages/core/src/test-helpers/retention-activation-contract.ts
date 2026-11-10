@@ -5,7 +5,7 @@
  * and the pause cases behave the same in every dialect. Each harness works on its own fresh
  * database holding project `p` and two available builds, `one` and `two`.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { BuildReferenceLifecycle, RetentionPause } from "../adapters/database.ts";
 
 /** A baseline row the suite seeds; the harness fills the other columns with valid defaults. */

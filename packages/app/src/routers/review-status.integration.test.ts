@@ -1,7 +1,7 @@
 import type { Build, Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 

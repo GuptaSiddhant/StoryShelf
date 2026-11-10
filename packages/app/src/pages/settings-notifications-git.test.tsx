@@ -1,6 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import { Hono } from "hono";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { runWithStore, type Store } from "../store.ts";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
 

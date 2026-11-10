@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { startAttempt } from "./remote-lease-attempt.ts";
 import { onRemoteShutdown, shutdownRemote } from "./remote-lease-shutdown.ts";
 

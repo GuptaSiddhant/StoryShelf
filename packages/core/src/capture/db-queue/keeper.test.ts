@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { LeaseRenewal, PollableJob } from "../../adapters/capture-queue.ts";
 import { createManualClock } from "../../test-helpers/manual-clock.ts";
 import { CANCEL_CHECK_MS } from "./cadence.ts";

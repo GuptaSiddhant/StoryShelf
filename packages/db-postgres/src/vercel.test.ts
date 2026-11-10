@@ -1,5 +1,5 @@
 import type { VercelClient } from "@vercel/postgres";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createVercelDatabase } from "./vercel.ts";
 
 function createRecordingClient() {

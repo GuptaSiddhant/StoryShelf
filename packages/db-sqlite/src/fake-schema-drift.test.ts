@@ -1,6 +1,6 @@
 import { makeDatabase } from "@storyshelf/core/test-helpers";
 import { getTableColumns, getTableName, type Table } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { schema } from "./schema/index.ts";
 
 /**

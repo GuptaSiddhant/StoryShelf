@@ -5,7 +5,7 @@ import AdmZip from "adm-zip";
 import { execFile, type ExecException } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { expect } from "vitest";
+import { expect } from "vite-plus/test";
 
 const FIXTURE_DIR = process.env["FIXTURE_DIR"]
   ? resolve(process.env["FIXTURE_DIR"])

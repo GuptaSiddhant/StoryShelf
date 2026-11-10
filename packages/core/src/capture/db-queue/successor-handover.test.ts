@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { DatabaseAdapter, TxStore } from "../../adapters/database.ts";
 import { BuildModel } from "../../models/build.ts";
 import { attemptRowId, CaptureJobModel } from "../../models/capture-job.ts";

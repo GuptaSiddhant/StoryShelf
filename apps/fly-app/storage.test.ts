@@ -1,6 +1,6 @@
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { makeStorage } from "@storyshelf/core/test-helpers";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { storageFromEnv, type StorageFactories } from "./storage.ts";
 
 function factories() {

@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/core/test-helpers";
 import { createHmac } from "node:crypto";
 import { pino } from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { z } from "zod";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";

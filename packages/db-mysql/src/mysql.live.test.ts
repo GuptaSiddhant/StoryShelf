@@ -17,7 +17,7 @@ import type { Project } from "@storyshelf/core/schema";
 import { databaseQueueMultiInstanceSuite } from "@storyshelf/core/test-helpers";
 import { getTableColumns, ne, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { createMysqlDatabase } from "./index.ts";
 import { schema } from "./schema/index.ts";
 

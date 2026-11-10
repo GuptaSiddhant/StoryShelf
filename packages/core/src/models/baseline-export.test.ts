@@ -1,5 +1,5 @@
 import AdmZip from "adm-zip";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { Baseline } from "../schema/baseline.ts";
 import { makeStorage } from "../test-helpers/fake-adapters.ts";
 import {

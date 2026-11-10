@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { normalizeImportPath, resolveDesigns } from "./design-resolve.ts";
 
 const A = "https://www.figma.com/design/AAA/Kit?node-id=1-2";

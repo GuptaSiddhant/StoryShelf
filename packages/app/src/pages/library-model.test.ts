@@ -1,6 +1,6 @@
 import type { CatalogEntry } from "@storyshelf/core/capture";
 import type { Snapshot } from "@storyshelf/core/schema";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { entriesFromSnapshots, groupLibrary } from "./library-model.ts";
 
 function entry(id: string, overrides: Partial<CatalogEntry> = {}): CatalogEntry {

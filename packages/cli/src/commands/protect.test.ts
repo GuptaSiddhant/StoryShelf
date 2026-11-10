@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Fetch } from "./protect-types.ts";
 import { runProtect, requiredChecks, type ProtectOptions } from "./protect.ts";
 

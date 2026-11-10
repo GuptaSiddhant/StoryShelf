@@ -2,7 +2,7 @@ import type { TestResult } from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 import { testsSummaryNote } from "./build-tests.tsx";

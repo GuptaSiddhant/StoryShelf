@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
 import { TargetLaunchError } from "../adapters/capture-target.ts";
 import type { Build } from "../schema/build.ts";

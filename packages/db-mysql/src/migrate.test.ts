@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { DDL } from "./ddl.ts";
 import { FOREIGN_KEYS } from "./foreign-keys.ts";
 import { runMigrations } from "./migrate.ts";

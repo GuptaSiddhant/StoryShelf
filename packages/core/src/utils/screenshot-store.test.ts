@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { makeStorage } from "../test-helpers/fake-adapters.ts";
 import { contentDir, contentPath, isContentPath } from "./paths.ts";
 import { storeScreenshot } from "./screenshot-store.ts";

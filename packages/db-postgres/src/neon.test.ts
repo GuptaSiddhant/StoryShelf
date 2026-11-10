@@ -1,5 +1,5 @@
 import type { Pool } from "@neondatabase/serverless";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createNeonDatabase } from "./neon.ts";
 
 /** Recording stand-in for a Neon pool (migrate/ping/close delegation only). */

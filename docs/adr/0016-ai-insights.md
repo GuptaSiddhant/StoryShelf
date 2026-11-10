@@ -87,7 +87,7 @@ createAi({
 ```
 
 - `type ModelSlot = LanguageModel | { model: LanguageModel; maxTokens?: number; vision?: boolean;
-timeoutMs?: number; providerOptions?: ProviderOptions }`. A bare instance takes task defaults (triage
+  timeoutMs?: number; providerOptions?: ProviderOptions }`. A bare instance takes task defaults (triage
   about 1500 tokens, health about 4000); the object form overrides. Slot keys are closed:
   `{ triage?, vision?, health? }`. `triage` and `health` are the two tasks; `vision` is a modality slot
   used by `triage` when images are sent. An omitted slot falls back to the profile's `defaultModel`.
@@ -147,8 +147,8 @@ Both scopes run over a shared pipeline with deterministic evidence limits (defau
   prefixes (`sk-`, `ghp_`, `AKIA`, `xox`) and long base64/hex runs. Unmatched content is not assumed
   safe; evidence excludes environment dumps and request headers by construction.
 - **Result envelope** (zod, in core): `{ verdict: "likely-intended" | "needs-review" |
-"likely-regression", summary, items: { snapshotKey, note, severity }[], confidence: "low" | "medium" |
-"high" }`; health adds `{ score, trends[] }`. It is stored as an opaque validated text column, never
+  "likely-regression", summary, items: { snapshotKey, note, severity }[], confidence: "low" | "medium" |
+  "high" }`; health adds `{ score, trends[] }`. It is stored as an opaque validated text column, never
   queried.
 - The evidence builder is pure: it receives already-loaded inputs (rows, log text, PNG buffers), and the
   handler layer loads them from the database and storage.

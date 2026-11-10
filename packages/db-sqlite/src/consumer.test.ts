@@ -2,7 +2,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createCaptureConsumer, createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 
 const silent = createShelfLogger({ level: "silent" });

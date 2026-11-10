@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { loadCodec } from "./codecs.ts";
 import { codecFixtures } from "./test-fixtures.ts";
 

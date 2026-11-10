@@ -1,6 +1,6 @@
 import { MemberModel, ProjectGroupMappingModel, UserModel } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { syncLoginMemberships } from "./auth-sync.ts";
 
 async function seedProject(db: ReturnType<typeof makeDatabase>["db"], id = "p1"): Promise<void> {

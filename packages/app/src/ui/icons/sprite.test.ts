@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { ICON_PATHS } from "./paths.ts";
 import { buildSprite, contentHash, iconHref, iconSpriteHref } from "./sprite.ts";
 

@@ -1,6 +1,6 @@
 /** Buffered CRUD and listing tests for Azure Blob storage. */
 import { Readable } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createAzureStorage } from "./index.ts";
 
 interface BlobState {

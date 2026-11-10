@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { baseStyle } from "../styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "../theme.ts";
 

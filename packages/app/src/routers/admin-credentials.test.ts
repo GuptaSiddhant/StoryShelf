@@ -1,7 +1,7 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { WebhookModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { checkCredentialsAtBoot } from "../credentials.ts";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";

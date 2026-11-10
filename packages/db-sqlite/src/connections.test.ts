@@ -1,6 +1,6 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { ConnectionModel } from "@storyshelf/core/models";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 
 const NOW = "2026-01-01T00:00:00.000Z";

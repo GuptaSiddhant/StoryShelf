@@ -1,6 +1,6 @@
 import { getTableColumns, type Table } from "@storyshelf/core/orm";
 import { DDL, tableColumns } from "@storyshelf/db-sqlite/ddl";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { baseAuthTables } from "./auth-tables.ts";
 
 /**

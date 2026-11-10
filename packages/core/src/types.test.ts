@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { readSessionCookie, SECURE_SESSION_COOKIE, SESSION_COOKIE } from "./types.ts";
 
 describe("readSessionCookie", () => {

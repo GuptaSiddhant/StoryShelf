@@ -361,7 +361,7 @@ new layout and fixed Dockerfiles.
   `docker:run` scripts instead.
 - Fixes: the generated Docker images could not run. They bundled the server
   with esbuild into one ESM file, which crashes at startup (`Dynamic require of
-"util" is not supported` from a CommonJS dependency) and cannot find the
+  "util" is not supported` from a CommonJS dependency) and cannot find the
   vendored assets `@storyshelf/app` reads from disk; the `CMD` also pointed at
   a path the bundle was never copied to, and the build copied a `playwright`
   package that is never installed. Images now install production dependencies
@@ -706,7 +706,7 @@ and the sqlite/postgres/mysql adapter preset families.
 
 - oxfmt/oxlint pre-commit hooks with conventional-commit gate.
 - LICENSE (MIT) + npm/JSR keywords on publishable packages; `primary export
-first` lint enforced; dense router/core modules broken down into helpers.
+  first` lint enforced; dense router/core modules broken down into helpers.
 - Topological publish order derived from manifests; GitHub Release split into
   its own job; OIDC check runs early.
 

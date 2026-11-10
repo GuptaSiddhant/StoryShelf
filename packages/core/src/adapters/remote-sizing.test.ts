@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { defineRemote, type RemoteOptions } from "./remote-browser.ts";
 import { UNVERIFIED_NOTE, logRemoteSizing, remoteSizingOf } from "./remote-sizing.ts";
 

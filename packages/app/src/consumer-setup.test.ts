@@ -1,6 +1,6 @@
 import type { CaptureConsumer } from "@storyshelf/core/capture";
 import { captureMetrics } from "@storyshelf/observability";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
 
 function fake(): CaptureConsumer & {

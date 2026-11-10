@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 /** `@storyshelf/image` is a leaf: core depends on it, so it must never depend back (no cycles). */
 const SCOPE = ["@story", "shelf/"].join("");

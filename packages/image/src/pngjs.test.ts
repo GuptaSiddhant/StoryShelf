@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { pngjsCodec } from "./pngjs.ts";
 
 function rgba(width: number, height: number): Uint8Array {

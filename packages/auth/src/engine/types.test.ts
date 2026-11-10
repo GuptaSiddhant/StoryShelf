@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import * as engine from "../engine.ts";
 import * as pkg from "../index.ts";
 import { ENGINE_PROVIDER_ID } from "./types.ts";

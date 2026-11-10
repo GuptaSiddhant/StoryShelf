@@ -12,7 +12,7 @@
  * The instances share one manual clock, and every case uses its own build id, so a shared live
  * database needs no cleanup between runs.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import {
   createDatabaseCaptureQueue,

@@ -1,6 +1,6 @@
 import { SpanStatusCode } from "@opentelemetry/api";
 import { HttpError } from "@storyshelf/core/utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 import { withSpan } from "./tracing.ts";
 

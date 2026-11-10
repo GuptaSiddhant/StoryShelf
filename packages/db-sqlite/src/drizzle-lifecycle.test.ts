@@ -1,6 +1,6 @@
 import type { DrizzleAdapterOptions } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { buildLifecycle } from "./drizzle-lifecycle.ts";
 
 const logger = createShelfLogger({ level: "silent" });

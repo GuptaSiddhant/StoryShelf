@@ -21,7 +21,7 @@ import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vite-plus/test";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
 import { createPostgresDatabase } from "./index.ts";
 import { createPgliteDatabase } from "./pglite.ts";

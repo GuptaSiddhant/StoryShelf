@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Plugin } from "rolldown";
-import type { UserConfig } from "tsdown";
+import type { UserConfig } from "vite-plus/pack";
 
 const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w");
 

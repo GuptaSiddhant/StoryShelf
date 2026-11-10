@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ReviewThread } from "./review-comment.ts";
 import { upsertReviewComment } from "./review-comment.ts";
 

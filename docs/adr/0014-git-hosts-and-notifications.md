@@ -111,7 +111,7 @@ the statuses and the pull-request comment. Its details:
   otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
   A build past capture (`reviewing`, `approved`, `rejected`) with no manifest and no open `publish`
   job (queued, running or exhausting) has lost its content: `failure`, `Storybook content
-unavailable, see build page` (informational, `neutral` on check runs; the page says to re-upload or
+  unavailable, see build page` (informational, `neutral` on check runs; the page says to re-upload or
   purge). While such a job is open it stays `pending`, since capture can finish first. Every end of
   a publish job requests the state again once its row is written (the queue's `onEnded` hook).
 - A build without a commit SHA, or with a synthetic local identity, shows nothing.

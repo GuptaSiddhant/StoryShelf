@@ -126,7 +126,7 @@ covers the whole build.
 - **A plan replaces earlier plans:** it drops the build's earlier snapshots and cancels attempts
   an earlier plan left open, using the same affected-stories rule as an unsharded build.
 - **A shard cleans only its own output:** it deletes only the rendered rows of the `(story,
-target)` pairs it is about to write.
+  target)` pairs it is about to write.
 - **Completion is a reducer, by unique-claim insert:** the last shard inserts `<build>:finalize`
   and the single winner finalizes. A redelivered `done` shard still reduces while the build is
   `capturing`; a throwing finalize releases its claim for redelivery and fails on the last attempt;

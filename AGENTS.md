@@ -130,7 +130,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
   `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
   `/_s/` or widen what a token grants. Only `signedCacheControl` (`packages/app/src/routers/
-capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
+  capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
   manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
   by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
   never let a runner set response headers.

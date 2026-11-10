@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { activeRuns, cancelRuns, finishing, messageOf, outcomeOf, trackRun } from "./browser.ts";
 
 describe("outcomeOf", () => {

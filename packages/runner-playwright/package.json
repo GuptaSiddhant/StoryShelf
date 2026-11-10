@@ -49,14 +49,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown -w",
-    "fmt": "oxfmt ./src",
-    "lint": "oxlint --type-aware --type-check ./src",
-    "test": "vitest run",
-    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts passkey.integration.test.ts remote.integration.test.ts",
+    "build": "vp pack",
+    "dev": "vp pack -w",
+    "fmt": "vp fmt ./src",
+    "lint": "vp lint --type-aware --type-check ./src",
+    "test": "vp test run",
+    "test:integration": "RUN_INTEGRATION=1 vp test run integration.test.ts passkey.integration.test.ts remote.integration.test.ts",
     "prepublishOnly": "nub run build",
-    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts"
+    "test:flake": "vp test run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts"
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",
@@ -71,11 +71,8 @@
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {

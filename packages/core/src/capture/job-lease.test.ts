@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { abortableLease, ProgressLease } from "./job-lease.ts";
 

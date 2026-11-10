@@ -1,5 +1,5 @@
 import { makeDatabase } from "@storyshelf/core/test-helpers";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createJobQueue } from "./job-queue.ts";
 
 function jobsFor(kinds: Parameters<typeof createJobQueue>[1], retries = 2, testing?: object) {

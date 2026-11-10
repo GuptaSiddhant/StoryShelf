@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { contentPath } from "../utils/paths.ts";
 import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts";

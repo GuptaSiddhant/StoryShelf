@@ -2,7 +2,7 @@ import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { inPageWaitSettled, type SettleReport } from "./settle.ts";
 import { DEFAULT_TEST_TIMEOUT_MS, runTestEntries, verdictOf } from "./tests.ts";
 import type { ActiveRun, TargetDriver } from "./types.ts";

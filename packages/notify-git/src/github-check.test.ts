@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { findingsHash } from "./github-check-mapper.ts";
 import { postCheckRun } from "./github-check.ts";
 import { bodyOf, stubFetch } from "./test-fetch.ts";

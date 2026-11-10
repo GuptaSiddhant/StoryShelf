@@ -5,10 +5,9 @@
   "type": "module",
   "scripts": {
     "serve": "nub watch ./src/server.ts",
-    "lint": "oxlint --type-aware --type-check ./src",
-    "fmt": "oxfmt ./src",
-    "build": "nubx tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "lint": "vp lint --type-aware --type-check ./src",
+    "fmt": "vp fmt ./src",
+    "build": "nubx tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
@@ -27,10 +26,8 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   }
 }

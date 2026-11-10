@@ -1,6 +1,6 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { DefaultComparison } from "../routers/baseline-reference.ts";
 import { DefaultComparisonView } from "./build-diff-default.tsx";
 

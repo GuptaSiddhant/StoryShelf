@@ -3,7 +3,7 @@ import { StorybookAdapter } from "@storyshelf/core/capture";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vite-plus/test";
 import { createPuppeteerCaptureRunner } from "./capture-runner.ts";
 
 /**

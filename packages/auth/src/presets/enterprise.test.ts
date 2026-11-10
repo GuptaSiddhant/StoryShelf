@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { auth0Preset, keycloakPreset, oktaPreset } from "./enterprise.ts";
 
 describe("enterprise presets", () => {

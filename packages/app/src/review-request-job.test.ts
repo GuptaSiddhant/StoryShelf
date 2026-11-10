@@ -10,7 +10,7 @@ import {
 } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { notifyProjectWith, type NotifyDeps } from "./notify.ts";
 import { reviewRequestedData } from "./review-events.ts";
 import { createReviewRequestEnqueuer } from "./review-request-data.ts";

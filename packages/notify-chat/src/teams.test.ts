@@ -1,5 +1,5 @@
 import type { Logger } from "@storyshelf/core/logger";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { teamsWorkflowNotifier } from "./teams.ts";
 
 const CHANNEL = {

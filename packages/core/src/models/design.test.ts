@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { InvalidDesignUrlError } from "../adapters/design.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { fakeUrl, makeFakeDesign } from "../test-helpers/fake-design.ts";

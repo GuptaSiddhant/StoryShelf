@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { makeStorage } from "../../test-helpers/fake-adapters.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";

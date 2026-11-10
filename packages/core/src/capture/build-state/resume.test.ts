@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { requestOpenBuildStates, tryRequestOpenBuildStates } from "./resume.ts";
 import { world } from "./test-world.ts";
 

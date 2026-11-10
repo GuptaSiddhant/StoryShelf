@@ -2,7 +2,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { eq } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { pgTable, text } from "drizzle-orm/pg-core";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 
 const widgets = pgTable("widgets", {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { buildIdOf, parseJobData, reviewRequestKey } from "./review-request-data.ts";
 
 const user = { kind: "user", userId: "u1", provider: "email", route: "default" } as const;

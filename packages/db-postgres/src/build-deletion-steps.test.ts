@@ -3,7 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { drizzle } from "drizzle-orm/pglite";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import {
   completeDeletion,
   listDeleting,

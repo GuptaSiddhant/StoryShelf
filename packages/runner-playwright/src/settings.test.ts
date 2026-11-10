@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resolveSettings } from "./settings.ts";
 
 /** The settings for the given environment and options. */

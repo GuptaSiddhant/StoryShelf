@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createJobQueue } from "./job-queue.ts";
 import { setupPublishing } from "./publish-setup.ts";
 

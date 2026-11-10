@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { assertSameBytes, parseRecorded, type RecordedChecksums } from "./htmx-checksums.ts";
 
 const OLD = "a".repeat(64);

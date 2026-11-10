@@ -2,7 +2,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { stubTables } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { assetManifest } from "../asset-manifest.ts";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";

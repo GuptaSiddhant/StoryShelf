@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { defineRemote, remoteTargetsOf, type RemoteOptions } from "./remote-browser.ts";
 import { holdLease, noLease, releaseAllHeld, withDeadline } from "./remote-lease-held.ts";
 

@@ -1,7 +1,7 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 /** `build_components` on embedded Postgres (PGlite): the model over the real table, and the foreign-key cascade. */
 import { BuildComponentModel } from "@storyshelf/core/models";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
 import { createPgliteDatabase } from "./pglite.ts";

@@ -1,7 +1,7 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 /** `builds.review_cycle` and the once-per-cycle claim of a review request, on embedded Postgres (PGlite). */
 import { BuildModel } from "@storyshelf/core/models";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { createPgliteDatabase } from "./pglite.ts";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });

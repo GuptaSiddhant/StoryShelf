@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
 import { createManualClock } from "../../test-helpers/manual-clock.ts";
 import { databaseQueueMultiInstanceSuite } from "../../test-helpers/queue-multi-instance.ts";

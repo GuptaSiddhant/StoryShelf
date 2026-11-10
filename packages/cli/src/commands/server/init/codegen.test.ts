@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { Answers } from "./answers.ts";
 import { generateServer } from "./codegen.ts";
 

@@ -21,7 +21,7 @@ URLs that npm clients cannot depend on durably.
    bump of all pending changesets. `scripts/release-validate.mjs` keeps enforcing it.
 3. **`next` channel, daily** (amended 2026-11-07, see below). A push to `main` that has pending changesets publishes a snapshot
    of every package to npm under the **`next`** dist-tag, versioned `<calculated next
-version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is made in the CI
+   version>-next-<short sha>` (for example `0.9.0-next-3fa9c1d`). The snapshot is made in the CI
    working tree and never committed. npm only. A push without a pending
    changeset publishes nothing, and `latest` is never touched.
 4. **Stable channel, by release pull request.** There is no standing version pull request and no

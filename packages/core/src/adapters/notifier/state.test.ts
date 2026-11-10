@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { makeFakeStateNotifier } from "../../test-helpers/fake-notifier.ts";
 import type { BuildStateSet } from "./build-state.ts";
 import { channelPrefix, writeBuildState } from "./state.ts";

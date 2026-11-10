@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import * as schemas from "./schemas.ts";
 
 /** The names the routers import from `schemas.ts`; the split into `schemas/*` must not change them. */

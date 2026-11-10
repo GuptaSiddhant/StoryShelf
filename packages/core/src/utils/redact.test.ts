@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { redactSecrets, sanitizeErrorText } from "./redact.ts";
 
 describe("redactSecrets", () => {

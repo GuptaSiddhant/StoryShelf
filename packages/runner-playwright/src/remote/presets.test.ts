@@ -1,5 +1,5 @@
 import { remoteTargetsOf, type BrowserName } from "@storyshelf/core/adapter/capture-runner";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { playwrightVersion } from "../version.ts";
 import { azurePlaywright } from "./azure.ts";
 import { browserstack } from "./browserstack.ts";

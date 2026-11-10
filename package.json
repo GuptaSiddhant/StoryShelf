@@ -46,8 +46,6 @@
   },
   "type": "module",
   "scripts": {
-    "build": "turbo build",
-    "build:pkg": "turbo build --filter='./packages/*'",
     "core:build": "nub run --filter @storyshelf/core build",
     "core:dev": "nub run --filter @storyshelf/core dev",
     "cli": "nub run --filter storyshelf start",
@@ -58,12 +56,8 @@
     "deprecate:dry": "nub ./scripts/deprecate-packages.mjs --dry-run",
     "serve": "nub run --filter dev-server serve",
     "storybook": "nub run --filter @storyshelf/app storybook",
-    "fmt": "turbo fmt",
     "hook:install": "git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/commit-msg",
-    "lint": "turbo lint",
-    "test": "turbo test",
-    "audit": "turbo audit",
-    "verify": "turbo verify --filter='./packages/*' --filter='website'",
+    "verify": "vp run -r build && vp run -r build-storybook && vp run -r lint && vp run -r test",
     "clean": "node ./scripts/clean.mjs",
     "clean:cache": "node ./scripts/clean.mjs --cache-only",
     "web:build": "nub run --filter website build",
@@ -80,14 +74,11 @@
   "devDependencies": {
     "axe-core": "^4.13.0",
     "jsdom": "^30.0.1",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
     "pkg-pr-new": "0.0.92",
     "rolldown": "*",
-    "tsdown": "catalog:",
     "turbo": "^2.11.2",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "yaml": "catalog:"
   },
   "overrides": {
@@ -99,9 +90,9 @@
   },
   "devEngines": {
     "packageManager": {
-      "name": "nub",
-      "version": "^0.10.0",
-      "onFail": "ignore"
+      "name": "pnpm",
+      "version": "12.18.0",
+      "onFail": "error"
     },
     "runtime": {
       "name": "node",
@@ -109,6 +100,7 @@
       "onFail": "error"
     }
   },
+  "packageManager": "pnpm@12.18.0",
   "allowScripts": {
     "better-sqlite3": true,
     "protobufjs": false

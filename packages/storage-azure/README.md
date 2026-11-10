@@ -17,8 +17,8 @@ npm install @storyshelf/storage-azure
 ## Quick start
 
 ```ts
-import { createAzureStorage } from "@storyshelf/storage-azure";
 import { createShelfApp } from "@storyshelf/app";
+import { createAzureStorage } from "@storyshelf/storage-azure";
 
 // Via connection string (recommended for local / Azurite)
 const storage = createAzureStorage({

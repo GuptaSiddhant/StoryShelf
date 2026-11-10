@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Answers } from "./answers.ts";
 import { printNextSteps } from "./next-steps.ts";
 

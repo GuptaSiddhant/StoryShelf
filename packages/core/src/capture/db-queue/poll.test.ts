@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
 import { createDatabaseCaptureQueue } from "./index.ts";
 import { attemptRef, MAX_NACK_DELAY_MS } from "./poll.ts";

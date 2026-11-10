@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
 import type { StoryEntry } from "./adapter.ts";
 import { renderIsolating, type PassOutcome } from "./isolate.ts";

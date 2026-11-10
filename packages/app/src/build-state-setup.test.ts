@@ -9,7 +9,7 @@ import {
   makeFakeStateNotifier,
   makeStorage,
 } from "@storyshelf/core/test-helpers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { setupBuildState } from "./build-state-setup.ts";
 import { createJobQueue } from "./job-queue.ts";
 import { resolveRuntime } from "./runtime.ts";

@@ -2,7 +2,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { zipStream, type ZipSource } from "../../utils/zip-write.ts";
 import { extractZipStream } from "./extract.ts";
 import { ZipInvalidError } from "./invalid-zip.ts";

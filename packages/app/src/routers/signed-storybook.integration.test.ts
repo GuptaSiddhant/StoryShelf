@@ -2,7 +2,7 @@ import type { Build, Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { signStorybookToken, storybookDir } from "@storyshelf/core/utils";
 import { pino } from "pino";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 import { stubRunner } from "../test-runner.ts";

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   DEFAULT_MAX_INLINE_UNZIP_SIZE,
   DEFAULT_MAX_UNZIPPED_BYTES,

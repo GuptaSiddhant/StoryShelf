@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createManualClock } from "../../test-helpers/manual-clock.ts";
 import { REAL_TIMERS, repeatEvery } from "./timers.ts";
 

@@ -1,5 +1,5 @@
 import { metrics } from "@opentelemetry/api";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { captureMetrics, dbMetrics, storageMetrics } from "./metrics.ts";
 
 describe("instruments", () => {

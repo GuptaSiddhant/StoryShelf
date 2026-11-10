@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { runMigrations } from "./migrate.ts";
 
 /** Run SQL through PGlite as the shared migration runner does (multi-statement allowed). */

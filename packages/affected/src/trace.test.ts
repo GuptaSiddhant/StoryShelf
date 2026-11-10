@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { buildGraph } from "./stats.ts";
 import { matchesAnyGlob, traceAffected } from "./trace.ts";
 import type { DepGraph } from "./types.ts";

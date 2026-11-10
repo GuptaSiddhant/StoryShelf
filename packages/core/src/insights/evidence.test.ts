@@ -1,5 +1,5 @@
 import { PNG } from "pngjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { buildHealthEvidence } from "./evidence-health.ts";
 import { buildTriageEvidence, type SnapshotEvidence } from "./evidence.ts";
 

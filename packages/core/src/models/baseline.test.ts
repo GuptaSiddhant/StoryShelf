@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { baselinePath, contentPath } from "../utils/paths.ts";
 import { BaselineModel } from "./baseline.ts";

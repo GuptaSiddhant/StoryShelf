@@ -13,7 +13,7 @@ import { BuildModel, BuildReviewModel, deriveReviewStatus } from "@storyshelf/co
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import postgres from "postgres";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { createPostgresDatabase } from "./index.ts";
 
 const LIVE =

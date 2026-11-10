@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createBuildStatePublisher, PAUSED_MESSAGE } from "./publisher.ts";
 import { statusLog, world } from "./test-world.ts";
 

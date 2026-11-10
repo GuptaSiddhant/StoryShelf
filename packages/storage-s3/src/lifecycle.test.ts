@@ -1,7 +1,7 @@
 /** Lifecycle setup/health/teardown tests for S3 storage. */
 import { ListObjectsV2Command, type S3Client } from "@aws-sdk/client-s3";
 import type { AdapterSetupContext } from "@storyshelf/core/adapter/metadata";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createS3Storage } from "./index.ts";
 
 const setupCtx = { config: {} } as unknown as AdapterSetupContext;

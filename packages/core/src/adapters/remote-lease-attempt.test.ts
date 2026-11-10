@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { endAttempt, startAttempt, stopAllAttempts } from "./remote-lease-attempt.ts";
 
 describe("startAttempt", () => {

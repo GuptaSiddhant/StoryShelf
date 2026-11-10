@@ -51,12 +51,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown -w",
-    "fmt": "oxfmt ./src",
-    "lint": "oxlint --type-aware --type-check ./src",
+    "build": "vp pack",
+    "dev": "vp pack -w",
+    "fmt": "vp fmt ./src",
+    "lint": "vp lint --type-aware --type-check ./src",
     "prepublishOnly": "nub run build",
-    "test": "vitest run"
+    "test": "vp test run"
   },
   "dependencies": {
     "@hono/otel": "catalog:",
@@ -77,11 +77,8 @@
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {

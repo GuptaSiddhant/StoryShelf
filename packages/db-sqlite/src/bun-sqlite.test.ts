@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { schema } from "./schema/index.ts";
 
 // Bun-only: `bun:sqlite` cannot load under Node, so the implementation module

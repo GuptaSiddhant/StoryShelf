@@ -1,7 +1,7 @@
 import { TargetLaunchError, remoteTargetsOf } from "@storyshelf/core/adapter/capture-runner";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { connectRemote, reasonOf } from "./connect.ts";
 import { remote } from "./remote/remote.ts";
 import { playwrightVersion } from "./version.ts";

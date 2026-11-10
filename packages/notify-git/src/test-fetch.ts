@@ -1,5 +1,5 @@
 /** Test helpers: a recording `fetch` stub and request-body reader shared by the provider tests. */
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 
 /** One request the stubbed `fetch` saw. */
 export interface FetchCall {

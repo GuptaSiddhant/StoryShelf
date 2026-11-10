@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, type Browser } from "playwright-core";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { screenshotWithRetry } from "./pipeline.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { createStaticServer, type StaticServer } from "./static-server.ts";

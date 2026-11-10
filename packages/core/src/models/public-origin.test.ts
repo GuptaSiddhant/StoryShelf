@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { UserFacingError } from "../utils/user-facing-error.ts";
 import { createPublicOriginResolver, PUBLIC_ORIGIN_KEY } from "./public-origin.ts";

@@ -24,7 +24,7 @@ unset SECRET AUTH_PASSWORD AUTH_VIEWER_PASSWORD STORYSHELF_ADMIN_TOKEN ADMIN_TOK
 export PORT DATA_DIR
 export PATH="$HOME/.nub/bin:$PATH"
 
-nub ./apps/dev-server/src/server.ts >"$LOG" 2>&1 &
+${SMOKE_RUN:-nub} ./apps/dev-server/src/server.ts >"$LOG" 2>&1 &
 pid=$!
 cleanup() {
   code=$?

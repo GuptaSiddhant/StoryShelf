@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { EmailSender } from "@storyshelf/core/adapter/email-sender";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("../invites.ts", () => ({
   issueInvite: vi.fn(),

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createGcsContext, resolveClientOptions } from "./client.ts";
 import { createGcsStorage } from "./index.ts";
 

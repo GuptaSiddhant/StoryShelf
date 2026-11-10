@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
 import { MIN_CAPTURES_PER_SLICE } from "../utils/storybook-token.ts";
 import type { StoryEntry } from "./adapter.ts";

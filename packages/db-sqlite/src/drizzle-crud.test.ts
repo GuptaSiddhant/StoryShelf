@@ -3,7 +3,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
 import { asc, desc, eq, getTableColumns, gt } from "drizzle-orm";
 import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 import { schema } from "./schema/index.ts";
 

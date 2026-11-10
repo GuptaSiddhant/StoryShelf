@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { generateAwsTerraformFiles } from "./terraform-aws.ts";
 import { generateAzureTerraformFiles } from "./terraform-azure.ts";
 import {

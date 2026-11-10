@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { UserModel } from "@storyshelf/core/models";
 import { createPgliteDatabase } from "@storyshelf/db-postgres/pglite";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vite-plus/test";
 import { createShelfAuth, type ShelfAuth } from "./engine.ts";
 
 /**

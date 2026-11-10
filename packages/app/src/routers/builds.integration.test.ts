@@ -6,7 +6,7 @@ import { storybookZipPath } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";
 import { Readable } from "node:stream";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 const silentLogger = pino({ level: "silent" });

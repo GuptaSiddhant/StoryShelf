@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { mentionSpans, resolveMentions, type MentionCandidate } from "./mentions.ts";
 
 const alex: MentionCandidate = { userId: "u-alex", handles: ["alex.doe", "Alex Doe"] };

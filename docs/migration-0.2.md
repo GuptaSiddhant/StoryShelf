@@ -25,14 +25,23 @@ else. Every other value moved to a subpath (new entries: `core/logger`,
 
 ```ts
 // Before
-import { createShelfLogger, executeCaptureJob, InMemoryCaptureQueue, StorybookAdapter } from "@storyshelf/core";
+import {
+  createShelfLogger,
+  executeCaptureJob,
+  InMemoryCaptureQueue,
+  StorybookAdapter,
+} from "@storyshelf/core";
 import type { CaptureQueue } from "@storyshelf/core";
-import type { Logger } from "@storyshelf/core/types";
 // After
 import { createShelfApp } from "@storyshelf/core";
-import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
-import { executeCaptureJob, InMemoryCaptureQueue, StorybookAdapter } from "@storyshelf/core/capture";
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import {
+  executeCaptureJob,
+  InMemoryCaptureQueue,
+  StorybookAdapter,
+} from "@storyshelf/core/capture";
+import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
+import type { Logger } from "@storyshelf/core/types";
 ```
 
 Adapter interfaces (`DatabaseAdapter`, `StorageAdapter`, `CaptureRunner`,
@@ -61,10 +70,10 @@ Only affects consumers importing TypeScript source directly (the `source` export
 condition) via deep paths. Published `dist` consumers are unaffected.
 
 ```ts
-// Before
-import { builds } from "@storyshelf/core/src/schema-tables.ts";
 // After
 import { builds } from "@storyshelf/core/schema/build";
+// Before
+import { builds } from "@storyshelf/core/src/schema-tables.ts";
 ```
 
 ### 4. `findMrIid` host parameter is optional

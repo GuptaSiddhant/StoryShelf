@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 
 const CHILD = fileURLToPath(new URL("test-helpers/queue-claimer-child.ts", import.meta.url));

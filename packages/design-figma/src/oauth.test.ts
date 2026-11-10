@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createFigmaClient } from "./api.ts";
 import { respond, URL_NODE } from "./fixtures.ts";
 import { createFigmaDesign } from "./index.ts";

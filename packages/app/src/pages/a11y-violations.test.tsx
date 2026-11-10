@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   A11yViolationsDetails,
   A11yViolationsNotice,

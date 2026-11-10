@@ -26,13 +26,13 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 
 ## StoryShelf vs Chromatic
 
-| | Chromatic (SaaS) | StoryShelf (self-hosted) |
-|---|---|---|
-| **Pricing** | 5k snapshots free, then $179/mo per 35k | MIT, unlimited; infrastructure cost only |
-| **Hosting** | Chromatic cloud only | Your infrastructure |
-| **Data residency** | US / EU regions | Your database and storage |
-| **Interaction tests** | `play` functions | `play` functions |
-| **Lock-in** | Proprietary | Open source, standard `/api/v1` |
+|                       | Chromatic (SaaS)                        | StoryShelf (self-hosted)                 |
+| --------------------- | --------------------------------------- | ---------------------------------------- |
+| **Pricing**           | 5k snapshots free, then $179/mo per 35k | MIT, unlimited; infrastructure cost only |
+| **Hosting**           | Chromatic cloud only                    | Your infrastructure                      |
+| **Data residency**    | US / EU regions                         | Your database and storage                |
+| **Interaction tests** | `play` functions                        | `play` functions                         |
+| **Lock-in**           | Proprietary                             | Open source, standard `/api/v1`          |
 
 Full breakdown: [Chromatic comparison](https://storyshelf.js.org/guides/chromatic-comparison/) · [Migration guide](https://storyshelf.js.org/guides/chromatic-migration/).
 

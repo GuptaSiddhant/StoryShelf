@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { extractDesignUrl as extract, logInvalidDesigns } from "./design.ts";
 
 /** Accepts https://www.figma.com/design/… style links only. */

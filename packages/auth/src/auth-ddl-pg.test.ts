@@ -1,6 +1,6 @@
 import { getTableColumns, type Table } from "@storyshelf/core/orm";
 import { DDL } from "@storyshelf/db-postgres/ddl";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { baseAuthDateFieldsPg, baseAuthTablesPg } from "./auth-tables-pg.ts";
 
 /**

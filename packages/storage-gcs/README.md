@@ -17,8 +17,8 @@ npm install @storyshelf/storage-gcs
 ## Quick start
 
 ```ts
-import { createGcsStorage } from "@storyshelf/storage-gcs";
 import { createShelfApp } from "@storyshelf/app";
+import { createGcsStorage } from "@storyshelf/storage-gcs";
 
 const storage = createGcsStorage({
   bucket: "my-shelf",

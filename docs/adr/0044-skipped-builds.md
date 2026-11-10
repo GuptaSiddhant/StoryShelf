@@ -52,7 +52,7 @@ build creation.
    - `GET /api/v1/projects/:slug/builds/skip-source?branch=&sha=` answers
      `{ sourceBuildId, sha } | null`. It is a hint only.
    - `POST /api/v1/projects/:slug/builds/skipped` with `{ gitSha, gitBranch, sourceBuildId,
-changedFiles, entryIds, idempotencyKey, labels?, message?, author? }` creates the skipped
+     changedFiles, entryIds, idempotencyKey, labels?, message?, author? }` creates the skipped
      build. The server re-checks eligibility in the same transaction as the insert, so a source
      whose verdict moved after the hint answers `409` and the CLI uploads normally. It records
      `changedFiles` (bounded like the affected post) so the build page can show what was compared.
@@ -73,7 +73,7 @@ changedFiles, entryIds, idempotencyKey, labels?, message?, author? }` creates th
 5. **What the status says.** `statusesForBuild` (ADR 0014; one new case, no call-site status)
    gives a skipped build the **current** outcome of its source. For an `approved` source the
    `testing` (or `review`) gate is `success` with the description `No story changed since
-<short sha>`. The informational `storybook` status links to the source build's Storybook while
+   <short sha>`. The informational `storybook` status links to the source build's Storybook while
    that build is available, and is left out once it is not. The pull-request comment says the same
    in one line and links both builds.
 6. **A skipped build follows its source.** If the source's outcome changes later (a verdict moves),

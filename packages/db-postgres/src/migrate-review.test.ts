@@ -8,7 +8,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, BuildReviewModel, deriveReviewStatus } from "@storyshelf/core/models";
 import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { runMigrations } from "./migrate.ts";
 import { createPgliteDatabase } from "./pglite.ts";
 

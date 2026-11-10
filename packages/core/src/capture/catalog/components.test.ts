@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { diffEntries, groupComponents, hashEntries, toBuildComponent } from "./components.ts";
 import type { CatalogEntry } from "./types.ts";
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { capturePhase, TransientCaptureError } from "./capture-retry.ts";
 import { screenshotWithRetry } from "./pipeline.ts";
 import { captureScreenshot } from "./screenshot.ts";

@@ -10,7 +10,7 @@ import { readFile } from "node:fs/promises";
 import { devNull, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   detectGitDefaultBranch,
   detectGitRepository,

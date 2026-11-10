@@ -45,15 +45,15 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown -w",
-    "fmt": "oxfmt ./src",
-    "lint": "oxlint --type-aware --type-check ./src",
+    "build": "vp pack",
+    "dev": "vp pack -w",
+    "fmt": "vp fmt ./src",
+    "lint": "vp lint --type-aware --type-check ./src",
     "prepublishOnly": "nub run build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "vp test run",
+    "test:coverage": "vp test run --coverage",
     "bench": "node --conditions=source bench/run.ts",
-    "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/pool.test.ts"
+    "test:flake": "vp test run --repeats=10 --maxWorkers=1 --no-file-parallelism src/pool.test.ts"
   },
   "dependencies": {
     "pixelmatch": "^7.1.0",
@@ -63,12 +63,9 @@
     "@types/node": "catalog:",
     "@types/pngjs": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
     "sharp": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {

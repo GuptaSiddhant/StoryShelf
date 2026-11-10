@@ -4,7 +4,7 @@
  * Structural conformance (identity, descriptor, config schema). Message
  * and state delivery stay per-package behind faked transports.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import { isStateProvider } from "../adapters/notifier/provider.ts";
 

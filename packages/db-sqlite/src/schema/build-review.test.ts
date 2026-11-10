@@ -1,6 +1,6 @@
 import type { BuildReview } from "@storyshelf/core/schema";
 import { getTableColumns, getTableName } from "drizzle-orm";
-import { expect, expectTypeOf, it } from "vitest";
+import { expect, expectTypeOf, it } from "vite-plus/test";
 import { DDL } from "../ddl.ts";
 import { buildReviews } from "./build-review.ts";
 import { schema } from "./index.ts";

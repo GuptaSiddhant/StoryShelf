@@ -1,5 +1,5 @@
 /** Shared fixtures for the Figma API tests: a scriptable fake of api.figma.com and its CDN. */
-import { vi, type MockInstance } from "vitest";
+import { vi, type MockInstance } from "vite-plus/test";
 
 /** Spy on `fetch` returned by the fakes below. */
 export type FetchSpy = MockInstance<typeof fetch>;

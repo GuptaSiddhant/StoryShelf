@@ -1,7 +1,7 @@
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";

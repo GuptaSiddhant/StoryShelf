@@ -55,9 +55,9 @@ Dual-driver verification checklist (run before promoting the deploy):
 ## Code migration
 
 ```ts
+import { createOAuthAuth, cognitoPreset } from "@storyshelf/auth-oauth";
 // Before
 import { createPasswordAuth } from "@storyshelf/auth-password";
-import { createOAuthAuth, cognitoPreset } from "@storyshelf/auth-oauth";
 const auth = createPasswordAuth({ password: process.env.AUTH_PASSWORD! });
 
 // After: local accounts + invite flow

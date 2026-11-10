@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, type Browser } from "playwright-core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createStaticServer, type StaticServer } from "./static-server.ts";
 
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("loopback HTTP cache", () => {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { gitLabNotifier } from "./gitlab.ts";
 import { bodyOf, stubFetch } from "./test-fetch.ts";
 

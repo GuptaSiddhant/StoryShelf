@@ -8,7 +8,7 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { signStorybookToken, storybookDir } from "@storyshelf/core/utils";
 import { createHash } from "node:crypto";
 import { pino } from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 import { stubRunner } from "../test-runner.ts";

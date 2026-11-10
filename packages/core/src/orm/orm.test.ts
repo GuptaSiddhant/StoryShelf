@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import * as orm from "./index.ts";
 import * as pgCore from "./pg-core.ts";
 import * as sqliteCore from "./sqlite-core.ts";

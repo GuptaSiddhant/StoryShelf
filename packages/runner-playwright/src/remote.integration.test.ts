@@ -17,7 +17,7 @@ import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 import { ensureFixtureBuilt, readJson, uploadBuild, waitForBuild } from "./integration-harness.ts";
 import { playwrightServer } from "./remote/playwright-server.ts";

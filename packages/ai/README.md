@@ -13,9 +13,9 @@ nub add @storyshelf/ai
 ## Usage
 
 ```ts
+import { openai } from "@ai-sdk/openai";
 import { createAi } from "@storyshelf/ai";
 import { createShelfApp } from "@storyshelf/app";
-import { openai } from "@ai-sdk/openai";
 
 const ai = createAi({
   profiles: { default: { defaultModel: openai("gpt-4o-mini") } },

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { decideCaptureProcess, FORK_MIN_CPUS, FORK_MIN_MEMORY_BYTES } from "./decision.ts";
 
 const roomy = { cpus: 4, memoryBytes: 8 * 1024 ** 3, canFork: true };

@@ -1,5 +1,5 @@
 import AdmZip from "adm-zip";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { zipStream, type ZipSource } from "./zip-write.ts";
 
 async function collect(chunks: AsyncIterable<Buffer>): Promise<Buffer> {

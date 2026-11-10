@@ -1,6 +1,6 @@
 import type { Snapshot } from "@storyshelf/core/schema";
 import { createHash } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { readComparisonImage, validFrozenReference } from "./comparison-image.ts";
 
 const read = vi.fn();

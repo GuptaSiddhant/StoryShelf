@@ -1,6 +1,6 @@
 /** Client construction/injection tests for S3 storage. */
 import type { S3Client } from "@aws-sdk/client-s3";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { resolveS3Context } from "./client.ts";
 import { createS3Storage } from "./index.ts";
 

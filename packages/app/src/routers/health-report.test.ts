@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { collectHealthReport } from "./health-report.ts";
 
 function sources(): Parameters<typeof collectHealthReport>[0] {

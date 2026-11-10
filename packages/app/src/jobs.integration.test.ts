@@ -14,7 +14,7 @@ import {
   makeStorage,
   type ManualClock,
 } from "@storyshelf/core/test-helpers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "./index.tsx";
 import { stubRunner } from "./test-runner.ts";
 

@@ -1,5 +1,5 @@
 // oxlint-disable typescript/promise-function-async -- helpers return Hono JSX (a Promise<HtmlEscapedString>)
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { PreviewEmbed } from "../src/ui/components.tsx";
 import { previewState } from "./preview-state.ts";
 import { renderJsx } from "./render.tsx";

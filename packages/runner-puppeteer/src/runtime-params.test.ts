@@ -1,5 +1,5 @@
 import { deferred } from "@storyshelf/core/test-helpers";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createRuntimeParamsState, runtimeParametersForStory } from "./runtime-params.ts";
 
 type Preview = { extract?: () => Promise<unknown>; ready?: () => Promise<unknown> };

@@ -1,5 +1,5 @@
 import type { Snapshot } from "@storyshelf/core/schema";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { nextOpenSnapshotId } from "./review-next.ts";
 
 const snap = (id: string, status: string): Snapshot => ({ id, status }) as unknown as Snapshot;

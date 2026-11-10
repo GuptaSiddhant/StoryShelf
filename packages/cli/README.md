@@ -106,8 +106,7 @@ jobs:
         with: { node-version: 24 }
       - run: nub install && nub run build
       - run: nubx storybook build -o storybook-static
-      - run:
-          nubx storyshelf upload \
+      - run: nubx storyshelf upload \
           --token "${{ secrets.STORYSHELF_TOKEN }}" \
           --sha "${{ github.sha }}" \
           --branch "${{ github.ref_name }}"

@@ -6,7 +6,7 @@ import {
 } from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { notifyAssignedWith, notifyMentionWith, notifyProject, notifySystem } from "./notify.ts";
 import { runWithStore, type Store } from "./store.ts";
 

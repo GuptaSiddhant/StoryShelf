@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Logger } from "../logger.ts";
 import { recordSpans, type RecordedSpan } from "../test-helpers/span-recorder.ts";
 import { HttpError, httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";

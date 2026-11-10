@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { JSDOM, type DOMWindow } from "jsdom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { DesignSource } from "../pages/build-diff-model.ts";
 import { ComparisonSources } from "../pages/build-diff-reference.tsx";
 import { CompareStage } from "../ui/components.tsx";

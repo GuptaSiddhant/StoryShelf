@@ -1,5 +1,5 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createJobCanceller } from "./job-canceller.ts";
 
 function queueWith(cancel?: (id: string) => Promise<boolean>): CaptureQueue {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { credentialDaysLeft, designChange, designDrift, isDesignStale } from "./design-health.ts";
 
 describe("isDesignStale / credentialDaysLeft", () => {

@@ -4,7 +4,7 @@
  * Structural conformance (identity, descriptor, link parsing). Vendor API calls
  * stay per-package behind faked transports.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { DesignProvider } from "../adapters/design.ts";
 
 /** Build the provider under test (sync or async factories both work). */

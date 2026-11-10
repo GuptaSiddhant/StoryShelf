@@ -2,7 +2,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
 import Database from "better-sqlite3";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createD1Database, type D1Database } from "./d1.ts";
 import { schema } from "./schema/index.ts";
 

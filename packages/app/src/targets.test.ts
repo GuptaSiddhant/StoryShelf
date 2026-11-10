@@ -1,6 +1,6 @@
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import { NO_SECRET_REASON } from "@storyshelf/core/capture";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { runWithStore, type Store } from "./store.ts";
 import { assertTargetsSelectable, runnerTargets, targetLabel } from "./targets.ts";
 import { stubRunner } from "./test-runner.ts";

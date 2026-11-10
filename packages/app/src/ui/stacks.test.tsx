@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { Style } from "./css.ts";
 import { HStack, VStack } from "./stacks.tsx";
 

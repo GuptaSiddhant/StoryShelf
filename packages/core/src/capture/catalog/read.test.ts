@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeStorage } from "../../test-helpers/fake-adapters.ts";
 import { storybookDir } from "../../utils/paths.ts";
 import { readPublishedFile, readPublishedFileInfo } from "./read.ts";

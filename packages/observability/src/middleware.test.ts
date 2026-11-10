@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requestId } from "hono/request-id";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createHttpMiddleware } from "./middleware.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 

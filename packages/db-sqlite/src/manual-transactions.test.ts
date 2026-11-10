@@ -1,5 +1,5 @@
 import type { DatabaseAdapter, TxStore } from "@storyshelf/core/adapter/database";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { withManualTransactions } from "./manual-transactions.ts";
 
 /** An adapter that only records the plain calls the transaction store forwards to it. */

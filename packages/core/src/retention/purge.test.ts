@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
 import { createDatabaseCaptureQueue } from "../capture/db-queue/index.ts";
 import { BuildComponentModel } from "../models/build-component.ts";

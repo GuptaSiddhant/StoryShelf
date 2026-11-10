@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createLatch, deferred } from "../test-helpers/index.ts";
 import { createSessionGate, sessionGateFor } from "./session-gate.ts";
 

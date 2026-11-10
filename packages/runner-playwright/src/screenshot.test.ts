@@ -1,6 +1,6 @@
 import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { TransientCaptureError } from "./capture-retry.ts";
 import { inPagePlay } from "./play.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";

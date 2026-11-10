@@ -4,6 +4,7 @@ Status: implemented (data model, guard, re-diff, UI, docs).
 Scope: `@storyshelf/core`, `@storyshelf/app`, `db-sqlite`, `db-postgres`, `db-mysql`.
 
 Implementation notes (deviations from the design below)
+
 - Approval is check-then-write, not an atomic compare-and-set: `DatabaseAdapter.update` is by id only,
   so two truly simultaneous approvals can still both pass the check. The window is small (the check
   runs right before the baseline write), and the loser of a sequential race gets the 409.
@@ -39,11 +40,13 @@ upload re-diffs.
 ## Goals / non-goals
 
 Goals
+
 - Make staleness detectable: a snapshot knows which baseline it was diffed against.
 - Never overwrite a baseline the reviewer did not see, without an explicit decision.
 - Let a reviewer re-diff a build against current baselines without re-rendering.
 
 Non-goals
+
 - Automatic recapture of open builds when a baseline changes (cost grows with open PRs x merges).
 - Changing default-branch semantics (auto-approve + re-baseline stays).
 - Rebasing/merging screenshots (no three-way merge).
@@ -51,7 +54,9 @@ Non-goals
 ## Design
 
 ### 1. Record the baseline on the snapshot (data model)
+
 Add to `snapshots`:
+
 - `baseline_id TEXT NULL` - the baseline row used for the diff (NULL for new stories).
 - `baseline_version TEXT NULL` - that baseline's `updated_at` (or its `snapshot_id`) at diff time.
   Needed because baseline rows are updated in place by `BaselineModel.upsert`, so the id alone
@@ -62,6 +67,7 @@ For the fallback case (feature branch using the default baseline) the id refers 
 branch's baseline row, which is exactly what we need to detect drift.
 
 Schema work, following the repo's layout:
+
 - `packages/core/src/schema/snapshot.ts` (type), `models/snapshot.ts` (create/update mapping).
 - DDL + schema in each of `db-sqlite` (`ddl.ts`, `schema/snapshot.ts`, `ensureColumns` handles upgrades),
   `db-postgres` and `db-mysql` (`ddl.ts`, `schema/snapshot.ts`, plus an `ALTER TABLE ... ADD COLUMN IF NOT
@@ -69,8 +75,10 @@ Schema work, following the repo's layout:
 - Existing rows have NULLs; treat NULL as "unknown, not stale" so old builds keep working.
 
 ### 2. Staleness check
+
 New pure helper in core, e.g. `baselineStatus(snapshot, currentBaseline)` returning
 `"current" | "stale" | "unknown" | "removed"`:
+
 - `unknown` if `baseline_version` is NULL (legacy rows, new stories with no baseline when captured).
 - `removed` if the recorded baseline no longer exists (branch purged).
 - `stale` if the resolved baseline (same fallback rules as capture: own branch, else default) has a
@@ -81,7 +89,9 @@ Resolve the current baseline with the existing `BaselineModel` resolution (own b
 default). No new query shape.
 
 ### 3. Guard approval
+
 In `approveSnapshot` and the bulk approve route (`snapshots.ts`, `approveAllRoute`):
+
 - Compute `baselineStatus`; if `stale` or `removed`, refuse by default with `409` and a structured
   body (`{ code: "baseline_changed", snapshotId }`).
 - Accept `?force=true` / a `force` field for an explicit override, recorded on the snapshot review
@@ -94,7 +104,9 @@ In `approveSnapshot` and the bulk approve route (`snapshots.ts`, `approveAllRout
 - Reject is unaffected (it does not touch baselines).
 
 ### 4. Re-diff action (no re-render)
+
 New operation `rediffBuild(buildId)` in core capture code:
+
 - For each snapshot of the build that is `changed`/`new`/`unchanged` (not `approved`/`rejected`), reload the
   stored screenshot, resolve the current baseline, run `diffImages`, and rewrite diff path/ratio, status,
   and `baseline_id`/`baseline_version`.
@@ -107,6 +119,7 @@ New operation `rediffBuild(buildId)` in core capture code:
 - Snapshots whose screenshot files were purged are skipped and reported.
 
 ### 5. UI
+
 - Review page: per-snapshot banner "Baseline changed since this diff was computed" with actions
   "Re-diff" (build level) and "Approve anyway" (force).
 - Build page and list: a `stale` badge/count when any open snapshot is stale.
@@ -116,6 +129,7 @@ New operation `rediffBuild(buildId)` in core capture code:
   form should use HTMX or redirect back), since this flow adds more conflict responses.
 
 ### 6. Optional: mark builds stale after default-branch re-baseline
+
 After a default-branch build re-baselines stories, find open (`reviewing`) builds on other branches that
 contain `changed`/`new` snapshots for those stories and mark them for the stale banner. This is a
 derived view, not a state change: compute staleness lazily on page load using step 2 rather than

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeStorage } from "../test-helpers/fake-storage.ts";
 import { publishedGzipPath } from "../utils/paths.ts";
 import { sweepPublishedGzip } from "./published-gzip-sweep.ts";

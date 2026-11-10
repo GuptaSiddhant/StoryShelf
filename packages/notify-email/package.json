@@ -69,11 +69,11 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown -w",
-    "fmt": "oxfmt ./src",
-    "lint": "oxlint --type-aware --type-check ./src",
-    "test": "vitest run",
+    "build": "vp pack",
+    "dev": "vp pack -w",
+    "fmt": "vp fmt ./src",
+    "lint": "vp lint --type-aware --type-check ./src",
+    "test": "vp test run",
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
@@ -85,11 +85,8 @@
     "@types/nodemailer": "^8.0.2",
     "@vitest/coverage-v8": "catalog:",
     "nodemailer": "^10.2.1",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {

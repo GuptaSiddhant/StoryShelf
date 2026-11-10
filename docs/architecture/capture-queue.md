@@ -19,7 +19,7 @@ there is no in-memory queue). The claim algorithm needs only one primitive from
 the adapter, a unique-key insert whose conflict can be told apart (the `claimFinalize` pattern):
 
 1. **Probe.** One query, `kind = ? AND visible_at <= now AND status IN ('queued','running') ORDER BY
-visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates have a
+   visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates have a
    `visible_at` (a queued job, a running attempt whose lease is its `visible_at`), so an idle probe
    reads no rows and a busy one reads one.
 2. **Claim.** Insert attempt row `<jobId>:<n+1>` (owner, lease). Exactly one instance wins; the

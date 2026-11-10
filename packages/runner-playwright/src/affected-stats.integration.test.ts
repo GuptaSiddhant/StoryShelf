@@ -1,7 +1,7 @@
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { ensureFixtureBuilt } from "./integration-harness.ts";
 
 /** A missing or stats-less fixture is built first, which `runFixtureCommand` allows 300 s. */

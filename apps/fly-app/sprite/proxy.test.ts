@@ -1,7 +1,7 @@
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import { connect, Socket, type AddressInfo } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 // @ts-expect-error -- plain ES module run by the Sprite itself, with no type declarations
 import { createProxy, MIN_SECRET_LENGTH, secretMatches } from "./proxy.mjs";
 

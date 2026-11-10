@@ -1,6 +1,6 @@
 import type { Build } from "@storyshelf/core/schema";
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { InheritedRatioCard } from "./inherited-ratio-card.tsx";
 
 function build(snapshotCount: number, inheritedCount: number, createdAt: string): Build {

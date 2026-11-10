@@ -18,7 +18,7 @@ import {
 } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { alreadyAlerted } from "./capture-alerts.ts";
 import { setupCapture } from "./capture-setup.ts";
 import { recordShardRepeated } from "./consumer-setup.ts";

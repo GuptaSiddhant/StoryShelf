@@ -9,7 +9,7 @@ import type { InsightRow } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { settleInsightJobs } from "../insights/job.ts";
 import { fakeAi } from "../insights/test-support.ts";

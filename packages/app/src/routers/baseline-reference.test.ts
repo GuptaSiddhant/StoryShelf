@@ -1,6 +1,6 @@
 import { BaselineModel, BuildModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Baseline, Build, Project, Snapshot } from "@storyshelf/core/schema";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { runWithStore, type Store } from "../store.ts";
 import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
 

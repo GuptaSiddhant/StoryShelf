@@ -14,7 +14,7 @@
  * - `LIVE_GL_SHA` — commit SHA in the test project to status
  * - `LIVE_GL_HOST` — optional self-managed host (defaults to gitlab.com).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { gitLabNotifier } from "./index.ts";
 
 const LIVE = process.env["LIVE_CLOUD"] === "1" && process.env["LIVE_GL_TOKEN"] !== undefined;

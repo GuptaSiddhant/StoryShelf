@@ -1,5 +1,5 @@
 import { PNG } from "pngjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { loadCodec } from "./codecs.ts";
 import { diffImages } from "./engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "./options.ts";

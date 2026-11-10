@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createNestingGuard } from "./nesting-guard.ts";
 import { isolatePlainStatements } from "./statement-isolation.ts";
 import { createTransactionMutex } from "./transaction-mutex.ts";

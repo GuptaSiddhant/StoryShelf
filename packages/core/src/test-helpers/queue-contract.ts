@@ -18,7 +18,7 @@
  * how many retries the queue allows; queues without `extend`, `inspect` or `cancel` skip those
  * checks, so the suite stays backward compatible.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { CaptureQueue, PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
 
 /** Build the adapter under test (sync or async factories both work). */

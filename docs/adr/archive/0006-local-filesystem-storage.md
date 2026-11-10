@@ -49,8 +49,8 @@ Same path structure, stored in a bucket. Prefix: `data/` or configurable via `--
 ```typescript
 const s3 = createS3Storage({
   bucket: process.env.S3_BUCKET,
-  prefix: "shelf/",                       // optional key prefix
-  endpoint: process.env.S3_ENDPOINT,      // for MinIO, R2, etc.
+  prefix: "shelf/", // optional key prefix
+  endpoint: process.env.S3_ENDPOINT, // for MinIO, R2, etc.
   region: process.env.S3_REGION,
   // Uses AWS SDK v3 from-env credentials
 });
@@ -69,11 +69,13 @@ Default-branch baselines are the durable truth and are **never purged**; feature
 ## Consequences
 
 **Positive:**
+
 - Local: zero infrastructure, one `docker run`, trivial debugging
 - S3: horizontal scaling, cloud-native, versioning, lifecycle policies
 - Same adapter interface — switch between local and S3 by changing one config flag
 - MinIO gives you S3-compatible storage on-prem without an AWS account
 
 **Negative:**
+
 - Two implementations to maintain (but the interface is ~5 methods, so this is minimal)
 - S3 has eventual consistency for listing (mitigated by strong consistency for reads/writes since 2020)

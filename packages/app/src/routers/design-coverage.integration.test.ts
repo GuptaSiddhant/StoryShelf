@@ -3,7 +3,7 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
 import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { PAGE_ROUTE_CLASSES } from "../routes/page-routes.ts";
 import { stubAuth } from "../stub-auth.ts";

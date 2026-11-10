@@ -1,5 +1,5 @@
 /** Client construction/injection tests for Azure Blob storage. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { resolveContainerClient } from "./client.ts";
 import { createAzureStorage } from "./index.ts";
 

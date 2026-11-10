@@ -8,7 +8,7 @@ import type {
 import type { Logger } from "@storyshelf/core/logger";
 import type { SQL, Table } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createInstrumentedDatabase } from "./instrument-db.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 

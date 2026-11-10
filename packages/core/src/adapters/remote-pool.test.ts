@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { deferred } from "../test-helpers/index.ts";
 import type { RemoteConnectContext } from "./remote-browser.ts";
 import { shutdownRemote } from "./remote-lease.ts";

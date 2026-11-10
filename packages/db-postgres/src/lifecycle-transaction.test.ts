@@ -1,6 +1,6 @@
 /** The pure helpers of the lifecycle transaction: result shapes, timestamps and bound lists. */
 import { PgDialect } from "drizzle-orm/pg-core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { instant, isoOf, rowsOf, textRows, valueList } from "./lifecycle-transaction.ts";
 
 const dialect = new PgDialect();

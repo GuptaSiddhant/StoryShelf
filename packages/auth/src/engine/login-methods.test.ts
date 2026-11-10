@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { BetterAuthPlugin } from "better-auth";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 // Capture what the engine hands to the OAuth and passkey plugins instead of running them.
 vi.mock("@better-auth/passkey", () => ({
   passkey: vi.fn((config: unknown) => ({ id: "passkey", config })),

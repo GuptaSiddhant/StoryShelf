@@ -1,6 +1,6 @@
 import type { HeldConnection } from "@storyshelf/core/adapter/capture-runner";
 import type { Browser } from "playwright-core";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   activeRuns,
   cancelRuns,

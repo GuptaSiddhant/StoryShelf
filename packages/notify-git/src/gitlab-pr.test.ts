@@ -1,5 +1,5 @@
 import type { NotifierState } from "@storyshelf/core/adapter/notifier";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
 import { mapState } from "./gitlab-mapper.ts";
 import { findMrIid } from "./gitlab-pr.ts";

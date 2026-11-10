@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { CaptureLogModel } from "../../models/capture-log.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import type { ShardTarget } from "./context.ts";

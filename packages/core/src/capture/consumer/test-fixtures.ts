@@ -1,5 +1,5 @@
 /** Shared set-up of the consumer tests: a manual clock, the database queue on the fake DB, a stub logger. */
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import type { DatabaseAdapter } from "../../adapters/database.ts";
 import type { Logger } from "../../logger.ts";
 import type { CaptureJobKind } from "../../schema/capture-job.ts";

@@ -1,7 +1,7 @@
 /** `AiUsageModel.reserve` on node:sqlite: parallel requests at the limit (#545). */
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { AiUsageModel } from "@storyshelf/core/models";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 
 const silent = createShelfLogger({ level: "silent" });

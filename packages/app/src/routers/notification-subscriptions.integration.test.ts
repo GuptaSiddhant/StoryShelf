@@ -2,7 +2,7 @@ import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";

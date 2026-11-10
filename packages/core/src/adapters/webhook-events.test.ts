@@ -1,5 +1,5 @@
 import type { Logger } from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { reencryptCredentials } from "../models/credentials.ts";
 import { WebhookModel } from "../models/webhook.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";

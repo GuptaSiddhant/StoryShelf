@@ -4,7 +4,7 @@ import type {
   CaptureJobRow,
   CaptureShard,
 } from "@storyshelf/core/schema";
-import { expect, expectTypeOf, it } from "vitest";
+import { expect, expectTypeOf, it } from "vite-plus/test";
 import { DDL, IDENTITY_STATEMENTS } from "./ddl.ts";
 import { baselines } from "./schema/baseline.ts";
 import type { Baseline } from "./schema/baseline.ts";

@@ -1,6 +1,6 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { childEnvOf, createForkedHandler, shouldForkCapture } from "./capture-process.ts";
 
 const logger = createShelfLogger({ level: "silent" });

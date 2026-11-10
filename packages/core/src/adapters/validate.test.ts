@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import { makeFakeDesign } from "../test-helpers/fake-design.ts";
 import { validateAdapter, validateAdapterSources, validateAuth } from "./validate.ts";

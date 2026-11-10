@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { assertScreenshotBuffer, MAX_SCREENSHOT_BYTES } from "./guards.ts";
 
 function png(size: number): Buffer {

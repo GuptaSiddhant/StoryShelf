@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { A11Y_ROOT_SELECTOR, resolveA11yRun } from "./options.ts";
 
 describe("resolveA11yRun", () => {

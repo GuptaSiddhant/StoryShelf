@@ -86,10 +86,10 @@ Persistent builds are excluded from `purgeTtlDays` retention. Their snapshots re
 
 Feature-branch baselines are GC'd after `branchTtlDays` (default 30, `null` = disabled) of inactivity via a daily sweep (`branchGcIntervalMs` 24h). Default-branch baselines are never GC'd.
 
-| Config               | Default        | Description                                                  |
-| -------------------- | -------------- | ------------------------------------------------------------ |
-| `branchTtlDays`      | 30             | Days of inactivity before feature-branch baselines GC'd      |
-| `branchGcIntervalMs` | 86400000 (24h) | How often to run the GC sweep                                |
+| Config               | Default        | Description                                                                                           |
+| -------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+| `branchTtlDays`      | 30             | Days of inactivity before feature-branch baselines GC'd                                               |
+| `branchGcIntervalMs` | 86400000 (24h) | How often to run the GC sweep                                                                         |
 | `purgeTtlDays`       | unset (opt-in) | Days before terminal builds are purged daily; unset: no scheduled purge (a manual purge then uses 30) |
 
 ```mermaid

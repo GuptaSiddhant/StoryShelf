@@ -22,9 +22,9 @@ const app = createShelfApp({ database, storage, notifications: { notifiers: chat
 Each provider is importable on its own (root aggregates all three):
 
 ```ts
+import { logNotifier } from "@storyshelf/notify-chat/log";
 import { slackWebhookNotifier } from "@storyshelf/notify-chat/slack";
 import { teamsWorkflowNotifier } from "@storyshelf/notify-chat/teams";
-import { logNotifier } from "@storyshelf/notify-chat/log";
 ```
 
 ## Providers

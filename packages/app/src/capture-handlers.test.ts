@@ -1,7 +1,7 @@
 import type { ConsumerJob } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   alerting,
   handlerFor,

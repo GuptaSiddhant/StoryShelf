@@ -1,5 +1,5 @@
 import type { RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { targetChoices } from "./target-choices.ts";
 
 const offered: RunnerTarget[] = [

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { isRetryableConnectError, retryConnect } from "./connect-retry.ts";
 
 const noSleep = async (): Promise<void> => await Promise.resolve();

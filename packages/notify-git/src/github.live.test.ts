@@ -12,7 +12,7 @@
  * - `LIVE_GH_OWNER` / `LIVE_GH_REPO` — test repo coordinates
  * - `LIVE_GH_SHA` — commit SHA on the test repo to status.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { gitHubNotifier } from "./index.ts";
 
 const LIVE = process.env["LIVE_CLOUD"] === "1" && process.env["LIVE_GH_TOKEN"] !== undefined;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeDatabase } from "../test-helpers/fake-database.ts";
 import { attemptRowId, CaptureJobModel, isTerminalJob, parseAttemptRowId } from "./capture-job.ts";
 

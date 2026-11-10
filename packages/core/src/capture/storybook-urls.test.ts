@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { RunnerTarget } from "../adapters/capture-runner.ts";
 import {
   DEFAULT_STORYBOOK_URL_TTL,

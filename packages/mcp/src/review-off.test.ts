@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { ToolError, type ApiClient } from "./client.ts";
 import { REVIEW_OFF_MESSAGE, explainFailure } from "./review-off.ts";
 import type { ToolDef } from "./tools/types.ts";

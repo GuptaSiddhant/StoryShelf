@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { assertReviewSchema } from "./review-schema-check.ts";
 
 type Row = { table_name: string; column_name: string; data_type: string };

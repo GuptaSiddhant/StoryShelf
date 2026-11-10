@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import { decodePayload, encodePayload, toDatabaseJob, toQueueEntry } from "./codec.ts";
 

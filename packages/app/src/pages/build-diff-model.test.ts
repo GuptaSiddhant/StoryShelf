@@ -1,5 +1,5 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   designSources,
   diffPercent,

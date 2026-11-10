@@ -1,5 +1,5 @@
 /** The GitHub provider in `checks` mode: a recorded GitHub answers the App and Checks APIs. */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { clearInstallationTokens } from "./github-app.ts";
 import { gitHubNotifier } from "./github.ts";
 import { bodyOf, stubFetch } from "./test-fetch.ts";

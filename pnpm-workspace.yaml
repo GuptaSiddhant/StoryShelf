@@ -1,0 +1,88 @@
+packages:
+  - ./apps/*
+  - ./packages/*
+
+catalog:
+  "@hono/node-server": "^1.17.0"
+  "@hono/otel": "^1.1.2"
+  "@opentelemetry/api": "^1.9.0"
+  "@opentelemetry/context-async-hooks": "^2.11.0"
+  "@opentelemetry/core": "^2.11.0"
+  "@opentelemetry/exporter-metrics-otlp-http": "^0.222.0"
+  "@opentelemetry/exporter-trace-otlp-http": "^0.222.0"
+  "@opentelemetry/resources": "^2.11.0"
+  "@opentelemetry/sdk-metrics": "^2.11.0"
+  "@opentelemetry/sdk-node": "^0.222.0"
+  "@opentelemetry/sdk-trace-base": "^2.11.0"
+  "@opentelemetry/semantic-conventions": "^1.43.0"
+  "@types/node": "^26.0.0"
+  "@types/picomatch": "^4.0.1"
+  "@types/pngjs": "^6.0.5"
+  "@types/prompts": "^2.4.9"
+  "@types/unzipper": "0.10.11"
+  "@vitest/coverage-v8": "5.1.0"
+  "adm-zip": "0.6.1"
+  "drizzle-orm": "^0.45.4"
+  "hono": "^4.11.0"
+  "pino": "^10.3.1"
+  "sharp": "^0.35.5"
+  "typescript": "^7.0.2"
+  "vite": "npm:@voidzero-dev/vite-plus-core@1.5.1"
+  "vite-plus": "1.5.1"
+  "vitest": "5.1.0"
+  "yaml": "^2.9.0"
+  "zod": "^4.6.7"
+
+overrides:
+  "vite@*": "catalog:"
+  "vitest@*": "catalog:"
+  "form-data@^4.0.0": "4.0.6"
+  "source-map-js": "1.2.2"
+  "tinypool": "2.2.0"
+  "undici@^7.0.0": "7.30.1"
+  "undici@^8.0.0": "8.12.3"
+
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: "*"
+    vitest: "*"
+
+# nub allowScripts: better-sqlite3 built, protobufjs not
+allowBuilds:
+  better-sqlite3: true
+  protobufjs: false
+  bufferutil: false
+  esbuild: false
+
+# nub.jsonc install.publicHoist
+publicHoistPattern:
+  - "@types/*"
+  - "@hono/*"
+  - "hono"
+  - "pino"
+  - "drizzle-orm"
+  - "zod"
+  - "pixelmatch"
+  - "pngjs"
+  - "adm-zip"
+  - "axe-core"
+  - "unzipper"
+  - "playwright-core"
+  - "puppeteer-core"
+  - "postgres"
+  - "yaml"
+
+minimumReleaseAgeExclude:
+  - "@voidzero-dev/vite-plus-core@1.5.1"
+  - "@voidzero-dev/vite-plus-darwin-arm64@1.5.1"
+  - "@voidzero-dev/vite-plus-darwin-x64@1.5.1"
+  - "@voidzero-dev/vite-plus-linux-arm64-gnu@1.5.1"
+  - "@voidzero-dev/vite-plus-linux-arm64-musl@1.5.1"
+  - "@voidzero-dev/vite-plus-linux-x64-gnu@1.5.1"
+  - "@voidzero-dev/vite-plus-linux-x64-musl@1.5.1"
+  - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.5.1"
+  - "@voidzero-dev/vite-plus-win32-x64-msvc@1.5.1"
+  - vite-plus@1.5.1

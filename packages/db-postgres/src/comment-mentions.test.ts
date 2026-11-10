@@ -1,7 +1,7 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 /** `comments.mentions` round trip on embedded Postgres (PGlite). */
 import { CommentModel } from "@storyshelf/core/models";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { createPgliteDatabase } from "./pglite.ts";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });

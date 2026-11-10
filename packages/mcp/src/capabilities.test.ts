@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { probeCapabilities, toolsFor } from "./capabilities.ts";
 import type { ApiClient } from "./client.ts";
 import { ALL_TOOLS } from "./tools/index.ts";

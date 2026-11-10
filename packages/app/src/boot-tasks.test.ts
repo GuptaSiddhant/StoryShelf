@@ -3,7 +3,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { runBootTasks } from "./boot-tasks.ts";
 import type { LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";

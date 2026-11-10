@@ -177,13 +177,13 @@ by preset, so it cannot by itself carry this guarantee.
 
 All writers use the fenced capability when it is present:
 
-| Path                                                      | Mutation                                                                                                                                                                          |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `approveSnapshot` (`app/src/routers/builds.handlers.ts`)  | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`)                                                                       |
-| `core/src/capture/pipeline.ts`                            | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict        |
-| `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                      |
-| `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                      |
-| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                     |
+| Path                                                      | Mutation                                                                                                                                                                                                     |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `approveSnapshot` (`app/src/routers/builds.handlers.ts`)  | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`)                                                                                                  |
+| `core/src/capture/pipeline.ts`                            | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict                                   |
+| `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                                                 |
+| `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                                                 |
+| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                                                |
 | `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; invoked once at every SQLite boot, before the capability is exposed (#536) |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { publishVerdict, type PublishFacts } from "./accept.ts";
 
 const base: PublishFacts = {

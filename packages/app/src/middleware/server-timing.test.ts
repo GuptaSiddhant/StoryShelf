@@ -2,7 +2,7 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { addTiming } from "@storyshelf/core/utils";
 import { Hono } from "hono";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createShelfApp } from "../index.tsx";
 import { serverTiming } from "./server-timing.ts";
 

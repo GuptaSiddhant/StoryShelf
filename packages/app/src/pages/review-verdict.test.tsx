@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { BUILD_REVIEW, builds, project } from "../stories-fixtures/dataset.ts";
 import { VerdictCard } from "./review-verdict.tsx";

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { CaptureRunner } from "../../adapters/capture-runner.ts";
 import { BuildModel } from "../../models/build.ts";
 import { CaptureAttemptModel } from "../../models/capture-attempt.ts";

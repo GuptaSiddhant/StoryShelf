@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createLatch, deferred } from "../test-helpers/index.ts";
 import { chunk, mapLimit } from "./map-limit.ts";
 

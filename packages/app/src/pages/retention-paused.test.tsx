@@ -1,6 +1,6 @@
 import type { RetentionPause } from "@storyshelf/core/adapter/database";
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { RetentionPausedNotice } from "./retention-paused.tsx";
 
 async function render(pause?: RetentionPause): Promise<string> {

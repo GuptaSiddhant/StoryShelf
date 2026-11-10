@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { getMetadata } from "./log.ts";
 import { createStateAdapter, requireToken, type StateWriter } from "./state-adapter.ts";
 

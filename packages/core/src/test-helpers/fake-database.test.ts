@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeDatabase } from "./fake-database.ts";
 
 const now = "2026-01-01T00:00:00.000Z";

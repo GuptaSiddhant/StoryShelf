@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { PER_CAPTURE_BUDGET_MS, signStorybookToken } from "../utils/storybook-token.ts";
 import {
   RENDER_TIMEOUT_MS,

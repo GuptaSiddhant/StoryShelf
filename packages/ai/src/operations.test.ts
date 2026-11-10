@@ -1,7 +1,7 @@
 import { AiError } from "@storyshelf/core/ai";
 import { triageEnvelopeSchema } from "@storyshelf/core/insights";
 import { MockLanguageModelV4 } from "ai/test";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createAi } from "./index.ts";
 import { resetOtelRegistrationForTests } from "./telemetry.ts";
 import { TRIAGE_JSON, installTestTelemetry, mockModel } from "./test-support.ts";

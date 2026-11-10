@@ -15,7 +15,7 @@ import { sql } from "drizzle-orm";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vite-plus/test";
 import { prepareBaselineReferences } from "./baseline-preparation.ts";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
 import { createPostgresDatabase } from "./index.ts";

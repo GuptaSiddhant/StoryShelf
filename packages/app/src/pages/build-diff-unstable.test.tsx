@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { UnstableBadge, UnstableNotice, isUnstable } from "./build-diff-unstable.tsx";
 
 async function html(node: unknown): Promise<string> {

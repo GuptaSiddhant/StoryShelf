@@ -6,7 +6,7 @@
  * orchestrator owns timeouts, byte guards, and failure caps, so runners
  * only promise to return PNG buffers and honor `cancel`.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import { isCaptureTarget } from "../adapters/capture-target.ts";
 

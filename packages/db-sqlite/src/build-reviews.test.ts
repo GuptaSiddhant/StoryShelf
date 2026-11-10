@@ -1,7 +1,7 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 /** `build_reviews`, `projects.review_*` and `comments.story_id` on node:sqlite. */
 import { BuildReviewModel, CommentModel, ProjectModel } from "@storyshelf/core/models";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 
 const silent = createShelfLogger({ level: "silent" });

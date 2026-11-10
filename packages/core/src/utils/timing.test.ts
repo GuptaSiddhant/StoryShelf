@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { addTiming, runWithTimings, timed } from "./timing.ts";
 
 async function failing(): Promise<never> {

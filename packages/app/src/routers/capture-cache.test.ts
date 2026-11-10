@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { SIGNED_NO_STORE, signedCacheControl } from "./capture-cache.ts";
 
 const NOW = Date.UTC(2026, 0, 1);

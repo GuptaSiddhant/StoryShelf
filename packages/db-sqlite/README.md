@@ -17,8 +17,8 @@ npm install @storyshelf/db-sqlite
 ## Quick start
 
 ```ts
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createShelfApp } from "@storyshelf/app";
+import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
 
 const database = createSqliteDatabase("./data/shelf.db");

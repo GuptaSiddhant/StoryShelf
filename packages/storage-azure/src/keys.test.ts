@@ -1,5 +1,5 @@
 /** Key join/split tests for Azure blob names. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { azureKey, azureRel } from "./keys.ts";
 
 describe("azureKey", () => {

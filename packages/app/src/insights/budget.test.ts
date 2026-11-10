@@ -1,6 +1,6 @@
 import { AiUsageModel } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { recordUsage, reserveBudget } from "./budget.ts";
 import type { InsightDeps } from "./deps.ts";
 import { fakeAi } from "./test-support.ts";

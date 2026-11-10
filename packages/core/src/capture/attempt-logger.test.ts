@@ -1,5 +1,5 @@
 import type { Logger } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
 import { mirrorAttemptLog } from "./attempt-logger.ts";
 

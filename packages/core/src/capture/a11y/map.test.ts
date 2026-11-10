@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { mapAxeViolations, MAX_REPORTED_VIOLATIONS, type SlimViolation } from "./map.ts";
 
 function v(over: Partial<SlimViolation> = {}): SlimViolation {

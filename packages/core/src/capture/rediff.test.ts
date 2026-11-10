@@ -1,5 +1,5 @@
 import { PNG } from "pngjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { createLatch, deferred } from "../test-helpers/index.ts";

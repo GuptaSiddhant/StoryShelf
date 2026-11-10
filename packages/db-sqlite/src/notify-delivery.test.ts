@@ -19,7 +19,7 @@ import { makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helper
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createSqliteDatabase } from "./index.ts";
 
 const silent = createShelfLogger({ level: "silent" });

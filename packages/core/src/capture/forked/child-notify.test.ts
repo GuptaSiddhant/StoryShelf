@@ -4,7 +4,7 @@
  * claims and delivers it. Nothing travels over IPC, and with no consumer the job waits.
  */
 import { EventEmitter } from "node:events";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createShelfLogger } from "../../logger.ts";
 import { createNotifyHandler } from "../build-state/notify-job.ts";
 import { world, type World } from "../build-state/test-world.ts";

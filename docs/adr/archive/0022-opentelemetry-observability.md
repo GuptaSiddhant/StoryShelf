@@ -143,7 +143,7 @@ capture therefore nests `capture.job` under the uploading request's
 - Rejected `@storyshelf/telemetry` despite being shorter and easier to spell:
   in self-hosted products "telemetry" connotes data leaving the deployment
   (phone-home usage stats to the vendor) — the opposite of this package's job
-  (export to the *operator's own* collector) and corrosive to the
+  (export to the _operator's own_ collector) and corrosive to the
   your-data-stays-here promise. **The word `telemetry` is hereby reserved for
   a future opt-in anonymous usage-reporting feature**, where it is accurate.
 

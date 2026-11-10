@@ -1,5 +1,5 @@
 import { PNG } from "pngjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { downscaleWithPngjs } from "./pngjs-downscale.ts";
 
 function solid(width: number, height: number, value: number): Uint8Array {

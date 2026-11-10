@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { DDL } from "./ddl.ts";
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("drizzle-orm/postgres-js", () => ({
   // A transaction over a database with no baselines: every statement answers no rows.
