@@ -34,7 +34,7 @@ jobs:
           # Later spike commits edit files the migration added (vite.config.ts), so a plain
           # `git revert` would conflict: put back every path the migration touched instead.
           git diff --name-status "$MIGRATION_SHA^" "$MIGRATION_SHA" | while IFS=$'\t' read -r st path; do
-            if [ "$st" = "A" ]; then git rm -rqf --ignore-unmatch -- "$path"; else git checkout "$MIGRATION_SHA^" -- "$path"; fi
+            if [ "$st" = "A" ]; then git rm -rqf --ignore-unmatch -- "$path"; else git checkout origin/main -- "$path" 2>/dev/null || git checkout "$MIGRATION_SHA^" -- "$path"; fi
           done
           # Files that main changed after the migration (merged in later) carry `vite-plus/test`
           # imports from my merge fixes; put the plain vitest import back everywhere.
