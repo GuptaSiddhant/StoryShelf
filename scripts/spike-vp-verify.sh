@@ -13,6 +13,11 @@ for stage in build build-storybook lint test; do
   vp run -r --concurrency-limit "${VP_CONCURRENCY:-1}" "${extra[@]}" "$stage" 2>&1 | tee ".tmp/vp-$label-$stage.log" | tail -n 5
   code=${PIPESTATUS[0]}
   t1=$(date +%s)
+  if [ "$code" -ne 0 ]; then
+    echo "::group::$stage failures"
+    grep -nE "FAIL|AssertionError|Error:|✗|×|SIGTRAP|failed" ".tmp/vp-$label-$stage.log" | head -40
+    echo "::endgroup::"
+  fi
   {
     echo "### $stage: $((t1 - t0))s (exit $code)"
     echo '```'
