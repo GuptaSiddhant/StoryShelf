@@ -36,7 +36,7 @@ Facts checked against the code on 2026-11-11, which the decisions below rely on:
 - **Session answers are publicly cacheable.** Files of a signed-in viewer's private build are sent
   with `Cache-Control: public, max-age=31536000, immutable` on the project path and on the ULID short
   link (`storybook.handlers.ts`, the `IMMUTABLE` constant; `published-files.ts` sends the caller's
-  `cacheControl` for every access except `token`). See the Open points.
+  `cacheControl` for every access except `token`). Tracked as #923; decision 9 gives the target.
 
 ## Decision
 
@@ -49,7 +49,8 @@ storybookHosting?: { mode: "trusted" | "sandboxed" | "subdomain"; baseDomain?: s
 - An unset value means `trusted`, which keeps today's behaviour.
 - `baseDomain` is required for `subdomain` and refused for the other modes.
 - Boot validation lower-cases the value, drops one trailing dot, and refuses a port, a scheme, a
-  wildcard, a label that is not a valid DNS label, and a domain equal to the portal's host.
+  wildcard, a label that is not a valid DNS label, a domain equal to the portal's host, and a parent
+  of the portal's host (portal `a.example.com`, `baseDomain` `example.com`).
 - A configured value that does not validate stops the server from starting. It never falls back to
   `trusted`.
 - `publishedBaseDomain` is retired in decision 6.
@@ -92,13 +93,16 @@ amendment is part of the implementation, not of this ADR.
   `signed-storybook` rate-limit bucket in `mountGuards`. Refusals are one identical 404, as on `/_s/`.
 - The token stays in the URL in mode 3. An opaque origin sends no cookie, so the URL is the only
   credential that can reach it. That is accepted and bounded by the lifetime.
-- Rotating the server secret invalidates grants (see the Open points for `previousSecret`).
+- Read grants verify with the current secret only, never with `previousSecret`, so a rotation ends
+  every read grant at once. They last at most one hour, so this is acceptable. Capture grants keep the
+  ADR 0007 rule, which accepts `previousSecret` during rotation.
+- The read token is single-use at the exchange in mode 5.
 
 ### 5. `subdomain`: one content host per build
 
-- A build is served at `<build-id>.<baseDomain>`, with the build id in lower case. The id is one DNS
-  label, so one wildcard certificate covers every build. The host lookup is case-insensitive, because
-  build ids are stored in upper case.
+- A build is served at `<build-id>.<baseDomain>`. The host label is the lower-case form of the build id,
+  which is stored as an upper-case ULID (`ulid.ts`). The lookup is case-insensitive. The label is one
+  DNS label, so one wildcard certificate covers every build.
 - `<project-slug>.<baseDomain>` redirects to that project's published build (the latest approved
   build on the default branch, as the short link does).
 - Refused as project slugs, and as the label of a content host: a 26-character ULID shape (already
@@ -110,9 +114,15 @@ amendment is part of the implementation, not of this ADR.
   to `https://<build-id>.<baseDomain>/_r/<token>/`. The content host exchanges the grant once for a
   host-only cookie: no `Domain`, `Secure`, `HttpOnly`, `SameSite=Lax`, and a `Max-Age` equal to the
   grant's lifetime. It then redirects to the clean URL. Renewal, revocation and rotation are as in
-  decision 4. The cookie's name and value are fixed in #358.
-- Sandbox headers are optional in this mode, because the origin already isolates. See the Open points
-  on same-site.
+  decision 4. The cookie is named `__Host-storyshelf-grant`: the `__Host-` prefix forces `Secure`,
+  `Path=/` and no `Domain`. Its value is the grant's opaque id or a sealed token, decided in #358. It is
+  never the read token itself.
+- The sandbox header is required in this mode too (decision 3's header, on every content answer). It
+  is defence in depth. A content host under the portal's registrable domain is same-site with the
+  portal, and `SameSite=Lax` cookies still flow on same-site requests, so the origin split alone is not
+  enough. The docs recommend a `baseDomain` on a separate registrable domain, but do not require it, so
+  a single-domain operator can still run this mode. CSRF protection against same-site requests is an
+  acceptance item of #359 (#786).
 
 ### 6. `publishedBaseDomain` is retired
 
@@ -154,15 +164,19 @@ Credentials and CORS:
 | Content host `<build-id>.<baseDomain>/*` (new)       | `hosting` | Host-only cookie from the exchange, or none for public builds | `*` for public builds, nothing for private                               |
 | Project alias host `<slug>.<baseDomain>` (new)       | `hosting` | None                                                          | None: it only redirects                                                  |
 
-Cache and headers (current code is marked):
+Cache and headers. These are the targets by access. The current values for a signed-in viewer are
+wrong for private files and are tracked as #923.
 
-| Route family                              | `Cache-Control`                                                  | Sandbox CSP                      | Other                            |
-| ----------------------------------------- | ---------------------------------------------------------------- | -------------------------------- | -------------------------------- |
-| Project path and short link, public build | `public, max-age=31536000, immutable` (current)                  | Only in `sandboxed`              | `Referrer-Policy` none (current) |
-| Project path and short link, session      | `public, max-age=31536000, immutable` (current; see Open points) | Only in `sandboxed` (via `/_r/`) | As above                         |
-| `/_s/<token>/*`                           | `private, no-store`, or the capture cache rule                   | Not set (current)                | `no-referrer`, `noindex`         |
-| `/_r/<token>/*` (new)                     | `private, no-store`                                              | Always                           | `no-referrer`, `noindex`         |
-| Content host                              | Per build, immutable after decision 7                            | Optional in `subdomain`          | `Referrer-Policy` set            |
+| Route family                                  | `Cache-Control` (target)                                                | Sandbox CSP                      | Other                    |
+| --------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------- | ------------------------ |
+| Project path and short link, `public` access  | `public, max-age=31536000, immutable` (as today)                        | Only in `sandboxed`              | `Referrer-Policy` none   |
+| Project path and short link, `session` access | `private, max-age=31536000, immutable` (today `public`; #923)           | Only in `sandboxed` (via `/_r/`) | As above                 |
+| Slug short link `/_/<slug>/*`, `public`       | `public, max-age=60` or `public, max-age=3600` (as today)               | Only in `sandboxed`              | As above                 |
+| Slug short link `/_/<slug>/*`, `session`      | `private, max-age=60` or `private, max-age=3600` (today `public`; #923) | Only in `sandboxed`              | As above                 |
+| `/_s/<token>/*`                               | `private, no-store`, or the capture cache rule (ADR 0007)               | Not set                          | `no-referrer`, `noindex` |
+| `/_r/<token>/*` (new)                         | `private, no-store`                                                     | Always                           | `no-referrer`, `noindex` |
+| Content host, public build                    | `public, max-age=31536000, immutable`                                   | Required (decision 5)            | `Referrer-Policy` set    |
+| Content host, private build                   | `private, max-age=31536000, immutable`                                  | Required (decision 5)            | `Referrer-Policy` set    |
 
 Every route family that serves a build passes through `publishedAccess`, and CORS comes only from
 `publishedCorsHeaders`. A route that answers nothing for a token is refused with the same 404 as a
@@ -188,6 +202,8 @@ missing build.
   expires in an open page loses sub-resources until the frame reloads through the canonical path.
 - Revocation and logout take up to one hour to reach an open private page in modes 3 and 5.
 - Write-once builds change the upload API for the CLI's retry path.
+- Private files of a signed-in viewer must stop being publicly cacheable before any mode ships. That
+  fix is #923, and it is independent of this ADR's modes.
 
 ## Alternatives considered
 
@@ -196,29 +212,3 @@ missing build.
 - **A portal cookie with `Domain=`.** Refused: the cookie would reach every content host under the
   domain, which is the leak the host-only cookie exists to prevent.
 - **A header-only stopgap on the app origin.** Rejected in the ADR 0010 amendment (#916).
-
-## Open points for the architect
-
-These are contradictions found in the code, or places where a decision above needs a second look.
-None is settled in this ADR.
-
-1. **Same-site, not same-origin (mode 5).** A content host under the portal's registrable domain is
-   same-site with the portal. The origin split does not stop a content page from sending requests
-   that carry the portal's `SameSite=Lax` cookies, because `Lax` allows same-site requests. Options:
-   refuse a `baseDomain` that shares the portal's registrable domain, or keep the sandbox header in
-   mode 5.
-2. **Session answers are publicly cacheable today.** `storybook.handlers.ts` (`IMMUTABLE`) and
-   `published-files.ts` send `public, max-age=31536000, immutable` to a signed-in viewer's private
-   build. A shared cache in front of the app could store it and serve it to anyone. The target value
-   for session answers needs a decision before #357.
-3. **Build ids are upper case.** Decision 5 says lower case. The stored and generated form is upper
-   case (`ulid.ts`), so the host label is its lower-case form and the lookup is case-insensitive, as
-   written above.
-4. **`previousSecret`.** ADR 0007 lets `previousSecret` verify during rotation. Decision 4 says rotation
-   invalidates every grant. Both can hold only if read grants stop verifying under `previousSecret`,
-   and that needs a decision.
-5. **Cookie name and value.** The host-only cookie's name and value are not decided here; they are
-   left to #358.
-6. **Validation of `baseDomain`.** Decision 1 refuses a domain equal to the portal's host. It should
-   also refuse a parent of the portal's host (portal `a.example.com`, `baseDomain` `example.com`),
-   because that makes the content hosts same-site with the portal.

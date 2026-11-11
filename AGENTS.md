@@ -129,7 +129,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `servePublishedFile`/`publishedRelativePath`; CORS only from `publishedCorsHeaders`. The signed
   route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
   `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
-  `/_s/` or widen what a token grants. Only `signedCacheControl` (`packages/app/src/routers/
+  `/_s/` or widen what a token grants (ADR 0051, proposed: the one exception, once that ADR is
+  accepted, is the `/_r/` read grant, one build with purpose `read`, and nothing more). Only `signedCacheControl` (`packages/app/src/routers/
 capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
   manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
   by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
