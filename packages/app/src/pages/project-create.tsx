@@ -8,6 +8,75 @@ export interface ProjectCreateFormState {
   globalError?: string;
 }
 
+/** Submit and cancel buttons of the creation form. */
+function ProjectCreateActions(): ReturnType<typeof HStack> {
+  return (
+    <div class="mt-1">
+      <HStack>
+        <Button variant="primary" type="submit" icon="plus">
+          Create project
+        </Button>
+        <Button variant="secondary" href="/projects">
+          Cancel
+        </Button>
+      </HStack>
+    </div>
+  );
+}
+
+/** The creation form card: name, git repository, default branch. */
+function ProjectCreateForm(props: {
+  values: NonNullable<ProjectCreateFormState["values"]>;
+  errors: Record<string, string>;
+}): ReturnType<typeof Card> {
+  const { values, errors } = props;
+  return (
+    <div class="max-w-prose">
+      <Card>
+        <form
+          method="post"
+          action="/projects/new"
+          hx-post="/projects/new"
+          hx-target="body"
+          hx-swap="outerHTML"
+          novalidate
+        >
+          <Field
+            label="Name"
+            name="name"
+            required
+            autofocus
+            value={values.name ?? ""}
+            placeholder="Design System"
+            error={errors["name"]}
+            hint="Human readable name. A URL-friendly slug is generated automatically."
+            autocomplete="off"
+          />
+
+          <Field
+            label="Git repository"
+            name="gitRepository"
+            value={values.gitRepository ?? ""}
+            placeholder="acme/design-system"
+            error={errors["gitRepository"]}
+            hint="Optional owner/repo for status checks and links."
+          />
+
+          <Field
+            label="Default branch"
+            name="gitDefaultBranch"
+            value={values.gitDefaultBranch ?? "main"}
+            placeholder="main"
+            hint="Baselines fall back to this branch when no branch-specific baseline exists."
+          />
+
+          <ProjectCreateActions />
+        </form>
+      </Card>
+    </div>
+  );
+}
+
 /** New-project form page (one project corresponds to one Storybook). */
 export function renderProjectCreatePage(state: ProjectCreateFormState = {}): RenderedContent {
   const values = state.values ?? {};
@@ -28,58 +97,7 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
         </Alert>
       ) : null}
 
-      <div class="max-w-prose">
-        <Card>
-          <form
-            method="post"
-            action="/projects/new"
-            hx-post="/projects/new"
-            hx-target="body"
-            hx-swap="outerHTML"
-            novalidate
-          >
-            <Field
-              label="Name"
-              name="name"
-              required
-              autofocus
-              value={values.name ?? ""}
-              placeholder="Design System"
-              error={errors["name"]}
-              hint="Human readable name. A URL-friendly slug is generated automatically."
-              autocomplete="off"
-            />
-
-            <Field
-              label="Git repository"
-              name="gitRepository"
-              value={values.gitRepository ?? ""}
-              placeholder="acme/design-system"
-              error={errors["gitRepository"]}
-              hint="Optional owner/repo for status checks and links."
-            />
-
-            <Field
-              label="Default branch"
-              name="gitDefaultBranch"
-              value={values.gitDefaultBranch ?? "main"}
-              placeholder="main"
-              hint="Baselines fall back to this branch when no branch-specific baseline exists."
-            />
-
-            <div class="mt-1">
-              <HStack>
-                <Button variant="primary" type="submit" icon="plus">
-                  Create project
-                </Button>
-                <Button variant="secondary" href="/projects">
-                  Cancel
-                </Button>
-              </HStack>
-            </div>
-          </form>
-        </Card>
-      </div>
+      <ProjectCreateForm values={values} errors={errors} />
     </DocumentLayout>
   );
 }

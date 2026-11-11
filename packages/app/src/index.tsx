@@ -13,7 +13,11 @@ import {
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
-import { configureOutbound, STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
+import {
+  configureOutbound,
+  STORYBOOK_READ_PREFIX,
+  STORYBOOK_TOKEN_PREFIX,
+} from "@storyshelf/core/utils";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and notifier
  * adapters into a complete self-hosted visual-testing Hono app.
@@ -67,6 +71,7 @@ import { registerNotificationSubscriptions } from "./routers/notification-subscr
 import { registerPreviewToken } from "./routers/preview-token.ts";
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
+import { registerReadGrants } from "./routers/read-grants.ts";
 import { registerReviewForms } from "./routers/review-forms.ts";
 import { registerSignedStorybook } from "./routers/signed-storybook.ts";
 import { registerStorybook } from "./routers/storybook.ts";
@@ -268,7 +273,7 @@ const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] 
   },
 ];
 
-/** Requests per minute per client IP on the signed Storybook URL route (`testing.storybookUrlRateLimit`). */
+/** Requests per minute per client IP on the signed Storybook URL route (`storybookUrlRateLimit`, alias `testing.storybookUrlRateLimit`). */
 const DEFAULT_STORYBOOK_URL_RATE_LIMIT = 6000;
 
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
@@ -277,8 +282,11 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOption
   // A render fetches thousands of assets from one farm IP, so this floor is generous; it counts
   // before the token is looked at and answers 429 alike for any token.
   const signedUrls = {
-    paths: [`${STORYBOOK_TOKEN_PREFIX}*`],
-    max: options.testing?.storybookUrlRateLimit ?? DEFAULT_STORYBOOK_URL_RATE_LIMIT,
+    paths: [`${STORYBOOK_TOKEN_PREFIX}*`, `${STORYBOOK_READ_PREFIX}*`],
+    max:
+      options.storybookUrlRateLimit ??
+      options.testing?.storybookUrlRateLimit ??
+      DEFAULT_STORYBOOK_URL_RATE_LIMIT,
     bucket: "signed-storybook",
   };
   for (const { paths, max, bucket } of [...RATE_LIMITS, signedUrls]) {
@@ -381,12 +389,18 @@ function registerAuthFlow(app: ShelfRouter, options: ShelfOptions): void {
   registerConnections(app);
 }
 
+/** The two token routes that read a build without a session: `/_s/` (capture) and `/_r/` (read grant). */
+function registerTokenStorybook(app: ShelfRouter): void {
+  registerSignedStorybook(app);
+  registerReadGrants(app);
+}
+
 /** Register HTML pages, assets, and the optional auth flow. */
 function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
   registerAuthFlow(app, options);
   registerAssets(app);
   registerStorybook(app);
-  registerSignedStorybook(app);
+  registerTokenStorybook(app);
   registerPreviewToken(app);
   registerAdminPages(app, health, options.auth);
   registerPublicOriginRoutes(app);

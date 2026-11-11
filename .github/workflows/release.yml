@@ -5,13 +5,13 @@ name: Release
 # composite action that runs inside these jobs, so the OIDC token still names this file. A run picks
 # one channel (`detect`):
 #
-# - stable: a push to `main` (or the daily run) whose shared version has no `v<version>` tag yet,
+# - stable: a push to `main` whose shared version has no `v<version>` tag yet,
 #   which is what merging a release pull request (`nub run release:prepare`) produces. Validate,
 #   publish `latest` to npm, create tag `v<version>`, create the GitHub Release.
-# - next: once a day (`schedule`), while changesets are pending and a package changed since the last
-#   `next` build, a throwaway `x.y.z-next-<sha>` build of every package goes to npm under the `next`
-#   dist-tag; the version is never committed. A quiet day publishes nothing, and a push to `main`
-#   never publishes `next`.
+# - next: only by hand (`workflow_dispatch`, channel `next`) while changesets are pending: a
+#   throwaway `x.y.z-next-<sha>` build of every package goes to npm under the `next` dist-tag; the
+#   version is never committed. A push to `main` never publishes `next`, and there is no daily run
+#   (ADR 0043, amendment 2026-11-11): `main` is previewed through pkg.pr.new (`release-preview.yml`).
 # - none: nothing to publish.
 #
 # `workflow_dispatch` with channel `next` publishes a `next` build now. With channel `stable` (input:
@@ -31,8 +31,6 @@ on:
       - "scripts/changeset-lib.mjs"
       - ".github/actions/npm-publish/**"
       - ".github/workflows/release.yml"
-  schedule:
-    - cron: "23 2 * * *" # daily `next` build, debounced by `detect`
   workflow_dispatch:
     inputs:
       channel:
@@ -71,7 +69,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # tags decide whether this version was released; history, what changed since next
+          fetch-depth: 0 # tags decide whether this version was released; history, which commit it was
           persist-credentials: false
 
       - name: Detect
