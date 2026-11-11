@@ -129,7 +129,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `servePublishedFile`/`publishedRelativePath`; CORS only from `publishedCorsHeaders`. The signed
   route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
   `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
-  `/_s/` or widen what a token grants. Only `signedCacheControl` (`packages/app/src/routers/
+  `/_s/` or widen what a token grants (ADR 0051: the only exceptions are the `/_r/` read grant,
+  one build with purpose `read`, and the content host's `/_x/` exchange, purpose `exchange`; nothing more). Only `signedCacheControl` (`packages/app/src/routers/
 capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
   manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
   by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
@@ -227,6 +228,7 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
   accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
   versioned Terraform module per cloud on the published image.
+- **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 
 ## Conventions
 

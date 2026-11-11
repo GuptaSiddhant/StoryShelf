@@ -170,3 +170,31 @@ snippet) and `HttpRequestOptions` (`method`, `headers`, `json`, `timeoutMs` defa
 | Collapsing zero-dependency adapters into core               | Grows the bundle that runners and workers must keep small                               |
 | A separate router-without-UI package                        | Every HTML route needs the pages, so it would have no consumer                          |
 | `ky` / `ofetch` for outbound HTTP                           | About 120 lines of helper do not justify a third-party dependency                       |
+
+## Amendment, 2026-11-11 (other story sources; owner)
+
+- **Correction to decision 3.** Decision 3 says another explorer can be added "without changing the
+  pipeline". That is not true today. `StorySourceAdapter` exists (`packages/core/src/capture/adapter.ts:126`),
+  but `new StorybookAdapter()` is hard-coded at these production sites:
+  - `packages/core/src/capture/orchestrator.ts:258` and `packages/core/src/capture/tests.ts:112`;
+  - `packages/runner-playwright/src/pipeline.ts:249` and `:297`, and `packages/runner-playwright/src/tests.ts:137`;
+  - `packages/runner-puppeteer/src/pipeline.ts:229` and `packages/runner-puppeteer/src/tests.ts:131`.
+
+  The in-page half (settle, play status, parameters, the `#storybook-root` selector) lives in the runners
+  and talks to Storybook's globals directly.
+
+- **Where a new source goes.** A future source (Ladle, Histoire, a static page list) is built into core
+  under `core/src/sources/<tool>/`, per ADR 0049's dependency rule. It gets no package per tool and no
+  `@storyshelf/sources`. A separate package is justified only if a source brings a real third-party
+  dependency.
+- **`affected` stays a zero-dependency leaf.** Its three Storybook bindings (the `preview-stats.json` name,
+  reading `index.json`, the `.storybook/` rule) become inputs when a second source arrives. The addon stays
+  Storybook-only (ADR 0042).
+- **Review rule, now.** No new `new StorybookAdapter()`, `__STORYBOOK_*` or `#storybook-root` site outside
+  the files that already hold them.
+- **Later, only when a second source is requested.** An ADR for the wider interface (a server half and an
+  in-page half); the Storybook code moved under `core/src/sources/storybook/`; the in-page scripts moved into
+  core; and a per-project source field defaulting to `storybook`. Component-test screenshots and live external
+  URLs are not sources and need their own ADRs.
+- **Package target.** 19 published packages, as ADR 0049 counts them (with `@storyshelf/storybook-addon`,
+  ADR 0042). `storage-local` stays its own package (#367).
