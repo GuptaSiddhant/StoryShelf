@@ -9,11 +9,13 @@ import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
 import {
   hiddenFrom,
+  hostingMode,
   publishedAccess,
   publishedCacheControl,
   type PublishedFreshness,
 } from "./published-access.ts";
 import { publishedRelativePath, servePublishedFile } from "./published-files.ts";
+import { redirectToReadGrant } from "./read-grants.ts";
 
 type Access = NonNullable<Awaited<ReturnType<typeof publishedAccess>>>;
 
@@ -127,11 +129,16 @@ async function serveShortBuild(c: Context, link: ShortLink): Promise<Response> {
       "cache-control": publishedCacheControl(access, "page"),
     });
   }
+  if (access === "session" && hostingMode() === "sandboxed") {
+    // A sandboxed frame sends no cookie: the private build is read through a grant (ADR 0051).
+    return redirectToReadGrant(c, project, build, rest);
+  }
   const served = await servePublishedFile(c, {
     projectId: project.id,
     buildId: build.id,
     rel: rest === "" ? "index.html" : rest,
     access,
+    family: "short",
     freshness: shortLinkFreshness(isUlid, rest === ""),
   });
   if (served) return served;
@@ -178,11 +185,24 @@ async function serveBuild(
   if (rest === "") {
     return await storybookLanding(c, project, build, access);
   }
+  return await serveBuildFile(c, { project, build, access, rest });
+}
+
+/** A file of the canonical path: a read-grant redirect in `sandboxed` mode, otherwise the file. */
+async function serveBuildFile(
+  c: Context,
+  target: { project: Project; build: Build; access: Access; rest: string },
+): Promise<Response> {
+  const { project, build, access, rest } = target;
+  if (access === "session" && hostingMode() === "sandboxed") {
+    return redirectToReadGrant(c, project, build, rest);
+  }
   const served = await servePublishedFile(c, {
     projectId: project.id,
     buildId: build.id,
     rel: rest,
     access,
+    family: "project",
     freshness: "immutable",
   });
   return served ?? c.notFound();

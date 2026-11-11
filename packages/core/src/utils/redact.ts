@@ -6,13 +6,18 @@
  * logs) must pass through here before truncation or transport.
  */
 
-import { STORYBOOK_TOKEN_PREFIX, STORYBOOK_TOKEN_SOURCE } from "./storybook-token.ts";
+import {
+  STORYBOOK_READ_PREFIX,
+  STORYBOOK_TOKEN_PREFIX,
+  STORYBOOK_TOKEN_SOURCE,
+} from "./storybook-token.ts";
 
 const SECRET_PATTERNS: RegExp[] = [
   /(:\/\/)[^/\s:]+:[^/\s@]+(?=@)/u,
   /([?&#](?:token|secret|password|api[_-]?key|auth[_-]?token|access[_-]?key)=)[^&#\s]*/giu,
   /((?:password|passwd|secret|token|api[_-]?key|auth[_-]?token|client[_-]?secret|access[_-]?key|private[_-]?key)\s*[:=]\s*['"]?)[^\s'";,[\]&]+/giu,
   new RegExp(`(${STORYBOOK_TOKEN_PREFIX})${STORYBOOK_TOKEN_SOURCE}`, "gu"),
+  new RegExp(`(${STORYBOOK_READ_PREFIX})${STORYBOOK_TOKEN_SOURCE}`, "gu"),
   /AKIA[0-9A-Z]{16}/gu,
   /gh[pous]_[A-Za-z0-9_]+/gu,
   /github_pat_[A-Za-z0-9_]+/gu,

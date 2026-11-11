@@ -168,8 +168,8 @@ function assertNotificationsConfig(config: unknown): void {
 /**
  * The boot refusals of ADR 0051, decision 1, that need more than the hosting object: `sandboxed` and
  * `subdomain` mint grants, so with sign-in on they need the server `secret`. A broken value stops
- * boot; it never falls back to `trusted`. The `subdomain` mode (#358) and the `sandboxed` mode's
- * serving (#357) are not wired yet, so both are refused rather than served as `trusted`.
+ * boot; it never falls back to `trusted`. The `subdomain` mode (#358) is not wired yet, so it is
+ * refused rather than served as `trusted`.
  */
 function assertStorybookHosting(options: ShelfOptions): void {
   const mode = options.config?.storybookHosting?.mode;
@@ -181,5 +181,7 @@ function assertStorybookHosting(options: ShelfOptions): void {
       `storybookHosting.mode "${mode}" needs config.secret when sign-in is on: read grants are signed with it`,
     );
   }
-  throw new Error(`storybookHosting.mode "${mode}" is not available in this version`);
+  if (mode !== "sandboxed") {
+    throw new Error(`storybookHosting.mode "${mode}" is not available in this version`);
+  }
 }
