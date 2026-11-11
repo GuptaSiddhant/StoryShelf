@@ -52,6 +52,42 @@ describe("deliverBuildState: a skipped build (ADR 0044)", () => {
   });
 });
 
+describe("deliverBuildState: a skipped build's Storybook status (ADR 0044)", () => {
+  const skippedFromApproved = async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "approved");
+    const skipped = await w.builds.createSkipped({
+      projectId: w.project.id,
+      gitSha: "fedcba987654",
+      gitBranch: "feature/x",
+      sourceBuildId: w.build.id,
+      changedFiles: [],
+    });
+    const run = async () =>
+      await deliverBuildState(
+        { ...w.deps, flags: () => ({ testing: true, review: false }) },
+        { buildId: skipped.id, channelId: w.channelId },
+      );
+    return { w, run };
+  };
+
+  it("links the source's Storybook while the source is published", async () => {
+    const { w, run } = await skippedFromApproved();
+    await w.storage.write(
+      `${storybookDir(w.project.id, w.build.id)}/manifest.json`,
+      Buffer.from("{}"),
+    );
+    await run();
+    expect(statusLog(w.git)).toContainEqual(["storyshelf/storybook", "success"]);
+  });
+
+  it("leaves the Storybook status out while the source is not available", async () => {
+    const { w, run } = await skippedFromApproved();
+    await run();
+    expect(statusLog(w.git)).toEqual([["storyshelf/testing", "success"]]);
+  });
+});
+
 describe("deliverBuildState", () => {
   it("shows a build that was never captured: pending statuses and the comment", async () => {
     const w = await world();
