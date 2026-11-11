@@ -10,7 +10,12 @@ import { isSafeSegment, mimeFor, type StorybookTokenClaims } from "@storyshelf/c
 import type { Context } from "hono";
 import { getStore } from "../store.ts";
 import { signedCacheControl, SIGNED_NO_STORE } from "./capture-cache.ts";
-import { publishedCorsHeaders, type PublishedAccess } from "./published-access.ts";
+import {
+  publishedCacheControl,
+  publishedCorsHeaders,
+  type PublishedAccess,
+  type PublishedFreshness,
+} from "./published-access.ts";
 import { acceptsGzip, publishedGzip } from "./published-compression.ts";
 
 /**
@@ -57,8 +62,11 @@ export interface PublishedFileRequest {
   /** A path accepted by {@link publishedRelativePath}, not the root. */
   rel: string;
   access: PublishedAccess;
-  /** `Cache-Control` of a normal answer; a signed URL answers `signedCacheControl` instead. */
-  cacheControl: string;
+  /**
+   * How long a normal answer may be kept. The header itself comes from `publishedCacheControl`, so a
+   * caller cannot pass its own value. A signed URL ignores it and answers `signedCacheControl`.
+   */
+  freshness: PublishedFreshness;
   /** The verified claims of a signed URL's token; decides whether its answer may be fresh. */
   grant?: StorybookTokenClaims | undefined;
 }
@@ -84,7 +92,7 @@ export async function servePublishedFile(
             immutable: file.contentHash !== undefined,
           }),
         }
-      : { "cache-control": request.cacheControl };
+      : { "cache-control": publishedCacheControl(access, request.freshness) };
   const mime = mimeFor(rel);
   const compressed =
     config.publishedCompression && acceptsGzip(c.req.header("accept-encoding"))

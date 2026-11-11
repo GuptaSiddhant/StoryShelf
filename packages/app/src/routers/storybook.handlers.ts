@@ -7,15 +7,18 @@ import { posix } from "node:path";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
-import { hiddenFrom, publishedAccess } from "./published-access.ts";
+import {
+  hiddenFrom,
+  publishedAccess,
+  publishedCacheControl,
+  type PublishedFreshness,
+} from "./published-access.ts";
 import { publishedRelativePath, servePublishedFile } from "./published-files.ts";
 
 type Access = NonNullable<Awaited<ReturnType<typeof publishedAccess>>>;
 
 /** A short link resolved to its build, with the caller's access and the path inside the build. */
 type ShortLink = { project: Project; build: Build; access: Access; isUlid: boolean; rest: string };
-
-const IMMUTABLE = "public, max-age=31536000, immutable";
 
 /** Check whether a build's extracted statics are available for serving. */
 async function staticsReady(projectId: string, buildId: string): Promise<boolean> {
@@ -61,12 +64,12 @@ function unreachable(c: Context): Response | Promise<Response> {
   return c.notFound();
 }
 
-/** Cache policy of the short link: a ULID names one build forever; a slug follows the latest. */
-function shortLinkCache(isUlid26: boolean, isRoot: boolean): string {
+/** Freshness of the short link: a ULID names one build forever; a slug follows the latest. */
+function shortLinkFreshness(isUlid26: boolean, isRoot: boolean): PublishedFreshness {
   if (isUlid26) {
-    return IMMUTABLE;
+    return "immutable";
   }
-  return isRoot ? "public, max-age=60" : "public, max-age=3600";
+  return isRoot ? "minute" : "hour";
 }
 
 async function projectBySlug(slug: string): Promise<Project> {
@@ -120,14 +123,16 @@ export async function serveShortLink(c: Context): Promise<Response> {
 async function serveShortBuild(c: Context, link: ShortLink): Promise<Response> {
   const { project, build, access, isUlid, rest } = link;
   if (rest === "" && !(await staticsReady(project.id, build.id))) {
-    return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
+    return c.html(renderStorybookPreparingPage(project, build, project.slug), 200, {
+      "cache-control": publishedCacheControl(access, "page"),
+    });
   }
   const served = await servePublishedFile(c, {
     projectId: project.id,
     buildId: build.id,
     rel: rest === "" ? "index.html" : rest,
     access,
-    cacheControl: shortLinkCache(isUlid, rest === ""),
+    freshness: shortLinkFreshness(isUlid, rest === ""),
   });
   if (served) return served;
   const fallback = isUlid
@@ -171,25 +176,35 @@ async function serveBuild(
     return denied(c, hidden);
   }
   if (rest === "") {
-    return await storybookLanding(c, project, build);
+    return await storybookLanding(c, project, build, access);
   }
   const served = await servePublishedFile(c, {
     projectId: project.id,
     buildId: build.id,
     rel: rest,
     access,
-    cacheControl: IMMUTABLE,
+    freshness: "immutable",
   });
   return served ?? c.notFound();
 }
 
-async function storybookLanding(c: Context, project: Project, build: Build): Promise<Response> {
+async function storybookLanding(
+  c: Context,
+  project: Project,
+  build: Build,
+  access: Access,
+): Promise<Response> {
+  const headers = { "cache-control": publishedCacheControl(access, "page") };
   if (!(await staticsReady(project.id, build.id))) {
-    return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
+    return c.html(renderStorybookPreparingPage(project, build, project.slug), 200, headers);
   }
   const storyId = c.req.query("storyId") ?? c.req.query("id") ?? undefined;
   const viewMode = c.req.query("viewMode") === "docs" ? "docs" : undefined;
-  return c.html(renderStorybookPage(project, build, project.slug, { storyId, viewMode }), 200);
+  return c.html(
+    renderStorybookPage(project, build, project.slug, { storyId, viewMode }),
+    200,
+    headers,
+  );
 }
 
 /** The label value in `/projects/:slug/storybook/:key/<value>`, or null when absent or malformed. */
