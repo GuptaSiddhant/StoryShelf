@@ -2,11 +2,11 @@
 
 ## Status
 
-Proposed (architect, 2026-11-11), revised after the same day's security review, for the owner to
-accept. It settles the contract that #356 asks for, under epic #355. Implementation is tracked in
+Accepted (owner, 2026-11-11; proposed by the architect and revised after the same day's security
+review). It settles the contract that #356 asks for, under epic #355. Implementation is tracked in
 #357 (modes 1 to 4, previews, caching), #358 (subdomain, mode 5), #359 (private paths and the request
-contract of decision 9), #360 (custom domains, out of scope here) and #361 (docs). Until it is
-accepted, the behaviour described in Context is the only one that ships.
+contract of decision 9), #360 (custom domains, out of scope here) and #361 (docs). Until those land,
+the behaviour described in Context is the only one that ships.
 
 ## Context
 
