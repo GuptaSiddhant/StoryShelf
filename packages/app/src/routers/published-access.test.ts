@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { publishedCacheControl, type PublishedFreshness } from "./published-access.ts";
 
 const FRESHNESS: PublishedFreshness[] = ["immutable", "minute", "hour", "page"];
