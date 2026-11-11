@@ -512,3 +512,82 @@ describe("short links for a signed-out visitor (auth on)", () => {
     ).toEqual(paths.map(() => [302, "/auth/login"]));
   });
 });
+
+describe("published answers by access (#923)", () => {
+  const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+  const viewer = { id: "u1", email: "a@example.com", name: "Ada", role: "admin" as const };
+
+  /** One private build, reachable by its path, its ULID and its slug, with the files a page needs. */
+  async function privateBuildApp(auth: ReturnType<typeof stubAuth>) {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ public: false }));
+    await db.insert(
+      db.tables.builds,
+      mockBuild({ id: ulid, public: false, gitBranch: "feature/x" }),
+    );
+    for (const id of ["b1", ulid]) {
+      objects.set(`${storybookDir("p1", id)}/index.html`, Buffer.from("<html>storybook</html>"));
+      objects.set(`${storybookDir("p1", id)}/iframe.js`, Buffer.from("console.log('hi')"));
+    }
+    return createShelfApp({ database: db, storage, logger: silentLogger, auth });
+  }
+
+  it("answers a signed-in viewer's private build path as private, never shared", async () => {
+    const app = await privateBuildApp(stubAuth(viewer));
+    const response = await app.request("/projects/test-project/storybook/build/b1/iframe.js");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+  });
+
+  it("keeps a public build's path publicly cacheable", async () => {
+    const { app } = await seededApp();
+    const response = await app.request("/projects/test-project/storybook/build/b1/iframe.js");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+  });
+
+  it("answers a signed-in viewer's private build by its ULID short link as private", async () => {
+    const app = await privateBuildApp(stubAuth(viewer));
+    const response = await app.request(`/_/${ulid}/iframe.js`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+  });
+
+  it("answers a signed-in viewer's private slug short link as private, root and files alike", async () => {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ public: false }));
+    objects.set(`${storybookDir("p1", "b1")}/index.html`, Buffer.from("<html>storybook</html>"));
+    objects.set(`${storybookDir("p1", "b1")}/iframe.html`, Buffer.from("<html>preview</html>"));
+    objects.set(`${storybookDir("p1", "b1")}/iframe.js`, Buffer.from("console.log('hi')"));
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      auth: stubAuth(viewer),
+    });
+    const root = await app.request("/_/test-project/");
+    expect(root.status).toBe(200);
+    expect(root.headers.get("cache-control")).toBe("private, max-age=60");
+    const file = await app.request("/_/test-project/iframe.js");
+    expect(file.status).toBe(200);
+    expect(file.headers.get("cache-control")).toBe("private, max-age=3600");
+  });
+
+  it("answers a private landing page as private, to be revalidated", async () => {
+    const app = await privateBuildApp(stubAuth(viewer));
+    const response = await app.request("/projects/test-project/storybook/build/b1/");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-cache");
+  });
+
+  it("answers a public landing page as public, to be revalidated", async () => {
+    const { app } = await seededApp();
+    const response = await app.request("/projects/test-project/storybook/build/b1/");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("public, no-cache");
+  });
+});
