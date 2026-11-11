@@ -51,3 +51,5 @@ export {
   type SeededBaseline,
   type SeededSnapshot,
 } from "./retention-activation-contract.ts";
+
+export { publicNetworkForTests } from "./public-network.ts";

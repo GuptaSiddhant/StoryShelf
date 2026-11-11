@@ -103,8 +103,21 @@ export interface CaptureAssetsConfig {
   cacheMaxAgeSeconds?: number;
 }
 
+/** Policy for URLs a project configured (webhooks, chat, GitLab hosts). */
+export interface OutboundConfig {
+  /**
+   * Exact hostnames (no wildcards) that project URLs may reach even when they are private
+   * addresses or plain `http`, for example a self-hosted GitLab on a private network.
+   */
+  allowHosts?: string[];
+  /** Allow plain `http` for any host. For local development only. */
+  allowHttp?: boolean;
+}
+
 /** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
 export interface ShelfConfig {
+  /** Policy for project-set outbound URLs; see {@link OutboundConfig}. */
+  outbound?: OutboundConfig;
   secret?: string;
   /**
    * The secret `secret` replaced. Used only to decrypt stored credentials
@@ -239,6 +252,20 @@ export const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.objec
 /** Zod schema validating the shelf-level configuration. */
 export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .object({
+    outbound: z
+      .object({
+        allowHosts: z
+          .array(
+            z
+              .string()
+              .min(1)
+              .regex(/^[^*\s/]+$/u, "exact hosts only, no wildcards"),
+          )
+          .optional(),
+        allowHttp: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     secret: z.string().min(1).optional(),
     previousSecret: z.string().min(1).optional(),
     migrateCredentialsOnBoot: z.boolean().optional(),
