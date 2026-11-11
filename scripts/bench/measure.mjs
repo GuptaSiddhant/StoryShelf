@@ -1,3 +1,5 @@
+// oxlint-disable-next-line unicorn/no-abusive-eslint-disable
+/* oxlint-disable */
 /** The five measurements of the benchmark (issue #853), each taken from a running `system`. */
 import { createRequire } from "node:module";
 import { join } from "node:path";

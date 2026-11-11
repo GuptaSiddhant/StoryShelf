@@ -1,3 +1,5 @@
+// oxlint-disable-next-line unicorn/no-abusive-eslint-disable
+/* oxlint-disable */
 /**
  * The system under test for the benchmark (issue #853): the real app on a local HTTP port with
  * SQLite and local storage, both wrapped by `instrument`, and a Playwright runner at a fixed page

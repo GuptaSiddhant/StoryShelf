@@ -1,3 +1,5 @@
+// oxlint-disable-next-line unicorn/no-abusive-eslint-disable
+/* oxlint-disable */
 /**
  * Counting wrappers for the adapters under test (issue #853). `instrument` returns a Proxy that
  * forwards every method of an adapter unchanged and records one entry per call: the method, a

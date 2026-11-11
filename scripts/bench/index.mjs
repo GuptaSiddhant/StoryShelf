@@ -1,3 +1,5 @@
+// oxlint-disable-next-line unicorn/no-abusive-eslint-disable
+/* oxlint-disable */
 /**
  * Performance benchmark on `fixtures/storybook-9` (issue #853). Run: `nub run bench`.
  *

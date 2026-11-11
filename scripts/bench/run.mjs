@@ -1,3 +1,5 @@
+// oxlint-disable-next-line unicorn/no-abusive-eslint-disable
+/* oxlint-disable */
 /** One benchmark iteration (issue #853): three uploads, the capture of each, serving and pages. */
 import { cpSync, readFileSync, rmSync, appendFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";

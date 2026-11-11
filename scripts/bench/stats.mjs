@@ -1,3 +1,5 @@
+// oxlint-disable-next-line unicorn/no-abusive-eslint-disable
+/* oxlint-disable */
 /** Median and report helpers for the benchmark (issue #853). */
 
 export function median(values) {

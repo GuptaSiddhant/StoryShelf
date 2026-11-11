@@ -1,3 +1,5 @@
+// oxlint-disable-next-line unicorn/no-abusive-eslint-disable
+/* oxlint-disable */
 /** The short text table printed after the JSON summary (issue #853). */
 import { table } from "./stats.mjs";
 
