@@ -60,6 +60,34 @@ export function isAnonymouslyViewable(
 }
 
 /**
+ * How long a normal (not signed) published answer may be kept:
+ * `immutable` for a file whose URL names its content, `minute` and `hour` for a slug short link that
+ * follows the latest build, and `page` for an HTML page that carries build state and must be
+ * revalidated.
+ */
+export type PublishedFreshness = "immutable" | "minute" | "hour" | "page";
+
+const FRESHNESS: Record<PublishedFreshness, string> = {
+  immutable: "max-age=31536000, immutable",
+  minute: "max-age=60",
+  hour: "max-age=3600",
+  page: "no-cache",
+};
+
+/**
+ * `Cache-Control` of a normal published answer, from who may read it. A `public` answer may be kept
+ * by a shared cache. A `session` answer is one viewer's private build, so only that viewer's browser
+ * may keep it: a shared cache that stored it would serve it to anyone (#923). A signed URL never
+ * comes here; `signedCacheControl` decides its answer, and anything that is not `public` is private.
+ */
+export function publishedCacheControl(
+  access: PublishedAccess,
+  freshness: PublishedFreshness,
+): string {
+  return `${access === "public" ? "public" : "private"}, ${FRESHNESS[freshness]}`;
+}
+
+/**
  * CORS headers of a published file. A sandboxed preview frame runs on an opaque origin, so its
  * module scripts are cross-origin requests without cookies: they load only when the file answers
  * `Access-Control-Allow-Origin: *`. That is offered exactly where no credentials are involved, for

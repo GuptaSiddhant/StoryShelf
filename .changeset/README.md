@@ -30,5 +30,6 @@ Fixed: the compare page keeps keyboard focus after approving (#812).
 Details for CHANGELOG.md: what changed, why, and anything an operator must do.
 ```
 
-Never edit `CHANGELOG.md` by hand. Merging to `main` publishes a `next` build when changesets are
-pending; a stable release is cut by hand (see `docs/adr/0043-release-channels.md`).
+Never edit `CHANGELOG.md` by hand. Merging to `main` publishes a pkg.pr.new preview, never an npm
+build; a stable release comes from a release pull request, and a `next` npm build only by hand (see
+`docs/adr/0043-release-channels.md`).
