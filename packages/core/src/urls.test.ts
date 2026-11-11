@@ -209,7 +209,8 @@ describe("dot segments", () => {
   });
 
   it("builds the settings entry and one tab", () => {
-    expect(urls.settings("app")).toBe("/projects/app/settings/general");
-    expect(urls.settingsTab("app", "access")).toBe("/projects/app/settings/access");
+    const local = createUrlBuilder("/");
+    expect(local.settings("app")).toBe("/projects/app/settings/general");
+    expect(local.settingsTab("app", "access")).toBe("/projects/app/settings/access");
   });
 });
