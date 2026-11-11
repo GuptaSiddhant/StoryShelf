@@ -3,13 +3,13 @@ import { CommentModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
-import type { ProjectRole } from "@storyshelf/core/types";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadInsightPanel } from "../insights/panel.ts";
 import { loadBuildDetails } from "../pages/build-detail.tsx";
 import { renderBuildDiffPage, selectedSnapshot } from "../pages/build-diff.tsx";
 import { renderComponentPage } from "../pages/component-detail.tsx";
-import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
+import { renderActiveQueue } from "../pages/compute-jobs.tsx";
 import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
 import { renderLibraryPage } from "../pages/library.tsx";
 import { renderProjectBuildsPage } from "../pages/project-builds.tsx";
@@ -29,10 +29,11 @@ import {
   returnPathOf,
 } from "./design.handlers.ts";
 import { flash } from "./flash.ts";
-import { currentProjectRole, publicMessage } from "./helpers.ts";
+import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
 import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
+import { getQueueView } from "./settings-insights.ts";
 import { registerSettingsPages } from "./settings.ts";
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
@@ -44,41 +45,6 @@ function decodeRest(value: string): string {
   } catch {
     return "";
   }
-}
-
-interface QueueView {
-  buildId: string;
-  status: string;
-  queuedAt: string;
-  startedAt?: string;
-  finishedAt?: string;
-  error?: string;
-}
-
-async function getQueueView(): Promise<QueueView[]> {
-  const queue = getStore().captureQueue;
-  if (!queue) {
-    return [];
-  }
-  const active = await queue.active();
-  return active.map((entry) => ({
-    buildId: entry.buildId,
-    status: entry.status,
-    queuedAt: entry.queuedAt,
-    startedAt: entry.startedAt,
-    finishedAt: entry.finishedAt,
-    error: entry.error,
-  }));
-}
-
-async function canManageJobs(projectId: string): Promise<boolean> {
-  const { authEnabled } = getStore();
-  if (!authEnabled) {
-    return true;
-  }
-  const roles: readonly ProjectRole[] = ["developer", "approver", "admin"];
-  const role = await currentProjectRole(projectId);
-  return Boolean(role && roles.includes(role));
 }
 
 /** Register the server-rendered HTML pages (projects, builds, diffs, labels, settings). */
@@ -146,22 +112,17 @@ export function registerUiPages(app: ShelfRouter): void {
     );
   });
 
+  // Jobs moved to the project's Insights tab; the queue card still refreshes itself from here.
   app.get("/projects/:slug/jobs", async (c) => {
     const slug = c.req.param("slug");
     const project = await new ProjectModel(getStore().db).getBySlug(slug);
     if (!project) {
       return c.notFound();
     }
-    const queueView = await getQueueView();
-    const canRetry = await canManageJobs(project.id);
     if (c.req.query("partial") === "queue") {
-      return c.html(renderActiveQueue(slug, queueView));
+      return c.html(renderActiveQueue(slug, await getQueueView()));
     }
-    const html = await renderComputeJobsPage(slug, queueView, canRetry);
-    if (!html) {
-      return c.notFound();
-    }
-    return c.html(html);
+    return c.redirect(createUrlBuilder("/").settingsTab(slug, "insights"), 302);
   });
 
   app.get("/projects/:slug/builds/:buildId/diff", async (c) => {

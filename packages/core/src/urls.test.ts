@@ -207,4 +207,9 @@ describe("dot segments", () => {
     expect(hasDotSegment("a/b.")).toBe(false);
     expect(hasDotSegment("...")).toBe(false);
   });
+
+  it("builds the settings entry and one tab", () => {
+    expect(urls.settings("app")).toBe("/projects/app/settings/general");
+    expect(urls.settingsTab("app", "access")).toBe("/projects/app/settings/access");
+  });
 });

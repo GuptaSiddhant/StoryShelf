@@ -57,7 +57,9 @@ describe("project runTests setting", () => {
       slug: string;
     };
     const tab = `/projects/${created.slug}/settings/tests`;
-    expect(await (await app.request(tab)).text()).toMatch(/name="runTests"(?![^>]*checked)/u);
+    expect(
+      await (await app.request(tab.replace("/settings/tests", "/settings/capture"))).text(),
+    ).toMatch(/name="runTests"(?![^>]*checked)/u);
 
     const save = async (fields: Record<string, string>) =>
       await app.request(tab, {
@@ -73,7 +75,9 @@ describe("project runTests setting", () => {
       runTests?: boolean;
     };
     expect(on.runTests).toBe(true);
-    expect(await (await app.request(tab)).text()).toMatch(/name="runTests"[^>]*checked/u);
+    expect(
+      await (await app.request(tab.replace("/settings/tests", "/settings/capture"))).text(),
+    ).toMatch(/name="runTests"[^>]*checked/u);
 
     expect([200, 204, 302]).toContain((await save({})).status);
     const off = (await (await json("GET", `/projects/${created.slug}`)).json()) as {

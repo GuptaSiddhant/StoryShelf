@@ -4,6 +4,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
@@ -13,7 +14,6 @@ import { asString, renderSettingsPage } from "./settings.handlers.ts";
 /** Design settings (project design files, component mapping, provider credentials). */
 export function registerDesignSettings(app: ShelfRouter): void {
   const base = "/projects/:slug/settings/design";
-  app.get(base, async (c) => c.html(await renderSettingsPage(c, "design")));
   app.post(`${base}/files`, handleAddFile);
   app.post(`${base}/files/:id/delete`, handleRemoveLink);
   app.post(`${base}/components`, handleMapComponent);
@@ -56,7 +56,7 @@ async function reject(c: Context, errors: Record<string, string>): Promise<Respo
 
 function done(c: Context, slug: string, message: string): Response {
   flash(c, message);
-  return hxRedirect(c, `/projects/${slug}/settings/design`);
+  return hxRedirect(c, settingsHref(slug, "design"));
 }
 
 async function handleAddFile(c: Context): Promise<Response> {

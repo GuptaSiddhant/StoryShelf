@@ -1,9 +1,8 @@
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
-import { loadHealthPanel } from "../insights/health-panel.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { getStore, testingEnabled } from "../store.ts";
+import { getStore } from "../store.ts";
 import {
   Badge,
   Button,
@@ -14,8 +13,6 @@ import {
   SelectField,
   VStack,
 } from "../ui/components.tsx";
-import { HealthSlot } from "./health-panel.tsx";
-import { InheritedRatioCard } from "./inherited-ratio-card.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 const STATUSES = ["reviewing", "approved", "rejected", "failed", "cancelled", "pending"] as const;
 
@@ -111,7 +108,6 @@ export async function renderProjectBuildsPage(
   const builds = all.filter((build) => matches(build, query));
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const filtered = Boolean(query.status ?? query.branch);
-  const health = await loadHealthPanel(project);
 
   return (
     <DocumentLayout
@@ -128,8 +124,6 @@ export async function renderProjectBuildsPage(
         }
       />
       <VStack>
-        <HealthSlot project={project} data={health} />
-        {testingEnabled() ? <InheritedRatioCard builds={all} /> : null}
         <BuildsToolbar
           project={project}
           all={all}

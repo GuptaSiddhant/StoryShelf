@@ -196,7 +196,7 @@ function linkTarget(data: DesignCoverageData, component: CoverageComponent): str
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return data.storyLinksRead
     ? urls.component(data.project.slug, component.importPath, { tab: "design" })
-    : `${urls.settings(data.project.slug)}/design`;
+    : `${urls.settingsTab(data.project.slug, "capture")}#design`;
 }
 
 function ComponentLink(props: {
@@ -347,9 +347,13 @@ function DriftAlert(props: { data: DesignCoverageData }): Rendered {
   return (
     <Alert tone="info" title="Drift can't be checked">
       {withoutToken.join(", ")} has no access token for this project, so StoryShelf cannot see which
-      designs changed. Add one in Settings → Design.
+      designs changed. Add one in Settings → Capture & tests.
       <div class="mt-1">
-        <Button variant="secondary" size="sm" href={`${urls.settings(project.slug)}/design`}>
+        <Button
+          variant="secondary"
+          size="sm"
+          href={`${urls.settingsTab(project.slug, "capture")}#design`}
+        >
           Open design settings
         </Button>
       </div>
