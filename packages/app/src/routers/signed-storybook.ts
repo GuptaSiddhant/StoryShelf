@@ -3,7 +3,9 @@
  * Storybook files to a remote browser, with no session. The HMAC token is the only credential; it
  * names one project and one build and expires. The file itself is served by the same handler and
  * access policy as the other published routes (`published-files.ts`, `published-access.ts`).
- * Nothing else lives under `/_s/`: no wrapper page, no API, no other build, no listing.
+ * Nothing else lives under `/_s/`: no wrapper page, no API, no other build, no listing. It accepts
+ * `capture` tokens only (ADR 0051, decision 8): a read grant, or a legacy token with no purpose, is
+ * refused like any other bad token.
  * Answers are `private, no-store`, except a success for a capture-purpose grant when the server
  * opted in (`captureAssets.cacheMaxAgeSeconds`, see `capture-cache.ts`).
  */
@@ -18,11 +20,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { publishedAccess } from "./published-access.ts";
-import {
-  publishedRelativePath,
-  servePublishedFile,
-  SIGNED_URL_HEADERS,
-} from "./published-files.ts";
+import { publishedRelativePath, refuseToken, servePublishedFile } from "./published-files.ts";
 
 /** Register the signed-URL file route. */
 export function registerSignedStorybook(app: ShelfRouter): void {
@@ -41,7 +39,7 @@ async function serveSigned(c: Context): Promise<Response> {
 /** The file the token grants as a response, or null (for the debug log only: why not). */
 async function serveGranted(c: Context, token: string, rel: string): Promise<Response | null> {
   const { config, db } = getStore();
-  const verified = verifyStorybookToken(token, credentialKeys(config));
+  const verified = verifyStorybookToken(token, credentialKeys(config), "capture");
   if (!verified.ok) {
     return refuse(c, verified.reason);
   }
@@ -59,13 +57,13 @@ async function serveGranted(c: Context, token: string, rel: string): Promise<Res
     buildId,
     rel,
     access,
+    family: "signed",
     freshness: "immutable", // ignored: a signed answer takes `signedCacheControl`
     grant: verified.claims,
   });
 }
 
-/** The one answer for every refusal, so a caller cannot tell a bad signature from an expired token. */
+/** The one answer for every refusal (`refuseToken`). */
 function refuse(c: Context, reason: string): Response {
-  getStore().logger.debug({ reason }, "signed storybook request refused");
-  return c.text("Not found", 404, SIGNED_URL_HEADERS);
+  return refuseToken(c, reason);
 }

@@ -118,23 +118,31 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `build:failed` / `sys:capture-failed`). `BuildModel.update`/`setStatus` refuse other statuses for a
   cancelled build; `finalizeBuild` and the orchestrator skip it; only `resetStatus` (retry) leaves it.
   Treat `cancelled` like `failed` anywhere a build is reviewed, moved or promoted (409, no verdict).
-- **Signed Storybook URLs.** The one unauthenticated read of a private build is `GET /_s/:token/*`
-  (`packages/app/src/routers/signed-storybook.ts`, class `testing`).
-  `packages/core/src/utils/storybook-token.ts` is the single owner of the prefix
-  `STORYBOOK_TOKEN_PREFIX`, token shape, derived key, sign/verify and lifetime: never type `/_s/` or
-  derive a key elsewhere. Mint only through `storybookUrlSource` (renders; it alone signs the
-  `capture` purpose claim) and
-  `packages/app/src/routers/preview-base.ts` (private previews); `renderInSlices` re-mints for long
-  passes. Every published-file route goes through `publishedAccess` +
-  `servePublishedFile`/`publishedRelativePath`; CORS only from `publishedCorsHeaders`. The signed
-  route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
-  `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
-  `/_s/` or widen what a token grants (ADR 0051: the only exceptions are the `/_r/` read grant,
-  one build with purpose `read`, and the content host's `/_x/` exchange, purpose `exchange`; nothing more). Only `signedCacheControl` (`packages/app/src/routers/
-capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
-  manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
-  by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
-  never let a runner set response headers.
+- **Signed Storybook URLs and read grants.** Two unauthenticated reads of a private build exist, each
+  with its own token purpose, key, prefix and route (ADR 0007, ADR 0051). `GET /_s/:token/*`
+  (`packages/app/src/routers/signed-storybook.ts`, class `testing`) takes `capture` tokens only; a
+  `read` token or a token with no purpose is refused. `GET /_r/:token/*`
+  (`packages/app/src/routers/read-grants.ts`, class `hosting`) takes `read` tokens only: one build, at
+  most an hour, current secret only (`previousSecret` is never tried), every answer sandboxed,
+  `private, no-store`, `no-referrer`. `packages/core/src/utils/storybook-token.ts` is the single owner
+  of both prefixes (`STORYBOOK_TOKEN_PREFIX`, `STORYBOOK_READ_PREFIX`), the token shape, the derived
+  key per purpose, sign/verify and the lifetimes: never type `/_s/` or `/_r/` or derive a key
+  elsewhere. Mint a `capture` token only through `storybookUrlSource` (renders; it alone signs the
+  purpose) and a `read` grant only through `mintReadGrant` (`redirectToReadGrant` for the sandboxed
+  redirect, `previewBaseOf` for previews); `renderInSlices` re-mints capture tokens for long passes.
+  Every published-file route goes through `publishedAccess` +
+  `servePublishedFile`/`publishedRelativePath`; CORS only from `publishedCorsHeaders`; the sandbox
+  header only from `sandboxHeaders` (route family + `config.storybookHosting.mode`, ADR 0051: never
+  `allow-same-origin`). Both token routes are rate-limited per IP in one bucket before the token is
+  read; every refusal returns one identical 404 (`refuseToken`) with `Cache-Control: private,
+  no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
+  what a token grants, or accept one purpose on the other's route (ADR 0051 allows only these two
+  routes plus the content host's `/_x/` exchange, purpose `exchange`, with #358; nothing more). Only `signedCacheControl`
+  (`packages/app/src/routers/capture-cache.ts`) may give a signed answer freshness: a success for a
+  `capture` grant on a manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as
+  `private, max-age=N` capped by the grant's remaining life. Never `public`/`s-maxage`, never from a
+  query or header, and never let a runner set response headers. A signed-in viewer's own answer is
+  `private, no-cache` with a content-hash `ETag` (`publishedCacheControl`).
 - **Review.** `projects.review_enabled` (default true) and `review_approvals` (default 1) are the only
   switches; there is no `ShelfOptions` field. Verdicts live in `build_reviews` (`BuildReviewModel`;
   newest row counts) and are attributed by `resolveReviewer` (session user or bearer-token owner;

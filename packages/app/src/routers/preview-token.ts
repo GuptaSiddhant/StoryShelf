@@ -1,6 +1,6 @@
 /**
  * `GET /api/v1/projects/:slug/builds/:buildId/preview-token`: a fresh root for a component page's preview frame
- * (ADR 0006, decision 9). A frame holding a signed `/_s/<token>` URL (ADR 0007, decision 5) outlives
+ * (ADR 0006, decision 9). A frame holding a `/_r/<token>` read grant (ADR 0051, decision 4) outlives
  * the token's hour on a page left open, so the page's script asks for a new root before then and
  * re-points the frame. Answers `{ base }` for a viewer who may open the build, 404 otherwise or when
  * the build needs no token (anyone may open it). Never cached: the answer carries a token.
@@ -17,13 +17,13 @@ import { errorSchema } from "./schemas.ts";
 const previewTokenRoute = createRoute({
   method: "get",
   tags: ["Review"],
-  summary: "Get a fresh signed root for a build's preview frame",
+  summary: "Get a fresh read-grant root for a build's preview frame",
   path: "/api/v1/projects/{slug}/builds/{buildId}/preview-token",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
     200: {
       content: { "application/json": { schema: z.object({ base: z.string() }) } },
-      description: "The signed root (`/_s/<token>`) to frame the build's Storybook under",
+      description: "The read-grant root (`/_r/<token>`) to frame the build's Storybook under",
     },
     404: {
       content: { "application/json": { schema: errorSchema } },

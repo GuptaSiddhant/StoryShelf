@@ -66,6 +66,7 @@ interface Boot {
     projectId?: string;
     secret?: string;
     now?: number;
+    purpose?: "capture" | "read";
   }) => string;
 }
 
@@ -124,6 +125,7 @@ async function boot(
         secret: overrides.secret ?? SECRET,
         projectId: overrides.projectId ?? "p1",
         buildId: overrides.buildId ?? "b1",
+        purpose: overrides.purpose ?? "capture",
         now: overrides.now,
       }),
   };
@@ -188,7 +190,12 @@ describe("GET /_s/:token/*", () => {
       testing: { runner: stubRunner() },
     });
     apps.push(app);
-    const token = signStorybookToken({ secret: SECRET, projectId: "p1", buildId: "b1" });
+    const token = signStorybookToken({
+      secret: SECRET,
+      projectId: "p1",
+      buildId: "b1",
+      purpose: "capture",
+    });
     const viaSession = await app.request("/projects/one/storybook/build/b1/assets/app.js");
     const viaToken = await app.request(`/_s/${token}/assets/app.js`);
     expect(await viaToken.text()).toBe(await viaSession.text());

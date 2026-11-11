@@ -12,9 +12,12 @@ import { createHash } from "node:crypto";
 import { getStore } from "../store.ts";
 import { signedCacheControl, SIGNED_NO_STORE } from "./capture-cache.ts";
 import {
+  hostingMode,
   publishedCacheControl,
   publishedCorsHeaders,
+  sandboxHeaders,
   type PublishedAccess,
+  type PublishedFamily,
   type PublishedFreshness,
 } from "./published-access.ts";
 import { acceptsGzip, publishedGzip } from "./published-compression.ts";
@@ -30,6 +33,15 @@ export const SIGNED_URL_HEADERS = {
   "x-robots-tag": "noindex, nofollow",
   "x-content-type-options": "nosniff",
 } as const;
+
+/**
+ * The one answer for every refused token request, on `/_s/` and `/_r/` alike, so a caller cannot
+ * tell a bad signature from an expired token, a wrong purpose or a missing build.
+ */
+export function refuseToken(c: Context, reason: string): Response {
+  getStore().logger.debug({ reason }, "token storybook request refused");
+  return c.text("Not found", 404, SIGNED_URL_HEADERS);
+}
 
 /**
  * The file path after `base`, decoded once. `""` is the root; `null` when the path is not under
@@ -63,6 +75,8 @@ export interface PublishedFileRequest {
   /** A path accepted by {@link publishedRelativePath}, not the root. */
   rel: string;
   access: PublishedAccess;
+  /** The route family, which decides the sandbox header (`sandboxHeaders`). */
+  family: PublishedFamily;
   /**
    * How long a normal answer may be kept. The header itself comes from `publishedCacheControl`, so a
    * caller cannot pass its own value. A signed URL ignores it and answers `signedCacheControl`.
@@ -132,7 +146,11 @@ function answerHeaders(
           }),
         }
       : { "cache-control": publishedCacheControl(access, freshness) };
-  return { ...cacheControl, ...publishedCorsHeaders(access) };
+  return {
+    ...cacheControl,
+    ...publishedCorsHeaders(access),
+    ...sandboxHeaders(request.family, hostingMode()),
+  };
 }
 
 /**

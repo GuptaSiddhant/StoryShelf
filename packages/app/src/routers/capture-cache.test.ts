@@ -3,9 +3,9 @@ import { SIGNED_NO_STORE, signedCacheControl } from "./capture-cache.ts";
 
 const NOW = Date.UTC(2026, 0, 1);
 const nowSeconds = NOW / 1000;
-const grant = (remaining: number, purpose: "capture" | "none" = "capture") => ({
+const grant = (remaining: number, purpose: "capture" | "read" = "capture") => ({
   expiresAt: nowSeconds + remaining,
-  ...(purpose === "none" ? {} : { purpose }),
+  purpose,
 });
 const decide = (
   input: Partial<Parameters<typeof signedCacheControl>[0]> & { remaining?: number },
@@ -64,7 +64,7 @@ describe("signedCacheControl", () => {
   });
 
   it("is no-store for a grant without the capture purpose, or no grant at all", () => {
-    expect(decide({ grant: grant(7200, "none") })).toBe(SIGNED_NO_STORE);
+    expect(decide({ grant: grant(7200, "read") })).toBe(SIGNED_NO_STORE);
     expect(decide({ grant: undefined })).toBe(SIGNED_NO_STORE);
   });
 

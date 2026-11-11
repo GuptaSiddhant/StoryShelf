@@ -237,9 +237,14 @@ describe("resolveShelfOptions storybook hosting", () => {
     expect(hosted("subdomain", { auth })).toThrow(/needs config.secret/u);
   });
 
-  it("refuses modes whose serving is not wired, rather than serving them as trusted", () => {
-    expect(hosted("sandboxed")).toThrow(/not available in this version/u);
+  it("accepts sandboxed, with a secret when sign-in is on and without one when it is off", () => {
+    expect(hosted("sandboxed")).not.toThrow();
+    expect(hosted("sandboxed", { auth, config: { secret: "s" } })).not.toThrow();
+  });
+
+  it("refuses subdomain, whose serving is not wired, rather than serving it as trusted", () => {
     expect(hosted("subdomain", { auth, config: { secret: "s" } })).toThrow(/not available/u);
+    expect(hosted("subdomain")).toThrow(/not available/u);
   });
 
   it("validates the top-level storybookUrlRateLimit as a positive whole number", () => {
