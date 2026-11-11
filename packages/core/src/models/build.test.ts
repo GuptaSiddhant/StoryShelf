@@ -589,3 +589,101 @@ describe("BuildModel: a cancelled build is terminal", () => {
     expect((await model.setStatus(id, "capturing")).status).toBe("capturing");
   });
 });
+
+async function setUpSkipped() {
+  const { db } = makeDatabase();
+  const model = new BuildModel(db, buildTables(db));
+  const source = await model.create("p1", { gitSha: "aaaaaaa1111", gitBranch: "main" });
+  await model.setStatus(source.id, "approved");
+  return { db, model, source };
+}
+
+const skip = (sourceBuildId: string, gitSha = "bbbbbbb2222") => ({
+  projectId: "p1",
+  gitSha,
+  gitBranch: "main",
+  sourceBuildId,
+  changedFiles: ["README.md"],
+});
+
+describe("BuildModel: skipped builds (ADR 0044)", () => {
+  it("creates a skipped build that names its source and holds what was compared", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkipped({
+      ...skip(source.id),
+      message: "docs only",
+      author: { email: "a@example.com", name: "A" },
+    });
+    expect(skipped).toMatchObject({
+      status: "skipped",
+      skippedFromBuildId: source.id,
+      baselineSha: "aaaaaaa1111",
+      gitSha: "bbbbbbb2222",
+      message: "docs only",
+      authorEmail: "a@example.com",
+      authorName: "A",
+    });
+    expect(JSON.parse(skipped.changedFiles ?? "null")).toEqual(["README.md"]);
+    expect((await model.get(skipped.id))?.status).toBe("skipped");
+  });
+
+  it("resolves a chain: a build skipped from a skipped build points at the real source", async () => {
+    const { model, source } = await setUpSkipped();
+    const first = await model.createSkipped(skip(source.id));
+    const second = await model.createSkipped(skip(first.id, "ccccccc3333"));
+    expect(second.skippedFromBuildId).toBe(source.id);
+    expect((await model.skipSourceOf(second))?.id).toBe(source.id);
+    expect((await model.skipSourceOf(source))?.id).toBe(source.id);
+  });
+
+  it("lists the builds skipped from a source, newest first", async () => {
+    const { model, source } = await setUpSkipped();
+    const first = await model.createSkipped(skip(source.id));
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    const second = await model.createSkipped(skip(first.id, "ccccccc3333"));
+    expect((await model.skippedFrom(source.id)).map((build) => build.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+    expect(await model.skippedFrom(first.id)).toEqual([]);
+  });
+
+  it("has no source once the source build is gone", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkipped(skip(source.id));
+    await model.remove(source.id);
+    expect(await model.skipSourceOf(skipped)).toBeNull();
+  });
+
+  it("refuses a source that is missing or in another project", async () => {
+    const { model, source } = await setUpSkipped();
+    await expect(model.createSkipped(skip("nope"))).rejects.toThrow("Skip source build not found");
+    await expect(model.createSkipped({ ...skip(source.id), projectId: "other" })).rejects.toThrow(
+      "Skip source build not found",
+    );
+  });
+
+  it("never moves a skipped build, and never moves a build to skipped", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkipped(skip(source.id));
+    for (const status of ["pending", "capturing", "approved", "rejected", "cancelled"] as const) {
+      // oxlint-disable-next-line no-await-in-loop -- one write per status, in order
+      expect((await model.setStatus(skipped.id, status)).status).toBe("skipped");
+      // oxlint-disable-next-line no-await-in-loop
+      expect((await model.update(skipped.id, { status })).status).toBe("skipped");
+    }
+    expect((await model.setStatus(skipped.id, "skipped")).status).toBe("skipped");
+    const open = await model.create("p1", { gitSha: "ddddddd4444", gitBranch: "x" });
+    expect((await model.setStatus(open.id, "skipped")).status).toBe("pending");
+    expect((await model.update(open.id, { status: "skipped" })).status).toBe("pending");
+  });
+
+  it("does not retry a skipped build", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkipped(skip(source.id));
+    const reset = await model.resetStatus(skipped.id, "pending");
+    expect(reset.status).toBe("skipped");
+    expect((await model.get(skipped.id))?.status).toBe("skipped");
+    await expect(model.resetStatus("missing", "pending")).rejects.toThrow("Build not found");
+  });
+});

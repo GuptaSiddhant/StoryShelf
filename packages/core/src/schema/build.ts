@@ -47,6 +47,11 @@ export interface Build {
    * overwrites a newer run's ownership. Starts at 0.
    */
   captureGeneration?: number;
+  /**
+   * For a `skipped` build, the real build whose outcome it repeats (ADR 0044); null on every other
+   * build. Never another skipped build: creation resolves a chain to its source.
+   */
+  skippedFromBuildId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

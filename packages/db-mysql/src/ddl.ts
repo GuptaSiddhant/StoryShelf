@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS builds (
   review_cycle INT NOT NULL DEFAULT 0,
   review_requested_cycle INT,
   capture_job_id VARCHAR(26),
+  skipped_from_build_id VARCHAR(26),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_builds_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

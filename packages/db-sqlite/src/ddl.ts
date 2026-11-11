@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS builds (
   review_cycle INTEGER NOT NULL DEFAULT 0,
   review_requested_cycle INTEGER,
   capture_job_id TEXT,
+  skipped_from_build_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -583,6 +584,8 @@ export const IDENTITY_STATEMENTS: string[] = [
   "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)",
   // Single-flight job kinds (ADR 0040): at most one non-terminal job per active_key; NULLs never collide.
   "CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx ON capture_jobs (active_key)",
+  // Skipped builds (ADR 0044): the lookup of the builds skipped from one source; after the column exists.
+  "CREATE INDEX IF NOT EXISTS builds_skipped_from_idx ON builds (skipped_from_build_id)",
   // Pre-adapter Figma tables, replaced by design_nodes / design_credentials (no data is carried over).
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",

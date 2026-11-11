@@ -155,6 +155,7 @@ const builds = defineTable("builds", {
   reviewCycle: "review_cycle",
   reviewRequestedCycle: "review_requested_cycle",
   captureJobId: "capture_job_id",
+  skippedFromBuildId: "skipped_from_build_id",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

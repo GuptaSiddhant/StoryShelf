@@ -2,7 +2,7 @@
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { allowedFrom, enteringFrom } from "../lifecycle/build-lifecycle.ts";
+import { allowedFrom, enteringFrom, isEntryOnly } from "../lifecycle/build-lifecycle.ts";
 import type { Logger } from "../logger.ts";
 import type { Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
@@ -88,6 +88,70 @@ export class BuildModel {
       createdAt: now,
       updatedAt: now,
     })) as unknown as Build;
+  }
+
+  /**
+   * Create a `skipped` build (ADR 0044): a commit that changed no story, repeating the outcome of
+   * `sourceBuildId`. It has no upload, snapshots or job. The row is created in `skipped` because no
+   * write moves a build there. A source that is itself skipped is replaced by its own source, so the
+   * column always names a real build. Throws when the source is missing or in another project.
+   */
+  async createSkipped(input: SkippedBuildInput): Promise<Build> {
+    const source = await this.skipSourceFor(input.projectId, input.sourceBuildId);
+    const now = new Date().toISOString();
+    return (await this.db.insert(this.tables.builds, {
+      id: ulid(),
+      projectId: input.projectId,
+      gitSha: input.gitSha,
+      gitBranch: input.gitBranch,
+      isDefault: input.isDefault ?? false,
+      authorEmail: input.author?.email,
+      authorName: input.author?.name,
+      message: input.message,
+      public: false,
+      affectedOnly: true,
+      baselineSha: source.gitSha,
+      changedFiles: serializePaths(input.changedFiles),
+      affectedImportPaths: serializePaths([]),
+      status: "skipped",
+      skippedFromBuildId: source.id,
+      captureGeneration: 0,
+      createdAt: now,
+      updatedAt: now,
+    })) as unknown as Build;
+  }
+
+  /** The real source for `sourceBuildId` in `projectId`, or a thrown error. */
+  private async skipSourceFor(projectId: string, sourceBuildId: string): Promise<Build> {
+    const found = await this.get(sourceBuildId);
+    const source = found === null ? null : await this.skipSourceOf(found);
+    if (source === null || source.projectId !== projectId) {
+      throw new Error("Skip source build not found");
+    }
+    return source;
+  }
+
+  /** The builds skipped from `sourceBuildId`, newest first (an indexed lookup). */
+  async skippedFrom(sourceBuildId: string): Promise<Build[]> {
+    return (await this.db.list(this.tables.builds, {
+      where: eq(col(this.tables.builds, "skippedFromBuildId"), sourceBuildId),
+      orderBy: desc(col(this.tables.builds, "createdAt")),
+    })) as unknown as Build[];
+  }
+
+  /**
+   * The real build behind `build`: the build itself unless it is `skipped`, else the source its
+   * chain ends in. Null when a link of the chain is gone (the source was deleted).
+   */
+  async skipSourceOf(build: Build): Promise<Build | null> {
+    let current: Build | null = build;
+    for (let hops = 0; hops < MAX_SKIP_CHAIN && current !== null; hops += 1) {
+      const next: string | null | undefined = current.skippedFromBuildId;
+      if (current.status !== "skipped" || !next) return current;
+      // oxlint-disable-next-line no-await-in-loop -- each hop needs the previous row
+      current = await this.get(next);
+    }
+    return null;
   }
 
   async get(id: string): Promise<Build | null> {
@@ -320,6 +384,10 @@ export class BuildModel {
    * generation it read), so an enqueue that read the old generation can no longer stamp its job.
    */
   async resetStatus(id: string, status: BuildStatus): Promise<Build> {
+    if (isEntryOnly(status) || isEntryOnly((await this.get(id))?.status ?? status)) {
+      // A skipped build is never retried (ADR 0044); the row comes back as it is.
+      return await this.requireBuild(id);
+    }
     for (let attempt = 0; attempt < RESET_ATTEMPTS; attempt += 1) {
       // oxlint-disable-next-line no-await-in-loop -- each retry needs the generation the loser lost to
       const reset = await this.resetOnce(id, status);
@@ -328,6 +396,12 @@ export class BuildModel {
       }
     }
     throw new Error("Build reset lost the race repeatedly");
+  }
+
+  private async requireBuild(id: string): Promise<Build> {
+    const build = await this.get(id);
+    if (build === null) throw new Error("Build not found");
+    return build;
   }
 
   /** One compare-and-set reset; null when another writer advanced the generation first. */
@@ -587,6 +661,23 @@ export function isPublicBuild(
   }
   return new RegExp(project.publicBranchRegex, "u").test(build.gitBranch);
 }
+
+/** Input for {@link BuildModel.createSkipped} (ADR 0044). */
+export interface SkippedBuildInput {
+  projectId: string;
+  gitSha: string;
+  gitBranch: string;
+  /** The build whose outcome the new one repeats; a skipped build is resolved to its own source. */
+  sourceBuildId: string;
+  /** Repo-relative files that changed since the source's commit, recorded for the build page. */
+  changedFiles: string[];
+  isDefault?: boolean;
+  message?: string;
+  author?: { email?: string; name?: string };
+}
+
+/** Links followed at most when resolving a skip chain; chains are one hop, this bounds a cycle. */
+const MAX_SKIP_CHAIN = 16;
 
 /** Input for creating a build. */
 export interface BuildCreateInput {

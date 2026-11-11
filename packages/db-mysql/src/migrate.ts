@@ -103,6 +103,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
   { table: "builds", column: "capture_generation", definition: "INTEGER NOT NULL DEFAULT 0" },
+  { table: "builds", column: "skipped_from_build_id", definition: "VARCHAR(26) NULL" },
   {
     table: "notification_subscriptions",
     column: "review_requests",
@@ -143,6 +144,11 @@ const BUILD_CAPTURE_JOB_BACKFILL =
   "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
 
 const IDENTITY_INDEXES = [
+  {
+    table: "builds",
+    name: "builds_skipped_from_idx",
+    sql: "CREATE INDEX builds_skipped_from_idx ON builds (skipped_from_build_id)",
+  },
   {
     table: "snapshots",
     name: "snapshots_build_story_mode_browser_idx",

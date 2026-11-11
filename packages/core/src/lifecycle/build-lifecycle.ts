@@ -14,6 +14,7 @@ export const BUILD_STATUSES = [
   "rejected",
   "failed",
   "cancelled",
+  "skipped",
 ] as const;
 
 /** Lifecycle status of a build. */
@@ -34,7 +35,21 @@ const ORDINARY: Readonly<Record<BuildStatus, readonly BuildStatus[]>> = {
   rejected: [],
   failed: [],
   cancelled: [],
+  // Entry-only (below): a skipped build repeats its source's outcome and nothing moves it.
+  skipped: [],
 };
+
+/**
+ * The entry-only states (ADR 0046, ADR 0044): a row is created in one and no write moves a build to
+ * or from it. They are terminal, and neither the idempotent same-status write nor a named exit
+ * applies, so a `skipped` build can be neither written again nor retried, cancelled or reviewed.
+ */
+export const ENTRY_ONLY_BUILD_STATUSES: readonly BuildStatus[] = ["skipped"];
+
+/** Whether `status` is entry-only: created in, never moved to or from. */
+export function isEntryOnly(status: BuildStatus): boolean {
+  return ENTRY_ONLY_BUILD_STATUSES.includes(status);
+}
 
 /**
  * The named exits: moves that leave a terminal state, each tied to one operation. Anything else
@@ -42,7 +57,9 @@ const ORDINARY: Readonly<Record<BuildStatus, readonly BuildStatus[]>> = {
  */
 export const BUILD_EXITS = {
   /** `resetStatus` (the retry route): any build goes back to `pending` for a new run. */
-  retry: BUILD_STATUSES.map((from) => [from, "pending"] as const),
+  retry: BUILD_STATUSES.filter((from) => !isEntryOnly(from)).map(
+    (from) => [from, "pending"] as const,
+  ),
   /** A reviewer's verdict (ADR 0013) moves a reviewed build between verdicts or reopens it. */
   verdict: [
     ["approved", "rejected"],
@@ -72,9 +89,10 @@ export function isExit(exit: BuildExit, from: BuildStatus, to: BuildStatus): boo
 
 /**
  * Whether a write may move a build from `from` to `to`. Writing the status a row already has is an
- * idempotent no-op and always allowed (a redelivered capture, a rollup that changes nothing).
+ * idempotent no-op and allowed, except for an entry-only status (a redelivered capture, a rollup that changes nothing).
  */
 export function canMove(from: BuildStatus, to: BuildStatus): boolean {
+  if (isEntryOnly(from) || isEntryOnly(to)) return false;
   if (from === to || isOrdinary(from, to)) return true;
   return Object.keys(BUILD_EXITS).some((exit) => isExit(exit as BuildExit, from, to));
 }
