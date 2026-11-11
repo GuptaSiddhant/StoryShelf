@@ -119,6 +119,15 @@ createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, 
 
 - `config.captureAssets.cacheMaxAgeSeconds` (`0` to `3600`, default `0`) lets a remote browser's own cache keep a render's signed Storybook assets for that many seconds at most, never past the token's lifetime. It is off by default and trades faster long runs for the fact that revoked access cannot reclaim bytes already cached. See [Browser caching of capture assets](/guides/remote-browsers/#browser-caching-of-capture-assets-opt-in).
 
+### Outbound URLs set by projects
+
+`config.outbound` controls the URLs project admins configure (webhooks, Slack and Teams, GitLab hosts). By default they must be `https` and resolve only to public addresses.
+
+- `allowHosts` (array of exact hostnames, no wildcards) lets those hosts resolve to private addresses and use plain `http`, for example `["gitlab.internal.example"]`.
+- `allowHttp` (boolean, default `false`) allows plain `http` for any host. Use it for local development only; it does not lift the address check.
+
+See [Security](/guides/security/#urls-that-projects-set).
+
 ### Image engine
 
 - `testing.images.engine` (a `createShelfApp` option) or `STORYSHELF_IMAGE_ENGINE` picks the PNG library for diffs, diff overlays, and AI thumbnails: `"pngjs"` (default, pure JavaScript, runs anywhere) or `"sharp"` (native, faster on large screenshots; install the optional `sharp` package). The option wins over the variable. An unknown name fails at startup, and so does `"sharp"` without the package installed. See [Image engines](/guides/image-engines/).

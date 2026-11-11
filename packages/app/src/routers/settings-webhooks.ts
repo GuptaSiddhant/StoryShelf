@@ -32,7 +32,7 @@ async function handleCreateWebhook(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   const form = await c.req.formData();
   const url = asString(form.get("url"));
-  const urlError = WebhookModel.urlError(url);
+  const urlError = await WebhookModel.urlRefusal(url);
   if (urlError || !url) {
     return c.html(
       (await renderSettingsPage(c, "webhooks", { errors: { url: urlError ?? "Invalid URL" } })) ??

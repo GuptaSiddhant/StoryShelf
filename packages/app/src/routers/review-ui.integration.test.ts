@@ -7,7 +7,7 @@ import {
   NotificationSubscriptionModel,
   WebhookModel,
 } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage, publicNetworkForTests } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -66,10 +66,13 @@ async function stopApps(): Promise<void> {
   }
 }
 
+let restoreNetwork: (() => void) | undefined;
 beforeEach(async () => {
+  restoreNetwork = publicNetworkForTests();
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-review-ui-"));
 });
 afterEach(async () => {
+  restoreNetwork?.();
   try {
     await stopApps();
   } finally {

@@ -1,8 +1,9 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { SCRATCH_DIRNAME } from "@storyshelf/core/capture";
 import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { storybookDir, storybookZipPath } from "@storyshelf/core/utils";
+import { contentKey, storybookDir, storybookZipPath } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -131,6 +132,23 @@ afterEach(async () => {
   await rm(scratchDir, { recursive: true, force: true });
 });
 
+/** Whether the build's manifest names `file` and its blob is in the content store. */
+async function hasPublished(
+  storage: StorageAdapter,
+  projectId: string,
+  buildId: string,
+  file: string,
+): Promise<boolean> {
+  const manifestKey = `${storybookDir(projectId, buildId)}/manifest.json`;
+  if (!(await storage.exists(manifestKey))) return false;
+  const manifest = JSON.parse((await storage.read(manifestKey)).toString()) as Record<
+    string,
+    string
+  >;
+  const hash = manifest[file];
+  return hash !== undefined && (await storage.exists(contentKey(hash)));
+}
+
 describe("upload inline statics", () => {
   it("persists statics inline for small zips", async () => {
     const { db } = makeDatabase();
@@ -147,7 +165,7 @@ describe("upload inline statics", () => {
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
     expect(await queuedCaptures(db)).toContain(buildId);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(true);
     // Capture will run, so publishing leaves the status to it (no auto-accept).
     expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
     // The extracted scratch copy is removed once the statics are persisted.
@@ -205,7 +223,7 @@ describe("upload inline statics", () => {
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
     expect(await queuedCaptures(db)).toContain(buildId);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(false);
   });
 
   it("extracts inline by default (50 MB) without any configuration", async () => {
@@ -221,7 +239,7 @@ describe("upload inline statics", () => {
     const zip = storybookZip();
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(true);
   });
 
   it("counts the streamed bytes: a chunked upload without Content-Length is still extracted inline", async () => {
@@ -236,7 +254,7 @@ describe("upload inline statics", () => {
     const { slug, id: projectId } = await setupProject(app);
     const { buildId, status } = await uploadChunked(app, slug, storybookZip());
     expect(status).toBe(202);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(true);
   });
 
   it("sends a chunked upload over the inline limit to a publish job", async () => {
@@ -251,7 +269,7 @@ describe("upload inline statics", () => {
     const { slug, id: projectId } = await setupProject(app);
     const { buildId, status } = await uploadChunked(app, slug, storybookZip());
     expect(status).toBe(202);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(false);
     const jobs = await new CaptureJobModel(db).listForBuild(buildId);
     expect(jobs.map((job) => job.kind)).toEqual(["publish"]);
   });
@@ -290,7 +308,7 @@ describe("upload inline statics", () => {
     const zip = storybookZip();
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(true);
   });
 
   it("rejects an inline zip that breaks a cap without publishing", async () => {
@@ -385,7 +403,7 @@ describe("upload inline statics", () => {
     expect(status).toBe(202);
     const jobs = await new CaptureJobModel(db).listForBuild(buildId);
     expect(jobs.map((job) => job.kind)).toEqual(["publish"]);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(false);
   });
 
   it("defaults the scratch dir for inline extraction when none is configured", async () => {
@@ -401,7 +419,7 @@ describe("upload inline statics", () => {
     const zip = storybookZip();
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(true);
   });
 
   it("fails the build when an inline zip is rejected, and refuses a corrected zip on it with 409", async () => {
@@ -421,7 +439,7 @@ describe("upload inline statics", () => {
     expect(body).toContain("Invalid Storybook zip");
     expect(await queuedCaptures(db)).not.toContain(buildId);
     expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
+    expect(await hasPublished(storage, projectId, buildId, "iframe.html")).toBe(false);
     expect((await new BuildModel(db).get(buildId))?.status).toBe("failed");
 
     const corrected = await app.request(`/api/v1/projects/${slug}/builds/${buildId}/zip`, {

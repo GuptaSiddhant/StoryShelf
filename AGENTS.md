@@ -220,7 +220,13 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   source of truth) is accepted but not yet implemented; until its neutral tables land, change a
   table in every dialect's DDL, Drizzle schema and migration, plus the core row type. ADR 0047
   (toolchain on Vite+ and pnpm) is accepted, gated by a spike; until its epic merges, nub and turbo
-  as described here stay the toolchain.
+  as described here stay the toolchain. ADR 0048 (installable app, offline Storybooks, web push)
+  is accepted: the one service worker caches only opted-in default-branch Storybooks and the
+  offline home page, never app HTML or `/api/v1` answers. ADR 0049 (built-in integrations) is accepted: git, chat, email, push and design integrations
+  move into `packages/core/src/integrations/`, `@storyshelf/image` folds into core, and the app
+  stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
+  accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
+  versioned Terraform module per cloud on the published image.
 
 ## Conventions
 

@@ -41,7 +41,7 @@ afterEach(async () => {
 });
 
 describe("persistStorybookStatics", () => {
-  it("streams files to content-addressed and per-build paths with a manifest", async () => {
+  it("writes each blob once plus the manifest, and no per-build copy of the files", async () => {
     await mkdir(join(dir, "assets"), { recursive: true });
     await writeFile(join(dir, "index.html"), "<html></html>");
     await writeFile(join(dir, "assets", "a.js"), "same");
@@ -52,17 +52,23 @@ describe("persistStorybookStatics", () => {
 
     expect(files.get(`content/${sha("same")}`)?.toString()).toBe("same");
     expect(files.get(`content/${sha("<html></html>")}`)).toBeDefined();
-    const prefix = [...files.keys()]
-      .find((key) => key.endsWith("/index.html"))
-      ?.replace("/index.html", "");
-    expect(prefix).toBeDefined();
-    expect(files.get(`${prefix}/assets/b.js`)?.toString()).toBe("same");
-    const manifest = JSON.parse(files.get(`${prefix}/manifest.json`)?.toString() ?? "{}");
+    const buildKeys = [...files.keys()].filter((key) => key.startsWith("p1/builds/b1/storybook/"));
+    expect(buildKeys).toEqual(["p1/builds/b1/storybook/manifest.json"]);
+    const manifest = JSON.parse(
+      files.get("p1/builds/b1/storybook/manifest.json")?.toString() ?? "{}",
+    );
     expect(manifest).toEqual({
       "index.html": sha("<html></html>"),
       "assets/a.js": sha("same"),
       "assets/b.js": sha("same"),
     });
+    expect(new Set(files.keys())).toEqual(
+      new Set([
+        `content/${sha("same")}`,
+        `content/${sha("<html></html>")}`,
+        "p1/builds/b1/storybook/manifest.json",
+      ]),
+    );
   });
 
   it("handles more files than the concurrency cap", async () => {

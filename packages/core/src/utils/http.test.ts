@@ -386,3 +386,19 @@ describe("httpBytes", () => {
     expect(caught).toBeInstanceOf(HttpError);
   });
 });
+
+describe("destination: project", () => {
+  it("refuses a private address without retrying or echoing it", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { logger, lines } = recordingLogger();
+    const error = await httpStatus("https://10.9.8.7/hook?k=secret", {
+      destination: "project",
+      logger,
+    }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ reason: "address-not-public" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((error as Error).message).not.toContain("10.9.8.7");
+    expect(`${(error as Error).message}${lines.join("")}`).not.toContain("secret");
+  });
+});

@@ -1,8 +1,9 @@
 import type { Logger } from "pino";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { reencryptCredentials } from "../models/credentials.ts";
 import { WebhookModel } from "../models/webhook.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
+import { publicNetworkForTests } from "../test-helpers/public-network.ts";
 import { hmacSha256 } from "../utils/hash.ts";
 import type { DatabaseAdapter } from "./database.ts";
 import { emitWebhookEvent } from "./webhook-events.ts";
@@ -52,7 +53,12 @@ async function received(subscribed: string[], scope: string): Promise<string[]> 
 }
 
 describe("emitWebhookEvent", () => {
+  let restoreNetwork: (() => void) | undefined;
+  beforeEach(() => {
+    restoreNetwork = publicNetworkForTests();
+  });
   afterEach(() => {
+    restoreNetwork?.();
     vi.unstubAllGlobals();
   });
 

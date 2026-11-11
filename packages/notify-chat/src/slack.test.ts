@@ -1,5 +1,6 @@
 import type { Logger } from "@storyshelf/core/logger";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { publicNetworkForTests } from "@storyshelf/core/test-helpers";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { slackWebhookNotifier } from "./slack.ts";
 
 const CHANNEL = {
@@ -18,7 +19,13 @@ const FORMATTED = {
   html: "<p>hello</p>",
 };
 
+let restoreNetwork: (() => void) | undefined;
+beforeEach(() => {
+  restoreNetwork = publicNetworkForTests();
+});
+
 afterEach(() => {
+  restoreNetwork?.();
   vi.unstubAllGlobals();
 });
 

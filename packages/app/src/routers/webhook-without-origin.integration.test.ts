@@ -5,10 +5,11 @@ import {
   createTestProject,
   makeDatabase,
   makeStorage,
+  publicNetworkForTests,
 } from "@storyshelf/core/test-helpers";
 import { createHmac } from "node:crypto";
 import { pino } from "pino";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { z } from "zod";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
@@ -96,7 +97,12 @@ async function seed(chat: string[], publicBaseUrl?: string) {
 
 /** Every app a test booted, torn down even when an assertion failed (each runs a branch-GC timer). */
 const apps: ReturnType<typeof createShelfApp>[] = [];
+let restoreNetwork: (() => void) | undefined;
+beforeEach(() => {
+  restoreNetwork = publicNetworkForTests();
+});
 afterEach(async () => {
+  restoreNetwork?.();
   vi.unstubAllGlobals();
   await Promise.allSettled(apps.splice(0).map(async (app) => await app.lifecycle.teardown()));
 });
