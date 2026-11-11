@@ -1,8 +1,8 @@
-name: Vite+ spike (#821)
+name: Vite+ retest (#907)
 
-# DO NOT MERGE. Runs the Vite+ migration (commit MIGRATION_SHA) beside turbo on the same commits.
-# `turbo` reverts the migration commit on the checked-out PR merge, so it builds exactly what main's
-# toolchain would on the same sources; `vp` runs the tree as is.
+# DO NOT MERGE. Times turbo (main's toolchain, restored over this tree) and Vite+ on the same commit,
+# the same runner type and the same task set (website excluded on both), at each tool's default
+# concurrency, then ports the CI jobs the first spike skipped.
 on:
   pull_request:
     branches: [main]
@@ -20,145 +20,129 @@ env:
 
 jobs:
   turbo:
-    name: turbo (baseline)
+    name: turbo (timings)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Restore main's toolchain files (back to nub + turbo on the same sources)
+      - name: Restore main's toolchain files (nub + turbo on the same sources)
         run: |
-          # Later spike commits edit files the migration added (vite.config.ts), so a plain
-          # `git revert` would conflict: put back every path the migration touched instead.
           git diff --name-status "$MIGRATION_SHA^" "$MIGRATION_SHA" | while IFS=$'\t' read -r st path; do
             if [ "$st" = "A" ]; then git rm -rqf --ignore-unmatch -- "$path"; else git checkout origin/main -- "$path" 2>/dev/null || git checkout "$MIGRATION_SHA^" -- "$path"; fi
           done
-          # Files that main changed after the migration (merged in later) carry `vite-plus/test`
-          # imports from my merge fixes; put the plain vitest import back everywhere.
           grep -rlE "vite-plus/test" --include='*.ts' --include='*.tsx' packages apps scripts 2>/dev/null | grep -v node_modules | xargs -r sed -i 's#"vite-plus/test"#"vitest"#g'
           git status --short | wc -l
       - uses: ./.github/actions/setup-workspace
       - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "1.9.x", terraform_wrapper: false }
+      - name: Time turbo
+        env: { RUN_TERRAFORM: "1" }
+        run: bash scripts/spike-time.sh turbo
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
-          terraform_version: "1.9.x"
-          terraform_wrapper: false
-      - name: Warm verify (main's turbo cache restored)
-        env: { TURBO_CONCURRENCY: "1", RUN_TERRAFORM: "1" }
-        run: |
-          s=$(date +%s)
-          nubx turbo verify --filter='!website' --continue 2>&1 | tee .tmp-turbo-warm.log | tail -n 12
-          grep -nE 'ERROR|Failed:|✗|FAIL' .tmp-turbo-warm.log | head -20 || true
-          echo "## turbo warm verify: $(( $(date +%s) - s ))s" >> "$GITHUB_STEP_SUMMARY"
-          grep -E "Tasks:|Cached:|Time:" .tmp-turbo-warm.log >> "$GITHUB_STEP_SUMMARY" || true
-      - name: Cold verify (--force)
-        env: { TURBO_CONCURRENCY: "1", RUN_TERRAFORM: "1" }
-        run: |
-          s=$(date +%s)
-          nubx turbo verify --filter='!website' --force --continue 2>&1 | tee .tmp-turbo-cold.log | tail -n 12
-          grep -nE 'ERROR|Failed:|✗|FAIL' .tmp-turbo-cold.log | head -20 || true
-          echo "## turbo cold verify: $(( $(date +%s) - s ))s" >> "$GITHUB_STEP_SUMMARY"
-          grep -E "Tasks:|Cached:|Time:" .tmp-turbo-cold.log >> "$GITHUB_STEP_SUMMARY" || true
-      - name: Website (uncached)
-        run: |
-          s=$(date +%s); nubx turbo verify --filter=website --force 2>&1 | tail -n 25
-          echo "## turbo website: $(( $(date +%s) - s ))s" >> "$GITHUB_STEP_SUMMARY"
+          name: turbo-logs
+          path: |
+            .tmp/logs
+            .tmp/times.tsv
 
   vp:
-    name: vp (verify)
+    name: vp (timings)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-vp-spike
       - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.x"
-          terraform_wrapper: false
-      - name: Restore Vite Task cache
-        id: cache
-        uses: actions/cache/restore@v4
-        with:
-          path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            vite-task-${{ runner.os }}-
-      - name: Warm verify (restored task cache)
+        with: { terraform_version: "1.9.x", terraform_wrapper: false }
+      - name: Time vp
         env: { RUN_TERRAFORM: "1" }
-        run: mkdir -p .tmp && scripts/spike-vp-verify.sh warm
-      - name: Save Vite Task cache
-        if: success()
-        uses: actions/cache/save@v4
+        run: bash scripts/spike-time.sh vp
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.cache.outputs.cache-primary-key }}
-      - name: Cold verify (--no-cache)
-        env: { RUN_TERRAFORM: "1" }
-        run: scripts/spike-vp-verify.sh cold --no-cache
+          name: vp-logs
+          path: |
+            .tmp/logs
+            .tmp/times.tsv
 
-  vp-fixtures:
-    name: vp (gate 5, fixtures)
+  lint-files:
+    name: vp (lint:files port)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-        with: { fetch-depth: 0 }
-      - uses: ./.github/actions/setup-vp-spike
-      - name: Fixture isolation, builds and cached fixture task
-        run: scripts/spike-fixtures.sh
-
-  vp-coverage:
-    name: vp (smoke, release dry run, Fly image)
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-vp-spike
-      - name: Build packages
-        run: vp run -r build
-      - name: App smoke test
-        env: { SMOKE_RUN: "vpx tsx@4.20.6 --conditions=source", TSX_TSCONFIG_PATH: packages/app/tsconfig.json }
-        run: bash scripts/smoke.sh
-      - name: Built-artifact smoke
-        if: ${{ !cancelled() }}
-        working-directory: packages/cli
-        env: { RUN_SMOKE: "1", SMOKE_NODE_MAJOR: "24" }
-        run: vp test run src/smoke.integration.test.ts
-      - name: docs:check
-        if: ${{ !cancelled() }}
-        run: node ./scripts/check-adr-refs.mjs
-      - name: Release dry run
-        if: ${{ !cancelled() }}
-        env: { RELEASE_PUBLISH_CMD: "pnpm publish -r --dry-run --no-git-checks" }
+      - name: check-files unit test
+        run: node --test scripts/check-files.test.mjs
+      - name: vp check (oxfmt + oxlint over every tracked file)
         run: |
-          git config user.email spike@example.invalid && git config user.name spike
-          git add -A && git commit -q -m wip --no-verify || true
-          node scripts/release.mjs --dry-run
-      - name: Fly image (pnpm install --filter fly-app...)
-        if: ${{ !cancelled() }}
-        run: docker build -f apps/fly-app/Dockerfile.vp -t storyshelf-fly-vp .
+          s=$(date +%s); vp check --continue-on-error 2>&1 | tail -n 15; code=${PIPESTATUS[0]}
+          echo "vp check: $(( $(date +%s) - s ))s, exit $code" >> "$GITHUB_STEP_SUMMARY"; exit $code
 
-  vp-capture:
-    name: vp (capture integration)
+  storybook-dev:
+    name: vp (storybook-dev port)
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-vp-spike
-      - name: Install Playwright browsers
-        working-directory: packages/runner-playwright
-        run: pnpm exec playwright-core install --with-deps chromium firefox
-      - name: Build packages the runners need
-        run: vp run --filter '@storyshelf/runner-playwright...' --filter '@storyshelf/runner-puppeteer...' build
-      - name: Build storybook-9 fixture
-        run: |
-          pnpm --dir fixtures/storybook-9 install --frozen-lockfile
-          pnpm --dir fixtures/storybook-9 run build-storybook
-      - name: Real-browser capture tests
-        working-directory: packages/runner-playwright
+      - name: Build the packages the app's Storybook imports
+        run: vp run -F '@storyshelf/app^...' build
+      - name: Open every story in the Storybook dev server
+        working-directory: packages/app
+        env: { STORYBOOK_SMOKE_BROWSER_CHANNEL: chrome }
+        run: pnpm run smoke:storybook
+
+  postgres-lifecycle:
+    name: vp (postgres-lifecycle port)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: test-password, POSTGRES_DB: storyshelf_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres -d storyshelf_test"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+      wsproxy:
+        image: ghcr.io/neondatabase/wsproxy:latest
+        env: { APPEND_PORT: "postgres:5432", ALLOW_ADDR_REGEX: ".*", LOG_TRAFFIC: "false" }
+        ports: ["5433:80"]
+    steps:
+      - uses: actions/checkout@v7
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-vp-spike
+      - name: Build the packages the adapter imports
+        run: vp run -F '@storyshelf/db-postgres^...' build
+      - name: Build-reference contract against real Postgres
+        working-directory: packages/db-postgres
         env:
-          FIXTURE_DIR: ${{ github.workspace }}/fixtures/storybook-9
-          RUN_INTEGRATION: "1"
-        run: pnpm run test:integration
+          LIVE_CLOUD: "1"
+          POSTGRES_SCHEMA_MUTATION_TEST: "1"
+          DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
+          NEON_WSPROXY: 127.0.0.1:5433/v1
+        run: |
+          vp test run src/build-reference-lifecycle.test.ts
+          vp test run src/retention-activation.test.ts
+          vp test run src/retention-pool-presets.test.ts
+
+  website:
+    name: "vp (website build, links, a11y)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-vp-spike
+      - name: Build, then link check
+        working-directory: apps/website
+        run: |
+          s=$(date +%s); vp run build; echo "website build: $(( $(date +%s) - s ))s" >> "$GITHUB_STEP_SUMMARY"
+          pnpm run check:links
+      - name: Accessibility (axe, light/dark/mobile)
+        working-directory: apps/website
+        env: { A11Y_BROWSER_CHANNEL: chrome }
+        run: pnpm run check:a11y
