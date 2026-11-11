@@ -1,7 +1,8 @@
 name: Capture
 
 # Reusable: real-browser capture tests, one matrix leg per Storybook fixture.
-# Called by ci.yml (storybook-9) and nightly.yml (every fixture).
+# Called by ci.yml (storybook-9) and nightly.yml (every fixture). The golden-path end-to-end test
+# (#941) runs once, on the storybook-9 leg, in both.
 on:
   workflow_call:
     inputs:
@@ -69,3 +70,21 @@ jobs:
           # puppeteer-core ships no browser; GitHub's ubuntu runners include Chrome.
           PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
         run: nub run test:integration
+
+      - name: Golden-path end-to-end test (real browser)
+        if: ${{ !cancelled() && matrix.fixture == 'storybook-9' }}
+        working-directory: packages/runner-playwright
+        env:
+          FIXTURE_DIR: ${{ github.workspace }}/fixtures/${{ matrix.fixture }}
+          # A failed run leaves its Playwright trace here; a passing run leaves nothing.
+          E2E_TRACE_DIR: ${{ runner.temp }}/e2e-trace
+        run: nub run test:e2e
+
+      - name: Upload the end-to-end trace (failure only)
+        if: ${{ failure() && matrix.fixture == 'storybook-9' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-trace
+          path: ${{ runner.temp }}/e2e-trace
+          if-no-files-found: ignore
+          retention-days: 7

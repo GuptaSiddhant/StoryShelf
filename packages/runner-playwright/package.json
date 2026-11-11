@@ -54,7 +54,8 @@
     "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "test": "vitest run",
-    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts passkey.integration.test.ts remote.integration.test.ts",
+    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts passkey.integration.test.ts remote.integration.test.ts --exclude '**/e2e.integration.test.ts'",
+    "test:e2e": "RUN_INTEGRATION=1 vitest run e2e.integration.test.ts",
     "prepublishOnly": "nub run build",
     "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts"
   },
@@ -67,6 +68,7 @@
     "@storyshelf/app": "workspace:*",
     "@storyshelf/auth": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/notify-git": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
@@ -74,6 +76,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "storyshelf": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

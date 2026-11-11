@@ -1117,6 +1117,9 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
+      '@storyshelf/notify-git':
+        specifier: workspace:*
+        version: link:../notify-git
       '@storyshelf/storage-local':
         specifier: workspace:*
         version: link:../storage-local
@@ -1138,6 +1141,9 @@ importers:
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2005
+      storyshelf:
+        specifier: workspace:*
+        version: link:../cli
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(typescript@7.0.2)
