@@ -52,25 +52,25 @@ describe("deliverBuildState: a skipped build (ADR 0044)", () => {
   });
 });
 
-describe("deliverBuildState: a skipped build's Storybook status (ADR 0044)", () => {
-  const skippedFromApproved = async () => {
-    const w = await world();
-    await w.builds.setStatus(w.build.id, "approved");
-    const skipped = await w.builds.createSkipped({
-      projectId: w.project.id,
-      gitSha: "fedcba987654",
-      gitBranch: "feature/x",
-      sourceBuildId: w.build.id,
-      changedFiles: [],
-    });
-    const run = async () =>
-      await deliverBuildState(
-        { ...w.deps, flags: () => ({ testing: true, review: false }) },
-        { buildId: skipped.id, channelId: w.channelId },
-      );
-    return { w, run };
-  };
+const skippedFromApproved = async () => {
+  const w = await world();
+  await w.builds.setStatus(w.build.id, "approved");
+  const skipped = await w.builds.createSkipped({
+    projectId: w.project.id,
+    gitSha: "fedcba987654",
+    gitBranch: "feature/x",
+    sourceBuildId: w.build.id,
+    changedFiles: [],
+  });
+  const run = async () =>
+    await deliverBuildState(
+      { ...w.deps, flags: () => ({ testing: true, review: false }) },
+      { buildId: skipped.id, channelId: w.channelId },
+    );
+  return { w, run };
+};
 
+describe("deliverBuildState: a skipped build's Storybook status (ADR 0044)", () => {
   it("links the source's Storybook while the source is published", async () => {
     const { w, run } = await skippedFromApproved();
     await w.storage.write(
