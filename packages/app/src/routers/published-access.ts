@@ -60,14 +60,6 @@ export function isAnonymouslyViewable(
 }
 
 /**
- * CORS headers of a published file. A sandboxed preview frame runs on an opaque origin, so its
- * module scripts are cross-origin requests without cookies: they load only when the file answers
- * `Access-Control-Allow-Origin: *`. That is offered exactly where no credentials are involved, for
- * a public build and for a signed URL (which is itself the credential, never sent as a cookie or
- * header, and never with `Allow-Credentials`). A signed-in viewer's private build answers without
- * it: only same-origin pages may read it.
- */
-/**
  * How long a normal (not signed) published answer may be kept:
  * `immutable` for a file whose URL names its content, `minute` and `hour` for a slug short link that
  * follows the latest build, and `page` for an HTML page that carries build state and must be
@@ -95,6 +87,14 @@ export function publishedCacheControl(
   return `${access === "public" ? "public" : "private"}, ${FRESHNESS[freshness]}`;
 }
 
+/**
+ * CORS headers of a published file. A sandboxed preview frame runs on an opaque origin, so its
+ * module scripts are cross-origin requests without cookies: they load only when the file answers
+ * `Access-Control-Allow-Origin: *`. That is offered exactly where no credentials are involved, for
+ * a public build and for a signed URL (which is itself the credential, never sent as a cookie or
+ * header, and never with `Allow-Credentials`). A signed-in viewer's private build answers without
+ * it: only same-origin pages may read it.
+ */
 export function publishedCorsHeaders(access: PublishedAccess): Record<string, string> {
   return access === "session" ? {} : { "access-control-allow-origin": "*" };
 }
