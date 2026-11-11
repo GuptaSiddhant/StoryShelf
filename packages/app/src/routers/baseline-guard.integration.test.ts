@@ -465,7 +465,7 @@ describe("re-diff after a baseline change", () => {
       app,
       "f1/snapshots/sf1/approve",
       true,
-      "/projects/test-project/builds/f1",
+      "/projects/test-project/builds",
     );
 
     expect(response.headers.get("hx-refresh")).toBe("true");
@@ -564,11 +564,11 @@ describe("review pages for changed baselines", () => {
     expect(await page(app, REVIEW)).not.toContain("Baseline changed since this build");
   });
 
-  it("surfaces the same notice on the build overview", async () => {
+  it("surfaces the notice on the build page, with Re-diff in its details", async () => {
     const { app, db } = await setup();
     await moveMainBaseline(db);
 
-    const body = await page(app, "/projects/test-project/builds/f1");
+    const body = await page(app, "/projects/test-project/builds/f1/diff");
 
     expect(body).toContain("Baseline changed since this build was captured");
     expect(body).toContain("Re-diff against current baselines");

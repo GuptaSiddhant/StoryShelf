@@ -200,7 +200,7 @@ describe("component page", () => {
     expect(review).toContain(
       "/projects/app/components/src/Button.stories.tsx?build=b2#button--primary",
     );
-    const card = await (await get(app, "/projects/app/builds/b2")).text();
+    const card = await (await get(app, "/projects/app/builds/b2/diff")).text();
     expect(card).toContain(
       "/projects/app/components/src/Button.stories.tsx?build=b2#button--primary",
     );

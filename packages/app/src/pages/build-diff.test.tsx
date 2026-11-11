@@ -116,11 +116,11 @@ describe("review workspace page", () => {
 });
 
 describe("review page breadcrumb", () => {
-  it("lists Builds and the build (ancestors), not Review itself", async () => {
+  it("lists Builds only: the build is the current page, so its heading names it", async () => {
     const { html } = await reviewPage();
     const topbar = html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
     expect(topbar).toContain(">Builds</a>");
-    expect(topbar).toContain("feature/x · abc1234");
+    expect(topbar).not.toContain("feature/x · abc1234");
     expect(topbar).not.toContain(">Review<");
   });
 
@@ -329,7 +329,7 @@ describe("review page: capture environment migration", () => {
 const VIOLATION =
   "color-contrast (serious): Elements must meet minimum color contrast [button] 1 node(s)";
 
-async function pageWith(violations: string | null, view: "diff" | "" = "diff"): Promise<string> {
+async function pageWith(violations: string | null): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const project = await new ProjectModel(db).create({ name: "Docs" });
@@ -354,10 +354,7 @@ async function pageWith(violations: string | null, view: "diff" | "" = "diff"): 
     storage,
     logger: createShelfLogger({ level: "silent" }),
   });
-  const url =
-    view === "diff"
-      ? `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`
-      : `/projects/${project.slug}/builds/${build.id}`;
+  const url = `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`;
   return await (await app.request(url)).text();
 }
 
@@ -371,17 +368,17 @@ describe("review page: accessibility violations", () => {
 
   it("sums the findings in the header and offers an a11y filter on the snapshot list", async () => {
     const html = await pageWith(JSON.stringify([VIOLATION, "label (critical): x"]));
-    expect(html).toContain("a11y 2 (does not block)");
+    expect(html).toContain("2 a11y findings");
     expect(html).toMatch(/data-filter-switch[\s\S]*A11y 1/u);
     expect(html).toContain('data-filter="a11y"');
     expect(html).toContain("data-a11y");
   });
 
   it("shows the build's total on the build page as information only", async () => {
-    const html = await pageWith(JSON.stringify([VIOLATION]), "");
+    const html = await pageWith(JSON.stringify([VIOLATION]));
     expect(html).toContain("Accessibility findings");
     expect(html).toContain("On 1 snapshot. Information only; they never change the status.");
-    expect(await pageWith(null, "")).toContain("No findings recorded. Information only.");
+    expect(await pageWith(null)).toContain("No findings recorded. Information only.");
   });
 
   it("offers no a11y filter and no header count when nothing was found", async () => {
@@ -402,7 +399,7 @@ describe("review page: accessibility violations", () => {
   });
 
   it("reports an `axe unavailable` entry on the build page without calling it a finding", async () => {
-    const page = await pageWith(JSON.stringify(["axe unavailable: page crashed"]), "");
+    const page = await pageWith(JSON.stringify(["axe unavailable: page crashed"]));
     expect(page).toContain("No findings recorded.");
     expect(page).toContain("axe did not run on 1 snapshot.");
   });

@@ -15,6 +15,7 @@ export { CheckField, Field, FormActions, SelectField, TextareaField } from "./fo
 export { Card, CardSection, PageHeader, SectionTitle } from "./layout.tsx";
 export { HStack, VStack } from "./stacks.tsx";
 export { Avatar, AvatarGroup } from "./avatar.tsx";
+export { DefinitionList, Disclosure } from "./disclosure.tsx";
 export { Dropdown, DropdownDivider, DropdownItem } from "./dropdown.tsx";
 export { Icon } from "./icons/icon.tsx";
 export type { IconName } from "./icons/paths.ts";

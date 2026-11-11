@@ -2,11 +2,70 @@
 import type { Meta } from "@storybook/html-vite";
 import type { Snapshot } from "@storyshelf/core/schema";
 import { pageStory } from "../../.storybook/page.tsx";
+import type { RenderedContent } from "../shell/document.tsx";
+import {
+  BUILD_CANCELLED,
+  BUILD_FAILED,
+  BUILD_MAIN,
+  BUILD_REVIEW,
+  builds,
+  project,
+  snapshots,
+} from "../stories-fixtures/dataset.ts";
 import { NEW_STORY_ID, reviewData } from "../stories-fixtures/review.ts";
-import { renderBuildDiffPage } from "./build-diff.tsx";
+import { loadBuildDetails } from "./build-detail.tsx";
+import { type BuildDiffData, renderBuildDiffPage } from "./build-diff.tsx";
 
-const meta: Meta = { title: "Pages/Builds/Review stage" };
+const meta: Meta = { title: "Pages/Builds/Build page" };
 export default meta;
+
+/** The build page for one fixture build, with its details panel loaded from the story database. */
+async function buildPage(
+  buildId: string,
+  patch: Partial<BuildDiffData> = {},
+): Promise<RenderedContent> {
+  const build = builds.find((item) => item.id === buildId);
+  if (!build) throw new Error(`fixture missing: ${buildId}`);
+  const owner = patch.project ?? project;
+  return renderBuildDiffPage({
+    ...reviewData(),
+    build,
+    snapshots: snapshots.filter((snapshot) => snapshot.buildId === buildId),
+    comments: [],
+    selectedId: undefined,
+    details: await loadBuildDetails(owner, build),
+    ...patch,
+  });
+}
+
+/** Undecided changes: the stage, the Approve all / Reject all header and the collapsed details. */
+export const Reviewing = pageStory(() => buildPage(BUILD_REVIEW));
+
+/** Every change decided: nothing left to approve in the header. */
+export const Approved = pageStory(() => buildPage(BUILD_MAIN));
+
+/** Capture failed: no snapshots, and Retry capture waits in the ⋯ menu. */
+export const Failed = pageStory(() => buildPage(BUILD_FAILED));
+
+/** A cancelled build is terminal: nothing to review or approve. */
+export const Cancelled = pageStory(() => buildPage(BUILD_CANCELLED));
+
+/** The baseline moved after the diffs were computed: a one-line warning with Re-diff. */
+export const StaleBaseline = pageStory(() =>
+  buildPage(BUILD_REVIEW, {
+    drifted: Object.fromEntries(
+      reviewData().snapshots.map((snapshot) => [snapshot.id, "stale" as const]),
+    ),
+  }),
+);
+
+/** Capture off: review only. No stage; the verdict and the discussion stay in view. */
+export const TestingOff = pageStory(() => buildPage(BUILD_MAIN), { store: { testing: false } });
+
+/** Review off: capture and the stage stay, without Approve all or any verdict controls. */
+export const ReviewOff = pageStory(() =>
+  buildPage(BUILD_REVIEW, { project: { ...project, reviewEnabled: false } }),
+);
 
 /** A changed snapshot against its baseline: side by side, with the diff and the thread. */
 export const ChangedAgainstBaseline = pageStory(() => renderBuildDiffPage(reviewData()));

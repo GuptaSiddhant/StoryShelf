@@ -98,7 +98,7 @@ function done(c: Context, buildId: string, message: string): Response {
 /** The path the form was posted from when it is on this host, else the build page. */
 function returnPath(c: Context, buildId: string): string {
   const slug = c.req.param("slug") ?? "";
-  const fallback = `/projects/${slug}/builds/${buildId}`;
+  const fallback = `/projects/${slug}/builds/${buildId}/diff`;
   try {
     const referer = new URL(c.req.header("referer") ?? "", c.req.url);
     return referer.origin === new URL(c.req.url).origin

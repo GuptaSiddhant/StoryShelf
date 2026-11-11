@@ -1,3 +1,4 @@
+import { parseTestResults } from "@storyshelf/core/capture";
 import type { Build } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
@@ -8,6 +9,8 @@ import type { BaselineReference, DefaultComparison } from "../routers/baseline-r
 import { DocumentLayout, type NavConfig, type RenderedContent } from "../shell/document.tsx";
 import { EmptyState } from "../ui/components.tsx";
 import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
+import { a11ySummaryOf } from "./a11y-violations.tsx";
+import { BuildDetails, ReviewOnlySection, type BuildDetailsData } from "./build-detail.tsx";
 import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
 import { ReviewNotices } from "./build-diff-environment.tsx";
@@ -28,6 +31,8 @@ export interface BuildDiffData {
   comments: Comment[];
   selectedId?: string;
   canReview: boolean;
+  /** Whether the viewer may retry or cancel the build; omitted, the header hides the menu. */
+  canManage?: boolean;
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
   /** Display names of the users behind comments, by user id. */
@@ -45,6 +50,8 @@ export interface BuildDiffData {
   design?: DesignItem[];
   /** Base domain for published Storybook deep links. */
   publishedBaseDomain?: string;
+  /** Details panel data; omitted, the page shows the review stage alone. */
+  details?: BuildDetailsData;
 }
 interface DiffReviewGridProps {
   project: Project;
@@ -144,24 +151,66 @@ function reviewNav(project: Project, build: Build): NavConfig {
     sidebarDefault: "rail",
     projectSlug: project.slug,
     projectName: project.name,
-    trail: [
-      {
-        label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}`,
-        href: `/projects/${project.slug}/builds/${build.id}`,
-      },
-      { label: "Review" },
-    ],
+    trail: [{ label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}` }],
   };
 }
 
-/** Three-up diff review page: baseline, current, and diff with keyboard review. */
+/** The collapsed details panel, when the page has its data. */
+function DetailsPanel(props: {
+  data: BuildDiffData;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { project, build, snapshots, canReview, drifted, details } = props.data;
+  if (!details) {
+    return null;
+  }
+  return (
+    <div class="mb-1">
+      <BuildDetails
+        project={project}
+        build={build}
+        details={details}
+        snapshotCount={snapshots.length}
+        a11y={a11ySummaryOf(snapshots)}
+        staleCount={Object.keys(drifted).length}
+        canReview={canReview}
+        tests={parseTestResults(build.testResults)}
+      />
+    </div>
+  );
+}
+
+/** The stage: snapshots and their comparison, or the empty state; absent with capture off. */
+function Stage(props: {
+  data: BuildDiffData;
+  selected: Snapshot | undefined;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { data, selected } = props;
+  if (data.details?.testing === false) {
+    return null;
+  }
+  return data.snapshots.length === 0 ? (
+    <EmptyState
+      title="No snapshots"
+      description="This build has no snapshots yet. Capture may still be running."
+    />
+  ) : (
+    <DiffReviewGrid
+      {...data}
+      selected={selected}
+      usage={data.usage ?? []}
+      design={data.design ?? []}
+    />
+  );
+}
+
+/** The build page: header, details panel, and the review stage with keyboard review. */
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
   const { project, build, snapshots, selectedId, canReview, drifted } = data;
   const selected = selectedSnapshot(snapshots, selectedId);
   const pendingGroups = reviewProgress(snapshots).pending;
   return (
     <DocumentLayout
-      title={`Review · ${build.gitBranch}`}
+      title={`Build ${build.gitBranch}`}
       nav={reviewNav(project, build)}
       layout="wide"
     >
@@ -171,6 +220,8 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         snapshots={snapshots}
         pendingCount={pendingGroups}
         canReview={canReview}
+        canManage={data.canManage}
+        details={data.details}
       />
       <ReviewNotices
         project={project}
@@ -180,19 +231,9 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         canReview={canReview}
       />
       <InsightSlot project={project} build={build} data={data.insight} />
-      {snapshots.length === 0 ? (
-        <EmptyState
-          title="No snapshots"
-          description="This build has no snapshots yet. Capture may still be running."
-        />
-      ) : (
-        <DiffReviewGrid
-          {...data}
-          selected={selected}
-          usage={data.usage ?? []}
-          design={data.design ?? []}
-        />
-      )}
+      <DetailsPanel data={data} />
+      {data.details ? <ReviewOnlySection details={data.details} /> : null}
+      <Stage data={data} selected={selected} />
       <ShortcutsDialog />
     </DocumentLayout>
   );

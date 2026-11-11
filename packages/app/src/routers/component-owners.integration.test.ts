@@ -356,7 +356,7 @@ describe("the build page and the approval rules", () => {
     });
     const id = await publish(booted);
     await vi.waitFor(() => expect(booted.mails.length).toBeGreaterThan(0));
-    const before = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
+    const before = await (await booted.call("bob", `/projects/owners/builds/${id}/diff`)).text();
     expect(before).toContain("Assigned reviewers");
     expect(before).toContain(
       "Assigned from component owners. Anyone who can approve may still approve.",
@@ -375,7 +375,7 @@ describe("the build page and the approval rules", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ verdict: "approved" }),
     });
-    const after = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
+    const after = await (await booted.call("bob", `/projects/owners/builds/${id}/diff`)).text();
     expect(after).toContain("Approved");
   });
 
@@ -384,7 +384,7 @@ describe("the build page and the approval rules", () => {
       componentOwners: JSON.stringify([{ pattern: "src/forms/**", owners: ["alice"] }]),
     });
     const id = await publish(booted, "b".repeat(40), "main");
-    const html = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
+    const html = await (await booted.call("bob", `/projects/owners/builds/${id}/diff`)).text();
     expect(html).not.toContain("Assigned reviewers");
   });
 
@@ -393,7 +393,7 @@ describe("the build page and the approval rules", () => {
       componentOwners: JSON.stringify([{ pattern: "src/other/**", owners: ["alice"] }]),
     });
     const id = await publish(booted);
-    const html = await (await booted.call("bob", `/projects/owners/builds/${id}`)).text();
+    const html = await (await booted.call("bob", `/projects/owners/builds/${id}/diff`)).text();
     expect(html).not.toContain("Assigned reviewers");
     expect(html).not.toContain("Assigned from component owners");
   });
