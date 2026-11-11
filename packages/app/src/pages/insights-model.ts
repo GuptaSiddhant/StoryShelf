@@ -1,3 +1,5 @@
+import type { QueueView } from "./compute-jobs.tsx";
+
 /** Capture timings of a build, from the milliseconds the renderer reported per snapshot. */
 export interface CaptureTimings {
   /** Snapshots that reported a duration. */
@@ -43,4 +45,24 @@ export function formatDurationMs(ms: number): string {
   }
   const minutes = Math.floor(ms / 60_000);
   return `${minutes} min ${Math.round((ms % 60_000) / 1000)} s`;
+}
+
+/**
+ * The queue entries of the builds in `owned`, in the shape the jobs card shows. The capture queue is
+ * shared by every project, so a project's view must never include another project's builds.
+ */
+export function queueViewOf(
+  entries: readonly QueueView[],
+  owned: ReadonlySet<string>,
+): QueueView[] {
+  return entries
+    .filter((entry) => owned.has(entry.buildId))
+    .map((entry) => ({
+      buildId: entry.buildId,
+      status: entry.status,
+      queuedAt: entry.queuedAt,
+      startedAt: entry.startedAt,
+      finishedAt: entry.finishedAt,
+      error: entry.error,
+    }));
 }

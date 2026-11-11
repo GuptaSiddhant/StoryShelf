@@ -4,7 +4,7 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import { loadHealthPanel } from "../insights/health-panel.ts";
 import { a11ySummaryOf } from "../pages/a11y-violations.tsx";
 import type { QueueView } from "../pages/compute-jobs.tsx";
-import { captureTimingsOf } from "../pages/insights-model.ts";
+import { captureTimingsOf, queueViewOf } from "../pages/insights-model.ts";
 import type { SettingsInsightsData } from "../pages/settings-insights.tsx";
 import { getStore, testingEnabled } from "../store.ts";
 import { currentProjectRole } from "./helpers.ts";
@@ -18,15 +18,7 @@ export async function getQueueView(projectId: string): Promise<QueueView[]> {
   const owned = new Set(
     (await new BuildModel(getStore().db).list(projectId)).map((build) => build.id),
   );
-  const active = (await queue.active()).filter((entry) => owned.has(entry.buildId));
-  return active.map((entry) => ({
-    buildId: entry.buildId,
-    status: entry.status,
-    queuedAt: entry.queuedAt,
-    startedAt: entry.startedAt,
-    finishedAt: entry.finishedAt,
-    error: entry.error,
-  }));
+  return queueViewOf(await queue.active(), owned);
 }
 
 /** Whether the viewer may retry the project's captures. */
