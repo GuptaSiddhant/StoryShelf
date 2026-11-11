@@ -95,8 +95,8 @@ a token grants" must be amended before #357 lands, to allow exactly this grant a
 - Lifetime: one hour. Renewal is a fresh redirect through the canonical path, which checks permission
   again, so revocation and logout take effect at renewal.
 - Every answer is `Cache-Control: private, no-store`, with `Referrer-Policy: no-referrer` and
-  `X-Robots-Tag: noindex`. A private build's answer also carries `Cross-Origin-Resource-Policy:
-same-origin` (decision 9). Refusals are one identical 404, as on `/_s/`.
+  `X-Robots-Tag: noindex`. A private build's answer carries no CORP header here (see amendment
+  2026-11-11, CORP; decision 9 covers content hosts). Refusals are one identical 404, as on `/_s/`.
 - `redactSecrets` (`packages/core/src/utils/redact.ts`) learns the `/_r/` prefix, as it already does for
   `/_s/`. The token is never logged.
 - `/_r/*` shares the signed route's per-IP rate-limit bucket (decision 10).
@@ -233,7 +233,7 @@ Headers, with the target values:
 | Project path and short link, session, `trusted`   | `private, no-cache`, ETag (#924 interim: `private, max-age=31536000, immutable`) | None             | None                                                      |
 | Project path and short link, session, `sandboxed` | None: a `302` to `/_r/`, `private, no-store`, `no-referrer`                      | None             | As the redirect                                           |
 | `/_s/<token>/*`                                   | `private, no-store`, or the capture cache rule                                   | Not set          | `no-referrer`, `noindex`                                  |
-| `/_r/<token>/*`                                   | `private, no-store`                                                              | Always           | `no-referrer`, `noindex`, CORP `same-origin` when private |
+| `/_r/<token>/*`                                   | `private, no-store`                                                              | Always           | `no-referrer`, `noindex`, No CORP (see amendment 2026-11-11, CORP) |
 | Exchange and portal redirect                      | `private, no-store` on the `302`                                                 | None             | `no-referrer`, navigations only                           |
 | Content host, public                              | `public, max-age=31536000, immutable`                                            | None             | None                                                      |
 | Content host, private                             | `private, no-cache`, ETag                                                        | None             | CORP `same-origin`                                        |
@@ -274,3 +274,14 @@ answers 404.
   isolates private builds.
 - **A portal cookie with `Domain=`.** Refused: the cookie would reach every content host under the domain.
 - **A header-only stopgap on the app origin.** Rejected in the ADR 0010 amendment (#916).
+
+## Amendment, 2026-11-11 (CORP, #357)
+
+- `Cross-Origin-Resource-Policy: same-origin` applies to private answers from **content hosts** only
+  (decision 9), never to `/_r/`.
+- Measured in #357: a sandboxed page has an opaque origin, which is cross-origin to the app origin, so
+  CORP blocks its own no-CORS sub-resources (images, fonts, `<link>` stylesheets). The cross-build attack
+  CORP closes needs a same-site cookie, which exists only on content hosts.
+- The #357 browser test that asserts a `/_r/` image loads is the guard for this rule.
+- Confirmed in #357: the preview-token refresh route is class `hosting`, and the option is named
+  `storybookUrlRateLimit`, with `testing.storybookUrlRateLimit` as an alias.
