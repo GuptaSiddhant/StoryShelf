@@ -18,7 +18,20 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 - **`pending` builds** (waiting for a review verdict, ADR 0013 decision 9; `core/src/retention/pending.ts`): purged once their last activity (the build's `updated_at`, its newest comment, its newest `build_reviews` row) is older than `purgeTtlDays`. A pending build replaced by a newer one on its branch with no attempts, comments or verdicts is "superseded" and leaves at the same window; the latest-per-branch rule does not shield pending builds, and persistent ones are kept. No new status.
 - **Stale branch baselines:** branches whose latest build is older than `branchTtlDays` (default 30, `null` = disabled) are GC'd — deletes `baselines/{branch}/**` files and `baselines` rows for that branch (default branch never GC'd).
 
-Purge removes **both** storage files (`builds/{buildId}/` or `baselines/{branch}/**`) and database rows (`builds`, `snapshots`, or `baselines`) in one transaction.
+### How a claimed purge removes a build
+
+Purge claims a build first, then finishes it in recorded steps (ADR 0039 decision 2; `packages/core/src/retention/build-deletion.ts`). Nothing is deleted before the tombstone commits:
+
+1. **Claim.** An atomic check that no baseline or investigation still protects the build moves `builds.retention_state` from `available` to `deleting`. A `deleting` build never returns to service and admits no new reference.
+2. **Release content** (`content` step). The build's shared content uses are released, once per hash.
+3. **Delete storage** (`storage` step). The build's `{projectId}/builds/{buildId}/` objects are deleted. This happens outside any database transaction.
+4. **Remove rows** (`rows` step). The build row and its dependent rows are removed in one transaction. This is the only transactional step: storage and the database are two systems and cannot be changed atomically, so the order above is what keeps a crash recoverable.
+
+Each step is recorded durably. A crash between steps leaves the build `deleting`, and the next run resumes at the first unfinished step. A step that runs before its predecessor is recorded fails instead of continuing. The tombstone never expires; only the cleaner may remove it.
+
+**Resume.** Every claimed purge first lists the project's `deleting` builds, then claims the new candidates and finishes all `deleting` builds, including those an earlier run left half done (`packages/core/src/retention/purge-claimed.ts`). A build another cleaner already finished counts as `already-gone`. A build whose deletion fails is logged and stays `deleting` for the next run, and it does not stop the others. The purge response's `resumed` counts the builds an earlier run had claimed.
+
+Branch baselines follow the same fenced lifecycle when the database has the capability (ADR 0039).
 
 ### Orphaned baselines
 
