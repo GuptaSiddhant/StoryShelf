@@ -367,11 +367,12 @@ const StageGrid: FC<CompareStageProps & { design: boolean; baselineLabel: string
  * nothing to compare. No mode switch, diff pane, divider or range. `data-modes="split"` makes the review
  * script refuse the other mode keys, and the flip click and `t` key do nothing because the view never flips.
  */
-const SingleStage: FC<{ currentSrc: string; subject: string; emptyText: unknown }> = ({
-  currentSrc,
-  subject,
-  emptyText,
-}) => (
+const SingleStage: FC<{
+  currentSrc: string;
+  subject: string;
+  emptyText: unknown;
+  diffSrc: string | null;
+}> = ({ currentSrc, subject, emptyText, diffSrc }) => (
   <div
     class={stageRoot}
     data-compare
@@ -386,6 +387,11 @@ const SingleStage: FC<{ currentSrc: string; subject: string; emptyText: unknown 
       <Segmented label="Zoom" data-compare-zoom items={withActive(ZOOMS, "fit")} />
     </div>
     <p class="stage__note">{emptyText}</p>
+    {diffSrc ? (
+      <p class="stage__note">
+        <a href={diffSrc}>Open the saved diff</a>
+      </p>
+    ) : null}
     <div class="stage__grid">
       <Pane
         kind="current"
@@ -412,6 +418,7 @@ export const CompareStage: FC<CompareStageProps> = ({
         currentSrc={images.currentSrc}
         subject={images.subject}
         emptyText={images.baselineEmpty ?? DEFAULT_BASELINE_EMPTY}
+        diffSrc={images.diffSrc}
       />
     );
   }

@@ -292,6 +292,7 @@ describe("CompareStage", () => {
     expect(html).toContain('alt="Current for X"');
     expect(html).not.toContain('alt="Diff for X"');
     expect(html).not.toContain("data-compare-mode");
+    expect(html).toContain('href="/d.png"');
   });
 });
 
