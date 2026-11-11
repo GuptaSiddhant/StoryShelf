@@ -59,7 +59,7 @@ async function serveGranted(c: Context, token: string, rel: string): Promise<Res
     buildId,
     rel,
     access,
-    cacheControl: "",
+    freshness: "immutable", // ignored: a signed answer takes `signedCacheControl`
     grant: verified.claims,
   });
 }
