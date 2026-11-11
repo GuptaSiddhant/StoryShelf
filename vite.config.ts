@@ -174,6 +174,8 @@ export default defineConfig({
       "eslint/max-lines": "allow",
       "typescript/strict-boolean-expressions": "allow",
       "vite-plus/prefer-vite-plus-imports": "error",
+      // New in oxlint 1.93 (bundled with Vite+ 1.6.0); it flags three `throw new Error` guards on main.
+      "unicorn/prefer-type-error": "allow",
     },
     overrides: [
       {
@@ -211,6 +213,16 @@ export default defineConfig({
           "typescript/no-unsafe-member-access": "allow",
           "typescript/no-unsafe-return": "allow",
           "unicorn/prefer-at": "allow",
+        },
+      },
+      {
+        // Vite+ 1.6 lints the script blocks of .astro files; main's `lint:files` never saw them.
+        files: ["apps/website/**/*.astro"],
+        env: { browser: true },
+        globals: { Astro: "readonly" },
+        rules: {
+          "typescript/explicit-function-return-type": "allow",
+          "eslint/no-implicit-globals": "allow",
         },
       },
       {
