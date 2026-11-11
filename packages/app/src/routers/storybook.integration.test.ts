@@ -538,7 +538,21 @@ describe("published answers by access (#923)", () => {
     const app = await privateBuildApp(stubAuth(viewer));
     const response = await app.request("/projects/test-project/storybook/build/b1/iframe.js");
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    expect(response.headers.get("cache-control")).toBe("private, no-cache");
+    expect(response.headers.get("etag")).toMatch(/^"[0-9a-f]{64}"$/u);
+  });
+
+  it("answers 304 when a viewer's cached copy still matches, with the same validators", async () => {
+    const app = await privateBuildApp(stubAuth(viewer));
+    const url = "/projects/test-project/storybook/build/b1/iframe.js";
+    const first = await app.request(url);
+    const etag = first.headers.get("etag") ?? "";
+    const again = await app.request(url, { headers: { "if-none-match": etag } });
+    expect(again.status).toBe(304);
+    expect(again.headers.get("cache-control")).toBe("private, no-cache");
+    expect(again.headers.get("etag")).toBe(etag);
+    const other = await app.request(url, { headers: { "if-none-match": '"stale"' } });
+    expect(other.status).toBe(200);
   });
 
   it("keeps a public build's path publicly cacheable", async () => {
@@ -552,7 +566,7 @@ describe("published answers by access (#923)", () => {
     const app = await privateBuildApp(stubAuth(viewer));
     const response = await app.request(`/_/${ulid}/iframe.js`);
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    expect(response.headers.get("cache-control")).toBe("private, no-cache");
   });
 
   it("answers a signed-in viewer's private slug short link as private, root and files alike", async () => {
@@ -571,10 +585,10 @@ describe("published answers by access (#923)", () => {
     });
     const root = await app.request("/_/test-project/");
     expect(root.status).toBe(200);
-    expect(root.headers.get("cache-control")).toBe("private, max-age=60");
+    expect(root.headers.get("cache-control")).toBe("private, no-cache");
     const file = await app.request("/_/test-project/iframe.js");
     expect(file.status).toBe(200);
-    expect(file.headers.get("cache-control")).toBe("private, max-age=3600");
+    expect(file.headers.get("cache-control")).toBe("private, no-cache");
   });
 
   it("answers a private landing page as private, to be revalidated", async () => {

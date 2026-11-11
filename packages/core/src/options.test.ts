@@ -89,6 +89,16 @@ function shardSized(shardSize: number, extra = {}): () => void {
   };
 }
 
+function hosted(mode: string, extra: Partial<ShelfOptions> = {}): () => void {
+  return () => {
+    resolveShelfOptions({
+      ...base,
+      ...extra,
+      config: { secret: undefined, ...extra.config, storybookHosting: { mode } },
+    } as unknown as ShelfOptions);
+  };
+}
+
 function rateLimited(storybookUrlRateLimit: number): () => void {
   return () => {
     resolveShelfOptions({ ...base, testing: { runner, storybookUrlRateLimit } });
@@ -211,5 +221,31 @@ describe("sequentialTransactionsWarning", () => {
       database: { metadata: { name: "Fake", category: "database", transactions: "atomic" } },
     } as unknown as ShelfOptions;
     expect(sequentialTransactionsWarning({ ...atomic, testing: { runner } })).toBeUndefined();
+  });
+});
+
+describe("resolveShelfOptions storybook hosting", () => {
+  const auth = {} as ShelfOptions["auth"];
+
+  it("accepts the default and trusted mode, with or without sign-in or a secret", () => {
+    expect(() => resolveShelfOptions({ ...base, auth })).not.toThrow();
+    expect(hosted("trusted", { auth })).not.toThrow();
+  });
+
+  it("refuses sandboxed and subdomain with sign-in on and no secret", () => {
+    expect(hosted("sandboxed", { auth })).toThrow(/needs config.secret/u);
+    expect(hosted("subdomain", { auth })).toThrow(/needs config.secret/u);
+  });
+
+  it("refuses modes whose serving is not wired, rather than serving them as trusted", () => {
+    expect(hosted("sandboxed")).toThrow(/not available in this version/u);
+    expect(hosted("subdomain", { auth, config: { secret: "s" } })).toThrow(/not available/u);
+  });
+
+  it("validates the top-level storybookUrlRateLimit as a positive whole number", () => {
+    expect(() => resolveShelfOptions({ ...base, storybookUrlRateLimit: 100 })).not.toThrow();
+    expect(() => resolveShelfOptions({ ...base, storybookUrlRateLimit: 0 })).toThrow(
+      /^storybookUrlRateLimit must be/u,
+    );
   });
 });

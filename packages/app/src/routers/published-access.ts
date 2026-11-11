@@ -75,16 +75,18 @@ const FRESHNESS: Record<PublishedFreshness, string> = {
 };
 
 /**
- * `Cache-Control` of a normal published answer, from who may read it. A `public` answer may be kept
- * by a shared cache. A `session` answer is one viewer's private build, so only that viewer's browser
- * may keep it: a shared cache that stored it would serve it to anyone (#923). A signed URL never
- * comes here; `signedCacheControl` decides its answer, and anything that is not `public` is private.
+ * `Cache-Control` of a normal published answer, from who may read it (ADR 0051, decision 10). A
+ * `public` answer may be kept by a shared cache. A `session` answer is one viewer's private build:
+ * `private, no-cache`, so only that viewer's browser keeps it and must revalidate (with the content
+ * hash `ETag`) before every use, which lets revocation and logout reach cached copies. A signed URL
+ * never comes here; `signedCacheControl` decides its answer, and anything that is not `public` is
+ * private.
  */
 export function publishedCacheControl(
   access: PublishedAccess,
   freshness: PublishedFreshness,
 ): string {
-  return `${access === "public" ? "public" : "private"}, ${FRESHNESS[freshness]}`;
+  return access === "public" ? `public, ${FRESHNESS[freshness]}` : "private, no-cache";
 }
 
 /**

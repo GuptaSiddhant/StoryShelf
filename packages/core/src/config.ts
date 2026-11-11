@@ -9,6 +9,13 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import {
+  storybookHostingSchema,
+  validateStorybookHosting,
+  type StorybookHostingConfig,
+} from "./storybook-hosting.ts";
+
+export type { StorybookHostingConfig, StorybookHostingMode } from "./storybook-hosting.ts";
 
 /** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {
@@ -137,7 +144,17 @@ export interface ShelfConfig {
    * mint sessions from it. Distinct from `secret` (session signing).
    */
   adminToken?: string;
+  /**
+   * Base domain of published Storybook links. ADR 0051 (decision 6) retires it in favor of
+   * `storybookHosting: { mode: "subdomain", baseDomain }` (#358); setting both stops boot.
+   */
   publishedBaseDomain?: string;
+  /**
+   * Where published Storybooks are served from and how uploaded code is isolated from the app
+   * (ADR 0051). Unset means `trusted`: path hosting on the app origin. A value that does not
+   * validate stops boot; it never falls back to `trusted`.
+   */
+  storybookHosting?: StorybookHostingConfig;
   /**
    * Public base URL of this deployment (e.g. `https://shelf.example.com`).
    * Used as the issuer in the `/.well-known/openid-configuration` relying-party
@@ -271,6 +288,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     migrateCredentialsOnBoot: z.boolean().optional(),
     adminToken: z.string().min(1).optional(),
     publishedBaseDomain: z.string().optional(),
+    storybookHosting: storybookHostingSchema.optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     publicBaseUrl: z.string().url().optional(),
     scratchDir: z.string().optional(),
@@ -294,6 +312,14 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   })
   .strict()
   .superRefine((config, ctx) => {
+    if (config.publishedBaseDomain !== undefined && config.storybookHosting !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["storybookHosting"],
+        message:
+          "publishedBaseDomain and storybookHosting are both set; use storybookHosting only (ADR 0051)",
+      });
+    }
     if (config.previousSecret !== undefined && config.secret === undefined) {
       ctx.addIssue({
         code: "custom",
@@ -338,7 +364,19 @@ export function validateConfig(config: Record<string, unknown>): ShelfConfig {
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Invalid ShelfConfig: ${issues}`);
   }
-  return result.data;
+  const hosting = result.data.storybookHosting;
+  return hosting === undefined
+    ? result.data
+    : { ...result.data, storybookHosting: checkedHosting(hosting) };
+}
+
+/** {@link validateStorybookHosting}, with its reason in the same `Invalid ShelfConfig` form. */
+function checkedHosting(hosting: StorybookHostingConfig): StorybookHostingConfig {
+  try {
+    return validateStorybookHosting(hosting);
+  } catch (error) {
+    throw new Error(`Invalid ShelfConfig: ${(error as Error).message}`, { cause: error });
+  }
 }
 
 /**
@@ -395,10 +433,8 @@ export interface ShelfTestingOptions {
    */
   shardSize?: number;
   /**
-   * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`
-   * (ADR 0007, decision 5). Default 6000, enough for a render fetching thousands of assets from one
-   * farm IP; a larger farm behind one address raises it. Over the limit the route answers `429`
-   * before it looks at the token, so the answer says nothing about a token's validity.
+   * Alias of the top-level `storybookUrlRateLimit` option (ADR 0051, decision 10); the top-level
+   * value wins when both are set.
    */
   storybookUrlRateLimit?: number;
   /**
@@ -464,6 +500,15 @@ export interface ShelfOptions {
    * no queue, and the tuning below is unreachable rather than silently ignored.
    */
   testing?: ShelfTestingOptions;
+  /**
+   * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`,
+   * and to the read-grant route, `/_r/<token>/*`, which share one bucket (ADR 0007, decision 5;
+   * ADR 0051, decision 10). Default 6000, enough for a render fetching thousands of assets from one
+   * farm IP; a larger farm behind one address raises it. Over the limit the routes answer `429`
+   * before they look at the token, so the answer says nothing about a token's validity. Replaces
+   * `testing.storybookUrlRateLimit`, which stays as an alias, and works without `testing`.
+   */
+  storybookUrlRateLimit?: number;
   auth?: Auth;
   /** AI insights surface (ADR 0016). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;

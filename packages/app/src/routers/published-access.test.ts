@@ -13,13 +13,8 @@ describe("publishedCacheControl", () => {
     expect(publishedCacheControl("public", freshness)).toBe(header);
   });
 
-  it.each([
-    ["immutable", "private, max-age=31536000, immutable"],
-    ["minute", "private, max-age=60"],
-    ["hour", "private, max-age=3600"],
-    ["page", "private, no-cache"],
-  ] as const)("makes a session answer private for %s", (freshness, header) => {
-    expect(publishedCacheControl("session", freshness)).toBe(header);
+  it.each(FRESHNESS)("makes a session answer private and revalidated for %s", (freshness) => {
+    expect(publishedCacheControl("session", freshness)).toBe("private, no-cache");
   });
 
   it.each(FRESHNESS)("never answers a session or token access as public (%s)", (freshness) => {

@@ -268,7 +268,7 @@ const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] 
   },
 ];
 
-/** Requests per minute per client IP on the signed Storybook URL route (`testing.storybookUrlRateLimit`). */
+/** Requests per minute per client IP on the signed Storybook URL route (`storybookUrlRateLimit`, alias `testing.storybookUrlRateLimit`). */
 const DEFAULT_STORYBOOK_URL_RATE_LIMIT = 6000;
 
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
@@ -278,7 +278,10 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOption
   // before the token is looked at and answers 429 alike for any token.
   const signedUrls = {
     paths: [`${STORYBOOK_TOKEN_PREFIX}*`],
-    max: options.testing?.storybookUrlRateLimit ?? DEFAULT_STORYBOOK_URL_RATE_LIMIT,
+    max:
+      options.storybookUrlRateLimit ??
+      options.testing?.storybookUrlRateLimit ??
+      DEFAULT_STORYBOOK_URL_RATE_LIMIT,
     bucket: "signed-storybook",
   };
   for (const { paths, max, bucket } of [...RATE_LIMITS, signedUrls]) {
