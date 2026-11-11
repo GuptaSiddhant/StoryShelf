@@ -6,6 +6,7 @@ import type { Context } from "hono";
 import { posix } from "node:path";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import { getStore } from "../store.ts";
+import { redirectToContentHost } from "./content-redirect.ts";
 import { notFound } from "./helpers.ts";
 import {
   hiddenFrom,
@@ -129,23 +130,40 @@ async function serveShortBuild(c: Context, link: ShortLink): Promise<Response> {
       "cache-control": publishedCacheControl(access, "page"),
     });
   }
-  if (access === "session" && hostingMode() === "sandboxed") {
-    // A sandboxed frame sends no cookie: the private build is read through a grant (ADR 0051).
-    return redirectToReadGrant(c, project, build, rest);
-  }
-  const served = await servePublishedFile(c, {
-    projectId: project.id,
-    buildId: build.id,
-    rel: rest === "" ? "index.html" : rest,
-    access,
-    family: "short",
-    freshness: shortLinkFreshness(isUlid, rest === ""),
-  });
+  const served =
+    redirectForHosting(c, { project, build, access, rest }) ??
+    (await servePublishedFile(c, {
+      projectId: project.id,
+      buildId: build.id,
+      rel: rest === "" ? "index.html" : rest,
+      access,
+      family: "short",
+      freshness: shortLinkFreshness(isUlid, rest === ""),
+    }));
   if (served) return served;
   const fallback = isUlid
     ? `/projects/${project.slug}/builds/${build.id}`
     : `/projects/${project.slug}`;
   return rest === "" || rest === "index.html" ? c.redirect(fallback, 302) : c.notFound();
+}
+
+/**
+ * The redirect that replaces serving a build's bytes from the portal, or null when the portal serves
+ * them: `subdomain` mode sends every viewer to the build's content host, `sandboxed` mode sends a
+ * signed-in viewer of a private build to a read grant (a sandboxed frame sends no cookie). ADR 0051.
+ */
+function redirectForHosting(
+  c: Context,
+  target: { project: Project; build: Build; access: Access; rest: string },
+): Response | null {
+  const mode = hostingMode();
+  if (mode === "subdomain") {
+    return redirectToContentHost(c, target);
+  }
+  if (mode === "sandboxed" && target.access === "session") {
+    return redirectToReadGrant(c, target.project, target.build, target.rest);
+  }
+  return null;
 }
 
 /** Canonical build route: serves the static Storybook and the landing page. */
@@ -194,8 +212,9 @@ async function serveBuildFile(
   target: { project: Project; build: Build; access: Access; rest: string },
 ): Promise<Response> {
   const { project, build, access, rest } = target;
-  if (access === "session" && hostingMode() === "sandboxed") {
-    return redirectToReadGrant(c, project, build, rest);
+  const redirect = redirectForHosting(c, target);
+  if (redirect) {
+    return redirect;
   }
   const served = await servePublishedFile(c, {
     projectId: project.id,
@@ -217,6 +236,9 @@ async function storybookLanding(
   const headers = { "cache-control": publishedCacheControl(access, "page") };
   if (!(await staticsReady(project.id, build.id))) {
     return c.html(renderStorybookPreparingPage(project, build, project.slug), 200, headers);
+  }
+  if (hostingMode() === "subdomain") {
+    return redirectToContentHost(c, { project, build, access, rest: "" });
   }
   const storyId = c.req.query("storyId") ?? c.req.query("id") ?? undefined;
   const viewMode = c.req.query("viewMode") === "docs" ? "docs" : undefined;

@@ -15,6 +15,7 @@ import {
   hostingMode,
   publishedCacheControl,
   publishedCorsHeaders,
+  resourcePolicyHeaders,
   sandboxHeaders,
   type PublishedAccess,
   type PublishedFamily,
@@ -33,6 +34,13 @@ export const SIGNED_URL_HEADERS = {
   "x-robots-tag": "noindex, nofollow",
   "x-content-type-options": "nosniff",
 } as const;
+
+/** Set {@link SIGNED_URL_HEADERS} on the response being built: a credential rides in or out of it. */
+export function applySignedUrlHeaders(c: Context): void {
+  for (const [name, value] of Object.entries(SIGNED_URL_HEADERS)) {
+    c.header(name, value);
+  }
+}
 
 /**
  * The one answer for every refused token request, on `/_s/` and `/_r/` alike, so a caller cannot
@@ -150,6 +158,7 @@ function answerHeaders(
     ...cacheControl,
     ...publishedCorsHeaders(access),
     ...sandboxHeaders(request.family, hostingMode()),
+    ...resourcePolicyHeaders(request.family, access),
   };
 }
 

@@ -1,4 +1,5 @@
 import { groupComponents, parseTestResults } from "@storyshelf/core/capture";
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel } from "@storyshelf/core/models";
 import { CaptureAttemptModel } from "@storyshelf/core/models";
 import { CaptureLogModel } from "@storyshelf/core/models";
@@ -88,7 +89,7 @@ export async function renderBuildDetailPage(
   const { drifted } = await loadBaselineView(project, build, snapshots);
   const designs = await loadDesignResolutions(project, snapshots).catch(() => new Map());
   const staleCount = Object.keys(drifted).length;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const testing = testingEnabled();
   const published = build.status === "approved" && attempts.length === 0;
   const [catalog, labels] = await Promise.all([
@@ -374,7 +375,7 @@ export async function renderBuildDetailPage(
                 {snap.storyImportPath && usageByStory.has(snap.storyImportPath) ? (
                   <LinkedUsage
                     usage={usageByStory.get(snap.storyImportPath) ?? []}
-                    publishedBaseDomain={getStore().config.publishedBaseDomain}
+                    publishedBaseDomain={contentHostSuffix(getStore().config)}
                   />
                 ) : null}
                 <HStack>

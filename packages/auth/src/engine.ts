@@ -8,7 +8,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
  * (mounted at `/api/auth/*`) — never through `createSession`, which exists
  * only for interface conformance and fails loudly.
  */
-import { SESSION_COOKIE } from "@storyshelf/core/types";
+import { HOST_SESSION_COOKIE, SESSION_COOKIE } from "@storyshelf/core/types";
 import { ulid } from "@storyshelf/core/utils";
 import { betterAuth } from "better-auth";
 import { baseAuthDateFields, baseAuthTables } from "./auth-tables.ts";
@@ -103,7 +103,7 @@ function buildAuthInstance(options: ShelfAuthOptions, db: DatabaseAdapter): Shel
     // management stays off (see SSO_MANAGEMENT_PATHS).
     ...(options.sso ? { disabledPaths: SSO_MANAGEMENT_PATHS } : {}),
     session: { expiresIn, updateAge: 60 * 60 * 24, cookieCache: { enabled: false } },
-    advanced: advancedOptions(options.baseURL),
+    advanced: advancedOptions(options),
     databaseHooks: {
       user: {
         create: {
@@ -125,15 +125,27 @@ interface AdvancedOptions {
   cookies: {
     session_token: { name: string; attributes: ReturnType<typeof sessionCookieAttributes> };
   };
+  /** Set to false for the `__Host-` cookie: the library would add `__Secure-` in front of the name. */
+  useSecureCookies?: false;
 }
 
 /** Better Auth's `advanced` block: ULID ids and our session cookie (name and attributes). */
-function advancedOptions(baseURL: string): AdvancedOptions {
+function advancedOptions(options: ShelfAuthOptions): AdvancedOptions {
+  const attributes = sessionCookieAttributes(options.baseURL);
+  if (options.hostSessionCookie === true) {
+    // The library prefixes `__Secure-` to the name whenever it considers the cookie secure. Turning
+    // that off and stating `secure: true` ourselves leaves the `__Host-` name as it is typed here.
+    return {
+      database: { generateId: (): string => ulid() },
+      cookies: {
+        session_token: { name: HOST_SESSION_COOKIE, attributes: { ...attributes, secure: true } },
+      },
+      useSecureCookies: false,
+    };
+  }
   return {
     database: { generateId: (): string => ulid() },
-    cookies: {
-      session_token: { name: SESSION_COOKIE, attributes: sessionCookieAttributes(baseURL) },
-    },
+    cookies: { session_token: { name: SESSION_COOKIE, attributes } },
   };
 }
 

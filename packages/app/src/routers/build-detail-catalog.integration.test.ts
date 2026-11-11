@@ -41,7 +41,7 @@ const index = {
 async function seed(options: { testing?: boolean; status?: string; catalogued?: boolean } = {}) {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  const project = await createTestProject(db, db.tables, { name: "app" });
+  const project = await createTestProject(db, db.tables, { name: "web" });
   const created = await createTestBuild(db, db.tables, project.id);
   // `reviewing` is only reached from `capturing`, as a run finalizes.
   if (options.status === "reviewing") await new BuildModel(db).setStatus(created.id, "capturing");
@@ -66,7 +66,7 @@ async function seed(options: { testing?: boolean; status?: string; catalogued?: 
 }
 
 const page = async (app: Awaited<ReturnType<typeof seed>>["app"], id: string) =>
-  await (await app.request(`/projects/app/builds/${id}`)).text();
+  await (await app.request(`/projects/web/builds/${id}`)).text();
 
 describe("build page without testing", () => {
   it("labels an accepted build with no attempts Published and counts components and stories", async () => {
@@ -115,7 +115,7 @@ describe("build page without testing", () => {
     const { app, build } = await seed({ catalogued: false });
     const html = await page(app, build.id);
     expect(html).not.toContain("Components");
-    expect((await app.request("/projects/app/builds/nope")).status).toBe(404);
+    expect((await app.request("/projects/web/builds/nope")).status).toBe(404);
   });
 });
 
