@@ -1,0 +1,52 @@
+name: Bench
+
+# Manual: the performance benchmark on fixtures/storybook-9 (issue #853, docs/testing.md). The JSON
+# summary is uploaded as an artifact. Numbers from a shared runner are comparable only with other
+# runs of this workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Measured runs (a warm-up run is added and dropped).
+        type: string
+        default: "3"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Install Playwright browsers (chromium)
+        working-directory: packages/runner-playwright
+        run: |
+          nubx playwright-core install chromium
+          if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
+            nubx playwright-core install-deps chromium
+          fi
+
+      - name: Build workspace packages
+        run: nubx turbo build --filter=@storyshelf/app --filter=storyshelf --filter=@storyshelf/db-sqlite --filter=@storyshelf/storage-local --filter=@storyshelf/runner-playwright
+
+      - name: Build fixture Storybook
+        uses: ./.github/actions/build-fixture
+        with:
+          fixture: storybook-9
+
+      - name: Benchmark
+        run: nub run bench -- --runs "${{ inputs.runs }}" --out bench.json
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-summary
+          path: bench.json
