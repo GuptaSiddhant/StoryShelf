@@ -227,6 +227,7 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
   accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
   versioned Terraform module per cloud on the published image.
+- **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 
 ## Conventions
 
