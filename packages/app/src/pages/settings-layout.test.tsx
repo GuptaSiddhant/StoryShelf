@@ -1,11 +1,15 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { ProjectModel } from "@storyshelf/core/models";
+import { LabelModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 
-function boot(): { app: ReturnType<typeof createShelfApp>; ready: Promise<unknown> } {
+function boot(): {
+  app: ReturnType<typeof createShelfApp>;
+  ready: Promise<unknown>;
+  labels: LabelModel;
+} {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const ready = new ProjectModel(db).create({ name: "Docs" });
@@ -15,7 +19,7 @@ function boot(): { app: ReturnType<typeof createShelfApp>; ready: Promise<unknow
     storage,
     logger: createShelfLogger({ level: "silent" }),
   });
-  return { app, ready };
+  return { app, ready, labels: new LabelModel(db) };
 }
 
 async function get(path: string): Promise<string> {
@@ -63,8 +67,12 @@ describe("project settings tabs", () => {
   });
 
   it("opens a label type for editing from the review tab", async () => {
-    const html = await get("/projects/docs/settings/review?edit=jira");
-    expect(html).toContain('id="labels"');
+    const { app, ready, labels } = boot();
+    const project = (await ready) as { id: string };
+    await labels.createType(project.id, { key: "jira", name: "Jira Tickets" });
+    const html = await (await app.request("/projects/docs/settings/review?edit=jira")).text();
+    expect(html).toContain("Save label type");
+    expect(html).toContain("Jira Tickets");
   });
 
   it("links to the Labels overview from the labels section, so it stays reachable", async () => {

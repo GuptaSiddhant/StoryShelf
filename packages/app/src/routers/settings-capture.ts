@@ -11,6 +11,7 @@ import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { toProjectPatch } from "./capture-config.ts";
 import { flash } from "./flash.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 
@@ -103,14 +104,14 @@ function fractionOf(raw: string | undefined): number | undefined | null {
 
 /** Diff thresholds: how different two captures may be before a snapshot counts as changed. */
 async function handleThresholdsUpdate(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const form = await c.req.formData();
   const pixelThreshold = fractionOf(asString(form.get("pixelThreshold")));
   const maxDiffRatio = fractionOf(asString(form.get("maxDiffRatio")));
-  if (pixelThreshold === null || maxDiffRatio === null) {
+  if (typeof pixelThreshold !== "number" || typeof maxDiffRatio !== "number") {
     return c.html(
       (await renderSettingsPage(c, "thresholds", {
-        globalError: "Both thresholds must be numbers from 0 to 1",
+        globalError: "Both thresholds are required, as numbers from 0 to 1",
       })) ?? "",
       400,
     );

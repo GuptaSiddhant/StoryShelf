@@ -1,7 +1,41 @@
 import type { Project } from "@storyshelf/core/schema";
+import type { HtmlEscapedString } from "hono/utils/html";
 import { csrfField } from "../shell/csrf-field.tsx";
 import { Alert, Button, Card, Field, FormActions, Meta, SectionTitle } from "../ui/components.tsx";
 import type { SettingsFormState } from "./settings-general.tsx";
+
+/** The two threshold inputs: any precision from 0 to 1, both required. */
+function ThresholdFields(props: {
+  project: Project;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project } = props;
+  return (
+    <div class="grid grid--2">
+      <Field
+        label="Pixel threshold"
+        name="pixelThreshold"
+        type="number"
+        step="any"
+        min="0"
+        max="1"
+        required
+        value={String(project.pixelThreshold)}
+        hint="Per-pixel color distance 0–1"
+      />
+      <Field
+        label="Max diff ratio"
+        name="maxDiffRatio"
+        type="number"
+        step="any"
+        min="0"
+        max="1"
+        required
+        value={String(project.maxDiffRatio)}
+        hint="Allowed diff ratio 0–1"
+      />
+    </div>
+  );
+}
 
 /** Thresholds section: how different two captures may be before a snapshot counts as changed. */
 export function renderSettingsThresholds(
@@ -17,28 +51,7 @@ export function renderSettingsThresholds(
         <SectionTitle>Diff thresholds</SectionTitle>
         <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
           {csrfField()}
-          <div class="grid grid--2">
-            <Field
-              label="Pixel threshold"
-              name="pixelThreshold"
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              value={String(project.pixelThreshold)}
-              hint="Per-pixel color distance 0–1"
-            />
-            <Field
-              label="Max diff ratio"
-              name="maxDiffRatio"
-              type="number"
-              step="0.001"
-              min="0"
-              max="1"
-              value={String(project.maxDiffRatio)}
-              hint="Allowed diff ratio 0–1"
-            />
-          </div>
+          <ThresholdFields project={project} />
           {isAdmin ? (
             <FormActions>
               <Button variant="primary" type="submit" icon="check">

@@ -152,6 +152,14 @@ describe("diff thresholds", () => {
     expect(await project()).toMatchObject({ pixelThreshold: 0.2, maxDiffRatio: 0.01 });
   });
 
+  it("refuses a blank threshold and saves nothing", async () => {
+    const { saveThresholds, project } = await setup();
+    const before = await project();
+    const refused = await saveThresholds({ pixelThreshold: "", maxDiffRatio: "0.01" });
+    expect(refused.status).toBe(400);
+    expect(await project()).toEqual(before);
+  });
+
   it("refuses a value outside 0 to 1 and saves nothing", async () => {
     const { saveThresholds, project } = await setup();
     const before = await project();

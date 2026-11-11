@@ -9,13 +9,16 @@ import type { SettingsInsightsData } from "../pages/settings-insights.tsx";
 import { getStore, testingEnabled } from "../store.ts";
 import { currentProjectRole } from "./helpers.ts";
 
-/** The captures queued or running on this server (empty without a queue). */
-export async function getQueueView(): Promise<QueueView[]> {
+/** The captures queued or running for one project (the queue is shared by every project; empty without a queue). */
+export async function getQueueView(projectId: string): Promise<QueueView[]> {
   const queue = getStore().captureQueue;
   if (!queue) {
     return [];
   }
-  const active = await queue.active();
+  const owned = new Set(
+    (await new BuildModel(getStore().db).list(projectId)).map((build) => build.id),
+  );
+  const active = (await queue.active()).filter((entry) => owned.has(entry.buildId));
   return active.map((entry) => ({
     buildId: entry.buildId,
     status: entry.status,
@@ -77,7 +80,7 @@ export async function loadSettingsInsights(
     testing: true,
     health,
     latest: await loadLatest(builds),
-    queue: await getQueueView(),
+    queue: await getQueueView(project.id),
     canRetry: await canManageJobs(project.id),
   };
 }

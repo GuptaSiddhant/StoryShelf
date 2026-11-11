@@ -120,7 +120,7 @@ export function registerUiPages(app: ShelfRouter): void {
       return c.notFound();
     }
     if (c.req.query("partial") === "queue") {
-      return c.html(renderActiveQueue(slug, await getQueueView()));
+      return c.html(renderActiveQueue(slug, await getQueueView(project.id)));
     }
     return c.redirect(createUrlBuilder("/").settingsTab(slug, "insights"), 302);
   });

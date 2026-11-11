@@ -22,6 +22,7 @@ const settingsPage = (
     {
       project: { ...project, ...changes },
       activeTab: "review",
+      formSection: "review",
       labelTypes: [],
       links: [],
       linkCandidates: [],
