@@ -123,8 +123,8 @@ same-origin` (decision 9). Refusals are one identical 404, as on `/_s/`.
 - A content host serves only its own build's files and answers only that build. Every portal and API path
   answers 404. A content host never serves `/_r/` paths.
 - **Private builds** follow the owner's decision of 2026-11-08. The portal checks permission and redirects
-  with `302` to `https://<build-id>.<baseDomain>/<exchange>/<exchange-token>/<rest>`. The exchange prefix
-  is not named by the decisions; it must differ from `/_r/` (`/_x/` is proposed, to confirm in #358).
+  with `302` to `https://<build-id>.<baseDomain>/_x/<exchange-token>/<rest>`. `/_x/` is the exchange path:
+  it exists on content hosts only, and it is distinct from `/_r/`.
   The exchange token has purpose `exchange`, lives 60 seconds, and is accepted only by the exchange route
   on its matching host. The exchange answers navigations only (decision 9). The content host checks that
   the token's build equals its own, then sets a host-only cookie: no `Domain`, `Secure`, `HttpOnly`,
@@ -154,10 +154,14 @@ then removed. The two-level link shape is dropped. Setting it together with `sto
 
 ### 8. Previews and `/_s/`
 
-- In `trusted` and `sandboxed` mode, preview frames of private builds move to `/_r/`, so they work without
-  `testing`. `preview-base.ts` mints a `read` token for them. In `subdomain` mode the portal must not serve
-  uploaded bytes and a content host never serves `/_r/`, so the preview path is not decided here (see
-  decision 13).
+- Previews of private builds, by mode:
+  - `trusted` and `sandboxed`: the preview frame loads `/_r/`, so it works without `testing`.
+    `preview-base.ts` mints a `read` token for it.
+  - `subdomain`: the portal must not serve uploaded bytes, and a content host never serves `/_r/`. A frame
+    is opaque under the sandbox below, and an opaque frame sends no cookie, so the exchange cannot work in
+    a frame. A private preview therefore opens the content host in a new tab, which the click-to-load preview
+    already offers. Public previews load in a frame of the content host.
+- Every preview frame keeps `sandbox="allow-scripts"` without `allow-same-origin`, in every mode.
 - `/_s/` becomes capture-only: a token with no purpose, or any other purpose, is refused. The earlier
   claim that `/_s/` accepts only `capture` was wrong, because no-purpose tokens are served there today.
 - Preview tokens minted before the change are refused after deploy. They are short-lived, so the effect is
@@ -170,6 +174,8 @@ then removed. The two-level link shape is dropped. Setting it together with `sto
   (`types.ts:29-35`). The prefix stops a content host, which is a subdomain of the portal host, from setting
   or overwriting the portal's cookie through `Domain=`. Changing the mode renames the cookie, so everyone is
   signed out once. `trusted` and `sandboxed` keep their names.
+- **Cookie name and mechanism.** The `__Host-` name is a requirement. The mechanism is the auth engine's cookie
+  configuration, not a constant: the library adds the `__Secure-` prefix today. That mechanism is confirmed in #358.
 - **Navigations only for the grant hops.** The portal redirect and the content host's exchange answer only
   navigations: `Sec-Fetch-Mode: navigate`, with `Sec-Fetch-Dest` of `document` or `iframe`. Any other request
   gets the identical 404.
@@ -195,13 +201,13 @@ immutable` as an interim fix. #357 moves it to `no-cache` with an ETag, answered
 
 ### 11. Features by mode
 
-| Feature                              | `trusted`                                 | `sandboxed`                                 | `subdomain`                                                                                    |
-| ------------------------------------ | ----------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Addon (ADR 0042)                     | Badges on the app origin                  | Inert: no panel, no request, no CORS (#916) | No badges (#530)                                                                               |
-| Offline Storybooks (ADR 0048)        | Yes                                       | No: the API and opt-in UI say so            | No: same reason                                                                                |
-| Component preview embeds (ADR 0010)  | Click-to-load frame; previews use `/_r/`  | Click-to-load frame; previews use `/_r/`    | Click-to-load frame of the content host; the private-preview path is not decided (decision 13) |
-| Capture, local and remote (ADR 0007) | Unchanged: `/_s/` capture grants          | Unchanged                                   | Unchanged                                                                                      |
-| Screenshot review                    | Unchanged: review pages on the app origin | Unchanged                                   | Unchanged                                                                                      |
+| Feature                              | `trusted`                                 | `sandboxed`                                 | `subdomain`                                                                             |
+| ------------------------------------ | ----------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Addon (ADR 0042)                     | Badges on the app origin                  | Inert: no panel, no request, no CORS (#916) | No badges (#530)                                                                        |
+| Offline Storybooks (ADR 0048)        | Yes                                       | No: the API and opt-in UI say so            | No: same reason                                                                         |
+| Component preview embeds (ADR 0010)  | Click-to-load frame; previews use `/_r/`  | Click-to-load frame; previews use `/_r/`    | Public: click-to-load frame of the content host. Private: a new tab on the content host |
+| Capture, local and remote (ADR 0007) | Unchanged: `/_s/` capture grants          | Unchanged                                   | Unchanged                                                                               |
+| Screenshot review                    | Unchanged: review pages on the app origin | Unchanged                                   | Unchanged                                                                               |
 
 Capture keeps `/_s/` capture grants in every mode. Review pages never move to another origin.
 
@@ -215,7 +221,7 @@ Credentials and CORS:
 | Short link `/_/:id/*`                                | `hosting` | As the project path                                                           | As the project path                                       |
 | Signed URL `/_s/<token>/*`                           | `testing` | `capture` token only                                                          | `*` for a capture grant                                   |
 | Read grant `/_r/<token>/*`                           | `hosting` | `read` token, one build, one hour                                             | `*`, never `Allow-Credentials`: the URL is the credential |
-| Exchange `/<exchange>/<token>/*` on a content host   | `hosting` | `exchange` token, 60 s, navigations only                                      | None                                                      |
+| Exchange `/_x/<token>/*` on a content host           | `hosting` | `exchange` token, 60 s, navigations only                                      | None                                                      |
 | Content host files `<build-id>.<baseDomain>/*`       | `hosting` | Host-only grant cookie, or none for public                                    | `*` for public builds only                                |
 | Alias host `<slug>.<baseDomain>/*`                   | `hosting` | None                                                                          | None: redirects to the portal                             |
 
@@ -243,13 +249,10 @@ answers 404.
   rate-limit setting, the AGENTS.md amendment, route classification, OpenAPI, and tests for each refusal.
   The write-once manifest rule is part of this task too.
 - **#358** (mode 5): the content-host router, the host lookup, the reserved and ULID label checks, the alias
-  redirect, the exchange route and its prefix, the host-only cookie, the `__Host-` portal cookie, and the
+  redirect, the exchange route at `/_x/`, the host-only cookie, the `__Host-` portal cookie, and the
   build-equality check.
 - **#359**: the request contract of decision 9 (navigations, CORP, CSRF on `/api/v1`, #786), and what a viewer
   sees when a one-hour grant expires in an open frame.
-- **Not decided here, for #358**: how a private preview frame loads in `subdomain` mode. The portal cannot
-  serve uploaded bytes there, and a content host never serves `/_r/`, so the frame needs a navigation-based
-  exchange of its own. The decision does not name it.
 - **#360**: custom domains, out of scope here.
 - **#361**: documentation of the three modes, the migration from `publishedBaseDomain`, single-host setup,
   operator-managed DNS and TLS, and the difference between same-site and same-origin.
