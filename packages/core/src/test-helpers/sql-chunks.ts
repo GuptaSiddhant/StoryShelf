@@ -24,7 +24,12 @@ function textOf(chunk: SqlChunk | undefined): string | undefined {
 }
 
 /** Test whether an in-memory row satisfies a drizzle where-clause. */
-export function whereMatches(where: SQL, row: Record<string, unknown>, table: Table): boolean {
+export function whereMatches(
+  where: SQL,
+  row: Record<string, unknown>,
+  table: Table,
+  lookup?: RowLookup,
+): boolean {
   let current = where.queryChunks as unknown as SqlChunk[];
   let wrapped = current[1]?.queryChunks;
   while (wrapped !== undefined && textOf(current[0]) === "(" && textOf(current.at(-1)) === ")") {
@@ -39,13 +44,43 @@ export function whereMatches(where: SQL, row: Record<string, unknown>, table: Ta
   if (current.some((chunk) => textOf(chunk)?.trim() === "and")) {
     return current
       .filter((chunk) => textOf(chunk) === undefined)
-      .every((chunk) => matchChunk(chunk.queryChunks ?? [], row, table));
+      .every((chunk) => matchChunk(chunk.queryChunks ?? [], row, table, lookup));
   }
-  return matchChunk(current, row, table);
+  return matchChunk(current, row, table, lookup);
 }
 
-function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
+/** Rows of the table named `name` in the fake store, for conditions that read another table. */
+export type RowLookup = (name: string) => Record<string, unknown>[];
+
+/**
+ * `BuildReviewModel.newestVerdictIs`: `not exists (select 1 from build_reviews …)` or
+ * `(select id … order by created_at desc, id desc limit 1) = ?`. Undefined when `text` is not one.
+ */
+function verdictFenceMatches(chunks: SqlChunk[], text: string, lookup?: RowLookup): boolean {
+  // A value interpolated into `sql` stays raw in the chunk list (a column or SQL node is an object).
+  const params = (chunks as unknown[]).filter(
+    (chunk) => typeof chunk === "string" && textOf(chunk as unknown as SqlChunk) === undefined,
+  );
+  const reviews = (lookup?.("build_reviews") ?? []).filter((r) => r["buildId"] === params[0]);
+  if (text.includes("not exists")) return reviews.length === 0;
+  const newest = reviews.toSorted(
+    (a, b) =>
+      String(b["createdAt"]).localeCompare(String(a["createdAt"])) ||
+      String(b["id"]).localeCompare(String(a["id"])),
+  )[0];
+  return newest !== undefined && newest["id"] === params[1];
+}
+
+function matchChunk(
+  chunks: SqlChunk[],
+  row: Record<string, unknown>,
+  table: Table,
+  lookup?: RowLookup,
+): boolean {
   const text = chunks.map((c) => textOf(c) ?? "").join("");
+  if (/\bselect\b/iu.test(text)) {
+    return verdictFenceMatches(chunks, text, lookup);
+  }
   if (/is not null/iu.test(text)) {
     return isNullMatches(chunks, row, table, true);
   }

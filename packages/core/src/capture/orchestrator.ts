@@ -16,6 +16,7 @@ import type { Project } from "../schema/project.ts";
 import { parentContext, withSpan } from "../tracing.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
+import { storybookDir as storybookDirKey } from "../utils/paths.ts";
 import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory } from "./adapter.ts";
 import type { DiscoverOptions, Viewport } from "./adapter.ts";
@@ -159,6 +160,42 @@ export async function executeCaptureJob(
   );
 }
 
+/**
+ * Persist the extracted statics unless publishing already did: a build with a
+ * `storybook/manifest.json` has its files in the content store, so writing them again is waste.
+ */
+async function persistStaticsOnce(
+  options: CaptureJobOptions,
+  projectId: string,
+  buildId: string,
+  storybookDir: string,
+  recordLog: CaptureJobInput["recordLog"],
+  logger: Logger | undefined,
+): Promise<void> {
+  if (await options.storage.exists(`${storybookDirKey(projectId, buildId)}/manifest.json`)) {
+    logger?.info("storybook statics already persisted; skipped");
+    await emitAttemptLog(recordLog, logger, "info", "storybook statics already persisted");
+    return;
+  }
+  const staticsStart = performance.now();
+  await timed(
+    "capture.persist-statics",
+    async () =>
+      await withSpan("capture.persist-statics", async () => {
+        await persistStorybookStatics(
+          options.storage,
+          storybookDir,
+          projectId,
+          buildId,
+          options.db,
+        );
+      }),
+  );
+  const durationMs = Math.round(performance.now() - staticsStart);
+  logger?.info({ durationMs }, "storybook statics persisted");
+  await emitAttemptLog(recordLog, logger, "info", "storybook statics persisted", { durationMs });
+}
+
 /** Execute the phase pipeline inside the `capture.job` span. */
 async function runCapturePhases(
   input: CaptureJobInput,
@@ -216,27 +253,7 @@ async function runCapturePhases(
     // (`storybookDir`) can be served after the scratch dir is cleaned up.
     // Copy to a const: closures below need the narrowed string type.
     const storybookDir: string = extractedDir;
-    const staticsStart = performance.now();
-    await timed(
-      "capture.persist-statics",
-      async () =>
-        await withSpan("capture.persist-statics", async () => {
-          await persistStorybookStatics(
-            options.storage,
-            storybookDir,
-            project.id,
-            build.id,
-            options.db,
-          );
-        }),
-    );
-    logger?.info(
-      { durationMs: Math.round(performance.now() - staticsStart) },
-      "storybook statics persisted",
-    );
-    await emitAttemptLog(input.recordLog, logger, "info", "storybook statics persisted", {
-      durationMs: Math.round(performance.now() - staticsStart),
-    });
+    await persistStaticsOnce(options, project.id, build.id, storybookDir, input.recordLog, logger);
 
     const adapter = new StorybookAdapter();
     const discovered = await adapter.discover(extractedDir, {

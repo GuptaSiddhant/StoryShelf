@@ -25,7 +25,12 @@ describe("renderBudgetMs", () => {
 
 describe("renderWithTimeout", () => {
   it("scrubs a signed Storybook URL from a failure's error text", async () => {
-    const token = signStorybookToken({ secret: "k", projectId: "p1", buildId: "b1" });
+    const token = signStorybookToken({
+      secret: "k",
+      projectId: "p1",
+      buildId: "b1",
+      purpose: "capture",
+    });
     const runner = {
       render: async () =>
         await Promise.resolve({

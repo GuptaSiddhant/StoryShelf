@@ -2,6 +2,7 @@
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { allowedFrom, enteringFrom } from "../lifecycle/build-lifecycle.ts";
 import type { Logger } from "../logger.ts";
 import type { Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
@@ -55,7 +56,7 @@ export class BuildModel {
   private readonly db: DatabaseAdapter;
   private readonly logger: Logger | undefined;
 
-  /** `logger` only reports a status write refused by a `cancelled` build, at debug. */
+  /** `logger` only reports a status write the lifecycle table refuses, at debug. */
   constructor(db: DatabaseAdapter, tables?: BuildTables, logger?: Logger) {
     this.db = db;
     this.logger = logger;
@@ -190,45 +191,51 @@ export class BuildModel {
   }
 
   /**
-   * Patch a build. A `cancelled` build is terminal (ADR 0006): a patch that carries another status
-   * is refused, the row is returned as it is, so a capture that ends after a cancel cannot move
-   * the build. Only {@link BuildModel.resetStatus} leaves `cancelled`.
+   * Patch a build. A status in the patch moves the build only along the lifecycle table (ADR 0046):
+   * one conditional write, `WHERE status IN (the states that may move to it)` plus `fence`, so a
+   * write that races a cancel, a retry or a verdict loses, across instances. A refused write is a
+   * normal outcome: the row comes back as it is. Only {@link BuildModel.resetStatus} leaves `cancelled`.
    */
   async update(
     id: string,
     patch: Partial<
       Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName" | "captureJobId">
     >,
-    options: { reset?: boolean } = {},
+    fence?: SQL,
   ): Promise<Build> {
     const values = { ...patch, updatedAt: new Date().toISOString() };
-    if (patch.status === "pending") {
+    if (patch.status === undefined) {
+      return (await this.db.update(this.tables.builds, id, values)) as unknown as Build;
+    }
+    if (patch.status === "pending" && fence === undefined) {
       const reopened = await this.reopen(id, values);
       if (reopened) return reopened;
     }
-    if (patch.status !== undefined && patch.status !== "cancelled" && options.reset !== true) {
-      return await this.updateUnlessCancelled(id, values, patch.status);
-    }
-    return (await this.db.update(this.tables.builds, id, values)) as unknown as Build;
+    return await this.moveStatus(id, values, patch.status, fence);
   }
 
-  /** A status write that a `cancelled` build refuses: the row comes back as it is. */
-  private async updateUnlessCancelled(
+  /** A status write the lifecycle table gates: a refused one returns the row as it is. */
+  private async moveStatus(
     id: string,
     values: Record<string, unknown>,
     status: BuildStatus,
+    fence: SQL | undefined,
   ): Promise<Build> {
+    const statusColumn = col(this.tables.builds, "status");
     const current = (await this.db.updateWhere(
       this.tables.builds,
       id,
       values,
-      ne(col(this.tables.builds, "status"), "cancelled"),
+      allOf(
+        inArray(statusColumn, [...allowedFrom(status)]),
+        ...(fence === undefined ? [] : [fence]),
+      ),
     )) as unknown as Build | null;
     if (!current) throw new Error("Build not found");
-    if (current.status === "cancelled") {
+    if (current.status !== status) {
       this.logger?.debug(
-        { buildId: id, refused: status },
-        "build is cancelled; status write refused",
+        { buildId: id, refused: status, status: current.status },
+        "build status write refused",
       );
     }
     return current;
@@ -297,8 +304,13 @@ export class BuildModel {
     return written && sameInstant(written.updatedAt, stamp) ? written : null;
   }
 
-  async setStatus(id: string, status: BuildStatus): Promise<Build> {
-    return await this.update(id, { status });
+  /**
+   * Move the build to `status` if the lifecycle allows it from where it is; the row comes back
+   * either way. `fence` is an extra condition for a status derived from other rows (see
+   * `BuildReviewModel.newestVerdictIs`): the write applies only while it still holds.
+   */
+  async setStatus(id: string, status: BuildStatus, fence?: SQL): Promise<Build> {
+    return await this.update(id, { status }, fence);
   }
 
   /**
@@ -414,7 +426,7 @@ export class BuildModel {
   }
 
   /**
-   * Set the build's status only while it is still at run `generation` and not cancelled: one
+   * Set the build's status only while it is still at run `generation` and the lifecycle allows the move from `capturing` (the state a run finalizes from): one
    * conditional write, so a worker of a superseded run (a retry started a newer one) writes nothing.
    * Resolves to whether it applied and the row as it stands.
    */
@@ -430,7 +442,10 @@ export class BuildModel {
       id,
       { status, updatedAt: stamp },
       allOf(
-        ne(col(columns, "status"), "cancelled"),
+        inArray(
+          col(columns, "status"),
+          allowedFrom(status).filter((from) => from === "capturing" || from === status),
+        ),
         eq(col(columns, "captureGeneration"), generation),
       ),
     )) as unknown as Build | null;
@@ -459,7 +474,7 @@ export class BuildModel {
       id,
       { status: "failed", updatedAt: stamp },
       allOf(
-        inArray(col(columns, "status"), ["pending", "capturing"]),
+        inArray(col(columns, "status"), [...enteringFrom("failed")]),
         eq(col(columns, "captureJobId"), jobId),
       ),
     )) as unknown as Build | null;

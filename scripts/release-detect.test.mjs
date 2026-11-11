@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { chooseChannel, findReleaseCommit, nextShaOf } from "./release-detect.mjs";
+import { chooseChannel, findReleaseCommit } from "./release-detect.mjs";
 
 const push = { event: "push", version: "0.9.0", tagExists: true, pending: 0 };
 
@@ -25,22 +25,10 @@ describe("chooseChannel for next", () => {
     assert.deepEqual(chooseChannel({ ...push, pending: 1 }), { channel: "none" });
   });
 
-  it("publishes next from the daily run when a package changed since the last next build", () => {
-    const daily = { ...push, event: "schedule", pending: 1, changedSinceNext: true };
-    assert.deepEqual(chooseChannel(daily), { channel: "next" });
-  });
-
-  it("skips the daily next build when nothing changed or nothing is pending", () => {
-    const daily = { ...push, event: "schedule", pending: 1, changedSinceNext: false };
+  it("has no scheduled next build: any event other than a dispatch publishes stable or nothing", () => {
+    const daily = { ...push, event: "schedule", pending: 1 };
     assert.deepEqual(chooseChannel(daily), { channel: "none" });
-    assert.deepEqual(chooseChannel({ ...daily, pending: 0, changedSinceNext: true }), {
-      channel: "none",
-    });
-  });
-
-  it("still publishes a merged stable release from the daily run", () => {
-    const daily = { ...push, event: "schedule", tagExists: false, pending: 1 };
-    assert.deepEqual(chooseChannel(daily), { channel: "stable" });
+    assert.deepEqual(chooseChannel({ ...daily, tagExists: false }), { channel: "stable" });
   });
 
   it("publishes next on demand while changesets are pending, changed or not", () => {
@@ -81,17 +69,6 @@ describe("chooseChannel for a stable re-run", () => {
       requested: "0.9.0-rc.1",
     });
     assert.match(result.error, /prerelease/u);
-  });
-});
-
-describe("nextShaOf", () => {
-  it("reads the commit from a next version", () => {
-    assert.equal(nextShaOf("0.10.0-next-abc1234\n"), "abc1234");
-  });
-
-  it("is undefined for a stable version or nothing", () => {
-    assert.equal(nextShaOf("0.9.0"), undefined);
-    assert.equal(nextShaOf(""), undefined);
   });
 });
 

@@ -82,14 +82,19 @@ async function boot(config: Record<string, unknown> = {}) {
   });
   apps.push(app);
   const token = (
-    options: { purpose?: "capture"; ttlSeconds?: number; buildId?: string; secret?: string } = {},
+    options: {
+      purpose?: "capture" | "read";
+      ttlSeconds?: number;
+      buildId?: string;
+      secret?: string;
+    } = {},
   ): string =>
     signStorybookToken({
       secret: options.secret ?? SECRET,
       projectId: options.buildId === "b2" ? "p2" : "p1",
       buildId: options.buildId ?? "b1",
-      ttlSeconds: options.ttlSeconds ?? 7200,
-      purpose: options.purpose,
+      ttlSeconds: options.ttlSeconds ?? (options.purpose === "read" ? 3600 : 7200),
+      purpose: options.purpose ?? "capture",
       now: NOW,
     });
   return { app, db, token };
@@ -162,17 +167,17 @@ describe("capture-scoped signed asset caching", () => {
     expect(expired.headers.get("cache-control")).toBe("private, no-store");
   });
 
-  it("gives an interactive preview grant and a legacy token no freshness", async () => {
+  it("refuses a read grant on /_s/, so an interactive preview never gets capture freshness", async () => {
     atClock();
     const { app, token } = await boot({ captureAssets: { cacheMaxAgeSeconds: 600 } });
-    const preview = await get(app, token());
-    expect(preview.status).toBe(200);
+    const preview = await get(app, token({ purpose: "read" }));
+    expect(preview.status).toBe(404);
     expect(preview.headers.get("cache-control")).toBe("private, no-store");
   });
 
   it("cannot be elevated by a caller: not by query, header or an edited payload", async () => {
     atClock();
-    const { app, token } = await boot({ captureAssets: { cacheMaxAgeSeconds: 600 } });
+    const { app, token } = await boot();
     const plain = token();
     const asks = await get(app, plain, "assets/app.js?purpose=capture", {
       "x-storyshelf-purpose": "capture",

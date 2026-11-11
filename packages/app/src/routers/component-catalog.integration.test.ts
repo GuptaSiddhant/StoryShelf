@@ -214,15 +214,15 @@ describe("component page without testing", () => {
     expect(html).toContain("Open");
   });
 
-  it("frames a private build under sign-in through a short-lived signed URL when testing is on", async () => {
+  it("frames a private build under sign-in through a short-lived read grant when testing is on", async () => {
     const secret = "preview-secret-preview-secret";
     const { app, project, b2 } = await seed({ auth: true, testing: true, secret });
     const html = await page(app, "src/Button.stories.tsx");
-    const token = /<iframe[^>]*src="\/_s\/([^/]+)\/iframe\.html\?id=button--primary/u.exec(
+    const token = /<iframe[^>]*src="\/_r\/([^/]+)\/iframe\.html\?id=button--primary/u.exec(
       html,
     )?.[1];
     expect(token).toBeDefined();
-    const verified = verifyStorybookToken(token, secret);
+    const verified = verifyStorybookToken(token, secret, "read");
     expect(verified).toMatchObject({
       ok: true,
       claims: { projectId: project.id, buildId: b2.id },
@@ -244,8 +244,8 @@ describe("component page without testing", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     const { base } = (await response.json()) as { base: string };
-    const token = /^\/_s\/([^/]+)$/u.exec(base)?.[1];
-    expect(verifyStorybookToken(token, secret)).toMatchObject({
+    const token = /^\/_r\/([^/]+)$/u.exec(base)?.[1];
+    expect(verifyStorybookToken(token, secret, "read")).toMatchObject({
       ok: true,
       claims: { projectId: project.id, buildId: b2.id },
     });
@@ -260,11 +260,18 @@ describe("component page without testing", () => {
     );
   });
 
-  it("offers no frame for a private build when there is no testing to serve a signed URL", async () => {
+  it("frames a private build through a read grant without testing: previews need a secret, not a renderer", async () => {
     const { app } = await seed({
       auth: true,
       secret: "preview-secret-preview-secret",
     });
+    const html = await page(app, "src/Button.stories.tsx");
+    expect(html).toMatch(/<iframe[^>]*src="\/_r\/[^/]+\/iframe\.html/u);
+    expect(html).not.toContain("needs a sign-in");
+  });
+
+  it("offers no frame for a private build when the server has no secret to sign a grant", async () => {
+    const { app } = await seed({ auth: true });
     expect(await page(app, "src/Button.stories.tsx")).toContain("needs a sign-in");
   });
 

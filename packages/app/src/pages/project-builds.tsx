@@ -44,6 +44,37 @@ function matches(build: Build, filters: BuildFilters): boolean {
   );
 }
 
+/** Branch select that submits on change and keeps the status filter. */
+function BranchFilter(props: {
+  base: string;
+  filters: BuildFilters;
+  branches: string[];
+}): ReturnType<typeof SelectField> {
+  const { base, filters, branches } = props;
+  return (
+    <form
+      method="get"
+      action={base}
+      hx-get={base}
+      hx-trigger="change"
+      hx-target="body"
+      hx-push-url="true"
+    >
+      {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
+      <SelectField
+        label="Branch"
+        name="branch"
+        layout="inline"
+        value={filters.branch ?? ""}
+        options={[
+          { value: "", label: "All branches" },
+          ...branches.map((branch) => ({ value: branch, label: branch })),
+        ]}
+      />
+    </form>
+  );
+}
+
 /** Status chips (with counts) plus a branch select that applies instantly. */
 function BuildsToolbar(props: {
   project: Project;
@@ -73,27 +104,38 @@ function BuildsToolbar(props: {
           active: (filters.status ?? "") === item.value,
         }))}
       />
-      <form
-        method="get"
-        action={base}
-        hx-get={base}
-        hx-trigger="change"
-        hx-target="body"
-        hx-push-url="true"
-      >
-        {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
-        <SelectField
-          label="Branch"
-          name="branch"
-          layout="inline"
-          value={filters.branch ?? ""}
-          options={[
-            { value: "", label: "All branches" },
-            ...branches.map((branch) => ({ value: branch, label: branch })),
-          ]}
-        />
-      </form>
+      <BranchFilter base={base} filters={filters} branches={branches} />
     </HStack>
+  );
+}
+
+/** The build table, or an empty state that explains whether a filter hides builds. */
+function BuildsList(props: {
+  project: Project;
+  builds: Build[];
+  filtered: boolean;
+}): ReturnType<typeof EmptyState> | ReturnType<typeof BuildsTable> {
+  const { project, builds, filtered } = props;
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  if (builds.length > 0) {
+    return <BuildsTable project={project} builds={builds} />;
+  }
+  return (
+    <EmptyState
+      title="No builds"
+      description={
+        filtered
+          ? "No builds match the current filter."
+          : "Upload your first build with the CLI. Builds appear here once uploaded."
+      }
+      action={
+        filtered ? (
+          <Button variant="secondary" href={urls.buildsList(project.slug)}>
+            Clear filters
+          </Button>
+        ) : null
+      }
+    />
   );
 }
 
@@ -141,25 +183,7 @@ export async function renderProjectBuildsPage(
           filters={query}
           base={urls.buildsList(project.slug)}
         />
-        {builds.length === 0 ? (
-          <EmptyState
-            title="No builds"
-            description={
-              filtered
-                ? "No builds match the current filter."
-                : "Upload your first build with the CLI. Builds appear here once uploaded."
-            }
-            action={
-              filtered ? (
-                <Button variant="secondary" href={urls.buildsList(project.slug)}>
-                  Clear filters
-                </Button>
-              ) : null
-            }
-          />
-        ) : (
-          <BuildsTable project={project} builds={builds} />
-        )}
+        <BuildsList project={project} builds={builds} filtered={filtered} />
       </VStack>
     </DocumentLayout>
   );

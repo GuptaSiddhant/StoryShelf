@@ -31,6 +31,15 @@ export {
   type MentionSpan,
 } from "./mentions.ts";
 export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";
+export {
+  assertOutboundUrl,
+  checkOutboundUrl,
+  configureOutbound,
+  OutboundRefusedError,
+  outboundReasonText,
+  type OutboundPolicy,
+  type OutboundReason,
+} from "./outbound.ts";
 export { httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";
 export {
   baselinePath,
@@ -78,11 +87,14 @@ export {
   MIN_STORYBOOK_URL_TTL,
   MIN_STORYBOOK_URL_TTL_OVERRIDE,
   PER_CAPTURE_BUDGET_MS,
+  STORYBOOK_READ_PREFIX,
+  STORYBOOK_READ_TTL,
   STORYBOOK_TOKEN_PREFIX,
   STORYBOOK_TOKEN_SOURCE,
   STORYBOOK_URL_TTL_GRACE,
   assertStorybookUrlTtl,
   signStorybookToken,
+  storybookReadPath,
   storybookTokenPath,
   storybookUrlTtl,
   storybookUrlTtlOverrideError,

@@ -7,11 +7,11 @@ import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import { BuildModel } from "../../models/build.ts";
 import { ProjectModel } from "../../models/project.ts";
 import type { Project } from "../../schema/project.ts";
-import type { BuildStatus } from "../../types.ts";
+import { OPEN_BUILD_STATUSES, type BuildStatus } from "../../types.ts";
 import type { BuildStateDeps, BuildStatePublisher } from "./types.ts";
 
 /** Builds that have not reached a verdict. */
-const OPEN: ReadonlySet<BuildStatus> = new Set(["pending", "capturing", "comparing", "reviewing"]);
+const OPEN: ReadonlySet<BuildStatus> = new Set(OPEN_BUILD_STATUSES);
 
 /** Newest builds looked at per project. */
 const PER_PROJECT = 25;

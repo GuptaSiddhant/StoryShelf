@@ -69,7 +69,12 @@ async function setup(compression?: boolean) {
     auth: stubAuth({ id: "u1", email: "a@example.com", name: "Ada", role: "admin" }),
   });
   const publicApp = createShelfApp(common);
-  const token = signStorybookToken({ secret: SECRET, projectId: "p1", buildId: "b1" });
+  const token = signStorybookToken({
+    secret: SECRET,
+    projectId: "p1",
+    buildId: "b1",
+    purpose: "capture",
+  });
   return { anonymous, session, publicApp, token, objects, storage };
 }
 

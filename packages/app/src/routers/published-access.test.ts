@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+import { publishedCacheControl, type PublishedFreshness } from "./published-access.ts";
+
+const FRESHNESS: PublishedFreshness[] = ["immutable", "minute", "hour", "page"];
+
+describe("publishedCacheControl", () => {
+  it.each([
+    ["immutable", "public, max-age=31536000, immutable"],
+    ["minute", "public, max-age=60"],
+    ["hour", "public, max-age=3600"],
+    ["page", "public, no-cache"],
+  ] as const)("keeps a public answer shared for %s", (freshness, header) => {
+    expect(publishedCacheControl("public", freshness)).toBe(header);
+  });
+
+  it.each(FRESHNESS)("makes a session answer private and revalidated for %s", (freshness) => {
+    expect(publishedCacheControl("session", freshness)).toBe("private, no-cache");
+  });
+
+  it.each(FRESHNESS)("never answers a session or token access as public (%s)", (freshness) => {
+    expect(publishedCacheControl("session", freshness)).not.toMatch(/public|s-maxage/u);
+    expect(publishedCacheControl("token", freshness)).toMatch(/^private,/u);
+  });
+});

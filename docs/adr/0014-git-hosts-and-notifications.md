@@ -3,7 +3,7 @@
 ## Status
 
 Accepted. Amended with the details of the statuses function and the `notify` job kind (decisions 5
-and 7), recorded while implementing them (#221, #222).
+and 7), recorded while implementing them (#221, #222). Decision 3 is replaced by ADR 0049.
 
 Supersedes (archived): ADR 0010, ADR 0024, ADR 0036
 
