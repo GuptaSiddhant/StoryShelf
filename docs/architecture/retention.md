@@ -35,7 +35,7 @@ Branch baselines follow the same fenced lifecycle when the database has the capa
 
 ### Orphaned baselines
 
-When a story is renamed or removed from Storybook, its baseline is never touched by normal builds. On each **default-branch** build, diff `index.json` against the `baselines` table and delete baselines whose `story_id` no longer exists (now also deletes the storage file).
+When a story is renamed or removed from Storybook, its baseline is never touched by normal builds. On each **default-branch** build, diff `index.json` against the `baselines` table and remove baselines whose `story_id` no longer exists. Removal follows the same rules as the stale-branch bullet above: the rows go, a legacy `baselines/**` file is deleted directly, and content-addressed screenshots are left to the screenshot sweep.
 
 ### Trigger
 
