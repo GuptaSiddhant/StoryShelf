@@ -140,6 +140,27 @@ const sendNoCors = async (page: Page, url: string): Promise<string> =>
     `fetch(${JSON.stringify(url)}, { mode: "no-cors", credentials: "include" }).then(() => "sent", () => "failed")`,
   );
 
+/** The attacker's second page: posts a form to the portal, where the viewer's session cookie is. */
+const csrfPage = (portal: string): string =>
+  `<!doctype html><form method="post" action="${portal}/api/v1/projects"><input name="x" value="y"></form><script>document.forms[0].submit();</script>`;
+
+/** A fake portal session cookie: the stub auth signs everyone in, so only its presence matters here. */
+const SESSION_COOKIE_FOR_PORTAL = {
+  name: "__Host-storyshelf_session",
+  value: "viewer-session",
+  domain: DOMAIN,
+  path: "/",
+  secure: true,
+  httpOnly: true,
+  sameSite: "Lax" as const,
+};
+
+/** What each server answered, by port: the browser hides the answer to a blocked cross-origin write. */
+const served = new Map<
+  number,
+  Array<{ method: string; host: string; path: string; status: number }>
+>();
+
 interface Running {
   server: Server;
   port: number;
@@ -184,6 +205,7 @@ async function startServer(
     const dir = storybookDir("p1", id);
     objects.set(`${dir}/index.html`, Buffer.from(attackerPage(hostOf(port, B))));
     objects.set(`${dir}/iframe.html`, Buffer.from("<html>preview</html>"));
+    objects.set(`${dir}/csrf.html`, Buffer.from(csrfPage(portalOf(port))));
     objects.set(`${dir}/assets/leak.js`, Buffer.from(`window.__leak = "${id}";`));
   }
   const app = createShelfApp({
@@ -198,7 +220,14 @@ async function startServer(
     },
   });
   await app.lifecycle.setup();
-  handler = async (request) => await app.fetch(request);
+  const log: NonNullable<ReturnType<typeof served.get>> = [];
+  served.set(port, log);
+  handler = async (request) => {
+    const response = await app.fetch(request);
+    const { host, pathname } = new URL(request.url);
+    log.push({ method: request.method, host, path: pathname, status: response.status });
+    return response;
+  };
   return { server, port };
 }
 
@@ -353,6 +382,88 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
       expect(direct.status()).toBe(404);
       expect(await cookieNames(context, hostOf(port, B))).toEqual([]);
       await context.close();
+    });
+
+    it("same-site CSRF: a page on a content host cannot make the portal act on the session cookie", async () => {
+      const port = await start();
+      const context = await openContext();
+      await context.addCookies([SESSION_COOKIE_FOR_PORTAL]);
+      const attacker = await context.newPage();
+      const portalWrites = (): number[] =>
+        (served.get(port) ?? [])
+          .filter((entry) => entry.method === "POST" && entry.host === `${DOMAIN}:${port}`)
+          .map((entry) => entry.status);
+      // A form post from build A's page: same site as the portal, so the browser sends the cookie.
+      // The page submits at once, so do not wait for it to finish loading.
+      await attacker.goto(`${portalOf(port)}/_/${A}/csrf.html`, { waitUntil: "commit" });
+      await attacker.waitForURL(`${portalOf(port)}/api/v1/projects`);
+      expect(portalWrites()).toEqual([403]);
+      expect(await attacker.textContent("body")).toContain("did not come from this site");
+      // A background request from the same page is refused alike, though the page cannot read the answer.
+      await attacker.goto(`${portalOf(port)}/_/${A}/`);
+      await attacker.evaluate(
+        `fetch(${JSON.stringify(`${portalOf(port)}/api/v1/projects`)}, { method: "POST", mode: "no-cors", credentials: "include" }).catch(() => "blocked")`,
+      );
+      await attacker.waitForTimeout(500);
+      expect(portalWrites()).toEqual([403, 403]);
+      // The portal's own page, with the same cookie, is not refused by the rule.
+      const portal = await context.newPage();
+      await portal.goto(`${portalOf(port)}/api/v1/health`);
+      const own = await portal.evaluate(
+        `fetch("/api/v1/projects", { method: "POST" }).then(async (r) => r.status + ":" + (await r.text()))`,
+      );
+      expect(own).not.toContain("did not come from this site");
+      await context.close();
+    });
+
+    it("renews an expired grant on a reload, and answers an open page's other requests with 404", async () => {
+      const port = await start();
+      const context = await openContext();
+      const page = await context.newPage();
+      await page.goto(`${portalOf(port)}/_/${B}/`);
+      const first = (await context.cookies(hostOf(port, B))).find(
+        (cookie) => cookie.name === COOKIE,
+      );
+      expect(first).toBeDefined();
+      // The cookie's hour is up: the browser drops it, the page stays open.
+      await context.clearCookies({ name: COOKIE });
+      const sub = await page.evaluate(`fetch("/assets/leak.js").then((r) => r.status)`);
+      expect(sub).toBe(404);
+      // A reload is a navigation: the host sends it through the portal, which checks permission again.
+      await page.reload();
+      expect(page.url()).toBe(`${hostOf(port, B)}/`);
+      const renewed = (await context.cookies(hostOf(port, B))).find(
+        (cookie) => cookie.name === COOKIE,
+      );
+      expect(renewed?.value).toBeDefined();
+      expect(await page.evaluate(`fetch("/assets/leak.js").then((r) => r.status)`)).toBe(200);
+      await context.close();
+    });
+
+    it("works with third-party cookies blocked: every hop is a first-party navigation", async () => {
+      const restricted = await chromium.launch({
+        args: [
+          "--proxy-server=direct://",
+          "--proxy-bypass-list=*",
+          `--host-resolver-rules=MAP ${DOMAIN} 127.0.0.1, MAP *.${DOMAIN} 127.0.0.1`,
+          "--test-third-party-cookie-phaseout",
+        ],
+        ...(process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"]
+          ? { executablePath: process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"] }
+          : {}),
+      });
+      try {
+        const port = await start();
+        const context = await restricted.newContext({ ignoreHTTPSErrors: true });
+        const page = await context.newPage();
+        await page.goto(`${portalOf(port)}/_/${B}/assets/leak.js`);
+        expect(page.url()).toBe(`${hostOf(port, B)}/assets/leak.js`);
+        expect(await page.textContent("body")).toContain(`window.__leak = "${B}"`);
+        expect(await cookieNames(context, hostOf(port, B))).toContain(COOKIE);
+        await context.close();
+      } finally {
+        await restricted.close();
+      }
     });
 
     it("gives a viewer with no role nothing: no redirect, no cookie", async () => {

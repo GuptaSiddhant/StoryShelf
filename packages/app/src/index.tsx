@@ -46,6 +46,7 @@ import {
   rateLimitKey,
   requestLogging,
   resolveRequestUser,
+  sameSiteWrites,
   storeScope,
 } from "./middleware/index.ts";
 import { serverTiming } from "./middleware/server-timing.ts";
@@ -223,9 +224,18 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("*", requireTesting(wiring.options.testing !== undefined));
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
-  // `subdomain` hosting: a content or alias host never reaches the portal's gates and routes.
-  app.use("*", hostDispatch());
+  mountPortalBoundary(app, config);
   mountAccessGates(app);
+}
+
+/**
+ * Where a request may come from (ADR 0051): `subdomain` hosting sends a content or alias host to its
+ * own router, so it never reaches the portal's gates and routes; and a write that carries a session
+ * cookie must come from the portal (decision 9).
+ */
+function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
+  app.use("*", hostDispatch());
+  app.use("*", sameSiteWrites(config));
 }
 
 /**
