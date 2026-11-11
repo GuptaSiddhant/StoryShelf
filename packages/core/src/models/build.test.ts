@@ -637,13 +637,12 @@ describe("BuildModel: skipped builds (ADR 0044)", () => {
   });
 
   it("lists the builds skipped from a source, newest first", async () => {
-    const { model, source } = await setUpSkipped();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-11-11T10:00:00.000Z"));
+    const { db, model, source } = await setUpSkipped();
     const first = await model.createSkipped(skip(source.id));
-    vi.setSystemTime(new Date("2026-11-11T10:00:01.000Z"));
     const second = await model.createSkipped(skip(first.id, "ccccccc3333"));
-    vi.useRealTimers();
+    // Distinct creation times are assigned, not slept for: the order is the point under test.
+    await db.update(db.tables.builds, first.id, { createdAt: "2026-11-11T10:00:00.000Z" });
+    await db.update(db.tables.builds, second.id, { createdAt: "2026-11-11T10:00:01.000Z" });
     expect((await model.skippedFrom(source.id)).map((build) => build.id)).toEqual([
       second.id,
       first.id,
