@@ -16,10 +16,10 @@ if [ "$tool" = turbo ]; then
   grouped() { nubx turbo run test --only --force --filter='!website' --continue --log-order=grouped; }
 else
   clear_cache() { rm -rf node_modules/.vite/task-cache; }
-  stage() { vp run -r -F '!website' "$1"; }
+  stage() { vp run -F '!website' "$1"; }
   graph() { vp run verify-graph; }
   pgonly() { vp run --no-cache -F @storyshelf/db-postgres test; }
-  grouped() { vp run -r -F '!website' --no-cache --log=grouped test; }
+  grouped() { vp run -F '!website' --no-cache --log=grouped test; }
 fi
 
 # rec <label> <command...>: wall seconds and exit code into times.tsv, full output into logs/<label>.log
