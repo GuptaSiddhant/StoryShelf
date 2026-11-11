@@ -638,9 +638,12 @@ describe("BuildModel: skipped builds (ADR 0044)", () => {
 
   it("lists the builds skipped from a source, newest first", async () => {
     const { model, source } = await setUpSkipped();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-11T10:00:00.000Z"));
     const first = await model.createSkipped(skip(source.id));
-    await new Promise((resolve) => setTimeout(resolve, 2));
+    vi.setSystemTime(new Date("2026-11-11T10:00:01.000Z"));
     const second = await model.createSkipped(skip(first.id, "ccccccc3333"));
+    vi.useRealTimers();
     expect((await model.skippedFrom(source.id)).map((build) => build.id)).toEqual([
       second.id,
       first.id,

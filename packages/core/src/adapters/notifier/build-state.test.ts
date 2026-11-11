@@ -455,6 +455,15 @@ describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
     expect(skippedRun({}).comment?.markdown).toContain("no longer exists");
   });
 
+  it("waits (pending) on a source status it does not know, and shows nothing for a local identity", () => {
+    expect(gate(skippedRun({ source: skippedSource({ status: "skipped" }) }))).toMatchObject({
+      state: "pending",
+    });
+    expect(
+      skippedRun({ build: { gitSha: "local-abc123def456" }, source: skippedSource() }),
+    ).toEqual({ statuses: [], comment: null });
+  });
+
   it("shows nothing without a commit, like any build", () => {
     expect(skippedRun({ build: { gitSha: "" }, source: skippedSource() })).toEqual({
       statuses: [],

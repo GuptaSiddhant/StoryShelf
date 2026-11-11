@@ -21,6 +21,37 @@ const publishJob = async (w: Awaited<ReturnType<typeof world>>) =>
     "2026-01-01T00:00:00.000Z",
   );
 
+describe("deliverBuildState: a skipped build (ADR 0044)", () => {
+  it("shows the source's current outcome, and follows it when the source is rejected", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "approved");
+    const skipped = await w.builds.createSkipped({
+      projectId: w.project.id,
+      gitSha: "fedcba987654",
+      gitBranch: "feature/x",
+      sourceBuildId: w.build.id,
+      changedFiles: [],
+    });
+    const run = async () =>
+      await deliverBuildState(
+        { ...w.deps, flags: () => ({ testing: true, review: false }) },
+        { buildId: skipped.id, channelId: w.channelId },
+      );
+    await expect(run()).resolves.toBe("delivered");
+    const testing = () =>
+      w.git.calls.filter(
+        (call) => call.target.kind === "status" && call.target.context === "storyshelf/testing",
+      );
+    expect(testing().at(-1)).toMatchObject({
+      state: "success",
+      target: { description: "No story changed since abc123" },
+    });
+    await w.builds.setStatus(w.build.id, "rejected");
+    await run();
+    expect(testing().at(-1)).toMatchObject({ state: "failure" });
+  });
+});
+
 describe("deliverBuildState", () => {
   it("shows a build that was never captured: pending statuses and the comment", async () => {
     const w = await world();
