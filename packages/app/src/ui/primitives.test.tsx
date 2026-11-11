@@ -289,7 +289,9 @@ describe("CompareStage", () => {
       <CompareStage baselineSrc={null} currentSrc="/c.png" diffSrc="/d.png" subject="X" />,
     );
     expect(html).toContain("no baseline yet");
-    expect(html).toContain('alt="Diff for X"');
+    expect(html).toContain('alt="Current for X"');
+    expect(html).not.toContain('alt="Diff for X"');
+    expect(html).not.toContain("data-compare-mode");
   });
 });
 
