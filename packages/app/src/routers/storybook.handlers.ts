@@ -227,6 +227,19 @@ async function serveBuildFile(
   return served ?? c.notFound();
 }
 
+/**
+ * The query the build's own manager reads for a `?storyId=` / `?viewMode=docs` link (the portal's
+ * copy-link form): `?path=/story/<id>` or `?path=/docs/<id>`. `undefined` keeps the request's query.
+ */
+function managerSearch(c: Context): string | undefined {
+  const id = c.req.query("storyId")?.trim() ?? "";
+  if (id === "" || !/^[a-zA-Z0-9._/-]+$/u.test(id)) {
+    return undefined;
+  }
+  const view = c.req.query("viewMode") === "docs" ? "docs" : "story";
+  return `?path=${encodeURIComponent(`/${view}/${id}`)}`;
+}
+
 async function storybookLanding(
   c: Context,
   project: Project,
@@ -238,7 +251,13 @@ async function storybookLanding(
     return c.html(renderStorybookPreparingPage(project, build, project.slug), 200, headers);
   }
   if (hostingMode() === "subdomain") {
-    return redirectToContentHost(c, { project, build, access, rest: "" });
+    return redirectToContentHost(c, {
+      project,
+      build,
+      access,
+      rest: "",
+      search: managerSearch(c),
+    });
   }
   const storyId = c.req.query("storyId") ?? c.req.query("id") ?? undefined;
   const viewMode = c.req.query("viewMode") === "docs" ? "docs" : undefined;

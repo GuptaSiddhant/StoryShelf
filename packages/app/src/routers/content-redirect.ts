@@ -50,12 +50,19 @@ function contentLocation(
 
 /**
  * The `302` to the build's content host. Path and query are kept (Storybook reads `?path=` and
- * `?id=`). Anything that is not a navigation, and any deployment without the credentials to mint,
+ * `?id=`), or `search` replaces the query. Anything that is not a navigation, and any deployment without the credentials to mint,
  * gets the one identical 404.
  */
 export function redirectToContentHost(
   c: Context,
-  target: { project: Project; build: Build; access: PublishedAccess; rest: string },
+  target: {
+    project: Project;
+    build: Build;
+    access: PublishedAccess;
+    rest: string;
+    /** Replaces the request's query string (`?...`), for a link whose parameters the manager does not read. */
+    search?: string;
+  },
 ): Response {
   const origins = hostingOriginsOfConfig(getStore().config);
   if (!origins || !isNavigation(c)) {
@@ -66,5 +73,5 @@ export function redirectToContentHost(
     return refuseToken(c, "no secret");
   }
   applySignedUrlHeaders(c);
-  return c.redirect(`${location}${new URL(c.req.url).search}`, 302);
+  return c.redirect(`${location}${target.search ?? new URL(c.req.url).search}`, 302);
 }

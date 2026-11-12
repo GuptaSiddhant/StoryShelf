@@ -281,6 +281,7 @@ describe("resolveShelfOptions storybook hosting", () => {
         storybookHosting: { mode: "subdomain", baseDomain: "localhost" },
       };
       expect(sub(local)).not.toThrow();
+      expect(sub({ ...local, publicBaseUrl: "ftp://localhost:3000" })).toThrow(/https/u);
       expect(sub({ ...local, publicBaseUrl: "http://app.localhost:3000" })).toThrow(
         /would also match the portal host/u,
       );
