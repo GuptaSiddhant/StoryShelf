@@ -30,10 +30,12 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  */
 import { mkdirSync } from "node:fs";
 import { aiFromEnv, aiLogFields } from "./ai.ts";
+import { refuseLegacyVariables } from "./legacy-env.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
 const env = process.env;
+refuseLegacyVariables(env);
 const dataDir = env["DATA_DIR"] ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
@@ -44,14 +46,14 @@ const publicBaseUrl = env["PUBLIC_BASE_URL"];
 
 function buildAuthUi(): AuthUiConfig | undefined {
   const pairs: Array<[string, string | undefined]> = [
-    ["title", env["SS_AUTH_TITLE"]],
-    ["subtitle", env["SS_AUTH_SUBTITLE"]],
-    ["passwordLabel", env["SS_AUTH_PASSWORD_LABEL"]],
-    ["passwordPlaceholder", env["SS_AUTH_PASSWORD_PLACEHOLDER"]],
-    ["submitLabel", env["SS_AUTH_SUBMIT_LABEL"]],
-    ["ssoLabelTemplate", env["SS_AUTH_SSO_LABEL"]],
-    ["helpText", env["SS_AUTH_HELP_TEXT"]],
-    ["footerText", env["SS_AUTH_FOOTER_TEXT"]],
+    ["title", env["SHELF_AUTH_TITLE"]],
+    ["subtitle", env["SHELF_AUTH_SUBTITLE"]],
+    ["passwordLabel", env["SHELF_AUTH_PASSWORD_LABEL"]],
+    ["passwordPlaceholder", env["SHELF_AUTH_PASSWORD_PLACEHOLDER"]],
+    ["submitLabel", env["SHELF_AUTH_SUBMIT_LABEL"]],
+    ["ssoLabelTemplate", env["SHELF_AUTH_SSO_LABEL"]],
+    ["helpText", env["SHELF_AUTH_HELP_TEXT"]],
+    ["footerText", env["SHELF_AUTH_FOOTER_TEXT"]],
   ];
   const out: Record<string, string> = {};
   for (const [key, value] of pairs) {
@@ -63,8 +65,8 @@ function buildAuthUi(): AuthUiConfig | undefined {
 }
 
 function buildUi(): UIConfig | undefined {
-  const name = env["SS_BRAND_NAME"];
-  const logo = env["SS_LOGO_URL"];
+  const name = env["SHELF_BRAND_NAME"];
+  const logo = env["SHELF_LOGO_URL"];
   const auth = buildAuthUi();
   const hasBrand = Boolean(name ?? logo);
   if (!hasBrand && !auth) {
