@@ -3,6 +3,7 @@ import { buildLifecycleContractSuite } from "../test-helpers/build-lifecycle-con
 import { makeDatabase } from "../test-helpers/fake-database.ts";
 import {
   BUILD_EXITS,
+  ENTRY_ONLY_BUILD_STATUSES,
   BUILD_STATUSES,
   CANCELLABLE_BUILD_STATUSES,
   OPEN_BUILD_STATUSES,
@@ -11,12 +12,19 @@ import {
   canMove,
   enteringFrom,
   exitFrom,
+  isEntryOnly,
   isExit,
 } from "./build-lifecycle.ts";
 
 describe("build lifecycle table", () => {
   it("derives the status lists the code used to maintain by hand", () => {
-    expect(TERMINAL_BUILD_STATUSES).toEqual(["approved", "rejected", "failed", "cancelled"]);
+    expect(TERMINAL_BUILD_STATUSES).toEqual([
+      "approved",
+      "rejected",
+      "failed",
+      "cancelled",
+      "skipped",
+    ]);
     expect(CANCELLABLE_BUILD_STATUSES).toEqual(["pending", "capturing", "comparing"]);
     expect(OPEN_BUILD_STATUSES).toEqual(["pending", "capturing", "comparing", "reviewing"]);
   });
@@ -27,7 +35,8 @@ describe("build lifecycle table", () => {
         const named = Object.keys(BUILD_EXITS).some((exit) =>
           isExit(exit as keyof typeof BUILD_EXITS, from, to),
         );
-        expect(canMove(from, to), `${from} → ${to}`).toBe(from === to || named);
+        const idempotent = from === to && !isEntryOnly(from);
+        expect(canMove(from, to), `${from} → ${to}`).toBe(idempotent || named);
       }
     }
   });
@@ -42,7 +51,7 @@ describe("build lifecycle table", () => {
   });
 
   it("treats a write of the status a row already has as an idempotent no-op", () => {
-    for (const status of BUILD_STATUSES) {
+    for (const status of BUILD_STATUSES.filter((entry) => !isEntryOnly(entry))) {
       expect(canMove(status, status)).toBe(true);
       expect(enteringFrom(status)).not.toContain(status);
       expect(allowedFrom(status)).toContain(status);
@@ -54,6 +63,27 @@ describe("build lifecycle table", () => {
     expect(canMove("rejected", "approved")).toBe(true);
     expect(canMove("failed", "approved")).toBe(false);
     expect(canMove("failed", "reviewing")).toBe(false);
+  });
+});
+
+describe("skipped builds (ADR 0044, decision 7)", () => {
+  it("is entry-only and terminal", () => {
+    expect(ENTRY_ONLY_BUILD_STATUSES).toEqual(["skipped"]);
+    expect(TERMINAL_BUILD_STATUSES).toContain("skipped");
+  });
+
+  it("is not cancellable and not part of the open (resumed) set", () => {
+    expect(CANCELLABLE_BUILD_STATUSES).not.toContain("skipped");
+    expect(OPEN_BUILD_STATUSES).not.toContain("skipped");
+  });
+
+  it("is never moved to, from, or retried, whatever the status", () => {
+    for (const other of BUILD_STATUSES) {
+      expect(canMove(other, "skipped"), `${other} → skipped`).toBe(false);
+      expect(canMove("skipped", other), `skipped → ${other}`).toBe(false);
+    }
+    expect(exitFrom("retry", "pending")).not.toContain("skipped");
+    expect(allowedFrom("skipped")).toEqual([]);
   });
 });
 

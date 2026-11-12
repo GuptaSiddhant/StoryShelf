@@ -95,6 +95,11 @@ const BUILD_CAPTURE_JOB_BACKFILL =
   "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
 const BUILD_CAPTURE_GENERATION_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS capture_generation INTEGER NOT NULL DEFAULT 0";
+/** Skipped builds (ADR 0044): the source a skipped build repeats, and the lookup by it. */
+const BUILD_SKIPPED_FROM_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS skipped_from_build_id TEXT";
+const BUILD_SKIPPED_FROM_INDEX =
+  "CREATE INDEX IF NOT EXISTS builds_skipped_from_idx ON builds (skipped_from_build_id)";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
@@ -247,6 +252,7 @@ async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> 
 async function migrateBuildRetentionColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_RETENTION_STATE_ALTER);
   await run(BUILD_BASELINE_SHA_ALTER);
+  await migrateBuildSkippedFrom(run);
 }
 
 async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
@@ -260,6 +266,12 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
   await run(BUILD_CAPTURE_JOB_ALTER);
   await run(BUILD_CAPTURE_GENERATION_ALTER);
+}
+
+/** The column first, then the index on it: the DDL cannot index a column an old table lacks. */
+async function migrateBuildSkippedFrom(run: MigrationRunner): Promise<void> {
+  await run(BUILD_SKIPPED_FROM_ALTER);
+  await run(BUILD_SKIPPED_FROM_INDEX);
 }
 
 /** Runs `use` with one dedicated connection's row-query runner, then releases the connection. */

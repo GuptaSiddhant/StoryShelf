@@ -35,12 +35,25 @@ export interface BuildStateFlags {
 export interface BuildStateBuild {
   id: string;
   gitSha: string;
-  /** Build status: `pending`, `capturing`, `comparing`, `reviewing`, `approved`, `rejected`, `failed`, `cancelled`. */
+  /** Build status: `pending`, `capturing`, `comparing`, `reviewing`, `approved`, `rejected`, `failed`, `cancelled`, `skipped`. */
   status: string;
   snapshotCount: number;
   changedCount: number;
   approvedCount: number;
   rejectedCount: number;
+}
+
+/**
+ * The build a `skipped` build repeats (ADR 0044): its current outcome is the skipped build's. Callers
+ * resolve it with `BuildModel.skipSourceOf`; leave it out when the source row is gone.
+ */
+export interface BuildStateSource {
+  id: string;
+  gitSha: string;
+  /** The source's build status now, not when the skipped build was created. */
+  status: string;
+  /** The source's Storybook is published and its content present. */
+  available: boolean;
 }
 
 /** The part of a snapshot row the annotations read. */
@@ -73,6 +86,8 @@ export interface BuildStateInput {
    * verdict and the approvals the project requires. Shown on `<prefix>/review` while it waits.
    */
   approvals?: { given: number; required: number } | undefined;
+  /** For a `skipped` build, the build it repeats; absent when that build no longer exists. */
+  source?: BuildStateSource | undefined;
   /** The build's snapshots; the `changed` and `new` ones become annotations of `<prefix>/testing`. */
   changes?: readonly BuildStateChange[] | undefined;
 }
@@ -117,11 +132,107 @@ export function statusesForBuild(input: BuildStateInput): BuildStateSet {
     return { statuses: [], comment: null };
   }
   const links = linksOf(input);
+  if (build.status === "skipped") {
+    return skippedState(input, links);
+  }
   const statuses = [
     ...withAnnotations(gateStatus(input, links.build), input),
     storybookStatus(input.publishing, input.prefix, links),
   ].map((status) => withProgress(status, input.build));
   return { statuses, comment: commentOf(input, statuses, links) };
+}
+
+/**
+ * A skipped build shows the **current** outcome of its source (ADR 0044, decision 5): the gate
+ * follows the source's verdict, the `storybook` status links the source's Storybook only while it
+ * is available, and the comment is one line naming both builds.
+ */
+function skippedState(input: BuildStateInput, links: Links): BuildStateSet {
+  const { source, flags, prefix } = input;
+  const gate = skippedGate(input);
+  const sourceUrl = source === undefined ? undefined : sourceLinks(input, source);
+  const storybook: DesiredStatus[] =
+    source?.available === true && sourceUrl !== undefined
+      ? [
+          {
+            name: "storybook",
+            context: `${prefix}/storybook`,
+            informational: true,
+            state: "success",
+            description: "Storybook published",
+            url: sourceUrl.storybook,
+          },
+        ]
+      : [];
+  const statuses = [...(flags.testing || flags.review ? [gate] : []), ...storybook].map((status) =>
+    withProgress(status, input.build),
+  );
+  const markdown = skippedComment(input, links, sourceUrl?.build);
+  return { statuses, comment: { url: links.build, state: gate.state, markdown } };
+}
+
+/** The gate of a skipped build, under the same name `gateStatus` gives a normal one. */
+function skippedGate(input: BuildStateInput): DesiredStatus {
+  const { flags, prefix, source } = input;
+  const name = flags.testing ? "testing" : "review";
+  return {
+    name,
+    context: `${prefix}/${name}`,
+    url: linksOf(input).build,
+    ...skippedOutcome(source, flags.testing),
+  };
+}
+
+/** What the source's status means for the skipped build (`approved` is the only green). */
+function skippedOutcome(source: BuildStateSource | undefined, testing: boolean): Outcome {
+  if (source === undefined) {
+    return { state: "failure", description: "Compared build no longer exists" };
+  }
+  const since = `since ${shortSha(source.gitSha)}`;
+  switch (source.status) {
+    case "approved": {
+      return { state: "success", description: `No story changed ${since}` };
+    }
+    case "rejected": {
+      return { state: "failure", description: `No story changed ${since}, which was rejected` };
+    }
+    case "failed": {
+      return { state: "failure", description: `No story changed ${since}, which failed` };
+    }
+    case "cancelled": {
+      return CANCELLED;
+    }
+    default: {
+      return {
+        state: "pending",
+        description: `No story changed ${since}, waiting for ${testing ? "its review" : "a review verdict"}`,
+      };
+    }
+  }
+}
+
+/** The source build's page and Storybook links. */
+function sourceLinks(input: BuildStateInput, source: BuildStateSource): Links {
+  const { urls, projectSlug } = input;
+  return {
+    build: urls.build(projectSlug, source.id),
+    storybook: `${urls.storybookBuild(projectSlug, source.id).replace(/\/+$/u, "")}/`,
+  };
+}
+
+/** One line linking both builds. */
+function skippedComment(input: BuildStateInput, links: Links, sourceBuildUrl?: string): string {
+  const { source } = input;
+  const compared =
+    source === undefined || sourceBuildUrl === undefined
+      ? "a build that no longer exists"
+      : `[${shortSha(source.gitSha)}](${sourceBuildUrl})`;
+  return `**StoryShelf** — [Build skipped](${links.build}): no story changed since ${compared}, so it repeats that build's result.`;
+}
+
+/** The first seven characters of a commit. */
+function shortSha(sha: string): string {
+  return sha.slice(0, 7);
 }
 
 /** `pending` is `queued` while the build waits to be captured, `running` after. */

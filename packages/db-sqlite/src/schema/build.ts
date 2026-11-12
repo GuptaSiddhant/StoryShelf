@@ -34,12 +34,14 @@ export const builds = sqliteTable(
     reviewCycle: integer("review_cycle").notNull().default(0),
     reviewRequestedCycle: integer("review_requested_cycle"),
     captureJobId: text("capture_job_id"),
+    skippedFromBuildId: text("skipped_from_build_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
     index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
     index("builds_git_branch_idx").on(t.gitBranch),
+    index("builds_skipped_from_idx").on(t.skippedFromBuildId),
   ],
 );
 
@@ -70,6 +72,7 @@ export interface Build {
   reviewCycle: number;
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
+  skippedFromBuildId: string | null;
   createdAt: string;
   updatedAt: string;
 }

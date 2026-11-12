@@ -34,12 +34,14 @@ export const builds = mysqlTable(
     reviewCycle: int("review_cycle").notNull().default(0),
     reviewRequestedCycle: int("review_requested_cycle"),
     captureJobId: varchar("capture_job_id", { length: 26 }),
+    skippedFromBuildId: varchar("skipped_from_build_id", { length: 26 }),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
   (t) => [
     index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
     index("builds_git_branch_idx").on(t.gitBranch),
+    index("builds_skipped_from_idx").on(t.skippedFromBuildId),
   ],
 );
 
@@ -69,6 +71,7 @@ export interface Build {
   reviewCycle: number;
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
+  skippedFromBuildId: string | null;
   createdAt: string;
   updatedAt: string;
 }

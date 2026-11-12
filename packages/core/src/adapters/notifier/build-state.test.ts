@@ -6,6 +6,7 @@ import {
   type BuildStateBuild,
   type BuildStateChange,
   type BuildStateFlags,
+  type BuildStateSource,
   type PublishingState,
 } from "./build-state.ts";
 
@@ -27,6 +28,7 @@ function run(
     publishing?: PublishingState;
     approvals?: { given: number; required: number };
     changes?: BuildStateChange[];
+    source?: BuildStateSource;
     prefix?: string;
     base?: string;
   } = {},
@@ -40,6 +42,7 @@ function run(
     publishing: overrides.publishing ?? "success",
     approvals: overrides.approvals,
     changes: overrides.changes,
+    source: overrides.source,
   });
 }
 
@@ -368,5 +371,103 @@ describe("statusesForBuild: progress and annotations", () => {
     expect(withTesting.statuses.find((s) => s.name === "storybook")?.annotations).toBeUndefined();
     const review = run({ flags: { testing: false, review: true }, changes: [change(1)] });
     expect(gate(review)?.annotations).toBeUndefined();
+  });
+});
+
+const skippedSource = (overrides: Partial<BuildStateSource> = {}): BuildStateSource => ({
+  id: "src1",
+  gitSha: "1234567890abcdef",
+  status: "approved",
+  available: true,
+  ...overrides,
+});
+const skippedRun = (overrides: Parameters<typeof run>[0] = {}) =>
+  run({
+    ...overrides,
+    build: { id: "sk1", gitSha: "fedcba0987", status: "skipped", ...overrides.build },
+  });
+
+describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
+  it("is green with the source's short sha while the source is approved", () => {
+    const set = skippedRun({ source: skippedSource() });
+    expect(gate(set)).toMatchObject({
+      name: "testing",
+      state: "success",
+      description: "No story changed since 1234567",
+      url: "https://shelf.example.com/projects/web/builds/sk1",
+    });
+  });
+
+  it("uses the review gate when only review is on", () => {
+    const set = skippedRun({ source: skippedSource(), flags: { testing: false, review: true } });
+    expect(gate(set)).toMatchObject({
+      name: "review",
+      state: "success",
+      description: "No story changed since 1234567",
+    });
+  });
+
+  it.each([
+    ["rejected", "failure"],
+    ["failed", "failure"],
+    ["cancelled", "cancelled"],
+    ["reviewing", "pending"],
+    ["capturing", "pending"],
+  ])("follows a source that is now %s -> %s", (status, state) => {
+    expect(gate(skippedRun({ source: skippedSource({ status }) }))).toMatchObject({ state });
+  });
+
+  it("fails when the source build no longer exists", () => {
+    const set = skippedRun({});
+    expect(gate(set)).toMatchObject({ state: "failure" });
+    expect(set.statuses.map((status) => status.name)).toEqual(["testing"]);
+  });
+
+  it("links the source's Storybook only while the source is available", () => {
+    const linked = skippedRun({ source: skippedSource() });
+    expect(linked.statuses.find((status) => status.name === "storybook")).toMatchObject({
+      state: "success",
+      informational: true,
+      url: "https://shelf.example.com/projects/web/storybook/build/src1/",
+    });
+    const gone = skippedRun({ source: skippedSource({ available: false }) });
+    expect(gone.statuses.map((status) => status.name)).toEqual(["testing"]);
+  });
+
+  it("shows no gate with neither testing nor review, only the available Storybook", () => {
+    const set = skippedRun({ source: skippedSource(), flags: { testing: false, review: false } });
+    expect(set.statuses.map((status) => status.name)).toEqual(["storybook"]);
+  });
+
+  it("writes one comment line that links both builds and carries the gate state", () => {
+    const set = skippedRun({ source: skippedSource() });
+    expect(set.comment).toMatchObject({
+      url: "https://shelf.example.com/projects/web/builds/sk1",
+      state: "success",
+    });
+    const markdown = set.comment?.markdown ?? "";
+    expect(markdown.split("\n")).toHaveLength(1);
+    expect(markdown).toContain("(https://shelf.example.com/projects/web/builds/sk1)");
+    expect(markdown).toContain("[1234567](https://shelf.example.com/projects/web/builds/src1)");
+  });
+
+  it("says so in the comment when the source is gone", () => {
+    expect(skippedRun({}).comment?.markdown).toContain("no longer exists");
+  });
+
+  it("waits (pending) on a source status it does not know, and shows nothing for a local identity", () => {
+    expect(gate(skippedRun({ source: skippedSource({ status: "skipped" }) }))).toMatchObject({
+      state: "pending",
+    });
+    expect(
+      skippedRun({ build: { gitSha: "local-abc123def456" }, source: skippedSource() }),
+    ).toEqual({ statuses: [], comment: null });
+  });
+
+  it("shows nothing without a commit, like any build", () => {
+    expect(skippedRun({ build: { gitSha: "" }, source: skippedSource() })).toEqual({
+      statuses: [],
+      comment: null,
+    });
   });
 });
