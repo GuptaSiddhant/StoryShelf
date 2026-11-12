@@ -34,6 +34,7 @@ export const builds = sqliteTable(
     reviewCycle: integer("review_cycle").notNull().default(0),
     reviewRequestedCycle: integer("review_requested_cycle"),
     captureJobId: text("capture_job_id"),
+    manifestSha256: text("manifest_sha256"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -70,6 +71,7 @@ export interface Build {
   reviewCycle: number;
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
+  manifestSha256: string | null;
   createdAt: string;
   updatedAt: string;
 }
