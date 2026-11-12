@@ -16,6 +16,23 @@ import {
 } from "./storybook-hosting.ts";
 
 export type { StorybookHostingConfig, StorybookHostingMode } from "./storybook-hosting.ts";
+export {
+  assertPortalOutsideContentHosts,
+  classifyHost,
+  contentHostLabel,
+  contentHostSuffix,
+  contentOriginOf,
+  hostingModeOf,
+  hostingOriginsOf,
+  hostingOriginsOfConfig,
+  isAliasLabel,
+  isReservedLabel,
+  isUlidShape,
+  portalOriginOf,
+  RESERVED_HOST_LABELS,
+  storybookHostingOf,
+} from "./content-hosts.ts";
+export type { HostClass, HostingOrigins } from "./content-hosts.ts";
 
 /** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {

@@ -46,7 +46,7 @@ afterEach(async () => {
 async function seed() {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await createTestProject(db, db.tables, { name: "app" });
+  const project = await createTestProject(db, db.tables, { name: "web" });
   const build = await createTestBuild(db, db.tables, project.id);
   await new BuildModel(db).setStatus(build.id, "capturing");
   for (const user of users) {
@@ -90,7 +90,7 @@ describe.each(Object.entries(VARIANTS))("cancel through the %s", (_name, headers
     ["outsider", 404],
   ])("%s gets %i and a refused cancel leaves the build alone", async (id, status) => {
     const { app, db, build } = await seed();
-    const response = await app.request(`/api/v1/projects/app/builds/${build.id}/cancel`, {
+    const response = await app.request(`/api/v1/projects/web/builds/${build.id}/cancel`, {
       method: "POST",
       headers: { cookie: `storyshelf_session=${id}`, ...headers },
     });
@@ -101,7 +101,7 @@ describe.each(Object.entries(VARIANTS))("cancel through the %s", (_name, headers
 
   it("answers an anonymous visitor 404 (auth on, no user) and leaves the build alone", async () => {
     const { app, db, build } = await seed();
-    const response = await app.request(`/api/v1/projects/app/builds/${build.id}/cancel`, {
+    const response = await app.request(`/api/v1/projects/web/builds/${build.id}/cancel`, {
       method: "POST",
       headers,
     });
