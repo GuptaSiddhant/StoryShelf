@@ -206,7 +206,7 @@ describe("admin system page", () => {
     form.set("password", "hunter2hunter2");
     const login = await app.request("/auth/engine/login", {
       method: "POST",
-      headers: { origin: "http://localhost:3000" },
+      headers: { origin: "http://localhost:3000", "sec-fetch-site": "same-origin" },
       body: form,
     });
     const cookie = (login.headers.get("set-cookie") ?? "").split(";")[0] ?? "";

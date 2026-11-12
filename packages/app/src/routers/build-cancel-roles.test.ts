@@ -92,7 +92,7 @@ describe.each(Object.entries(VARIANTS))("cancel through the %s", (_name, headers
     const { app, db, build } = await seed();
     const response = await app.request(`/api/v1/projects/web/builds/${build.id}/cancel`, {
       method: "POST",
-      headers: { cookie: `storyshelf_session=${id}`, ...headers },
+      headers: { cookie: `storyshelf_session=${id}`, "sec-fetch-site": "same-origin", ...headers },
     });
     expect(response.status).toBe(status);
     const after = (await new BuildModel(db).get(build.id))?.status;
