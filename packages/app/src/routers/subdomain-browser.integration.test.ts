@@ -171,6 +171,21 @@ async function startServer(
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
+  try {
+    handler = await bootApp(user, port);
+  } catch (error) {
+    // A server that failed to finish setting up is never registered, so `afterAll` cannot close it.
+    server.close();
+    throw error;
+  }
+  return { server, port };
+}
+
+/** The app on `port`, with its builds seeded. */
+async function bootApp(
+  user: typeof admin | null,
+  port: number,
+): Promise<(request: Request) => Promise<Response>> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
   await db.insert(db.tables.projects, project());
@@ -198,8 +213,7 @@ async function startServer(
     },
   });
   await app.lifecycle.setup();
-  handler = async (request) => await app.fetch(request);
-  return { server, port };
+  return async (request) => await app.fetch(request);
 }
 
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(

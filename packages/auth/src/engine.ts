@@ -125,6 +125,8 @@ interface AdvancedOptions {
   cookies: {
     session_token: { name: string; attributes: ReturnType<typeof sessionCookieAttributes> };
   };
+  /** Attributes of every other cookie the library sets (OAuth `state`): `useSecureCookies: false` must not drop `Secure`. */
+  defaultCookieAttributes?: { secure: true };
   /** Set to false for the `__Host-` cookie: the library would add `__Secure-` in front of the name. */
   useSecureCookies?: false;
 }
@@ -141,6 +143,7 @@ function advancedOptions(options: ShelfAuthOptions): AdvancedOptions {
         session_token: { name: HOST_SESSION_COOKIE, attributes: { ...attributes, secure: true } },
       },
       useSecureCookies: false,
+      defaultCookieAttributes: { secure: true },
     };
   }
   return {

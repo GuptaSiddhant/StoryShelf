@@ -206,7 +206,7 @@ function assertSubdomainHosting(options: ShelfOptions, baseDomain: string): void
     );
   }
   const url = new URL(portal);
-  if (url.protocol !== "https:" && !isLocalhostName(url.hostname)) {
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalhostName(url.hostname))) {
     throw new Error(
       `storybookHosting.mode "subdomain" needs an https config.publicBaseUrl: the portal session cookie is __Host- prefixed, which browsers accept over https only (or on a localhost name)`,
     );

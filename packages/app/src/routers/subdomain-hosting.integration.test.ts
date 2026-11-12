@@ -236,6 +236,21 @@ describe("the portal never serves a build's bytes in subdomain mode", () => {
     expect(response.headers.get("location")).toBe(`https://${hostOf(A)}/`);
   });
 
+  it("maps a storyId link to the manager's own path parameter", async () => {
+    const { app } = await boot({ publicA: true });
+    const base = `${PORTAL}/projects/test-project/storybook/build/${A}/`;
+    const story = await get(app, `${base}?storyId=button--primary`, NAV);
+    expect(story.headers.get("location")).toBe(
+      `https://${hostOf(A)}/?path=${encodeURIComponent("/story/button--primary")}`,
+    );
+    const docs = await get(app, `${base}?storyId=button--primary&viewMode=docs`, NAV);
+    expect(docs.headers.get("location")).toBe(
+      `https://${hostOf(A)}/?path=${encodeURIComponent("/docs/button--primary")}`,
+    );
+    const bad = await get(app, `${base}?storyId=${encodeURIComponent("<x>")}`, NAV);
+    expect(bad.headers.get("location")).toBe(`https://${hostOf(A)}/?storyId=%3Cx%3E`);
+  });
+
   it("sends a private build through the exchange with a 60 second token", async () => {
     const { app } = await boot();
     const response = await get(app, `${PORTAL}/_/${B}/assets/app.js?x=1`, NAV);
@@ -421,7 +436,7 @@ describe("the exchange and the grant cookie", () => {
     for (const rest of ["%2F%2Fevil.example.org", "..%2F..", "%5Cevil.example.org"]) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- sequential, short
       const response = await get(app, `${base}${rest}`, NAV);
-      expect(response.headers.get("location") ?? "/").toMatch(/^\/(?!\/)[^\\]*$/u);
+      expect([rest, response.status, response.headers.get("location")]).toEqual([rest, 404, null]);
     }
   });
 });

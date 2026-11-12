@@ -789,6 +789,23 @@ describe("the session cookie", () => {
     expect(user?.email).toBe("ada@example.com");
   }, 30_000);
 
+  it("keeps Secure on the library's other cookies (OAuth state) with hostSessionCookie", async () => {
+    const { shelf } = await testEngine(false, false, false, false, {
+      baseURL: "https://shelf.example.com",
+      hostSessionCookie: true,
+    });
+    const { $context } = shelf.auth as unknown as {
+      $context: Promise<{
+        createAuthCookie: (name: string) => { attributes: Record<string, unknown> };
+        authCookies: { sessionToken: { name: string } };
+      }>;
+    };
+    const context = await $context;
+    expect(context.createAuthCookie("state").attributes["secure"]).toBe(true);
+    expect(context.createAuthCookie("oauth_state").attributes["secure"]).toBe(true);
+    expect(context.authCookies.sessionToken.name).toBe("__Host-storyshelf_session");
+  });
+
   it("does not claim the __Host- cookie by default", async () => {
     const { shelf } = await testEngine();
     expect(shelf.adapter.hostSessionCookie).toBe(false);
