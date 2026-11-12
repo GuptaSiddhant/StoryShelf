@@ -86,6 +86,10 @@ async function applyVerdict(
   });
   if (!outcome.ok) {
     options.logger.error({ buildId: build.id, error: outcome.error, verdict }, "publish failed");
+    // A failed publish gives the manifest claim back, so a corrected manifest can be sent again.
+    if (build.manifestSha256) {
+      await new BuildModel(options.db).releaseManifest(build.id, build.manifestSha256);
+    }
   }
   if (verdict === "unchanged") {
     return build;

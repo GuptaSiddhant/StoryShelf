@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS builds (
   review_cycle INTEGER NOT NULL DEFAULT 0,
   review_requested_cycle INTEGER,
   capture_job_id TEXT,
+  manifest_sha256 TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
