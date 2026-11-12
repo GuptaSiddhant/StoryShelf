@@ -1,7 +1,9 @@
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { csrfField } from "../shell/csrf-field.tsx";
+import { getStore } from "../store.ts";
 import {
   Alert,
   Badge,
@@ -21,6 +23,7 @@ export function renderSettingsLabels(
   isAdmin: boolean,
   formState?: { globalError?: string; editKey?: string },
 ): unknown {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const editing = isAdmin ? labelTypes.find((item) => item.key === formState?.editKey) : undefined;
   return (
     <div class="grid max-w-form">
@@ -31,6 +34,11 @@ export function renderSettingsLabels(
           Labels attach typed values to builds (e.g. pr=123, jira=ABC-123). Values link out via the
           template.
         </Meta>
+        <div class="mt-1">
+          <Button variant="secondary" size="sm" href={urls.labels(project.slug)}>
+            Browse labels
+          </Button>
+        </div>
         <Table label="Label types">
           <table>
             <thead>
@@ -56,7 +64,7 @@ export function renderSettingsLabels(
                       <Button
                         variant="ghost"
                         size="sm"
-                        href={`/projects/${project.slug}/settings/labels?edit=${labelType.key}`}
+                        href={`/projects/${project.slug}/settings/review?edit=${encodeURIComponent(labelType.key)}#labels`}
                         aria-label={`Edit ${labelType.key}`}
                       >
                         Edit
@@ -113,7 +121,7 @@ export function renderSettingsLabels(
               <Button variant="primary" type="submit">
                 Save label type
               </Button>
-              <Button variant="ghost" href={`/projects/${project.slug}/settings/labels`}>
+              <Button variant="ghost" href={`/projects/${project.slug}/settings/review#labels`}>
                 Cancel
               </Button>
             </FormActions>

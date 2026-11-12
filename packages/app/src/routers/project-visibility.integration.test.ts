@@ -198,6 +198,18 @@ describe("a project the caller cannot see", () => {
     }
   });
 
+  it("hides the Insights tab and its queue fragment of a private project from an outsider", async () => {
+    const app = await boot();
+    for (const path of ["/settings/insights", "/jobs?partial=queue"]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one view at a time keeps failures readable
+      const hidden = await getAs(app, `/projects/hidden${path}`, "storyshelf_session=outsider");
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      const unknown = await getAs(app, `/projects/ghost${path}`, "storyshelf_session=outsider");
+      expect(hidden, path).toEqual(unknown);
+      expect(hidden["status"], path).toBe(404);
+    }
+  });
+
   it("still answers 403 to a member whose role is too low", async () => {
     const app = await boot();
     const asViewer = async (method: string, path: string): Promise<number> =>

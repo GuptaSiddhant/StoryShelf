@@ -7,6 +7,7 @@ import {
 } from "@storyshelf/core/models";
 import { isProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -14,10 +15,6 @@ import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Project member settings (assign roles, remove members). */
 export function registerMemberSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings/members", async (c) =>
-    c.html(await renderSettingsPage(c, "members")),
-  );
-
   app.post("/projects/:slug/settings/members", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
     const form = await c.req.formData();
@@ -32,14 +29,14 @@ export function registerMemberSettings(app: ShelfRouter): void {
     }
     await new MemberModel(getStore().db).set(project.id, userId, role);
     flash(c, "Member saved");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "members"));
   });
 
   app.post("/projects/:slug/settings/members/:userId/remove", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
     await new MemberModel(getStore().db).remove(project.id, c.req.param("userId") ?? "");
     flash(c, "Member removed");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "members"));
   });
 
   registerOwnerSettings(app);
@@ -60,13 +57,13 @@ function registerOwnerSettings(app: ShelfRouter): void {
     const { rules, problems } = parseOwnerRules(text, new Set(members.map((m) => m.userId)));
     if (problems.length > 0) {
       const state = { ownerText: text, ownerProblems: problems };
-      return c.html((await renderSettingsPage(c, "members", state)) ?? "", 400);
+      return c.html((await renderSettingsPage(c, "owners", state)) ?? "", 400);
     }
     await new ProjectModel(getStore().db).update(project.id, {
       componentOwners: serializeOwnerRules(rules),
     });
     flash(c, "Component owners saved");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "owners"));
   });
 }
 
@@ -87,7 +84,7 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
     }
     await new ProjectGroupMappingModel(getStore().db).create(project.id, groupName, role);
     flash(c, "Group mapping added");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "members"));
   });
 
   app.post("/projects/:slug/settings/members/groups/:mappingId/remove", async (c) => {
@@ -97,6 +94,6 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
       c.req.param("mappingId") ?? "",
     );
     flash(c, "Group mapping removed");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "members"));
   });
 }

@@ -1,8 +1,6 @@
-import { BuildModel } from "@storyshelf/core/models";
-import { ProjectModel } from "@storyshelf/core/models";
+import type { Build, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { getStore } from "../store.ts";
+import type { RenderedContent } from "../shell/document.tsx";
 import {
   Badge,
   Button,
@@ -10,16 +8,16 @@ import {
   EmptyState,
   HStack,
   Meta,
-  PageHeader,
   SectionTitle,
   Table,
+  VStack,
   statusTone,
 } from "../ui/components.tsx";
 
 /** Build statuses the retry button of the jobs table offers. */
 const RETRYABLE: ReadonlySet<string> = new Set(["failed", "cancelled", "pending"]);
 
-interface QueueView {
+export interface QueueView {
   buildId: string;
   status: string;
   queuedAt: string;
@@ -81,42 +79,20 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
   );
 }
 
-/** Compute jobs page: live capture queue plus recent build history with retry. */
-export async function renderComputeJobsPage(
-  slug: string,
-  queueView: QueueView[],
-  canRetry: boolean,
-): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db).list();
-  const project = projects.find((item) => item.slug === slug);
-  if (!project) {
-    return null;
-  }
-  const builds = await new BuildModel(getStore().db).list(project.id);
-  const recentBuilds = builds.slice(0, 20);
-  const queueByBuild = new Map(queueView.map((job) => [job.buildId, job]));
+/** Jobs on the Insights tab: the live capture queue plus recent build history with retry. */
+export function JobsSection(props: {
+  project: Project;
+  builds: Build[];
+  queue: QueueView[];
+  canRetry: boolean;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, queue, canRetry } = props;
+  const recentBuilds = props.builds.slice(0, 20);
+  const queueByBuild = new Map(queue.map((job) => [job.buildId, job]));
 
   return (
-    <DocumentLayout
-      title={`${project.name} · Compute jobs`}
-      nav={{
-        active: "settings",
-        projectSlug: project.slug,
-        projectName: project.name,
-        trail: [{ label: "Jobs" }],
-      }}
-    >
-      <PageHeader
-        title="Compute jobs"
-        description="Capture jobs run on this server. Queued and running jobs refresh live; recent history is below."
-        actions={
-          <Button variant="secondary" href={`/projects/${project.slug}/builds`}>
-            Back to builds
-          </Button>
-        }
-      />
-
-      {renderActiveQueue(project.slug, queueView)}
+    <VStack>
+      {renderActiveQueue(project.slug, queue)}
 
       <Card>
         <SectionTitle>Recent builds</SectionTitle>
@@ -159,7 +135,7 @@ export async function renderComputeJobsPage(
                       <Button
                         variant="secondary"
                         size="sm"
-                        href={`/projects/${project.slug}/builds/${build.id}`}
+                        href={`/projects/${project.slug}/builds/${build.id}/diff`}
                       >
                         View
                       </Button>
@@ -189,6 +165,6 @@ export async function renderComputeJobsPage(
         </Table>
         {recentBuilds.length === 0 ? <EmptyState description="No builds yet." /> : null}
       </Card>
-    </DocumentLayout>
+    </VStack>
   );
 }

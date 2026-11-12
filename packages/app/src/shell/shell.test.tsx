@@ -70,11 +70,15 @@ describe("sidebar groups", () => {
     expect(html).toContain('aria-label="Builds" data-tooltip="Builds"');
   });
 
-  it("keeps Jobs and Labels under Settings", async () => {
-    const jobs = await page("/projects/alpha/jobs", twoProjects);
-    expect(jobs).toMatch(/sidebar__link--active[^>]*href="\/projects\/alpha\/settings"/u);
+  it("keeps Insights and Labels under Settings", async () => {
+    const insights = await page("/projects/alpha/settings/insights", twoProjects);
+    expect(insights).toMatch(
+      /sidebar__link--active[^>]*href="\/projects\/alpha\/settings\/general"/u,
+    );
     const labels = await page("/projects/alpha/labels", twoProjects);
-    expect(labels).toMatch(/sidebar__link--active[^>]*href="\/projects\/alpha\/settings"/u);
+    expect(labels).toMatch(
+      /sidebar__link--active[^>]*href="\/projects\/alpha\/settings\/general"/u,
+    );
   });
 
   it("puts API docs and the OpenAPI spec in a help menu in the sidebar footer", async () => {
@@ -143,12 +147,12 @@ describe("top bar and sidebar footer", () => {
 
   it("shows the project picker and the page's ancestors, not the page itself", async () => {
     const section = await page("/projects/alpha/builds", twoProjects);
-    const deeper = await page("/projects/alpha/settings/tokens", twoProjects);
+    const deeper = await page("/projects/alpha/settings/access", twoProjects);
     expect(bar(section)).toContain('aria-label="Project: Alpha"');
     expect(bar(section)).not.toContain('aria-label="Breadcrumb"');
     expect(bar(deeper)).toContain('aria-label="Breadcrumb"');
     expect(bar(deeper)).toContain(">Settings</a>");
-    expect(bar(deeper)).not.toContain("Tokens");
+    expect(bar(deeper)).not.toContain("Access");
   });
 
   it("labels the picker for assistive tech even though phones show only its icon", async () => {

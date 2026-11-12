@@ -73,17 +73,21 @@ describe("hosting-only navigation", () => {
     const { db } = makeDatabase();
     const { slug } = await seedSnapshot(db);
     const hosting = boot(db, false);
-    const html = await (await hosting.request(`/projects/${slug}/settings/tokens`)).text();
-    for (const hidden of ["settings/capture", "settings/tests", "settings/ai"]) {
-      expect(html).not.toContain(`/projects/${slug}/${hidden}"`);
+    const html = await (await hosting.request(`/projects/${slug}/settings/capture`)).text();
+    for (const hidden of ['id="thresholds"', 'id="tests"', 'id="capture"', 'id="ai"']) {
+      expect(html).not.toContain(hidden);
     }
-    expect(html).toContain(`/projects/${slug}/settings/tokens"`);
+    expect(html).toContain('id="design"');
+    expect((await hosting.request(`/projects/${slug}/settings/insights`)).status).toBe(404);
+    expect((await hosting.request(`/projects/${slug}/jobs?partial=queue`)).status).toBe(404);
     await hosting.lifecycle.teardown();
 
     const testing = boot(db, true);
-    const full = await (await testing.request(`/projects/${slug}/settings/tokens`)).text();
-    expect(full).toContain(`/projects/${slug}/settings/capture"`);
-    expect(full).toContain(`/projects/${slug}/settings/tests"`);
+    const full = await (await testing.request(`/projects/${slug}/settings/capture`)).text();
+    for (const shown of ['id="thresholds"', 'id="tests"', 'id="capture"', 'id="design"']) {
+      expect(full).toContain(shown);
+    }
+    expect((await testing.request(`/projects/${slug}/settings/insights`)).status).toBe(200);
     await testing.lifecycle.teardown();
   });
 });
@@ -99,7 +103,7 @@ describe("hosting-only git channels", () => {
       logger: pino({ level: "silent" }),
       notifications: { notifiers: [makeFakeStateNotifier("github-a").provider] },
     });
-    const html = await (await app.request(`/projects/${slug}/settings/notifications`)).text();
+    const html = await (await app.request(`/projects/${slug}/settings/review`)).text();
     expect(html).toContain("Add a git channel");
     await app.lifecycle.teardown();
   });

@@ -3,6 +3,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { LISTED_TOPICS, REVIEW_REQUESTED_EVENT } from "../pages/settings-notifications.tsx";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { retryChannelState } from "./channel-retry.ts";
 import { flash } from "./flash.ts";
@@ -14,9 +15,6 @@ import { asString, findProject, renderSettingsPage } from "./settings.handlers.t
 
 /** Notifications settings (message and git channels plus my preferences). */
 export function registerNotificationSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings/notifications", async (c) =>
-    c.html(await renderSettingsPage(c, "notifications")),
-  );
   app.post("/projects/:slug/settings/notifications", handleCreateChannel);
   app.post("/projects/:slug/settings/notifications/:channelId/delete", handleDeleteChannel);
   app.post("/projects/:slug/settings/notifications/:channelId/retry", handleRetryChannel);
@@ -171,7 +169,7 @@ async function handleRetryChannel(c: Context): Promise<Response> {
       : "Retry queued. The Delivery column updates once the status is sent.",
   );
   // Back to the same row, so focus does not reset to the top of the page.
-  const back = `/projects/${project.slug}/settings/notifications#channel-${c.req.param("channelId")}`;
+  const back = `${settingsHref(project.slug, "notifications").split("#")[0]}#channel-${c.req.param("channelId")}`;
   c.header("HX-Redirect", back);
   return isHxRequest(c) ? c.body(null, 200) : c.redirect(back, 303);
 }

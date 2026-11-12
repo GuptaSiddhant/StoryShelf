@@ -10,10 +10,10 @@ import {
   type SettingsFormState,
 } from "./project-settings.tsx";
 
-const meta: Meta = { title: "Pages/Settings/General" };
+const meta: Meta = { title: "Pages/Settings/Review" };
 export default meta;
 
-/** The project settings page on its General tab; the review card is the part that differs per story. */
+/** The project settings page on its Review & notifications tab; the review card is the part that differs per story. */
 const settingsPage = (
   changes: Partial<Project>,
   options: { isAdmin?: boolean; formState?: SettingsFormState } = {},
@@ -21,7 +21,8 @@ const settingsPage = (
   renderProjectSettingsPage(
     {
       project: { ...project, ...changes },
-      activeTab: "general",
+      activeTab: "review",
+      formSection: "review",
       labelTypes: [],
       links: [],
       linkCandidates: [],
