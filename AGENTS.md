@@ -144,7 +144,7 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   query or header, and never let a runner set response headers. A signed-in viewer's own answer is
   `private, no-cache` with a content-hash `ETag` (`publishedCacheControl`).
 - **Cookie boundary and writes** (ADR 0051, decision 9). A state-changing request that carries a session
-  cookie is refused (403) unless `Origin` is the portal origin or `Sec-Fetch-Site` is `same-origin` or
+  cookie, or that posts to sign-in or sign-up (`SIGN_IN_PATHS`, closing login CSRF), is refused (403) unless `Origin` is the portal origin or `Sec-Fetch-Site` is `same-origin` or
   `none`: `sameSiteWrites` (`packages/app/src/middleware/same-site-writes.ts`), mounted for every path,
   `/api/v1` included. `same-site` is not enough, because every content host is the same site as the
   portal and its pages are uploaded. In `subdomain` mode the portal origin is the configured one and the

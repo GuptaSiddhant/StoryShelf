@@ -6,6 +6,12 @@ import { jsonRefusal } from "./api-errors.ts";
 /** Methods that change state. */
 const WRITES: ReadonlySet<string> = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+/**
+ * Sign-in and sign-up writes. They are judged even with no session cookie: a cross-site form that signs
+ * the victim in as the attacker (login CSRF) arrives before any cookie exists.
+ */
+const SIGN_IN_PATHS = /^\/(?:auth\/engine\/login|api\/auth\/sign-(?:in|up)(?:\/.*)?)$/u;
+
 /** What the refusal tells the caller: it names the rule, not the request. */
 export const CROSS_SITE_WRITE_MESSAGE =
   "This request did not come from this site, so it was refused. Open the page again and retry.";
@@ -42,13 +48,15 @@ function fromPortal(c: Context, origin: string): boolean {
  * refused with `403` unless it comes from the portal. It covers every path, `/api/v1` included
  * (`CSRF_PATHS` guards page routes only), and exists because `SameSite=Lax` still sends the session
  * cookie on a same-site request, and every content host is the same site as the portal. A request
- * without a session cookie (a bearer-token client, an anonymous form) is not this rule's concern.
+ * without a session cookie (a bearer-token client, an anonymous form) is not this rule's concern,
+ * except sign-in and sign-up (`SIGN_IN_PATHS`), which close login CSRF.
  */
 export function sameSiteWrites(config: ShelfConfig) {
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
   return async (c: Context, next: Next): Promise<Response | void> => {
-    const hasSession = readSessionCookie(c.req.header("cookie")) !== undefined;
-    if (!WRITES.has(c.req.method) || !hasSession || fromPortal(c, portalOrigin(config, c))) {
+    const judged =
+      readSessionCookie(c.req.header("cookie")) !== undefined || SIGN_IN_PATHS.test(c.req.path);
+    if (!WRITES.has(c.req.method) || !judged || fromPortal(c, portalOrigin(config, c))) {
       await next();
       return;
     }

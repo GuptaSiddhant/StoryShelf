@@ -167,6 +167,37 @@ describe("the rule's reach", () => {
     ]);
   });
 
+  it.each(["/auth/engine/login", "/api/auth/sign-in/email", "/api/auth/sign-up/email"])(
+    "refuses a cookie-less cross-site POST to %s (login CSRF)",
+    async (path) => {
+      const app = boot();
+      const bad: Record<string, string>[] = [
+        {},
+        { origin: "https://evil.example" },
+        { "sec-fetch-site": "same-site" },
+      ];
+      const answers = await Promise.all(
+        bad.map(
+          async (headers) => await app.request(`${PORTAL}${path}`, { method: "POST", headers }),
+        ),
+      );
+      expect(await Promise.all(answers.map(async (answer) => await refused(answer)))).toEqual([
+        true,
+        true,
+        true,
+      ]);
+      const ok = await Promise.all(
+        ([{ origin: PORTAL }, { "sec-fetch-site": "same-origin" }] as Record<string, string>[]).map(
+          async (headers) => await app.request(`${PORTAL}${path}`, { method: "POST", headers }),
+        ),
+      );
+      expect(await Promise.all(ok.map(async (answer) => await refused(answer)))).toEqual([
+        false,
+        false,
+      ]);
+    },
+  );
+
   it("answers a content host's write with 404, not the portal's refusal", async () => {
     const response = await boot("subdomain").request(`${CONTENT}/api/v1/projects`, {
       method: "POST",
