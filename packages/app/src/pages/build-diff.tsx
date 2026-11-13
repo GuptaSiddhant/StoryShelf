@@ -7,8 +7,8 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
 import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
 import { DocumentLayout, type NavConfig, type RenderedContent } from "../shell/document.tsx";
-import { EmptyState } from "../ui/components.tsx";
-import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
+import { EmptyState, type ImageSize } from "../ui/components.tsx";
+import { canvasColumn, comparisonCard, workspace } from "../ui/styles/review-layout.ts";
 import { a11ySummaryOf } from "./a11y-violations.tsx";
 import { BuildDetails, ReviewOnlySection, type BuildDetailsData } from "./build-detail.tsx";
 import { DiffActionBar } from "./build-diff-actions.tsx";
@@ -52,6 +52,8 @@ export interface BuildDiffData {
   publishedBaseDomain?: string;
   /** Details panel data; omitted, the page shows the review stage alone. */
   details?: BuildDetailsData;
+  /** Natural size of the selected snapshot's screenshot, read from its PNG header. */
+  currentSize?: ImageSize | null;
 }
 interface DiffReviewGridProps {
   project: Project;
@@ -71,6 +73,7 @@ interface DiffReviewGridProps {
   usage: LinkedUsageItem[];
   design: DesignItem[];
   publishedBaseDomain?: string;
+  currentSize?: ImageSize | null;
 }
 
 /** The snapshot the review page shows: the requested one, else the first needing review. */
@@ -113,28 +116,32 @@ function DiffReviewGrid(
       <div class={canvasColumn}>
         {selected ? (
           <>
-            <DiffViewer
-              project={project}
-              build={build}
-              selected={selected}
-              siblings={groupOf(snapshots, selected.id)?.members}
-              hasBaseline={hasBaseline}
-              reference={props.reference}
-              defaultComparison={props.defaultComparison}
-              drifted={drifted[selected.id]}
-              usage={usage}
-              design={design}
-              publishedBaseDomain={publishedBaseDomain}
-            />
+            {/* The comparison card: the action bar is its footer, docked while the card is in view. */}
+            <div class={comparisonCard}>
+              <DiffViewer
+                project={project}
+                build={build}
+                selected={selected}
+                siblings={groupOf(snapshots, selected.id)?.members}
+                hasBaseline={hasBaseline}
+                reference={props.reference}
+                defaultComparison={props.defaultComparison}
+                drifted={drifted[selected.id]}
+                usage={usage}
+                design={design}
+                publishedBaseDomain={publishedBaseDomain}
+                currentSize={props.currentSize}
+              />
+              <DiffActionBar
+                project={project}
+                build={build}
+                snapshots={snapshots}
+                selected={selected}
+                canReview={canReview}
+                drifted={drifted}
+              />
+            </div>
             <SnapshotComments grid={props} selected={selected} />
-            <DiffActionBar
-              project={project}
-              build={build}
-              snapshots={snapshots}
-              selected={selected}
-              canReview={canReview}
-              drifted={drifted}
-            />
           </>
         ) : (
           <EmptyState description="Select a snapshot to review." />

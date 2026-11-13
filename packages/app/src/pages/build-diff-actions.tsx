@@ -1,7 +1,13 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, Button, Kbd, statusTone } from "../ui/components.tsx";
-import { actionBar, actionGroup, actionHints, actionPosition } from "../ui/styles/review-layout.ts";
+import {
+  actionBar,
+  actionGroup,
+  actionHints,
+  actionKey,
+  actionPosition,
+} from "../ui/styles/review-layout.ts";
 import { groupOf, neighbours, snapshotPageUrl, type SnapshotGroup } from "./build-diff-model.ts";
 /** Sticky bottom bar props. */
 export interface DiffActionBarProps {
@@ -60,6 +66,15 @@ function decisionTarget(props: DiffActionBarProps): DecisionTarget | null {
   return { base: `${base}/snapshots/${first.id}`, shared: false, label: first.storyName, ...drift };
 }
 
+/** The key that triggers a button, shown inside it; hidden from assistive tech (`aria-keyshortcuts` says it). */
+function KeyHint(props: { keys: string }): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <span class={actionKey} aria-hidden="true">
+      <Kbd keys={props.keys} />
+    </span>
+  );
+}
+
 /** Approve (or "Approve anyway" when a baseline moved) as its own form. */
 function ApproveForm(props: {
   target: DecisionTarget;
@@ -91,9 +106,10 @@ function ApproveForm(props: {
           type="submit"
           icon="check"
           data-approve
+          aria-keyshortcuts="a"
           title={target.shared ? "Approve every browser (a)" : "Approve (a)"}
         >
-          {target.shared ? "Approve all browsers" : "Approve"}
+          {target.shared ? "Approve all browsers" : "Approve"} <KeyHint keys="a" />
         </Button>
       )}
     </form>
@@ -123,6 +139,35 @@ function ApproveOnlyThisForm(props: {
   );
 }
 
+/** Reject: secondary weight with danger text, so Approve stays the one filled button. */
+function RejectForm(props: {
+  target: DecisionTarget;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { target } = props;
+  return (
+    <form
+      method="post"
+      action={`${target.base}/reject`}
+      hx-post={`${target.base}/reject`}
+      hx-target="body"
+      data-toast={`Rejected ${target.label}`}
+      data-toast-tone="warning"
+    >
+      <Button
+        variant="danger-secondary"
+        size="sm"
+        type="submit"
+        icon="x"
+        data-reject
+        aria-keyshortcuts="r"
+        title="Reject (r)"
+      >
+        Reject <KeyHint keys="r" />
+      </Button>
+    </form>
+  );
+}
+
 /** Approve/reject for a reviewable story/mode; both advance to the next open one. */
 function DecisionButtons(props: {
   project: Project;
@@ -134,22 +179,11 @@ function DecisionButtons(props: {
   const selectedOpen = selected.status === "new" || selected.status === "changed";
   return (
     <div class={actionGroup}>
-      <ApproveForm target={target} />
+      <RejectForm target={target} />
       {target.shared && selectedOpen ? (
         <ApproveOnlyThisForm project={project} build={build} selected={selected} />
       ) : null}
-      <form
-        method="post"
-        action={`${target.base}/reject`}
-        hx-post={`${target.base}/reject`}
-        hx-target="body"
-        data-toast={`Rejected ${target.label}`}
-        data-toast-tone="warning"
-      >
-        <Button variant="danger" size="sm" type="submit" icon="x" data-reject title="Reject (r)">
-          Reject
-        </Button>
-      </form>
+      <ApproveForm target={target} />
     </div>
   );
 }
@@ -184,7 +218,7 @@ function StepButton(props: {
   );
 }
 
-/** Previous/next stepping, position, shortcut hints, and the review decision. */
+/** The comparison card's footer: previous/next stepping, the review decision, and keyboard help. */
 export function DiffActionBar(
   props: DiffActionBarProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
@@ -200,12 +234,6 @@ export function DiffActionBar(
         </span>
         <StepButton target={around.next} project={project} build={build} direction="next" />
       </div>
-      <div class={actionHints}>
-        <Kbd keys={["j", "k"]} /> navigate <Kbd keys="a" /> approve <Kbd keys="r" /> reject
-        <Button variant="ghost" size="sm" data-shortcuts-open aria-label="Keyboard shortcuts (?)">
-          <Kbd keys="?" />
-        </Button>
-      </div>
       {canReview && target ? (
         <DecisionButtons project={project} build={build} selected={selected} target={target} />
       ) : (
@@ -213,6 +241,11 @@ export function DiffActionBar(
           {selected.status}
         </Badge>
       )}
+      <div class={actionHints}>
+        <Button variant="ghost" size="sm" data-shortcuts-open aria-label="Keyboard shortcuts (?)">
+          <Kbd keys="?" />
+        </Button>
+      </div>
     </div>
   );
 }

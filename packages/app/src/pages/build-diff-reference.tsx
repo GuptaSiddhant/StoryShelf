@@ -1,34 +1,53 @@
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { BaselineReference } from "../routers/baseline-reference.ts";
-import { Alert, CompareStage, Segmented } from "../ui/components.tsx";
+import { CompareStage, Meta, RelativeTime, Segmented } from "../ui/components.tsx";
 import type { DesignSource } from "./build-diff-model.ts";
-export function BaselineReferenceNotice(props: {
+/** "vs main", or "vs feature/x, accepted on this branch" for a branch's own baseline. */
+function branchLabel(reference: { branch: string; defaultBranch: boolean }): string {
+  return reference.defaultBranch
+    ? `vs ${reference.branch}`
+    : `vs ${reference.branch}, accepted on this branch`;
+}
+
+/**
+ * One quiet line naming what the snapshot was compared with: "vs main · abc1234 · updated 2 h ago".
+ * Not a live region, so stepping through snapshots does not re-announce it. The commit links to the
+ * reference build (its page has the full id) and the time shows the exact timestamp on hover.
+ */
+export function BaselineReferenceLine(props: {
   reference: BaselineReference;
+  projectSlug: string;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const reference = props.reference;
-  if (reference.kind === "none")
+  const { reference, projectSlug } = props;
+  if (reference.kind === "none") {
+    return <Meta>No baseline at capture: this was a new comparison.</Meta>;
+  }
+  if (reference.kind === "unavailable") {
     return (
-      <Alert tone="info" title="No baseline at capture">
-        This was a new comparison; no baseline existed when it was captured.
-      </Alert>
+      <Meta>
+        Baseline reference unavailable: it changed after this diff, so an image shown may be the
+        current baseline rather than the one compared.
+      </Meta>
     );
-  if (reference.kind === "unavailable")
-    return (
-      <Alert tone="warning" title="Baseline reference unavailable">
-        The original baseline details or image are unavailable or have changed since this diff was
-        computed. For older records, any image shown may be the current baseline rather than the one
-        used for the diff.
-      </Alert>
-    );
+  }
+  const build = reference.build;
   return (
-    <Alert tone="info" title="Comparison baseline">
-      {reference.defaultBranch ? "Default branch" : "Accepted branch"}: {reference.branch}. Baseline
-      updated {reference.updatedAt}.
-      {reference.imageAvailable ? "" : " The baseline image is unavailable."}
-      {reference.build
-        ? ` Reference build ${reference.build.id}, commit ${reference.build.gitSha.slice(0, 7)}.`
-        : " Reference build and commit are unavailable."}
-    </Alert>
+    <Meta>
+      {branchLabel(reference)} ·{" "}
+      {build ? (
+        <a
+          class="mono"
+          href={createUrlBuilder("/").build(projectSlug, build.id)}
+          title={`Reference build ${build.id}`}
+        >
+          {build.gitSha.slice(0, 7)}
+        </a>
+      ) : (
+        "reference build unknown"
+      )}{" "}
+      · updated <RelativeTime value={reference.updatedAt} />
+    </Meta>
   );
 }
 

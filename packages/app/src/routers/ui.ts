@@ -33,6 +33,7 @@ import { registerGetStarted } from "./get-started.tsx";
 import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
+import { readPngSize } from "./png-size.ts";
 import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
 import { getQueueView } from "./settings-insights.ts";
 import { registerSettingsPages } from "./settings.ts";
@@ -179,6 +180,7 @@ export function registerUiPages(app: ShelfRouter): void {
           selectedSnapshot(snapshots, snapshotId)?.storyImportPath ?? null,
         ).catch(() => []),
         publishedBaseDomain: getStore().config.publishedBaseDomain,
+        currentSize: selected ? await readPngSize(selected.screenshotPath) : null,
       }),
     );
   });

@@ -25,6 +25,26 @@ export const canvasColumn = css`
   min-width: 0;
 `;
 
+/**
+ * The comparison card: heading, stage and, as its footer, the action bar. No overflow clipping, so
+ * the footer can stay docked at the bottom of the viewport while the card is in view.
+ */
+export const comparisonCard = css`
+  /* review-comparison-card */
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4) var(--space-4) 0;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  @media (max-width: 720px) {
+    & {
+      padding: var(--space-3) var(--space-3) 0;
+    }
+  }
+`;
+
 /* ---- header ---- */
 
 export const reviewHeader = css`
@@ -326,19 +346,23 @@ export const viewerMeta = css`
 export const actionBar = css`
   /* review-action-bar */
   position: sticky;
-  bottom: var(--space-4);
+  bottom: 0;
   z-index: 20;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-2);
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-2);
+  margin: 0 calc(var(--space-4) * -1);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-card);
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  @media (max-width: 720px) {
+    & {
+      margin: 0 calc(var(--space-3) * -1);
+      padding: var(--space-2) var(--space-3);
+    }
+  }
 `;
 
 export const actionGroup = css`
@@ -346,24 +370,38 @@ export const actionGroup = css`
   display: flex;
   gap: var(--space-2);
   align-items: center;
+  @media (max-width: 480px) {
+    & {
+      gap: var(--space-1);
+    }
+  }
 `;
 
 export const actionPosition = css`
   /* review-action-position */
-  min-width: 4.5rem;
+  min-width: 3.5rem;
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   text-align: center;
 `;
 
+/** The shortcuts button: keyboard help is for keyboards, so a phone-width bar drops it. */
 export const actionHints = css`
   /* review-action-hints */
   display: flex;
-  gap: var(--space-2);
   align-items: center;
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
+  @media (max-width: 480px) {
+    & {
+      display: none;
+    }
+  }
+`;
+
+/** A key hint inside a button ("Approve a"); hidden on narrow screens, where it rarely applies. */
+export const actionKey = css`
+  /* review-action-key */
+  display: inline-flex;
   @media (max-width: 720px) {
     & {
       display: none;

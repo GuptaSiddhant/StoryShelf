@@ -681,9 +681,9 @@ describe("per-snapshot baseline presentation", () => {
     const feature = await (
       await app.request("/projects/test-project/builds/f1/diff?snapshot=sf2")
     ).text();
-    expect(main).toContain("Default branch");
-    expect(feature).toContain("Accepted branch");
-    expect(feature).toContain("Reference build and commit are unavailable");
+    expect(main).toContain("vs main ·");
+    expect(feature).toContain("vs feature/x, accepted on this branch");
+    expect(feature).toContain("reference build unknown");
   });
 });
 
@@ -744,7 +744,8 @@ describe("inherited baseline origin", () => {
     const html = await (
       await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
     ).text();
-    expect(html).toContain("Reference build original, commit abcdef1");
+    expect(html).toContain('href="/projects/test-project/builds/original"');
+    expect(html).toContain(">abcdef1</a>");
   });
 });
 
@@ -779,7 +780,7 @@ describe("frozen comparison history", () => {
     const html = await (
       await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
     ).text();
-    expect(html).toContain("Default branch");
+    expect(html).toContain("vs main ·");
     expect(html).toContain('alt="Baseline for T / A"');
     expect((await post(app, "f1/snapshots/sf1/approve")).status).toBe(409);
     for (const unsafePath of [
