@@ -1,6 +1,6 @@
 import type { Auth } from "@storyshelf/core/auth";
 import type { AuthUser } from "@storyshelf/core/types";
-import { STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
+import { STORYBOOK_READ_PREFIX, STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 import { getStore } from "../store.ts";
 
@@ -37,8 +37,8 @@ const SHORT_LINK = /^\/_\/[^/]+(?:\/|$)/u;
  * Gate the server-rendered UI behind auth (ADR 0008): unauthenticated HTML
  * requests redirect to login. API/auth routes answer 401/403 themselves, and
  * published-Storybook routes enforce their own auth (public builds are
- * viewable without a session, ADR 0011), and `/_s/<token>` is answered by its signed token
- * alone (ADR 0007).
+ * viewable without a session, ADR 0011), and `/_s/<token>` and `/_r/<token>` are answered by
+ * their token alone (ADR 0007, ADR 0051).
  */
 export function authGate() {
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
@@ -52,6 +52,7 @@ export function authGate() {
       path.startsWith("/auth/") ||
       path.startsWith("/assets/") ||
       path.startsWith(STORYBOOK_TOKEN_PREFIX) ||
+      path.startsWith(STORYBOOK_READ_PREFIX) ||
       path.startsWith("/.well-known/") ||
       PUBLISHED_STORYBOOK.test(path) ||
       SHORT_LINK.test(path) ||

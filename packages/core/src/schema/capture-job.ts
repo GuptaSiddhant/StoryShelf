@@ -9,7 +9,7 @@
  *   last allowed attempt), and `visibleAt` is when a queued job may next be claimed;
  * - an **attempt** row (`id` = `<jobId>:<attempt>`) is one claim of a job, created by a unique-key
  *   insert. It holds the `owner`, the lease expiry (in `visibleAt`) and, once over, its outcome:
- *   `status` is `running | done | failed | expired`.
+ *   `status` is `running | done | failed | expired | released`.
  *
  * `visibleAt` is non-null only while a row is a poll candidate (a queued job row, a running attempt
  * row), so the poll is one indexed range query that reads at most one row.
@@ -33,8 +33,11 @@ export type CaptureJobStatus =
   | "failed"
   | "cancelled";
 
-/** Lifecycle of an attempt row; `expired` is a lease another instance took over. */
-export type CaptureAttemptStatus = "running" | "done" | "failed" | "expired";
+/**
+ * Lifecycle of an attempt row; `expired` is a lease another instance took over, `released` an
+ * attempt its holder handed back (shutdown) without spending it.
+ */
+export type CaptureAttemptStatus = "running" | "done" | "failed" | "expired" | "released";
 
 /** One row of `capture_jobs`: a job, or one attempt at it. */
 export interface CaptureJobRow {

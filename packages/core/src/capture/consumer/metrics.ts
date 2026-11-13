@@ -15,6 +15,7 @@ export type JobOutcome =
   | "failed"
   | "cancelled"
   | "lost"
+  | "released"
   | "dropped"
   | "unhandled";
 

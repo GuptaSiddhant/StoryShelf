@@ -206,8 +206,14 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
-  return (app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } })
-    .lifecycle;
+  return (
+    app as unknown as {
+      lifecycle: {
+        setup(): Promise<void>;
+        teardown(options?: { graceMs?: number }): Promise<void>;
+      };
+    }
+  ).lifecycle;
 }
 
 describe("setup rerun", () => {
@@ -262,6 +268,23 @@ describe("job consumer lifecycle", () => {
     await lifecycle.teardown();
     expect(consumer.stop).toHaveBeenCalledOnce();
     expect(consumer.isRunning()).toBe(false);
+  });
+
+  it("drains unbounded without a grace, and passes a grace on to the consumer", async () => {
+    const unbounded = fakeConsumer();
+    const first = lifecycleOf(unbounded);
+    await first.setup();
+    await first.teardown();
+    expect(unbounded.stop).toHaveBeenCalledWith(undefined);
+
+    // A consumer that is slow to finish its session does not hold a bounded teardown.
+    const bounded = fakeConsumer();
+    bounded.stop.mockImplementation(async () => {});
+    const second = lifecycleOf(bounded);
+    await second.setup();
+    await second.teardown({ graceMs: 7000 });
+    expect(bounded.stop).toHaveBeenCalledWith({ graceMs: 7000 });
+    expect(bounded.isRunning()).toBe(true);
   });
 
   it("works without a consumer (serverless hosts)", async () => {

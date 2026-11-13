@@ -94,6 +94,8 @@ export interface DatabaseJob extends PollableJob {
 export interface DatabaseCaptureQueue extends PollableCaptureQueue {
   readonly lifecycle: AdapterLifecycle;
   poll(options?: { waitMs?: number }): Promise<DatabaseJob | null>;
+  /** Hand a running job back at shutdown: queued again at once, the attempt not counted. */
+  release(job: PollableJob): Promise<void>;
   extend(job: PollableJob): Promise<LeaseRenewal>;
   /** Put a job of any kind on the queue; resolves to its job id. */
   enqueueJob(job: QueueJobInput): Promise<string>;

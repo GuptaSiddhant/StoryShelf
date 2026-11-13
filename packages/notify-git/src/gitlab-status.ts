@@ -46,6 +46,7 @@ export async function postCommitStatus(
         context: input.context,
       },
       logger: project.logger,
+      destination: "project",
     });
   } catch (error) {
     project.logger?.error(

@@ -101,6 +101,9 @@ function entryStatus(status: CaptureJobRow["status"]): QueueEntryStatus {
   if (status === "expired") {
     return "failed";
   }
+  if (status === "released") {
+    return "queued";
+  }
   if (status === "exhausting") {
     return "recovering";
   }

@@ -22,6 +22,7 @@ export const AgainstBaseline = jsxStory(() => (
   />
 ));
 
+/** A new story: only the screenshot, the zoom switch and the reason there is nothing to compare. */
 export const NewStory = jsxStory(() => (
   <CompareStage
     baselineSrc={null}
@@ -29,7 +30,17 @@ export const NewStory = jsxStory(() => (
     diffSrc={null}
     subject="Kit / Button / Default"
     baselineEmpty="No baseline yet: this story is new."
-    diffEmpty="Nothing to compare."
+  />
+));
+
+/** A snapshot whose baseline image is missing: the same single view, with the unavailable line. */
+export const BaselineUnavailable = jsxStory(() => (
+  <CompareStage
+    baselineSrc={null}
+    currentSrc={currentShot}
+    diffSrc={null}
+    subject="Kit / Button / Default"
+    baselineEmpty="The original baseline image is unavailable."
   />
 ));
 

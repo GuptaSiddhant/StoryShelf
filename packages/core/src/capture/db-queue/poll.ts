@@ -71,6 +71,26 @@ export async function nackJob(
   if (current !== null) await settleFailure(rt, current, options);
 }
 
+/**
+ * The holder hands the job back (shutdown): the job is queued again at once and the attempt is not
+ * spent ({@link CaptureJobModel.release}). Like `nack`, only the current holder acts: a holder whose
+ * attempt is no longer `running`, or whose job moved on, ended, or was asked to cancel, writes nothing.
+ */
+export async function releaseJob(rt: QueueRuntime, job: PollableJob): Promise<void> {
+  const ref = attemptRef(job);
+  if ((await rt.model.get(ref.receipt))?.status !== "running") {
+    return;
+  }
+  const row = await rt.model.get(ref.jobId);
+  if (!isCurrent(row, ref.attempt) || row.status !== "running" || row.cancelRequestedAt !== null) {
+    return;
+  }
+  if (await rt.model.release(row, ref.attempt, isoAt(rt))) {
+    rt.logger?.info({ jobId: ref.jobId, attempt: ref.attempt }, "job released");
+    rt.wake.notify();
+  }
+}
+
 /** Whether `row` is open and still on `attempt`. */
 function isCurrent(row: CaptureJobRow | null, attempt: number): row is CaptureJobRow {
   return row !== null && !isTerminalJob(row) && row.attempt === attempt;

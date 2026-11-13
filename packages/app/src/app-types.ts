@@ -38,8 +38,13 @@ export interface ShelfLifecycle {
    * Optional — when skipped, the first request gates on `ready` instead.
    */
   setup(): Promise<void>;
-  /** Graceful teardown for SIGTERM/SIGINT (`await app.lifecycle.teardown()`). Idempotent. */
-  teardown(): Promise<void>;
+  /**
+   * Graceful teardown for SIGTERM/SIGINT (`await app.lifecycle.teardown()`). Idempotent. With
+   * `graceMs` the job drain is bounded: jobs still running after it are cancelled and handed back
+   * to the queue without spending an attempt (hosts pass `shutdownGraceMs()`). Without it the drain
+   * waits for them with no limit.
+   */
+  teardown(options?: { graceMs?: number }): Promise<void>;
 }
 
 /** Shelf app with the shelf lifecycle namespace attached. */

@@ -152,3 +152,10 @@ Questions 1 to 4 follow the architect's recommendation of 2026-11-03, confirmed 
    `reviewPath` so the addon links to the review without building URLs itself, which keeps URL
    construction in the server's `UrlBuilder`. Decided: accept the envelope. Per-story state alone
    would make the addon derive the link from its own pathname, which duplicates URL rules.
+
+## Amendment, 2026-11-11 (hosting modes, #916)
+
+- **Inert on an opaque origin.** The addon does nothing when `self.origin === "null"`: it registers no panel and makes no request. A Storybook served under a sandbox (#357) has that origin.
+- **No CORS for `null`.** The status route never gets `Access-Control-Allow-Origin` for `null`, `Access-Control-Allow-Credentials` or any other CORS header. Every sandboxed page on the web shares the `null` origin, so such a rule would let any of them read a signed-in viewer's status.
+- **Badges exist only in `trusted` mode** (path hosting on the app origin, ADR 0010 amendment). A project subdomain gets none, as #530 already says, and a sandboxed Storybook gets none by the first bullet.
+- **Later option:** render badges in the app's own wrapper page, `packages/app/src/pages/storybook.tsx`, which runs on the app origin in every mode. Not decided; it needs its own issue.

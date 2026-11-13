@@ -600,6 +600,105 @@ describe("drain", () => {
   });
 });
 
+function heldRig(extra: Partial<KindHandler> = {}) {
+  const hold = gate();
+  const cancel = vi.fn(async () => {
+    hold.open();
+  });
+  const r = rig({
+    handlers: {
+      capture: {
+        run: async () => {
+          await hold.promise;
+        },
+        cancel,
+        ...extra,
+      },
+    },
+  });
+  return { r, hold, cancel };
+}
+
+describe("bounded drain (stop with a grace)", () => {
+  it("lets a job that ends within the grace finish and ack, handing nothing back", async () => {
+    const { r, hold, cancel } = heldRig();
+    const consumer = r.consume();
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.clock.advance(100);
+
+    const stopping = consumer.stop({ graceMs: 10_000 });
+    await r.clock.advance(3000);
+    hold.open();
+    await stopping;
+    await started;
+
+    expect(cancel).not.toHaveBeenCalled();
+    expect((await stateOf(r, id))?.status).toBe("done");
+  });
+
+  it("hands a job still running at the grace back: cancelled run, no spent attempt, resolves in time", async () => {
+    const { r, cancel } = heldRig();
+    const consumer = r.consume();
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.clock.advance(100);
+    const before = await stateOf(r, id);
+
+    let stopped = false;
+    const stopping = consumer.stop({ graceMs: 5000 }).then(() => {
+      stopped = true;
+    });
+    await r.clock.advance(2999);
+    expect(stopped).toBe(false);
+    await r.clock.advance(1);
+    await stopping;
+    await started;
+
+    expect(cancel).toHaveBeenCalledOnce();
+    const row = await stateOf(r, id);
+    expect(row).toMatchObject({ status: "queued", attempt: 1, error: null });
+    expect((row?.maxAttempts ?? 0) - (row?.attempt ?? 0)).toBe(
+      (before?.maxAttempts ?? 0) - (before?.attempt ?? 0) + 1,
+    );
+    // Another copy claims it at once, as attempt 2 of a job that still has all its retries.
+    const next = await r.queue.poll();
+    expect(next).toMatchObject({ jobId: id, attempt: 2 });
+  });
+
+  it("leaves a job cancelled during the drain cancelled, not handed back", async () => {
+    const { r } = heldRig();
+    const consumer = r.consume();
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.clock.advance(100);
+
+    const stopping = consumer.stop({ graceMs: 20_000 });
+    expect(await r.queue.cancel(id)).toBe(true);
+    await r.clock.advance(6000);
+    await stopping;
+    await started;
+
+    expect((await stateOf(r, id))?.status).toBe("cancelled");
+  });
+
+  it("still resolves within the grace when the run's cancel hangs", async () => {
+    const { r } = heldRig({ cancel: () => new Promise<void>(() => {}) });
+    const consumer = r.consume();
+    consumer.start().catch(() => {});
+    await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.clock.advance(100);
+
+    let stopped = false;
+    const stopping = consumer.stop({ graceMs: 4000 }).then(() => {
+      stopped = true;
+    });
+    await r.clock.advance(4000);
+    await stopping;
+    expect(stopped).toBe(true);
+  });
+});
+
 describe("metrics hooks", () => {
   it("reports how each job ended and samples the queue's depth and oldest job", async () => {
     const hold = gate();

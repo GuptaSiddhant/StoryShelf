@@ -23,7 +23,7 @@ import {
   recentEntries,
   statusOf,
 } from "./operations.ts";
-import { ackJob, nackJob, pollJob } from "./poll.ts";
+import { ackJob, nackJob, pollJob, releaseJob } from "./poll.ts";
 import {
   DEFAULT_LEASE_MS,
   DEFAULT_RETRIES,
@@ -70,6 +70,9 @@ export function createDatabaseCaptureQueue(
     },
     nack: async (job, nackOptions) => {
       await nackJob(rt, job, nackOptions);
+    },
+    release: async (job) => {
+      await releaseJob(rt, job);
     },
     extend: async (job) => await extendJob(rt, job),
     inspect: async (job) => await inspectJob(rt, job),

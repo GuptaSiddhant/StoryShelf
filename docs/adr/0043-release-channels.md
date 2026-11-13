@@ -114,6 +114,37 @@ The owner asked for short notes, with the detail kept in `CHANGELOG.md`.
   section and the diff from the previous release. The roll-up of the previous minor line is
   dropped: with a release every week each version's own notes are enough.
 
+## Amendment, 2026-11-10 (website and demo follow releases)
+
+The owner decided that readers and demo visitors see only released behaviour.
+
+- **Website** (the `/next/` part was dropped on 2026-11-11, see below).
+  - `/` is built from the latest stable release tag. `/next/` is built from `main`, carries an
+    "unreleased" banner and is kept out of search engines (`noindex`, canonical links to stable).
+  - One Pages workflow builds both, with separate search indexes, on every push to `main` and every
+    stable release. A version switcher links the two.
+  - There are no per-release archives before 1.0. After 1.0, one copy is kept per major version.
+  - A docs-only fix reaches `/` with the next release, or a P0 patch release when urgent.
+- **Fly demo.** It deploys only after a stable release publishes, from that release's tag. Once the
+  official image exists (#887), it runs that image at the released version.
+  - There is no `next` demo for now. The owner may host one on another cloud later.
+  - The app's own Storybook upload (`app-storybook.yml`) still runs on every push to `main`: it uses
+    the demo as a CI tool, not as release documentation.
+
+## Amendment, 2026-11-11 (next by hand, previews of main, stable-only docs)
+
+The owner decided that weekly and P0 releases make a daily `next` build unnecessary.
+
+- **`next` only by hand.** Decision 3 changes: `release.yml` has no schedule, and a `next` build is
+  published only by a `workflow_dispatch` with channel `next` while changesets are pending. Use it,
+  for example, before a breaking minor so early users can install `@next`.
+- **`main` is previewed, not published.** Decision 8 changes: `release-preview.yml` also runs on
+  pushes to `main` that change a package, so `main` installs from pkg.pr.new (`@main` or a commit)
+  and adds nothing to npm.
+- **The website has one version.** The 2026-11-10 `/next/` build is dropped: `main` is not something
+  users install, so docs for it would describe what nobody can run. The website is built from the
+  latest stable release tag only, and deployed after each stable release.
+
 ## Operations
 
 - **Re-running.** `scripts/publish-npm.mjs` skips versions already on npm; the tag and the GitHub

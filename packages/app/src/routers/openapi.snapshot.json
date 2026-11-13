@@ -6258,7 +6258,7 @@
     "/api/v1/projects/{slug}/builds/{buildId}/preview-token": {
       "get": {
         "tags": ["Review"],
-        "summary": "Get a fresh signed root for a build's preview frame",
+        "summary": "Get a fresh read-grant root for a build's preview frame",
         "parameters": [
           {
             "schema": {
@@ -6279,7 +6279,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The signed root (`/_s/<token>`) to frame the build's Storybook under",
+            "description": "The read-grant root (`/_r/<token>`) to frame the build's Storybook under",
             "content": {
               "application/json": {
                 "schema": {
@@ -6305,7 +6305,7 @@
             }
           }
         },
-        "x-storyshelf-class": "testing"
+        "x-storyshelf-class": "hosting"
       }
     }
   }
