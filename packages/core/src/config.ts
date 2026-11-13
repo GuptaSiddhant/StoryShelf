@@ -220,7 +220,7 @@ export interface ShelfConfig {
    * Opt-in, off by default — some deployments prefer no timing headers.
    */
   serverTiming?: boolean;
-  /** Persist gzip variants for published Storybook files (default off). */
+  /** Persist gzip and brotli copies of published Storybook files, made when publishing ends (default off). */
   publishedCompression?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;

@@ -1,7 +1,7 @@
 import { getTableName } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter, ListOptions, TxStore } from "../adapters/database.ts";
-import { clampListLimit } from "../adapters/database.ts";
+import { clampListLimit, listSelection } from "../adapters/database.ts";
 import { fakeSchema } from "./fake-tables.ts";
 import { orderRows, whereMatches } from "./sql-chunks.ts";
 
@@ -37,6 +37,11 @@ const UNIQUE_COLUMNS: Record<string, readonly string[]> = {
 // Without a driver, so the casts and await-free `async` methods are unavoidable.
 /* eslint-disable require-await, no-unnecessary-type-assertion, no-unnecessary-type-parameters, non-nullable-type-assertion-style */
 /** Create an in-memory database adapter for capture pipeline tests. */
+/** A copy of `row` holding only `keys`, as a projected list returns it. */
+function pickKeys(row: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+  return Object.fromEntries(keys.map((key) => [key, row[key]]));
+}
+
 export function makeDatabase(): { db: DatabaseAdapter } {
   const store = new Map<Table, Map<string, unknown>>();
 
@@ -118,6 +123,12 @@ export function makeDatabase(): { db: DatabaseAdapter } {
       current = current.slice(start, start + (clampListLimit(opts.limit) ?? 0));
     } else if (start > 0) {
       current = current.slice(start);
+    }
+    if (opts.columns) {
+      const keep = Object.keys(listSelection(table, opts.columns) ?? {});
+      current = current.map((row) =>
+        pickKeys(row as Record<string, unknown>, keep),
+      ) as typeof current;
     }
     return current as T["$inferSelect"][];
   };

@@ -1,7 +1,7 @@
 /**
  * File-by-file upload (`/dedup`, `/content`, `/manifest`): stores a build's files content-addressed
  * and needs no zip extraction on the server, so it publishes on any host, serverless included.
- * `upload` falls back to it when the server refuses a zip over its inline limit.
+ * `upload` uses it by default, and also when the server refuses a zip over its inline limit.
  */
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -18,6 +18,11 @@ const DEDUP_CHUNK = 5000;
 /** What the server answers a zip it cannot extract inline and cannot hand to a job. */
 export function isOverInlineLimit(error: unknown): boolean {
   return error instanceof RequestError && error.status === 413 && error.message.includes("/dedup");
+}
+
+/** The server has no hash routes (an older release): nothing was sent, so a zip upload can follow. */
+export class HashRoutesMissingError extends Error {
+  override readonly name = "HashRoutesMissingError";
 }
 
 /** Where a build's files are and which build they belong to. */
@@ -39,7 +44,12 @@ export async function uploadFileByFile(
     target.buildDir,
     await walkFiles(target.cwd, target.buildDir),
   );
-  const needed = await neededHashes(client, target, files);
+  const needed = await neededHashes(client, target, files).catch((error: unknown) => {
+    if (error instanceof RequestError && error.status === 404) {
+      throw new HashRoutesMissingError("The server has no /dedup route", { cause: error });
+    }
+    throw error;
+  });
   const toSend = firstFileOfEach(files, needed);
   log(`Uploading ${toSend.length} of ${files.length} files (the server has the rest)`);
   for (const batch of batches(toSend)) {
