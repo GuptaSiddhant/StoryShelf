@@ -63,6 +63,9 @@ describe("resolveSettings from the environment", () => {
 
 describe("resolveSettings options", () => {
   it("reuses pages by default", () => {
+    // Stub first so the original value is restored afterwards, then leave it truly unset.
+    vi.stubEnv("STORYSHELF_REUSE_PAGES", "1");
+    delete process.env["STORYSHELF_REUSE_PAGES"];
     expect(settingsFor({}).reusePages).toBe(true);
   });
 

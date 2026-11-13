@@ -111,6 +111,11 @@ const fake = vi.hoisted(() => {
           opened.push(page);
           return await Promise.resolve(page);
         },
+        // The pool's reset clears cookies; without these it would fail and discard every page.
+        cookies: async (): Promise<unknown[]> => await Promise.resolve([]),
+        deleteCookie: async (): Promise<void> => {
+          await Promise.resolve();
+        },
         close: async () => {
           if (!closed) {
             closed = true;
@@ -497,7 +502,8 @@ describe("a remote browser lost mid-pass", () => {
     expect(error).toBeInstanceOf(RemoteBrowserLostError);
     expect(onCapture).toHaveBeenCalledOnce();
     expect(fake.state.screenshots).toBe(2);
-    expect(fake.state.gotos).toHaveLength(2);
+    // The pool's `about:blank` reset between captures is not a story navigation.
+    expect(fake.state.gotos.filter((url) => url !== "about:blank")).toHaveLength(2);
     const lostWarnings = warn.mock.calls.filter(([, message]) =>
       String(message).includes("remote browser lost"),
     );
