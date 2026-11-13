@@ -82,8 +82,31 @@ describe("content-addressed dedup", () => {
     // Storing a blob records no use; the manifest does, once per distinct hash.
     const recordContentUses = vi.fn(async () => await Promise.resolve([] as string[]));
     Object.assign(db, { buildReferenceLifecycle: { recordContentUses } });
-    const manifest = async (): Promise<Response> =>
-      await app.request("/api/v1/projects/proj/builds/b1/manifest", {
+    const stamp = "2026-01-01T00:00:00.000Z";
+    for (const id of ["b2", "b3"]) {
+      // oxlint-disable-next-line no-await-in-loop -- two seed rows
+      await db.insert(db.tables.builds, {
+        id,
+        projectId: "p1",
+        gitSha: id,
+        gitBranch: "main",
+        isDefault: false,
+        authorEmail: null,
+        authorName: null,
+        message: null,
+        public: true,
+        status: "pending",
+        snapshotCount: 0,
+        changedCount: 0,
+        approvedCount: 0,
+        rejectedCount: 0,
+        inheritedCount: 0,
+        createdAt: stamp,
+        updatedAt: stamp,
+      });
+    }
+    const manifest = async (id = "b1"): Promise<Response> =>
+      await app.request(`/api/v1/projects/proj/builds/${id}/manifest`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -99,19 +122,73 @@ describe("content-addressed dedup", () => {
     expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(true);
 
     // A blob a collector claimed first: 409, and no manifest makes the build serve it.
-    await storage.delete("p1/builds/b1/storybook/manifest.json");
     recordContentUses.mockResolvedValueOnce([HELLO]);
-    expect((await manifest()).status).toBe(409);
-    expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(false);
+    expect((await manifest("b2")).status).toBe(409);
+    expect(await storage.exists("p1/builds/b2/storybook/manifest.json")).toBe(false);
 
     // A blob collected between the client's check and the record: 409 as well, no manifest.
-    const gone = await app.request("/api/v1/projects/proj/builds/b1/manifest", {
+    const gone = await app.request("/api/v1/projects/proj/builds/b3/manifest", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ files: [{ rel: "c.js", hash: hashOf("9"), size: 1 }] }),
     });
     expect(gone.status).toBe(409);
-    expect(await storage.exists("p1/builds/b1/storybook/manifest.json")).toBe(false);
+    expect(await storage.exists("p1/builds/b3/storybook/manifest.json")).toBe(false);
+  });
+
+  it("accepts one manifest per build: the same again is a no-op, another is a 409, a failed publish frees it", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const stamp = "2026-01-01T00:00:00.000Z";
+    await db.insert(db.tables.projects, {
+      id: "p1",
+      name: "P",
+      slug: "proj",
+      gitRepository: null,
+      gitDefaultBranch: "main",
+      pixelThreshold: 0.1,
+      maxDiffRatio: 0.01,
+      publicBranchRegex: null,
+      storybookMeta: null,
+      executePlay: false,
+      playTimeoutMs: 10_000,
+      runA11y: false,
+      browser: "chromium",
+      viewports: null,
+      automigrate: false,
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+    await db.insert(db.tables.builds, {
+      id: "b1",
+      projectId: "p1",
+      gitSha: "sha1",
+      gitBranch: "main",
+      isDefault: true,
+      authorEmail: null,
+      authorName: null,
+      message: null,
+      public: true,
+      status: "pending",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      inheritedCount: 0,
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const post = async (hash: string): Promise<Response> =>
+      await app.request("/api/v1/projects/proj/builds/b1/manifest", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ files: [{ rel: "a.js", hash, size: 1 }] }),
+      });
+    const [first, second] = await Promise.all([post(A), post(A)]);
+    expect([first?.status, second?.status]).toEqual([200, 200]);
+    expect((await post(B)).status).toBe(409);
+    expect((await post(A)).status).toBe(200);
   });
 
   it("manifest stores and serving via manifest uses immutable cache for buildId", async () => {

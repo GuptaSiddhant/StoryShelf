@@ -160,7 +160,11 @@ export function createDrizzleMySqlAdapter(
       table: T,
       opts: ListOptions = {},
     ): Promise<T["$inferSelect"][]> => {
-      const rows: unknown = await applyListOptions(drizzle.select().from(table), opts);
+      const rows: unknown = await applyListOptions(
+        drizzle.select().from(table),
+        opts,
+        idColumn(table),
+      );
       return rows as T["$inferSelect"][];
     },
     count: async (table: Table, where?: SQL): Promise<number> => await drizzle.$count(table, where),
@@ -181,7 +185,11 @@ function buildTxStore(drizzle: DrizzleMySqlLike): TxStore {
       await drizzle.delete(table).where(where);
     },
     list: async (table, opts: ListOptions = {}) => {
-      const rows: unknown = await applyListOptions(drizzle.select().from(table), opts);
+      const rows: unknown = await applyListOptions(
+        drizzle.select().from(table),
+        opts,
+        idColumn(table),
+      );
       return rows as never[];
     },
     count: async (table, where) => await drizzle.$count(table, where),
