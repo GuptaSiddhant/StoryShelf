@@ -1,6 +1,6 @@
-import type { NotifierState, StateAnnotation } from "@storyshelf/core/adapter/notifier";
 /** Pure mapping from a desired status to GitHub check-run payloads (never posts anything). */
 import { createHash } from "node:crypto";
+import type { NotifierState, StateAnnotation } from "../../adapters/notifier/index.ts";
 
 /** GitHub accepts at most this many annotations per request. */
 export const ANNOTATIONS_PER_REQUEST = 50;

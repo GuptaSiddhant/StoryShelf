@@ -1,4 +1,4 @@
-import type { NotifierState } from "@storyshelf/core/adapter/notifier";
+import type { NotifierState } from "../../adapters/notifier/index.ts";
 
 /** GitLab's pipeline statuses; a cancelled build is GitLab's own `canceled`. */
 const STATES: Record<NotifierState, "pending" | "success" | "failed" | "canceled"> = {

@@ -127,7 +127,13 @@ describe("health endpoints", () => {
       adapters: { category: string; state: string }[];
     };
     expect(body.status).toBe("ok");
-    expect(body.adapters.map((a) => a.category).toSorted()).toEqual(["database", "storage"]);
+    expect(body.adapters.map((a) => a.category).toSorted()).toEqual([
+      "database",
+      "notifier",
+      "notifier",
+      "notifier",
+      "storage",
+    ]);
     expect(body.adapters.every((a) => a.state === "ok")).toBe(true);
   });
 
