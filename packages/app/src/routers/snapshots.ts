@@ -192,7 +192,8 @@ export function registerSnapshots(app: ShelfRouter): void {
   });
 
   app.openapi(approveSnapshotRoute, async (c) => {
-    await approveOne(c, c.req.valid("param"), c.req.valid("query").force === "true");
+    // MUTATION: approve answers ok without approving
+    c.req.valid("param");
     return c.json({ ok: true }, 200);
   });
 
@@ -209,7 +210,8 @@ export function registerSnapshots(app: ShelfRouter): void {
 
   app.openapi(approveGroupRoute, async (c) => {
     const force = c.req.valid("query").force === "true";
-    const snapshotIds = await approveGroupOf(c, c.req.valid("param"), force);
+    // MUTATION
+    const snapshotIds: string[] = (force, []);
     return c.json({ ok: true, snapshotIds }, 200);
   });
 
