@@ -1,48 +1,80 @@
 name: Fly Deploy
 
-# A push to main that touches the image or the demo data deploys the workspace version of the demo
-# (apps/fly-app, local adapters). Manual via workflow_dispatch.
+# The demo runs a stable release only (ADR 0043, amendment 2026-11-10). A push to `main` deploys
+# nothing: `release.yml` calls this workflow after a stable release is tagged and its image is
+# pushed, and `workflow_dispatch` redeploys a version on demand. The release is checked out from its
+# tag. When the official image (#887, `ghcr.io/guptasiddhant/storyshelf:<version>`, first published
+# with v0.12.0) exists for that version, the demo runs it with the demo's own fly.toml; otherwise the
+# image is built from the tag's `apps/fly-app/Dockerfile`.
 on:
-  push:
-    branches:
-      - main
-    # Only what can change the image or the demo data: a docs, website, CI-only or ADR merge
-    # deploys nothing.
-    paths:
-      - "packages/**"
-      - "apps/fly-app/**"
-      - ".dockerignore" # the build context of the image
-      - "fixtures/storybook-9/**"
-      - "package.json"
-      - "nub.lock"
-      - "nub.jsonc"
-      - "turbo.json"
-      - "tsconfig.json"
-      - "config/**"
-      - ".github/actions/**"
-      - ".github/workflows/fly.yml"
+  workflow_call:
+    inputs:
+      version:
+        description: "The release to deploy, with or without the leading v (for example 0.12.0)."
+        required: false
+        default: ""
+        type: string
   workflow_dispatch:
+    inputs:
+      version:
+        description: "The release to deploy, with or without the leading v (for example 0.12.0). Empty: the latest stable release."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
+  packages: read # the existence check of the official image
 
-# Newest wins: while a deploy runs, at most one more waits, and a newer push replaces the waiting
-# one, so a burst of merges deploys the running commit and then only the latest. A running
+# Newest wins: while a deploy runs, at most one more waits, and a newer run replaces the waiting
+# one. A running
 # deploy is never cancelled: stopping `flyctl deploy` mid-rollout can leave machines on
 # different versions.
 concurrency:
   group: fly
   cancel-in-progress: false
 
+env:
+  IMAGE: ghcr.io/guptasiddhant/storyshelf
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
     steps:
-      - name: Checkout
+      # Only to read the tags: the demo is built and seeded from the tag checked out below.
+      - name: Checkout (tags)
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve the release tag
+        id: release
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          set -e
+          if [ -n "$REQUESTED" ]; then
+            tag="v${REQUESTED#v}"
+          else
+            # Latest stable tag: vX.Y.Z only, never a pre-release.
+            tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -Ev -- '-' | head -n 1)
+          fi
+          if ! git rev-parse -q --verify "refs/tags/${tag}^{commit}" >/dev/null; then
+            echo "::error::No release tag found (${tag:-none}); nothing to deploy."
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the release
+        uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+          persist-credentials: false
 
       - name: Setup Flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
@@ -56,7 +88,32 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to Fly
+      # The official image exists from v0.12.0 on (#887); an older release has none.
+      - name: Look for the official image
+        id: image
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          GH_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+          if docker manifest inspect "${IMAGE}:${VERSION}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Deploying ${IMAGE}:${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No ${IMAGE}:${VERSION}; building from the tag" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Deploy the official image to Fly
+        if: steps.image.outputs.exists == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: flyctl deploy --config apps/fly-app/fly.toml --image "${IMAGE}:${VERSION}"
+
+      - name: Build from the tag and deploy to Fly
+        if: steps.image.outputs.exists != 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile --remote-only --no-cache
@@ -102,9 +159,11 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout
+      - name: Checkout the release
         if: steps.token.outputs.present == 'true'
         uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ needs.deploy.outputs.tag }}
 
       - name: Setup workspace
         if: steps.token.outputs.present == 'true'

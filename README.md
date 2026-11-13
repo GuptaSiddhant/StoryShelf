@@ -68,7 +68,7 @@ packages/
 apps/
   dev-server/     dev-server      — local dev server (from TS source via nub watch)
   website/        website         — public docs (Astro Starlight)
-  fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
+  fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on a stable release via fly.yml)
 fixtures/
   storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
   storybook-9/    storybook-fixture -- SB 9 Vite React

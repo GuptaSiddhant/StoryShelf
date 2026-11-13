@@ -287,3 +287,28 @@ jobs:
           tag_name: ${{ needs.detect.outputs.tag }}
           body_path: release-body.md
           generate_release_notes: false
+
+  # The website and the Fly demo follow stable releases only (ADR 0043, amendments 2026-11-10 and
+  # 2026-11-11). They run after the tag exists and the image is pushed, so the site builds from the
+  # tag and the demo runs the image when it exists. A push to `main` deploys neither.
+  website:
+    name: website
+    needs: [detect, github-release]
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/website.yml
+    with:
+      tag: ${{ needs.detect.outputs.tag }}
+
+  fly:
+    name: fly demo
+    needs: [detect, github-release]
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/fly.yml
+    secrets: inherit
+    with:
+      version: ${{ needs.detect.outputs.tag }}
