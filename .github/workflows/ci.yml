@@ -327,6 +327,58 @@ jobs:
     if: ${{ needs.changes.outputs.heavy == 'true' }}
     uses: ./.github/workflows/fly-dry-run.yml
 
+  # The product container image (#887, apps/server-image): built, never pushed (release.yml pushes it),
+  # then smoke-tested as a container. Runs only for a change that can alter it; the filter lives in
+  # this job so `changes` stays untouched.
+  image:
+    name: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Did the image's inputs change?
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          run=true
+          if [ "$EVENT" = "pull_request" ]; then
+            git diff --name-only HEAD^1 HEAD > changed.txt || echo "diff failed; building" >&2
+            if [ -s changed.txt ] && ! grep -qE '^(apps/server-image/|packages/|config/|package\.json|nub\.(lock|jsonc)|turbo\.json|scripts/smoke\.sh|\.dockerignore|\.github/workflows/(ci|release)\.yml)' changed.txt; then
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        if: steps.filter.outputs.run == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build both variants (not pushed)
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          set -e
+          docker buildx build -f apps/server-image/Dockerfile --target full --load -t storyshelf:ci .
+          docker buildx build -f apps/server-image/Dockerfile --target hosting --load -t storyshelf:ci-hosting .
+          docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep '^storyshelf:ci'
+
+      - name: Smoke test the container
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          set -e
+          for variant in storyshelf:ci storyshelf:ci-hosting; do
+            docker run -d --name smoke -p 3000:3000 "$variant"
+            if ! SMOKE_BASE_URL=http://127.0.0.1:3000 bash scripts/smoke.sh; then
+              docker logs smoke
+              exit 1
+            fi
+            docker rm -f smoke
+          done
+
   # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
   # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child
   # checks, so requiring those by name would wait forever. This passes when every job passed or
@@ -334,7 +386,7 @@ jobs:
   ci:
     name: ci
     if: ${{ always() }}
-    needs: [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly]
+    needs: [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly, image]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

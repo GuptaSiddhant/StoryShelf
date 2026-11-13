@@ -12,7 +12,7 @@ For a visual overview, see [`architecture-diagrams.md`](./architecture-diagrams.
 ## Bundler rule: tsdown for libs, rolldown for apps
 
 - **Publishable packages** (`packages/*`): `tsdown` via `config/tsdown.ts` (`libConfig` for libraries, `cliConfig` for the CLI binary). Entry points derive from each `package.json` `exports` map.
-- **Deployables** (`apps/fly-app`): `rolldown` (`rolldown.config.ts` bundles `server.ts` → `dist/server.mjs`).
+- **Deployables** (`apps/fly-app`, `apps/server-image`): `rolldown` (`rolldown.config.ts` bundles `server.ts` → `dist/server.mjs`).
 - **No-build dev**: `apps/dev-server` runs TS source directly (`nub run serve`, `nub watch`).
 - **Launcher ownership**: `apps/dev-server` and `apps/fly-app` each own their adapter
   wiring so deployments can diverge (locals vs Turso/S3). Shared code goes in
