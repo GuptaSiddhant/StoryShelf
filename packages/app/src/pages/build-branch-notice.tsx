@@ -19,7 +19,11 @@ export function DefaultBranchNotice(
 ): HtmlEscapedString | Promise<HtmlEscapedString> | null {
   const { build, project } = props;
   const branch = project.gitDefaultBranch;
-  switch (build.branchVerified) {
+  const verification = build.branchVerified;
+  if (verification === null || verification === undefined || verification === "verified") {
+    return null;
+  }
+  switch (verification) {
     case "refused": {
       return (
         <ClaimNotRecognised {...props} title={`Commit is not on ${branch}`}>
@@ -36,7 +40,7 @@ export function DefaultBranchNotice(
         </ClaimNotRecognised>
       );
     }
-    case "unverified": {
+    default: {
       return build.isDefault ? (
         <Alert tone="info" title="Default branch not verified">
           No git channel can confirm this commit is on {branch}, and the project counts such builds
@@ -49,9 +53,6 @@ export function DefaultBranchNotice(
           project's Tests settings.
         </ClaimNotRecognised>
       );
-    }
-    default: {
-      return null;
     }
   }
 }

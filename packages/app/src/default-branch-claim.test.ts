@@ -43,7 +43,7 @@ function runner(): CaptureRunner {
   };
 }
 
-function zip(): Uint8Array {
+function zip(): Uint8Array<ArrayBuffer> {
   const archive = new AdmZip();
   archive.addFile(
     "index.json",
@@ -124,7 +124,7 @@ function lastTesting(git: ReturnType<typeof makeFakeStateNotifier>) {
     (call) => call.target.kind === "status" && call.target.context === "storyshelf/testing",
   );
   const last = testing.at(-1);
-  return last && last.target.kind === "status"
+  return last?.target.kind === "status"
     ? { state: last.state, description: last.target.description }
     : undefined;
 }
