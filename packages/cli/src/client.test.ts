@@ -53,6 +53,40 @@ describe("postFormWithProgress", () => {
   });
 });
 
+describe("skip calls", () => {
+  it("asks for the skip source with the branch and sha in the query", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ sourceBuildId: "b1", sha: "abc" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const source = await createClient("https://shelf.test", "tok").projects.builds.skipSource(
+      "demo",
+      "feat/a b",
+      "def",
+    );
+    expect(source).toEqual({ sourceBuildId: "b1", sha: "abc" });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://shelf.test/api/v1/projects/demo/builds/skip-source?branch=feat%2Fa+b&sha=def",
+    );
+  });
+
+  it("posts a skipped build as JSON, and a refusal is a RequestError", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ build: { id: "b2" }, buildUrl: "/builds/b2" }))
+      .mockResolvedValueOnce(new Response("no", { status: 409 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { builds } = createClient("https://shelf.test", "tok").projects;
+    const input = { gitSha: "s", gitBranch: "main", sourceBuildId: "b1", changedFiles: ["a"] };
+    await expect(builds.createSkipped("demo", input)).resolves.toMatchObject({
+      build: { id: "b2" },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://shelf.test/api/v1/projects/demo/builds/skipped",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(input) }),
+    );
+    await expect(builds.createSkipped("demo", input)).rejects.toMatchObject({ status: 409 });
+  });
+});
+
 describe("file-by-file upload calls", () => {
   it("posts hashes to /dedup and returns the needed ones", async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ needed: ["b"] }));

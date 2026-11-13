@@ -303,6 +303,31 @@
           }
         }
       },
+      "SkipSource": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "sourceBuildId": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          }
+        },
+        "required": ["sourceBuildId", "sha"]
+      },
+      "SkippedBuildCreated": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "$ref": "#/components/schemas/Build"
+          },
+          "buildUrl": {
+            "type": "string"
+          }
+        },
+        "required": ["build", "buildUrl"]
+      },
       "Build": {
         "type": "object",
         "properties": {
@@ -384,6 +409,10 @@
             "type": "string",
             "nullable": true
           },
+          "skippedFromBuildId": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
@@ -414,6 +443,45 @@
           "createdAt",
           "updatedAt"
         ]
+      },
+      "SkippedBuildCreate": {
+        "type": "object",
+        "properties": {
+          "gitSha": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gitBranch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sourceBuildId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "changedFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20000
+          },
+          "message": {
+            "type": "string"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": ["gitSha", "gitBranch", "sourceBuildId", "changedFiles"]
       },
       "BuildCreated": {
         "type": "object",
@@ -1844,6 +1912,143 @@
           }
         },
         "x-storyshelf-class": "hosting"
+      }
+    },
+    "/api/v1/projects/{slug}/builds/skip-source": {
+      "get": {
+        "tags": ["Builds"],
+        "summary": "Find the build a commit may skip from",
+        "description": "A hint for `--skip-unchanged`: the real build the newest build on `branch` (other than commit `sha`) repeats, or null. Only an `approved` build qualifies, or a skipped build whose source is still `approved`; a newer build that is open, rejected, failed or cancelled answers null. `testing` class; 404 unless the instance enables skipped builds. Creation re-checks, so this is never a promise.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "branch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "sha",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The source build and its commit, or null when the commit must upload normally",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkipSource"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
+      }
+    },
+    "/api/v1/projects/{slug}/builds/skipped": {
+      "post": {
+        "tags": ["Builds"],
+        "summary": "Create a skipped build",
+        "description": "Records a commit that changed no story as a `skipped` build repeating the outcome of `sourceBuildId`: no upload, capture or snapshots. Eligibility is checked again in the same transaction as the insert: `409` when the source is no longer the newest approved build of the branch (or a skipped one's approved source), is on another branch, or the project runs Storybook tests. It raises `build:skipped` and asks for the build's state on its git channels. `testing` class; 404 unless the instance enables skipped builds.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkippedBuildCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The skipped build and the URL of its page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkippedBuildCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The source is not eligible: upload the Storybook normally",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
       }
     },
     "/api/v1/projects/{slug}/builds": {

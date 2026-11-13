@@ -569,6 +569,14 @@ export interface ShelfOptions {
    */
   testing?: ShelfTestingOptions;
   /**
+   * Accept skipped builds (ADR 0044): `GET …/builds/skip-source` and `POST …/builds/skipped`. Off by
+   * default, and then both answer 404 as if they did not exist, so a release can ship the readers of
+   * the `skipped` status before any server writes it (ADR 0053, decision 5). The release after the
+   * readers turns the default on and removes the option. Needs `testing`; without it the routes
+   * answer 404 either way.
+   */
+  skippedBuilds?: boolean;
+  /**
    * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`,
    * and to the read-grant route, `/_r/<token>/*`, which share one bucket (ADR 0007, decision 5;
    * ADR 0051, decision 10). Default 6000, enough for a render fetching thousands of assets from one

@@ -143,6 +143,18 @@ export async function buildForProject(projectId: string, buildId: string): Promi
   return build;
 }
 
+/**
+ * A skipped build repeats its source's outcome and nothing moves it (ADR 0044, decision 7): a
+ * verdict, retry, cancel, re-diff or promotion answers 409 so the caller learns to act on the source.
+ */
+export function assertNotSkipped(build: { status: BuildStatus }, action: string): void {
+  if (build.status === "skipped") {
+    throw new HTTPException(409, {
+      message: `A skipped build cannot be ${action}; act on the build it repeats`,
+    });
+  }
+}
+
 /** Fetch a snapshot scoped to its build, throwing 404 when it does not belong. */
 export async function snapshotForBuild(
   build: { id: string },
@@ -225,6 +237,7 @@ export async function approveSnapshot(
   if (!project || !build) {
     notFound("Project or build not found");
   }
+  assertNotSkipped(build, "reviewed");
   if (build.status === "cancelled") {
     throw new HTTPException(409, { message: "The build was cancelled; retry it to review it" });
   }

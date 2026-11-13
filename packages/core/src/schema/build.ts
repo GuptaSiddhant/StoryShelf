@@ -52,6 +52,7 @@ export interface Build {
    * build. Never another skipped build: creation resolves a chain to its source.
    */
   skippedFromBuildId?: string | null;
+  /**
    * Hash of the manifest the file-by-file upload accepted (write-once publish, ADR 0051). Null
    * until a manifest claims it, and again after a failed publish releases it.
    */
