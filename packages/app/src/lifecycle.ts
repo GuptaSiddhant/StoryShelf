@@ -18,6 +18,7 @@ import { purgeAiData } from "@storyshelf/core/retention";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { ShelfRouter, ShelfLifecycle } from "./app-types.ts";
 import { settleInsightJobs } from "./insights/job.ts";
+import { packageVersion } from "./package-version.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
@@ -159,7 +160,11 @@ export function attachLifecycle(
   runtime: ServerRuntime,
   cell: LifecycleCell,
 ): void {
-  const setupCtx: AdapterSetupContext = { config: runtime.config, logger: runtime.logger };
+  const setupCtx: AdapterSetupContext = {
+    config: runtime.config,
+    logger: runtime.logger,
+    release: packageVersion(),
+  };
   bindAdapterLoggers(options, runtime.logger);
   options.ai?.setLogger?.(runtime.logger.child({ component: "ai" }));
   logAuthMode(options, runtime.logger);

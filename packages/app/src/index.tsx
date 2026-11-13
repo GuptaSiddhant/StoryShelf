@@ -52,6 +52,7 @@ import {
 } from "./middleware/index.ts";
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
+import { packageVersion } from "./package-version.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerPublicOriginRoutes } from "./routers/admin-public-origin.ts";
 import { registerAdmin } from "./routers/admin.ts";
@@ -507,17 +508,6 @@ function registerDocs(app: ShelfRouter): void {
     ),
   );
   app.get("/api/v1/docs", swaggerUI({ url: "/api/v1/openapi.json" }));
-}
-
-declare const __PKG_VERSION__: string | undefined;
-
-/**
- * Package version injected at build via the `__PKG_VERSION__` define. Read as a bare identifier:
- * bundler defines replace identifiers, not `globalThis` property reads. Undefined when running
- * from source (dev server, tests).
- */
-function packageVersion(): string {
-  return typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0";
 }
 
 /**
