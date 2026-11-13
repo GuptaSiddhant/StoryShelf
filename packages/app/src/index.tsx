@@ -34,6 +34,7 @@ import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import { createClientIpResolver } from "./middleware/client-ip.ts";
+import { compression } from "./middleware/compression.ts";
 import {
   authGate,
   notFoundPage,
@@ -201,6 +202,8 @@ const CSRF_PATHS = [
 function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   const { config, logger, getReady } = wiring;
   app.use("*", requestId());
+  // Gzip HTML pages and JSON answers (#868); runs last on the way out, after every header is set.
+  app.use("*", compression());
   // OTEL server spans (W3C extraction, route-template naming). Mounted right
   // after requestId so `storyshelf.req_id` resolves; `enduser.id` resolves
   // once storeScope runs downstream. Noop without an SDK.
