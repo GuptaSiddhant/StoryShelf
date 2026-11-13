@@ -149,6 +149,9 @@ describe("a failure reading the offered capture targets", () => {
     const { logged, json, createProject } = boot();
     const slug = await createProject("Targets");
     vi.spyOn(SiteSettingsModel.prototype, "get").mockRejectedValue(new Error(INTERNAL));
+    // Creating the project already read the public origin; step past its read cache so the next read hits the failing model.
+    const later = Date.now() + 60_000;
+    vi.spyOn(Date, "now").mockReturnValue(later);
 
     const response = await json("PATCH", `/projects/${slug}`, { browser: "chromium" });
     const body = await response.text();
