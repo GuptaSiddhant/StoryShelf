@@ -35,8 +35,15 @@ export const SESSION_COOKIE = "storyshelf_session";
 export const SECURE_SESSION_COOKIE = `__Secure-${SESSION_COOKIE}`;
 
 /**
+ * The session cookie's name in `subdomain` hosting (ADR 0051, decision 9): the `__Host-` prefix forces
+ * `Secure`, `Path=/` and no `Domain`, so a content host (a subdomain of the portal host) cannot set or
+ * overwrite it with `Domain=`.
+ */
+export const HOST_SESSION_COOKIE = `__Host-${SESSION_COOKIE}`;
+
+/**
  * The session cookie's value from a `Cookie` header, or `undefined` when there is none (or it is
- * empty). The `__Secure-` name wins over the plain one; the one place that types either name.
+ * empty). The `__Host-` name wins over the `__Secure-` one, which wins over the plain one; the one place that types either name.
  */
 export function readSessionCookie(cookieHeader: string | null | undefined): string | undefined {
   const values = new Map<string, string>();
@@ -49,7 +56,11 @@ export function readSessionCookie(cookieHeader: string | null | undefined): stri
       values.set(name, value);
     }
   }
-  return values.get(SECURE_SESSION_COOKIE) ?? values.get(SESSION_COOKIE);
+  return (
+    values.get(HOST_SESSION_COOKIE) ??
+    values.get(SECURE_SESSION_COOKIE) ??
+    values.get(SESSION_COOKIE)
+  );
 }
 
 /** An authenticated user of the platform. */

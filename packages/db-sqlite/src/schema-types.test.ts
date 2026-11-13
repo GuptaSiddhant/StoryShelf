@@ -116,7 +116,8 @@ const DDL_TABLES = [
 
 const DDL_INDEXES = [
   "builds_project_gitsha_idx",
-  "builds_git_branch_idx",
+  "builds_project_created_idx",
+  "builds_project_branch_created_idx",
   "capture_attempts_build_no_idx",
   "capture_attempts_build_id_idx",
   "capture_logs_attempt_seq_idx",
