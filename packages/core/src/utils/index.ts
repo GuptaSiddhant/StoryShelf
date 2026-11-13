@@ -58,6 +58,7 @@ export {
   screenshotPath,
   storybookDir,
   storybookZipPath,
+  publishedBrotliPath,
   publishedGzipPath,
 } from "./paths.ts";
 export {
