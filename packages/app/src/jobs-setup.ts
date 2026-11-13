@@ -29,7 +29,6 @@ import { announceReviewWith, REVIEW_EVENTS, reviewRequestedData } from "./review
 import { setupReviewRequests, type ReviewRequestWiring } from "./review-request-job.ts";
 import type { ServerRuntime } from "./runtime.ts";
 import { isServerlessHost } from "./serverless.ts";
-import { setupStaticsReclaim, type StaticsReclaimWiring } from "./statics-reclaim-job.ts";
 
 /** What the rest of the app takes from the job wiring. */
 export interface JobsWiring {
@@ -39,8 +38,6 @@ export interface JobsWiring {
   /** Whether this instance runs the capture jobs (the retry and compute-jobs UI applies). */
   capturesHere: boolean;
   publish: PublishService;
-  /** Queues the sweep of per-build Storybook copies; undefined on a host that polls no queue. */
-  reclaimCopies: StaticsReclaimWiring["enqueue"];
   /** Asks for a build's current state to be shown on its git channels (ADR 0014). */
   buildState: BuildStatePublisher;
   /** Cancels every unfinished job of a build, of any kind (capture, publish, notify). */
@@ -80,17 +77,12 @@ export function setupJobs(
       reviewRequested: reviewRequestedFor(options, runtime, reviewRequests.enqueue),
     },
   );
-  const reclaim = setupStaticsReclaim(
-    { db: options.database, storage: options.storage, logger: runtime.logger },
-    jobs,
-  );
-  const wiring = { capture, publishing, reclaim, buildState, reviewRequests, notifyJobs };
+  const wiring = { capture, publishing, buildState, reviewRequests, notifyJobs };
   return {
     captureQueue: capture.queue,
     enqueueCapture: capture.enqueueCapture,
     capturesHere: capture.handler !== null,
     publish: publishing,
-    reclaimCopies: reclaim.enqueue,
     buildState: buildState.publisher,
     cancelBuildJobs: createJobCanceller([jobs.view]),
     consumer: combineConsumers(consumersOf(options, runtime, jobs, wiring)),
@@ -110,7 +102,7 @@ function queuesFor(
   const databaseCaptures = testing?.runner !== undefined;
   const kinds: CaptureJobKind[] = [
     ...(databaseCaptures ? (["capture"] as const) : []),
-    ...(serverless ? [] : (["publish", "statics-reclaim"] as const)),
+    ...(serverless ? [] : (["publish"] as const)),
   ];
   return {
     jobs: createJobQueue(options, kinds, testing?.retries ?? DEFAULT_RETRIES),
@@ -128,16 +120,15 @@ function consumersOf(
   wiring: {
     capture: CaptureWiring;
     publishing: Pick<PublishWiring, "handler">;
-    reclaim: Pick<StaticsReclaimWiring, "handler">;
     buildState: Pick<BuildStateWiring, "handler">;
     reviewRequests: Pick<ReviewRequestWiring, "handler">;
     notifyJobs: JobQueue | null;
   },
 ): CaptureConsumer[] {
-  const { capture, publishing, reclaim, buildState, reviewRequests, notifyJobs } = wiring;
+  const { capture, publishing, buildState, reviewRequests, notifyJobs } = wiring;
   return [
     ...(jobs.kinds.length > 0
-      ? [databaseConsumer(options, runtime, jobs, { capture, publishing, reclaim })]
+      ? [databaseConsumer(options, runtime, jobs, { capture, publishing })]
       : []),
     ...(buildState.handler !== null && notifyJobs !== null
       ? [
@@ -158,10 +149,9 @@ function databaseConsumer(
   wiring: {
     capture: CaptureWiring;
     publishing: Pick<PublishWiring, "handler">;
-    reclaim: Pick<StaticsReclaimWiring, "handler">;
   },
 ): CaptureConsumer {
-  const { capture, publishing, reclaim } = wiring;
+  const { capture, publishing } = wiring;
   const capturesHere = jobs.kinds.includes("capture");
   return lazyConsumer(
     () => ({
@@ -169,7 +159,6 @@ function databaseConsumer(
       handlers: {
         ...(capturesHere && capture.handler ? { capture: capture.handler } : {}),
         ...(publishing.handler ? { publish: publishing.handler } : {}),
-        ...(reclaim.handler ? { "statics-reclaim": reclaim.handler } : {}),
       },
       // Publishing alone is one job at a time, so a big zip never crowds out the web server.
       config: {

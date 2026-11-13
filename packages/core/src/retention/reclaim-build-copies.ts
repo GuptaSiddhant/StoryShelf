@@ -232,8 +232,3 @@ async function blobsPresent(
   }));
   return new Set(found.filter((entry) => entry.ok).map((entry) => entry.hash));
 }
-
-/** Whether an earlier run visited every build, so a caller can skip queueing another. */
-export async function reclaimCopiesDone(db: DatabaseAdapter): Promise<boolean> {
-  return parseProgress(await new SiteSettingsModel(db).get(RECLAIM_COPIES_KEY)).done === true;
-}

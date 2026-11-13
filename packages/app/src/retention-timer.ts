@@ -5,11 +5,19 @@ import type { ShelfConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 /* oxlint-disable typescript/promise-function-async -- interval helpers return promise factories */
 import { ProjectModel } from "@storyshelf/core/models";
-import { Retention, purgeAiData, type AiRetention } from "@storyshelf/core/retention";
+import {
+  Retention,
+  purgeAiData,
+  reclaimBuildCopies,
+  type AiRetention,
+} from "@storyshelf/core/retention";
 
 const DEFAULT_BRANCH_TTL_DAYS = 30;
 const DEFAULT_EXPIRED_AUTH_TTL_DAYS = 7;
 const DEFAULT_BRANCH_GC_INTERVAL_MS = 86_400_000;
+
+/** Pages of 50 builds the per-build copy reclaim visits in one sweep; the next sweep resumes from its cursor. */
+const RECLAIM_PAGES_PER_SWEEP = 20;
 
 /** Handle for the background branch-GC interval; call `stop()` on server shutdown. */
 export interface BranchGcTimer {
@@ -34,10 +42,10 @@ interface SweepContext {
   auth: Auth | undefined;
   /** Resolves with the adapter setup result; a sweep waits for it and runs only when it succeeded. */
   ready: () => Promise<{ ok: boolean }>;
-  /** Queues the per-build copy sweep; the job does the work. */
-  reclaimCopies: () => Promise<void>;
   /** Set by `stop()`: a sweep that was waiting for setup must not start after shutdown began. */
   stopped: boolean;
+  /** Aborted by `stop()`: a running batched stage stops between builds. */
+  signal: AbortSignal;
   warned: boolean;
 }
 
@@ -56,7 +64,6 @@ interface SweepContext {
  * @param logger - Structured logger for sweep diagnostics
  * @param testing - Whether the deployment has testing enabled
  * @param ready - Adapter setup result; every sweep waits for it and is skipped if setup failed
- * @param reclaimCopies - Queues the `statics-reclaim` job (a no-op once finished or on a host with no queue)
  * @returns Timer handle with `stop()`, or `null` if nothing is scheduled
  */
 export function startBranchGcTimer(
@@ -67,9 +74,6 @@ export function startBranchGcTimer(
   testing = false,
   ready: () => Promise<{ ok: boolean }> = async () => await Promise.resolve({ ok: true }),
   auth?: Auth,
-  reclaimCopies: () => Promise<void> = async () => {
-    await Promise.resolve();
-  },
 ): BranchGcTimer | null {
   const branchTtlDays =
     config.branchTtlDays === undefined ? DEFAULT_BRANCH_TTL_DAYS : config.branchTtlDays;
@@ -78,6 +82,7 @@ export function startBranchGcTimer(
   if (intervalMs <= 0) {
     return null;
   }
+  const stop = new AbortController();
   const context: SweepContext = {
     db,
     storage,
@@ -92,12 +97,13 @@ export function startBranchGcTimer(
         : config.expiredAuthTtlDays,
     auth,
     ready,
-    reclaimCopies,
     stopped: false,
+    signal: stop.signal,
     warned: false,
   };
   return scheduleBranchGc(createSweepRunner(context), intervalMs, () => {
     context.stopped = true;
+    stop.abort();
   });
 }
 
@@ -131,13 +137,29 @@ async function sweep(context: SweepContext): Promise<void> {
       await sweepBuilds(context, purgeTtlDays);
     });
   }
-  await stage(context, "build copy reclaim", context.reclaimCopies);
+  await stage(context, "build copy reclaim", async () => {
+    await sweepBuildCopies(context);
+  });
   await stage(context, "AI data cleanup", async () => {
     await purgeAiData(db, new Date(), context.logger, context.retention);
   });
   await stage(context, "expired auth rows", async () => {
     await sweepExpiredAuth(context);
   });
+}
+
+/**
+ * Reclaim the per-build Storybook copies kept before published files were stored once (#850): a
+ * bounded number of pages per sweep, resumed from a saved cursor, idempotent, never at boot. It is
+ * not a job kind, so it adds no new queue row type (ADR 0053).
+ */
+async function sweepBuildCopies(context: SweepContext): Promise<void> {
+  const { db, storage, logger, signal } = context;
+  for (let page = 0; page < RECLAIM_PAGES_PER_SWEEP && !signal.aborted; page += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- one page at a time; the cursor is saved per build
+    const result = await reclaimBuildCopies({ db, storage, logger, signal });
+    if (result.done) return;
+  }
 }
 
 /** Delete session and verification rows that expired `expiredAuthTtlDays` ago (batched by the auth engine). */

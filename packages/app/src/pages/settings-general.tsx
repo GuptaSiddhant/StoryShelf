@@ -204,6 +204,7 @@ function DangerZoneCard(props: { project: Project }): Rendered {
         hx-target="body"
         hx-confirm="Delete this project? This cannot be undone."
       >
+        {csrfField()}
         <Button variant="danger" type="submit">
           Delete project
         </Button>

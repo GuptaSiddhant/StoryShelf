@@ -35,8 +35,6 @@ export interface LifecycleCell {
   consumerRun?: Promise<void>;
   /** Teardown ran: the consumer stays stopped (a late "adapters are ready" must not restart it). */
   consumerStopped?: boolean;
-  /** Queues the sweep of per-build Storybook copies; set once the queues are wired. */
-  reclaimCopies?: (() => Promise<void>) | undefined;
 }
 
 /** Longest teardown waits for background boot tasks before closing adapters anyway. */
@@ -185,7 +183,6 @@ function startBranchGcInterval(
     Boolean(options.testing),
     async () => await cell.ready,
     options.auth,
-    async () => await cell.reclaimCopies?.(),
   );
 }
 

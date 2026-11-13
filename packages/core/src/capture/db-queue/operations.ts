@@ -34,12 +34,8 @@ export async function enqueueJob(rt: QueueRuntime, job: QueueJobInput): Promise<
   return id;
 }
 
-/** Kinds of many short delivery jobs, and the build-less reclaim job, which the queue's views leave out. */
-const DELIVERY_KINDS: ReadonlySet<CaptureJobKind> = new Set([
-  "notify",
-  "review-request",
-  "statics-reclaim",
-]);
+/** Kinds of many short delivery jobs, which the queue's views leave out. */
+const DELIVERY_KINDS: ReadonlySet<CaptureJobKind> = new Set(["notify", "review-request"]);
 
 /**
  * The kinds the queue's views (`status`, `active`, `recent`, `cancel`) show: every polled kind but

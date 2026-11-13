@@ -20,15 +20,9 @@ export type CaptureJobEntry = "job" | "attempt";
 
 /**
  * What a job does: render a build or shard, publish a zip, deliver a build state (`notify`) or
- * deliver one review request to one recipient (`review-request`) or reclaim per-build Storybook
- * copies (`statics-reclaim`, ADR 0040).
+ * deliver one review request to one recipient (`review-request`, ADR 0040).
  */
-export type CaptureJobKind =
-  | "capture"
-  | "publish"
-  | "notify"
-  | "review-request"
-  | "statics-reclaim";
+export type CaptureJobKind = "capture" | "publish" | "notify" | "review-request";
 
 /** Lifecycle of a job row. */
 export type CaptureJobStatus =
