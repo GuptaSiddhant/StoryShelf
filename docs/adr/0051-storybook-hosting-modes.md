@@ -227,16 +227,16 @@ Credentials and CORS:
 
 Headers, with the target values:
 
-| Route family                                      | `Cache-Control`                                                                  | Sandbox CSP      | Other                                                     |
-| ------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------- |
-| Project path and short link, public               | `public, max-age=31536000, immutable` (slug: `max-age=60` / `3600`)              | `sandboxed` only | `Referrer-Policy` none                                    |
-| Project path and short link, session, `trusted`   | `private, no-cache`, ETag (#924 interim: `private, max-age=31536000, immutable`) | None             | None                                                      |
-| Project path and short link, session, `sandboxed` | None: a `302` to `/_r/`, `private, no-store`, `no-referrer`                      | None             | As the redirect                                           |
-| `/_s/<token>/*`                                   | `private, no-store`, or the capture cache rule                                   | Not set          | `no-referrer`, `noindex`                                  |
+| Route family                                      | `Cache-Control`                                                                  | Sandbox CSP      | Other                                                              |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------ |
+| Project path and short link, public               | `public, max-age=31536000, immutable` (slug: `max-age=60` / `3600`)              | `sandboxed` only | `Referrer-Policy` none                                             |
+| Project path and short link, session, `trusted`   | `private, no-cache`, ETag (#924 interim: `private, max-age=31536000, immutable`) | None             | None                                                               |
+| Project path and short link, session, `sandboxed` | None: a `302` to `/_r/`, `private, no-store`, `no-referrer`                      | None             | As the redirect                                                    |
+| `/_s/<token>/*`                                   | `private, no-store`, or the capture cache rule                                   | Not set          | `no-referrer`, `noindex`                                           |
 | `/_r/<token>/*`                                   | `private, no-store`                                                              | Always           | `no-referrer`, `noindex`, No CORP (see amendment 2026-11-11, CORP) |
-| Exchange and portal redirect                      | `private, no-store` on the `302`                                                 | None             | `no-referrer`, navigations only                           |
-| Content host, public                              | `public, max-age=31536000, immutable`                                            | None             | None                                                      |
-| Content host, private                             | `private, no-cache`, ETag                                                        | None             | CORP `same-origin`                                        |
+| Exchange and portal redirect                      | `private, no-store` on the `302`                                                 | None             | `no-referrer`, navigations only                                    |
+| Content host, public                              | `public, max-age=31536000, immutable`                                            | None             | None                                                               |
+| Content host, private                             | `private, no-cache`, ETag                                                        | None             | CORP `same-origin`                                                 |
 
 Every route family that serves a build passes through `publishedAccess`, and CORS comes only from
 `publishedCorsHeaders`. A request whose `Host` is neither the portal, a content host nor an alias host
