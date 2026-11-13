@@ -10,6 +10,8 @@ The server is one container. Capture runs **in-process** with the image's own Ch
 
 The image is built from `apps/fly-app/Dockerfile`, a rolldown bundle of `apps/fly-app/server.ts` started with `node dist/server.mjs`. The build context must be the repository root. The official image (#887) and the cloud modules (ADR 0050) are coming; until then, build from this Dockerfile.
 
+The public website and the Fly demo follow stable releases only (ADR 0043): `release.yml` calls `website.yml` (built from the release tag) and `fly.yml` (the official image of that version when it exists, else a build from the tag) after the tag is created, and a push to `main` deploys neither. Both can be run by hand with `workflow_dispatch`; website PRs are still built and link-checked in `ci.yml`.
+
 ```sh
 docker build -f apps/fly-app/Dockerfile -t storyshelf .
 docker run -p 3000:3000 \
