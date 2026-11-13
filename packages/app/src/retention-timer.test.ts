@@ -1,3 +1,4 @@
+import type { Auth } from "@storyshelf/core/auth";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { Retention } from "@storyshelf/core/retention";
@@ -253,13 +254,45 @@ describe("background retention", () => {
       timer?.stop();
     });
 
-    it("schedules nothing when both are off", async () => {
+    it("schedules nothing when the interval is not positive", async () => {
       const { db } = makeDatabase();
       const { storage } = makeStorage();
       const logger = createShelfLogger({ level: "silent" });
       expect(
-        startBranchGcTimer(db, storage, { branchTtlDays: null } as ShelfConfig, logger),
+        startBranchGcTimer(db, storage, { branchGcIntervalMs: 0 } as ShelfConfig, logger),
       ).toBeNull();
+    });
+
+    it("sweeps expired auth rows with the configured window", async () => {
+      vi.useFakeTimers();
+      const { db } = makeDatabase();
+      const { storage } = makeStorage();
+      const logger = createShelfLogger({ level: "silent" });
+      const purgeExpired = vi.fn().mockResolvedValue({ sessions: 1, verifications: 2 });
+      const auth = { purgeExpired } as unknown as Auth;
+      const config = { branchTtlDays: null, expiredAuthTtlDays: 3 } as ShelfConfig;
+      const timer = startBranchGcTimer(db, storage, config, logger, false, undefined, auth);
+      await vi.advanceTimersByTimeAsync(3_600_001);
+      timer?.stop();
+      vi.useRealTimers();
+      expect(purgeExpired).toHaveBeenCalledOnce();
+      const cutoff = Date.parse(purgeExpired.mock.calls[0]?.[0] as string);
+      expect(Date.now() - cutoff).toBeGreaterThan(3 * 86_400_000 - 10_000);
+    });
+
+    it("keeps expired auth rows when the window is null", async () => {
+      vi.useFakeTimers();
+      const { db } = makeDatabase();
+      const { storage } = makeStorage();
+      const logger = createShelfLogger({ level: "silent" });
+      const purgeExpired = vi.fn();
+      const auth = { purgeExpired } as unknown as Auth;
+      const config = { branchTtlDays: null, expiredAuthTtlDays: null } as ShelfConfig;
+      const timer = startBranchGcTimer(db, storage, config, logger, false, undefined, auth);
+      await vi.advanceTimersByTimeAsync(3_600_001);
+      timer?.stop();
+      vi.useRealTimers();
+      expect(purgeExpired).not.toHaveBeenCalled();
     });
   });
 });

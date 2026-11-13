@@ -88,6 +88,11 @@ export interface Auth {
   createSession: (user: AuthUser) => Promise<string>;
   /** Revoke one session by token (accepts the signed cookie value). */
   destroySession: (sessionToken: string) => Promise<void>;
+  /**
+   * Delete expired `session` and `verification` rows whose `expires_at` is before `cutoffIso`, in
+   * bounded batches. Better Auth never sweeps them itself, so the retention timer calls this.
+   */
+  purgeExpired?: (cutoffIso: string) => Promise<{ sessions: number; verifications: number }>;
 }
 
 /** Minimum password length for local accounts (matches legacy policy). */
