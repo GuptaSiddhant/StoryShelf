@@ -151,6 +151,9 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   session cookie is `__Host-storyshelf_session` (`createShelfAuth({ hostSessionCookie: true })`; boot
   refuses sign-in without it); `readSessionCookie` is the one reader of every name. A content host sets
   only `__Host-storyshelf-grant` and never sees a portal credential. Do not add CORS to portal routes.
+  Every page (form) write outside `/api/` also needs a CSRF token: add its path to `CSRF_PATHS` and
+  `csrfField()` to its form (`packages/app/src/routes/write-protection.ts`; `write-protection.test.ts`
+  fails otherwise). An `Authorization` header means the session cookie is ignored, never trusted.
 - **Review.** `projects.review_enabled` (default true) and `review_approvals` (default 1) are the only
   switches; there is no `ShelfOptions` field. Verdicts live in `build_reviews` (`BuildReviewModel`;
   newest row counts) and are attributed by `resolveReviewer` (session user or bearer-token owner;

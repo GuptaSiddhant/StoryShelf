@@ -186,7 +186,7 @@ then removed. The two-level link shape is dropped. Setting it together with `sto
   embed of B's private files.
 - **CSRF contract.** Every state-changing request that carries a session cookie is refused unless `Origin`
   equals the portal origin, or `Sec-Fetch-Site` is `same-origin` or `none`. This covers `/api/v1`, because
-  `CSRF_PATHS` in `index.tsx` covers page routes only. Verifying it is part of #359 (#786).
+  `CSRF_PATHS` (`routes/write-protection.ts`) covers page routes only. Verified in #786 (amendment below).
 
 ### 10. Caching and rate limits
 
@@ -285,3 +285,15 @@ answers 404.
 - The #357 browser test that asserts a `/_r/` image loads is the guard for this rule.
 - Confirmed in #357: the preview-token refresh route is class `hosting`, and the option is named
   `storybookUrlRateLimit`, with `testing.storybookUrlRateLimit` as an alias.
+
+## Amendment, 2026-11-13 (CSRF audit, #786)
+
+- Every write is protected by the decision 9 rule (`sameSiteWrites`); every page (form) write outside
+  `/api/` also needs a CSRF token (`CSRF_PATHS` in `packages/app/src/routes/write-protection.ts`).
+  `/api/v1` relies on the rule alone, not on its `Content-Type` (uploads take zip and multipart bodies).
+- The audit found four page writes without a token: `POST /projects/new`, `POST /projects/:slug/delete`
+  and the comment box's `mention-suggest` / `mention-complete`. They now need one; the app's own forms
+  send it. `POST /auth/engine/login` alone stays origin-only (`ORIGIN_ONLY_WRITES`): no session exists yet.
+- A request with an `Authorization` header is never cookie-authenticated; the rule still judges its cookie.
+- `routes/write-protection.test.ts` fails on a page write with neither a token nor an origin-only entry,
+  and on any cookie-carrying write a cross-site or same-site sibling origin can make.
