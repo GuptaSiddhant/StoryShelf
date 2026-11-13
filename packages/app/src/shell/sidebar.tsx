@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { createUrlBuilder, safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
 import { getStore } from "../store.ts";
@@ -255,7 +256,7 @@ export const Sidebar: FC<{ nav?: NavConfig; name: string; logo?: string }> = ({
   logo,
 }) => {
   const { user, authEnabled, config, testing } = getStore();
-  const urls = createUrlBuilder("/", config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(config));
   const showAdmin = !authEnabled || user?.role === "admin";
   const projects: NavItem = {
     key: "projects",

@@ -25,6 +25,44 @@ import {
 } from "./builds.handlers.ts";
 import { discardZip, planUpload, publishUpload } from "./publish-upload.ts";
 
+/** SHA-256 of the manifest with its paths sorted, so the same files hash the same in any order. */
+function manifestHash(manifest: Record<string, string>): string {
+  const sorted = Object.entries(manifest).toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return createHash("sha256").update(JSON.stringify(sorted)).digest("hex");
+}
+
+/**
+ * Write-once publish: the first manifest of a build claims it and publishes; the same one again
+ * resolves false (nothing to do) and another is a 409. A publish that fails gives the claim back.
+ */
+async function publishManifest(
+  projectId: string,
+  buildId: string,
+  files: { rel: string; hash: string; size: number }[],
+  manifest: Record<string, string>,
+): Promise<boolean> {
+  const builds = new BuildModel(getStore().db);
+  const sha256 = manifestHash(manifest);
+  const claim = await builds.claimManifest(buildId, sha256);
+  if (claim === "duplicate") return false;
+  if (claim === "conflict") {
+    throw new HTTPException(409, { message: "This build already accepted a different manifest" });
+  }
+  try {
+    await recordUses(projectId, buildId, files);
+    await getStore().storage.write(
+      `${projectId}/builds/${buildId}/storybook/manifest.json`,
+      Buffer.from(JSON.stringify(manifest)),
+    );
+    // The files are stored content-addressed: nothing to extract, so publishing is complete.
+    await getStore().publish?.completer.complete(buildId, { ok: true });
+  } catch (error) {
+    await builds.releaseManifest(buildId, sha256);
+    throw error;
+  }
+  return true;
+}
+
 /** Decide how the stored zip is published; a zip this host cannot publish is removed and refused. */
 async function planOrDiscard(
   zipBytes: number,
@@ -200,16 +238,9 @@ export function registerBuilds(app: ShelfRouter): void {
     for (const f of files) {
       manifest[f.rel] = f.hash;
     }
-    await recordUses(project.id, build.id, files);
-    await getStore().storage.write(
-      `${project.id}/builds/${build.id}/storybook/manifest.json`,
-      Buffer.from(JSON.stringify(manifest)),
-    );
-    // The files are stored content-addressed: nothing to extract, so publishing is complete.
-    await getStore().publish?.completer.complete(build.id, { ok: true });
-    const reqId = c.get("requestId");
-    await getStore().enqueueCapture?.(build.id, reqId);
-    return c.json({ ok: true });
+    const published = await publishManifest(project.id, build.id, files, manifest);
+    if (published) await getStore().enqueueCapture?.(build.id, c.get("requestId"));
+    return c.json({ ok: true }, 200);
   });
 
   app.openapi(getBuildRoute, async (c) => {
@@ -443,7 +474,11 @@ const manifestRoute = createRoute({
   responses: {
     200: {
       content: { "application/json": { schema: z.object({ ok: z.boolean() }) } },
-      description: "Manifest stored",
+      description: "Manifest stored, or the same manifest was already accepted (no-op)",
+    },
+    409: {
+      content: { "application/json": { schema: errorSchema } },
+      description: "The build already accepted a different manifest",
     },
     ...notFoundResponse,
   },
