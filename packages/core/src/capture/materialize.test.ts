@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import { COMPLETE_MARKER, materializeStorybook, prepareStorybook } from "./materialize.ts";
+import {
+  COMPLETE_MARKER,
+  MissingContentError,
+  materializeStorybook,
+  prepareStorybook,
+} from "./materialize.ts";
 import { ZipInvalidError } from "./publish/invalid-zip.ts";
 import { ZipLimitError } from "./publish/limits.ts";
 import { buildScratchDir, removeJobScratch, removeShardScratch } from "./scratch.ts";
@@ -134,6 +139,27 @@ describe("materializeStorybook", () => {
         limits: { maxEntries: 10, maxBytes: 5 },
       }),
     ).rejects.toThrow(ZipLimitError);
+  });
+
+  it("fails with the missing content hash, never falling back to the zip", async () => {
+    const files = publishedBuild({ "a.js": "a" });
+    delete files[`content/${sha("a")}`];
+    const error = await prepareStorybook(storageWith(files).storage, scratch, "p1", "b1").catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(MissingContentError);
+    expect((error as Error).message).toContain(sha("a"));
+  });
+
+  it("leaves a storage failure for a present blob unwrapped, so the job retries it", async () => {
+    const files = publishedBuild({ "a.js": "a" });
+    const { storage } = storageWith(files);
+    const read = storage.read.bind(storage);
+    storage.read = async (key: string) => {
+      if (key.startsWith("content/")) throw new Error("timeout");
+      return await read(key);
+    };
+    await expect(prepareStorybook(storage, scratch, "p1", "b1")).rejects.toThrow("timeout");
   });
 
   it("leaves no tree behind on failure, cancel or a missing blob", async () => {

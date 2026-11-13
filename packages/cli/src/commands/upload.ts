@@ -13,7 +13,7 @@ import * as picomatch from "picomatch";
 import { createClient, normalizeBaseUrl, RequestError, type BuildCreated } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
-import { isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
+import { HashRoutesMissingError, isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 
@@ -81,6 +81,8 @@ export interface UploadOptions {
   untraced?: string[];
   /** Bundler stats file for affected tracing (default `<buildDir>/preview-stats.json`). */
   statsFile?: string;
+  /** Upload a zip instead of hashing files (for servers without the hash routes). */
+  zip?: boolean;
   /** Validate everything but send no requests. */
   dryRun?: boolean;
   /** Working directory (defaults to process.cwd()). Test seam for fs access. */
@@ -141,6 +143,7 @@ interface CollectedUploadOptions {
   buildStats: boolean;
   untraced: string[];
   statsFile?: string;
+  zip: boolean;
 }
 
 interface ResolvedUploadOptions extends CollectedUploadOptions {
@@ -188,6 +191,7 @@ function collectUploadOptions(
     buildStats: resolveBuildStats(options, cfg),
     untraced: mergeUntraced(cfg?.untraced, options.untraced),
     statsFile: options.statsFile,
+    zip: options.zip === true || envOf("STORYSHELF_ZIP") === "1",
   };
 }
 
@@ -384,8 +388,9 @@ function describeAffected(result: AffectedResult, baselineSha: string): string {
 }
 
 /**
- * Send the build: as a zip, or, when the server refuses a zip over its inline publish limit (a
- * serverless host with no job consumer), file by file.
+ * Send the build by content hash (only the files the server lacks, then the manifest). `--zip`,
+ * or a server without the hash routes (404 from `/dedup`), sends a zip instead; a zip the server
+ * refuses over its inline publish limit goes file by file.
  */
 async function uploadBuild(
   client: ReturnType<typeof createClient>,
@@ -393,6 +398,23 @@ async function uploadBuild(
   cwd: string,
   collected: ResolvedUploadOptions,
 ): Promise<void> {
+  const target = {
+    slug: collected.slug,
+    buildId: created.build.id,
+    cwd,
+    buildDir: collected.buildDir,
+  };
+  if (!collected.zip) {
+    try {
+      await uploadFileByFile(client, target, printLine);
+      return;
+    } catch (error) {
+      if (!(error instanceof HashRoutesMissingError)) {
+        throw error;
+      }
+      printLine("The server has no hash upload routes; uploading a zip instead");
+    }
+  }
   try {
     await putZipStream(client, created, cwd, collected.buildDir);
   } catch (error) {
@@ -407,11 +429,7 @@ async function uploadBuild(
       throw error;
     }
     printLine("Zip is over the server's inline publish limit; uploading file by file instead");
-    await uploadFileByFile(
-      client,
-      { slug: collected.slug, buildId: created.build.id, cwd, buildDir: collected.buildDir },
-      printLine,
-    );
+    await uploadFileByFile(client, target, printLine);
   }
 }
 

@@ -7,6 +7,10 @@ The simplest self-hosted deploy: one container, no cloud dependencies. Every sta
 `ghcr.io/guptasiddhant/storyshelf` for `linux/amd64` and `linux/arm64`, with an SBOM and provenance
 attestation.
 
+:::caution
+The container image is published from v0.12.0. Until that release, build it from the repository's [Dockerfile](https://github.com/GuptaSiddhant/StoryShelf/blob/main/apps/server-image/Dockerfile).
+:::
+
 ## Quick start
 
 ```sh
