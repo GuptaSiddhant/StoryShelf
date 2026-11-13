@@ -3,11 +3,11 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import { Segmented, Thumbnail, statusTone } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import {
-  filmBody,
+  filmGroup,
+  filmGroupHead,
   filmItem,
   filmItemActive,
   filmStatus,
-  filmSub,
   filmTitle,
   filmstrip,
   filmstripHead,
@@ -38,6 +38,13 @@ const filteredList = css`
   &[data-filter="a11y"] [data-snapshot-link]:not([data-a11y]):not([aria-current="true"]) {
     display: none;
   }
+  &[data-filter="review"]
+    section:not(:has([data-status="new"], [data-status="changed"], [aria-current="true"])),
+  &[data-filter="a11y"] section:not(:has([data-a11y], [aria-current="true"])),
+  &[data-filter="done"]
+    section:not(:has([data-status="approved"], [data-status="rejected"], [aria-current="true"])) {
+    display: none;
+  }
   &[data-filter="done"]
     [data-status]:not([data-status="approved"]):not([data-status="rejected"]):not(
       [aria-current="true"]
@@ -59,17 +66,16 @@ function FilmItem(props: {
   build: Build;
   group: SnapshotGroup;
   active: boolean;
+  multiBrowser: boolean;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, group, active } = props;
+  const { project, build, group, active, multiBrowser } = props;
   const snap = group.representative;
   const url = snapshotPageUrl(project, build, snap.id);
   const percent = diffPercent(snap);
   const carrier = a11yCarrierOf(snap, group.members);
   const a11yCount = a11yFindingsOf(carrier).length;
-  const tags = [
-    group.modeKey === "desktop" ? "" : group.modeKey,
-    group.members.length > 1 ? `${group.members.length} browsers` : "",
-  ].filter((tag) => tag !== "");
+  const mode = group.modeKey === "desktop" ? "" : ` · ${group.modeKey}`;
+  const decided = snap.status === "approved" || snap.status === "rejected";
   return (
     <a
       href={url}
@@ -84,35 +90,79 @@ function FilmItem(props: {
       hx-push-url="true"
     >
       <Thumbnail src={snapshotImageUrl(project, build, snap, "image")} alt="" placeholder="…" />
-      <span class={filmBody}>
-        <span class={filmTitle} title={`${snap.storyTitle} / ${snap.storyName}`}>
-          {snap.storyName}
-        </span>
-        <span class={filmSub}>{[snap.storyTitle, ...tags].join(" · ")}</span>
-        <span class={filmStatus}>
-          <span class={statusDots[statusTone(snap.status)]} aria-hidden="true" />
-          {snap.status}
-          {percent ? ` · ${percent}` : ""}
-          {a11yCount > 0 ? ` · a11y ${a11yCount} ${a11yOrigin(carrier)}` : ""}
-        </span>
+      <span class={filmTitle} title={`${snap.storyTitle} / ${snap.storyName}`}>
+        {snap.storyName}
+        {mode}
+        {multiBrowser && group.members.length > 1 ? ` · ${group.members.length} browsers` : ""}
+      </span>
+      <span class={filmStatus}>
+        {a11yCount > 0 ? `a11y ${a11yCount}${a11yOrigin(carrier, multiBrowser)} ` : ""}
+        {decided ? "✓ " : ""}
+        <span class={statusDots[statusTone(snap.status)]} aria-hidden="true" />
+        <span class="visually-hidden">{snap.status}</span>
+        {percent ?? ""}
       </span>
     </a>
   );
 }
 
-/** Where a filmstrip item's findings were measured: "(chromium)", or "(baseline abc1234)" when inherited. */
-function a11yOrigin(carrier: Pick<Snapshot, "a11yViolations" | "browser">): string {
+/** Where a filmstrip item's findings were measured: "(chromium)" when the build has several browsers, or "(baseline abc1234)" when inherited. */
+function a11yOrigin(
+  carrier: Pick<Snapshot, "a11yViolations" | "browser">,
+  multiBrowser: boolean,
+): string {
   const sha = a11yBaselineShaOf(carrier);
   if (sha !== undefined) {
-    return `(baseline ${sha})`;
+    return ` (baseline ${sha})`;
   }
-  return carrier.browser ? `(${carrier.browser})` : "";
+  return multiBrowser && carrier.browser ? ` (${carrier.browser})` : "";
+}
+
+function ComponentGroup(props: {
+  title: string;
+  list: SnapshotGroup[];
+  project: Project;
+  build: Build;
+  selectedId?: string;
+  multiBrowser: boolean;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { title, list, project, build, selectedId, multiBrowser } = props;
+  return (
+    <section class={filmGroup}>
+      <h3 class={filmGroupHead}>
+        <span>{title}</span>
+        <span>{list.length}</span>
+      </h3>
+      {list.map((group): HtmlEscapedString | Promise<HtmlEscapedString> => (
+        <FilmItem
+          key={group.key}
+          project={project}
+          build={build}
+          group={group}
+          multiBrowser={multiBrowser}
+          active={group.members.some((snap) => snap.id === selectedId)}
+        />
+      ))}
+    </section>
+  );
+}
+
+/** Groups per component title, in list order (the model sorts by title). */
+function groupByComponent(groups: SnapshotGroup[]): [string, SnapshotGroup[]][] {
+  const byTitle = new Map<string, SnapshotGroup[]>();
+  for (const group of groups) {
+    const title = group.representative.storyTitle;
+    byTitle.set(title, [...(byTitle.get(title) ?? []), group]);
+  }
+  return [...byTitle.entries()];
 }
 
 /** Left filmstrip: filter chips plus a thumbnail per story/mode (browsers share one entry). */
 export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, selectedId } = props;
   const groups = groupSnapshots(snapshots);
+  const multiBrowser = new Set(snapshots.map((snap) => snap.browser ?? "chromium")).size > 1;
+  const components = groupByComponent(groups);
   const progress = reviewProgress(snapshots);
   const filter = progress.pending > 0 ? "review" : "all";
   const withA11y = groups.filter(
@@ -137,13 +187,15 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
         />
       </div>
       <div data-diff-nav data-current={selectedId} data-filter={filter} class={filteredList}>
-        {groups.map((group): HtmlEscapedString | Promise<HtmlEscapedString> => (
-          <FilmItem
-            key={group.key}
+        {components.map(([title, list]): HtmlEscapedString | Promise<HtmlEscapedString> => (
+          <ComponentGroup
+            key={title}
+            title={title}
+            list={list}
             project={project}
             build={build}
-            group={group}
-            active={group.members.some((snap) => snap.id === selectedId)}
+            selectedId={selectedId}
+            multiBrowser={multiBrowser}
           />
         ))}
       </div>
