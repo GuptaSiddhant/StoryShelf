@@ -151,7 +151,8 @@ describe("createPublishHandler", () => {
     const { storage, project, build, run, statusOf } = await setup();
     await run();
     const prefix = storybookDir(project.id, build.id);
-    expect(await storage.exists(`${prefix}/iframe.html`)).toBe(true);
+    // Files are stored once, by content; the per-build directory holds only the manifest.
+    expect(await storage.exists(`${prefix}/iframe.html`)).toBe(false);
     expect(await storage.exists(`${prefix}/manifest.json`)).toBe(true);
     expect(await statusOf()).toBe("approved");
   });

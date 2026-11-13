@@ -70,8 +70,10 @@ async function prepareTargetDir(targetDir: string): Promise<string> {
  * Persist an extracted Storybook directory to storage for published serving.
  *
  * Uses content-addressed deduplication: each file is hashed and stored once
- * under `content/<hash>`, with a per-build manifest at
- * `${projectId}/builds/${buildId}/storybook/manifest.json`.
+ * under `content/<hash>`, with a per-build manifest (path to hash) at
+ * `${projectId}/builds/${buildId}/storybook/manifest.json`. No other file is
+ * written under the build's `storybook/` directory; that layout is legacy and
+ * only read for builds published before the content store.
  *
  * @param storage - Destination storage adapter.
  * @param sourceDir - Extracted Storybook directory.
@@ -93,9 +95,7 @@ export async function persistStorybookStatics(
   const files = await walkFiles(root);
   const manifest: Record<string, string> = {};
   // Bounded: a large Storybook has thousands of files, and buffering them all
-  // at once exhausts memory on small hosts. Each file is read fully before any
-  // write: the scratch dir is often the storage root, so the per-build path
-  // below can be the very file being read (a streamed write would truncate it).
+  // at once exhausts memory on small hosts.
   await mapLimit(files, STATICS_CONCURRENCY, async (file) => {
     signal?.throwIfAborted();
     const rel = relative(root, file);
@@ -107,9 +107,6 @@ export async function persistStorybookStatics(
       signal?.throwIfAborted();
       await storage.write(contentKey(hash), buffer);
     }
-    // Also write to legacy per-build path for backward compat (can be removed after migration)
-    signal?.throwIfAborted();
-    await storage.write(`${destinationPrefix}/${rel}`, buffer);
   });
   // The uses are recorded once per hash, before the manifest that names them makes the build serve.
   signal?.throwIfAborted();

@@ -1,6 +1,5 @@
-import { BuildModel } from "@storyshelf/core/models";
-import { ProjectModel } from "@storyshelf/core/models";
-import type { HtmlEscapedString } from "hono/utils/html";
+import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import type { Build, Project } from "@storyshelf/core/schema";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
@@ -28,6 +27,50 @@ interface QueueView {
   error?: string;
 }
 
+type Rendered = ReturnType<typeof Card>;
+
+function QueueRow(props: { slug: string; job: QueueView }): Rendered {
+  const { slug, job } = props;
+  return (
+    <tr>
+      <td>
+        <a href={`/projects/${slug}/builds/${job.buildId}`}>{job.buildId.slice(0, 8)}</a>
+      </td>
+      <td>
+        <Badge tone={statusTone(job.status)}>{job.status}</Badge>
+      </td>
+      <td>
+        <Meta as="span">{new Date(job.queuedAt).toLocaleTimeString()}</Meta>
+      </td>
+      <td>
+        <Meta as="span">{job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "—"}</Meta>
+      </td>
+    </tr>
+  );
+}
+
+function QueueTable(props: { slug: string; queueView: QueueView[] }): Rendered {
+  return (
+    <Table label="Active queue">
+      <table>
+        <thead>
+          <tr>
+            <th>Build</th>
+            <th>Status</th>
+            <th>Queued</th>
+            <th>Started</th>
+          </tr>
+        </thead>
+        <tbody>
+          {props.queueView.map((job) => (
+            <QueueRow key={job.buildId} slug={props.slug} job={job} />
+          ))}
+        </tbody>
+      </table>
+    </Table>
+  );
+}
+
 /** Live-refreshing partial showing the currently queued and running captures. */
 export function renderActiveQueue(slug: string, queueView: QueueView[]): RenderedContent {
   return (
@@ -42,41 +85,106 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
       {queueView.length === 0 ? (
         <Meta>No captures are currently queued or running.</Meta>
       ) : (
-        <Table label="Active queue">
-          <table>
-            <thead>
-              <tr>
-                <th>Build</th>
-                <th>Status</th>
-                <th>Queued</th>
-                <th>Started</th>
-              </tr>
-            </thead>
-            <tbody>
-              {queueView.map((job): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                <tr key={job.buildId}>
-                  <td>
-                    <a href={`/projects/${slug}/builds/${job.buildId}`}>
-                      {job.buildId.slice(0, 8)}
-                    </a>
-                  </td>
-                  <td>
-                    <Badge tone={statusTone(job.status)}>{job.status}</Badge>
-                  </td>
-                  <td>
-                    <Meta as="span">{new Date(job.queuedAt).toLocaleTimeString()}</Meta>
-                  </td>
-                  <td>
-                    <Meta as="span">
-                      {job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "—"}
-                    </Meta>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
+        <QueueTable slug={slug} queueView={queueView} />
       )}
+    </Card>
+  );
+}
+
+function RetryForm(props: { slug: string; buildId: string }): Rendered {
+  const url = `/api/v1/projects/${props.slug}/builds/${props.buildId}/retry`;
+  return (
+    <form method="post" action={url} hx-post={url} hx-target="body">
+      <Button variant="ghost" size="sm" type="submit">
+        Retry
+      </Button>
+    </form>
+  );
+}
+
+function BuildRow(props: {
+  slug: string;
+  build: Build;
+  canRetry: boolean;
+  error?: string;
+}): Rendered {
+  const { slug, build, canRetry, error } = props;
+  return (
+    <tr>
+      <td>
+        <strong>{build.gitBranch}</strong>
+        <Meta as="div" mono>
+          {build.gitSha.slice(0, 7)}
+        </Meta>
+      </td>
+      <td>
+        <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+      </td>
+      <td>
+        <Meta as="span">
+          {build.snapshotCount} total · {build.changedCount} changed
+        </Meta>
+      </td>
+      <td>
+        <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
+      </td>
+      <td class="nowrap">
+        <HStack wrap={false}>
+          <Button variant="secondary" size="sm" href={`/projects/${slug}/builds/${build.id}`}>
+            View
+          </Button>
+          {canRetry && RETRYABLE.has(build.status) ? (
+            <RetryForm slug={slug} buildId={build.id} />
+          ) : null}
+        </HStack>
+        {error ? (
+          <Meta as="div" tone="danger">
+            {error}
+          </Meta>
+        ) : null}
+      </td>
+    </tr>
+  );
+}
+
+function RecentBuildsCard(props: {
+  project: Project;
+  builds: Build[];
+  queueByBuild: Map<string, QueueView>;
+  canRetry: boolean;
+}): Rendered {
+  const { project, builds, queueByBuild, canRetry } = props;
+  return (
+    <Card>
+      <SectionTitle>Recent builds</SectionTitle>
+      <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
+      <Table label="Recent builds">
+        <table>
+          <thead>
+            <tr>
+              <th>Branch</th>
+              <th>Status</th>
+              <th>Snapshots</th>
+              <th>Created</th>
+              <th>
+                <span class="visually-hidden">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {builds.map((build) => (
+              <BuildRow
+                key={build.id}
+                slug={project.slug}
+                build={build}
+                canRetry={canRetry}
+                error={queueByBuild.get(build.id)?.error}
+              />
+            ))}
+          </tbody>
+        </table>
+      </Table>
+      {builds.length === 0 ? <EmptyState description="No builds yet." /> : null}
     </Card>
   );
 }
@@ -93,7 +201,6 @@ export async function renderComputeJobsPage(
     return null;
   }
   const builds = await new BuildModel(getStore().db).list(project.id);
-  const recentBuilds = builds.slice(0, 20);
   const queueByBuild = new Map(queueView.map((job) => [job.buildId, job]));
 
   return (
@@ -113,77 +220,12 @@ export async function renderComputeJobsPage(
 
       {renderActiveQueue(project.slug, queueView)}
 
-      <Card>
-        <SectionTitle>Recent builds</SectionTitle>
-        <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
-        <Table label="Recent builds">
-          <table>
-            <thead>
-              <tr>
-                <th>Branch</th>
-                <th>Status</th>
-                <th>Snapshots</th>
-                <th>Created</th>
-                <th>
-                  <span class="visually-hidden">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentBuilds.map((build): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                <tr key={build.id}>
-                  <td>
-                    <strong>{build.gitBranch}</strong>
-                    <Meta as="div" mono>
-                      {build.gitSha.slice(0, 7)}
-                    </Meta>
-                  </td>
-                  <td>
-                    <Badge tone={statusTone(build.status)}>{build.status}</Badge>
-                  </td>
-                  <td>
-                    <Meta as="span">
-                      {build.snapshotCount} total · {build.changedCount} changed
-                    </Meta>
-                  </td>
-                  <td>
-                    <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
-                  </td>
-                  <td class="nowrap">
-                    <HStack wrap={false}>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        href={`/projects/${project.slug}/builds/${build.id}`}
-                      >
-                        View
-                      </Button>
-                      {canRetry && RETRYABLE.has(build.status) ? (
-                        <form
-                          method="post"
-                          action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
-                          hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
-                          hx-target="body"
-                        >
-                          <Button variant="ghost" size="sm" type="submit">
-                            Retry
-                          </Button>
-                        </form>
-                      ) : null}
-                    </HStack>
-                    {queueByBuild.get(build.id)?.error ? (
-                      <Meta as="div" tone="danger">
-                        {queueByBuild.get(build.id)?.error}
-                      </Meta>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
-        {recentBuilds.length === 0 ? <EmptyState description="No builds yet." /> : null}
-      </Card>
+      <RecentBuildsCard
+        project={project}
+        builds={builds.slice(0, 20)}
+        queueByBuild={queueByBuild}
+        canRetry={canRetry}
+      />
     </DocumentLayout>
   );
 }

@@ -8,6 +8,7 @@ import {
   resolveShelfOptions,
   sequentialTransactionsWarning,
 } from "./options.ts";
+import { makeFakeDesign } from "./test-helpers/fake-design.ts";
 
 const runner = { metadata: { kind: "r" } } as unknown as CaptureRunner;
 const base = {
@@ -16,6 +17,26 @@ const base = {
 } as unknown as ShelfOptions;
 
 describe("resolveShelfOptions", () => {
+  it("resolves the integration groups into lists (ADR 0049)", () => {
+    const design = makeFakeDesign().provider;
+    const resolved = resolveShelfOptions({
+      ...base,
+      design: (builtIn) => [...builtIn, design],
+      notifications: { notifiers: false, config: { fromName: "Shelf" } },
+    });
+    expect(resolved.design).toEqual([design]);
+    expect(resolved.notifications?.notifiers).toEqual([]);
+    expect(resolved.notifications?.email).toEqual([]);
+    expect(resolved.notifications?.config).toEqual({ fromName: "Shelf" });
+  });
+
+  it("throws at startup on a repeated provider kind, naming it", () => {
+    const design = makeFakeDesign("figma").provider;
+    expect(() => resolveShelfOptions({ ...base, design: [design, design] })).toThrow(
+      /design\[1\] \(".*"\): kind "figma" is already used/u,
+    );
+  });
+
   it("defaults scratchDir for a hosting-only deployment: publishing extracts zips there", () => {
     expect(resolveShelfOptions(base).config?.scratchDir).toBe(DEFAULT_SCRATCH_DIR);
   });
@@ -86,6 +107,16 @@ describe("resolveShelfOptions", () => {
 function shardSized(shardSize: number, extra = {}): () => void {
   return () => {
     resolveShelfOptions({ ...base, testing: { runner, shardSize, ...extra } });
+  };
+}
+
+function hosted(mode: string, extra: Partial<ShelfOptions> = {}): () => void {
+  return () => {
+    resolveShelfOptions({
+      ...base,
+      ...extra,
+      config: { secret: undefined, ...extra.config, storybookHosting: { mode } },
+    } as unknown as ShelfOptions);
   };
 }
 
@@ -211,5 +242,36 @@ describe("sequentialTransactionsWarning", () => {
       database: { metadata: { name: "Fake", category: "database", transactions: "atomic" } },
     } as unknown as ShelfOptions;
     expect(sequentialTransactionsWarning({ ...atomic, testing: { runner } })).toBeUndefined();
+  });
+});
+
+describe("resolveShelfOptions storybook hosting", () => {
+  const auth = {} as ShelfOptions["auth"];
+
+  it("accepts the default and trusted mode, with or without sign-in or a secret", () => {
+    expect(() => resolveShelfOptions({ ...base, auth })).not.toThrow();
+    expect(hosted("trusted", { auth })).not.toThrow();
+  });
+
+  it("refuses sandboxed and subdomain with sign-in on and no secret", () => {
+    expect(hosted("sandboxed", { auth })).toThrow(/needs config.secret/u);
+    expect(hosted("subdomain", { auth })).toThrow(/needs config.secret/u);
+  });
+
+  it("accepts sandboxed, with a secret when sign-in is on and without one when it is off", () => {
+    expect(hosted("sandboxed")).not.toThrow();
+    expect(hosted("sandboxed", { auth, config: { secret: "s" } })).not.toThrow();
+  });
+
+  it("refuses subdomain, whose serving is not wired, rather than serving it as trusted", () => {
+    expect(hosted("subdomain", { auth, config: { secret: "s" } })).toThrow(/not available/u);
+    expect(hosted("subdomain")).toThrow(/not available/u);
+  });
+
+  it("validates the top-level storybookUrlRateLimit as a positive whole number", () => {
+    expect(() => resolveShelfOptions({ ...base, storybookUrlRateLimit: 100 })).not.toThrow();
+    expect(() => resolveShelfOptions({ ...base, storybookUrlRateLimit: 0 })).toThrow(
+      /^storybookUrlRateLimit must be/u,
+    );
   });
 });

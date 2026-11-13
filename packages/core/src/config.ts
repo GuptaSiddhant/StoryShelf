@@ -9,6 +9,14 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationOption } from "./integrations/resolve.ts";
+import {
+  storybookHostingSchema,
+  validateStorybookHosting,
+  type StorybookHostingConfig,
+} from "./storybook-hosting.ts";
+
+export type { StorybookHostingConfig, StorybookHostingMode } from "./storybook-hosting.ts";
 
 /** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {
@@ -103,8 +111,29 @@ export interface CaptureAssetsConfig {
   cacheMaxAgeSeconds?: number;
 }
 
+/** Policy for URLs a project configured (webhooks, chat, GitLab hosts). */
+export interface OutboundConfig {
+  /**
+   * Exact hostnames (no wildcards) that project URLs may reach even when they are private
+   * addresses or plain `http`, for example a self-hosted GitLab on a private network.
+   */
+  allowHosts?: string[];
+  /** Allow plain `http` for any host. For local development only. */
+  allowHttp?: boolean;
+}
+
+/**
+ * Which reverse proxies in front of this server may name the client (`ShelfConfig.trustProxy`).
+ * A number trusts that many hops counted from this server, whatever their address; a list trusts
+ * peers whose address is one of these IPs or CIDRs; `"fly"` trusts Fly.io's proxy and reads its
+ * `Fly-Client-IP` header. A forwarded header from a peer that is not trusted is never read.
+ */
+export type TrustProxy = number | string[] | "fly";
+
 /** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
 export interface ShelfConfig {
+  /** Policy for project-set outbound URLs; see {@link OutboundConfig}. */
+  outbound?: OutboundConfig;
   secret?: string;
   /**
    * The secret `secret` replaced. Used only to decrypt stored credentials
@@ -124,13 +153,29 @@ export interface ShelfConfig {
    * mint sessions from it. Distinct from `secret` (session signing).
    */
   adminToken?: string;
+  /**
+   * Base domain of published Storybook links. ADR 0051 (decision 6) retires it in favor of
+   * `storybookHosting: { mode: "subdomain", baseDomain }` (#358); setting both stops boot.
+   */
   publishedBaseDomain?: string;
+  /**
+   * Where published Storybooks are served from and how uploaded code is isolated from the app
+   * (ADR 0051). Unset means `trusted`: path hosting on the app origin. A value that does not
+   * validate stops boot; it never falls back to `trusted`.
+   */
+  storybookHosting?: StorybookHostingConfig;
   /**
    * Public base URL of this deployment (e.g. `https://shelf.example.com`).
    * Used as the issuer in the `/.well-known/openid-configuration` relying-party
    * helper document; falls back to the request origin when unset.
    */
   publicBaseUrl?: string;
+  /**
+   * Proxies allowed to report the client's IP, which keys rate limits (see {@link TrustProxy}).
+   * Unset keeps the socket peer, so behind a load balancer every client shares the proxy's
+   * buckets. Hosts map it from `TRUST_PROXY` with {@link parseTrustProxy}.
+   */
+  trustProxy?: TrustProxy;
   /**
    * Working directory for capture and inline statics extraction. Defaults to
    * `<os.tmpdir()>/storyshelf`; publishing and capture extract there.
@@ -237,15 +282,67 @@ export const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.objec
 });
 
 /** Zod schema validating the shelf-level configuration. */
+/** Most trusted hops `trustProxy` may count (a longer proxy chain is a misconfiguration). */
+const MAX_TRUSTED_HOPS = 10;
+
+/** Shape of one `trustProxy` entry: an IPv4/IPv6 address with an optional prefix length. */
+const TRUSTED_PROXY_PATTERN = /^[\da-f:.]+(?:\/\d{1,3})?$/iu;
+
+/**
+ * Map a `TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
+ * or `0` is off; `fly` is Fly.io; digits are a hop count; anything else is a comma-separated list
+ * of IPs or CIDRs (checked by {@link validateConfig}).
+ */
+export function parseTrustProxy(raw?: string): TrustProxy | undefined {
+  const value = raw?.trim() ?? "";
+  if (value === "" || value === "false" || value === "0") {
+    return undefined;
+  }
+  if (value === "fly") {
+    return "fly";
+  }
+  if (/^\d+$/u.test(value)) {
+    return Number(value);
+  }
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+}
+
+const trustedProxyEntry = z.string().regex(TRUSTED_PROXY_PATTERN, "an IP address or CIDR");
+
+const trustProxySchema: z.ZodType<TrustProxy> = z.union([
+  z.number().int().min(1).max(MAX_TRUSTED_HOPS),
+  z.literal("fly"),
+  z.array(trustedProxyEntry).min(1, "at least one IP address or CIDR"),
+]);
+
 export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .object({
+    outbound: z
+      .object({
+        allowHosts: z
+          .array(
+            z
+              .string()
+              .min(1)
+              .regex(/^[^*\s/]+$/u, "exact hosts only, no wildcards"),
+          )
+          .optional(),
+        allowHttp: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     secret: z.string().min(1).optional(),
     previousSecret: z.string().min(1).optional(),
     migrateCredentialsOnBoot: z.boolean().optional(),
     adminToken: z.string().min(1).optional(),
     publishedBaseDomain: z.string().optional(),
+    storybookHosting: storybookHostingSchema.optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     publicBaseUrl: z.string().url().optional(),
+    trustProxy: trustProxySchema.optional(),
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     branchTtlDays: z.number().int().positive().nullable().optional(),
@@ -267,6 +364,14 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   })
   .strict()
   .superRefine((config, ctx) => {
+    if (config.publishedBaseDomain !== undefined && config.storybookHosting !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["storybookHosting"],
+        message:
+          "publishedBaseDomain and storybookHosting are both set; use storybookHosting only (ADR 0051)",
+      });
+    }
     if (config.previousSecret !== undefined && config.secret === undefined) {
       ctx.addIssue({
         code: "custom",
@@ -311,7 +416,19 @@ export function validateConfig(config: Record<string, unknown>): ShelfConfig {
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Invalid ShelfConfig: ${issues}`);
   }
-  return result.data;
+  const hosting = result.data.storybookHosting;
+  return hosting === undefined
+    ? result.data
+    : { ...result.data, storybookHosting: checkedHosting(hosting) };
+}
+
+/** {@link validateStorybookHosting}, with its reason in the same `Invalid ShelfConfig` form. */
+function checkedHosting(hosting: StorybookHostingConfig): StorybookHostingConfig {
+  try {
+    return validateStorybookHosting(hosting);
+  } catch (error) {
+    throw new Error(`Invalid ShelfConfig: ${(error as Error).message}`, { cause: error });
+  }
 }
 
 /**
@@ -368,10 +485,8 @@ export interface ShelfTestingOptions {
    */
   shardSize?: number;
   /**
-   * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`
-   * (ADR 0007, decision 5). Default 6000, enough for a render fetching thousands of assets from one
-   * farm IP; a larger farm behind one address raises it. Over the limit the route answers `429`
-   * before it looks at the token, so the answer says nothing about a token's validity.
+   * Alias of the top-level `storybookUrlRateLimit` option (ADR 0051, decision 10); the top-level
+   * value wins when both are set.
    */
   storybookUrlRateLimit?: number;
   /**
@@ -400,8 +515,17 @@ export interface ShelfTestingOptions {
 
 /** Notification options: who can deliver, over which transport, with what branding. */
 export interface ShelfNotificationsOptions {
-  /** Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these. */
-  notifiers?: NotifierProvider[];
+  /**
+   * Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these.
+   * An array lists exactly these; a function `(builtIn) => list` adds, replaces or filters the
+   * built-in notifiers; `false` wires none (ADR 0049).
+   */
+  notifiers?: IntegrationOption<NotifierProvider>;
+  /**
+   * Email transports, chosen like `notifiers`: an array, a function of the built-ins, or `false`
+   * (ADR 0049). Resolved and checked at startup; the app does not use the list yet.
+   */
+  email?: IntegrationOption<EmailSender>;
   /** Email transport. Listed here so its setup/teardown/validation hooks run with the app's. */
   emailSender?: EmailSender;
   /** Site-wide brand and sender settings for outgoing notifications. */
@@ -437,11 +561,23 @@ export interface ShelfOptions {
    * no queue, and the tuning below is unreachable rather than silently ignored.
    */
   testing?: ShelfTestingOptions;
+  /**
+   * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`,
+   * and to the read-grant route, `/_r/<token>/*`, which share one bucket (ADR 0007, decision 5;
+   * ADR 0051, decision 10). Default 6000, enough for a render fetching thousands of assets from one
+   * farm IP; a larger farm behind one address raises it. Over the limit the routes answer `429`
+   * before they look at the token, so the answer says nothing about a token's validity. Replaces
+   * `testing.storybookUrlRateLimit`, which stays as an alias, and works without `testing`.
+   */
+  storybookUrlRateLimit?: number;
   auth?: Auth;
   /** AI insights surface (ADR 0016). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
-  /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
-  design?: DesignProvider[];
+  /**
+   * Design-tool providers (Figma, …) that resolve links, metadata and previews: an array (exactly
+   * these), a function `(builtIn) => list`, or `false` for none (ADR 0049).
+   */
+  design?: IntegrationOption<DesignProvider>;
   /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
   logger?: Logger;
@@ -453,6 +589,25 @@ export interface ShelfOptions {
    * observability package. Flushed on `app.lifecycle.teardown()`.
    */
   observability?: ObservabilityHandle;
+}
+
+/** Notification options after {@link resolveShelfOptions}: every integration group is a list. */
+export interface ResolvedNotificationsOptions extends Omit<
+  ShelfNotificationsOptions,
+  "notifiers" | "email"
+> {
+  notifiers?: NotifierProvider[];
+  email?: EmailSender[];
+}
+
+/**
+ * `ShelfOptions` after {@link resolveShelfOptions}: the integration groups are resolved, once, into
+ * the lists the app registers. `resolveShelfOptions` always sets them; they stay optional so a
+ * hand-built options object (tests, embedders) reads as "none".
+ */
+export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  design?: DesignProvider[];
+  notifications?: ResolvedNotificationsOptions;
 }
 
 /**

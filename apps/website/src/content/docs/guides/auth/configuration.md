@@ -26,7 +26,7 @@ Sessions are Better Auth DB rows under the `storyshelf_session` cookie (seven-da
 
 ## Custom login text
 
-Reword the sign-in page without code via `ui.auth` (or `SS_AUTH_*` env vars on the dev/fly servers):
+Reword the sign-in page without code via `ui.auth` (or `SHELF_AUTH_*` env vars on the dev/fly servers):
 
 ```ts
 const app = createShelfApp({

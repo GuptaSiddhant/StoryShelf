@@ -1,7 +1,15 @@
-/** Resolves `ShelfOptions` once at boot: validates `testing.compare` and fills the scratch default. */
+/**
+ * Resolves `ShelfOptions` once at boot: validates `testing.compare`, fills the scratch default and
+ * resolves the integration groups.
+ */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { notificationsConfigSchema, type ShelfOptions } from "./config.ts";
+import {
+  notificationsConfigSchema,
+  type ResolvedShelfOptions,
+  type ShelfOptions,
+} from "./config.ts";
+import { resolveShelfIntegrations } from "./integrations/index.ts";
 
 /** Where capture scratch lives when `config.scratchDir` is not set. */
 export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
@@ -13,16 +21,31 @@ export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
  * - `notifications.config` must match its schema (it used to live in `ShelfConfig`, which validated it).
  * - `config.scratchDir` defaults to {@link DEFAULT_SCRATCH_DIR}: publishing extracts zips there,
  *   with or without `testing`.
+ * - `design`, `notifications.notifiers` and `notifications.email` resolve to lists against the
+ *   built-in integrations (ADR 0049); a broken provider or a repeated provider kind throws.
  */
-export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
+export function resolveShelfOptions(options: ShelfOptions): ResolvedShelfOptions {
   assertThreads(options.testing?.compare?.threads);
   assertTestingProcess(options.testing);
+  assertStorybookUrlRateLimit(options.storybookUrlRateLimit, "storybookUrlRateLimit");
+  assertStorybookHosting(options);
   assertTestingBackable(options);
   assertNotificationsConfig(options.notifications?.config);
+  const resolved = withIntegrations(options);
   if (options.config?.scratchDir !== undefined) {
-    return options;
+    return resolved;
   }
-  return { ...options, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };
+  return { ...resolved, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };
+}
+
+/** `options` with its integration groups resolved into lists. */
+function withIntegrations(options: ShelfOptions): ResolvedShelfOptions {
+  const { notifiers, email, design } = resolveShelfIntegrations({
+    notifiers: options.notifications?.notifiers,
+    email: options.notifications?.email,
+    design: options.design,
+  });
+  return { ...options, design, notifications: { ...options.notifications, notifiers, email } };
 }
 
 /**
@@ -78,14 +101,14 @@ function assertTestingNumbers(testing: ShelfOptions["testing"]): void {
   assertRetries(testing?.retries);
   assertLeaseSeconds(testing?.leaseSeconds);
   assertMaxJobSeconds(testing?.maxJobSeconds);
-  assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit);
+  assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit, "testing.storybookUrlRateLimit");
 }
 
 /** A whole number of requests per minute; `0` would refuse every render. */
-function assertStorybookUrlRateLimit(limit: number | undefined): void {
+function assertStorybookUrlRateLimit(limit: number | undefined, name: string): void {
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
     throw new Error(
-      `testing.storybookUrlRateLimit must be a positive whole number of requests per minute, got ${String(limit)}`,
+      `${name} must be a positive whole number of requests per minute, got ${String(limit)}`,
     );
   }
 }
@@ -160,5 +183,26 @@ function assertNotificationsConfig(config: unknown): void {
   if (!result.success) {
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Invalid notifications.config: ${issues}`);
+  }
+}
+
+/**
+ * The boot refusals of ADR 0051, decision 1, that need more than the hosting object: `sandboxed` and
+ * `subdomain` mint grants, so with sign-in on they need the server `secret`. A broken value stops
+ * boot; it never falls back to `trusted`. The `subdomain` mode (#358) is not wired yet, so it is
+ * refused rather than served as `trusted`.
+ */
+function assertStorybookHosting(options: ShelfOptions): void {
+  const mode = options.config?.storybookHosting?.mode;
+  if (mode === undefined || mode === "trusted") {
+    return;
+  }
+  if (options.auth !== undefined && !options.config?.secret) {
+    throw new Error(
+      `storybookHosting.mode "${mode}" needs config.secret when sign-in is on: read grants are signed with it`,
+    );
+  }
+  if (mode !== "sandboxed") {
+    throw new Error(`storybookHosting.mode "${mode}" is not available in this version`);
   }
 }

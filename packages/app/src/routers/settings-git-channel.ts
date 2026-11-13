@@ -32,7 +32,10 @@ async function formError(c: Context, errors: Record<string, string>): Promise<Re
 /** Map a failed validation to the form fields it concerns. */
 function fieldErrors(
   secretField: "token" | "privateKey",
-  checked: Extract<ReturnType<typeof NotificationChannelModel.validateInput>, { ok: false }>,
+  checked: Extract<
+    Awaited<ReturnType<typeof NotificationChannelModel.validateInput>>,
+    { ok: false }
+  >,
 ): Record<string, string> {
   if (checked.field === "secret") {
     return { [secretField]: checked.message };
@@ -58,7 +61,7 @@ export async function createGitChannel(
   // A GitHub App channel keeps its private key where other channels keep a token.
   const checks = config["mode"] === "checks";
   const token = asString(form.get(checks ? "privateKey" : "token"));
-  const problem = gitChannelProblem(project, provider, config, {
+  const problem = await gitChannelProblem(project, provider, config, {
     token,
     secretField: checks ? "privateKey" : "token",
   });
@@ -76,17 +79,17 @@ export async function createGitChannel(
 }
 
 /** The form errors for a git channel input, or null when it is valid. */
-function gitChannelProblem(
+async function gitChannelProblem(
   project: Project,
   provider: string,
   config: Record<string, string>,
   secret: { token: string | undefined; secretField: "token" | "privateKey" },
-): Record<string, string> | null {
+): Promise<Record<string, string> | null> {
   const { notifiers } = getStore();
   if (!NotificationChannelModel.isStateKind(notifiers, provider)) {
     return { gitProvider: `Unknown git provider: ${provider}` };
   }
-  const checked = NotificationChannelModel.validateInput(notifiers, provider, config, {
+  const checked = await NotificationChannelModel.validateInput(notifiers, provider, config, {
     projectId: project.id,
     hasSecret: Boolean(secret.token),
   });

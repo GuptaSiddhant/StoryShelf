@@ -19,7 +19,15 @@ export {
   type EntryChanges,
 } from "./components.ts";
 export { parseStorybookIndex, parseStorybookIndexText } from "./parse.ts";
-export { readPublishedFile, readPublishedFileInfo } from "./read.ts";
+export {
+  locatePublishedFile,
+  openPublishedFile,
+  readPublishedFile,
+  readPublishedFileInfo,
+  type OpenedPublishedFile,
+  type PublishedFileLocation,
+} from "./read.ts";
+export { forgetManifest, loadManifest, MANIFEST_CACHE_SIZE } from "./manifest-cache.ts";
 export type { Catalog, CatalogComponent, CatalogEntry } from "./types.ts";
 export {
   catalogPresence,
