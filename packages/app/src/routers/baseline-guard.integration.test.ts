@@ -353,7 +353,7 @@ describe("approval guard for changed baselines", () => {
   });
 
   it.each(["approve", "reject"])(
-    "sends htmx to the next open snapshot after %s",
+    "swaps htmx to the next open snapshot after %s",
     async (action) => {
       const { app, db } = await setup();
       await db.insert(db.tables.snapshots, {
@@ -379,10 +379,14 @@ describe("approval guard for changed baselines", () => {
         "/projects/test-project/builds/f1/diff?snapshot=sf1",
       );
 
-      expect(response.headers.get("hx-redirect")).toBe(
+      // In place since #937: the next snapshot as HTML to swap in, its address pushed.
+      expect(response.status).toBe(200);
+      expect(response.headers.get("hx-push-url")).toBe(
         "/projects/test-project/builds/f1/diff?snapshot=sf-next",
       );
+      expect(response.headers.get("hx-redirect")).toBeNull();
       expect(response.headers.get("hx-refresh")).toBeNull();
+      expect(await response.text()).toMatch(/id="snapshot-heading"[^>]*>[^<]*Next/u);
     },
   );
 });

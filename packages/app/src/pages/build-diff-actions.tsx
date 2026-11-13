@@ -2,7 +2,13 @@ import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, Button, Kbd, statusTone } from "../ui/components.tsx";
 import { actionBar, actionGroup, actionHints, actionPosition } from "../ui/styles/review-layout.ts";
-import { groupOf, neighbours, snapshotPageUrl, type SnapshotGroup } from "./build-diff-model.ts";
+import {
+  REVIEW_CANVAS_ID,
+  groupOf,
+  neighbours,
+  snapshotPageUrl,
+  type SnapshotGroup,
+} from "./build-diff-model.ts";
 /** Sticky bottom bar props. */
 export interface DiffActionBarProps {
   project: Project;
@@ -23,6 +29,12 @@ interface DecisionTarget {
   drifted: boolean;
   label: string;
 }
+
+/**
+ * Approve and reject swap the review canvas in place: the server answers with the next snapshot
+ * (and the header and filmstrip out of band), or redirects when the baseline moved.
+ */
+const CANVAS = `#${REVIEW_CANVAS_ID}`;
 
 function apiBase(project: Project, build: Build): string {
   return `/api/v1/projects/${project.slug}/builds/${build.id}`;
@@ -71,7 +83,8 @@ function ApproveForm(props: {
       method="post"
       action={url}
       hx-post={url}
-      hx-target="body"
+      hx-target={CANVAS}
+      hx-swap="outerHTML"
       data-toast={`Approved ${target.label}`}
     >
       {target.drifted ? (
@@ -113,7 +126,8 @@ function ApproveOnlyThisForm(props: {
       method="post"
       action={url}
       hx-post={url}
-      hx-target="body"
+      hx-target={CANVAS}
+      hx-swap="outerHTML"
       data-toast={`Approved ${selected.storyName} on ${selected.browser ?? "chromium"}`}
     >
       <Button variant="ghost" size="sm" type="submit" title="Approve only this browser">
@@ -142,7 +156,8 @@ function DecisionButtons(props: {
         method="post"
         action={`${target.base}/reject`}
         hx-post={`${target.base}/reject`}
-        hx-target="body"
+        hx-target={CANVAS}
+        hx-swap="outerHTML"
         data-toast={`Rejected ${target.label}`}
         data-toast-tone="warning"
       >

@@ -126,6 +126,9 @@ export function snapshotPageUrl(project: Project, build: Build, snapshotId: stri
   return `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snapshotId}`;
 }
 
+/** The id the review forms swap in place: the viewer, comments and action bar of one snapshot. */
+export const REVIEW_CANVAS_ID = "review-canvas";
+
 /** API URL of a snapshot image (`image`), its diff overlay, or its baseline. */
 export function snapshotImageUrl(
   project: Project,

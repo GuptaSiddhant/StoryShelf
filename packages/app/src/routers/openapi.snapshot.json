@@ -2791,11 +2791,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Snapshot approved",
+            "description": "Snapshot approved. An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Ok"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -2856,11 +2861,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Snapshot rejected",
+            "description": "Snapshot rejected. An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Ok"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -2984,11 +2994,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Every open snapshot of the story and mode approved and each engine's baseline promoted",
+            "description": "Every open snapshot of the story and mode approved and each engine's baseline promoted. An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GroupDecisionResult"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -3057,11 +3072,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Every open snapshot of the story and mode rejected",
+            "description": "Every open snapshot of the story and mode rejected. An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GroupDecisionResult"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }

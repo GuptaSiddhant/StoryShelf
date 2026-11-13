@@ -244,12 +244,30 @@ function toastPart(): string {
  */
 function formPart(): string {
   return `
+    function mergeSheet(sheet,text){
+      var have=sheet.textContent||'', add='', depth=0, start=0;
+      for(var i=0;i<text.length;i++){
+        if(text[i]==='{'){ depth++; }
+        else if(text[i]==='}'&&--depth===0){
+          var rule=text.slice(start,i+1);
+          if(have.indexOf(rule)===-1) add+=rule;
+          start=i+1;
+        }
+      }
+      if(add) sheet.textContent=have+add;
+    }
     document.addEventListener('htmx:beforeSwap',function(e){
       // A body swap only replaces <body>, so classes first used by the new page
       // would be unstyled: adopt the stylesheet the server collected for it.
       var match=/<style id="storyshelf-css">([\\s\\S]*?)<\\/style>/.exec(e.detail.serverResponse||'');
       var sheet=document.getElementById('storyshelf-css');
       if(match&&sheet&&e.detail.target===document.body){ sheet.textContent=match[1]; }
+      else if(match&&sheet){
+        // An in-place swap (the next snapshot, a posted comment) opens with the sheet of its own
+        // markup: add only the rules the page lacks, and keep the block out of the page.
+        mergeSheet(sheet,match[1]);
+        e.detail.serverResponse=e.detail.serverResponse.replace(match[0],'');
+      }
       var status=e.detail.xhr ? e.detail.xhr.status : 0;
       if(status===400||status===409||status===422){
         e.detail.shouldSwap=true;
@@ -434,6 +452,16 @@ function focusPart(): string {
   return `
     document.addEventListener('htmx:afterSwap',function(e){
       var target=e.detail && e.detail.target;
+      var fresh=e.target instanceof Element && e.target!==target ? e.target : null;
+      if(fresh&&fresh.id&&target&&target.id===fresh.id){
+        // An in-place outerHTML swap (the next snapshot after approve or reject, a posted
+        // comment): wire up the new markup, then focus the new snapshot's heading, or the box
+        // marked autofocus, without scrolling the reviewer away from where they are.
+        if(window.__ssInit) window.__ssInit();
+        var into=fresh.querySelector('[data-focus-heading]')||fresh.querySelector('[autofocus]');
+        if(into) try{ into.focus({preventScroll:true}); }catch(_){}
+        return;
+      }
       if(target===document.body){
         // A whole-page swap (review verdict, next snapshot, a failed sign-in) drops the focused
         // element: put focus on the page's main heading so keyboard and screen-reader users stay.

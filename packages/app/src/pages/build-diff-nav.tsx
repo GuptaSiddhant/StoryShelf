@@ -52,6 +52,8 @@ export interface DiffNavProps {
   build: Build;
   snapshots: Snapshot[];
   selectedId?: string;
+  /** Mark the list for an out-of-band swap (the in-place answer to approve and reject). */
+  oob?: boolean;
 }
 
 function FilmItem(props: {
@@ -109,6 +111,15 @@ function a11yOrigin(carrier: Pick<Snapshot, "a11yViolations" | "browser">): stri
   return carrier.browser ? `(${carrier.browser})` : "";
 }
 
+/** The skip link past the filmstrip; left out of the out-of-band swap, which keeps the page's own. */
+function SkipToComparison(): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <a class="skip-link" href="#snapshot-heading" data-skip-to-comparison>
+      Skip to comparison
+    </a>
+  );
+}
+
 /** Left filmstrip: filter chips plus a thumbnail per story/mode (browsers share one entry). */
 export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, selectedId } = props;
@@ -120,10 +131,13 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
   ).length;
   return (
     <>
-      <a class="skip-link" href="#snapshot-heading" data-skip-to-comparison>
-        Skip to comparison
-      </a>
-      <aside class={filmstrip} aria-label="Snapshots">
+      {props.oob ? null : <SkipToComparison />}
+      <aside
+        class={filmstrip}
+        id="review-filmstrip"
+        aria-label="Snapshots"
+        hx-swap-oob={props.oob ? "true" : undefined}
+      >
         <div class={filmstripHead}>
           <Segmented
             label="Filter snapshots"
