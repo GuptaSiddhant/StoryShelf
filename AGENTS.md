@@ -330,11 +330,14 @@ The weekly usage quota is shared, so agents work in short, fresh sessions and ta
   green PR back.
 - **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
   Label those PRs `skip-review`, so CodeRabbit skips them.
-- **Schedules.** Agents have two scheduled runs a day, 12 hours apart: the architect's triage. It
-  answers `architect` items, enables auto-merge, revives open PRs that lost their session, starts
-  sessions for ready issues (at most one per lane in #370), archives finished ones, and posts one
-  digest comment on issue #370 when something happened. No other agent session runs on a clock (CI's
-  own nightly workflows are unaffected).
+- **Schedules.** Two scheduled runs a day, at 05:41 and 17:41 UTC. Each starts a fresh Sonnet triage
+  session tagged `storyshelf:triage`. It does the mechanical work: auto-merge, starting and archiving
+  sessions, `status-ready`, and the digest. It forwards `architect` items and judgement calls to the
+  architect session and decides nothing itself. No other agent session runs on a clock (CI's own
+  nightly workflows are unaffected).
+- **Models.** The architect runs on Opus. Developers run on Sonnet by default, or on Opus when the
+  issue has the `model-opus` label. The Expert is the only Fable agent. Interns run on Haiku. Triage
+  runs on Sonnet.
 
 <!-- BEGIN:turborepo-agent-rules -->
 
