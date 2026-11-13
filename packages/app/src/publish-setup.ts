@@ -75,6 +75,7 @@ export function setupPublishing(
   const afterPublish = publishHooks(catalog, captureWillRun, delivery, options.database);
   const completer = createPublishCompleter({
     db: options.database,
+    storage: options.storage,
     captureWillRun,
     afterPublish,
     logger,

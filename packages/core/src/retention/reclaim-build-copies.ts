@@ -49,13 +49,14 @@ export interface ReclaimCopiesResult {
   skipped: number;
 }
 
-interface BuildRow {
+export interface BuildRow {
   id: string;
   projectId: string;
   retentionState?: string;
+  status?: string;
 }
 
-type Progress = { done: true } | { done?: false; after?: string };
+export type Progress = { done: true } | { done?: false; after?: string };
 
 /** Visit the next page of builds; resolves with counts only. */
 export async function reclaimBuildCopies(deps: ReclaimCopiesDeps): Promise<ReclaimCopiesResult> {
@@ -89,7 +90,7 @@ async function visitPage(
   return true;
 }
 
-function parseProgress(raw: string | null): Progress {
+export function parseProgress(raw: string | null): Progress {
   if (raw === null) return {};
   try {
     const value = JSON.parse(raw) as { done?: unknown; after?: unknown };
@@ -100,7 +101,10 @@ function parseProgress(raw: string | null): Progress {
   }
 }
 
-async function listPage(db: DatabaseAdapter, after: string | undefined): Promise<BuildRow[]> {
+export async function listPage(
+  db: DatabaseAdapter,
+  after: string | undefined,
+): Promise<BuildRow[]> {
   const id = col(db.tables.builds, "id");
   const rows = await db.list(db.tables.builds, {
     ...(after === undefined ? {} : { where: gte(id, after) }),
