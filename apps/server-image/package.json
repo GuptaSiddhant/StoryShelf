@@ -1,0 +1,34 @@
+{
+  "name": "server-image",
+  "private": true,
+  "description": "StoryShelf product container image: an env-configured server, published on each stable release.",
+  "type": "module",
+  "scripts": {
+    "build": "rolldown -c rolldown.config.ts",
+    "start": "node dist/server.mjs",
+    "lint": "oxlint --type-aware --type-check server.ts env.ts env.test.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@storyshelf/app": "workspace:*",
+    "@storyshelf/auth": "workspace:*",
+    "@storyshelf/core": "workspace:*",
+    "@storyshelf/db-mysql": "workspace:*",
+    "@storyshelf/db-postgres": "workspace:*",
+    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/notify-chat": "workspace:*",
+    "@storyshelf/notify-email": "workspace:*",
+    "@storyshelf/observability": "workspace:*",
+    "@storyshelf/runner-playwright": "workspace:*",
+    "@storyshelf/storage-local": "workspace:*",
+    "@storyshelf/storage-s3": "workspace:*",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "rolldown": "*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
