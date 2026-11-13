@@ -210,8 +210,6 @@ const CSRF_PATHS = [
 function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   const { config, logger, getReady } = wiring;
   app.use("*", requestId());
-  // Gzip HTML pages and JSON answers (#868); runs last on the way out, after every header is set.
-  app.use("*", compression());
   // OTEL server spans (W3C extraction, route-template naming). Mounted right
   // after requestId so `storyshelf.req_id` resolves; `enduser.id` resolves
   // once storeScope runs downstream. Noop without an SDK.
@@ -239,6 +237,9 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
  */
 function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
   app.use("*", hostDispatch());
+  // Gzip portal HTML pages and JSON (#868). After hostDispatch, so content and alias hosts, which
+  // serve published files with their own handling, never reach it.
+  app.use("*", compression());
   app.use("*", sameSiteWrites(config));
 }
 
