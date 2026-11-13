@@ -127,6 +127,32 @@ Rules:
 
 - **Settled signalling and `.test()` runs (`settle.integration.test.ts` in both runners):** on any fixture, a render waits for Storybook's own event (no fallback warning, identical re-captures, the play error of a flaky story is reported), falls back to the fixed wait on a page with no channel (immediately) and on a silent channel (after the 5 s timeout), and `runTests` reports pass or fail per `.test()` entry. Only `fixtures/storybook-10` has test entries (`renders its label` and `clicks without error` pass, `fails on purpose` fails; written as bare `Primary.test(...)` statements, because the indexer ignores an exported call), so the Playwright suite also runs a build with `runTests` on (the failing test fails the build, results are stored, no snapshot is taken for a test) and one with it off (nothing stored). On Storybook 8 and 9 the same tests assert the no-op. The failing test needs no tag: it is inert unless a project turns `runTests` on, which only these tests do. Puppeteer: set `PUPPETEER_EXECUTABLE_PATH`.
 
+- **Browser golden path on the Fly container (`apps/fly-app/e2e/golden-path.test.ts`, gated: `STORYSHELF_E2E=1`; issue #941):** the seams the `app.request(...)` suites cannot see (the sign-in cookie, CSRF, HTMX swaps, keyboard review, response headers, a private published Storybook) tested in Chromium against the production image the Fly dry run already boots and seeds. It adds no server or seed of its own. With `e2e: true`, `fly-dry-run.yml` boots the image with password sign-in, `SECRET` and a confirmed `PUBLIC_BASE_URL`; after the normal seed (`seed.sh` is unchanged: it seeds the live demo) the spec, in the seeded `demo-design-system` project, creates a `git-log` channel and uploads a copy of the built `storybook-9` fixture with one story repainted by a CSS patch to a feature branch with the workspace CLI; waits on the API until the build settles with one `changed` snapshot; signs in through the login page; opens the build (the changed count) and the comparison, and approves with `a`; asserts the verdict through the API and, from `docker logs`, the structured `git state (log)` record (`state: "success"` for the build's commit on the `/testing` context; the `git-log` provider is the only git provider registered in `apps/fly-app/server.ts` and writes to the log only, so there is no outbound call); checks the build is private (anonymous request refused) and opens its Storybook as the signed-in viewer; and runs axe on each app page it visits, failing only on serious or critical violations. Every wait is on API, log or DOM state: no sleeps and no retries. A failed run leaves a Playwright trace in `E2E_TRACE_DIR`, uploaded as the `e2e-trace` artifact, and the job prints `docker logs`.
+
+  | Trigger                         | Fly dry run               | Browser step (`e2e`)                                        |
+  | ------------------------------- | ------------------------- | ----------------------------------------------------------- |
+  | Pull request                    | as before (heavy changes) | off                                                         |
+  | Pull request from `release/v*`  | always (forces `heavy`)   | on, so it gates the release through the required `ci` check |
+  | Push to `main`                  | as before                 | off                                                         |
+  | `nightly.yml`                   | as before                 | on                                                          |
+  | `workflow_dispatch` on `ci.yml` | as before                 | on                                                          |
+
+  To run it locally against `docker run` (from the repo root; needs Docker, `curl`, `jq`):
+
+  ```sh
+  nubx turbo build --filter=storyshelf
+  (cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook)
+  docker build -f apps/fly-app/Dockerfile -t storyshelf-fly .
+  docker run -d --name storyshelf -p 3000:3000 -e STORYSHELF_ADMIN_TOKEN=ci-admin-token \
+    -e SECRET=e2e-secret-that-is-long-enough-1234567890 -e AUTH_EMAIL=reviewer@example.com \
+    -e AUTH_PASSWORD=e2e-password-123 -e PUBLIC_BASE_URL=http://127.0.0.1:3000 storyshelf-fly
+  export STORYSHELF_URL=http://127.0.0.1:3000 STORYSHELF_ADMIN_TOKEN=ci-admin-token
+  apps/fly-app/seed.sh                                  # then wait until the demo builds settle
+  npx -y playwright@1.63.0 install chromium             # one-time
+  (cd apps/fly-app && E2E_EMAIL=reviewer@example.com E2E_PASSWORD=e2e-password-123 nub run test:e2e)
+  docker rm -f storyshelf
+  ```
+
 ### 5. Performance benchmark (manual: `nub run bench`)
 
 `scripts/bench/` measures the real app on `fixtures/storybook-9` (SQLite, local storage, Playwright at 2 pages, jobs at concurrency 1) and prints a table plus one JSON line. It is not part of `turbo verify` or `turbo test`; it needs Chromium and the built packages. Every Performance task reports its before and after with it (issue #853).
