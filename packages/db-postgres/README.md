@@ -55,6 +55,28 @@ All providers speak the standard Postgres wire protocol. Pick the connection str
 | Neon                          | `postgres://user:pass@<neon-host>/db?sslmode=require`                                                               | `ssl: true`                                                                          | Serverless pooler — keep `max` low (e.g. `max: 5`); pooled endpoints via PgBouncer need `prepare: false`                        |
 | Azure Database for PostgreSQL | `postgres://user:pass@<server>.postgres.database.azure.com:5432/db?sslmode=require`                                 | `ssl: true`                                                                          | Microsoft Entra ID (IAM) via injected `client` with an access token; otherwise password auth works with default pooling         |
 
+## RDS and Aurora with IAM authentication (`rds-iam`)
+
+`@storyshelf/db-postgres/rds-iam` connects to RDS or Aurora Postgres with a short-lived IAM token instead of a password, so there is nothing to rotate. Install the optional peers (`pg` and `@aws-sdk/rds-signer`); the standard AWS credential chain applies (ECS task role, instance role, web identity).
+
+```ts
+import { createRdsIamDatabase } from "@storyshelf/db-postgres/rds-iam";
+
+const database = createRdsIamDatabase({
+  host: "mydb.cluster-abc.eu-west-1.rds.amazonaws.com",
+  database: "storyshelf",
+  user: "storyshelf_app", // GRANT rds_iam TO storyshelf_app;
+  region: "eu-west-1",
+  ca: readFileSync("global-bundle.pem", "utf8"), // optional, recommended
+});
+```
+
+- **A fresh token for every new connection.** Tokens live 15 minutes; the pool asks for one each time it opens a connection, so it never reuses a stale one. An open connection stays valid after its token expires.
+- **TLS is always on.** With the RDS CA bundle for your region (`ca`) the server certificate is verified; without it the connection is encrypted but not verified (`sslmode=require`).
+- **Tokens stay out of logs and errors.** A signer failure is reported without the token, and `redactSecrets` removes presigned `X-Amz-*` values.
+- **A missing `@aws-sdk/rds-signer` fails at startup** with an install hint.
+- The database user needs the `rds_iam` role and the task role needs `rds-db:connect` on the database user.
+
 ## Client injection (IAM and advanced TLS)
 
 When `client` is supplied, all other connection options are ignored and the caller owns the client lifecycle. Use this for IAM token refresh or pre-configured TLS:

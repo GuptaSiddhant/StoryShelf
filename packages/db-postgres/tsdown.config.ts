@@ -5,6 +5,7 @@ export default libConfig({
   pg: "./src/pg.ts",
   neon: "./src/neon.ts",
   "neon-http": "./src/neon-http.ts",
+  "rds-iam": "./src/rds-iam.ts",
   vercel: "./src/vercel.ts",
   pglite: "./src/pglite.ts",
   ddl: "./src/ddl.ts",
