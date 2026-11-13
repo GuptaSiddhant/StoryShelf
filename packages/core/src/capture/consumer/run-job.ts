@@ -67,7 +67,11 @@ async function execute(rt: JobRuntime, job: ConsumerJob, logger: Logger): Promis
   return await runHandler(rt, { job, handler, logger });
 }
 
-/** Fail a job nobody can run (no handler for its kind) or that is malformed; null when runnable. */
+/**
+ * Settle a job this consumer cannot run now: a kind with no handler (a queue that does not filter
+ * by kind; the database queue never claims one), a payload newer than the handler reads, or a
+ * malformed job. Null when runnable.
+ */
 async function refuse(
   rt: JobRuntime,
   job: ConsumerJob,
@@ -79,12 +83,37 @@ async function refuse(
     await failJob(rt, job, `no handler registered for job kind "${job.kind ?? "capture"}"`, logger);
     return "unhandled";
   }
+  return (job.payloadVersion ?? 1) > (handler.payloadVersion ?? 1)
+    ? await handBackNewer(rt, job, logger)
+    : await refuseUnrunnable(rt, job, { handler, logger });
+}
+
+async function refuseUnrunnable(
+  rt: JobRuntime,
+  job: ConsumerJob,
+  held: { handler: KindHandler; logger: Logger },
+): Promise<JobOutcome | null> {
+  const { handler, logger } = held;
   if (handler.accepts?.(job) === false) {
     logger.warn({ attempts: job.attempts }, "dropping malformed queue job");
     await failJob(rt, job, "malformed job", logger);
     return "dropped";
   }
   return (await handler.superseded?.(job)) === true ? await endSuperseded(rt, job, logger) : null;
+}
+
+/** A newer release wrote this payload: give it back unrun, with its attempts unchanged. */
+async function handBackNewer(
+  rt: JobRuntime,
+  job: ConsumerJob,
+  logger: Logger,
+): Promise<JobOutcome> {
+  logger.warn(
+    { payloadVersion: job.payloadVersion },
+    "payload is newer than this handler; handing the job back",
+  );
+  await rt.queue.handBack?.(job, { reason: "payload version" });
+  return "handed-back";
 }
 
 /** The job's run was superseded: cancel it, so it ends `cancelled` with no build write. */

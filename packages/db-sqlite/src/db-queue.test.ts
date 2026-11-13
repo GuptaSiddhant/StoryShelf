@@ -7,6 +7,7 @@ import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   databaseQueueMultiInstanceSuite,
+  databaseQueueHandBackSuite,
   databaseQueueSingleFlightSuite,
   queueContractSuite,
 } from "@storyshelf/core/test-helpers";
@@ -46,6 +47,8 @@ queueContractSuite(
 databaseQueueMultiInstanceSuite("node:sqlite", freshDatabase);
 
 databaseQueueSingleFlightSuite("node:sqlite", freshDatabase);
+
+databaseQueueHandBackSuite("node:sqlite", freshDatabase);
 
 describe("poll probe on SQLite", () => {
   it("is one range scan of capture_jobs_poll_idx with no sort", async () => {

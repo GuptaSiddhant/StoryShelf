@@ -8,6 +8,7 @@ import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   databaseQueueMultiInstanceSuite,
+  databaseQueueHandBackSuite,
   databaseQueueSingleFlightSuite,
   queueContractSuite,
 } from "@storyshelf/core/test-helpers";
@@ -58,6 +59,8 @@ queueContractSuite(
 databaseQueueMultiInstanceSuite("PGlite", freshDatabase);
 
 databaseQueueSingleFlightSuite("PGlite", freshDatabase);
+
+databaseQueueHandBackSuite("PGlite", freshDatabase);
 
 describe("poll probe on Postgres", () => {
   it("is an index scan of capture_jobs_poll_idx with no sort", async () => {
