@@ -33,6 +33,7 @@ import { runBootTasks } from "./boot-tasks.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
+import { createClientIpResolver } from "./middleware/client-ip.ts";
 import {
   authGate,
   notFoundPage,
@@ -278,7 +279,9 @@ const DEFAULT_STORYBOOK_URL_RATE_LIMIT = 6000;
 
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
 function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOptions): void {
-  const rateLimit = createRateLimiter();
+  // One resolver for every bucket: a forwarded header counts only from a trusted proxy (#911).
+  const clientIp = createClientIpResolver(config.trustProxy);
+  const rateLimit = createRateLimiter(clientIp);
   // A render fetches thousands of assets from one farm IP, so this floor is generous; it counts
   // before the token is looked at and answers 429 alike for any token.
   const signedUrls = {
@@ -290,7 +293,7 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOption
     bucket: "signed-storybook",
   };
   for (const { paths, max, bucket } of [...RATE_LIMITS, signedUrls]) {
-    const keyGenerator = bucket ? rateLimitKey(bucket) : undefined;
+    const keyGenerator = bucket ? rateLimitKey(bucket, clientIp) : undefined;
     for (const path of paths) {
       app.use(path, rateLimit({ windowMs: MINUTE, max, keyGenerator }));
     }
