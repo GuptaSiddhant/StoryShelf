@@ -135,7 +135,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   header only from `sandboxHeaders` (route family + `config.storybookHosting.mode`, ADR 0051: never
   `allow-same-origin`). Both token routes are rate-limited per IP in one bucket before the token is
   read; every refusal returns one identical 404 (`refuseToken`) with `Cache-Control: private,
-no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
+  no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
   what a token grants, or accept one purpose on the other's route (ADR 0051 allows only these two
   routes plus the content host's `/_x/` exchange, purpose `exchange`, with #358; nothing more). Only `signedCacheControl`
   (`packages/app/src/routers/capture-cache.ts`) may give a signed answer freshness: a success for a
@@ -243,7 +243,17 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   move into `packages/core/src/integrations/`, `@storyshelf/image` folds into core, and the app
   stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
   accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
-  versioned Terraform module per cloud on the published image.
+  versioned Terraform module per cloud on the published image. ADR 0052 (story switching during
+  capture) is accepted behind `projects.switch_stories` (default off) and ships only after its
+  measurement gate passes.
+- **Migrations keep the previous release working (ADR 0053).** Release N must run unchanged on the
+  schema of N+1. Schema changes are expand steps (new table, nullable or constant-default column,
+  non-unique index, widening) in any release; a drop, rename, new `NOT NULL`, unique index, check
+  or type narrowing is a contract step, allowed only one minor after the last release that used the
+  thing. Rename = add, dual-write, drop over three releases. A new status value or job kind is read
+  first and written one release later; backfills are batched, idempotent jobs, never boot work.
+  Until the claim filter and payload version land, ship no new job kind or status value. A schema
+  change's changeset carries a `Schema:` line.
 - **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 
 ## Conventions
