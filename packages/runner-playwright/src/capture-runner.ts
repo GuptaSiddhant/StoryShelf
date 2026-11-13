@@ -42,7 +42,7 @@ export function createPlaywrightCaptureRunner(
     navigationTimeoutMs?: number;
     /** Captures between browser restarts (0 disables); falls back to `STORYSHELF_BROWSER_RECYCLE_EVERY`, then 150. */
     recycleBrowserEvery?: number;
-    /** Reuse pages between captures (opt-in); falls back to `STORYSHELF_REUSE_PAGES=1`. */
+    /** Reuse pages between captures (default on); falls back to `STORYSHELF_REUSE_PAGES`, where `0` or `false` turns it off. */
     reusePages?: boolean;
     /** Gzip small loopback Storybook assets when requested by the browser (default off). */
     staticCompression?: boolean;
