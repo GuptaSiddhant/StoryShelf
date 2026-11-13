@@ -26,6 +26,7 @@ export type {
 export type { BuildReview } from "./build-review.ts";
 /** Component row of a published build (`build_components`). */
 export type { BuildComponent } from "./build-component.ts";
+export { SCHEMA_META_ID, type SchemaMeta } from "./schema-meta.ts";
 export type { SiteSetting } from "./site-setting.ts";
 /** Review comment row as stored in the `comments` table. */
 export type { Comment, CommentMention } from "./comment.ts";

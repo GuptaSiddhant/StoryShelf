@@ -23,7 +23,7 @@ import {
   recentEntries,
   statusOf,
 } from "./operations.ts";
-import { ackJob, nackJob, pollJob } from "./poll.ts";
+import { ackJob, handBackJob, nackJob, pollJob } from "./poll.ts";
 import {
   DEFAULT_LEASE_MS,
   DEFAULT_RETRIES,
@@ -64,6 +64,12 @@ export function createDatabaseCaptureQueue(
     active: async () => await activeEntries(rt),
     recent: async (limit) => await recentEntries(rt, limit),
     cancel: async (id) => await cancelJobs(rt, id),
+    claimOnly: (handled) => {
+      rt.claimKinds = rt.kinds.filter((kind) => handled.includes(kind));
+    },
+    handBack: async (job, handBackOptions) => {
+      await handBackJob(rt, job, handBackOptions);
+    },
     poll: async (pollOptions) => await pollJob(rt, pollOptions),
     ack: async (job) => {
       await ackJob(rt, job);
@@ -90,6 +96,7 @@ function resolveRuntime(db: DatabaseAdapter, options: DatabaseCaptureQueueOption
     model: new CaptureJobModel(db),
     builds: new BuildModel(db),
     kinds,
+    claimKinds: kinds,
     leaseMs: positive(options.leaseMs, DEFAULT_LEASE_MS),
     maxAttempts: retries + 1,
     owner: options.owner ?? `${hostname()}:${String(process.pid)}:${ulid().slice(-6)}`,

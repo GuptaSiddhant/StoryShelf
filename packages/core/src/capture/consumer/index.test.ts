@@ -45,22 +45,59 @@ describe("createCaptureConsumer over the database queue", () => {
     await started;
   });
 
-  it("fails a job of a kind without a handler, with a clear error, and keeps consuming", async () => {
+  it("never claims a kind it has no handler for: the job stays queued untouched", async () => {
     const capture = recordingHandler();
     const r = rig({ kinds: ["capture", "publish"], handlers: { capture } });
     const consumer = r.consume();
     const started = consumer.start();
     const publishId = await r.queue.enqueueJob({ kind: "publish", buildId: "b1" });
-    await r.clock.advance(3000);
-
-    const row = await stateOf(r, publishId);
-    expect(row?.status).toBe("failed");
-    expect(row?.error).toBe('no handler registered for job kind "publish"');
-    expect(r.log.calls.some((call) => call.level === "error")).toBe(true);
-
     await r.queue.enqueue({ buildId: "b2" });
     await r.clock.advance(3000);
+
     expect(capture.jobs.map((job) => job.buildId)).toEqual(["b2"]);
+    expect(await stateOf(r, publishId)).toMatchObject({
+      status: "queued",
+      attempt: 0,
+      error: null,
+    });
+    expect(await new CaptureJobModel(r.db).attempts(publishId)).toEqual([]);
+    await consumer.stop();
+    await started;
+  });
+
+  it("hands a newer payload back with its attempts unchanged, and runs the older ones", async () => {
+    const capture = recordingHandler();
+    const r = rig({ handlers: { capture } });
+    const consumer = r.consume();
+    const started = consumer.start();
+    const model = new CaptureJobModel(r.db);
+    const newer = await model.create(
+      { id: "j-newer", kind: "capture", buildId: "b1", maxAttempts: 3, payload: '{"v":2}' },
+      new Date(r.clock.now()).toISOString(),
+    );
+    await r.queue.enqueue({ buildId: "b2" });
+    await r.clock.advance(3000);
+
+    expect(capture.jobs.map((job) => job.buildId)).toEqual(["b2"]);
+    const row = await stateOf(r, newer.id);
+    expect(row).toMatchObject({ status: "queued", attempt: 0, error: null });
+    expect(new Date(row?.visibleAt ?? 0).getTime()).toBeGreaterThan(r.clock.now());
+    expect(await model.attempts(newer.id)).toEqual([]);
+    await consumer.stop();
+    await started;
+  });
+
+  it("runs a newer payload once its handler declares it reads that version", async () => {
+    const capture = recordingHandler();
+    const r = rig({ handlers: { capture: { run: capture.run, payloadVersion: 2 } } });
+    const consumer = r.consume();
+    const started = consumer.start();
+    await new CaptureJobModel(r.db).create(
+      { id: "j2", kind: "capture", buildId: "b1", maxAttempts: 3, payload: '{"v":2}' },
+      new Date(r.clock.now()).toISOString(),
+    );
+    await r.clock.advance(3000);
+    expect(capture.jobs.map((job) => job.buildId)).toEqual(["b1"]);
     await consumer.stop();
     await started;
   });

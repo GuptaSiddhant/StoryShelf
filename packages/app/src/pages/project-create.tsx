@@ -1,3 +1,4 @@
+import { csrfField } from "../shell/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { Alert, Button, Card, Field, HStack, PageHeader } from "../ui/components.tsx";
 
@@ -41,6 +42,7 @@ function ProjectCreateForm(props: {
           hx-swap="outerHTML"
           novalidate
         >
+          {csrfField()}
           <Field
             label="Name"
             name="name"

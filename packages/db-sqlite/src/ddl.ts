@@ -152,6 +152,11 @@ CREATE INDEX IF NOT EXISTS capture_jobs_poll_idx ON capture_jobs (kind, visible_
 CREATE INDEX IF NOT EXISTS capture_jobs_job_id_idx ON capture_jobs (job_id);
 CREATE INDEX IF NOT EXISTS capture_jobs_build_id_idx ON capture_jobs (build_id);
 CREATE INDEX IF NOT EXISTS capture_jobs_entry_created_idx ON capture_jobs (entry, created_at);
+CREATE TABLE IF NOT EXISTS schema_meta (
+  id TEXT PRIMARY KEY,
+  version TEXT NOT NULL,
+  migrated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS site_settings (
   id TEXT PRIMARY KEY,
   value TEXT NOT NULL,

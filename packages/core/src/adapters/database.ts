@@ -16,6 +16,19 @@ import type { MigrationContext } from "./skipped-index.ts";
 export class ReferenceGenerationConflict extends Error {}
 
 export {
+  decideMigration,
+  gatedMigration,
+  sqlSchemaLevelStore,
+  normalizeRelease,
+  SchemaTooNewError,
+  type GatedMigration,
+  type MigrationDecision,
+  type SchemaLevelDialect,
+  type SchemaLevelQuery,
+  type SchemaLevelStore,
+} from "./schema-level.ts";
+
+export {
   duplicateGroupsSql,
   logSkippedIndex,
   parseUniqueIndex,
@@ -39,6 +52,7 @@ export interface Tables {
   buildComponents: Table;
   buildReviews: Table;
   siteSettings: Table;
+  schemaMeta: Table;
   snapshots: Table;
   baselines: Table;
   comments: Table;

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
-import { decodePayload, encodePayload, toDatabaseJob, toQueueEntry } from "./codec.ts";
+import {
+  decodePayload,
+  encodePayload,
+  PAYLOAD_VERSION,
+  toDatabaseJob,
+  toQueueEntry,
+} from "./codec.ts";
 
 const row: CaptureJobRow = {
   id: "j1",
@@ -34,14 +40,20 @@ describe("payload codec", () => {
       data: { channelId: "c1" },
     });
     expect(decodePayload(encoded)).toEqual({
+      v: PAYLOAD_VERSION,
       reqId: "r1",
       traceparent: "00-a-b-01",
       data: { channelId: "c1" },
     });
   });
 
-  it("stores nothing for an empty payload", () => {
-    expect(encodePayload({ kind: "capture", data: {} })).toBeNull();
+  it("stamps the payload version, even on an empty payload", () => {
+    expect(decodePayload(encodePayload({ kind: "capture", data: {} }))).toEqual({
+      v: PAYLOAD_VERSION,
+    });
+    expect(decodePayload('{"v":2,"data":{"a":1}}')).toEqual({ v: 2, data: { a: 1 } });
+    expect(decodePayload('{"v":"2"}')).toEqual({});
+    expect(decodePayload('{"v":0}')).toEqual({});
     expect(decodePayload(null)).toEqual({});
     expect(decodePayload("")).toEqual({});
   });
@@ -67,6 +79,7 @@ describe("row mappings", () => {
       receipt: "j1:2",
       leaseMs: 1000,
       data: {},
+      payloadVersion: 1,
       shard: "s1",
       reqId: "r1",
       traceparent: "tp",

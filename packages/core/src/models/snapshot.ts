@@ -67,7 +67,11 @@ export class SnapshotModel {
       durationMs: input.durationMs ?? null,
       a11yViolations: input.a11yViolations ?? null,
       unstable: null,
-      status: "pending",
+      status: input.status ?? "pending",
+      diffPath: input.diffPath ?? null,
+      diffPixels: input.diffPixels ?? null,
+      diffRatio: input.diffRatio ?? null,
+      diffPassed: input.diffPassed ?? null,
       createdAt: now,
       updatedAt: now,
     })) as unknown as Snapshot;
@@ -213,4 +217,11 @@ export interface SnapshotCreateInput {
   durationMs?: number | null;
   /** JSON array of axe violation texts found on this capture; null when none. */
   a11yViolations?: string | null;
+  /** Final status when the outcome is known at insert time (default `pending`). */
+  status?: SnapshotStatus;
+  /** Diff outcome, written with the row so a capture is one insert; a passing diff has no overlay. */
+  diffPath?: string | null;
+  diffPixels?: number | null;
+  diffRatio?: number | null;
+  diffPassed?: boolean | null;
 }
