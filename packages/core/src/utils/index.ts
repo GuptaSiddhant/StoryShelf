@@ -13,6 +13,7 @@ export {
   type SecretInput,
   type SecretKeys,
 } from "./encrypt.ts";
+export { isStorageNotFound } from "./storage-not-found.ts";
 export { hmacSha256, randomToken, sha256, timingSafeEqualString } from "./hash.ts";
 export { HttpError } from "./http.ts";
 export {
