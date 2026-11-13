@@ -8,7 +8,7 @@ import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
 import { countHiddenSnapshots } from "../hidden-data.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
 import { buildUsageReport } from "../insights/usage-report.ts";
-import { notificationsPaused } from "../notifications-pause.ts";
+import { pausedBannerShown } from "../notifications-pause.ts";
 import { renderAdminAiPage } from "../pages/admin-ai.tsx";
 import { renderAdminSystemPage, type AdminSystemData } from "../pages/admin-system.tsx";
 import { getStore } from "../store.ts";
@@ -86,12 +86,6 @@ function reencryptMessage(result: { reencrypted: number; failed: number }): stri
   return result.failed > 0 ? `${base}; ${result.failed} failed — see server logs` : base;
 }
 
-/** Whether the System page warns that notifications are paused. */
-async function pausedView(): Promise<boolean> {
-  const store = getStore();
-  return store.notifiers.length > 0 && (await notificationsPaused(store));
-}
-
 /** The System page's capture browsers and public origin (ADR 0007). */
 async function captureView(): Promise<
   Pick<AdminSystemData, "targets" | "publicOrigin" | "notificationsPaused" | "retentionPause">
@@ -100,7 +94,7 @@ async function captureView(): Promise<
     retentionPause: getStore().db.retentionPause,
     targets: await runnerTargets(),
     publicOrigin: await publicOriginView(),
-    notificationsPaused: await pausedView(),
+    notificationsPaused: await pausedBannerShown(getStore()),
   };
 }
 
