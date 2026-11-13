@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { baselinePath, contentPath } from "../utils/paths.ts";
 import { BaselineModel } from "./baseline.ts";
@@ -66,6 +66,49 @@ describe("BaselineModel", () => {
     const resolved = await model.resolve("p1", "story", "desktop", "feature", "main");
     expect(resolved?.id).toBe(feature.id);
     expect(main.id).toBeDefined();
+  });
+
+  it("loadFor answers like resolve for every key, in one query", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
+    await storage.write("source/shot.png", PNG);
+    const up = (story: string, branch: string, browser = "chromium") =>
+      model.upsert("p1", story, "desktop", branch, "snap", "source/shot.png", undefined, {
+        browser,
+      });
+    await up("a", "main");
+    await up("a", "feature");
+    await up("b", "main");
+    await up("b", "main", "firefox");
+    await up("c", "other");
+    const list = vi.spyOn(db, "list");
+    const map = await model.loadFor("p1", "feature", "main", ["chromium", "firefox"]);
+    expect(list).toHaveBeenCalledTimes(1);
+    const keys = [
+      ["a", "chromium"],
+      ["b", "chromium"],
+      ["b", "firefox"],
+      ["c", "chromium"],
+      ["a", "firefox"],
+    ] as const;
+    const expected = await Promise.all(
+      keys.map(([story, browser]) =>
+        model.resolve("p1", story, "desktop", "feature", "main", browser),
+      ),
+    );
+    expect(keys.map(([story, browser]) => map.get(story, "desktop", browser)?.id ?? null)).toEqual(
+      expected.map((row) => row?.id ?? null),
+    );
+  });
+
+  it("loadFor on the default branch and with no engines", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
+    const main = await seedBaseline(model, storage);
+    const map = await model.loadFor("p1", "main", "main", ["chromium"]);
+    expect(map.get("components-button--primary", "desktop")?.id).toBe(main.id);
+    const none = await model.loadFor("p1", "main", "main", []);
+    expect(none.get("components-button--primary", "desktop")).toBeNull();
   });
 
   it("falls back to the default branch baseline", async () => {

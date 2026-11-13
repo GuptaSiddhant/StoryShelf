@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel } from "@storyshelf/core/models";
 import { CommentModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
@@ -215,7 +216,7 @@ export function registerUiPages(app: ShelfRouter): void {
           build.id,
           selectedSnapshot(snapshots, snapshotId)?.storyImportPath ?? null,
         ).catch(() => []),
-        publishedBaseDomain: getStore().config.publishedBaseDomain,
+        publishedBaseDomain: contentHostSuffix(getStore().config),
       }),
     );
   });

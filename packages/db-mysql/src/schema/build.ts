@@ -34,6 +34,7 @@ export const builds = mysqlTable(
     reviewCycle: int("review_cycle").notNull().default(0),
     reviewRequestedCycle: int("review_requested_cycle"),
     captureJobId: varchar("capture_job_id", { length: 26 }),
+    manifestSha256: varchar("manifest_sha256", { length: 64 }),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
@@ -70,6 +71,7 @@ export interface Build {
   reviewCycle: number;
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
+  manifestSha256: string | null;
   createdAt: string;
   updatedAt: string;
 }

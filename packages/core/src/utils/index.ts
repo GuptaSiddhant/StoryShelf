@@ -13,6 +13,7 @@ export {
   type SecretInput,
   type SecretKeys,
 } from "./encrypt.ts";
+export { DELETE_BATCH_SIZE, MAX_DELETE_BATCHES, deleteInBatches } from "./batched-delete.ts";
 export { isStorageNotFound } from "./storage-not-found.ts";
 export { hmacSha256, randomToken, sha256, timingSafeEqualString } from "./hash.ts";
 export { HttpError } from "./http.ts";
@@ -88,6 +89,10 @@ export {
   MIN_STORYBOOK_URL_TTL,
   MIN_STORYBOOK_URL_TTL_OVERRIDE,
   PER_CAPTURE_BUDGET_MS,
+  STORYBOOK_COOKIE_TTL,
+  STORYBOOK_EXCHANGE_PREFIX,
+  STORYBOOK_GRANT_COOKIE,
+  STORYBOOK_EXCHANGE_TTL,
   STORYBOOK_READ_PREFIX,
   STORYBOOK_READ_TTL,
   STORYBOOK_TOKEN_PREFIX,
@@ -95,6 +100,7 @@ export {
   STORYBOOK_URL_TTL_GRACE,
   assertStorybookUrlTtl,
   signStorybookToken,
+  storybookExchangePath,
   storybookReadPath,
   storybookTokenPath,
   storybookUrlTtl,
