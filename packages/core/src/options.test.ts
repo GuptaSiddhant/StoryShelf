@@ -8,6 +8,7 @@ import {
   resolveShelfOptions,
   sequentialTransactionsWarning,
 } from "./options.ts";
+import { makeFakeDesign } from "./test-helpers/fake-design.ts";
 
 const runner = { metadata: { kind: "r" } } as unknown as CaptureRunner;
 const base = {
@@ -16,6 +17,26 @@ const base = {
 } as unknown as ShelfOptions;
 
 describe("resolveShelfOptions", () => {
+  it("resolves the integration groups into lists (ADR 0049)", () => {
+    const design = makeFakeDesign().provider;
+    const resolved = resolveShelfOptions({
+      ...base,
+      design: (builtIn) => [...builtIn, design],
+      notifications: { notifiers: false, config: { fromName: "Shelf" } },
+    });
+    expect(resolved.design).toEqual([design]);
+    expect(resolved.notifications?.notifiers).toEqual([]);
+    expect(resolved.notifications?.email).toEqual([]);
+    expect(resolved.notifications?.config).toEqual({ fromName: "Shelf" });
+  });
+
+  it("throws at startup on a repeated provider kind, naming it", () => {
+    const design = makeFakeDesign("figma").provider;
+    expect(() => resolveShelfOptions({ ...base, design: [design, design] })).toThrow(
+      /design\[1\] \(".*"\): kind "figma" is already used/u,
+    );
+  });
+
   it("defaults scratchDir for a hosting-only deployment: publishing extracts zips there", () => {
     expect(resolveShelfOptions(base).config?.scratchDir).toBe(DEFAULT_SCRATCH_DIR);
   });

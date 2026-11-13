@@ -16,7 +16,7 @@ import {
 import type {
   NotificationsConfig,
   ShelfConfig,
-  ShelfOptions,
+  ResolvedShelfOptions,
   UIConfig,
 } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
@@ -78,7 +78,7 @@ export interface NotifyDeps {
 }
 
 /** The dependencies of a background fan-out, from the app's options and runtime. */
-export function notifyDepsFor(options: ShelfOptions, runtime: ServerRuntime): NotifyDeps {
+export function notifyDepsFor(options: ResolvedShelfOptions, runtime: ServerRuntime): NotifyDeps {
   return {
     db: options.database,
     config: runtime.config,
