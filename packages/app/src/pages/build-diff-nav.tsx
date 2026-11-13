@@ -59,6 +59,8 @@ export interface DiffNavProps {
   build: Build;
   snapshots: Snapshot[];
   selectedId?: string;
+  /** Mark the list for an out-of-band swap (the in-place answer to approve and reject). */
+  oob?: boolean;
 }
 
 function FilmItem(props: {
@@ -157,6 +159,45 @@ function groupByComponent(groups: SnapshotGroup[]): [string, SnapshotGroup[]][] 
   return [...byTitle.entries()];
 }
 
+/** The skip link past the filmstrip; left out of the out-of-band swap, which keeps the page's own. */
+function SkipToComparison(): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <a class="skip-link" href="#snapshot-heading" data-skip-to-comparison>
+      Skip to comparison
+    </a>
+  );
+}
+
+/** The filmstrip's filters: needing review, all, done and (when any) a11y findings, with counts. */
+function FilterChips(props: {
+  groups: SnapshotGroup[];
+  progress: ReturnType<typeof reviewProgress>;
+  filter: "review" | "all";
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { groups, progress, filter } = props;
+  const withA11y = groups.filter(
+    (group) => a11yFindingsOf(a11yCarrierOf(group.representative, group.members)).length > 0,
+  ).length;
+  return (
+    <div class={filmstripHead}>
+      <Segmented
+        label="Filter snapshots"
+        data-filter-switch
+        items={[
+          {
+            label: `Needs review ${progress.pending}`,
+            value: "review",
+            active: filter === "review",
+          },
+          { label: `All ${groups.length}`, value: "all", active: filter === "all" },
+          { label: `Done ${progress.done}`, value: "done" },
+          ...(withA11y > 0 ? [{ label: `A11y ${withA11y}`, value: "a11y" }] : []),
+        ]}
+      />
+    </div>
+  );
+}
+
 /** Left filmstrip: filter chips plus a thumbnail per story/mode (browsers share one entry). */
 export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, selectedId } = props;
@@ -165,31 +206,16 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
   const components = groupByComponent(groups);
   const progress = reviewProgress(snapshots);
   const filter = progress.pending > 0 ? "review" : "all";
-  const withA11y = groups.filter(
-    (group) => a11yFindingsOf(a11yCarrierOf(group.representative, group.members)).length > 0,
-  ).length;
   return (
     <>
-      <a class="skip-link" href="#snapshot-heading" data-skip-to-comparison>
-        Skip to comparison
-      </a>
-      <aside class={filmstrip} aria-label="Snapshots">
-        <div class={filmstripHead}>
-          <Segmented
-            label="Filter snapshots"
-            data-filter-switch
-            items={[
-              {
-                label: `Needs review ${progress.pending}`,
-                value: "review",
-                active: filter === "review",
-              },
-              { label: `All ${groups.length}`, value: "all", active: filter === "all" },
-              { label: `Done ${progress.done}`, value: "done" },
-              ...(withA11y > 0 ? [{ label: `A11y ${withA11y}`, value: "a11y" }] : []),
-            ]}
-          />
-        </div>
+      {props.oob ? null : <SkipToComparison />}
+      <aside
+        class={filmstrip}
+        id="review-filmstrip"
+        aria-label="Snapshots"
+        hx-swap-oob={props.oob ? "true" : undefined}
+      >
+        <FilterChips groups={groups} progress={progress} filter={filter} />
         <div data-diff-nav data-current={selectedId} data-filter={filter} class={filteredList}>
           {components.map(([title, list]): HtmlEscapedString | Promise<HtmlEscapedString> => (
             <ComponentGroup

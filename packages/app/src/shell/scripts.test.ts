@@ -524,6 +524,52 @@ describe("shell focus handling", () => {
     expect(document.activeElement?.textContent).toBe("Heading");
   });
 
+  it("after an in-place swap, wires the new canvas and focuses its heading without scrolling", () => {
+    const { document, CustomEvent } = drawerPage();
+    const old = document.createElement("div");
+    old.id = "review-canvas";
+    const fresh = document.createElement("div");
+    fresh.id = "review-canvas";
+    fresh.innerHTML = `<h2 id="snapshot-heading" tabindex="-1" data-focus-heading>Next</h2>
+      <div data-compare data-view="side"></div><textarea autofocus></textarea>`;
+    document.querySelector("main")?.append(fresh);
+    fresh.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { bubbles: true, detail: { target: old } }),
+    );
+    expect(document.activeElement?.textContent).toBe("Next");
+    expect(fresh.querySelector<HTMLElement>("[data-compare]")?.dataset["ready"]).toBe("1");
+  });
+
+  it("merges only the missing rules of an in-place swap's stylesheet and drops the block", () => {
+    const { document, CustomEvent } = drawerPage();
+    const sheet = document.createElement("style");
+    sheet.id = "storyshelf-css";
+    sheet.textContent = ".a{x:1}";
+    document.body.append(sheet);
+    const detail = {
+      target: document.createElement("div"),
+      serverResponse:
+        '<style id="storyshelf-css">.a{x:1}.b{y:2;&:hover{z:3}}</style><div id="c"></div>',
+    };
+    document.body.dispatchEvent(new CustomEvent("htmx:beforeSwap", { bubbles: true, detail }));
+    expect(sheet.textContent).toBe(".a{x:1}.b{y:2;&:hover{z:3}}");
+    expect(detail.serverResponse).toBe('<div id="c"></div>');
+  });
+
+  it("after an in-place comment swap, focuses the emptied box", () => {
+    const { document, CustomEvent } = drawerPage();
+    const old = document.createElement("section");
+    old.id = "snapshot-comments";
+    const fresh = document.createElement("section");
+    fresh.id = "snapshot-comments";
+    fresh.innerHTML = `<button>Mark resolved</button><textarea autofocus></textarea>`;
+    document.querySelector("main")?.append(fresh);
+    fresh.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { bubbles: true, detail: { target: old } }),
+    );
+    expect(document.activeElement?.tagName).toBe("TEXTAREA");
+  });
+
   it("keeps aria-expanded of the collapse button in step with the rail", () => {
     const dom = new JSDOM(
       `<body><button data-sidebar-collapse aria-expanded="true"></button></body>`,

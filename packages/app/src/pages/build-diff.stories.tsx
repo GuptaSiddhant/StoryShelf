@@ -223,3 +223,15 @@ export const ParametersNotApplied = pageStory(() =>
     }),
   ),
 );
+
+/** A snapshot as the reviewer left it: an open change approved, anything else as it was. */
+function decided(snapshot: Snapshot): Snapshot {
+  const open = snapshot.status === "new" || snapshot.status === "changed";
+  return open ? Object.assign(structuredClone(snapshot), { status: "approved" }) : snapshot;
+}
+
+/** Every change decided: the stage says the review is complete (what the last approve swaps in). */
+export const ReviewComplete = pageStory(() => {
+  const all = reviewData().snapshots.map((snapshot) => decided(snapshot));
+  return renderBuildDiffPage(reviewData({ snapshots: all }));
+});

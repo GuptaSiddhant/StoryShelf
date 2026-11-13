@@ -37,6 +37,8 @@ export interface DiffHeaderProps {
   canManage?: boolean;
   /** Loaded build details; without them the header assumes capture is on. */
   details?: BuildDetailsData;
+  /** Mark the header for an out-of-band swap (the in-place answer to approve and reject). */
+  oob?: boolean;
 }
 
 interface BulkProps {
@@ -194,7 +196,7 @@ export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<
   const reviewOn = project.reviewEnabled !== false;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
-    <header class={reviewHeader}>
+    <header class={reviewHeader} id="review-header" hx-swap-oob={props.oob ? "true" : undefined}>
       <div class={headerMain}>
         <HeaderTitle {...props} />
       </div>
