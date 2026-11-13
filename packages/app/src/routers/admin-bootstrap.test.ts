@@ -117,6 +117,7 @@ describe("admin token bootstrap", () => {
       headers: {
         "content-type": "application/json",
         cookie: "storyshelf_session=ok",
+        "sec-fetch-site": "same-origin",
       },
       body: JSON.stringify({ name: "Owned Project" }),
     });

@@ -134,6 +134,7 @@ describe("bearer token permissions", () => {
       headers: {
         "content-type": "application/json",
         cookie: "storyshelf_session=dev",
+        "sec-fetch-site": "same-origin",
       },
       body: JSON.stringify({ name: "ci" }),
     });
@@ -145,6 +146,7 @@ describe("bearer token permissions", () => {
       headers: {
         "content-type": "application/json",
         cookie: "storyshelf_session=admin",
+        "sec-fetch-site": "same-origin",
       },
       body: JSON.stringify({ name: "ci" }),
     });
