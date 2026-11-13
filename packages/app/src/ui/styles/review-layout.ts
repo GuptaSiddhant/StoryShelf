@@ -149,13 +149,54 @@ export const filmstripList = css`
   }
 `;
 
+export const filmGroup = css`
+  /* film-group */
+  display: block;
+  @media (max-width: 1024px) {
+    & {
+      display: contents;
+    }
+  }
+`;
+
+export const filmGroupHead = css`
+  /* film-group-head */
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  @media (max-width: 1024px) {
+    & {
+      flex: none;
+      align-items: center;
+      max-width: 160px;
+      border-bottom: 0;
+      border-right: 1px solid var(--border-subtle);
+      white-space: nowrap;
+    }
+    & > :first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+`;
+
 export const filmItem = css`
   /* film-item */
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: var(--space-3);
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: var(--space-2);
   align-items: center;
-  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
   border-left: 3px solid transparent;
   color: inherit;
@@ -164,6 +205,10 @@ export const filmItem = css`
   &:hover {
     background: var(--surface-subtle);
     text-decoration: none;
+  }
+  &[data-status="approved"],
+  &[data-status="rejected"] {
+    color: var(--text-secondary);
   }
   @media (max-width: 1024px) {
     & {
@@ -180,10 +225,10 @@ export const filmItem = css`
 export const filmItemActive = css`
   /* film-item-active */
   ${filmItem}
-  background: var(--accent-subtle);
+  background: var(--accent-wash);
   border-left-color: var(--accent);
   &:hover {
-    background: var(--accent-subtle);
+    background: var(--accent-wash);
   }
   @media (max-width: 1024px) {
     & {
@@ -193,27 +238,11 @@ export const filmItemActive = css`
   }
 `;
 
-export const filmBody = css`
-  /* film-body */
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-`;
-
 export const filmTitle = css`
   /* film-title */
   overflow: hidden;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-export const filmSub = css`
-  /* film-sub */
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 `;
@@ -223,9 +252,10 @@ export const filmStatus = css`
   display: inline-flex;
   gap: var(--space-1);
   align-items: center;
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 `;
 
 const dot = css`

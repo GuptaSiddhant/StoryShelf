@@ -115,6 +115,14 @@ describe("review workspace page", () => {
   });
 });
 
+describe("review page snapshot list", () => {
+  it("groups under one component header and labels each status dot", async () => {
+    const { html } = await reviewPage();
+    expect(html.match(/<h3 class="[^"]*film-group-head/gu)).toHaveLength(1);
+    expect(html).toContain('<span class="visually-hidden">changed</span>');
+  });
+});
+
 describe("review page breadcrumb", () => {
   it("lists Builds only: the build is the current page, so its heading names it", async () => {
     const { html } = await reviewPage();
@@ -363,7 +371,8 @@ describe("review page: accessibility violations", () => {
     const html = await pageWith(JSON.stringify([VIOLATION]));
     expect(html).toContain("Accessibility: 1 found on chromium (does not block)");
     expect(html).toContain("color-contrast (serious)");
-    expect(html).toContain("a11y 1 (chromium)");
+    expect(html).toContain("a11y 1");
+    expect(html).not.toContain("(chromium)");
   });
 
   it("sums the findings in the header and offers an a11y filter on the snapshot list", async () => {
