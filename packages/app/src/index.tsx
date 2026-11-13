@@ -35,10 +35,10 @@ import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import { createClientIpResolver } from "./middleware/client-ip.ts";
+import { compression } from "./middleware/compression.ts";
 import {
   authGate,
   notFoundPage,
-  csrf,
   createRateLimiter,
   hostDispatch,
   requireProjectVisible,
@@ -84,6 +84,7 @@ import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
 import { registerWellKnown } from "./routers/well-known.ts";
 import { markRouteClasses } from "./routes/openapi-classes.ts";
+import { mountCsrf } from "./routes/write-protection.ts";
 import { resolveRuntime, type ServerRuntime } from "./runtime.ts";
 
 /**
@@ -187,24 +188,6 @@ export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
   return app;
 }
 
-/** Cookie-authenticated write paths guarded by CSRF tokens. */
-const CSRF_PATHS = [
-  "/auth/logout",
-  "/auth/invites/*",
-  "/projects/:slug/settings/*",
-  "/profile/*",
-  "/connections/*",
-  "/profile",
-  "/admin/credentials/*",
-  "/admin/public-origin",
-  "/admin/public-origin/*",
-  "/projects/:slug/builds/:buildId/insights/generate",
-  "/projects/:slug/builds/:buildId/comments",
-  "/projects/:slug/builds/:buildId/comments/*",
-  "/projects/:slug/builds/:buildId/reviews",
-  "/projects/:slug/insights/health/generate",
-] as const;
-
 /** Attach global middleware: ids, logging, init gate, limits, store scope, auth gate. */
 function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   const { config, logger, getReady } = wiring;
@@ -236,6 +219,9 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
  */
 function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
   app.use("*", hostDispatch());
+  // Gzip portal HTML pages and JSON (#868). After hostDispatch, so content and alias hosts, which
+  // serve published files with their own handling, never reach it.
+  app.use("*", compression());
   app.use("*", sameSiteWrites(config));
 }
 
@@ -321,9 +307,8 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOption
       app.use(path, rateLimit({ windowMs: MINUTE, max, keyGenerator }));
     }
   }
-  for (const path of CSRF_PATHS) {
-    app.use(path, csrf(config.secret));
-  }
+  // CSRF tokens on page writes; the same-origin rule (`sameSiteWrites`) covers every write (#786).
+  mountCsrf(app, config.secret);
 }
 
 /** Mount the request-scoped store (db/storage/config/user/adapters). */

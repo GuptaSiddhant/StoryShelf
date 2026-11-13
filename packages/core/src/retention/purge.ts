@@ -26,7 +26,7 @@ export {
   type SweepTables,
 } from "./screenshot-sweep.ts";
 import { col } from "../models/columns.ts";
-export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
+export { purgeAiData, STALE_RUN_MS, type AiPurgeResult, type AiRetention } from "./ai.ts";
 export {
   deleteClaimedBuild,
   type BuildDeletionDeps,
@@ -40,6 +40,12 @@ export {
   type ContentBackfillDeps,
   type ContentBackfillResult,
 } from "./content-backfill.ts";
+export {
+  checkStorage,
+  type StorageCheckDeps,
+  type StorageCheckOptions,
+  type StorageCheckResult,
+} from "./storage-check.ts";
 export { CONTENT_GRACE_MS, collectUnreferencedContent, type ContentGcDeps } from "./content-gc.ts";
 export {
   purgeClaimedBuilds,
