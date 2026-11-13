@@ -96,7 +96,11 @@ export function clampListLimit(limit?: number): number | undefined {
 export interface ListOptions {
   /** SQL WHERE condition. */
   where?: SQL;
-  /** SQL ORDER BY condition. */
+  /**
+   * SQL ORDER BY condition. Every adapter appends `id` as the final tie-break,
+   * and orders by `id` alone when this is omitted, so equal sort keys come back
+   * in the same (creation) order on every dialect.
+   */
   orderBy?: SQL;
   /** Maximum number of rows to return. */
   limit?: number;

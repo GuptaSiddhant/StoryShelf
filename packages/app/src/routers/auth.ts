@@ -1,7 +1,7 @@
 import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
 import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
-import { SESSION_COOKIE } from "@storyshelf/core/types";
+import { HOST_SESSION_COOKIE, SESSION_COOKIE } from "@storyshelf/core/types";
 import { UserFacingError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -383,6 +383,16 @@ export function registerEngineAuth(app: ShelfRouter, engine: Auth): void {
       `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? "; Secure" : ""}`,
       { append: true },
     );
+    if (secure) {
+      // The `__Host-` name `subdomain` hosting uses (ADR 0051, decision 9); only a Secure line may touch it.
+      c.header(
+        "set-cookie",
+        `${HOST_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`,
+        {
+          append: true,
+        },
+      );
+    }
     return hxRedirect(c, "/auth/login");
   });
 }

@@ -1,6 +1,6 @@
 ---
 title: Published Storybook
-description: Share the latest Storybook — path-based URLs, per-project subdomains, and public-branch access control.
+description: Share the latest Storybook — path-based URLs, subdomain hosting, legacy links and public-branch access control.
 ---
 
 import Screenshot from "../../../components/Screenshot.astro";
@@ -81,28 +81,52 @@ A build is **public** iff `builds.public = true` or `builds.git_branch` matches 
 
 Retention keeps the latest build per branch, so the latest _published_ build on a branch survives purge; if it is purged, the URL falls back to the next-most-recent public build (or 404).
 
-## Subdomains (optional)
+## Subdomain hosting
 
-Opt in via `publishedBaseDomain` (e.g. `stories.example.com`) plus a wildcard DNS (`*.stories.example.com → your.server`) and wildcard TLS cert. Subdomains serve the Storybook at the **domain root** — no asset-path rewriting (Storybook expects root).
-
-- `:slug.stories.example.com` — latest published on default branch
-- `:buildId.:slug.stories.example.com` — a specific build
-
-Subdomains serve **published Storybooks only** — the review UI stays on the main domain at `/projects/:slug/...`. Labels are not exposed as subdomains (DNS labels can’t contain `/`). Without `publishedBaseDomain`, path-based URLs are the only surface (default for `localhost`).
-
-Configure:
+`storybookHosting: { mode: "subdomain", baseDomain: "shelf.example.com" }` serves every build at the root
+of its own host, `<build-id>.shelf.example.com`, so a Storybook never runs on the portal's origin. A wildcard
+DNS record and certificate for `*.shelf.example.com` (one label deep) are your proxy's job; StoryShelf issues
+none. `<project-slug>.shelf.example.com` is an alias that sends viewers to the project's latest Storybook.
 
 ```ts
 createShelfApp({
-  config: { publishedBaseDomain: "stories.example.com" },
+  config: {
+    publicBaseUrl: "https://shelf.example.com",
+    storybookHosting: { mode: "subdomain", baseDomain: "shelf.example.com" },
+  },
 });
 ```
 
-The URL builder switches between path and subdomain forms based on config. It only produces the links: the app does not route requests by host, so a reverse proxy must deliver the wildcard hostnames to it (native routing is tracked in [#358](https://github.com/GuptaSiddhant/StoryShelf/issues/358)).
+`publishedBaseDomain` is deprecated: it is read as `{ mode: "subdomain", baseDomain }`, and its old
+`<build-id>.<slug>.<domain>` link shape is no longer served.
+
+### Existing links keep working
+
+Every path link from before stays valid. In subdomain mode the portal checks access, then redirects to the
+build's host with the story path and query kept:
+
+- `/projects/:slug/storybook?path=/story/button--primary` → the latest approved default build, same story.
+- `/projects/:slug/storybook/pr/42` → the latest build labelled `pr/42`.
+- `/projects/:slug/storybook/build/:id/iframe.html?id=…` and `/_/:id/…` → that exact build.
+- `/_/:slug/…` → the latest approved default build; it moves when a newer one is approved.
+- `:slug.shelf.example.com/?path=…` → the project's latest Storybook, query kept.
+
+**Private builds** stay private through every link. You sign in on the portal as before; the redirect then
+passes through a short exchange that gives that one build's host its own one-hour cookie. Someone without
+access sees the same "not found" as for a build that does not exist. When the hour is up, opening the link
+again renews access, and checks it again. Only page loads are redirected: a script tag or `fetch` that
+pointed at an old path URL gets a 404, so point those at the build's own host. No link can redirect to a
+host outside your configuration.
+
+### Switching back
+
+Changing the mode signs everyone out once (the session cookie is renamed). Going back to `trusted` or
+`sandboxed` makes the path links serve in place again; links to `<build-id>.shelf.example.com` and the alias
+hosts no longer open a Storybook, so remove the wildcard hosts from your proxy until subdomain mode returns.
 
 ## Related
 
 - [Projects](/concepts/projects/) — `public_branch_regex` setting
 - [Labels](/concepts/labels/) — stable `/:key/:value` URLs
 - [Roles](/concepts/roles/) — viewer access for published Storybooks
-- Guides: [Deployment](/guides/deployment/docker-compose/) (subdomains DNS), [Auth](/guides/auth/)
+- Guides: [Deployment](/guides/deployment/docker-compose/) (wildcard DNS), [Auth](/guides/auth/)

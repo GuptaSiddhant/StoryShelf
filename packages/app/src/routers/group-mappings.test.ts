@@ -44,8 +44,8 @@ async function seed() {
   return { app, db };
 }
 
-const adminCookie = { cookie: "storyshelf_session=admin" };
-const viewerCookie = { cookie: "storyshelf_session=viewer" };
+const adminCookie = { cookie: "storyshelf_session=admin", "sec-fetch-site": "same-origin" };
+const viewerCookie = { cookie: "storyshelf_session=viewer", "sec-fetch-site": "same-origin" };
 const jsonHeaders = { "content-type": "application/json" };
 
 describe("group mapping API", () => {

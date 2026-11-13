@@ -3,6 +3,7 @@ import { DEFAULT_BROWSER, type RenderedSnapshot } from "../adapters/capture-runn
 import { ReferenceGenerationConflict, type DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BaselineWriteConflict } from "../models/baseline-conflict.ts";
+import type { BaselineMap } from "../models/baseline-map.ts";
 import { BaselinePromotionRefused } from "../models/baseline-promotion-refused.ts";
 import { NO_BASELINE } from "../models/baseline-status.ts";
 import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
@@ -91,7 +92,7 @@ export async function persistRendered(
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
   a11yFailedStoryIds: ReadonlySet<string> = new Set(),
 ): Promise<PersistedSets> {
-  const ctx = await withFreshBrowsers(input);
+  const ctx = await withBaselineMap(await withFreshBrowsers(input));
   const failedStoryIds = new Set(renderFailedStoryIds);
   const flakyIds = new Set(flakyFailedStoryIds);
   const a11yIds = new Set(a11yFailedStoryIds);
@@ -204,6 +205,19 @@ export async function freshBrowsersOf(ctx: CaptureContext): Promise<Set<string>>
     })),
   );
   return new Set(checks.filter((check) => check.fresh).map((check) => check.browser));
+}
+
+/** Load the pass's baselines in one query, so each snapshot compares from memory. */
+async function withBaselineMap(ctx: CaptureContext): Promise<CaptureContext> {
+  if (ctx.baselineMap) return ctx;
+  const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
+  const baselineMap = await baselines.loadFor(
+    ctx.project.id,
+    ctx.build.gitBranch,
+    ctx.project.gitDefaultBranch,
+    runBrowsers(ctx),
+  );
+  return { ...ctx, baselineMap };
 }
 
 /** Mark secondary engines with no baseline yet: their first snapshots bootstrap. */
@@ -351,6 +365,8 @@ export interface CaptureContext {
   browsers?: string[];
   /** Secondary engines with no baselines yet; worked out by `persistCapture`, or fixed up front by a shard plan. */
   freshBrowsers?: ReadonlySet<string>;
+  /** The pass's baselines, loaded once by `persistRendered`; absent, each snapshot resolves its own. */
+  baselineMap?: BaselineMap;
   /** Screenshot buffers produced by the capture renderer. */
   captures: RenderedSnapshot[];
   /** Stories inheriting their baseline without rendering (affected capture). */
@@ -402,6 +418,7 @@ async function resolveBaseline(
   viewport: string,
   browser: string,
 ): Promise<Baseline | null> {
+  if (ctx.baselineMap) return ctx.baselineMap.get(storyId, viewport, browser);
   const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
   return await baselines.resolve(
     ctx.project.id,

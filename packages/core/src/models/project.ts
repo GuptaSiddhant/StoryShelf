@@ -2,6 +2,7 @@
 import { eq } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { isReservedLabel, isUlidShape } from "../content-hosts.ts";
 import type { Project } from "../schema/project.ts";
 import { slugify, ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
@@ -102,6 +103,14 @@ export class ProjectModel {
 
   private async uniqueSlug(name: string): Promise<string> {
     const base = slugify(name) || "project";
+    if (isReservedLabel(base) || isUlidShape(base)) {
+      // A reserved label or a build-id shape would collide with a host (ADR 0051, decision 5).
+      return await this.uniqueSlugFrom(`${base}-project`);
+    }
+    return await this.uniqueSlugFrom(base);
+  }
+
+  private async uniqueSlugFrom(base: string): Promise<string> {
     const existing = (await this.db.list(this.tables.projects, {
       where: eq(col(this.tables.projects, "slug"), base),
     })) as unknown as Project[];
