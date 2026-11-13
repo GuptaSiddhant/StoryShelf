@@ -110,6 +110,7 @@ function instrumentedOptions(options: ShelfOptions): ShelfOptions {
 function wireQueues(scoped: ShelfOptions, runtime: ServerRuntime, cell: LifecycleCell): JobsWiring {
   const jobs = setupJobs(scoped, runtime);
   cell.consumer = jobs.consumer;
+  cell.reclaimCopies = jobs.reclaimCopies;
   runBootTasks(cell, scoped, runtime, jobs.buildState);
   return jobs;
 }

@@ -40,6 +40,14 @@ export {
   type ContentBackfillDeps,
   type ContentBackfillResult,
 } from "./content-backfill.ts";
+export {
+  RECLAIM_COPIES_KEY,
+  RECLAIM_COPIES_PAGE,
+  reclaimBuildCopies,
+  reclaimCopiesDone,
+  type ReclaimCopiesDeps,
+  type ReclaimCopiesResult,
+} from "./reclaim-build-copies.ts";
 export { CONTENT_GRACE_MS, collectUnreferencedContent, type ContentGcDeps } from "./content-gc.ts";
 export {
   purgeClaimedBuilds,

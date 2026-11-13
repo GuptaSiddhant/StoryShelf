@@ -18,6 +18,7 @@ async function arm(options: {
   config: Record<string, unknown>;
   testing?: boolean;
   ready?: () => Promise<{ ok: boolean }>;
+  reclaimCopies?: () => Promise<void>;
 }) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -47,6 +48,7 @@ async function arm(options: {
     logger,
     options.testing ?? false,
     options.ready,
+    options.reclaimCopies,
   );
   const scheduled = schedule.mock.calls.find((args) => args[1] === 120_000)?.[0];
   const run = async (): Promise<void> => {
@@ -185,6 +187,17 @@ describe("background retention", () => {
       );
       expect(await db.get(db.tables.aiUsage, "expired")).toBeNull();
       timer?.stop();
+    });
+
+    it("queues the build copy reclaim each sweep, and carries on when queueing fails", async () => {
+      const reclaimCopies = vi.fn(async () => await Promise.reject(new Error("queue down")));
+      const { run, error } = await arm({ capability: false, config: {}, reclaimCopies });
+      await run();
+      expect(reclaimCopies).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ stage: "build copy reclaim" }),
+        "retention sweep stage failed",
+      );
     });
 
     it("still runs when branch GC is off, because the build purge is on", async () => {

@@ -26,6 +26,8 @@ interface SweepContext {
   testing: boolean;
   /** Resolves with the adapter setup result; a sweep waits for it and runs only when it succeeded. */
   ready: () => Promise<{ ok: boolean }>;
+  /** Queues the per-build copy sweep; the job does the work. */
+  reclaimCopies: () => Promise<void>;
   /** Set by `stop()`: a sweep that was waiting for setup must not start after shutdown began. */
   stopped: boolean;
   warned: boolean;
@@ -46,6 +48,7 @@ interface SweepContext {
  * @param logger - Structured logger for sweep diagnostics
  * @param testing - Whether the deployment has testing enabled
  * @param ready - Adapter setup result; every sweep waits for it and is skipped if setup failed
+ * @param reclaimCopies - Queues the `statics-reclaim` job (a no-op once finished or on a host with no queue)
  * @returns Timer handle with `stop()`, or `null` if nothing is scheduled
  */
 export function startBranchGcTimer(
@@ -55,6 +58,7 @@ export function startBranchGcTimer(
   logger: Logger,
   testing = false,
   ready: () => Promise<{ ok: boolean }> = async () => await Promise.resolve({ ok: true }),
+  reclaimCopies: () => Promise<void> = async () => await Promise.resolve(),
 ): BranchGcTimer | null {
   const branchTtlDays =
     config.branchTtlDays === undefined ? DEFAULT_BRANCH_TTL_DAYS : config.branchTtlDays;
@@ -70,6 +74,7 @@ export function startBranchGcTimer(
     purgeTtlDays: config.purgeTtlDays,
     testing,
     ready,
+    reclaimCopies,
     stopped: false,
     warned: false,
   };
@@ -108,6 +113,7 @@ async function sweep(context: SweepContext): Promise<void> {
       await sweepBuilds(context, purgeTtlDays);
     });
   }
+  await stage(context, "build copy reclaim", context.reclaimCopies);
   await stage(context, "AI data cleanup", async () => {
     await purgeAiData(db, new Date(), context.logger);
   });
