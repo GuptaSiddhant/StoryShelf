@@ -55,7 +55,7 @@ All providers speak the standard Postgres wire protocol. Pick the connection str
 | Neon                          | `postgres://user:pass@<neon-host>/db?sslmode=require`                                                               | `ssl: true`                                                                          | Serverless pooler — keep `max` low (e.g. `max: 5`); pooled endpoints via PgBouncer need `prepare: false`                        |
 | Azure Database for PostgreSQL | `postgres://user:pass@<server>.postgres.database.azure.com:5432/db?sslmode=require`                                 | `ssl: true`                                                                          | Microsoft Entra ID (IAM) via injected `client` with an access token; otherwise password auth works with default pooling         |
 
-## RDS and Aurora with IAM authentication (`rds-iam`)
+## RDS and Aurora with IAM authentication
 
 `@storyshelf/db-postgres/rds-iam` connects to RDS or Aurora Postgres with a short-lived IAM token instead of a password, so there is nothing to rotate. Install the optional peers (`pg` and `@aws-sdk/rds-signer`); the standard AWS credential chain applies (ECS task role, instance role, web identity).
 
