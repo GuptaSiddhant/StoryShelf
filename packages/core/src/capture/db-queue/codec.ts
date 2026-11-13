@@ -7,16 +7,24 @@ import type { DatabaseJob, QueueJobInput } from "./types.ts";
 /** The `data` field of a build's capture job holding the run generation it was queued for. */
 export const GENERATION_KEY = "generation";
 
+/**
+ * The payload version this build writes and reads (ADR 0053, decision 5). Raise it when a kind's
+ * `data` changes in a way an older consumer cannot read; a consumer meeting a higher one hands the
+ * job back. A row with no `v` (written before versioning) is version 1.
+ */
+export const PAYLOAD_VERSION = 1;
+
 /** What the `payload` column holds. */
 interface StoredPayload {
+  v?: number;
   reqId?: string;
   traceparent?: string;
   data?: Record<string, unknown>;
 }
 
-/** Serialize the request id, trace context and kind-specific fields of a job; null when empty. */
+/** Serialize the version, request id, trace context and kind-specific fields of a job. */
 export function encodePayload(job: QueueJobInput): string | null {
-  const stored: StoredPayload = {};
+  const stored: StoredPayload = { v: PAYLOAD_VERSION };
   if (job.reqId !== undefined) {
     stored.reqId = job.reqId;
   }
@@ -26,7 +34,7 @@ export function encodePayload(job: QueueJobInput): string | null {
   if (job.data !== undefined && Object.keys(job.data).length > 0) {
     stored.data = job.data;
   }
-  return Object.keys(stored).length === 0 ? null : JSON.stringify(stored);
+  return JSON.stringify(stored);
 }
 
 /** Parse a stored payload. A malformed one (a poison row) decodes as empty rather than throwing. */
@@ -55,6 +63,7 @@ export function toDatabaseJob(row: CaptureJobRow, attempt: number, leaseMs: numb
     receipt: attemptRowId(row.jobId, attempt),
     leaseMs,
     data: payload.data ?? {},
+    payloadVersion: payload.v ?? 1,
   };
   return withOptional(job, row, payload);
 }
@@ -109,6 +118,9 @@ function entryStatus(status: CaptureJobRow["status"]): QueueEntryStatus {
 
 function pickPayload(parsed: Record<string, unknown>): StoredPayload {
   const stored: StoredPayload = {};
+  if (typeof parsed["v"] === "number" && Number.isInteger(parsed["v"]) && parsed["v"] >= 1) {
+    stored.v = parsed["v"];
+  }
   if (typeof parsed["reqId"] === "string") {
     stored.reqId = parsed["reqId"];
   }

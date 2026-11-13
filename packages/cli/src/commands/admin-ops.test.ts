@@ -60,3 +60,37 @@ describe("runPurge", () => {
     expect(seen[0]?.url).toBe("https://shelf.example.com/api/v1/admin/purge");
   });
 });
+
+describe("runServerCheckStorage", () => {
+  it("posts to the check endpoint and flags a missing blob", async () => {
+    const seen: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        await Promise.resolve();
+        seen.push(url);
+        return {
+          ok: true,
+          status: 200,
+          text: async (): Promise<string> => await Promise.resolve(""),
+          json: async (): Promise<unknown> =>
+            await Promise.resolve({
+              buildsChecked: 1,
+              baselinesChecked: 0,
+              builds: [{ buildId: "b1", missing: 1 }],
+              unreadableManifests: [],
+              missingBaselineImages: 0,
+              unreferencedBlobs: 2,
+              sampled: false,
+            }),
+        };
+      }),
+    );
+    const { runServerCheckStorage } = await import("./server/check-storage.ts");
+    const previous = process.exitCode;
+    await runServerCheckStorage({ url: "https://shelf.example.com", token: "t" });
+    expect(seen).toEqual(["https://shelf.example.com/api/v1/admin/check-storage"]);
+    expect(process.exitCode).toBe(1);
+    process.exitCode = previous;
+  });
+});

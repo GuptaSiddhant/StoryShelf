@@ -187,6 +187,7 @@ function startBranchGcInterval(
     runtime.logger,
     Boolean(options.testing),
     async () => await cell.ready,
+    options.auth,
   );
 }
 
