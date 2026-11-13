@@ -220,7 +220,7 @@ export interface ShelfConfig {
    * Opt-in, off by default — some deployments prefer no timing headers.
    */
   serverTiming?: boolean;
-  /** Persist gzip variants for published Storybook files (default off). */
+  /** Persist gzip and brotli copies of published Storybook files, made when publishing ends (default off). */
   publishedCompression?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;
@@ -520,6 +520,12 @@ export interface ShelfTestingOptions {
    * boot if it cannot.
    */
   mode?: "auto" | "in-process" | "fork";
+  /**
+   * Operator veto of story switching (ADR 0052, decision 2). `false` forbids a project's
+   * `switchStories` setting for the whole server; unset or `true` leaves the choice to each
+   * project (the setting itself defaults to off).
+   */
+  switchStories?: boolean;
   /** Screenshot comparison, shared by capture and the re-diff endpoint. */
   compare?: ShelfCompareOptions;
   /** Image library selection; see {@link ShelfImagesOptions}. */

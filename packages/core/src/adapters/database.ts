@@ -7,6 +7,7 @@
  * packages (`@storyshelf/db-sqlite`, `@storyshelf/db-postgres`).
  */
 import type { SQL } from "drizzle-orm";
+import { getTableColumns } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
 import type { MigrationContext } from "./skipped-index.ts";
@@ -120,6 +121,37 @@ export interface ListOptions {
   limit?: number;
   /** Number of rows to skip. */
   offset?: number;
+  /**
+   * Column keys (as named on the table object) to read. Omitted: every column. Rows come back
+   * without the other keys, so only pass it where the caller never reads them, and type the result
+   * accordingly. `id` is always read, so the tie-break order is unchanged.
+   */
+  columns?: readonly string[];
+}
+
+/** Every column key of `table` except `omit`: the `columns` of a list that skips only large columns. */
+export function columnsExcept(table: Table, ...omit: readonly string[]): string[] {
+  return Object.keys(getTableColumns(table)).filter((key) => !omit.includes(key));
+}
+
+/**
+ * The Drizzle selection for a list that reads only `columns` (plus `id`), or `undefined` for every
+ * column. The one place the projection is built, so each dialect and the fake agree on it.
+ */
+export function listSelection(
+  table: Table,
+  columns: readonly string[] | undefined,
+): Record<string, unknown> | undefined {
+  if (columns === undefined) {
+    return undefined;
+  }
+  const all = getTableColumns(table);
+  const keys = new Set(["id", ...columns]);
+  const unknown = [...keys].filter((key) => !(key in all));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown column(s) for list: ${unknown.join(", ")}`);
+  }
+  return Object.fromEntries([...keys].map((key) => [key, all[key]]));
 }
 
 /**

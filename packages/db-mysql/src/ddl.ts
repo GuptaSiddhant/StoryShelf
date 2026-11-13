@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS projects (
   play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
   run_a11y TINYINT(1) NOT NULL DEFAULT true,
   run_tests TINYINT(1) NOT NULL DEFAULT false,
+  switch_stories TINYINT(1) NOT NULL DEFAULT false,
   detect_unstable TINYINT(1) NOT NULL DEFAULT true,
   browser VARCHAR(64) NOT NULL DEFAULT 'chromium',
   viewports TEXT,

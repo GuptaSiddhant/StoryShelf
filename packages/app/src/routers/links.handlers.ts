@@ -28,7 +28,9 @@ interface ResolvedUpstream {
  */
 async function resolveUpstream(upstream: Project): Promise<ResolvedUpstream> {
   const build = await new BuildModel(getStore().db).latestApprovedDefault(upstream);
-  const snapshots = build ? await new SnapshotModel(getStore().db).listByBuild(build.id) : [];
+  const snapshots = build
+    ? await new SnapshotModel(getStore().db).listByBuildSummary(build.id)
+    : [];
   const stories = snapshots.flatMap((snapshot) =>
     snapshot.storyImportPath
       ? [{ importPath: snapshot.storyImportPath, storyId: snapshot.storyId }]

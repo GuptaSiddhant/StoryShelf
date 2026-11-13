@@ -15,6 +15,7 @@ export {
   refusalFor,
   resolveBrowsers,
 } from "./browsers.ts";
+export { switchStoriesEnabled, switchStoriesVetoed } from "./switch-stories.ts";
 export {
   NO_ORIGIN_REASON,
   NO_SECRET_REASON,
