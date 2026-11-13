@@ -59,6 +59,7 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "GET /projects/:slug/storybook/:key/*": "hosting",
   "GET /projects/:slug/storybook/build/:buildId/*": "hosting",
   "GET /_s/:token/*": "testing",
+  "GET /_r/:token/*": "hosting",
   "GET /auth/login": "hosting",
   "GET /auth/engine/login": "hosting",
   "POST /auth/engine/login": "hosting",

@@ -171,7 +171,7 @@ async function signedUrlLifetime(patch: Record<string, unknown>): Promise<number
   );
   const call = render.mock.calls[0] as [{ storybookUrl?: string }] | undefined;
   const token = /\/_s\/([^/]+)\//u.exec(call?.[0].storybookUrl ?? "")?.[1] ?? "";
-  const result = verifyStorybookToken(token, "s3cret-s3cret-s3cret");
+  const result = verifyStorybookToken(token, "s3cret-s3cret-s3cret", "capture");
   return result.ok ? Math.round(result.claims.expiresAt - Date.now() / 1000) : -1;
 }
 
@@ -727,7 +727,7 @@ describe("executeCaptureJob", () => {
       ).toMatch(/\/_s\//u);
       const project = await db.list(db.tables.projects);
       const token = /\/_s\/([^/]+)\//u.exec(urls[0] ?? "")?.[1] ?? "";
-      expect(verifyStorybookToken(token, "s3cret-s3cret-s3cret")).toMatchObject({
+      expect(verifyStorybookToken(token, "s3cret-s3cret-s3cret", "capture")).toMatchObject({
         ok: true,
         claims: { projectId: project[0]?.id, buildId },
       });

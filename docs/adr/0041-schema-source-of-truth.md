@@ -40,6 +40,12 @@ columns declared in that dialect's Drizzle schema, and the three DDLs with each 
 - **By design.** The auth engine tables (`user`, `session`, `account`, `verification`, `passkey`,
   `ssoProvider`) have DDL in every dialect but no Drizzle schema in the database packages; the auth
   bridge addresses them through its own model registry.
+- **Found by the parity test (#799, 2026-11-10).** Column names, types, nullability and defaults
+  agree between DDL and Drizzle in all three dialects, and `users` now carries the four access
+  columns everywhere (#418 is fixed). Eight DDL indexes (`notification_*`, `insights_*`,
+  `ai_usage_*`) are declared in no Drizzle schema (#833), and SQLite's `user_invite_tokens` index
+  likewise. The remaining differences are the allowlisted ones above. MySQL lacks
+  `builds.retention_state` and the four lifecycle tables until #376; the parity test names them.
 - Otherwise DDL and Drizzle column names agree within each dialect. Types, nullability, defaults
   and indexes were not compared; the parity test in decision 1 must.
 

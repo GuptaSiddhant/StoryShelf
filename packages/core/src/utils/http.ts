@@ -339,7 +339,11 @@ async function doFetchResponse(
   readErrorBody = true,
 ): Promise<Response> {
   const request = buildRequest(options);
-  injectTraceContext(request.headers);
+  // Trace and span ids stay inside the operator's own traffic: a project-set destination is a
+  // third party and gets no `traceparent`.
+  if (options.destination !== "project") {
+    injectTraceContext(request.headers);
+  }
   options.logger?.debug({ url: redactUrlForLog(url), method: request.method }, "http request");
   const signal = options.signal
     ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])

@@ -6,16 +6,22 @@ import type { Context } from "hono";
 import { posix } from "node:path";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import { getStore } from "../store.ts";
+import { redirectToContentHost } from "./content-redirect.ts";
 import { notFound } from "./helpers.ts";
-import { hiddenFrom, publishedAccess } from "./published-access.ts";
+import {
+  hiddenFrom,
+  hostingMode,
+  publishedAccess,
+  publishedCacheControl,
+  type PublishedFreshness,
+} from "./published-access.ts";
 import { publishedRelativePath, servePublishedFile } from "./published-files.ts";
+import { redirectToReadGrant } from "./read-grants.ts";
 
 type Access = NonNullable<Awaited<ReturnType<typeof publishedAccess>>>;
 
 /** A short link resolved to its build, with the caller's access and the path inside the build. */
 type ShortLink = { project: Project; build: Build; access: Access; isUlid: boolean; rest: string };
-
-const IMMUTABLE = "public, max-age=31536000, immutable";
 
 /** Check whether a build's extracted statics are available for serving. */
 async function staticsReady(projectId: string, buildId: string): Promise<boolean> {
@@ -61,12 +67,12 @@ function unreachable(c: Context): Response | Promise<Response> {
   return c.notFound();
 }
 
-/** Cache policy of the short link: a ULID names one build forever; a slug follows the latest. */
-function shortLinkCache(isUlid26: boolean, isRoot: boolean): string {
+/** Freshness of the short link: a ULID names one build forever; a slug follows the latest. */
+function shortLinkFreshness(isUlid26: boolean, isRoot: boolean): PublishedFreshness {
   if (isUlid26) {
-    return IMMUTABLE;
+    return "immutable";
   }
-  return isRoot ? "public, max-age=60" : "public, max-age=3600";
+  return isRoot ? "minute" : "hour";
 }
 
 async function projectBySlug(slug: string): Promise<Project> {
@@ -94,7 +100,16 @@ export async function redirectToLatestBuild(c: Context): Promise<Response> {
   if (!(await publishedAccess(build, project))) {
     return denied(c, hidden);
   }
-  return c.redirect(`/projects/${slug}/storybook/build/${build.id}/`, 302);
+  return c.redirect(`/projects/${slug}/storybook/build/${build.id}/${searchOf(c)}`, 302);
+}
+
+/**
+ * The request's query, kept through a resolver hop so a deep link (`?path=/story/<id>`,
+ * `?storyId=<id>`) still opens its story once it reaches the build. Re-serialized by `URL`, so it
+ * stays a query: it can never become a path, a host or a header.
+ */
+function searchOf(c: Context): string {
+  return new URL(c.req.url).search;
 }
 
 /**
@@ -120,20 +135,44 @@ export async function serveShortLink(c: Context): Promise<Response> {
 async function serveShortBuild(c: Context, link: ShortLink): Promise<Response> {
   const { project, build, access, isUlid, rest } = link;
   if (rest === "" && !(await staticsReady(project.id, build.id))) {
-    return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
+    return c.html(renderStorybookPreparingPage(project, build, project.slug), 200, {
+      "cache-control": publishedCacheControl(access, "page"),
+    });
   }
-  const served = await servePublishedFile(c, {
-    projectId: project.id,
-    buildId: build.id,
-    rel: rest === "" ? "index.html" : rest,
-    access,
-    cacheControl: shortLinkCache(isUlid, rest === ""),
-  });
+  const served =
+    redirectForHosting(c, { project, build, access, rest }) ??
+    (await servePublishedFile(c, {
+      projectId: project.id,
+      buildId: build.id,
+      rel: rest === "" ? "index.html" : rest,
+      access,
+      family: "short",
+      freshness: shortLinkFreshness(isUlid, rest === ""),
+    }));
   if (served) return served;
   const fallback = isUlid
     ? `/projects/${project.slug}/builds/${build.id}`
     : `/projects/${project.slug}`;
   return rest === "" || rest === "index.html" ? c.redirect(fallback, 302) : c.notFound();
+}
+
+/**
+ * The redirect that replaces serving a build's bytes from the portal, or null when the portal serves
+ * them: `subdomain` mode sends every viewer to the build's content host, `sandboxed` mode sends a
+ * signed-in viewer of a private build to a read grant (a sandboxed frame sends no cookie). ADR 0051.
+ */
+function redirectForHosting(
+  c: Context,
+  target: { project: Project; build: Build; access: Access; rest: string },
+): Response | null {
+  const mode = hostingMode();
+  if (mode === "subdomain") {
+    return redirectToContentHost(c, target);
+  }
+  if (mode === "sandboxed" && target.access === "session") {
+    return redirectToReadGrant(c, target.project, target.build, target.rest);
+  }
+  return null;
 }
 
 /** Canonical build route: serves the static Storybook and the landing page. */
@@ -171,25 +210,71 @@ async function serveBuild(
     return denied(c, hidden);
   }
   if (rest === "") {
-    return await storybookLanding(c, project, build);
+    return await storybookLanding(c, project, build, access);
+  }
+  return await serveBuildFile(c, { project, build, access, rest });
+}
+
+/** A file of the canonical path: a read-grant redirect in `sandboxed` mode, otherwise the file. */
+async function serveBuildFile(
+  c: Context,
+  target: { project: Project; build: Build; access: Access; rest: string },
+): Promise<Response> {
+  const { project, build, access, rest } = target;
+  const redirect = redirectForHosting(c, target);
+  if (redirect) {
+    return redirect;
   }
   const served = await servePublishedFile(c, {
     projectId: project.id,
     buildId: build.id,
     rel: rest,
     access,
-    cacheControl: IMMUTABLE,
+    family: "project",
+    freshness: "immutable",
   });
   return served ?? c.notFound();
 }
 
-async function storybookLanding(c: Context, project: Project, build: Build): Promise<Response> {
+/**
+ * The query the build's own manager reads for a `?storyId=` / `?viewMode=docs` link (the portal's
+ * copy-link form): `?path=/story/<id>` or `?path=/docs/<id>`. `undefined` keeps the request's query.
+ */
+function managerSearch(c: Context): string | undefined {
+  const id = c.req.query("storyId")?.trim() ?? "";
+  if (id === "" || !/^[a-zA-Z0-9._/-]+$/u.test(id)) {
+    return undefined;
+  }
+  const view = c.req.query("viewMode") === "docs" ? "docs" : "story";
+  return `?path=${encodeURIComponent(`/${view}/${id}`)}`;
+}
+
+async function storybookLanding(
+  c: Context,
+  project: Project,
+  build: Build,
+  access: Access,
+): Promise<Response> {
+  const headers = { "cache-control": publishedCacheControl(access, "page") };
   if (!(await staticsReady(project.id, build.id))) {
-    return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
+    return c.html(renderStorybookPreparingPage(project, build, project.slug), 200, headers);
+  }
+  if (hostingMode() === "subdomain") {
+    return redirectToContentHost(c, {
+      project,
+      build,
+      access,
+      rest: "",
+      search: managerSearch(c),
+    });
   }
   const storyId = c.req.query("storyId") ?? c.req.query("id") ?? undefined;
   const viewMode = c.req.query("viewMode") === "docs" ? "docs" : undefined;
-  return c.html(renderStorybookPage(project, build, project.slug, { storyId, viewMode }), 200);
+  return c.html(
+    renderStorybookPage(project, build, project.slug, { storyId, viewMode }),
+    200,
+    headers,
+  );
 }
 
 /** The label value in `/projects/:slug/storybook/:key/<value>`, or null when absent or malformed. */
@@ -238,5 +323,5 @@ async function labelRedirect(
   if (!build || !(await publishedAccess(build, project))) {
     return denied(c, hidden);
   }
-  return c.redirect(`/projects/${project.slug}/storybook/build/${buildId}/`, 302);
+  return c.redirect(`/projects/${project.slug}/storybook/build/${buildId}/${searchOf(c)}`, 302);
 }

@@ -369,6 +369,42 @@ export class BuildModel {
   }
 
   /**
+   * Claim the build's manifest (write-once publish, ADR 0051): one conditional write of
+   * `manifest_sha256` while it is NULL. `claimed` means this caller owns the publish; `duplicate`
+   * means the same manifest was already accepted; `conflict` means a different one was; `missing`
+   * means the build is gone. The adapter hands back the current row for a refused write too, so the
+   * winner is the caller whose own `updatedAt` stamp is on the returned row.
+   */
+  async claimManifest(id: string, sha256: string): Promise<ManifestClaim> {
+    const { builds } = this.tables;
+    const before = (await this.db.get(builds, id)) as unknown as Build | null;
+    if (!before) return "missing";
+    const stamp = uniqueStamp(before.updatedAt);
+    const written = (await this.db.updateWhere(
+      builds,
+      id,
+      { manifestSha256: sha256, updatedAt: stamp },
+      isNull(col(builds, "manifestSha256")),
+    )) as unknown as Build | null;
+    if (!written) return "missing";
+    if (written.manifestSha256 === sha256 && sameInstant(written.updatedAt, stamp)) {
+      return "claimed";
+    }
+    return written.manifestSha256 === sha256 ? "duplicate" : "conflict";
+  }
+
+  /** Give the claim back (a failed publish) so a corrected manifest can be sent; only while it is still `sha256`. */
+  async releaseManifest(id: string, sha256: string): Promise<void> {
+    const { builds } = this.tables;
+    await this.db.updateWhere(
+      builds,
+      id,
+      { manifestSha256: null },
+      eq(col(builds, "manifestSha256"), sha256),
+    );
+  }
+
+  /**
    * Move the build to `status` if the lifecycle allows it from where it is; the row comes back
    * either way. `fence` is an extra condition for a status derived from other rows (see
    * `BuildReviewModel.newestVerdictIs`): the write applies only while it still holds.
@@ -736,6 +772,9 @@ export interface BuildListFilter {
 
 /** How many times a reset re-reads the generation after losing a race to another reset. */
 const RESET_ATTEMPTS = 5;
+
+/** How {@link BuildModel.claimManifest} ended. */
+export type ManifestClaim = "claimed" | "duplicate" | "conflict" | "missing";
 
 /** The instant a stored timestamp names, in epoch ms, whichever string form the driver returns. */
 function instantOf(value: string): number {

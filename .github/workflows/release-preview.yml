@@ -1,10 +1,17 @@
 name: Package previews
 
-# Preview each push to an epic branch without publishing to npm (ADR 0043). `main` is covered by the
-# `next` channel in release.yml, which publishes real `next` builds when changesets are pending.
+# Preview each push to `main` and to an epic branch without publishing to npm (ADR 0043, amendment
+# 2026-11-11). A real npm `next` build is only published by hand from release.yml.
 on:
   push:
-    branches: ["epic/**"]
+    branches: ["main", "epic/**"]
+    # Only what changes a published package; a docs, website or CI-only push previews nothing.
+    paths:
+      - "packages/**"
+      - "package.json"
+      - "nub.lock"
+      - "scripts/rewrite-workspace-protocol.mjs"
+      - ".github/workflows/release-preview.yml"
 
 # pkg.pr.new resolves a branch to the latest commit published for it, so a newer push supersedes an
 # older preview of the same branch instead of racing it.

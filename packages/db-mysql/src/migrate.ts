@@ -104,6 +104,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
   { table: "builds", column: "capture_generation", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "skipped_from_build_id", definition: "VARCHAR(26) NULL" },
+  { table: "builds", column: "manifest_sha256", definition: "VARCHAR(64) NULL" },
   {
     table: "notification_subscriptions",
     column: "review_requests",
@@ -186,6 +187,22 @@ async function ensureColumns(run: MigrationRunner): Promise<void> {
   }
 }
 
+async function migrateBuildsListIndexes(run: MigrationRunner): Promise<void> {
+  await ensureIndex(
+    run,
+    "builds",
+    "builds_project_created_idx",
+    "CREATE INDEX builds_project_created_idx ON builds (project_id, created_at)",
+  );
+  await ensureIndex(
+    run,
+    "builds",
+    "builds_project_branch_created_idx",
+    "CREATE INDEX builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
+  );
+  await dropIndexIfExists(run, "builds", "builds_git_branch_idx");
+}
+
 async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<void> {
   await dropIndexIfExists(run, "snapshots", "snapshots_build_story_viewport_idx");
   await dropIndexIfExists(run, "baselines", "baselines_project_story_viewport_branch_idx");
@@ -202,6 +219,7 @@ async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<vo
     "builds_project_gitsha_idx",
     "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)",
   );
+  await migrateBuildsListIndexes(run);
   await ensureUniqueIndex(
     run,
     "design_links",

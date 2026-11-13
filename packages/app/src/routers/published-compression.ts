@@ -53,13 +53,18 @@ export async function publishedGzip(
   return undefined;
 }
 
+/** Whether a MIME type is one worth gzipping (text-like); size is checked once the bytes are read. */
+export function isCompressible(mime: string): boolean {
+  return /^(?:text\/|application\/(?:javascript|json|xml|wasm)|image\/svg\+xml)/iu.test(mime);
+}
+
 function eligible(hash: string | undefined, original: Buffer, mime: string): boolean {
   return (
     typeof hash === "string" &&
     /^[a-f0-9]{64}$/u.test(hash) &&
     original.length > 0 &&
     original.length <= MAX_FILE_BYTES &&
-    /^(?:text\/|application\/(?:javascript|json|xml|wasm)|image\/svg\+xml)/iu.test(mime)
+    isCompressible(mime)
   );
 }
 

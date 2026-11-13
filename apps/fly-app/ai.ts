@@ -11,9 +11,9 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { createAi } from "@storyshelf/ai";
 import type { Ai } from "@storyshelf/core/ai";
 
-/** The model when `SS_AI_MODEL` is unset: Anthropic's cheapest current one. */
+/** The model when `SHELF_AI_MODEL` is unset: Anthropic's cheapest current one. */
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
-/** Tokens the demo may spend a day when `SS_AI_DAILY_TOKENS` is unset or invalid. */
+/** Tokens the demo may spend a day when `SHELF_AI_DAILY_TOKENS` is unset or invalid. */
 export const DEFAULT_DAILY_TOKENS = 100_000;
 /** AI calls one project may make in an hour. */
 export const CALLS_PER_PROJECT_PER_HOUR = 5;
@@ -49,7 +49,7 @@ export function aiFromEnv(env: Readonly<Record<string, string | undefined>>): Ai
   if (nonEmpty(env["ANTHROPIC_API_KEY"]) === undefined) {
     return undefined;
   }
-  const model = anthropic(nonEmpty(env["SS_AI_MODEL"]) ?? DEFAULT_AI_MODEL);
+  const model = anthropic(nonEmpty(env["SHELF_AI_MODEL"]) ?? DEFAULT_AI_MODEL);
   return createAi({
     profiles: {
       default: {
@@ -62,7 +62,7 @@ export function aiFromEnv(env: Readonly<Record<string, string | undefined>>): Ai
       },
     },
     budget: {
-      dailyTokens: dailyTokensFrom(env["SS_AI_DAILY_TOKENS"]),
+      dailyTokens: dailyTokensFrom(env["SHELF_AI_DAILY_TOKENS"]),
       perProjectCallsPerHour: CALLS_PER_PROJECT_PER_HOUR,
     },
   });

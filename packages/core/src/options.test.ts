@@ -89,6 +89,16 @@ function shardSized(shardSize: number, extra = {}): () => void {
   };
 }
 
+function hosted(mode: string, extra: Partial<ShelfOptions> = {}): () => void {
+  return () => {
+    resolveShelfOptions({
+      ...base,
+      ...extra,
+      config: { secret: undefined, ...extra.config, storybookHosting: { mode } },
+    } as unknown as ShelfOptions);
+  };
+}
+
 function rateLimited(storybookUrlRateLimit: number): () => void {
   return () => {
     resolveShelfOptions({ ...base, testing: { runner, storybookUrlRateLimit } });
@@ -211,5 +221,99 @@ describe("sequentialTransactionsWarning", () => {
       database: { metadata: { name: "Fake", category: "database", transactions: "atomic" } },
     } as unknown as ShelfOptions;
     expect(sequentialTransactionsWarning({ ...atomic, testing: { runner } })).toBeUndefined();
+  });
+});
+
+/** An attempt to resolve options with `config`, as a function so a test can expect it to throw. */
+const sub =
+  (config: Record<string, unknown>, extra: Partial<ShelfOptions> = {}) =>
+  (): void => {
+    resolveShelfOptions({ ...base, ...extra, config } as unknown as ShelfOptions);
+  };
+
+describe("resolveShelfOptions storybook hosting", () => {
+  const auth = {} as ShelfOptions["auth"];
+
+  it("accepts the default and trusted mode, with or without sign-in or a secret", () => {
+    expect(() => resolveShelfOptions({ ...base, auth })).not.toThrow();
+    expect(hosted("trusted", { auth })).not.toThrow();
+  });
+
+  it("refuses sandboxed and subdomain with sign-in on and no secret", () => {
+    expect(hosted("sandboxed", { auth })).toThrow(/needs config.secret/u);
+    expect(hosted("subdomain", { auth })).toThrow(/needs config.secret/u);
+  });
+
+  it("accepts sandboxed, with a secret when sign-in is on and without one when it is off", () => {
+    expect(hosted("sandboxed")).not.toThrow();
+    expect(hosted("sandboxed", { auth, config: { secret: "s" } })).not.toThrow();
+  });
+
+  describe("subdomain", () => {
+    const hosting = { mode: "subdomain", baseDomain: "shelf.example.com" };
+    const ok = {
+      secret: "s",
+      publicBaseUrl: "https://shelf.example.com",
+      storybookHosting: hosting,
+    };
+    const hostAuth = { hostSessionCookie: true } as ShelfOptions["auth"];
+
+    it("accepts a configured https portal, with the __Host- cookie engine when sign-in is on", () => {
+      expect(sub(ok)).not.toThrow();
+      expect(sub(ok, { auth: hostAuth })).not.toThrow();
+    });
+
+    it("refuses a missing portal origin and a missing or malformed base domain", () => {
+      expect(sub({ ...ok, publicBaseUrl: undefined })).toThrow(/needs config.publicBaseUrl/u);
+      expect(sub({ ...ok, storybookHosting: { mode: "subdomain" } })).toThrow(
+        /baseDomain is required/u,
+      );
+      expect(
+        sub({ ...ok, storybookHosting: { mode: "subdomain", baseDomain: "*.x.com" } }),
+      ).toThrow(/plain domain/u);
+    });
+
+    it("refuses an http portal except on a localhost name", () => {
+      expect(sub({ ...ok, publicBaseUrl: "http://shelf.example.com" })).toThrow(/https/u);
+      const local = {
+        ...ok,
+        publicBaseUrl: "http://localhost:3000",
+        storybookHosting: { mode: "subdomain", baseDomain: "localhost" },
+      };
+      expect(sub(local)).not.toThrow();
+      expect(sub({ ...local, publicBaseUrl: "ftp://localhost:3000" })).toThrow(/https/u);
+      expect(sub({ ...local, publicBaseUrl: "http://app.localhost:3000" })).toThrow(
+        /would also match the portal host/u,
+      );
+    });
+
+    it("refuses a base domain that would also match the portal host", () => {
+      expect(
+        sub({ ...ok, storybookHosting: { mode: "subdomain", baseDomain: "example.com" } }),
+      ).toThrow(/would also match the portal host/u);
+    });
+
+    it("refuses sign-in without the __Host- session cookie", () => {
+      const plain = {} as ShelfOptions["auth"];
+      expect(sub(ok, { auth: plain })).toThrow(/__Host- session cookie/u);
+    });
+
+    it("reads the deprecated publishedBaseDomain as the same mode, with the same rules", () => {
+      const alias = {
+        secret: "s",
+        publicBaseUrl: "https://shelf.example.com",
+        publishedBaseDomain: "shelf.example.com",
+      };
+      expect(sub(alias)).not.toThrow();
+      expect(sub({ ...alias, publicBaseUrl: undefined })).toThrow(/needs config.publicBaseUrl/u);
+      expect(sub({ ...alias, publishedBaseDomain: "bad domain" })).toThrow(/plain domain/u);
+    });
+  });
+
+  it("validates the top-level storybookUrlRateLimit as a positive whole number", () => {
+    expect(() => resolveShelfOptions({ ...base, storybookUrlRateLimit: 100 })).not.toThrow();
+    expect(() => resolveShelfOptions({ ...base, storybookUrlRateLimit: 0 })).toThrow(
+      /^storybookUrlRateLimit must be/u,
+    );
   });
 });

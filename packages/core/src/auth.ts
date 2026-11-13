@@ -50,6 +50,11 @@ export interface EnginePasskeyInfo {
 
 /** Auth singleton: the shelf authentication surface (not an adapter). */
 export interface Auth {
+  /**
+   * Whether the session cookie is the `__Host-` one (`HOST_SESSION_COOKIE`), which `subdomain`
+   * hosting requires (ADR 0051, decision 9). Absent or false: the `__Secure-` / plain names.
+   */
+  hostSessionCookie?: boolean;
   /** Raw engine handler (mount at `/api/auth/*`). */
   handler: (request: Request) => Response | Promise<Response>;
   /** Login methods in display order (drives the login page). */

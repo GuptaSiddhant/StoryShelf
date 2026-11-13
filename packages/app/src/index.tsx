@@ -13,7 +13,12 @@ import {
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
-import { configureOutbound, STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
+import {
+  configureOutbound,
+  STORYBOOK_EXCHANGE_PREFIX,
+  STORYBOOK_READ_PREFIX,
+  STORYBOOK_TOKEN_PREFIX,
+} from "@storyshelf/core/utils";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and notifier
  * adapters into a complete self-hosted visual-testing Hono app.
@@ -29,17 +34,20 @@ import { runBootTasks } from "./boot-tasks.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
+import { createClientIpResolver } from "./middleware/client-ip.ts";
 import {
   authGate,
   notFoundPage,
   csrf,
   createRateLimiter,
+  hostDispatch,
   requireProjectVisible,
   requireReview,
   requireTesting,
   rateLimitKey,
   requestLogging,
   resolveRequestUser,
+  sameSiteWrites,
   storeScope,
 } from "./middleware/index.ts";
 import { serverTiming } from "./middleware/server-timing.ts";
@@ -67,6 +75,7 @@ import { registerNotificationSubscriptions } from "./routers/notification-subscr
 import { registerPreviewToken } from "./routers/preview-token.ts";
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
+import { registerReadGrants } from "./routers/read-grants.ts";
 import { registerReviewForms } from "./routers/review-forms.ts";
 import { registerSignedStorybook } from "./routers/signed-storybook.ts";
 import { registerStorybook } from "./routers/storybook.ts";
@@ -113,6 +122,11 @@ function warnOnServerless(options: ShelfOptions, logger: Logger): void {
   const warning = assertServerless(options.testing?.runner !== undefined);
   if (warning) {
     logger.warn(warning);
+  }
+  if (options.config?.publishedBaseDomain !== undefined) {
+    logger.warn(
+      'config.publishedBaseDomain is deprecated and is read as storybookHosting: { mode: "subdomain", baseDomain }; the two-level <build>.<slug>.<domain> links are gone (ADR 0051, decision 6). Set storybookHosting and remove publishedBaseDomain before the next minor release.',
+    );
   }
   const sequential = sequentialTransactionsWarning(options);
   if (sequential) {
@@ -211,7 +225,18 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("*", requireTesting(wiring.options.testing !== undefined));
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
+  mountPortalBoundary(app, config);
   mountAccessGates(app);
+}
+
+/**
+ * Where a request may come from (ADR 0051): `subdomain` hosting sends a content or alias host to its
+ * own router, so it never reaches the portal's gates and routes; and a write that carries a session
+ * cookie must come from the portal (decision 9).
+ */
+function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
+  app.use("*", hostDispatch());
+  app.use("*", sameSiteWrites(config));
 }
 
 /**
@@ -268,21 +293,30 @@ const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] 
   },
 ];
 
-/** Requests per minute per client IP on the signed Storybook URL route (`testing.storybookUrlRateLimit`). */
+/** Requests per minute per client IP on the signed Storybook URL route (`storybookUrlRateLimit`, alias `testing.storybookUrlRateLimit`). */
 const DEFAULT_STORYBOOK_URL_RATE_LIMIT = 6000;
 
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
 function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOptions): void {
-  const rateLimit = createRateLimiter();
+  // One resolver for every bucket: a forwarded header counts only from a trusted proxy (#911).
+  const clientIp = createClientIpResolver(config.trustProxy);
+  const rateLimit = createRateLimiter(clientIp);
   // A render fetches thousands of assets from one farm IP, so this floor is generous; it counts
   // before the token is looked at and answers 429 alike for any token.
   const signedUrls = {
-    paths: [`${STORYBOOK_TOKEN_PREFIX}*`],
-    max: options.testing?.storybookUrlRateLimit ?? DEFAULT_STORYBOOK_URL_RATE_LIMIT,
+    paths: [
+      `${STORYBOOK_TOKEN_PREFIX}*`,
+      `${STORYBOOK_READ_PREFIX}*`,
+      `${STORYBOOK_EXCHANGE_PREFIX}*`,
+    ],
+    max:
+      options.storybookUrlRateLimit ??
+      options.testing?.storybookUrlRateLimit ??
+      DEFAULT_STORYBOOK_URL_RATE_LIMIT,
     bucket: "signed-storybook",
   };
   for (const { paths, max, bucket } of [...RATE_LIMITS, signedUrls]) {
-    const keyGenerator = bucket ? rateLimitKey(bucket) : undefined;
+    const keyGenerator = bucket ? rateLimitKey(bucket, clientIp) : undefined;
     for (const path of paths) {
       app.use(path, rateLimit({ windowMs: MINUTE, max, keyGenerator }));
     }
@@ -381,12 +415,18 @@ function registerAuthFlow(app: ShelfRouter, options: ShelfOptions): void {
   registerConnections(app);
 }
 
+/** The two token routes that read a build without a session: `/_s/` (capture) and `/_r/` (read grant). */
+function registerTokenStorybook(app: ShelfRouter): void {
+  registerSignedStorybook(app);
+  registerReadGrants(app);
+}
+
 /** Register HTML pages, assets, and the optional auth flow. */
 function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
   registerAuthFlow(app, options);
   registerAssets(app);
   registerStorybook(app);
-  registerSignedStorybook(app);
+  registerTokenStorybook(app);
   registerPreviewToken(app);
   registerAdminPages(app, health, options.auth);
   registerPublicOriginRoutes(app);

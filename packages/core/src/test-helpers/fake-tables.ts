@@ -156,6 +156,7 @@ const builds = defineTable("builds", {
   reviewRequestedCycle: "review_requested_cycle",
   captureJobId: "capture_job_id",
   skippedFromBuildId: "skipped_from_build_id",
+  manifestSha256: "manifest_sha256",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
