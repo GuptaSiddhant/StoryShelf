@@ -73,7 +73,13 @@ function BuildsToolbar(props: {
   const { all, filters, base } = props;
   const skippedTotal = all.filter((build) => build.status === "skipped").length;
   const visible = all.filter((build) => showsSkipped(filters) || build.status !== "skipped");
-  const branches = [...new Set(visible.map((build) => build.gitBranch))].toSorted();
+  // Keep the selected branch in the list even when only skipped builds were on it.
+  const branches = [
+    ...new Set([
+      ...visible.map((build) => build.gitBranch),
+      ...(filters.branch ? [filters.branch] : []),
+    ]),
+  ].toSorted();
   const inBranch = visible.filter((build) => !filters.branch || build.gitBranch === filters.branch);
   const count = (status: string): number =>
     inBranch.filter((build) => build.status === status).length;
@@ -131,8 +137,13 @@ function BuildsToolbar(props: {
 /** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(
   slug: string,
-  query: BuildFilters = {},
+  rawQuery: BuildFilters = {},
 ): Promise<RenderedContent | null> {
+  // Hiding skipped builds also drops a `status=skipped` filter, which would match nothing.
+  const query: BuildFilters =
+    rawQuery.status === "skipped" && !showsSkipped(rawQuery)
+      ? { ...rawQuery, status: undefined }
+      : rawQuery;
   const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
