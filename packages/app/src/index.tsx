@@ -15,6 +15,7 @@ import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 import {
   configureOutbound,
+  STORYBOOK_EXCHANGE_PREFIX,
   STORYBOOK_READ_PREFIX,
   STORYBOOK_TOKEN_PREFIX,
 } from "@storyshelf/core/utils";
@@ -40,12 +41,14 @@ import {
   notFoundPage,
   csrf,
   createRateLimiter,
+  hostDispatch,
   requireProjectVisible,
   requireReview,
   requireTesting,
   rateLimitKey,
   requestLogging,
   resolveRequestUser,
+  sameSiteWrites,
   storeScope,
 } from "./middleware/index.ts";
 import { serverTiming } from "./middleware/server-timing.ts";
@@ -120,6 +123,11 @@ function warnOnServerless(options: ShelfOptions, logger: Logger): void {
   const warning = assertServerless(options.testing?.runner !== undefined);
   if (warning) {
     logger.warn(warning);
+  }
+  if (options.config?.publishedBaseDomain !== undefined) {
+    logger.warn(
+      'config.publishedBaseDomain is deprecated and is read as storybookHosting: { mode: "subdomain", baseDomain }; the two-level <build>.<slug>.<domain> links are gone (ADR 0051, decision 6). Set storybookHosting and remove publishedBaseDomain before the next minor release.',
+    );
   }
   const sequential = sequentialTransactionsWarning(options);
   if (sequential) {
@@ -220,7 +228,18 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("*", requireTesting(wiring.options.testing !== undefined));
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
+  mountPortalBoundary(app, config);
   mountAccessGates(app);
+}
+
+/**
+ * Where a request may come from (ADR 0051): `subdomain` hosting sends a content or alias host to its
+ * own router, so it never reaches the portal's gates and routes; and a write that carries a session
+ * cookie must come from the portal (decision 9).
+ */
+function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
+  app.use("*", hostDispatch());
+  app.use("*", sameSiteWrites(config));
 }
 
 /**
@@ -288,7 +307,11 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOption
   // A render fetches thousands of assets from one farm IP, so this floor is generous; it counts
   // before the token is looked at and answers 429 alike for any token.
   const signedUrls = {
-    paths: [`${STORYBOOK_TOKEN_PREFIX}*`, `${STORYBOOK_READ_PREFIX}*`],
+    paths: [
+      `${STORYBOOK_TOKEN_PREFIX}*`,
+      `${STORYBOOK_READ_PREFIX}*`,
+      `${STORYBOOK_EXCHANGE_PREFIX}*`,
+    ],
     max:
       options.storybookUrlRateLimit ??
       options.testing?.storybookUrlRateLimit ??

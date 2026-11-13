@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
@@ -116,7 +117,7 @@ function BuildsList(props: {
   filtered: boolean;
 }): ReturnType<typeof EmptyState> | ReturnType<typeof BuildsTable> {
   const { project, builds, filtered } = props;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   if (builds.length > 0) {
     return <BuildsTable project={project} builds={builds} />;
   }
@@ -151,7 +152,7 @@ export async function renderProjectBuildsPage(
   }
   const all = await new BuildModel(getStore().db).list(project.id);
   const builds = all.filter((build) => matches(build, query));
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const filtered = Boolean(query.status ?? query.branch);
   const health = await loadHealthPanel(project);
 
