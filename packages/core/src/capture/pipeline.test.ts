@@ -11,7 +11,7 @@ import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { parseComparisonReference } from "./comparison-reference.ts";
-import { finalizeBuild, persistCapture, type CaptureContext } from "./pipeline.ts";
+import { finalizeBuild, persistCapture, persistRendered, type CaptureContext } from "./pipeline.ts";
 
 const DEFAULT_VIEWPORT: Viewport = { name: "mobile", width: 320, height: 480 };
 
@@ -529,6 +529,22 @@ describe("persistCapture", () => {
       baselineId: "bl1",
       baselineVersion: "2026-01-01T00:00:00.000Z",
     });
+  });
+
+  it("reads a pass's baselines in one query, whatever its size", async () => {
+    const stories = ["a", "b", "c", "d", "e"].map((id) =>
+      captureFor(storyOf(id), png(4, 4, [0, 255, 0])),
+    );
+    const { ctx } = await makeContext({ captures: stories, isDefault: false });
+    await seedBaseline(ctx);
+    const list = vi.spyOn(ctx.db, "list");
+
+    await persistRendered(ctx);
+
+    const baselineReads = list.mock.calls.filter(([table]) => table === ctx.db.tables.baselines);
+    expect(baselineReads).toHaveLength(1);
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(rows.find((row) => row.storyId === "a")?.baselineId).toBe("bl1");
   });
 
   it("marks snapshots of stories without a baseline as diffed against none", async () => {

@@ -24,6 +24,17 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
 
+## Quick start
+
+```sh
+docker run -p 3000:3000 -v storyshelf:/data ghcr.io/guptasiddhant/storyshelf
+```
+
+Open <http://localhost:3000>. SQLite and local storage live on the `/data` volume, and capture uses the
+image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64`
+(`:<version>`, `:latest`, and `-hosting` variants without a browser); see the
+[Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose.
+
 ## StoryShelf vs Chromatic
 
 | | Chromatic (SaaS) | StoryShelf (self-hosted) |
