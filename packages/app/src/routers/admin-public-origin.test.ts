@@ -298,7 +298,7 @@ describe("notifications without a public origin", () => {
       config: { publicBaseUrl: ORIGIN },
     });
     expect(await (await withOrigin.request("/admin")).text()).not.toContain(paused);
-    const noNotifiers = await seedApp({});
+    const noNotifiers = await seedApp({ notifiers: [] });
     expect(await (await noNotifiers.request("/admin")).text()).not.toContain(paused);
   });
 

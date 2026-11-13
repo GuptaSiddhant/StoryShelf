@@ -31,8 +31,10 @@ const builtIn: BuiltInIntegrations = {
 };
 
 describe("BUILT_IN_INTEGRATIONS", () => {
-  it("starts empty and frozen; each move task adds its own", () => {
-    expect(BUILT_IN_INTEGRATIONS).toEqual({ notifiers: [], email: [], design: [] });
+  it("holds the email notifier so far, frozen; each move task adds its own", () => {
+    expect(BUILT_IN_INTEGRATIONS.notifiers.map((n) => n.metadata.kind)).toEqual(["email"]);
+    expect(BUILT_IN_INTEGRATIONS.email).toEqual([]);
+    expect(BUILT_IN_INTEGRATIONS.design).toEqual([]);
     expect(Object.isFrozen(BUILT_IN_INTEGRATIONS)).toBe(true);
     expect(Object.isFrozen(BUILT_IN_INTEGRATIONS.notifiers)).toBe(true);
   });
@@ -49,7 +51,10 @@ describe("BUILT_IN_INTEGRATIONS", () => {
 describe("resolveShelfIntegrations", () => {
   it("gives the built-ins of every group when nothing is set", () => {
     expect(resolveShelfIntegrations({}, builtIn)).toEqual(builtIn);
-    expect(resolveShelfIntegrations({})).toEqual({ notifiers: [], email: [], design: [] });
+    const resolved = resolveShelfIntegrations({});
+    expect(resolved.notifiers.map((n) => n.metadata.kind)).toEqual(["email"]);
+    expect(resolved.email).toEqual([]);
+    expect(resolved.design).toEqual([]);
   });
 
   it("resolves each group by its own form", () => {
