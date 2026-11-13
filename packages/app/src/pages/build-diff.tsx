@@ -13,6 +13,7 @@ import { a11ySummaryOf } from "./a11y-violations.tsx";
 import { BuildDetails, ReviewOnlySection, type BuildDetailsData } from "./build-detail.tsx";
 import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
+import { BuildEmptyState } from "./build-diff-empty.tsx";
 import { ReviewNotices } from "./build-diff-environment.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
 import { InsightSlot } from "./build-diff-insight.tsx";
@@ -171,7 +172,7 @@ function DetailsPanel(props: {
     return null;
   }
   return (
-    <div class="mb-1">
+    <div class="mb-1" id="build-details">
       <BuildDetails
         project={project}
         build={build}
@@ -196,9 +197,11 @@ function Stage(props: {
     return null;
   }
   return data.snapshots.length === 0 ? (
-    <EmptyState
-      title="No snapshots"
-      description="This build has no snapshots yet. Capture may still be running."
+    <BuildEmptyState
+      project={data.project}
+      build={data.build}
+      details={data.details}
+      canManage={data.canManage}
     />
   ) : (
     <DiffReviewGrid

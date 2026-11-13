@@ -4,28 +4,22 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import {
-  Avatar,
-  Badge,
   Button,
   Dropdown,
-  Icon,
   DropdownItem,
+  Icon,
   Meta,
+  PageHeader,
   Progress,
-  statusTone,
+  RelativeTime,
 } from "../ui/components.tsx";
-import {
-  headerActions,
-  headerMain,
-  headerMeta,
-  headerProgress,
-  headerSide,
-  headerTitle,
-  reviewHeader,
-} from "../ui/styles/review-layout.ts";
-import { a11ySummaryOf, a11yUnavailableNote } from "./a11y-violations.tsx";
+import { headerProgress } from "../ui/styles/review-layout.ts";
 import type { BuildDetailsData } from "./build-detail.tsx";
 import { reviewProgress } from "./build-diff-model.ts";
+import { failureReason, isCapturing, isRetryable, statusView } from "./build-diff-status.ts";
+
+type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
+
 /** Header props for the build page. */
 export interface DiffHeaderProps {
   project: Project;
@@ -39,133 +33,105 @@ export interface DiffHeaderProps {
   details?: BuildDetailsData;
 }
 
-interface BulkProps {
-  project: Project;
-  build: Build;
-  pendingCount: number;
+function buildBase(project: Project, build: Build): string {
+  return `/api/v1/projects/${project.slug}/builds/${build.id}`;
 }
 
-/** The one summary line: "3 to review · 11 snapshots · 4 inherited · 0 a11y findings". */
-export function summaryLine(
-  build: Build,
-  snapshots: Snapshot[],
-  details: BuildDetailsData | undefined,
-): string {
-  if (details && !details.testing) {
-    const parts: string[] = [];
-    if (details.components !== null) {
-      parts.push(`${details.components} ${details.components === 1 ? "component" : "components"}`);
-    }
-    if (details.stories !== null) {
-      parts.push(`${details.stories} ${details.stories === 1 ? "story" : "stories"}`);
-    }
-    return parts.join(" · ");
-  }
-  const findings = a11ySummaryOf(snapshots).findings;
-  return [
-    `${reviewProgress(snapshots).pending} to review`,
-    `${snapshots.length} ${snapshots.length === 1 ? "snapshot" : "snapshots"}`,
-    `${build.inheritedCount} inherited`,
-    `${findings} a11y ${findings === 1 ? "finding" : "findings"}`,
-  ].join(" · ");
+/** One post form around a header button: the action runs through its route class and CSRF. */
+function ActionForm(props: {
+  action: string;
+  confirm?: string;
+  toast?: string;
+  toastTone?: string;
+  children?: unknown;
+}): Rendered {
+  const { action, confirm, toast, toastTone, children } = props;
+  return (
+    <form
+      method="post"
+      action={action}
+      hx-post={action}
+      hx-target="body"
+      hx-confirm={confirm}
+      data-toast={toast}
+      data-toast-tone={toastTone}
+    >
+      {children}
+    </form>
+  );
 }
 
-/** Approve-all / reject-all bulk actions (each asks for confirmation). */
-function BulkActions({
-  project,
-  build,
-  pendingCount,
-}: BulkProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const base = `/api/v1/projects/${project.slug}/builds/${build.id}`;
+/** "Approve remaining 14": the one primary action while changes wait for a verdict. */
+function ApproveRemaining(props: { project: Project; build: Build; count: number }): Rendered {
+  const { project, build, count } = props;
+  return (
+    <ActionForm
+      action={`${buildBase(project, build)}/approve-all`}
+      confirm={`Approve all ${count} remaining changes?`}
+      toast={`Approved ${count} ${count === 1 ? "change" : "changes"}`}
+    >
+      <Button variant="primary" size="sm" type="submit" icon="check">
+        Approve remaining {count}
+      </Button>
+    </ActionForm>
+  );
+}
+
+/** "Retry capture" as the primary action of a failed or cancelled build. */
+function RetryButton(props: { project: Project; build: Build }): Rendered {
+  return (
+    <ActionForm action={`${buildBase(props.project, props.build)}/retry`}>
+      <Button variant="primary" size="sm" type="submit">
+        Retry capture
+      </Button>
+    </ActionForm>
+  );
+}
+
+/** Branch, short sha, author and age: the strip's one metadata line. */
+function HeaderMeta({ build }: { build: Build }): Rendered {
   return (
     <>
-      <form
-        method="post"
-        action={`${base}/approve-all`}
-        hx-post={`${base}/approve-all`}
-        hx-target="body"
-        hx-confirm={`Approve all ${pendingCount} remaining changes?`}
-        data-toast={`Approved ${pendingCount} ${pendingCount === 1 ? "change" : "changes"}`}
-      >
-        <Button variant="primary" size="sm" type="submit" icon="check">
-          Approve all ({pendingCount})
-        </Button>
-      </form>
-      <form
-        method="post"
-        action={`${base}/reject-all`}
-        hx-post={`${base}/reject-all`}
-        hx-target="body"
-        hx-confirm={`Reject all ${pendingCount} remaining changes?`}
-        data-toast={`Rejected ${pendingCount} ${pendingCount === 1 ? "change" : "changes"}`}
-        data-toast-tone="warning"
-      >
-        <Button variant="secondary" size="sm" type="submit">
-          Reject all
-        </Button>
-      </form>
+      <span>{build.gitBranch}</span>
+      <Meta as="span" mono>
+        {build.gitSha.slice(0, 7)}
+      </Meta>
+      {build.authorName ? <span>{build.authorName}</span> : null}
+      <RelativeTime value={build.updatedAt} />
     </>
   );
 }
 
-function HeaderTitle(props: DiffHeaderProps): HtmlEscapedString | Promise<HtmlEscapedString> {
+/** The line under the status: review progress, capture progress or why capture failed. */
+function HeaderDetail(props: DiffHeaderProps): Rendered | null {
   const { build, snapshots, details } = props;
-  const a11y = a11ySummaryOf(snapshots);
-  const label = details?.published ? "Published" : build.status;
-  return (
-    <>
-      <h1 class={headerTitle}>
-        <span>{build.gitBranch}</span>
-        <Meta as="span" mono>
-          {build.gitSha.slice(0, 7)}
-        </Meta>
-        <Badge tone={statusTone(build.status)} icon>
-          {label}
-        </Badge>
-      </h1>
-      <p class={headerMeta}>
-        {build.authorName ? <Avatar name={build.authorName} size="sm" /> : null}
-        {build.authorName ? <span>{build.authorName}</span> : null}
-        <span>{build.message ?? "No message"}</span>
-      </p>
-      <p class={headerMeta}>
-        <span>{summaryLine(build, snapshots, details)}</span>
-        {a11y.fromBaseline > 0 ? (
-          <Badge tone="neutral">a11y {a11y.fromBaseline} from baseline (not measured here)</Badge>
-        ) : null}
-        {a11y.unavailable > 0 ? (
-          <Badge tone="neutral">{a11yUnavailableNote(a11y.unavailable)}</Badge>
-        ) : null}
-      </p>
-    </>
-  );
-}
-
-function HeaderProgress({
-  snapshots,
-}: {
-  snapshots: Snapshot[];
-}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  if (build.status === "failed") {
+    return <span>{failureReason(details) ?? "No reason was recorded."}</span>;
+  }
+  if (isCapturing(build)) {
+    const total = details?.stories;
+    return <span>{total ? `Capturing… ${snapshots.length} of ${total}` : "Capturing…"}</span>;
+  }
   const progress = reviewProgress(snapshots);
+  if (details?.testing === false || progress.reviewable === 0) {
+    return null;
+  }
   return (
     <div class={headerProgress}>
       <span>
-        {progress.reviewable === 0
-          ? "No changes to review"
-          : `${progress.done} of ${progress.reviewable} reviewed`}
+        {progress.done} of {progress.reviewable} reviewed
       </span>
       <Progress value={progress.done} max={progress.reviewable} label="Review progress" />
     </div>
   );
 }
 
-/** The ⋯ menu: Retry capture (once, here) and Cancel build while it can still be cancelled. */
-function MoreMenu(props: {
-  project: Project;
-  build: Build;
-}): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build } = props;
-  const base = `/api/v1/projects/${project.slug}/builds/${build.id}`;
+/** The ⋯ menu: Open Storybook, Reject all, Retry (when it is not the primary action) and Cancel. */
+function MoreMenu(props: DiffHeaderProps & { showReject: boolean }): Rendered {
+  const { project, build, canManage = false, details, pendingCount, showReject } = props;
+  const base = buildBase(project, build);
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const manage = canManage && details?.testing !== false;
   return (
     <Dropdown
       label={<Icon name="more-horizontal" />}
@@ -173,43 +139,67 @@ function MoreMenu(props: {
       align="end"
       iconOnly
     >
-      <form method="post" action={`${base}/retry`} hx-post={`${base}/retry`} hx-target="body">
-        <DropdownItem type="submit">Retry capture</DropdownItem>
-      </form>
-      {CANCELLABLE_BUILD_STATUSES.includes(build.status) ? (
-        <form method="post" action={`${base}/cancel`} hx-post={`${base}/cancel`} hx-target="body">
+      <DropdownItem href={urls.short(build.id)}>Open Storybook ↗</DropdownItem>
+      {showReject ? (
+        <ActionForm
+          action={`${base}/reject-all`}
+          confirm={`Reject all ${pendingCount} remaining changes?`}
+          toast={`Rejected ${pendingCount} ${pendingCount === 1 ? "change" : "changes"}`}
+          toastTone="warning"
+        >
+          <DropdownItem type="submit">Reject all</DropdownItem>
+        </ActionForm>
+      ) : null}
+      {manage && !isRetryable(build) ? (
+        <ActionForm action={`${base}/retry`}>
+          <DropdownItem type="submit">Retry capture</DropdownItem>
+        </ActionForm>
+      ) : null}
+      {manage && CANCELLABLE_BUILD_STATUSES.includes(build.status) ? (
+        <ActionForm action={`${base}/cancel`}>
           <DropdownItem type="submit" icon="x-circle">
             Cancel build
           </DropdownItem>
-        </form>
+        </ActionForm>
       ) : null}
     </Dropdown>
   );
 }
 
-/** Branch, status, author, summary and the build's actions. */
-export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, snapshots, pendingCount, canReview, canManage = false, details } = props;
+/** The strip's actions: one primary button, then the menu (and "Show log" on a failed build). */
+function HeaderActions(props: DiffHeaderProps): Rendered {
+  const { project, build, pendingCount, canReview, canManage = false, details } = props;
   const testing = details?.testing ?? true;
-  const reviewOn = project.reviewEnabled !== false;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const showApprove = testing && canReview && project.reviewEnabled !== false && pendingCount > 0;
   return (
-    <header class={reviewHeader}>
-      <div class={headerMain}>
-        <HeaderTitle {...props} />
-      </div>
-      <div class={headerSide}>
-        {testing ? <HeaderProgress snapshots={snapshots} /> : null}
-        <div class={headerActions}>
-          {testing && reviewOn && canReview && pendingCount > 0 ? (
-            <BulkActions project={project} build={build} pendingCount={pendingCount} />
-          ) : null}
-          <Button variant="secondary" size="sm" href={urls.short(build.id)}>
-            Open Storybook ↗
-          </Button>
-          {testing && canManage ? <MoreMenu project={project} build={build} /> : null}
-        </div>
-      </div>
-    </header>
+    <>
+      {build.status === "failed" ? (
+        <Button variant="ghost" size="sm" href="#build-details">
+          Show log
+        </Button>
+      ) : null}
+      {testing && canManage && isRetryable(build) ? (
+        <RetryButton project={project} build={build} />
+      ) : null}
+      {showApprove ? (
+        <ApproveRemaining project={project} build={build} count={pendingCount} />
+      ) : null}
+      <MoreMenu {...props} showReject={showApprove} />
+    </>
+  );
+}
+
+/** The build header as a status strip: status, where it came from, progress or reason, one action. */
+export function DiffHeader(props: DiffHeaderProps): Rendered {
+  const { build, details } = props;
+  const view = statusView(build, details);
+  return (
+    <PageHeader
+      title={view.label}
+      status={{ tone: view.tone, icon: view.icon }}
+      meta={<HeaderMeta build={build} />}
+      detail={<HeaderDetail {...props} />}
+      actions={<HeaderActions {...props} />}
+    />
   );
 }

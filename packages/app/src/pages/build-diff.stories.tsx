@@ -1,12 +1,14 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
-import type { Snapshot } from "@storyshelf/core/schema";
+import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { pageStory } from "../../.storybook/page.tsx";
 import type { RenderedContent } from "../shell/document.tsx";
 import {
   BUILD_CANCELLED,
+  BUILD_CAPTURING,
   BUILD_FAILED,
   BUILD_MAIN,
+  BUILD_REJECTED,
   BUILD_REVIEW,
   builds,
   project,
@@ -18,6 +20,14 @@ import { type BuildDiffData, renderBuildDiffPage } from "./build-diff.tsx";
 
 const meta: Meta = { title: "Pages/Builds/Build page" };
 export default meta;
+
+const fixture = (id: string): Build => {
+  const found = builds.find((item) => item.id === id);
+  if (!found) throw new Error(`fixture missing: ${id}`);
+  return found;
+};
+const capturing = (): Build => fixture(BUILD_CAPTURING);
+const review = (): Build => fixture(BUILD_REVIEW);
 
 /** The build page for one fixture build, with its details panel loaded from the story database. */
 async function buildPage(
@@ -44,11 +54,27 @@ export const Reviewing = pageStory(() => buildPage(BUILD_REVIEW));
 /** Every change decided: nothing left to approve in the header. */
 export const Approved = pageStory(() => buildPage(BUILD_MAIN));
 
-/** Capture failed: no snapshots, and Retry capture waits in the ⋯ menu. */
+/** Capture failed: the reason and Retry capture sit in the strip and the stage, no menu to open. */
 export const Failed = pageStory(() => buildPage(BUILD_FAILED));
 
-/** A cancelled build is terminal: nothing to review or approve. */
+/** A cancelled build is terminal: nothing to review, and Retry is one click away. */
 export const Cancelled = pageStory(() => buildPage(BUILD_CANCELLED));
+
+/** Capturing: "Capturing… n of m" in the strip, and a stage that says snapshots are on their way. */
+export const Capturing = pageStory(() => buildPage(BUILD_CAPTURING));
+
+/** Queued: waiting for a capture worker. */
+export const Queued = pageStory(() =>
+  buildPage(BUILD_CAPTURING, { build: { ...capturing(), status: "pending" } }),
+);
+
+/** Rejected: a terminal verdict, nothing left to approve. */
+export const Rejected = pageStory(() => buildPage(BUILD_REJECTED));
+
+/** A finished build whose Storybook has no stories: a real "No stories" state. */
+export const NoStories = pageStory(() =>
+  buildPage(BUILD_REVIEW, { snapshots: [], build: { ...review(), status: "approved" } }),
+);
 
 /** The baseline moved after the diffs were computed: a one-line warning with Re-diff. */
 export const StaleBaseline = pageStory(() =>

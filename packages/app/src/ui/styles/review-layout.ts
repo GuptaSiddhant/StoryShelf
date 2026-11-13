@@ -47,66 +47,6 @@ export const comparisonCard = css`
 
 /* ---- header ---- */
 
-export const reviewHeader = css`
-  /* review-header */
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-  padding: var(--space-4);
-  background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-`;
-
-export const headerMain = css`
-  /* review-header-main */
-  display: grid;
-  gap: var(--space-1);
-  min-width: 0;
-`;
-
-export const headerTitle = css`
-  /* review-header-title */
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-  margin: 0;
-  font-size: var(--text-xl);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: var(--leading-tight);
-`;
-
-export const headerMeta = css`
-  /* review-header-meta */
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-`;
-
-export const headerSide = css`
-  /* review-header-side */
-  display: grid;
-  gap: var(--space-3);
-  justify-items: end;
-  min-width: min(100%, 280px);
-  @media (max-width: 720px) {
-    & {
-      justify-items: stretch;
-      width: 100%;
-    }
-  }
-`;
-
 export const headerProgress = css`
   /* review-header-progress */
   display: grid;
@@ -115,15 +55,6 @@ export const headerProgress = css`
   font-size: var(--text-sm);
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
-`;
-
-export const headerActions = css`
-  /* review-header-actions */
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: flex-end;
 `;
 
 /* ---- filmstrip ---- */
