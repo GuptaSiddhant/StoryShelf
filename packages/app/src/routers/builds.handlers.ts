@@ -25,6 +25,7 @@ import { requestBuildState } from "../git-status.ts";
 import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { assertBaselineCurrent, baselineChanged } from "./baseline-guard.ts";
+import { supersedeOlderBuilds } from "./build-supersede.ts";
 import { notFound } from "./helpers.ts";
 /**
  * Create a build record with labels and the `build:created` webhook.
@@ -82,6 +83,7 @@ export async function createBuildRecord(
     `/builds/${build.id}`,
   );
   await requestBuildState(build.id);
+  await supersedeOlderBuilds(project, build, meta.supersedes, announceBuildStatus);
   return build;
 }
 
@@ -298,6 +300,8 @@ export const buildCreateJsonSchema = z
     message: z.string().optional(),
     affectedOnly: z.boolean().optional(),
     labels: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
+    /** In-flight builds of this branch the CLI judged older (ADR 0045); the server re-checks each. */
+    supersedes: z.array(z.string().min(1)).max(50).optional(),
   })
   .openapi("BuildCreate");
 
@@ -310,6 +314,7 @@ export interface BuildCreateMetadata {
   message?: string;
   affectedOnly?: boolean;
   labels?: { key: string; value: string }[];
+  supersedes?: string[];
 }
 
 /**

@@ -101,6 +101,7 @@ async function recordUses(
 import { registerBuildCancel } from "./build-cancel.ts";
 import { registerBuildChangeset } from "./build-changeset.ts";
 import { registerBuildReviews } from "./build-reviews.ts";
+import { registerBuildsInFlight } from "./builds-in-flight.ts";
 import { registerComments } from "./comments.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -116,6 +117,7 @@ import {
 import { registerSnapshots } from "./snapshots.ts";
 /** Register the build list, upload, fetch, retry, and delete endpoints. */
 export function registerBuilds(app: ShelfRouter): void {
+  registerBuildsInFlight(app);
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { status, branch, labelKey, labelValue } = c.req.valid("query");

@@ -126,6 +126,9 @@
           "reviewApprovals": {
             "type": "number"
           },
+          "cancelSuperseded": {
+            "type": "boolean"
+          },
           "storybookUrlTtlSeconds": {
             "type": "number",
             "nullable": true
@@ -297,10 +300,28 @@
             "minimum": 1,
             "maximum": 20
           },
+          "cancelSuperseded": {
+            "type": "boolean"
+          },
           "storybookUrlTtlSeconds": {
             "type": "integer",
             "nullable": true
           }
+        }
+      },
+      "InFlightBuilds": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            }
+          },
+          "required": ["id", "sha"]
         }
       },
       "Build": {
@@ -472,6 +493,14 @@
               },
               "required": ["key", "value"]
             }
+          },
+          "supersedes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 50
           }
         },
         "required": ["gitSha", "gitBranch"]
@@ -1842,6 +1871,65 @@
           }
         },
         "x-storyshelf-class": "hosting"
+      }
+    },
+    "/api/v1/projects/{slug}/builds/in-flight": {
+      "get": {
+        "tags": ["Builds"],
+        "summary": "List a branch's in-flight builds",
+        "description": "The builds of one branch that are still working (pending, capturing or comparing), as `{ id, sha }`. The CLI compares them with local history and names the older ones in `supersedes` when it creates a build (ADR 0045). Same roles as build creation. `testing` class.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "branch",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The branch's builds in a cancellable status, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InFlightBuilds"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
       }
     },
     "/api/v1/projects/{slug}/builds": {
