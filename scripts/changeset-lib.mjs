@@ -6,6 +6,14 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { entryProblems, KINDS, renderGrouped, SUMMARY_MAX } from "./changelog-entry.mjs";
+
+/**
+ * No 1.0 until the owner has dogfood proof that everything works (owner decision 2026-11-09): before
+ * 1.0 a breaking change is a `minor`. Lifting this is an owner decision recorded in ADR 0043.
+ */
+export const NO_V1 =
+  "no major bump before 1.0: the owner has not approved v1 (ADR 0043, 2026-11-09); use minor for a breaking change";
 
 /** Bump sizes, largest first. */
 export const BUMPS = ["major", "minor", "patch"];
@@ -78,16 +86,19 @@ function rank(changeset) {
 }
 
 /**
- * The CHANGELOG entries for some changesets: each body as written, largest bump first, then by file name.
+ * The CHANGELOG blocks for some changesets: one `### <Kind>` block per kind (`changelog-entry.mjs`),
+ * entries inside it largest bump first, then by file name.
  *
  * @param {ReturnType<typeof parseChangeset>[]} changesets Pending changesets.
- * @returns {string[]} Entry paragraphs (empty bodies are dropped).
+ * @returns {string[]} Blocks in kind order (empty bodies are dropped).
  */
 export function renderEntries(changesets) {
-  return changesets
-    .toSorted((a, b) => rank(a) - rank(b) || a.file.localeCompare(b.file))
-    .map((changeset) => changeset.body)
-    .filter((body) => body !== "");
+  return renderGrouped(
+    changesets
+      .toSorted((a, b) => rank(a) - rank(b) || a.file.localeCompare(b.file))
+      .map((changeset) => changeset.body)
+      .filter((body) => body !== ""),
+  );
 }
 
 /**
@@ -117,6 +128,9 @@ export function bumpVersion(version, bump) {
     Number,
   );
   if (bump === "major") {
+    if (major === 0) {
+      throw new Error(NO_V1);
+    }
     return `${major + 1}.0.0`;
   }
   return bump === "minor" ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
@@ -142,8 +156,9 @@ export function unknownReleases(changesets, known) {
 }
 
 /** The body a new changeset starts with when no message is given: CI rejects a changeset that keeps it. */
-export const PLACEHOLDER_BODY =
-  "Describe what a user sees, starting with a bold lead (**Fixed: …**, **Added: …**, **Changed: …** or **Breaking: …**) and the issue numbers.";
+export const PLACEHOLDER_BODY = `<Kind>: <what a user sees, one line of at most ${SUMMARY_MAX} characters> (Kind: ${KINDS.join(", ")})
+
+<The details for CHANGELOG.md, with the issue numbers.>`;
 
 /**
  * The text of a new changeset file.
@@ -327,15 +342,27 @@ export function malformedChangesets(added, read, known) {
   for (const path of added.filter((entry) => CHANGESET_FILE.test(entry))) {
     try {
       const parsed = parseChangeset(read(path), path);
-      if (parsed.body === PLACEHOLDER_BODY) {
-        problems.push(`${path}: replace the placeholder text with the CHANGELOG entry`);
-      }
-      if (known !== undefined) {
-        problems.push(...unknownReleases([parsed], known));
-      }
+      problems.push(...changesetProblems(parsed, path, known));
     } catch (error) {
       problems.push(error.message);
     }
+  }
+  return problems;
+}
+
+/** The problems in one parsed changeset: the placeholder or a malformed entry, a major bump, unknown packages. */
+function changesetProblems(parsed, path, known) {
+  const problems = [];
+  if (parsed.body === PLACEHOLDER_BODY) {
+    problems.push(`${path}: replace the placeholder text with the CHANGELOG entry`);
+  } else if (parsed.releases.length > 0) {
+    problems.push(...entryProblems(parsed.body).map((problem) => `${path}: ${problem}`));
+  }
+  if (parsed.releases.some((release) => release.bump === "major")) {
+    problems.push(`${path}: ${NO_V1}`);
+  }
+  if (known !== undefined) {
+    problems.push(...unknownReleases([parsed], known));
   }
   return problems;
 }

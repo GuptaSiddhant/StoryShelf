@@ -478,3 +478,109 @@ describe("signed preview frame", () => {
     expect(page.part("disclosure")?.hidden).toBe(false);
   });
 });
+
+/** A page with the drawer, its toggle, and a page body behind it, with the client script running. */
+function drawerPage() {
+  const dom = new JSDOM(
+    `<body><button data-sidebar-toggle aria-expanded="false">Menu</button>
+      <aside id="sidebar"><a href="/a">First</a><a href="/b">Second</a></aside>
+      <div data-sidebar-backdrop hidden></div>
+      <div data-shell-main><main><h1 data-focus-heading>Heading</h1></main></div></body>`,
+    { runScripts: "outside-only", url: "https://shelf.test/" },
+  );
+  dom.window.eval(bootScript());
+  dom.window.eval(clientScript());
+  return dom.window;
+}
+
+describe("shell focus handling", () => {
+  it("moves focus into the open drawer, makes the page inert, and gives focus back on close", () => {
+    const { document } = drawerPage();
+    const toggle = document.querySelector<HTMLElement>("[data-sidebar-toggle]");
+    const main = document.querySelector<HTMLElement>("[data-shell-main]");
+    toggle?.click();
+    expect(document.activeElement?.textContent).toBe("First");
+    expect(main?.hasAttribute("inert")).toBe(true);
+    toggle?.click();
+    expect(main?.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("closes the drawer with Escape and returns focus to the toggle", () => {
+    const { document, KeyboardEvent } = drawerPage();
+    const toggle = document.querySelector<HTMLElement>("[data-sidebar-toggle]");
+    toggle?.click();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(document.querySelector("[data-shell-main]")?.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("focuses the main heading after a whole-page swap", () => {
+    const { document, CustomEvent } = drawerPage();
+    expect(document.activeElement).toBe(document.body);
+    document.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { detail: { target: document.body } }),
+    );
+    expect(document.activeElement?.textContent).toBe("Heading");
+  });
+
+  it("after an in-place swap, wires the new canvas and focuses its heading without scrolling", () => {
+    const { document, CustomEvent } = drawerPage();
+    const old = document.createElement("div");
+    old.id = "review-canvas";
+    const fresh = document.createElement("div");
+    fresh.id = "review-canvas";
+    fresh.innerHTML = `<h2 id="snapshot-heading" tabindex="-1" data-focus-heading>Next</h2>
+      <div data-compare data-view="side"></div><textarea autofocus></textarea>`;
+    document.querySelector("main")?.append(fresh);
+    fresh.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { bubbles: true, detail: { target: old } }),
+    );
+    expect(document.activeElement?.textContent).toBe("Next");
+    expect(fresh.querySelector<HTMLElement>("[data-compare]")?.dataset["ready"]).toBe("1");
+  });
+
+  it("merges only the missing rules of an in-place swap's stylesheet and drops the block", () => {
+    const { document, CustomEvent } = drawerPage();
+    const sheet = document.createElement("style");
+    sheet.id = "storyshelf-css";
+    sheet.textContent = ".a{x:1}";
+    document.body.append(sheet);
+    const detail = {
+      target: document.createElement("div"),
+      serverResponse:
+        '<style id="storyshelf-css">.a{x:1}.b{y:2;&:hover{z:3}}</style><div id="c"></div>',
+    };
+    document.body.dispatchEvent(new CustomEvent("htmx:beforeSwap", { bubbles: true, detail }));
+    expect(sheet.textContent).toBe(".a{x:1}.b{y:2;&:hover{z:3}}");
+    expect(detail.serverResponse).toBe('<div id="c"></div>');
+  });
+
+  it("after an in-place comment swap, focuses the emptied box", () => {
+    const { document, CustomEvent } = drawerPage();
+    const old = document.createElement("section");
+    old.id = "snapshot-comments";
+    const fresh = document.createElement("section");
+    fresh.id = "snapshot-comments";
+    fresh.innerHTML = `<button>Mark resolved</button><textarea autofocus></textarea>`;
+    document.querySelector("main")?.append(fresh);
+    fresh.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { bubbles: true, detail: { target: old } }),
+    );
+    expect(document.activeElement?.tagName).toBe("TEXTAREA");
+  });
+
+  it("keeps aria-expanded of the collapse button in step with the rail", () => {
+    const dom = new JSDOM(
+      `<body><button data-sidebar-collapse aria-expanded="true"></button></body>`,
+      { runScripts: "outside-only", url: "https://shelf.test/" },
+    );
+    dom.window.eval(bootScript());
+    dom.window.eval(clientScript());
+    const button = dom.window.document.querySelector<HTMLElement>("[data-sidebar-collapse]");
+    button?.click();
+    expect(button?.getAttribute("aria-expanded")).toBe("false");
+    button?.click();
+    expect(button?.getAttribute("aria-expanded")).toBe("true");
+  });
+});

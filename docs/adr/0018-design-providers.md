@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted. Decision 3 (`@storyshelf/design-figma` as a package) is replaced by ADR 0049: Figma is
+built into core.
 
 Supersedes (archived): ADR 0029
 

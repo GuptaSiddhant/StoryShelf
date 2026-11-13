@@ -6,11 +6,13 @@
  * Creates `.changeset/<three-random-words>.md` in the format `version-packages.mjs` reads. With no
  * `--package` it names every published package (they share one version, so the choice only decides
  * the bump size). With no `--message` the file holds a placeholder that CI rejects until it is
- * replaced by the CHANGELOG entry. There is no prompt.
+ * replaced by the CHANGELOG entry. The entry starts with one line `<Kind>: <summary>` (at most 100
+ * characters; `changelog-entry.mjs`), then a blank line and the details. There is no prompt.
  */
 import { randomInt } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { entryProblems } from "./changelog-entry.mjs";
 import { BUMPS, changesetName, renderChangeset } from "./changeset-lib.mjs";
 
 const root = join(import.meta.dirname, "..");
@@ -68,6 +70,10 @@ function parse(args) {
 const { bump, packages, message } = parse(process.argv.slice(2));
 if (bump === undefined || !BUMPS.includes(bump)) {
   fail(`the bump is one of ${BUMPS.join(", ")}`);
+}
+const problems = message === undefined ? [] : entryProblems(message);
+if (problems.length > 0) {
+  fail(`--message: ${problems.join("; ")}`);
 }
 const known = publishedNames();
 const unknown = packages.filter((name) => !known.includes(name));

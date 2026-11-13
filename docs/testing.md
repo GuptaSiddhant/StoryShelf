@@ -91,6 +91,9 @@ Rules:
   touches `packages/db-postgres/`, `packages/core/src/test-helpers/` or
   `packages/core/src/adapters/database.ts` (job `postgres-lifecycle`, a `postgres:16` service
   container), and the nightly database workflow runs it with the rest of the live suite.
+- The `pg` and `./neon` presets (`db-postgres/src/retention-pool-presets.test.ts`) run both suites on a
+  real server with every party on its own pool; `./neon` goes through a `ghcr.io/neondatabase/wsproxy`
+  service (`NEON_WSPROXY`), and the file skips without the gates. A single injected connection staying off is hermetic.
 - Postgres activation (`db-postgres/src/retention-activation.test.ts`) runs `retentionActivationContractSuite`
   the same way: PGlite always, a real server (same gates, same CI job) for the rest. Only the real server
   runs the mirrored race tests (an interrupted preparation that resumes, a fenced writer in flight, two
@@ -123,6 +126,27 @@ Rules:
 - **Interaction (`play`, only oldest):** When a project has `executePlay: true`, the same suite runs `play` functions before screenshots. Tested only against `fixtures/storybook-8` (oldest) unless a major changes the `play` channel — then add a single `play` smoke for that major. Verified: `BlockingFailure` → whole build `failed`, `FlakyTag`/`FlakyParam` (`flaky-test`) → non-blocking `reviewing` with warning, `Disabled` (`skip`/`disableSnapshot`) → not counted.
 
 - **Settled signalling and `.test()` runs (`settle.integration.test.ts` in both runners):** on any fixture, a render waits for Storybook's own event (no fallback warning, identical re-captures, the play error of a flaky story is reported), falls back to the fixed wait on a page with no channel (immediately) and on a silent channel (after the 5 s timeout), and `runTests` reports pass or fail per `.test()` entry. Only `fixtures/storybook-10` has test entries (`renders its label` and `clicks without error` pass, `fails on purpose` fails; written as bare `Primary.test(...)` statements, because the indexer ignores an exported call), so the Playwright suite also runs a build with `runTests` on (the failing test fails the build, results are stored, no snapshot is taken for a test) and one with it off (nothing stored). On Storybook 8 and 9 the same tests assert the no-op. The failing test needs no tag: it is inert unless a project turns `runTests` on, which only these tests do. Puppeteer: set `PUPPETEER_EXECUTABLE_PATH`.
+
+### 5. Performance benchmark (manual: `nub run bench`)
+
+`scripts/bench/` measures the real app on `fixtures/storybook-9` (SQLite, local storage, Playwright at 2 pages, jobs at concurrency 1) and prints a table plus one JSON line. It is not part of `turbo verify` or `turbo test`; it needs Chromium and the built packages. Every Performance task reports its before and after with it (issue #853).
+
+```sh
+nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db-sqlite' --filter='@storyshelf/storage-local' --filter='@storyshelf/runner-playwright'
+(cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook)
+nub run bench                      # warm-up run (dropped), then the median of 3
+nub run bench -- --runs 5 --out .tmp/bench.json
+```
+
+It uploads the fixture with the built CLI three times (first, unchanged, one asset changed by a line) and reports:
+
+- **Storage:** bytes and objects after each upload and its capture, split into Storybook files (`content/`), per-build zips, screenshots and metadata.
+- **Capture:** wall time from upload to a finished build, the orchestrator's `timed()` sums (`db`, `storage`, `capture.extract`, `capture.render`, `capture.persist`) and render time per screenshot. Navigation, settle, screenshot and diff are inside `capture.render`: nothing records them separately yet.
+- **Database:** queries between the build turning `capturing` and the `capture timings` log, by method, with the slowest. `transact` counts as one call; the statements inside it are not counted.
+- **Published serving:** storage calls (`exists`, `read`, `readStream`) and wall time to load `/_/<buildId>/` and one story's `iframe.html` in Chromium until the network is idle.
+- **App pages:** response bytes and time for the project, build and component pages.
+
+Runs compare when the machine, Node and Playwright versions match; quote them with the numbers. Concurrency is fixed in `scripts/bench/harness.mjs`. A manual `Bench` workflow (`workflow_dispatch`) uploads the JSON as an artifact; its numbers come from a shared runner, so compare them only with other runs of that workflow.
 
 ## File conventions
 

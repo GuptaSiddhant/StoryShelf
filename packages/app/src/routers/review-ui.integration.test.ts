@@ -7,7 +7,7 @@ import {
   NotificationSubscriptionModel,
   WebhookModel,
 } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage, publicNetworkForTests } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -66,10 +66,13 @@ async function stopApps(): Promise<void> {
   }
 }
 
+let restoreNetwork: (() => void) | undefined;
 beforeEach(async () => {
+  restoreNetwork = publicNetworkForTests();
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-review-ui-"));
 });
 afterEach(async () => {
+  restoreNetwork?.();
   try {
     await stopApps();
   } finally {
@@ -595,7 +598,7 @@ describe("the build page with testing", () => {
     const id = await publish(booted, "feature/z");
     const html = await (await booted.page("alice", `/builds/${id}/diff`)).text();
     const changes = html.indexOf("Changes in this build");
-    const empty = html.indexOf("No snapshots");
+    const empty = html.indexOf("Waiting for a capture worker");
     const verdict = html.indexOf("Approve build");
     expect(changes).toBeGreaterThan(-1);
     expect(verdict).toBeGreaterThan(changes);
@@ -661,7 +664,7 @@ const form = (fields: Record<string, string>): RequestInit => ({
 describe("the review settings and the switch-off pass", () => {
   it("shows the review card to admins and saves the switch and the approvals", async () => {
     const booted = await boot();
-    const html = await (await booted.page("admin", "/settings")).text();
+    const html = await (await booted.page("admin", "/settings/review")).text();
     expect(html).toContain("Review builds before they are accepted");
     expect(html).toContain("Approvals required");
 

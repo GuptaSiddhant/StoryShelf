@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { persistStorybookStatics } from "./statics.ts";
 
@@ -40,7 +41,7 @@ afterEach(async () => {
 });
 
 describe("persistStorybookStatics", () => {
-  it("streams files to content-addressed and per-build paths with a manifest", async () => {
+  it("writes each blob once plus the manifest, and no per-build copy of the files", async () => {
     await mkdir(join(dir, "assets"), { recursive: true });
     await writeFile(join(dir, "index.html"), "<html></html>");
     await writeFile(join(dir, "assets", "a.js"), "same");
@@ -51,17 +52,23 @@ describe("persistStorybookStatics", () => {
 
     expect(files.get(`content/${sha("same")}`)?.toString()).toBe("same");
     expect(files.get(`content/${sha("<html></html>")}`)).toBeDefined();
-    const prefix = [...files.keys()]
-      .find((key) => key.endsWith("/index.html"))
-      ?.replace("/index.html", "");
-    expect(prefix).toBeDefined();
-    expect(files.get(`${prefix}/assets/b.js`)?.toString()).toBe("same");
-    const manifest = JSON.parse(files.get(`${prefix}/manifest.json`)?.toString() ?? "{}");
+    const buildKeys = [...files.keys()].filter((key) => key.startsWith("p1/builds/b1/storybook/"));
+    expect(buildKeys).toEqual(["p1/builds/b1/storybook/manifest.json"]);
+    const manifest = JSON.parse(
+      files.get("p1/builds/b1/storybook/manifest.json")?.toString() ?? "{}",
+    );
     expect(manifest).toEqual({
       "index.html": sha("<html></html>"),
       "assets/a.js": sha("same"),
       "assets/b.js": sha("same"),
     });
+    expect(new Set(files.keys())).toEqual(
+      new Set([
+        `content/${sha("same")}`,
+        `content/${sha("<html></html>")}`,
+        "p1/builds/b1/storybook/manifest.json",
+      ]),
+    );
   });
 
   it("handles more files than the concurrency cap", async () => {
@@ -105,5 +112,35 @@ describe("persistStorybookStatics", () => {
 
     expect(await readFile(join(source, "index.html"), "utf8")).toBe("<html>real</html>");
     expect(await readFile(join(source, "assets", "app.js"), "utf8")).toBe("console.log(1)");
+  });
+
+  it("writes no manifest when the abort lands while the content uses are recorded", async () => {
+    await writeFile(join(dir, "index.html"), "<html></html>");
+    const { storage, files } = memoryStorage();
+    const controller = new AbortController();
+    const db = {
+      buildReferenceLifecycle: {
+        recordContentUses: async (): Promise<string[]> => {
+          controller.abort(new Error("publish cancelled"));
+          return await Promise.resolve([]);
+        },
+      },
+    } as unknown as DatabaseAdapter;
+
+    await expect(
+      persistStorybookStatics(storage, dir, "p1", "b1", db, controller.signal),
+    ).rejects.toThrow("publish cancelled");
+
+    expect([...files.keys()].some((key) => key.endsWith("manifest.json"))).toBe(false);
+  });
+
+  it("writes the manifest when nothing aborts, with the same lifecycle", async () => {
+    await writeFile(join(dir, "index.html"), "<html></html>");
+    const { storage, files } = memoryStorage();
+    const db = {
+      buildReferenceLifecycle: { recordContentUses: async () => await Promise.resolve([]) },
+    } as unknown as DatabaseAdapter;
+    await persistStorybookStatics(storage, dir, "p1", "b1", db, new AbortController().signal);
+    expect([...files.keys()].some((key) => key.endsWith("manifest.json"))).toBe(true);
   });
 });

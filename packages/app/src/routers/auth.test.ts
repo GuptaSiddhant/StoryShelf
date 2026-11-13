@@ -242,7 +242,7 @@ describe("engine auth routes", () => {
 
     const profile = await app.request("/profile", { headers: { cookie } });
     expect(profile.status).toBe(302);
-    expect(profile.headers.get("location")).toBe("/auth/login");
+    expect(profile.headers.get("location")).toBe("/auth/login?return_to=%2Fprofile");
   });
 
   it("marks the logout clear-cookie Secure over HTTPS", async () => {

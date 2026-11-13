@@ -49,7 +49,10 @@ export interface UrlBuilder {
   storybook(slug: string): string;
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
+  /** The project settings page on its first tab (General). */
   settings(slug: string): string;
+  /** One tab of the project settings: `general`, `capture`, `review`, `access` or `insights`. */
+  settingsTab(slug: string, tab: string): string;
   short(id: string): string;
 }
 
@@ -100,7 +103,8 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
       publishedBaseDomain
         ? `https://${buildId}.${slug}.${publishedBaseDomain}`
         : `${root}/projects/${slug}/storybook/build/${buildId}`,
-    settings: (slug) => `${root}/projects/${slug}/settings`,
+    settings: (slug) => `${root}/projects/${slug}/settings/general`,
+    settingsTab: (slug, tab) => `${root}/projects/${slug}/settings/${tab}`,
     short: (id) => `${root}/_/${id}/`,
   };
 }

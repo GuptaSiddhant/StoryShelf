@@ -66,6 +66,7 @@ interface Boot {
     projectId?: string;
     secret?: string;
     now?: number;
+    purpose?: "capture" | "read";
   }) => string;
 }
 
@@ -74,6 +75,8 @@ async function boot(
     testing?: boolean;
     config?: Record<string, unknown>;
     rateLimit?: number;
+    /** The top-level `storybookUrlRateLimit` option, which works without `testing`. */
+    topLevelRateLimit?: number;
     projectTtl?: number;
   } = {},
 ): Promise<Boot> {
@@ -99,6 +102,9 @@ async function boot(
     logger: pino({ level: "silent" }),
     auth: stubAuth(null),
     config: { secret: SECRET, ...options.config },
+    ...(options.topLevelRateLimit === undefined
+      ? {}
+      : { storybookUrlRateLimit: options.topLevelRateLimit }),
     ...(options.testing === false
       ? {}
       : {
@@ -119,6 +125,7 @@ async function boot(
         secret: overrides.secret ?? SECRET,
         projectId: overrides.projectId ?? "p1",
         buildId: overrides.buildId ?? "b1",
+        purpose: overrides.purpose ?? "capture",
         now: overrides.now,
       }),
   };
@@ -183,14 +190,19 @@ describe("GET /_s/:token/*", () => {
       testing: { runner: stubRunner() },
     });
     apps.push(app);
-    const token = signStorybookToken({ secret: SECRET, projectId: "p1", buildId: "b1" });
+    const token = signStorybookToken({
+      secret: SECRET,
+      projectId: "p1",
+      buildId: "b1",
+      purpose: "capture",
+    });
     const viaSession = await app.request("/projects/one/storybook/build/b1/assets/app.js");
     const viaToken = await app.request(`/_s/${token}/assets/app.js`);
     expect(await viaToken.text()).toBe(await viaSession.text());
     expect(viaToken.headers.get("content-type")).toBe(viaSession.headers.get("content-type"));
-    // Only the token answer is private; only the session answer is withheld from CORS.
+    // The token answer is never stored; the session answer is revalidated; only it is withheld from CORS.
     expect(viaToken.headers.get("cache-control")).toBe("private, no-store");
-    expect(viaSession.headers.get("cache-control")).toContain("immutable");
+    expect(viaSession.headers.get("cache-control")).toBe("private, no-cache");
     expect(viaToken.headers.get("access-control-allow-origin")).toBe("*");
     expect(viaSession.headers.get("access-control-allow-origin")).toBeNull();
   });
@@ -204,6 +216,17 @@ describe("GET /_s/:token/*", () => {
     // The old prefix and the bare one are not the token route: the sign-in gate answers.
     expect((await app.request(`/_s`)).status).toBe(302);
     expect((await app.request(`/s/${token()}/iframe.html`)).status).toBe(302);
+  });
+
+  it("takes the rate limit from the top-level option, which wins over the testing alias", async () => {
+    const { app, token } = await boot({ topLevelRateLimit: 2, rateLimit: 50 });
+    const forwarded = { headers: { "x-forwarded-for": "203.0.113.8" } };
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- the third request must follow the first two
+      statuses.push((await app.request(`/_s/${token()}/iframe.html`, forwarded)).status);
+    }
+    expect(statuses).toEqual([200, 200, 429]);
   });
 
   it("rate limits per client IP before it looks at the token, with one 429 for every token", async () => {

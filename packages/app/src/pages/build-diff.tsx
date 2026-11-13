@@ -7,16 +7,17 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
 import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
 import { DocumentLayout, type NavConfig, type RenderedContent } from "../shell/document.tsx";
-import { EmptyState } from "../ui/components.tsx";
-import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
+import { Alert, EmptyState, type ImageSize } from "../ui/components.tsx";
+import { canvasColumn, comparisonCard, workspace } from "../ui/styles/review-layout.ts";
 import { a11ySummaryOf } from "./a11y-violations.tsx";
 import { BuildDetails, ReviewOnlySection, type BuildDetailsData } from "./build-detail.tsx";
 import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
+import { BuildEmptyState } from "./build-diff-empty.tsx";
 import { ReviewNotices } from "./build-diff-environment.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
 import { InsightSlot } from "./build-diff-insight.tsx";
-import { groupOf, reviewProgress } from "./build-diff-model.ts";
+import { REVIEW_CANVAS_ID, groupOf, reviewProgress } from "./build-diff-model.ts";
 import { DiffNav } from "./build-diff-nav.tsx";
 import { ShortcutsDialog } from "./build-diff-shortcuts.tsx";
 import type { LinkedUsageItem } from "./build-diff-usage.tsx";
@@ -52,8 +53,11 @@ export interface BuildDiffData {
   publishedBaseDomain?: string;
   /** Details panel data; omitted, the page shows the review stage alone. */
   details?: BuildDetailsData;
+  /** Natural size of the selected snapshot's screenshot, read from its PNG header. */
+  currentSize?: ImageSize | null;
 }
-interface DiffReviewGridProps {
+/** What the review stage renders: the page data with the selected snapshot resolved. */
+export interface DiffReviewGridProps {
   project: Project;
   build: Build;
   snapshots: Snapshot[];
@@ -71,6 +75,7 @@ interface DiffReviewGridProps {
   usage: LinkedUsageItem[];
   design: DesignItem[];
   publishedBaseDomain?: string;
+  currentSize?: ImageSize | null;
 }
 
 /** The snapshot the review page shows: the requested one, else the first needing review. */
@@ -101,18 +106,38 @@ function SnapshotComments(props: {
   );
 }
 
-/** Snapshot nav plus the viewer/comments column for the selected snapshot. */
-function DiffReviewGrid(
+/** "Every change reviewed", once a build with changes has nothing left open. */
+function DoneNotice(props: {
+  snapshots: Snapshot[];
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const progress = reviewProgress(props.snapshots);
+  if (progress.reviewable === 0 || progress.pending > 0) {
+    return null;
+  }
+  return (
+    <Alert tone="success" role="status" title="Review complete">
+      {progress.reviewable === 1
+        ? "The one change in this build is reviewed."
+        : `All ${progress.reviewable} changes in this build are reviewed.`}
+    </Alert>
+  );
+}
+
+/**
+ * The viewer, comments and action bar of the selected snapshot. Approve and reject swap this
+ * column in place (`renderReviewSwap`), so it keeps one id across renders.
+ */
+export function ReviewCanvas(
   props: DiffReviewGridProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, selected, canReview, hasBaseline, drifted } = props;
-  const { usage, design, publishedBaseDomain } = props;
   return (
-    <div class={workspace}>
-      <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
-      <div class={canvasColumn}>
-        {selected ? (
-          <>
+    <div class={canvasColumn} id={REVIEW_CANVAS_ID}>
+      {selected ? (
+        <>
+          <DoneNotice snapshots={snapshots} />
+          {/* The comparison card: the action bar is its footer, docked while the card is in view. */}
+          <div class={comparisonCard}>
             <DiffViewer
               project={project}
               build={build}
@@ -122,11 +147,11 @@ function DiffReviewGrid(
               reference={props.reference}
               defaultComparison={props.defaultComparison}
               drifted={drifted[selected.id]}
-              usage={usage}
-              design={design}
-              publishedBaseDomain={publishedBaseDomain}
+              usage={props.usage}
+              design={props.design}
+              publishedBaseDomain={props.publishedBaseDomain}
+              currentSize={props.currentSize}
             />
-            <SnapshotComments grid={props} selected={selected} />
             <DiffActionBar
               project={project}
               build={build}
@@ -135,11 +160,25 @@ function DiffReviewGrid(
               canReview={canReview}
               drifted={drifted}
             />
-          </>
-        ) : (
-          <EmptyState description="Select a snapshot to review." />
-        )}
-      </div>
+          </div>
+          <SnapshotComments grid={props} selected={selected} />
+        </>
+      ) : (
+        <EmptyState description="Select a snapshot to review." />
+      )}
+    </div>
+  );
+}
+
+/** Snapshot nav plus the viewer/comments column for the selected snapshot. */
+function DiffReviewGrid(
+  props: DiffReviewGridProps,
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, snapshots, selected } = props;
+  return (
+    <div class={workspace}>
+      <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
+      <ReviewCanvas {...props} />
     </div>
   );
 }
@@ -164,7 +203,7 @@ function DetailsPanel(props: {
     return null;
   }
   return (
-    <div class="mb-1">
+    <div class="mb-1" id="build-details">
       <BuildDetails
         project={project}
         build={build}
@@ -189,9 +228,11 @@ function Stage(props: {
     return null;
   }
   return data.snapshots.length === 0 ? (
-    <EmptyState
-      title="No snapshots"
-      description="This build has no snapshots yet. Capture may still be running."
+    <BuildEmptyState
+      project={data.project}
+      build={data.build}
+      details={data.details}
+      canManage={data.canManage}
     />
   ) : (
     <DiffReviewGrid

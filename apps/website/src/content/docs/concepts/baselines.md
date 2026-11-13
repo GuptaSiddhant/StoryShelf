@@ -55,18 +55,18 @@ Accepting a change on a feature branch records a baseline **for that branch**, s
 sequenceDiagram
     participant Dev as Developer
     participant CI as CI/CD
-    participant SS as StoryShelf
+    participant Shelf
     Dev->>CI: Push feature branch
-    CI->>SS: Upload build (branch: feature-x)
-    SS-->>Dev: Snapshots show as "changed"
-    Dev->>SS: Accept changed snapshots
-    SS->>SS: Store branch baselines
+    CI->>Shelf: Upload build (branch: feature-x)
+    Shelf-->>Dev: Snapshots show as "changed"
+    Dev->>Shelf: Accept changed snapshots
+    Shelf->>Shelf: Store branch baselines
     Dev->>CI: Push new revision to feature-x
-    CI->>SS: Upload build
-    SS-->>Dev: Same snapshots now "unchanged" (branch baseline)
+    CI->>Shelf: Upload build
+    Shelf-->>Dev: Same snapshots now "unchanged" (branch baseline)
     Dev->>CI: Merge to main
-    CI->>SS: Upload build (branch: main)
-    SS->>SS: Auto-approve, update default baselines
+    CI->>Shelf: Upload build (branch: main)
+    Shelf->>Shelf: Auto-approve, update default baselines
 ```
 
 ## Persistent builds & release tags
@@ -86,10 +86,10 @@ Persistent builds are excluded from `purgeTtlDays` retention. Their snapshots re
 
 Feature-branch baselines are GC'd after `branchTtlDays` (default 30, `null` = disabled) of inactivity via a daily sweep (`branchGcIntervalMs` 24h). Default-branch baselines are never GC'd.
 
-| Config               | Default        | Description                                                  |
-| -------------------- | -------------- | ------------------------------------------------------------ |
-| `branchTtlDays`      | 30             | Days of inactivity before feature-branch baselines GC'd      |
-| `branchGcIntervalMs` | 86400000 (24h) | How often to run the GC sweep                                |
+| Config               | Default        | Description                                                                                           |
+| -------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+| `branchTtlDays`      | 30             | Days of inactivity before feature-branch baselines GC'd                                               |
+| `branchGcIntervalMs` | 86400000 (24h) | How often to run the GC sweep                                                                         |
 | `purgeTtlDays`       | unset (opt-in) | Days before terminal builds are purged daily; unset: no scheduled purge (a manual purge then uses 30) |
 
 ```mermaid

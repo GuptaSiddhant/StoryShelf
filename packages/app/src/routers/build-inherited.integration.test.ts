@@ -54,7 +54,7 @@ describe("inherited counts of a build", () => {
     await mine("bbb2222", [true, true, true, false]);
     const page = await (await app.request(`/projects/inherit/builds/${first.id}/diff`)).text();
     expect(page).toContain("Inherited");
-    const list = await (await app.request(`/projects/${project.slug}/builds`)).text();
+    const list = await (await app.request(`/projects/${project.slug}/settings/insights`)).text();
     expect(list).toContain("Average inherited share per build");
     expect(list).toContain("63%");
     expect(list).toContain("Over the 2 most recent builds with snapshots");

@@ -277,9 +277,13 @@ describe("BuildModel: a cancelled build is terminal", () => {
     const started = new Promise<void>((resolve) => {
       entered = resolve;
     });
+    let first = true;
     db.updateWhere = async (...args) => {
-      entered();
-      await paused;
+      if (first) {
+        first = false;
+        entered();
+        await paused;
+      }
       return await updateWhere(...args);
     };
     const late = model.setStatus(build.id, "capturing");
@@ -304,8 +308,8 @@ describe("BuildModel: a cancelled build is terminal", () => {
     await model.setStatus(build.id, "cancelled");
     await model.setStatus(build.id, "failed");
     expect(debug).toHaveBeenCalledWith(
-      { buildId: build.id, refused: "failed" },
-      "build is cancelled; status write refused",
+      { buildId: build.id, refused: "failed", status: "cancelled" },
+      "build status write refused",
     );
   });
 
@@ -436,7 +440,6 @@ describe("BuildModel: a cancelled build is terminal", () => {
       gitRepository: "owner/repo",
     });
     const { id } = await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
-    await model.update(id, { status: "failed" });
     const before = await model.get(id);
     // The verdict is written once, right before the reset's first write.
     const racing = Object.create(db) as typeof db;
@@ -483,15 +486,18 @@ describe("BuildModel: a cancelled build is terminal", () => {
     await model.setStatus(id, "capturing");
 
     await model.resetStatus(id, "pending");
+    await model.setStatus(id, "capturing");
     const old = await model.setStatusAtGeneration(id, "approved", 0);
     expect(old.applied).toBe(false);
-    expect((await model.get(id))?.status).toBe("pending");
+    expect((await model.get(id))?.status).toBe("capturing");
 
     expect((await model.setStatusAtGeneration(id, "approved", 1)).applied).toBe(true);
     expect((await model.get(id))?.status).toBe("approved");
 
+    await model.resetStatus(id, "pending");
+    await model.setStatus(id, "capturing");
     await model.setStatus(id, "cancelled");
-    expect((await model.setStatusAtGeneration(id, "approved", 1)).applied).toBe(false);
+    expect((await model.setStatusAtGeneration(id, "approved", 2)).applied).toBe(false);
     expect((await model.get(id))?.status).toBe("cancelled");
   });
 

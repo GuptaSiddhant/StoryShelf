@@ -36,6 +36,10 @@ export { storageContractSuite } from "./storage-contract.ts";
 export { makeFakeStateNotifier, type FakeStateNotifier } from "./fake-notifier.ts";
 
 export {
+  buildLifecycleContractSuite,
+  type BuildLifecycleDatabaseFactory,
+} from "./build-lifecycle-contract.ts";
+export {
   buildReferenceContractSuite,
   type BuildReferenceContractFixture,
   type BuildReferenceContractFixtureRunner,
@@ -47,3 +51,18 @@ export {
   type SeededBaseline,
   type SeededSnapshot,
 } from "./retention-activation-contract.ts";
+export {
+  compareCoreRowsWithDrizzle,
+  compareRequiredWithDdl,
+  compareDdlWithDrizzle,
+  CORE_ROW_TABLES,
+  indexStatementsIn,
+  parseDdl,
+  readCoreRowFields,
+  typeFamily,
+  type GetTableConfig,
+  type ParityAllowance,
+  type ParsedDdl,
+} from "./schema-parity.ts";
+
+export { publicNetworkForTests } from "./public-network.ts";

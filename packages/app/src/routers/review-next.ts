@@ -1,8 +1,11 @@
 import { SnapshotModel } from "@storyshelf/core/models";
-import type { Snapshot } from "@storyshelf/core/schema";
+import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { Context } from "hono";
+import { snapshotPageUrl } from "../pages/build-diff-model.ts";
+import { renderReviewSwap } from "../pages/build-diff-swap.tsx";
 import { getStore } from "../store.ts";
 import { isOpenSnapshot } from "./baseline-guard.ts";
+import { loadBuildDiffData } from "./build-diff-data.ts";
 import { hxRefresh, isHxRequest } from "./htmx.ts";
 
 /**
@@ -24,35 +27,40 @@ function fromReviewPage(c: Context): boolean {
   }
 }
 
-/** Where a decision on `snapshotId` should send the reviewer, or null to just reload. */
-async function advanceTarget(target: {
-  slug: string;
-  buildId: string;
+/** The build a decision was made on, and the snapshot it was made on. */
+export interface AdvanceTarget {
+  project: Project;
+  build: Build;
   snapshotId: string;
-}): Promise<string | null> {
-  const snapshots = await new SnapshotModel(getStore().db).listByBuild(target.buildId);
-  const next = nextOpenSnapshotId(snapshots, target.snapshotId);
-  return next === null
-    ? null
-    : `/projects/${target.slug}/builds/${target.buildId}/diff?snapshot=${next}`;
 }
 
 /**
- * After a single-snapshot decision, send HTMX clients on the review page to
- * the next open snapshot (so a reviewer can clear a build with `a`/`r`).
- * Elsewhere, or when nothing is left, reload the current page.
+ * The review page, swapped in place on the next open snapshot (or, with nothing left open, the
+ * one just decided, which then shows the build's done state). `HX-Push-Url` keeps the address
+ * bar on `?snapshot=`, so reload and back land where the reviewer is.
  */
-export async function hxAdvance(
-  c: Context,
-  target: { slug: string; buildId: string; snapshotId: string },
-): Promise<void> {
+async function reviewSwap(c: Context, target: AdvanceTarget): Promise<Response> {
+  const { project, build } = target;
+  const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
+  const shown = nextOpenSnapshotId(snapshots, target.snapshotId) ?? target.snapshotId;
+  const url = snapshotPageUrl(project, build, shown);
+  const data = await loadBuildDiffData(c, project, build, { snapshotId: shown, returnPath: url });
+  c.header("HX-Push-Url", url);
+  return c.html(renderReviewSwap(data));
+}
+
+/**
+ * After a single-snapshot decision, answer HTMX on the review page with the next open snapshot,
+ * swapped in place (so a reviewer can clear a build with `a`/`r` without a page load). Elsewhere
+ * HTMX reloads the current page, and a plain request gets null: the caller answers it.
+ */
+export async function hxAdvance(c: Context, target: AdvanceTarget): Promise<Response | null> {
   if (!isHxRequest(c)) {
-    return;
+    return null;
   }
-  const url = fromReviewPage(c) ? await advanceTarget(target) : null;
-  if (url === null) {
+  if (!fromReviewPage(c)) {
     hxRefresh(c);
-    return;
+    return null;
   }
-  c.header("HX-Redirect", url);
+  return await reviewSwap(c, target);
 }

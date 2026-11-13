@@ -1,22 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { REDIFFABLE_BUILD_STATUSES, rediffBuild } from "@storyshelf/core/capture";
 import { SnapshotModel } from "@storyshelf/core/models";
-import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
-import { findDriftedSnapshots, isBaselineChanged, isOpenSnapshot } from "./baseline-guard.ts";
-import {
-  VIEW_ROLES,
-  APPROVER_ROLES,
-  snapshotForBuild,
-  refreshBuild,
-  approveSnapshot,
-  buildForProject,
-} from "./builds.handlers.ts";
-import { flashHx } from "./flash.ts";
+import { VIEW_ROLES, buildForProject } from "./builds.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
-import { hxRefresh, isHxRequest } from "./htmx.ts";
-import { hxAdvance } from "./review-next.ts";
 import {
   snapshotSchema,
   okSchema,
@@ -28,7 +15,20 @@ import {
   notFound,
   unauthorized,
 } from "./schemas.ts";
-import { approveGroup, rejectGroup, splitByDrift } from "./snapshot-groups.ts";
+import {
+  approveAll,
+  approveGroupOf,
+  approveOne,
+  rediffOne,
+  rejectAll,
+  rejectGroupOf,
+  rejectOne,
+} from "./snapshots.handlers.ts";
+/** An HTMX request from the review page is answered with HTML to swap in, not JSON. */
+const reviewSwapContent = { "text/html": { schema: z.string() } };
+const REVIEW_SWAP_NOTE =
+  "An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.";
+
 const listSnapshotsRoute = createRoute({
   method: "get",
   tags: ["Review"],
@@ -56,8 +56,8 @@ const approveSnapshotRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: okSchema } },
-      description: "Snapshot approved",
+      content: { "application/json": { schema: okSchema }, ...reviewSwapContent },
+      description: `Snapshot approved. ${REVIEW_SWAP_NOTE}`,
     },
     409: {
       content: { "application/json": { schema: baselineChangedSchema } },
@@ -76,8 +76,8 @@ const rejectSnapshotRoute = createRoute({
   request: { params: z.object({ slug: z.string(), buildId: z.string(), snapshotId: z.string() }) },
   responses: {
     200: {
-      content: { "application/json": { schema: okSchema } },
-      description: "Snapshot rejected",
+      content: { "application/json": { schema: okSchema }, ...reviewSwapContent },
+      description: `Snapshot rejected. ${REVIEW_SWAP_NOTE}`,
     },
     ...notFound,
   },
@@ -119,9 +119,8 @@ const approveGroupRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: groupDecisionResultSchema } },
-      description:
-        "Every open snapshot of the story and mode approved and each engine's baseline promoted",
+      content: { "application/json": { schema: groupDecisionResultSchema }, ...reviewSwapContent },
+      description: `Every open snapshot of the story and mode approved and each engine's baseline promoted. ${REVIEW_SWAP_NOTE}`,
     },
     409: {
       content: { "application/json": { schema: baselineChangedSchema } },
@@ -140,8 +139,8 @@ const rejectGroupRoute = createRoute({
   request: { params: groupParams },
   responses: {
     200: {
-      content: { "application/json": { schema: groupDecisionResultSchema } },
-      description: "Every open snapshot of the story and mode rejected",
+      content: { "application/json": { schema: groupDecisionResultSchema }, ...reviewSwapContent },
+      description: `Every open snapshot of the story and mode rejected. ${REVIEW_SWAP_NOTE}`,
     },
     ...notFound,
   },
@@ -197,131 +196,40 @@ export function registerSnapshots(app: ShelfRouter): void {
   });
 
   app.openapi(approveSnapshotRoute, async (c) => {
-    const { slug, buildId, snapshotId } = c.req.valid("param");
-    const { force } = c.req.valid("query");
-    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    await snapshotForBuild(build, snapshotId);
-    const userId = getStore().user?.id ?? null;
-    try {
-      await approveSnapshot(snapshotId, userId, { force: force === "true" });
-    } catch (error) {
-      if (!isHxRequest(c) || !isBaselineChanged(error)) {
-        throw error;
-      }
-      // The review page recomputes staleness on load and offers re-diff / approve anyway.
-      c.header("HX-Redirect", `/projects/${slug}/builds/${buildId}/diff?snapshot=${snapshotId}`);
-      return c.json({ ok: true }, 200);
-    }
-    await hxAdvance(c, { slug, buildId, snapshotId });
-    return c.json({ ok: true }, 200);
+    const force = c.req.valid("query").force === "true";
+    const swap = await approveOne(c, c.req.valid("param"), force);
+    return swap ?? c.json({ ok: true }, 200);
   });
 
   app.openapi(rejectSnapshotRoute, async (c) => {
-    const { slug, buildId, snapshotId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    const snapshot = await snapshotForBuild(build, snapshotId);
-    const userId = getStore().user?.id ?? null;
-    await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
-    await refreshBuild(build.id);
-    await hxAdvance(c, { slug, buildId, snapshotId });
-    return c.json({ ok: true });
+    const swap = await rejectOne(c, c.req.valid("param"));
+    return swap ?? c.json({ ok: true }, 200);
   });
 
   app.openapi(approveAllRoute, async (c) => {
-    const { slug, buildId } = c.req.valid("param");
-    const { force } = c.req.valid("query");
-    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-    const userId = getStore().user?.id ?? null;
-    const forced = force === "true";
-    const drifted = forced ? new Map() : await findDriftedSnapshots(project, build, snapshots);
-    // A story/mode is approved on every engine or on none: one drifted member skips its group.
-    const { approvable, skipped } = splitByDrift(
-      snapshots.filter((snapshot) => isOpenSnapshot(snapshot)),
-      drifted,
-    );
-    await Promise.all(
-      approvable.map(async (snapshot) => {
-        await approveSnapshot(snapshot.id, userId, { force: forced, deferRefresh: true });
-      }),
-    );
-    await refreshBuild(build.id);
-    hxRefresh(c);
-    return c.json({ ok: true, skipped: skipped.map((snapshot) => snapshot.id) });
+    const force = c.req.valid("query").force === "true";
+    const skipped = await approveAll(c, c.req.valid("param"), force);
+    return c.json({ ok: true, skipped });
   });
 
   app.openapi(approveGroupRoute, async (c) => {
-    const { slug, buildId, storyId, modeKey } = c.req.valid("param");
-    const { force } = c.req.valid("query");
-    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    const userId = getStore().user?.id ?? null;
-    let snapshotIds: string[];
-    try {
-      snapshotIds = await approveGroup(project, build, { storyId, modeKey }, userId, {
-        force: force === "true",
-      });
-    } catch (error) {
-      if (!isHxRequest(c) || !isBaselineChanged(error)) {
-        throw error;
-      }
-      c.header("HX-Redirect", `/projects/${slug}/builds/${buildId}/diff`);
-      return c.json({ ok: true, snapshotIds: [] }, 200);
-    }
-    const first = snapshotIds[0];
-    if (first) await hxAdvance(c, { slug, buildId, snapshotId: first });
-    return c.json({ ok: true, snapshotIds }, 200);
+    const force = c.req.valid("query").force === "true";
+    const { snapshotIds, swap } = await approveGroupOf(c, c.req.valid("param"), force);
+    return swap ?? c.json({ ok: true, snapshotIds }, 200);
   });
 
   app.openapi(rejectGroupRoute, async (c) => {
-    const { slug, buildId, storyId, modeKey } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    const userId = getStore().user?.id ?? null;
-    const snapshotIds = await rejectGroup(build, { storyId, modeKey }, userId);
-    const first = snapshotIds[0];
-    if (first) await hxAdvance(c, { slug, buildId, snapshotId: first });
-    return c.json({ ok: true, snapshotIds }, 200);
+    const { snapshotIds, swap } = await rejectGroupOf(c, c.req.valid("param"));
+    return swap ?? c.json({ ok: true, snapshotIds }, 200);
   });
 
   app.openapi(rediffRoute, async (c) => {
-    const { slug, buildId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    if (build.isDefault) {
-      throw new HTTPException(400, { message: "Default-branch builds are not re-diffed" });
-    }
-    if (!REDIFFABLE_BUILD_STATUSES.has(build.status)) {
-      throw new HTTPException(409, {
-        message: `Build is ${build.status}; wait for capture to finish or retry capture`,
-      });
-    }
-    const { db, storage, logger } = getStore();
-    const result = await rediffBuild({ db, storage, logger }, project, build);
-    await refreshBuild(build.id);
-    hxRefresh(c);
-    flashHx(c, "Re-diffed against current baselines");
+    const result = await rediffOne(c, c.req.valid("param"));
     return c.json({ ok: true, ...result }, 200);
   });
 
   app.openapi(rejectAllRoute, async (c) => {
-    const { slug, buildId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-    const userId = getStore().user?.id ?? null;
-    await Promise.all(
-      snapshots
-        .filter((snapshot) => snapshot.status === "new" || snapshot.status === "changed")
-        .map(async (snapshot) => {
-          await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
-        }),
-    );
-    await refreshBuild(build.id);
-    hxRefresh(c);
+    await rejectAll(c, c.req.valid("param"));
     return c.json({ ok: true });
   });
 }

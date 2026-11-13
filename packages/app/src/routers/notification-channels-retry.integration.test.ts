@@ -237,7 +237,7 @@ describe("retry a git channel's current state", () => {
   it("serves the settings form to admins, shows the diagnostics, and refuses a developer", async () => {
     const t = await boot({ origin: true });
     await t.channels.recordOutcome(t.target.id);
-    const page = await t.app.request("/projects/retry/settings/notifications", {
+    const page = await t.app.request("/projects/retry/settings/review", {
       headers: as("admin"),
     });
     const html = await page.text();

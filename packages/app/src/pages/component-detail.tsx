@@ -99,8 +99,7 @@ export interface ComponentPageData {
   story: string | undefined;
   /**
    * Root the preview frame loads the Storybook from: the build's own URL when it is open to anyone
-   * who reaches the app, a signed `/_s/<token>` URL for a private build (needs `testing` and a
-   * `secret`), or null when no frame can load.
+   * who reaches the app, a `/_r/<token>` read grant for a private build (needs a `secret`), or null when no frame can load.
    */
   previewBase: string | null;
   design: DesignItem[];

@@ -171,7 +171,7 @@ async function signedUrlLifetime(patch: Record<string, unknown>): Promise<number
   );
   const call = render.mock.calls[0] as [{ storybookUrl?: string }] | undefined;
   const token = /\/_s\/([^/]+)\//u.exec(call?.[0].storybookUrl ?? "")?.[1] ?? "";
-  const result = verifyStorybookToken(token, "s3cret-s3cret-s3cret");
+  const result = verifyStorybookToken(token, "s3cret-s3cret-s3cret", "capture");
   return result.ok ? Math.round(result.claims.expiresAt - Date.now() / 1000) : -1;
 }
 
@@ -273,6 +273,33 @@ describe("executeCaptureJob", () => {
 
     expect((await db.get(db.tables.builds, build.id))?.status).toBe("cancelled");
     expect(await db.list(db.tables.baselines)).toEqual([]);
+  });
+
+  it("does not persist the statics again when publishing already wrote the manifest", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const manifestKey = `${storybookDir(project.id, build.id)}/manifest.json`;
+    await storage.write(manifestKey, Buffer.from("{}"));
+    const write = vi.spyOn(storage, "write");
+    const { runner } = fakeRunner();
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    const written = write.mock.calls.map(([key]) => key);
+    expect(
+      written.filter((key) => key.includes("/storybook/") || key.startsWith("content/")),
+    ).toEqual([]);
+    expect((await storage.read(manifestKey)).toString()).toBe("{}");
   });
 
   it("records the build's use of the persisted content, so retention knows who uses it", async () => {
@@ -700,7 +727,7 @@ describe("executeCaptureJob", () => {
       ).toMatch(/\/_s\//u);
       const project = await db.list(db.tables.projects);
       const token = /\/_s\/([^/]+)\//u.exec(urls[0] ?? "")?.[1] ?? "";
-      expect(verifyStorybookToken(token, "s3cret-s3cret-s3cret")).toMatchObject({
+      expect(verifyStorybookToken(token, "s3cret-s3cret-s3cret", "capture")).toMatchObject({
         ok: true,
         claims: { projectId: project[0]?.id, buildId },
       });
@@ -985,7 +1012,10 @@ describe("executeCaptureJob", () => {
       ),
     ).rejects.toThrow("browser exploded");
 
-    expect(await storage.exists(`${storybookDir(project.id, build.id)}/iframe.html`)).toBe(true);
+    const manifest = JSON.parse(
+      (await storage.read(`${storybookDir(project.id, build.id)}/manifest.json`)).toString(),
+    ) as Record<string, string>;
+    expect(await storage.exists(`content/${manifest["iframe.html"]}`)).toBe(true);
     // Scratch is gone even though the capture failed; persisted statics remain in storage.
     expect(await scratchExists(project.id, build.id)).toBe(false);
     const failedBuild = await db.get(db.tables.builds, build.id);

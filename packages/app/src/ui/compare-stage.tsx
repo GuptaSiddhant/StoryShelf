@@ -9,7 +9,9 @@ import { Segmented } from "./segmented.tsx";
 const stageRoot = css`
   /* compare-stage */
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
+  min-width: 0;
   .stage__bar {
     display: flex;
     flex-wrap: wrap;
@@ -17,9 +19,15 @@ const stageRoot = css`
     align-items: center;
     justify-content: space-between;
   }
+  /* On a phone the five modes are wider than the card: the switch scrolls instead of widening the stage. */
+  .stage__bar > * {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  /* Two columns: baseline and current. The diff is a mode (one column), never a third column. */
   .stage__grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3);
     align-items: start;
   }
@@ -28,9 +36,12 @@ const stageRoot = css`
     min-width: 0;
     max-height: 78vh;
     overflow: auto;
-    background: var(--surface-card);
-    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
+  }
+  .stage__canvas {
+    padding: var(--space-2);
   }
   .stage__pane:focus-visible {
     outline: 2px solid var(--ring);
@@ -63,12 +74,25 @@ const stageRoot = css`
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
+  /*
+   * Fit never upscales: an image is at most its natural width. Two images with known sizes are each
+   * an SVG whose viewBox is as wide as the wider image, so both shrink by the same factor
+   * (min(1, pane width / wider width)) and a 100 px square stays smaller than a 120 px one.
+   */
   .stage__img {
     display: block;
-    width: 100%;
+    max-width: 100%;
     height: auto;
-    background: repeating-conic-gradient(var(--surface-muted) 0% 25%, var(--surface-subtle) 0% 50%)
-      0 0 / 16px 16px;
+    outline: 1px solid var(--border-subtle);
+  }
+  .stage__img[data-scaled] {
+    overflow: visible;
+    outline: none;
+  }
+  .stage__outline {
+    fill: none;
+    stroke: var(--border-subtle);
+    vector-effect: non-scaling-stroke;
   }
   .stage__empty {
     display: grid;
@@ -117,9 +141,16 @@ const stageRoot = css`
   &[data-zoom="400"] .stage__img {
     image-rendering: pixelated;
   }
-  /* Design variant: screenshot against a render, two panes and no diff. */
-  &[data-variant="design"][data-view="split"] .stage__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Design variant: the render is scaled to the screenshot's width, as its note says. */
+  &[data-variant="design"] .stage__img {
+    width: 100%;
+  }
+  /* No baseline: one image, so one column. */
+  &[data-single] .stage__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  &:not([data-view="diff"]) .stage__pane[data-pane="diff"] {
+    display: none;
   }
   &[data-view="diff"] .stage__grid,
   &[data-view="flip"] .stage__grid,
@@ -132,10 +163,6 @@ const stageRoot = css`
   }
   &[data-view="flip"][data-flip="baseline"] .stage__pane:not([data-pane="baseline"]),
   &[data-view="flip"]:not([data-flip="baseline"]) .stage__pane:not([data-pane="current"]) {
-    display: none;
-  }
-  &[data-view="swipe"] .stage__pane[data-pane="diff"],
-  &[data-view="onion"] .stage__pane[data-pane="diff"] {
     display: none;
   }
   &[data-view="swipe"] .stage__pane,
@@ -197,6 +224,8 @@ const stageRoot = css`
   }
 `;
 
+const DEFAULT_BASELINE_EMPTY = "New story — no baseline yet. Approve to set the baseline.";
+
 const MODES = [
   { label: "Side by side", value: "split" },
   { label: "Swipe", value: "swipe" },
@@ -222,6 +251,65 @@ function withActive(
   return items.map((item) => ({ ...item, active: item.value === active }));
 }
 
+/** An image's natural size in pixels. */
+export interface ImageSize {
+  width: number;
+  height: number;
+}
+
+/** "120×100", the way the stage and the review header print a size. */
+export function formatSize(size: ImageSize): string {
+  return `${size.width}×${size.height}`;
+}
+
+/** True when both sizes are known and differ: the images cannot be diffed pixel for pixel. */
+export function sizesDiffer(
+  baseline: ImageSize | null | undefined,
+  current: ImageSize | null | undefined,
+): boolean {
+  return Boolean(
+    baseline && current && (baseline.width !== current.width || baseline.height !== current.height),
+  );
+}
+
+/**
+ * The common width both images are drawn against: the wider natural width, or null when either size
+ * is unknown (each image is then capped at its own natural width).
+ */
+function sharedWidth(
+  baseline: ImageSize | null | undefined,
+  current: ImageSize | null | undefined,
+): number | null {
+  return baseline && current ? Math.max(baseline.width, current.width) : null;
+}
+
+/**
+ * An image drawn at the stage's one scale: an SVG `box` pixels wide (the wider image), holding the
+ * image at its natural size. CSS caps the SVG at the pane width and never stretches it past `box`,
+ * so every image on the stage shrinks by the same factor and none is upscaled. Sizes are attributes
+ * computed on the server; no style value is.
+ */
+const ScaledImage: FC<{ src: string; alt: string; size: ImageSize; box: number }> = ({
+  src,
+  alt,
+  size,
+  box,
+}) => (
+  <svg
+    class="stage__img"
+    data-scaled=""
+    viewBox={`0 0 ${box} ${size.height}`}
+    width={box}
+    height={size.height}
+    preserveAspectRatio="xMinYMin meet"
+    role="img"
+    aria-label={alt}
+  >
+    <image href={src} width={size.width} height={size.height} />
+    <rect class="stage__outline" width={size.width} height={size.height} />
+  </svg>
+);
+
 interface PaneProps {
   kind: "baseline" | "current" | "diff";
   label: string;
@@ -229,13 +317,29 @@ interface PaneProps {
   alt: string;
   empty: unknown;
   meta?: string;
+  /** The image's natural size; with `box`, it is drawn at the stage's shared scale. */
+  size?: ImageSize | null;
+  box?: number | null;
 }
+
+/** The pane's image: at the shared scale when both sizes are known, else capped at its own width. */
+const PaneImage: FC<{ src: string; alt: string; size?: ImageSize | null; box?: number | null }> = ({
+  src,
+  alt,
+  size,
+  box,
+}) =>
+  size && box ? (
+    <ScaledImage src={src} alt={alt} size={size} box={box} />
+  ) : (
+    <img class="stage__img" src={src} alt={alt} loading="lazy" decoding="async" />
+  );
 
 /**
  * One image pane. It scrolls when the image is larger than the pane (zoomed in, or a tall screenshot),
  * so with an image it takes keyboard focus and a name, and the arrow keys pan it.
  */
-const Pane: FC<PaneProps> = ({ kind, label, src, alt, empty, meta }) => {
+const Pane: FC<PaneProps> = ({ kind, label, src, alt, empty, meta, size, box }) => {
   return (
     <div
       class="stage__pane"
@@ -246,10 +350,12 @@ const Pane: FC<PaneProps> = ({ kind, label, src, alt, empty, meta }) => {
     >
       <div class="stage__label">
         <span>{label}</span>
-        {meta ? <span>{meta}</span> : null}
+        {meta ? <span>{meta}</span> : size ? <span>{formatSize(size)}</span> : null}
       </div>
       {src ? (
-        <img class="stage__img" src={src} alt={alt} loading="lazy" decoding="async" />
+        <div class="stage__canvas">
+          <PaneImage src={src} alt={alt} size={size} box={box} />
+        </div>
       ) : (
         <div class="stage__empty">{empty}</div>
       )}
@@ -296,6 +402,10 @@ export interface CompareStageProps {
   baselineLabel?: string;
   /** A line under the controls, e.g. what the left-hand image is. */
   note?: string;
+  /** Natural size of the baseline image (read from its header on the server), when known. */
+  baselineSize?: ImageSize | null;
+  /** Natural size of the current screenshot, when known. With both sizes, Fit uses one scale. */
+  currentSize?: ImageSize | null;
 }
 
 /** Mode switch, plus the zoom switch (a design comparison always fits, so it has none). */
@@ -311,48 +421,106 @@ const StageBar: FC<{ design: boolean }> = ({ design }) => {
   );
 };
 
+/** The swipe divider and its draggable knob (shown in swipe mode only). */
+const SwipeDivider: FC = () => (
+  <span class="stage__divider" aria-hidden="true">
+    <span class="stage__knob" data-compare-knob>
+      ↔
+    </span>
+  </span>
+);
+
 /** The panes (baseline or design, current, diff) and the swipe divider. */
 const StageGrid: FC<CompareStageProps & { design: boolean; baselineLabel: string }> = ({
   baselineSrc,
   currentSrc,
   diffSrc,
   subject,
-  baselineEmpty = "New story — no baseline yet. Approve to set the baseline.",
+  baselineEmpty = DEFAULT_BASELINE_EMPTY,
   diffEmpty = "No diff",
   diffMeta,
   design,
   baselineLabel,
-}) => (
-  <div class="stage__grid">
-    <Pane
-      kind="baseline"
-      label={baselineLabel}
-      src={baselineSrc}
-      alt={`${baselineLabel} for ${subject}`}
-      empty={baselineEmpty}
-    />
-    <Pane
-      kind="current"
-      label="Current"
-      src={currentSrc}
-      alt={`Current for ${subject}`}
-      empty="No screenshot"
-    />
-    {design ? null : (
+  baselineSize,
+  currentSize,
+}) => {
+  const box = design ? null : sharedWidth(baselineSize, currentSize);
+  return (
+    <div class="stage__grid">
       <Pane
-        kind="diff"
-        label="Diff"
-        src={diffSrc}
-        alt={`Diff for ${subject}`}
-        empty={diffEmpty}
-        meta={diffMeta}
+        kind="baseline"
+        label={baselineLabel}
+        src={baselineSrc}
+        alt={`${baselineLabel} for ${subject}`}
+        empty={baselineEmpty}
+        size={design ? null : baselineSize}
+        box={box}
       />
-    )}
-    <span class="stage__divider" aria-hidden="true">
-      <span class="stage__knob" data-compare-knob>
-        ↔
-      </span>
-    </span>
+      <Pane
+        kind="current"
+        label="Current"
+        src={currentSrc}
+        alt={`Current for ${subject}`}
+        empty="No screenshot"
+        size={design ? null : currentSize}
+        box={box}
+      />
+      {design ? null : (
+        <Pane
+          kind="diff"
+          label="Diff"
+          src={diffSrc}
+          alt={`Diff for ${subject}`}
+          empty={diffEmpty}
+          meta={diffMeta}
+        />
+      )}
+      <SwipeDivider />
+    </div>
+  );
+};
+
+/**
+ * A snapshot with no baseline: the current screenshot, the zoom switch and one line saying why there is
+ * nothing to compare. No mode switch, diff pane, divider or range. `data-modes="split"` makes the review
+ * script refuse the other mode keys, and the flip click and `t` key do nothing because the view never flips.
+ */
+const SingleStage: FC<{
+  currentSrc: string;
+  subject: string;
+  emptyText: unknown;
+  diffSrc: string | null;
+  currentSize?: ImageSize | null;
+}> = ({ currentSrc, subject, emptyText, diffSrc, currentSize }) => (
+  <div
+    class={stageRoot}
+    data-compare
+    data-single=""
+    data-view="split"
+    data-zoom="fit"
+    data-flip="current"
+    data-variant="baseline"
+    data-modes="split"
+  >
+    <div class="stage__bar">
+      <Segmented label="Zoom" data-compare-zoom items={withActive(ZOOMS, "fit")} />
+    </div>
+    <p class="stage__note">{emptyText}</p>
+    {diffSrc ? (
+      <p class="stage__note">
+        <a href={diffSrc}>Open the saved diff</a>
+      </p>
+    ) : null}
+    <div class="stage__grid">
+      <Pane
+        kind="current"
+        label="Current"
+        src={currentSrc}
+        alt={`Current for ${subject}`}
+        empty="No screenshot"
+        size={currentSize}
+      />
+    </div>
   </div>
 );
 
@@ -364,6 +532,17 @@ export const CompareStage: FC<CompareStageProps> = ({
   ...images
 }) => {
   const design = variant === "design";
+  if (!design && images.baselineSrc === null) {
+    return (
+      <SingleStage
+        currentSrc={images.currentSrc}
+        subject={images.subject}
+        emptyText={images.baselineEmpty ?? DEFAULT_BASELINE_EMPTY}
+        diffSrc={images.diffSrc}
+        currentSize={images.currentSize}
+      />
+    );
+  }
   return (
     <div
       class={stageRoot}

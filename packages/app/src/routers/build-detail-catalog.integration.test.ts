@@ -43,6 +43,8 @@ async function seed(options: { testing?: boolean; status?: string; catalogued?: 
   const { storage, objects } = makeStorage();
   const project = await createTestProject(db, db.tables, { name: "app" });
   const created = await createTestBuild(db, db.tables, project.id);
+  // `reviewing` is only reached from `capturing`, as a run finalizes.
+  if (options.status === "reviewing") await new BuildModel(db).setStatus(created.id, "capturing");
   const build = await new BuildModel(db).setStatus(
     created.id,
     (options.status ?? "approved") as never,
@@ -98,7 +100,7 @@ describe("build page without testing", () => {
     const { app, build } = await seed({ status: "pending" });
     const html = await page(app, build.id);
     expect(html).not.toContain("Published");
-    expect(html).toContain("pending");
+    expect(html).toContain("Queued");
   });
 
   it("shows the build's labels", async () => {
@@ -138,8 +140,7 @@ describe("build page with testing", () => {
     const html = await page(app, build.id);
     expect(html).not.toContain("Review diffs");
     expect(html).toContain("Retry capture");
-    expect(html).toContain("Changed / new");
-    expect(html).toContain("No snapshots");
+    expect(html).toContain("Published without capture");
     expect(html).toContain("Components");
   });
 
@@ -180,15 +181,23 @@ describe("the old build overview URL", () => {
 });
 
 describe("the build page header", () => {
-  it("offers Retry capture once, in the menu, and the whole-build actions with review on", async () => {
+  it("puts Retry capture on the strip and in the empty state of a failed build, not in the menu", async () => {
     const { app, build } = await seed({ testing: true, status: "failed" });
     const html = await page(app, build.id);
-    expect(html.match(/Retry capture/gu)).toHaveLength(1);
+    expect(html.match(/Retry capture/gu)).toHaveLength(2);
+    expect(html).toContain("Show log");
     expect(html).toContain("Open Storybook");
   });
 
-  it("summarises a review-only build by its catalog", async () => {
+  it("offers Retry capture once, in the menu, while a build is running", async () => {
+    const { app, build } = await seed({ testing: true, status: "capturing" });
+    expect((await page(app, build.id)).match(/Retry capture/gu)).toHaveLength(1);
+  });
+
+  it("names the status in the strip and puts the catalog counts in the details", async () => {
     const { app, build } = await seed();
-    expect(await page(app, build.id)).toContain("2 components · 3 stories");
+    const html = await page(app, build.id);
+    expect(html).toContain("Published");
+    expect(html).toMatch(/Components<\/dt><dd[^>]*>\s*2/u);
   });
 });

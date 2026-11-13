@@ -351,6 +351,7 @@ const SidebarFooter: FC = () => (
         class="sidebar__collapse"
         type="button"
         data-sidebar-collapse
+        aria-expanded="true"
         aria-label="Collapse or expand sidebar"
         title="Collapse or expand sidebar"
       >

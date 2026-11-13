@@ -207,6 +207,12 @@ describe("dot segments", () => {
     expect(hasDotSegment("a/b.")).toBe(false);
     expect(hasDotSegment("...")).toBe(false);
   });
+
+  it("builds the settings entry and one tab", () => {
+    const local = createUrlBuilder("/");
+    expect(local.settings("app")).toBe("/projects/app/settings/general");
+    expect(local.settingsTab("app", "access")).toBe("/projects/app/settings/access");
+  });
 });
 
 describe("build url", () => {

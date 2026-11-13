@@ -1,9 +1,8 @@
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
-import { loadHealthPanel } from "../insights/health-panel.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { getStore, testingEnabled } from "../store.ts";
+import { getStore } from "../store.ts";
 import {
   Badge,
   Button,
@@ -14,8 +13,7 @@ import {
   SelectField,
   VStack,
 } from "../ui/components.tsx";
-import { HealthSlot } from "./health-panel.tsx";
-import { InheritedRatioCard } from "./inherited-ratio-card.tsx";
+import { GetStarted } from "./get-started.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 const STATUSES = ["reviewing", "approved", "rejected", "failed", "cancelled", "pending"] as const;
 
@@ -41,6 +39,37 @@ function matches(build: Build, filters: BuildFilters): boolean {
   return (
     (!filters.status || build.status === filters.status) &&
     (!filters.branch || build.gitBranch === filters.branch)
+  );
+}
+
+/** Branch select that submits on change and keeps the status filter. */
+function BranchFilter(props: {
+  base: string;
+  filters: BuildFilters;
+  branches: string[];
+}): ReturnType<typeof SelectField> {
+  const { base, filters, branches } = props;
+  return (
+    <form
+      method="get"
+      action={base}
+      hx-get={base}
+      hx-trigger="change"
+      hx-target="body"
+      hx-push-url="true"
+    >
+      {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
+      <SelectField
+        label="Branch"
+        name="branch"
+        layout="inline"
+        value={filters.branch ?? ""}
+        options={[
+          { value: "", label: "All branches" },
+          ...branches.map((branch) => ({ value: branch, label: branch })),
+        ]}
+      />
+    </form>
   );
 }
 
@@ -73,27 +102,43 @@ function BuildsToolbar(props: {
           active: (filters.status ?? "") === item.value,
         }))}
       />
-      <form
-        method="get"
-        action={base}
-        hx-get={base}
-        hx-trigger="change"
-        hx-target="body"
-        hx-push-url="true"
-      >
-        {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
-        <SelectField
-          label="Branch"
-          name="branch"
-          layout="inline"
-          value={filters.branch ?? ""}
-          options={[
-            { value: "", label: "All branches" },
-            ...branches.map((branch) => ({ value: branch, label: branch })),
-          ]}
-        />
-      </form>
+      <BranchFilter base={base} filters={filters} branches={branches} />
     </HStack>
+  );
+}
+
+/** The build table, or an empty state that explains whether a filter hides builds. */
+function BuildsList(props: {
+  project: Project;
+  builds: Build[];
+  filtered: boolean;
+  origin: string | undefined;
+  none: boolean;
+}): ReturnType<typeof EmptyState> | ReturnType<typeof BuildsTable> {
+  const { project, builds, filtered } = props;
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  if (builds.length > 0) {
+    return <BuildsTable project={project} builds={builds} />;
+  }
+  if (props.none) {
+    return <GetStarted project={project} origin={props.origin} />;
+  }
+  return (
+    <EmptyState
+      title="No builds"
+      description={
+        filtered
+          ? "No builds match the current filter."
+          : "Upload your first build with the CLI. Builds appear here once uploaded."
+      }
+      action={
+        filtered ? (
+          <Button variant="secondary" href={urls.buildsList(project.slug)}>
+            Clear filters
+          </Button>
+        ) : null
+      }
+    />
   );
 }
 
@@ -111,7 +156,6 @@ export async function renderProjectBuildsPage(
   const builds = all.filter((build) => matches(build, query));
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const filtered = Boolean(query.status ?? query.branch);
-  const health = await loadHealthPanel(project);
 
   return (
     <DocumentLayout
@@ -128,33 +172,19 @@ export async function renderProjectBuildsPage(
         }
       />
       <VStack>
-        <HealthSlot project={project} data={health} />
-        {testingEnabled() ? <InheritedRatioCard builds={all} /> : null}
         <BuildsToolbar
           project={project}
           all={all}
           filters={query}
           base={urls.buildsList(project.slug)}
         />
-        {builds.length === 0 ? (
-          <EmptyState
-            title="No builds"
-            description={
-              filtered
-                ? "No builds match the current filter."
-                : "Upload your first build with the CLI. Builds appear here once uploaded."
-            }
-            action={
-              filtered ? (
-                <Button variant="secondary" href={urls.buildsList(project.slug)}>
-                  Clear filters
-                </Button>
-              ) : null
-            }
-          />
-        ) : (
-          <BuildsTable project={project} builds={builds} />
-        )}
+        <BuildsList
+          project={project}
+          builds={builds}
+          filtered={filtered}
+          origin={await getStore().publicOrigin?.url()}
+          none={all.length === 0}
+        />
       </VStack>
     </DocumentLayout>
   );
