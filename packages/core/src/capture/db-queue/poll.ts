@@ -116,6 +116,26 @@ async function settleFailure(
   await rt.model.requeue(row.jobId, isoAt(rt, delayMs), error, now);
 }
 
+/** Longest a job handed back stays out of the queue unless the caller asks otherwise. */
+const DEFAULT_HAND_BACK_DELAY_MS = 30_000;
+
+/**
+ * Give a claimed job back without spending an attempt (see `PollableCaptureQueue.handBack`). Only
+ * the current holder can: a stale holder writes nothing.
+ */
+export async function handBackJob(
+  rt: QueueRuntime,
+  job: PollableJob,
+  options: { delayMs?: number; reason?: string } = {},
+): Promise<void> {
+  const ref = attemptRef(job);
+  const delayMs = Math.min(
+    Math.max(options.delayMs ?? DEFAULT_HAND_BACK_DELAY_MS, 0),
+    MAX_NACK_DELAY_MS,
+  );
+  await rt.model.handBack(ref.jobId, ref.attempt, isoAt(rt, delayMs), isoAt(rt));
+}
+
 /** The attempt a polled job refers to, from its receipt (`<jobId>:<attempt>`). */
 export function attemptRef(job: PollableJob): { receipt: string; jobId: string; attempt: number } {
   const parsed = job.receipt === undefined ? null : parseAttemptRowId(job.receipt);
