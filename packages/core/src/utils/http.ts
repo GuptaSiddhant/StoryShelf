@@ -2,6 +2,8 @@ import type { Span } from "@opentelemetry/api";
 import { Buffer } from "node:buffer";
 import type { Logger } from "../logger.ts";
 import { injectTraceContext, setSpanMessage, spanException, withSpan } from "../tracing.ts";
+import { guardedFetch } from "./outbound-fetch.ts";
+import { OutboundRefusedError } from "./outbound.ts";
 
 /**
  * Fetch JSON with timeout, retries, and structured errors.
@@ -109,6 +111,12 @@ export interface HttpRequestOptions {
   retries?: number;
   /** Aborts the request (and any further retry) when it fires. */
   signal?: AbortSignal;
+  /**
+   * `"project"` marks a URL a project configured: it must be `https` and public (or on the operator
+   * allowlist), is pinned to the checked address, and each redirect is checked again. Omit for
+   * operator-configured URLs.
+   */
+  destination?: "project";
   logger?: Logger;
 }
 
@@ -126,6 +134,12 @@ export interface HttpTextOptions {
   retries?: number;
   /** Aborts the request (and any further retry) when it fires. */
   signal?: AbortSignal;
+  /**
+   * `"project"` marks a URL a project configured: it must be `https` and public (or on the operator
+   * allowlist), is pinned to the checked address, and each redirect is checked again. Omit for
+   * operator-configured URLs.
+   */
+  destination?: "project";
   logger?: Logger;
 }
 const DEFAULT_RETRIES = 3;
@@ -136,6 +150,9 @@ const MAX_BODY_SNIPPET = 500;
 /** Whether a failure is worth retrying: network errors, 429, and 502/503/504. */
 function shouldRetry(error: unknown, attempt: number, maxAttempts: number): boolean {
   if (attempt >= maxAttempts) {
+    return false;
+  }
+  if (error instanceof OutboundRefusedError) {
     return false;
   }
   if (!(error instanceof HttpError)) {
@@ -322,16 +339,24 @@ async function doFetchResponse(
   readErrorBody = true,
 ): Promise<Response> {
   const request = buildRequest(options);
-  injectTraceContext(request.headers);
+  // Trace and span ids stay inside the operator's own traffic: a project-set destination is a
+  // third party and gets no `traceparent`.
+  if (options.destination !== "project") {
+    injectTraceContext(request.headers);
+  }
   options.logger?.debug({ url: redactUrlForLog(url), method: request.method }, "http request");
-  const response = await fetch(url, {
-    method: request.method,
-    headers: request.headers,
-    body: request.body,
-    signal: options.signal
-      ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
-      : AbortSignal.timeout(timeoutMs),
-  });
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
+    : AbortSignal.timeout(timeoutMs);
+  const response =
+    options.destination === "project"
+      ? await guardedFetch(url, { ...request, signal })
+      : await fetch(url, {
+          method: request.method,
+          headers: request.headers,
+          body: request.body,
+          signal,
+        });
   if (!response.ok) {
     throw await failureOf(response, readErrorBody);
   }

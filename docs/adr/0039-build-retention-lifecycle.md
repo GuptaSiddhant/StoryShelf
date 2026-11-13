@@ -9,8 +9,8 @@ Merged: source-build provenance (#345), frozen comparison references and fail-cl
 (#354), SQLite lifecycle primitives (#382), fenced baseline writers (#389), preparation of legacy
 references (#397), sealing of the capability to fenced mutations (#372) and resumable deletion with
 exactly-once content release (#374), per-build content uses (#564), SQLite activation (#536) and Postgres activation on the postgres.js
-preset (#375).
-Open: the `./neon` and `pg` presets (#375), MySQL (#376) and investigations (#377 to #381).
+preset, then on the `pg` and `./neon` presets (#375).
+Open: MySQL (#376) and investigations (#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -137,9 +137,13 @@ by preset, so it cannot by itself carry this guarantee.
   traffic and beside another booting instance: a writer or a second instance waits on its locks, and
   the second finds nothing to change. Unlike SQLite there is no global write lock, so a writer
   that does not take the fence (an older release, before this one) is not excluded; upgrade every
-  instance before relying on it. Only the postgres.js preset exposes it. PGlite never does (one
-  session proves no locking); `./neon`, `pg` and `./neon-http` stay fail closed until each passes
-  both suites on its own (`./neon-http` cannot: `transactions: "sequential"`). The activation suite
+  instance before relying on it. Per preset: postgres.js, `pg` and `./neon` expose it, each
+  only after both suites passed on it with every party on its own pool (`retention-pool-presets.test.ts`;
+  `./neon` through a `wsproxy` service in the `postgres-lifecycle` job). The pooled presets enable it
+  only when the driver object is a `Pool` (an owned pool, or an injected one): an injected single
+  `Client` or `PoolClient` shares one session, row locks would prove nothing, so it stays fail closed.
+  PGlite never exposes it (one session proves no locking); `./neon-http` cannot pass
+  (`transactions: "sequential"`) and stays fail closed. The activation suite
   runs unchanged on PGlite and on a real server; the race tests (interrupted preparation, a writer
   in flight, two instances) need the real server.
 - **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
@@ -224,8 +228,8 @@ could leave them, and they would keep an unrelated build protected.
 
 **Negative**
 
-- MySQL, and Postgres on `./neon`, `pg` and `./neon-http`, still do not purge builds or
-  garbage-collect branches with `testing` (#375, #376); their storage grows and operators must be
+- MySQL, and Postgres on `./neon-http`, PGlite and a single injected connection, still do not purge
+  builds or garbage-collect branches with `testing` (#375, #376); their storage grows and operators must be
   told.
 - Each of those needs its own multi-connection proof before it regains automatic retention.
 - Pinning whole builds keeps more storage than pinning artifacts would.

@@ -5,6 +5,7 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
+import { parseTrustProxy } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
@@ -30,10 +31,12 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  */
 import { mkdirSync } from "node:fs";
 import { aiFromEnv, aiLogFields } from "./ai.ts";
+import { refuseLegacyVariables } from "./legacy-env.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
 const env = process.env;
+refuseLegacyVariables(env);
 const dataDir = env["DATA_DIR"] ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
@@ -41,17 +44,23 @@ const authPassword = env["AUTH_PASSWORD"];
 const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
+// Rate limits key on the client, not Fly's proxy (#911): on Fly (`FLY_APP_NAME` is set by the
+// platform) trust `Fly-Client-IP` unless `TRUST_PROXY` says otherwise; `TRUST_PROXY=false` opts out.
+const trustProxy =
+  env["TRUST_PROXY"] === undefined && env["FLY_APP_NAME"]
+    ? "fly"
+    : parseTrustProxy(env["TRUST_PROXY"]);
 
 function buildAuthUi(): AuthUiConfig | undefined {
   const pairs: Array<[string, string | undefined]> = [
-    ["title", env["SS_AUTH_TITLE"]],
-    ["subtitle", env["SS_AUTH_SUBTITLE"]],
-    ["passwordLabel", env["SS_AUTH_PASSWORD_LABEL"]],
-    ["passwordPlaceholder", env["SS_AUTH_PASSWORD_PLACEHOLDER"]],
-    ["submitLabel", env["SS_AUTH_SUBMIT_LABEL"]],
-    ["ssoLabelTemplate", env["SS_AUTH_SSO_LABEL"]],
-    ["helpText", env["SS_AUTH_HELP_TEXT"]],
-    ["footerText", env["SS_AUTH_FOOTER_TEXT"]],
+    ["title", env["SHELF_AUTH_TITLE"]],
+    ["subtitle", env["SHELF_AUTH_SUBTITLE"]],
+    ["passwordLabel", env["SHELF_AUTH_PASSWORD_LABEL"]],
+    ["passwordPlaceholder", env["SHELF_AUTH_PASSWORD_PLACEHOLDER"]],
+    ["submitLabel", env["SHELF_AUTH_SUBMIT_LABEL"]],
+    ["ssoLabelTemplate", env["SHELF_AUTH_SSO_LABEL"]],
+    ["helpText", env["SHELF_AUTH_HELP_TEXT"]],
+    ["footerText", env["SHELF_AUTH_FOOTER_TEXT"]],
   ];
   const out: Record<string, string> = {};
   for (const [key, value] of pairs) {
@@ -63,8 +72,8 @@ function buildAuthUi(): AuthUiConfig | undefined {
 }
 
 function buildUi(): UIConfig | undefined {
-  const name = env["SS_BRAND_NAME"];
-  const logo = env["SS_LOGO_URL"];
+  const name = env["SHELF_BRAND_NAME"];
+  const logo = env["SHELF_LOGO_URL"];
   const auth = buildAuthUi();
   const hasBrand = Boolean(name ?? logo);
   if (!hasBrand && !auth) {
@@ -157,6 +166,7 @@ const app = createShelfApp({
     migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken,
     publicBaseUrl,
+    ...(trustProxy === undefined ? {} : { trustProxy }),
     scratchDir: dataDir,
     ...(purgeTtlDays === undefined ? {} : { purgeTtlDays }),
     // Emit Server-Timing response headers (total + db/storage roll-ups).

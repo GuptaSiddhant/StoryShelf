@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { StateNotifierProvider } from "../../adapters/notifier/provider.ts";
 import { CaptureJobModel } from "../../models/capture-job.ts";
+import { deferred } from "../../test-helpers/index.ts";
 import { rig, stubLogger } from "../consumer/test-fixtures.ts";
 import type { ConsumerJob } from "../consumer/types.ts";
 import {
@@ -239,6 +240,170 @@ describe("the notify job", () => {
     });
     await consumer.stop();
     await started;
+  });
+
+  it("surfaces nothing for a delivery that fails after its job was cancelled", async () => {
+    const onFailed = vi.fn(async () => {});
+    const { w, handler } = await setup({ onFailed });
+    w.failure.message = "HTTP 401: Bad credentials";
+    const job = {
+      buildId: w.build.id,
+      jobId: "n1",
+      attempt: NOTIFY_MAX_ATTEMPTS,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    const context = {
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      touch: () => {},
+      signal: new AbortController().signal,
+    };
+    const running = handler.run(job, context as never);
+    await handler.cancel?.(job);
+    await expect(running).rejects.toThrow("notify cancelled");
+    expect(onFailed).not.toHaveBeenCalled();
+    expect(await lastError(w)).toBeFalsy();
+  });
+
+  it("makes no request when the cancel lands while the job is still loading the build", async () => {
+    const { w, handler } = await setup();
+    const job = {
+      buildId: w.build.id,
+      jobId: "n3",
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    // The cancel arrives while the origin is resolved, after the job started and before the write.
+    const origin = w.deps.publicOrigin;
+    (w.deps as { publicOrigin: () => Promise<string | undefined> }).publicOrigin = async () => {
+      await handler.cancel?.(job);
+      return await origin();
+    };
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+    await expect(
+      handler.run(job, { logger, touch: () => {}, signal: new AbortController().signal } as never),
+    ).rejects.toThrow("notify cancelled");
+
+    expect(statusLog(w.git)).toEqual([]);
+    expect(await lastError(w)).toBeFalsy();
+  });
+
+  it("keeps a cancel for an older invocation when the job is reclaimed and starts again", async () => {
+    const { w, handler } = await setup();
+    const job = {
+      buildId: w.build.id,
+      jobId: "n5",
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    // The first invocation waits while its origin is resolved; later ones do not.
+    const origin = w.deps.publicOrigin;
+    const gate = deferred();
+    const entered = deferred();
+    let calls = 0;
+    (w.deps as { publicOrigin: () => Promise<string | undefined> }).publicOrigin = async () => {
+      calls += 1;
+      if (calls === 1) {
+        entered.resolve();
+        await gate.promise;
+      }
+      return await origin();
+    };
+    const olderLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const newerLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+    const older = handler.run(job, {
+      logger: olderLog,
+      touch: () => {},
+      signal: new AbortController().signal,
+    } as never);
+    await entered.promise;
+    await handler.cancel?.(job);
+    // The job is claimed again (its lease was lost) and starts a second invocation.
+    await handler.run(job, {
+      logger: newerLog,
+      touch: () => {},
+      signal: new AbortController().signal,
+    } as never);
+    const writtenByNewer = statusLog(w.git).length;
+    expect(writtenByNewer).toBeGreaterThan(0);
+    gate.resolve();
+    await expect(older).rejects.toThrow("notify cancelled");
+
+    // The older invocation stayed stopped: it wrote nothing more after the newer one's delivery.
+    expect(statusLog(w.git)).toHaveLength(writtenByNewer);
+  });
+
+  it("a cancel for a lost attempt does not stop the reclaimed attempt that runs now", async () => {
+    const { w, handler } = await setup();
+    const lost = {
+      buildId: w.build.id,
+      jobId: "n6",
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    const reclaimed = { ...(lost as object), attempt: 2 } as never;
+    const origin = w.deps.publicOrigin;
+    const gate = deferred();
+    const entered = deferred();
+    (w.deps as { publicOrigin: () => Promise<string | undefined> }).publicOrigin = async () => {
+      entered.resolve();
+      await gate.promise;
+      return await origin();
+    };
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const running = handler.run(reclaimed, {
+      logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    } as never);
+    await entered.promise;
+    await handler.cancel?.(lost);
+    gate.resolve();
+    await running;
+    expect(statusLog(w.git).length).toBeGreaterThan(0);
+  });
+
+  it("writes when no cancel arrives, with the same setup", async () => {
+    const { w, handler } = await setup();
+    const job = {
+      buildId: w.build.id,
+      jobId: "n4",
+      attempt: 1,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    await handler.run(job, {
+      logger,
+      touch: () => {},
+      signal: new AbortController().signal,
+    } as never);
+    expect(statusLog(w.git).length).toBeGreaterThan(0);
+  });
+
+  it("still surfaces the failure of a last attempt that was not cancelled", async () => {
+    const onFailed = vi.fn(async () => {});
+    const { w, handler } = await setup({ onFailed });
+    w.failure.message = "HTTP 401: Bad credentials";
+    const job = {
+      buildId: w.build.id,
+      jobId: "n2",
+      attempt: NOTIFY_MAX_ATTEMPTS,
+      maxAttempts: NOTIFY_MAX_ATTEMPTS,
+      data: { channelId: w.channelId },
+    } as never;
+    const context = {
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      touch: () => {},
+      signal: new AbortController().signal,
+    };
+    await expect(handler.run(job, context as never)).rejects.toThrow("Bad credentials");
+    expect(onFailed).toHaveBeenCalledTimes(1);
   });
 
   it("acks a job whose build or channel is gone", async () => {

@@ -230,3 +230,11 @@ automatically.
   re-diffing dependents (issue #123).
 - Label management polish (reorder, icons), label-based access control, label-driven webhook filters
   and syncing PR and MR labels from the git provider are deferred.
+
+## Amendment, 2026-11-11 (hosting modes, #916)
+
+The hosting modes of #355 decide where published code runs. Their contract is #356 and sandboxed serving is #357.
+
+- **`trusted` mode is an accepted risk.** This is path hosting on the app origin, the default, and the mode this ADR describes. Uploaded script runs there with the viewer's session cookie, so anyone who can upload to any project can act as any viewer who opens that Storybook, including admins.
+- **No stopgap header.** Published files get no `Content-Security-Policy: sandbox` or other stopgap header on the app origin. Under a sandbox, a signed-in viewer's private Storybook does not load: its module scripts are blocked by CORS. A header on public builds alone protects nothing, because the uploader can publish a private build.
+- **Isolation comes from #355.** #356 sets the contract, including that a sandboxed private build is reached through a URL credential, not a header. #357 then implements sandboxed serving. #355 moves ahead of epic #343.

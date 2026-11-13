@@ -121,6 +121,10 @@ const stageRoot = css`
   &[data-variant="design"][data-view="split"] .stage__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  /* No baseline: one image, so one column (the design rule above never applies to it). */
+  &[data-single] .stage__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
   &[data-view="diff"] .stage__grid,
   &[data-view="flip"] .stage__grid,
   &[data-view="swipe"] .stage__grid,
@@ -196,6 +200,8 @@ const stageRoot = css`
     display: flex;
   }
 `;
+
+const DEFAULT_BASELINE_EMPTY = "New story — no baseline yet. Approve to set the baseline.";
 
 const MODES = [
   { label: "Side by side", value: "split" },
@@ -317,7 +323,7 @@ const StageGrid: FC<CompareStageProps & { design: boolean; baselineLabel: string
   currentSrc,
   diffSrc,
   subject,
-  baselineEmpty = "New story — no baseline yet. Approve to set the baseline.",
+  baselineEmpty = DEFAULT_BASELINE_EMPTY,
   diffEmpty = "No diff",
   diffMeta,
   design,
@@ -356,6 +362,48 @@ const StageGrid: FC<CompareStageProps & { design: boolean; baselineLabel: string
   </div>
 );
 
+/**
+ * A snapshot with no baseline: the current screenshot, the zoom switch and one line saying why there is
+ * nothing to compare. No mode switch, diff pane, divider or range. `data-modes="split"` makes the review
+ * script refuse the other mode keys, and the flip click and `t` key do nothing because the view never flips.
+ */
+const SingleStage: FC<{
+  currentSrc: string;
+  subject: string;
+  emptyText: unknown;
+  diffSrc: string | null;
+}> = ({ currentSrc, subject, emptyText, diffSrc }) => (
+  <div
+    class={stageRoot}
+    data-compare
+    data-single=""
+    data-view="split"
+    data-zoom="fit"
+    data-flip="current"
+    data-variant="baseline"
+    data-modes="split"
+  >
+    <div class="stage__bar">
+      <Segmented label="Zoom" data-compare-zoom items={withActive(ZOOMS, "fit")} />
+    </div>
+    <p class="stage__note">{emptyText}</p>
+    {diffSrc ? (
+      <p class="stage__note">
+        <a href={diffSrc}>Open the saved diff</a>
+      </p>
+    ) : null}
+    <div class="stage__grid">
+      <Pane
+        kind="current"
+        label="Current"
+        src={currentSrc}
+        alt={`Current for ${subject}`}
+        empty="No screenshot"
+      />
+    </div>
+  </div>
+);
+
 /** Baseline / current / diff comparison with swipe, onion-skin, flip, and zoom. */
 export const CompareStage: FC<CompareStageProps> = ({
   variant = "baseline",
@@ -364,6 +412,16 @@ export const CompareStage: FC<CompareStageProps> = ({
   ...images
 }) => {
   const design = variant === "design";
+  if (!design && images.baselineSrc === null) {
+    return (
+      <SingleStage
+        currentSrc={images.currentSrc}
+        subject={images.subject}
+        emptyText={images.baselineEmpty ?? DEFAULT_BASELINE_EMPTY}
+        diffSrc={images.diffSrc}
+      />
+    );
+  }
   return (
     <div
       class={stageRoot}

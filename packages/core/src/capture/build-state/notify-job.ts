@@ -52,24 +52,50 @@ function channelIdOf(job: Pick<ConsumerJob, "data">): string {
  * attempt records the error on the channel and raises `onFailed`.
  */
 export function createNotifyHandler(options: NotifyHandlerOptions): KindHandler {
-  const { deps } = options;
+  // One controller per running attempt: a cancel aborts it, which stops the delivery like a deadline.
+  const running = new Map<string, AbortController>();
   return {
     accepts: (job) => job.buildId.length > 0 && channelIdOf(job).length > 0,
     backoff: NOTIFY_BACKOFF,
     run: async (job, context) => {
-      const channelId = channelIdOf(job);
-      context.signal.throwIfAborted();
+      const controller = new AbortController();
+      running.set(keyOf(job), controller);
       try {
-        await deliver(deps, { job, channelId }, context);
-      } catch (error) {
-        // Past its deadline the attempt records nothing: the redelivery, or `exhausted`, settles it.
-        if (!context.signal.aborted && isFinalAttempt(job)) {
-          await surfaceFailure(options, { channelId, buildId: job.buildId, error }, context.signal);
-        }
-        throw error;
+        const signal = AbortSignal.any([context.signal, controller.signal]);
+        await runAttempt(options, job, { logger: context.logger, signal });
+      } finally {
+        // Only this run's own controller: a reclaimed attempt may have registered a newer one.
+        if (running.get(keyOf(job)) === controller) running.delete(keyOf(job));
       }
     },
+    // oxlint-disable-next-line eslint/require-await -- the interface is async; aborting is synchronous
+    cancel: async (job) => {
+      running.get(keyOf(job))?.abort(new Error("notify cancelled"));
+    },
   };
+}
+
+/** One attempt; past its deadline or cancelled it records nothing and surfaces no failure. */
+async function runAttempt(
+  options: NotifyHandlerOptions,
+  job: ConsumerJob,
+  context: { logger: Logger; signal: AbortSignal },
+): Promise<void> {
+  const channelId = channelIdOf(job);
+  try {
+    context.signal.throwIfAborted();
+    await deliver(options.deps, { job, channelId }, context);
+  } catch (error) {
+    if (!context.signal.aborted && isFinalAttempt(job)) {
+      await surfaceFailure(options, { channelId, buildId: job.buildId, error }, context.signal);
+    }
+    throw error;
+  }
+}
+
+/** The key a job is tracked under while it runs: its row (else its channel and build) and its attempt. */
+function keyOf(job: ConsumerJob): string {
+  return `${job.jobId ?? `${job.buildId}:${channelIdOf(job)}`}#${job.attempt ?? 1}`;
 }
 
 /** One delivery; the signal is checked before the host is told and before the outcome is recorded. */

@@ -2,7 +2,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
-import { runMigrations } from "./migrate.ts";
+import { runMigrationsLocked } from "./migrate.ts";
 import {
   activateRetention,
   attachRetention,
@@ -88,7 +88,14 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
     },
     tables: schema,
     migrate: async ({ logger }) => {
-      await runMigrations(async (sql: string) => await client.unsafe(sql), logger);
+      await runMigrationsLocked(async (use) => {
+        const reserved = await client.reserve();
+        try {
+          return await use(async (sql) => await reserved.unsafe(sql));
+        } finally {
+          reserved.release();
+        }
+      }, logger);
       // postgres.js opens a real session per transaction, so row locks hold between processes.
       await activateRetention(db, retention);
     },

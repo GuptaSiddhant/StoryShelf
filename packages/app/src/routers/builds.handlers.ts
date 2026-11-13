@@ -169,10 +169,10 @@ export async function refreshBuild(buildId: string): Promise<void> {
   await new BuildModel(db).updateCounts(buildId);
   const snapshots = await new SnapshotModel(db).listByBuild(buildId);
   const status = rollupStatus(snapshots);
-  const build = await new BuildModel(db).get(buildId);
-  // A cancelled build is terminal: its snapshots may still be touched, but no verdict is announced.
-  if (!build || build.status === "cancelled") return;
-  await new BuildModel(db).setStatus(buildId, status);
+  // The lifecycle table decides whether the build may move (a cancelled build is terminal: its
+  // snapshots may still be touched, but no verdict is announced).
+  const written = await new BuildModel(db).setStatus(buildId, status);
+  if (written.status !== status) return;
   await announceBuildStatus(buildId, status, { snapshotCount: snapshots.length });
 }
 

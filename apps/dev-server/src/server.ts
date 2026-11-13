@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
+import { parseTrustProxy } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
@@ -24,6 +25,17 @@ import { createLocalStorage } from "@storyshelf/storage-local";
 import { mkdirSync } from "node:fs";
 
 const env = process.env;
+// The SS_* names were renamed to SHELF_* with no aliases (#948); refuse to boot while one is still set.
+// Mirrors apps/fly-app/legacy-env.ts.
+const LEGACY_PREFIX = "SS_";
+const legacy = Object.keys(env).filter((name) => name.startsWith(LEGACY_PREFIX));
+if (legacy.length > 0) {
+  throw new Error(
+    `StoryShelf no longer reads the SS_* variables. Rename them, then start again:\n${legacy
+      .map((name) => `  ${name} -> ${name.replace(/^SS_/u, "SHELF_")}`)
+      .join("\n")}`,
+  );
+}
 const dataDir = env["DATA_DIR"] ?? ".dev-data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
@@ -31,6 +43,8 @@ const authPassword = env["AUTH_PASSWORD"];
 const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
+// Proxies allowed to name the client for rate limits (#911); unset trusts none.
+const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
 
 // Scheduled build purge is opt-in (ADR 0039): `PURGE_TTL_DAYS` turns it on; unset leaves it off, so
 // an upgrade never starts deleting builds. A value that is not a positive whole number stops the boot.
@@ -46,14 +60,14 @@ const purgeTtlDays = purgeTtlDaysFromEnv();
 
 function buildAuthUi(): Record<string, string> | undefined {
   const pairs: Array<[string, string | undefined]> = [
-    ["title", env["SS_AUTH_TITLE"]],
-    ["subtitle", env["SS_AUTH_SUBTITLE"]],
-    ["passwordLabel", env["SS_AUTH_PASSWORD_LABEL"]],
-    ["passwordPlaceholder", env["SS_AUTH_PASSWORD_PLACEHOLDER"]],
-    ["submitLabel", env["SS_AUTH_SUBMIT_LABEL"]],
-    ["ssoLabelTemplate", env["SS_AUTH_SSO_LABEL"]],
-    ["helpText", env["SS_AUTH_HELP_TEXT"]],
-    ["footerText", env["SS_AUTH_FOOTER_TEXT"]],
+    ["title", env["SHELF_AUTH_TITLE"]],
+    ["subtitle", env["SHELF_AUTH_SUBTITLE"]],
+    ["passwordLabel", env["SHELF_AUTH_PASSWORD_LABEL"]],
+    ["passwordPlaceholder", env["SHELF_AUTH_PASSWORD_PLACEHOLDER"]],
+    ["submitLabel", env["SHELF_AUTH_SUBMIT_LABEL"]],
+    ["ssoLabelTemplate", env["SHELF_AUTH_SSO_LABEL"]],
+    ["helpText", env["SHELF_AUTH_HELP_TEXT"]],
+    ["footerText", env["SHELF_AUTH_FOOTER_TEXT"]],
   ];
   const out: Record<string, string> = {};
   for (const [key, value] of pairs) {
@@ -65,8 +79,8 @@ function buildAuthUi(): Record<string, string> | undefined {
 }
 
 function buildUi(): Record<string, unknown> | undefined {
-  const name = env["SS_BRAND_NAME"];
-  const logo = env["SS_LOGO_URL"];
+  const name = env["SHELF_BRAND_NAME"];
+  const logo = env["SHELF_LOGO_URL"];
   const auth = buildAuthUi();
   const hasBrand = Boolean(name ?? logo);
   if (!hasBrand && !auth) {
@@ -141,6 +155,7 @@ const app = createShelfApp({
     migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken,
     publicBaseUrl,
+    ...(trustProxy === undefined ? {} : { trustProxy }),
     scratchDir: dataDir,
     ...(purgeTtlDays === undefined ? {} : { purgeTtlDays }),
     serverTiming: true,

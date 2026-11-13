@@ -145,6 +145,12 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     }
   };
 
+  /** Rows of the table called `name`, for conditions that read another table. */
+  const lookup = (name: string): Record<string, unknown>[] => {
+    const found = [...store].find(([table]) => getTableName(table) === name);
+    return found ? ([...found[1].values()] as Record<string, unknown>[]) : [];
+  };
+
   const db: DatabaseAdapter = {
     metadata: { name: "Fake Database", version: "0.0.0", kind: "memory", category: "database" },
     tables: fakeSchema,
@@ -153,7 +159,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     updateWhere: async (table, id, values, where) => {
       const current = rowsOf(table).get(id) as Record<string, unknown> | undefined;
       if (!current) return null;
-      if (whereMatches(where, current, table)) return await updateRow(table, id, values);
+      if (whereMatches(where, current, table, lookup)) return await updateRow(table, id, values);
       return current as never;
     },
     get: getRow,

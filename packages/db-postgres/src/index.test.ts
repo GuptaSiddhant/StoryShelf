@@ -16,8 +16,10 @@ describe("createPostgresDatabase", () => {
   });
 
   it("creates an adapter with injected client (no network)", async () => {
+    const reserved = { unsafe: vi.fn(() => Promise.resolve([])), release: vi.fn() };
     const client = {
       unsafe: vi.fn(() => Promise.resolve([])),
+      reserve: vi.fn(() => Promise.resolve(reserved)),
       end: vi.fn(() => Promise.resolve()),
     } as unknown as ReturnType<typeof import("postgres")>;
 
@@ -28,7 +30,9 @@ describe("createPostgresDatabase", () => {
 
     expect(db.buildReferenceLifecycle).toBeUndefined();
     await db.lifecycle?.setup({} as never);
-    expect(client.unsafe).toHaveBeenCalled();
+    // Migrations run on one reserved connection, which is handed back.
+    expect(reserved.unsafe).toHaveBeenCalled();
+    expect(reserved.release).toHaveBeenCalledOnce();
     // Activation ran after the migration: nothing to prepare, so retention is on.
     expect(db.buildReferenceLifecycle).toBeDefined();
     expect(db.retentionPause).toBeUndefined();
