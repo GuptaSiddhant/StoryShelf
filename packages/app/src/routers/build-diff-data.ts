@@ -15,6 +15,7 @@ import { loadBaselineReference, loadDefaultComparison } from "./baseline-referen
 import { isBuildAuthor } from "./comment-triage.ts";
 import { designUrlsFor, loadDesignResolutions, loadReviewDesign } from "./design.handlers.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
+import { readPngSize } from "./png-size.ts";
 import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
 
 /** Which snapshot to show, and the page path a design link returns to. */
@@ -65,5 +66,6 @@ export async function loadBuildDiffData(
       () => [],
     ),
     publishedBaseDomain: config.publishedBaseDomain,
+    currentSize: selected ? await readPngSize(selected.screenshotPath) : null,
   };
 }

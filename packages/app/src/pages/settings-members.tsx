@@ -104,9 +104,15 @@ export function renderSettingsMembers(
             hx-target="body"
           >
             {csrfField()}
-            <Field label="User ID" name="userId" required placeholder="user_..." />
+            <Field
+              label="Email"
+              name="email"
+              type="email"
+              required
+              placeholder="name@example.com"
+            />
             <SelectField
-              label="Role"
+              label="Project role"
               name="role"
               options={[
                 { value: "viewer", label: "viewer" },
@@ -197,7 +203,7 @@ export function renderSettingsMembers(
                 placeholder="team-design"
               />
               <SelectField
-                label="Role"
+                label="Role for group members"
                 name="role"
                 options={[
                   { value: "viewer", label: "viewer" },

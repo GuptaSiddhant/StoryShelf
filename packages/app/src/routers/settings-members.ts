@@ -4,6 +4,7 @@ import {
   ProjectGroupMappingModel,
   ProjectModel,
   serializeOwnerRules,
+  UserModel,
 } from "@storyshelf/core/models";
 import { isProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
@@ -18,16 +19,15 @@ export function registerMemberSettings(app: ShelfRouter): void {
   app.post("/projects/:slug/settings/members", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
     const form = await c.req.formData();
-    const userId = asString(form.get("userId"));
     const role = asString(form.get("role"));
-    if (!userId || !isProjectRole(role)) {
+    const userId = await resolveMemberUser(form);
+    if (!userId.id || !isProjectRole(role)) {
       return c.html(
-        (await renderSettingsPage(c, "members", { globalError: "User and role are required" })) ??
-          "",
+        (await renderSettingsPage(c, "members", { globalError: userId.error })) ?? "",
         400,
       );
     }
-    await new MemberModel(getStore().db).set(project.id, userId, role);
+    await new MemberModel(getStore().db).set(project.id, userId.id, role);
     flash(c, "Member saved");
     return hxRedirect(c, settingsHref(project.slug, "members"));
   });
@@ -41,6 +41,19 @@ export function registerMemberSettings(app: ShelfRouter): void {
 
   registerOwnerSettings(app);
   registerGroupMappingSettings(app);
+}
+
+/** The user an add-member form names: an email (the form) or a raw id (API-style posts). */
+async function resolveMemberUser(form: FormData): Promise<{ id?: string; error: string }> {
+  const email = asString(form.get("email"));
+  const rawId = asString(form.get("userId"));
+  if (!email && !rawId) return { error: "Enter the member's email and a role" };
+  if (!email) return { id: rawId, error: "User and role are required" };
+  const user = await new UserModel(getStore().db).getByEmail(email);
+  if (!user) {
+    return { error: `No account has the email ${email}. They need to sign in once first.` };
+  }
+  return { id: user.id, error: "User and role are required" };
 }
 
 /**

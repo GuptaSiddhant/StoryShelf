@@ -25,6 +25,26 @@ export const canvasColumn = css`
   min-width: 0;
 `;
 
+/**
+ * The comparison card: heading, stage and, as its footer, the action bar. No overflow clipping, so
+ * the footer can stay docked at the bottom of the viewport while the card is in view.
+ */
+export const comparisonCard = css`
+  /* review-comparison-card */
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4) var(--space-4) 0;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  @media (max-width: 720px) {
+    & {
+      padding: var(--space-3) var(--space-3) 0;
+    }
+  }
+`;
+
 /* ---- header ---- */
 
 export const reviewHeader = css`
@@ -149,13 +169,54 @@ export const filmstripList = css`
   }
 `;
 
+export const filmGroup = css`
+  /* film-group */
+  display: block;
+  @media (max-width: 1024px) {
+    & {
+      display: contents;
+    }
+  }
+`;
+
+export const filmGroupHead = css`
+  /* film-group-head */
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  @media (max-width: 1024px) {
+    & {
+      flex: none;
+      align-items: center;
+      max-width: 160px;
+      border-bottom: 0;
+      border-right: 1px solid var(--border-subtle);
+      white-space: nowrap;
+    }
+    & > :first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+`;
+
 export const filmItem = css`
   /* film-item */
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: var(--space-3);
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: var(--space-2);
   align-items: center;
-  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
   border-left: 3px solid transparent;
   color: inherit;
@@ -164,6 +225,10 @@ export const filmItem = css`
   &:hover {
     background: var(--surface-subtle);
     text-decoration: none;
+  }
+  &[data-status="approved"],
+  &[data-status="rejected"] {
+    color: var(--text-secondary);
   }
   @media (max-width: 1024px) {
     & {
@@ -180,10 +245,10 @@ export const filmItem = css`
 export const filmItemActive = css`
   /* film-item-active */
   ${filmItem}
-  background: var(--accent-subtle);
+  background: var(--accent-wash);
   border-left-color: var(--accent);
   &:hover {
-    background: var(--accent-subtle);
+    background: var(--accent-wash);
   }
   @media (max-width: 1024px) {
     & {
@@ -193,27 +258,11 @@ export const filmItemActive = css`
   }
 `;
 
-export const filmBody = css`
-  /* film-body */
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-`;
-
 export const filmTitle = css`
   /* film-title */
   overflow: hidden;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-export const filmSub = css`
-  /* film-sub */
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 `;
@@ -223,9 +272,10 @@ export const filmStatus = css`
   display: inline-flex;
   gap: var(--space-1);
   align-items: center;
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 `;
 
 const dot = css`
@@ -296,19 +346,23 @@ export const viewerMeta = css`
 export const actionBar = css`
   /* review-action-bar */
   position: sticky;
-  bottom: var(--space-4);
+  bottom: 0;
   z-index: 20;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-2);
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-2);
+  margin: 0 calc(var(--space-4) * -1);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-card);
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  @media (max-width: 720px) {
+    & {
+      margin: 0 calc(var(--space-3) * -1);
+      padding: var(--space-2) var(--space-3);
+    }
+  }
 `;
 
 export const actionGroup = css`
@@ -316,24 +370,38 @@ export const actionGroup = css`
   display: flex;
   gap: var(--space-2);
   align-items: center;
+  @media (max-width: 480px) {
+    & {
+      gap: var(--space-1);
+    }
+  }
 `;
 
 export const actionPosition = css`
   /* review-action-position */
-  min-width: 4.5rem;
+  min-width: 3.5rem;
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   text-align: center;
 `;
 
+/** The shortcuts button: keyboard help is for keyboards, so a phone-width bar drops it. */
 export const actionHints = css`
   /* review-action-hints */
   display: flex;
-  gap: var(--space-2);
   align-items: center;
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
+  @media (max-width: 480px) {
+    & {
+      display: none;
+    }
+  }
+`;
+
+/** A key hint inside a button ("Approve a"); hidden on narrow screens, where it rarely applies. */
+export const actionKey = css`
+  /* review-action-key */
+  display: inline-flex;
   @media (max-width: 720px) {
     & {
       display: none;

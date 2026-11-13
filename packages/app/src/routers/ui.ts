@@ -18,6 +18,7 @@ import { loadComponentPage } from "./component.handlers.ts";
 import { registerDesignCoverage } from "./design-coverage.ts";
 import { returnPathOf } from "./design.handlers.ts";
 import { flash } from "./flash.ts";
+import { registerGetStarted } from "./get-started.tsx";
 import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { getQueueView } from "./settings-insights.ts";
@@ -181,5 +182,6 @@ export function registerUiPages(app: ShelfRouter): void {
   });
 
   registerDesignCoverage(app);
+  registerGetStarted(app);
   registerSettingsPages(app);
 }

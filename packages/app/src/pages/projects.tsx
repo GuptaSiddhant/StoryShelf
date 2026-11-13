@@ -46,20 +46,23 @@ async function summarize(project: Project): Promise<ProjectSummary> {
   return { project, latest, previews: preferred.slice(0, 3), pending: pending.length, health };
 }
 
-/** Copy-ready steps to get a first build uploaded. */
+/** Copy-ready steps to get a first build uploaded; `create` is suggested only while no project exists. */
 function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
   return (
     <Card>
       <details open={open}>
         <summary class={setupSummary}>Set up your first upload</summary>
         <VStack>
-          <Meta>1. Create a project (writes .storybook/storyshelf.json for later runs).</Meta>
-          <CodeBlock code='npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token $STORYSHELF_ADMIN_TOKEN' />
+          {open ? (
+            <>
+              <Meta>1. Create a project (writes .storybook/storyshelf.json for later runs).</Meta>
+              <CodeBlock code='npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token $STORYSHELF_ADMIN_TOKEN' />
+            </>
+          ) : null}
           <Meta>
-            2. Generate a token in <strong>Settings → Tokens</strong> and set it in CI.
+            {open ? "2" : "1"}. Open your project: its Library shows a token and the upload command.
           </Meta>
-          <CodeBlock code="export STORYSHELF_TOKEN=<your token>" />
-          <Meta>3. Upload your built Storybook.</Meta>
+          <Meta>{open ? "3" : "2"}. Upload your built Storybook.</Meta>
           <CodeBlock code="npx storyshelf upload" />
         </VStack>
       </details>

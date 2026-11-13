@@ -43,14 +43,17 @@ function memberOrder(a: Snapshot, b: Snapshot): number {
   return left < right ? -1 : 1;
 }
 
-/** Group snapshots by story and mode, keeping first-appearance order. */
+/** Group snapshots by story and mode; groups are ordered by component title, then first appearance. */
 export function groupSnapshots(snapshots: Snapshot[]): SnapshotGroup[] {
   const groups = new Map<string, Snapshot[]>();
   for (const snap of snapshots) {
     const key = `${snap.storyId}\u0000${snap.viewportName}`;
     groups.set(key, [...(groups.get(key) ?? []), snap]);
   }
-  return [...groups.entries()].flatMap(([key, list]): SnapshotGroup[] => {
+  const entries = [...groups.entries()].toSorted(([, left], [, right]) =>
+    (left[0]?.storyTitle ?? "").localeCompare(right[0]?.storyTitle ?? ""),
+  );
+  return entries.flatMap(([key, list]): SnapshotGroup[] => {
     const members = list.toSorted(memberOrder);
     const [primary] = members;
     if (!primary) return [];

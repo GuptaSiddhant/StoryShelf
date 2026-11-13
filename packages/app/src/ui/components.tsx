@@ -24,7 +24,13 @@ export { Option, OptionList } from "./option-list.tsx";
 export { Segmented, type SegmentedItem } from "./segmented.tsx";
 export { Table } from "./table.tsx";
 export { Thumbnail } from "./thumbnail.tsx";
-export { CompareStage, type CompareStageProps } from "./compare-stage.tsx";
+export {
+  CompareStage,
+  formatSize,
+  sizesDiffer,
+  type CompareStageProps,
+  type ImageSize,
+} from "./compare-stage.tsx";
 export { Progress } from "./progress.tsx";
 export { PreviewEmbed, PREVIEW_SANDBOX } from "./preview-embed.tsx";
 export { DesignPreview, DesignReference } from "./design-reference.tsx";

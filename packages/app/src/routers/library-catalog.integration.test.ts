@@ -144,7 +144,9 @@ describe("library without testing", () => {
     const { storage } = makeStorage();
     await createTestProject(db, db.tables, { name: "empty" });
     const app = createShelfApp({ database: db, storage, logger: pino({ level: "silent" }) });
-    expect(await (await app.request("/projects/empty/library")).text()).toContain("No builds yet");
+    expect(await (await app.request("/projects/empty/library")).text()).toContain(
+      "Get your first build",
+    );
     expect((await app.request("/projects/none/library")).status).toBe(404);
   });
 });

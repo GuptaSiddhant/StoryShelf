@@ -70,6 +70,48 @@ export const ReviewOff = pageStory(() =>
 /** A changed snapshot against its baseline: side by side, with the diff and the thread. */
 export const ChangedAgainstBaseline = pageStory(() => renderBuildDiffPage(reviewData()));
 
+/** A reference build for the baseline line ("vs main · abc1234 · updated …"). */
+const referenceBuild = builds.find((item) => item.id === BUILD_MAIN) ?? null;
+
+/** The baseline line under the heading: what this snapshot was compared with, in one quiet line. */
+export const ComparedWithMain = pageStory(() =>
+  renderBuildDiffPage(
+    reviewData({
+      reference: {
+        kind: "known",
+        branch: "main",
+        defaultBranch: true,
+        updatedAt: referenceBuild?.updatedAt ?? "2026-01-14T12:00:00.000Z",
+        imageAvailable: true,
+        imageSize: { width: 640, height: 400 },
+        build: referenceBuild,
+      },
+      currentSize: { width: 640, height: 400 },
+    }),
+  ),
+);
+
+/**
+ * The current screenshot is a different size from its baseline: "560×350 → 640×400" and a "sizes
+ * differ" badge instead of a 100% diff, and both images drawn at one scale.
+ */
+export const SizesDiffer = pageStory(() =>
+  renderBuildDiffPage(
+    reviewData({
+      reference: {
+        kind: "known",
+        branch: "main",
+        defaultBranch: true,
+        updatedAt: referenceBuild?.updatedAt ?? "2026-01-14T12:00:00.000Z",
+        imageAvailable: true,
+        imageSize: { width: 560, height: 350 },
+        build: referenceBuild,
+      },
+      currentSize: { width: 640, height: 400 },
+    }),
+  ),
+);
+
 /** A story with no baseline yet: nothing to compare, the current render is the proposal. */
 export const NewStory = pageStory(() =>
   renderBuildDiffPage(reviewData({ selectedId: NEW_STORY_ID })),
