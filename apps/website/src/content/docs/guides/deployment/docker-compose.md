@@ -5,7 +5,8 @@ description: Self-host StoryShelf with Docker Compose, local Postgres, and files
 
 The simplest self-hosted deploy: one container, no cloud dependencies. Every stable release publishes
 `ghcr.io/guptasiddhant/storyshelf` for `linux/amd64` and `linux/arm64`, with an SBOM and provenance
-attestation.
+attestation. The same image is mirrored to Docker Hub as `docker.io/guptasiddhant/storyshelf`, from
+the first release that has the mirror configured. The examples below use the GHCR name.
 
 ## Quick start
 

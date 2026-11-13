@@ -10,6 +10,8 @@ The server is one container. Capture runs **in-process** with the image's own Ch
 
 The image is built from `apps/fly-app/Dockerfile`, a rolldown bundle of `apps/fly-app/server.ts` started with `node dist/server.mjs`. The build context must be the repository root. The official image (#887) and the cloud modules (ADR 0050) are coming; until then, build from this Dockerfile.
 
+The release workflow's image job builds `apps/server-image/Dockerfile` instead, and pushes one build to `ghcr.io/guptasiddhant/storyshelf` and to `docker.io/guptasiddhant/storyshelf` (#1027) under the same tags (`<version>`, `latest`, and the `-hosting` variants). Both registries therefore share one digest, and the provenance and SBOM attestations travel with the pushed manifest, so both carry them. Docker Hub is skipped with a notice while `DOCKERHUB_USERNAME` or `DOCKERHUB_TOKEN` is unset, and the release still publishes to GHCR.
+
 ```sh
 docker build -f apps/fly-app/Dockerfile -t storyshelf .
 docker run -p 3000:3000 \
