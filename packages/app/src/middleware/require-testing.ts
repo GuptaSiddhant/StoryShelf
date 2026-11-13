@@ -27,17 +27,28 @@ export function requireTesting(enabled: boolean) {
   };
 }
 
-/** The last matched handler that the table classifies (middleware matches come first). */
+/** How many segments of a route pattern are a parameter or a wildcard: fewer is more specific. */
+function openSegments(path: string): number {
+  return path.split("/").filter((segment) => segment.startsWith(":") || segment.startsWith("*"))
+    .length;
+}
+
+/**
+ * The class of the most specific classified route Hono matched (middleware matches carry no
+ * class): the fewest parameter and wildcard segments, the later registration on a tie. A literal
+ * route (`/builds/in-flight`) therefore wins over the parameter route (`/builds/:buildId`) that
+ * also matches its path.
+ */
 export function matchedRouteClass(c: Context): RouteClass | undefined {
-  const routes = matchedRoutes(c);
-  for (let index = routes.length - 1; index >= 0; index -= 1) {
-    const route = routes[index];
-    const routeClass = route && classOfRoute(route.method, route.path);
-    if (routeClass !== undefined) {
-      return routeClass;
+  let best: { routeClass: RouteClass; open: number } | undefined;
+  for (const route of matchedRoutes(c)) {
+    const routeClass = classOfRoute(route.method, route.path);
+    const open = openSegments(route.path);
+    if (routeClass !== undefined && (best === undefined || open <= best.open)) {
+      best = { routeClass, open };
     }
   }
-  return undefined;
+  return best?.routeClass;
 }
 
 function isTestingRoute(c: Context): boolean {

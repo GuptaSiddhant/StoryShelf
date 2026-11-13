@@ -61,6 +61,8 @@ export const projectSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs when `testing` is off. */
     reviewApprovals: z.number().optional(),
+    /** Cancel older in-flight builds a newer commit supersedes (ADR 0045; default on). */
+    cancelSuperseded: z.boolean().optional(),
     /** Seconds the signed Storybook URLs of a render stay valid; null derives it from the stories. */
     storybookUrlTtlSeconds: z.number().nullable().optional(),
     createdAt: z.string(),
@@ -118,6 +120,8 @@ export const projectUpdateSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs before it is accepted when `testing` is off. */
     reviewApprovals: reviewApprovalsSchema.optional(),
+    /** Cancel older in-flight builds a newer commit supersedes (admins; ADR 0045). */
+    cancelSuperseded: z.boolean().optional(),
     /** Seconds (at least one minimum slice plus grace, 1050, to 86400) the signed Storybook URLs of a render stay valid; null derives it from the stories. */
     storybookUrlTtlSeconds: storybookUrlTtlSchema.nullable().optional(),
   })

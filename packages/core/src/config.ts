@@ -216,6 +216,13 @@ export interface ShelfConfig {
   serverTiming?: boolean;
   /** Persist gzip variants for published Storybook files (default off). */
   publishedCompression?: boolean;
+  /**
+   * Act on `supersedes` when a build is created (ADR 0045, decision 3): cancel the older in-flight
+   * builds the CLI names, for projects with `cancelSuperseded` on. Default off, so a rolling upgrade
+   * never has a copy cancel builds that a previous copy cannot read as superseded (ADR 0053,
+   * decision 5: readers first); turn it on one minor release after the readers shipped.
+   */
+  supersedeOnCreate?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;
   /**
@@ -366,6 +373,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
     publishedCompression: z.boolean().optional(),
+    supersedeOnCreate: z.boolean().optional(),
     captureAssets: z
       .object({
         cacheMaxAgeSeconds: z.number().int().min(0).max(MAX_CAPTURE_ASSET_CACHE_SECONDS).optional(),
