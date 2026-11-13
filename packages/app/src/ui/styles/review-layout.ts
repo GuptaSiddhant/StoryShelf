@@ -175,7 +175,16 @@ export const filmGroupHead = css`
   text-transform: uppercase;
   @media (max-width: 1024px) {
     & {
-      display: none;
+      flex: none;
+      align-items: center;
+      max-width: 160px;
+      border-bottom: 0;
+      border-right: 1px solid var(--border-subtle);
+      white-space: nowrap;
+    }
+    & > :first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
 `;
