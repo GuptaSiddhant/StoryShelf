@@ -2,6 +2,8 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { notificationsConfigSchema, type ShelfOptions } from "./config.ts";
+import { assertPortalOutsideContentHosts, storybookHostingOf } from "./content-hosts.ts";
+import { validateStorybookHosting } from "./storybook-hosting.ts";
 
 /** Where capture scratch lives when `config.scratchDir` is not set. */
 export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
@@ -17,6 +19,8 @@ export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
 export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
   assertThreads(options.testing?.compare?.threads);
   assertTestingProcess(options.testing);
+  assertStorybookUrlRateLimit(options.storybookUrlRateLimit, "storybookUrlRateLimit");
+  assertStorybookHosting(options);
   assertTestingBackable(options);
   assertNotificationsConfig(options.notifications?.config);
   if (options.config?.scratchDir !== undefined) {
@@ -78,14 +82,14 @@ function assertTestingNumbers(testing: ShelfOptions["testing"]): void {
   assertRetries(testing?.retries);
   assertLeaseSeconds(testing?.leaseSeconds);
   assertMaxJobSeconds(testing?.maxJobSeconds);
-  assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit);
+  assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit, "testing.storybookUrlRateLimit");
 }
 
 /** A whole number of requests per minute; `0` would refuse every render. */
-function assertStorybookUrlRateLimit(limit: number | undefined): void {
+function assertStorybookUrlRateLimit(limit: number | undefined, name: string): void {
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
     throw new Error(
-      `testing.storybookUrlRateLimit must be a positive whole number of requests per minute, got ${String(limit)}`,
+      `${name} must be a positive whole number of requests per minute, got ${String(limit)}`,
     );
   }
 }
@@ -160,5 +164,57 @@ function assertNotificationsConfig(config: unknown): void {
   if (!result.success) {
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Invalid notifications.config: ${issues}`);
+  }
+}
+
+/**
+ * The boot refusals of ADR 0051, decision 1, that need more than the hosting object: `sandboxed` and
+ * `subdomain` mint grants, so with sign-in on they need the server `secret`; `subdomain` also needs
+ * the configured portal origin (`publicBaseUrl`), served over https (a `localhost` name may use http),
+ * a base domain that does not swallow the portal host, and, with sign-in on, an auth engine that
+ * issues the `__Host-` session cookie (decision 9). A broken value stops boot; it never falls back
+ * to `trusted`.
+ */
+function assertStorybookHosting(options: ShelfOptions): void {
+  const hosting = storybookHostingOf(options.config);
+  if (hosting === undefined || hosting.mode === "trusted") {
+    return;
+  }
+  if (options.auth !== undefined && !options.config?.secret) {
+    throw new Error(
+      `storybookHosting.mode "${hosting.mode}" needs config.secret when sign-in is on: read grants are signed with it`,
+    );
+  }
+  if (hosting.mode === "subdomain") {
+    // Also checks a deprecated `publishedBaseDomain` read as the alias (decision 6).
+    const { baseDomain = "" } = validateStorybookHosting(hosting);
+    assertSubdomainHosting(options, baseDomain);
+  }
+}
+
+/** Whether a host name is a loopback name a browser treats as a secure context over http. */
+function isLocalhostName(hostname: string): boolean {
+  return hostname === "localhost" || hostname.endsWith(".localhost");
+}
+
+/** The `subdomain` rules of decision 1 and decision 9 that need the portal origin and the auth engine. */
+function assertSubdomainHosting(options: ShelfOptions, baseDomain: string): void {
+  const portal = options.config?.publicBaseUrl;
+  if (!portal) {
+    throw new Error(
+      `storybookHosting.mode "subdomain" needs config.publicBaseUrl: the portal origin content hosts redirect to`,
+    );
+  }
+  const url = new URL(portal);
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalhostName(url.hostname))) {
+    throw new Error(
+      `storybookHosting.mode "subdomain" needs an https config.publicBaseUrl: the portal session cookie is __Host- prefixed, which browsers accept over https only (or on a localhost name)`,
+    );
+  }
+  assertPortalOutsideContentHosts(portal, baseDomain);
+  if (options.auth !== undefined && options.auth.hostSessionCookie !== true) {
+    throw new Error(
+      `storybookHosting.mode "subdomain" needs the auth engine to issue the __Host- session cookie: create it with createShelfAuth({ hostSessionCookie: true })`,
+    );
   }
 }

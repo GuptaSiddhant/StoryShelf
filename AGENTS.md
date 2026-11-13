@@ -118,22 +118,39 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `build:failed` / `sys:capture-failed`). `BuildModel.update`/`setStatus` refuse other statuses for a
   cancelled build; `finalizeBuild` and the orchestrator skip it; only `resetStatus` (retry) leaves it.
   Treat `cancelled` like `failed` anywhere a build is reviewed, moved or promoted (409, no verdict).
-- **Signed Storybook URLs.** The one unauthenticated read of a private build is `GET /_s/:token/*`
-  (`packages/app/src/routers/signed-storybook.ts`, class `testing`).
-  `packages/core/src/utils/storybook-token.ts` is the single owner of the prefix
-  `STORYBOOK_TOKEN_PREFIX`, token shape, derived key, sign/verify and lifetime: never type `/_s/` or
-  derive a key elsewhere. Mint only through `storybookUrlSource` (renders; it alone signs the
-  `capture` purpose claim) and
-  `packages/app/src/routers/preview-base.ts` (private previews); `renderInSlices` re-mints for long
-  passes. Every published-file route goes through `publishedAccess` +
-  `servePublishedFile`/`publishedRelativePath`; CORS only from `publishedCorsHeaders`. The signed
-  route is rate-limited per IP before the token is read; every refusal returns one identical 404 with
-  `Cache-Control: private, no-store`; never log a token (`redactSecrets`). Do not add routes under
-  `/_s/` or widen what a token grants. Only `signedCacheControl` (`packages/app/src/routers/
-capture-cache.ts`) may give a signed answer freshness: a success for a `capture` grant on a
-  manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as `private, max-age=N` capped
-  by the grant's remaining life. Never `public`/`s-maxage`, never from a query or header, and
-  never let a runner set response headers.
+- **Signed Storybook URLs and read grants.** Two unauthenticated reads of a private build exist, each
+  with its own token purpose, key, prefix and route (ADR 0007, ADR 0051). `GET /_s/:token/*`
+  (`packages/app/src/routers/signed-storybook.ts`, class `testing`) takes `capture` tokens only; a
+  `read` token or a token with no purpose is refused. `GET /_r/:token/*`
+  (`packages/app/src/routers/read-grants.ts`, class `hosting`) takes `read` tokens only: one build, at
+  most an hour, current secret only (`previousSecret` is never tried), every answer sandboxed,
+  `private, no-store`, `no-referrer`. `packages/core/src/utils/storybook-token.ts` is the single owner
+  of both prefixes (`STORYBOOK_TOKEN_PREFIX`, `STORYBOOK_READ_PREFIX`), the token shape, the derived
+  key per purpose, sign/verify and the lifetimes: never type `/_s/` or `/_r/` or derive a key
+  elsewhere. Mint a `capture` token only through `storybookUrlSource` (renders; it alone signs the
+  purpose) and a `read` grant only through `mintReadGrant` (`redirectToReadGrant` for the sandboxed
+  redirect, `previewBaseOf` for previews); `renderInSlices` re-mints capture tokens for long passes.
+  Every published-file route goes through `publishedAccess` +
+  `servePublishedFile`/`publishedRelativePath`; CORS only from `publishedCorsHeaders`; the sandbox
+  header only from `sandboxHeaders` (route family + `config.storybookHosting.mode`, ADR 0051: never
+  `allow-same-origin`). Both token routes are rate-limited per IP in one bucket before the token is
+  read; every refusal returns one identical 404 (`refuseToken`) with `Cache-Control: private,
+no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
+  what a token grants, or accept one purpose on the other's route (ADR 0051 allows only these two
+  routes plus the content host's `/_x/` exchange, purpose `exchange`, with #358; nothing more). Only `signedCacheControl`
+  (`packages/app/src/routers/capture-cache.ts`) may give a signed answer freshness: a success for a
+  `capture` grant on a manifest file, when `config.captureAssets.cacheMaxAgeSeconds` > 0, as
+  `private, max-age=N` capped by the grant's remaining life. Never `public`/`s-maxage`, never from a
+  query or header, and never let a runner set response headers. A signed-in viewer's own answer is
+  `private, no-cache` with a content-hash `ETag` (`publishedCacheControl`).
+- **Cookie boundary and writes** (ADR 0051, decision 9). A state-changing request that carries a session
+  cookie, or that posts to sign-in or sign-up (`SIGN_IN_PATHS`, closing login CSRF), is refused (403) unless `Origin` is the portal origin or `Sec-Fetch-Site` is `same-origin` or
+  `none`: `sameSiteWrites` (`packages/app/src/middleware/same-site-writes.ts`), mounted for every path,
+  `/api/v1` included. `same-site` is not enough, because every content host is the same site as the
+  portal and its pages are uploaded. In `subdomain` mode the portal origin is the configured one and the
+  session cookie is `__Host-storyshelf_session` (`createShelfAuth({ hostSessionCookie: true })`; boot
+  refuses sign-in without it); `readSessionCookie` is the one reader of every name. A content host sets
+  only `__Host-storyshelf-grant` and never sees a portal credential. Do not add CORS to portal routes.
 - **Review.** `projects.review_enabled` (default true) and `review_approvals` (default 1) are the only
   switches; there is no `ShelfOptions` field. Verdicts live in `build_reviews` (`BuildReviewModel`;
   newest row counts) and are attributed by `resolveReviewer` (session user or bearer-token owner;
@@ -218,7 +235,16 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   proposed direction; ADR 0038 (environment migration/review) is accepted as the target but not yet
   implemented. ADRs 0003 and 0009 describe current behavior until that work lands. ADR 0041 (schema
   source of truth) is accepted but not yet implemented; until its neutral tables land, change a
-  table in every dialect's DDL, Drizzle schema and migration, plus the core row type.
+  table in every dialect's DDL, Drizzle schema and migration, plus the core row type. ADR 0047
+  (toolchain on Vite+ and pnpm) is accepted, gated by a spike; until its epic merges, nub and turbo
+  as described here stay the toolchain. ADR 0048 (installable app, offline Storybooks, web push)
+  is accepted: the one service worker caches only opted-in default-branch Storybooks and the
+  offline home page, never app HTML or `/api/v1` answers. ADR 0049 (built-in integrations) is accepted: git, chat, email, push and design integrations
+  move into `packages/core/src/integrations/`, `@storyshelf/image` folds into core, and the app
+  stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
+  accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
+  versioned Terraform module per cloud on the published image.
+- **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 
 ## Conventions
 
@@ -227,9 +253,12 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   Fix with `nub run fmt` and re-stage; do not bypass hooks.
 - **Changesets.** A pull request that changes shipped behavior (the source of `packages/*`, or a
   published `package.json`) adds a changeset: `nub run changeset <patch|minor|major>`, one Markdown file in `.changeset/`
-  written like a `CHANGELOG.md` entry. Never edit `CHANGELOG.md` by hand and never bump versions;
+  whose body starts with one line `<Kind>: <summary>` (≤ 100 characters; Kind `Breaking`, `Added`,
+  `Changed`, `Fixed`, `Security` or `Internal`), then a blank line and the details. The summary is
+  the release note; mark stories, tests and groundwork `Internal`. Never edit `CHANGELOG.md` by hand and never bump versions;
   `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
   tells the CI check so. Task PRs on an epic branch add theirs there.
+- **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` (`SHELF_*` variables, "Shelf" in prose and diagrams).
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
   JSON endpoints live under `/api/v1`; HTML pages at `/`.
@@ -281,7 +310,12 @@ capture-cache.ts`) may give a signed answer freshness: a success for a `capture`
   PR into `main`, runs the full `verify`. Keep the branch current by merging `main` into it (never
   rebase or force-push a shared branch); land an epic, or a coherent finished part of it, within
   about two weeks. P0/security fixes, standalone issues and docs/config changes still target `main`
-  directly.
+  directly. Any epic whose tasks change behaviour across several PRs gets an epic branch, because
+  `main` is released weekly (ADR 0043).
+- **Releases** (ADR 0043). `release-pr.yml` opens the release PR when a P0 PR (label `p0-critical`)
+  or an epic merges into `main`, and otherwise once the last minor release is 7 days old; only the
+  owner merges it. Label a P0 fix's PR `p0-critical`. There is no 1.0 yet: a breaking change is a
+  `minor`, and a `major` changeset fails the changeset check.
 
 ## Agent operating model
 
@@ -304,11 +338,14 @@ The weekly usage quota is shared, so agents work in short, fresh sessions and ta
   green PR back.
 - **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
   Label those PRs `skip-review`, so CodeRabbit skips them.
-- **Schedules.** Agents have two scheduled runs a day, 12 hours apart: the architect's triage. It
-  answers `architect` items, enables auto-merge, revives open PRs that lost their session, starts
-  sessions for ready issues (at most one per lane in #370), archives finished ones, and posts one
-  digest comment on issue #370 when something happened. No other agent session runs on a clock (CI's
-  own nightly workflows are unaffected).
+- **Schedules.** Two scheduled runs a day, at 05:41 and 17:41 UTC. Each starts a fresh Sonnet triage
+  session tagged `storyshelf:triage`. It does the mechanical work: auto-merge, starting and archiving
+  sessions, `status-ready`, and the digest. It forwards `architect` items and judgement calls to the
+  architect session and decides nothing itself. No other agent session runs on a clock (CI's own
+  nightly workflows are unaffected).
+- **Models.** The architect runs on Opus. Developers run on Sonnet by default, or on Opus when the
+  issue has the `model-opus` label. The Expert is the only Fable agent. Interns run on Haiku. Triage
+  runs on Sonnet.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

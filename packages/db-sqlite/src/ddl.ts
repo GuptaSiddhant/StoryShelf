@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_approvals INTEGER NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INTEGER,
   component_owners TEXT,
+  cancel_superseded INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -54,11 +55,14 @@ CREATE TABLE IF NOT EXISTS builds (
   review_cycle INTEGER NOT NULL DEFAULT 0,
   review_requested_cycle INTEGER,
   capture_job_id TEXT,
+  manifest_sha256 TEXT,
+  superseded_by_build_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha);
-CREATE INDEX IF NOT EXISTS builds_git_branch_idx ON builds (git_branch);
+CREATE INDEX IF NOT EXISTS builds_project_created_idx ON builds (project_id, created_at);
+CREATE INDEX IF NOT EXISTS builds_project_branch_created_idx ON builds (project_id, git_branch, created_at);
 CREATE TABLE IF NOT EXISTS build_references (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   owner_type TEXT NOT NULL CHECK (owner_type IN ('baseline', 'investigation')),

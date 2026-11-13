@@ -4,62 +4,65 @@
 
 ## Deployment
 
-### Docker (recommended)
+### Docker
 
-The Dockerfile and Compose file below are a sketch for a project of your own: `server.ts` is _your_ server entry, which calls `createShelfApp` the way `apps/fly-app/server.ts` and `apps/dev-server/src/server.ts` do (this repo has no root `server.ts`). The maintained image is `apps/fly-app/Dockerfile`: a rolldown bundle of `apps/fly-app/server.ts`, started with `node dist/server.mjs`, with `DATA_DIR=/data`.
+The server is one container. Capture runs **in-process** with the image's own Chromium: no Docker socket mount, no repository cloning. Its only state is the data directory (`DATA_DIR`, `/data` in the image).
 
-```dockerfile
-FROM mcr.microsoft.com/playwright:v1.63.0-noble
-# Playwright image includes Chromium, Firefox, WebKit + system deps
+The image is built from `apps/fly-app/Dockerfile`, a rolldown bundle of `apps/fly-app/server.ts` started with `node dist/server.mjs`. The build context must be the repository root. The official image (#887) and the cloud modules (ADR 0050) are coming; until then, build from this Dockerfile.
 
-WORKDIR /app
-COPY package.json nub.lock ./
-RUN nubx nub install --frozen-lockfile
-COPY . .
-RUN nubx nub run build
-
-EXPOSE 3000
-VOLUME /app/data
-
-CMD ["node", "server.ts"]
+```sh
+docker build -f apps/fly-app/Dockerfile -t storyshelf .
+docker run -p 3000:3000 \
+  -v storyshelf-data:/data \
+  -e SECRET=your-hmac-secret-of-at-least-32-chars \
+  storyshelf
 ```
 
 ```yaml
 # docker-compose.yml
 services:
   storyshelf:
-    build: .
+    build:
+      context: .
+      dockerfile: apps/fly-app/Dockerfile
     ports:
       - "3000:3000"
     volumes:
-      - storyshelf-data:/app/data
+      - storyshelf-data:/data
     environment:
-      - SECRET=your-hmac-secret-here
-      # Where the database and storage live: must be the mounted volume. The servers in this
-      # repo default elsewhere (`/data` in apps/fly-app, `.dev-data` in apps/dev-server).
-      - DATA_DIR=/app/data
-      # Capture + retention (read by apps/fly-app/server.ts)
-      - CAPTURE_CONCURRENCY=2
+      # Signs sessions. Keep it stable across restarts.
+      - SECRET=your-hmac-secret-of-at-least-32-chars
+      # Site-admin API access (project creation, purge). Never the same value as SECRET.
+      - STORYSHELF_ADMIN_TOKEN=your-long-random-token
+      # Optional: a daily purge of finished builds older than 30 days. Unset means no purge.
       - PURGE_TTL_DAYS=30
-      # Auth (optional — omit for no auth; see /guides/auth/)
-      # - AUTH_PASSWORD=a-long-admin-password   # ≥ 12 chars (local admin)
-      # SECRET must be ≥ 32 chars (e.g. openssl rand -hex 32)
-      # Bootstrap (optional — first site admin before any user exists):
-      # - STORYSHELF_ADMIN_TOKEN=your-long-random-token  # or ADMIN_TOKEN
-      #   `SECRET` signs sessions; `STORYSHELF_ADMIN_TOKEN` grants site-admin
-      #   API access (project creation, purge). Never the same value.
+      # Optional: concurrent captures on this instance.
+      - CAPTURE_CONCURRENCY=2
+      # Behind a load balancer: the proxies allowed to name the client (see "Behind a proxy").
+      - TRUST_PROXY=1
 
 volumes:
   storyshelf-data:
 ```
 
-The environment variables above are the ones `apps/fly-app/server.ts` reads (`SECRET`, `DATA_DIR`, `AUTH_PASSWORD`, `STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN`, `CAPTURE_CONCURRENCY`, `PURGE_TTL_DAYS`, `PORT`, `PUBLIC_BASE_URL`); `apps/dev-server` reads the same minus `CAPTURE_CONCURRENCY`, and the runners themselves fall back to `STORYSHELF_CAPTURE_CONCURRENCY`. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
+The variables above are read by `apps/fly-app/server.ts`, which also reads `DATA_DIR`, `PORT`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `ADMIN_TOKEN` and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
 
-Capture runs **in-process** on the server using the image's own Playwright browsers — no Docker socket mount, no repo cloning.
+### Behind a proxy
+
+Rate limits (`/api/v1/*`, sign-in, the signed Storybook routes) count per client IP. By default that is the socket peer, so behind a load balancer every user shares the proxy's buckets, and one client can use up sign-in for all. `ShelfConfig.trustProxy` names the proxies that may report the client; both shipped servers map it from `TRUST_PROXY` (`parseTrustProxy` in `core/src/config.ts`):
+
+| `TRUST_PROXY`               | Client IP                                                                                       | Use on                                                                                          |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| unset, `false`, `0`         | the socket peer (no forwarded header is read)                                                   | a server clients reach directly                                                                 |
+| `1`, `2`, …                 | `X-Forwarded-For`, counting that many hops from the right                                       | one load balancer (`1`): ECS behind an ALB, Cloud Run, Azure Container Apps                     |
+| `10.0.0.0/16,2001:db8::/32` | `X-Forwarded-For`, read only when the peer is in the list; the rightmost entry outside the list | proxies with known addresses                                                                    |
+| `fly`                       | `Fly-Client-IP`                                                                                 | Fly.io (`apps/fly-app/server.ts` uses it when `FLY_APP_NAME` is set and `TRUST_PROXY` is unset) |
+
+One resolver (`createClientIpResolver`, `app/src/middleware/client-ip.ts`) serves every rate-limit bucket. A forwarded header from a peer that is not trusted is never read, and an entry that is not an IP never names a client. Count only the proxies you run: a count higher than the real chain lets a client pick its own bucket by sending `X-Forwarded-For`. Limits stay per process.
 
 ### Development
 
 ```sh
-nubx nub install
-nubx nub run dev          # starts Hono dev server
+nub ci              # install workspace dependencies
+nub run serve       # dev server from TypeScript source on :3000, data in .dev-data/
 ```

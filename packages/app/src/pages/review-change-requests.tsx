@@ -1,4 +1,5 @@
 /** The change-request checklist of the build review page (ADR 0013): open requests, each linking to its anchor. */
+import { contentHostSuffix } from "@storyshelf/core/config";
 import type { Comment } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -61,7 +62,7 @@ function Entries(props: { data: ReviewSectionData; requests: readonly Comment[] 
 
 function Entry(props: { data: ReviewSectionData; request: Comment }): Rendered {
   const { data, request } = props;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const href = request.snapshotId
     ? `${urls.snapshot(data.project.slug, data.build.id, request.snapshotId)}#comment-${request.id}`
     : `#comment-${request.id}`;

@@ -29,6 +29,7 @@ function run(
     changes?: BuildStateChange[];
     prefix?: string;
     base?: string;
+    supersededBy?: { id: string; sha: string };
   } = {},
 ) {
   return statusesForBuild({
@@ -40,6 +41,7 @@ function run(
     publishing: overrides.publishing ?? "success",
     approvals: overrides.approvals,
     changes: overrides.changes,
+    supersededBy: overrides.supersededBy,
   });
 }
 
@@ -368,5 +370,29 @@ describe("statusesForBuild: progress and annotations", () => {
     expect(withTesting.statuses.find((s) => s.name === "storybook")?.annotations).toBeUndefined();
     const review = run({ flags: { testing: false, review: true }, changes: [change(1)] });
     expect(gate(review)?.annotations).toBeUndefined();
+  });
+});
+
+describe("statusesForBuild: a superseded build (ADR 0045)", () => {
+  const supersededBy = { id: "b2", sha: "def4567890" };
+
+  it("keeps the cancelled outcome and says which commit replaced it", () => {
+    for (const flags of [{ testing: true }, { testing: false, review: true }]) {
+      const set = run({ flags, build: { status: "cancelled" }, supersededBy });
+      expect(gate(set)).toMatchObject({ state: "cancelled", description: "Superseded by def4567" });
+      expect(set.comment?.state).toBe("cancelled");
+      expect(set.comment?.markdown).toContain(
+        "Superseded by [def4567](https://shelf.example.com/projects/web/builds/b2)",
+      );
+    }
+  });
+
+  it("changes nothing for a build that is not cancelled, or has no superseder", () => {
+    expect(gate(run({ build: { status: "reviewing" }, supersededBy }))?.description).not.toContain(
+      "Superseded",
+    );
+    expect(gate(run({ build: { status: "cancelled" } }))).toMatchObject({
+      description: "Cancelled",
+    });
   });
 });

@@ -247,7 +247,7 @@ describe("unstable render detection", () => {
     expect(calls).toHaveLength(2);
     for (const [request] of calls) {
       const token = /\/_s\/([^/]+)\//u.exec(request.storybookUrl ?? "")?.[1] ?? "";
-      expect(verifyStorybookToken(token, secret).ok).toBe(true);
+      expect(verifyStorybookToken(token, secret, "capture").ok).toBe(true);
     }
     expect(snapshot).toMatchObject({ unstable: true });
   });

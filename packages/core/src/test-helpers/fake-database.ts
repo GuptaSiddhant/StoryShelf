@@ -11,6 +11,15 @@ function withoutUndefined(values: unknown): Record<string, unknown> {
   );
 }
 
+function compareIds(left: unknown, right: unknown): number {
+  const a = String((left as { id?: unknown }).id);
+  const b = String((right as { id?: unknown }).id);
+  if (a === b) {
+    return 0;
+  }
+  return a < b ? -1 : 1;
+}
+
 /** Column defaults real drivers apply on insert (the fake has no DDL). */
 const INSERT_DEFAULTS: Record<string, Record<string, unknown>> = {
   builds: { reviewCycle: 0 },
@@ -99,6 +108,8 @@ export function makeDatabase(): { db: DatabaseAdapter } {
       const { where } = opts;
       current = current.filter((row) => whereMatches(where, row as Record<string, unknown>, table));
     }
+    // Real adapters order by `id` last; the sort is stable, so sorting by id first does the same.
+    current = current.toSorted(compareIds);
     if (opts.orderBy) {
       current = orderRows(current, opts.orderBy, table);
     }
@@ -145,6 +156,12 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     }
   };
 
+  /** Rows of the table called `name`, for conditions that read another table. */
+  const lookup = (name: string): Record<string, unknown>[] => {
+    const found = [...store].find(([table]) => getTableName(table) === name);
+    return found ? ([...found[1].values()] as Record<string, unknown>[]) : [];
+  };
+
   const db: DatabaseAdapter = {
     metadata: { name: "Fake Database", version: "0.0.0", kind: "memory", category: "database" },
     tables: fakeSchema,
@@ -153,7 +170,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     updateWhere: async (table, id, values, where) => {
       const current = rowsOf(table).get(id) as Record<string, unknown> | undefined;
       if (!current) return null;
-      if (whereMatches(where, current, table)) return await updateRow(table, id, values);
+      if (whereMatches(where, current, table, lookup)) return await updateRow(table, id, values);
       return current as never;
     },
     get: getRow,

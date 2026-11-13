@@ -42,10 +42,11 @@ async function freePort(): Promise<number> {
 interface Shelf {
   origin: string;
   /**
-   * A signed root URL for the build; `capture` marks a render-pass grant, else a preview grant. A
-   * different `ttlSeconds` gives a different token and so a different URL, with no waiting.
+   * A signed root URL for the build: a render-pass `capture` token at `/_s/`, or a `read` grant (an
+   * interactive preview) at `/_r/`. A different `ttlSeconds` gives a different token and so a
+   * different URL, with no waiting.
    */
-  rootUrl: (options?: { capture?: boolean; ttlSeconds?: number }) => string;
+  rootUrl: (options?: { purpose?: "capture" | "read"; ttlSeconds?: number }) => string;
   /** How many requests the server has answered for the asset. */
   assetRequests: () => number;
   close: () => Promise<void>;
@@ -86,13 +87,13 @@ async function startShelf(cacheMaxAgeSeconds?: number): Promise<Shelf> {
   const origin = `http://127.0.0.1:${String(port)}`;
   return {
     origin,
-    rootUrl: ({ capture = false, ttlSeconds = 3600 } = {}) =>
-      `${origin}/_s/${signStorybookToken({
+    rootUrl: ({ purpose = "capture", ttlSeconds = 3600 } = {}) =>
+      `${origin}${purpose === "read" ? "/_r/" : "/_s/"}${signStorybookToken({
         secret: SECRET,
         projectId: project.id,
         buildId: build.id,
         ttlSeconds,
-        ...(capture ? { purpose: "capture" as const } : {}),
+        purpose,
       })}/`,
     assetRequests: () => hits,
     close: async () => {
@@ -143,7 +144,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
     it("fetches the asset once across stories of one shared context when opted in", async () => {
       const opted = await shelf(600);
       const context = await browser.newContext();
-      const fromCache = await visitTwice(context, opted.rootUrl({ capture: true }));
+      const fromCache = await visitTwice(context, opted.rootUrl());
       expect(opted.assetRequests()).toBe(1);
       expect(fromCache).toBeGreaterThanOrEqual(1);
       await context.close();
@@ -152,23 +153,23 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
     it("fetches it every time by default, whatever the grant", async () => {
       const off = await shelf();
       const context = await browser.newContext();
-      const fromCache = await visitTwice(context, off.rootUrl({ capture: true }));
+      const fromCache = await visitTwice(context, off.rootUrl());
       expect(off.assetRequests()).toBe(2);
       expect(fromCache).toBe(0);
       await context.close();
     });
 
-    it("never caches an interactive preview grant, even when opted in", async () => {
+    it("never caches an interactive preview's read grant, even when opted in", async () => {
       const opted = await shelf(600);
       const context = await browser.newContext();
-      await visitTwice(context, opted.rootUrl());
+      await visitTwice(context, opted.rootUrl({ purpose: "read" }));
       expect(opted.assetRequests()).toBe(2);
       await context.close();
     });
 
     it("starts cold in a fresh isolated context", async () => {
       const opted = await shelf(600);
-      const root = opted.rootUrl({ capture: true });
+      const root = opted.rootUrl();
       const first = await browser.newContext();
       await visitTwice(first, root);
       expect(opted.assetRequests()).toBe(1);
@@ -183,9 +184,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
     it("treats a renewed grant's new URL as a new cache identity", async () => {
       const opted = await shelf(600);
       const context = await browser.newContext();
-      await visitTwice(context, opted.rootUrl({ capture: true }));
+      await visitTwice(context, opted.rootUrl());
       expect(opted.assetRequests()).toBe(1);
-      await visitTwice(context, opted.rootUrl({ capture: true, ttlSeconds: 3500 }));
+      await visitTwice(context, opted.rootUrl({ ttlSeconds: 3500 }));
       expect(opted.assetRequests()).toBe(2);
       await context.close();
     });

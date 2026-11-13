@@ -40,6 +40,8 @@ export interface Project {
   storybookUrlTtlSeconds?: number | null;
   /** JSON `OwnerRule[]` mapping story-file globs to member user ids (#465); null when none. */
   componentOwners?: string | null;
+  /** Cancel a branch's builds a newer commit supersedes (ADR 0045); the column defaults to true. */
+  cancelSuperseded?: boolean;
   createdAt: string;
   updatedAt: string;
 }

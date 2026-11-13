@@ -23,7 +23,10 @@ const auth = stubAuth(null, {
 });
 
 const repoSchema = z.object({ owner: z.string(), repo: z.string() });
-const as = (who: "admin" | "dev") => ({ cookie: `storyshelf_session=${who}` });
+const as = (who: "admin" | "dev") => ({
+  cookie: `storyshelf_session=${who}`,
+  "sec-fetch-site": "same-origin",
+});
 
 async function boot(options: { origin: boolean }) {
   const { db } = makeDatabase();

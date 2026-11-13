@@ -104,6 +104,7 @@ async function sendWebhook(
   await httpStatus(url, {
     method: "POST",
     json: event,
+    destination: "project",
     headers: {
       "X-StoryShelf-Event": event.event,
       "X-StoryShelf-Signature": hmacSha256(secret, JSON.stringify(event)),

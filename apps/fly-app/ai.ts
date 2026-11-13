@@ -11,9 +11,9 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { createAi } from "@storyshelf/ai";
 import type { Ai } from "@storyshelf/core/ai";
 
-/** The model when `SS_AI_MODEL` is unset: Anthropic's cheapest current one. */
+/** The demo's model, fixed: Anthropic's cheapest current one (#992). */
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
-/** Tokens the demo may spend a day when `SS_AI_DAILY_TOKENS` is unset or invalid. */
+/** Tokens the demo may spend a day, fixed (#992). */
 export const DEFAULT_DAILY_TOKENS = 100_000;
 /** AI calls one project may make in an hour. */
 export const CALLS_PER_PROJECT_PER_HOUR = 5;
@@ -28,28 +28,18 @@ export const HEALTH_MAX_TOKENS = 2000;
  */
 const NO_THINKING = { anthropic: { thinking: { type: "disabled" } } } as const;
 
-/** An environment value, or undefined when it is unset or empty. */
-function nonEmpty(value: string | undefined): string | undefined {
-  return value === undefined || value === "" ? undefined : value;
-}
-
-/** A positive whole number of tokens, else the default (an unreadable value never turns the budget off). */
-function dailyTokensFrom(value: string | undefined): number {
-  const parsed = value === undefined ? Number.NaN : Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : DEFAULT_DAILY_TOKENS;
-}
-
 /**
  * The AI surface for the demo, or `undefined` while `ANTHROPIC_API_KEY` is unset (then the app has
  * no AI: `501 ai-disabled` and no UI, as before). One profile, `default`, with images off, so a
- * screenshot is never sent. Nothing is enabled for a project by itself: a site admin picks the
- * profile under Project settings → AI.
+ * screenshot is never sent. The model and the budget are fixed here, not read from the environment
+ * (#992). Nothing is enabled for a project by itself: a site admin picks the profile under Project
+ * settings → AI, and `seed.sh` does that for the demo project.
  */
 export function aiFromEnv(env: Readonly<Record<string, string | undefined>>): Ai | undefined {
-  if (nonEmpty(env["ANTHROPIC_API_KEY"]) === undefined) {
+  if (env["ANTHROPIC_API_KEY"] === undefined || env["ANTHROPIC_API_KEY"] === "") {
     return undefined;
   }
-  const model = anthropic(nonEmpty(env["SS_AI_MODEL"]) ?? DEFAULT_AI_MODEL);
+  const model = anthropic(DEFAULT_AI_MODEL);
   return createAi({
     profiles: {
       default: {
@@ -62,7 +52,7 @@ export function aiFromEnv(env: Readonly<Record<string, string | undefined>>): Ai
       },
     },
     budget: {
-      dailyTokens: dailyTokensFrom(env["SS_AI_DAILY_TOKENS"]),
+      dailyTokens: DEFAULT_DAILY_TOKENS,
       perProjectCallsPerHour: CALLS_PER_PROJECT_PER_HOUR,
     },
   });

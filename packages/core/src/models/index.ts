@@ -64,6 +64,7 @@ export {
   averageInheritedRatio,
   type InheritedRatio,
 } from "./inherited-ratio.ts";
+export type { SupersedeOptions, SupersedingBuild } from "./build-supersede.ts";
 export { BuildReviewModel, type BuildReviewTables } from "./build-review.ts";
 export {
   deriveReviewStatus,

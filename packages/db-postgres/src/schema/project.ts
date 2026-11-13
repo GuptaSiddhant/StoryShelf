@@ -26,6 +26,7 @@ export const projects = pgTable("projects", {
   reviewApprovals: integer("review_approvals").notNull().default(1),
   storybookUrlTtlSeconds: integer("storybook_url_ttl_seconds"),
   componentOwners: text("component_owners"),
+  cancelSuperseded: boolean("cancel_superseded").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
 });
@@ -56,6 +57,7 @@ export interface Project {
   reviewApprovals: number;
   storybookUrlTtlSeconds: number | null;
   componentOwners: string | null;
+  cancelSuperseded: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -75,6 +75,11 @@ export interface BuildStateInput {
   approvals?: { given: number; required: number } | undefined;
   /** The build's snapshots; the `changed` and `new` ones become annotations of `<prefix>/testing`. */
   changes?: readonly BuildStateChange[] | undefined;
+  /**
+   * The newer build that cancelled this one (ADR 0045). A cancelled build with it keeps the
+   * `cancelled` outcome, described `Superseded by <short sha>`, and the comment links that build.
+   */
+  supersededBy?: { id: string; sha: string } | undefined;
 }
 
 /** One commit status to show. */
@@ -118,10 +123,27 @@ export function statusesForBuild(input: BuildStateInput): BuildStateSet {
   }
   const links = linksOf(input);
   const statuses = [
-    ...withAnnotations(gateStatus(input, links.build), input),
+    ...withAnnotations(withSuperseded(gateStatus(input, links.build), input), input),
     storybookStatus(input.publishing, input.prefix, links),
   ].map((status) => withProgress(status, input.build));
   return { statuses, comment: commentOf(input, statuses, links) };
+}
+
+/** The short form of a commit in a description. */
+function shortSha(sha: string): string {
+  return sha.slice(0, SHORT_SHA_LENGTH);
+}
+
+const SHORT_SHA_LENGTH = 7;
+
+/** A superseded build (cancelled by a newer one) says which commit replaced it; the outcome stays `cancelled`. */
+function withSuperseded(gates: DesiredStatus[], input: BuildStateInput): DesiredStatus[] {
+  const { supersededBy, build } = input;
+  if (supersededBy === undefined || build.status !== "cancelled") {
+    return gates;
+  }
+  const description = `Superseded by ${shortSha(supersededBy.sha)}`;
+  return gates.map((gate) => ({ ...gate, description }));
 }
 
 /** `pending` is `queued` while the build waits to be captured, `running` after. */
@@ -175,7 +197,20 @@ function commentOf(
       storybookUrl: input.publishing === "success" ? links.storybook : undefined,
       gates,
       counts: input.flags.testing || input.flags.review ? input.build : undefined,
+      supersededBy: supersededLink(input),
     }),
+  };
+}
+
+/** The newer build's link and short commit, when this cancelled build was superseded by it. */
+function supersededLink(input: BuildStateInput): { url: string; sha: string } | undefined {
+  const { supersededBy, build } = input;
+  if (supersededBy === undefined || build.status !== "cancelled") {
+    return undefined;
+  }
+  return {
+    url: input.urls.build(input.projectSlug, supersededBy.id),
+    sha: shortSha(supersededBy.sha),
   };
 }
 

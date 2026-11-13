@@ -5,10 +5,11 @@ import {
   createTestProject,
   makeDatabase,
   makeStorage,
+  publicNetworkForTests,
 } from "@storyshelf/core/test-helpers";
 import { createHmac } from "node:crypto";
 import { pino } from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
@@ -66,7 +67,7 @@ function stubWebhookReceiver(): Delivery[] {
 async function seed(chat: string[], publicBaseUrl?: string) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await createTestProject(db, db.tables, { name: "app" });
+  const project = await createTestProject(db, db.tables, { name: "web" });
   const build = await createTestBuild(db, db.tables, project.id);
   await new BuildModel(db).setStatus(build.id, "pending");
   const app = createShelfApp({
@@ -77,13 +78,13 @@ async function seed(chat: string[], publicBaseUrl?: string) {
     notifications: { notifiers: [recordingChat(chat)] },
     testing: { runner: stubRunner() },
   });
-  const channel = await app.request("/api/v1/projects/app/notification-channels", {
+  const channel = await app.request("/api/v1/projects/web/notification-channels", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ provider: "log", config: {} }),
   });
   expect(channel.status).toBe(201);
-  const webhook = await app.request("/api/v1/projects/app/webhooks", {
+  const webhook = await app.request("/api/v1/projects/web/webhooks", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ url: "https://hooks.example/receive" }),
@@ -91,12 +92,17 @@ async function seed(chat: string[], publicBaseUrl?: string) {
   expect(webhook.status).toBe(201);
   const { secret } = (await webhook.json()) as { secret: string };
   apps.push(app);
-  return { app, build, secret, cancel: `/api/v1/projects/app/builds/${build.id}/cancel` };
+  return { app, build, secret, cancel: `/api/v1/projects/web/builds/${build.id}/cancel` };
 }
 
 /** Every app a test booted, torn down even when an assertion failed (each runs a branch-GC timer). */
 const apps: ReturnType<typeof createShelfApp>[] = [];
+let restoreNetwork: (() => void) | undefined;
+beforeEach(() => {
+  restoreNetwork = publicNetworkForTests();
+});
 afterEach(async () => {
+  restoreNetwork?.();
   vi.unstubAllGlobals();
   await Promise.allSettled(apps.splice(0).map(async (app) => await app.lifecycle.teardown()));
 });

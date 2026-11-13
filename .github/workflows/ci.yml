@@ -13,7 +13,8 @@ name: CI
 #
 # Website: the `website` job runs only when apps/website/ changed (manual runs always run it).
 # The `changes` job also skips `capture` and `fly` for PRs that only touch docs, the
-# website or the fixtures this run does not use.
+# website or the fixtures this run does not use (never for a `release/v*` PR). The browser golden
+# path inside `fly` (e2e) runs only for `release/v*` PRs and manual runs; nightly.yml always runs it.
 #
 # Labels do not start this workflow: adding or removing one used to re-run (and cancel) the whole
 # suite. The `changeset` check, which reads the `no-release` label, lives in changeset.yml. The
@@ -103,6 +104,11 @@ jobs:
             # the interface that contract exercises (a locking regression must not merge).
             if grep -qE '^(packages/db-postgres/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then postgres=true; else postgres=false; fi
             if grep -qE "$FULL" changed.txt; then force=true; else force=false; fi
+            # A release PR often changes only versions and the changelog (all ignorable above), but it
+            # is the deploy gate: the Fly dry run and its browser test must run for it.
+            if [ "$EVENT" = "pull_request" ]; then
+              case "$HEAD_REF" in release/v*) heavy=true ;; esac
+            fi
             if [ "$EVENT" = "pull_request" ]; then
               # An epic branch merging into main carries many tasks: always verify everything.
               if grep -qE "$FULL" changed.txt \
@@ -250,6 +256,15 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=12
+      # Neon's WebSocket proxy in front of the same server, so `./neon` runs both suites for real.
+      wsproxy:
+        image: ghcr.io/neondatabase/wsproxy:latest
+        env:
+          APPEND_PORT: postgres:5432
+          ALLOW_ADDR_REGEX: ".*"
+          LOG_TRAFFIC: "false"
+        ports:
+          - 5433:80
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -269,9 +284,14 @@ jobs:
           # The suite clears and claims shared content rows: this service container is disposable.
           POSTGRES_SCHEMA_MUTATION_TEST: "1"
           DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
-        # One file at a time: each runs the migrations, and two first migrations on a fresh database
-        # collide ("duplicate key value violates unique constraint pg_type_typname_nsp_index").
-        run: nubx vitest run --no-file-parallelism src/build-reference-lifecycle.test.ts src/retention-activation.test.ts
+          NEON_WSPROXY: 127.0.0.1:5433/v1
+        # One file per run, in order: each runs the migrations, and two first migrations on a fresh database
+        # collide ("duplicate key value violates unique constraint pg_type_typname_nsp_index"); a file
+        # that fails must not leave its connections open under the next.
+        run: |
+          nubx vitest run src/build-reference-lifecycle.test.ts
+          nubx vitest run src/retention-activation.test.ts
+          nubx vitest run src/retention-pool-presets.test.ts
 
   website:
     name: website
@@ -312,6 +332,10 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.heavy == 'true' }}
     uses: ./.github/workflows/fly-dry-run.yml
+    with:
+      # The browser golden path (#941) is a release gate and a manual check, never part of an
+      # ordinary PR: release PRs (a `release/v*` head branch) and manual runs only.
+      e2e: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v') }}
 
   # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
   # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child

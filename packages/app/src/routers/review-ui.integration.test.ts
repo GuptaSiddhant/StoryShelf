@@ -7,7 +7,7 @@ import {
   NotificationSubscriptionModel,
   WebhookModel,
 } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage, publicNetworkForTests } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -66,10 +66,13 @@ async function stopApps(): Promise<void> {
   }
 }
 
+let restoreNetwork: (() => void) | undefined;
 beforeEach(async () => {
+  restoreNetwork = publicNetworkForTests();
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-review-ui-"));
 });
 afterEach(async () => {
+  restoreNetwork?.();
   try {
     await stopApps();
   } finally {
@@ -171,6 +174,7 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
         ...init,
         headers: {
           cookie: `storyshelf_session=${id}`,
+          "sec-fetch-site": "same-origin",
           "content-type": "application/json",
           ...(init.headers as Record<string, string> | undefined),
         },
@@ -202,7 +206,11 @@ async function publish(
   const { build } = (await created.json()) as { build: { id: string } };
   const upload = await booted.app.request(`/api/v1/projects/gate/builds/${build.id}/zip`, {
     method: "PUT",
-    headers: { cookie: "storyshelf_session=dev", "content-type": "application/zip" },
+    headers: {
+      cookie: "storyshelf_session=dev",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/zip",
+    },
     body: new Uint8Array(storybookZip(stories)),
   });
   expect(upload.status).toBe(202);
@@ -273,7 +281,7 @@ describe("the review gate", () => {
     // 404 as for an unknown project, not the 403 that would show the project exists (#497).
     expect(response.status).toBe(404);
     const unknown = await booted.app.request("/api/v1/projects/ghost/builds/b1/comments", {
-      headers: { cookie: "storyshelf_session=outsider" },
+      headers: { cookie: "storyshelf_session=outsider", "sec-fetch-site": "same-origin" },
     });
     const body = await response.text();
     expect(body).toBe(await unknown.text());
@@ -311,10 +319,14 @@ describe("the review gate", () => {
         const anonymous = await post({ "x-csrf-token": getCsrfToken("s", "default") });
         expect(anonymous.status, `anonymous ${path}`).toBe(302);
         expect(anonymous.headers.get("location"), `anonymous ${path}`).toContain("/login");
-        const noToken = await post({ cookie: "storyshelf_session=alice" });
+        const noToken = await post({
+          cookie: "storyshelf_session=alice",
+          "sec-fetch-site": "same-origin",
+        });
         expect(noToken.status, `no CSRF token ${path}`).toBe(403);
         const outsider = await post({
           cookie: "storyshelf_session=outsider",
+          "sec-fetch-site": "same-origin",
           "x-csrf-token": getCsrfToken("s", "outsider"),
         });
         // No role at all: the answer for a project that does not exist (#497), not a 403.
@@ -736,7 +748,11 @@ const reviewRequests = (booted: Booted): number =>
 async function republishBuild(booted: Booted, id: string): Promise<void> {
   const upload = await booted.app.request(`/api/v1/projects/gate/builds/${id}/zip`, {
     method: "PUT",
-    headers: { cookie: "storyshelf_session=dev", "content-type": "application/zip" },
+    headers: {
+      cookie: "storyshelf_session=dev",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/zip",
+    },
     body: new Uint8Array(storybookZip(BUTTON)),
   });
   expect(upload.status).toBe(202);

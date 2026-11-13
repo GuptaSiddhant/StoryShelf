@@ -1,10 +1,12 @@
 /**
- * Signed Storybook tokens (ADR 0007, decision 5): the single owner of everything about the path
- * prefix of the URL a remote browser opens to read one build's published Storybook, `/_s/<token>/`:
+ * Signed Storybook tokens (ADR 0007, decision 5; ADR 0051, decision 4): the single owner of everything
+ * about the path prefixes of the URLs that read one build's published Storybook with a token
+ * instead of a session, `/_s/<token>/` (capture) and `/_r/<token>/` (read grant):
  * the prefix, the token shape, the derived signing key, signing, verification and the lifetime
- * rules. Stateless: `base64url("<projectId>:<buildId>:<exp>[:<purpose>]")`, a dot, and the base64url
- * HMAC-SHA-256 of that first part. The optional purpose is covered by the signature; a token
- * without one is a legacy or interactive-preview grant. Imported through `@storyshelf/core/utils`.
+ * rules. Stateless: `base64url("<projectId>:<buildId>:<exp>:<purpose>")`, a dot, and the base64url
+ * HMAC-SHA-256 of that first part under the purpose's own key. `capture` tokens open `/_s/`, `read`
+ * grants (ADR 0051) open `/_r/`; neither opens the other's route. Imported through
+ * `@storyshelf/core/utils`.
  */
 import { createHmac } from "node:crypto";
 import type { SecretInput } from "./encrypt.ts";
@@ -12,6 +14,25 @@ import { timingSafeEqualString } from "./hash.ts";
 
 /** The path prefix every signed Storybook URL starts with; `/_/` is the unrelated short link. */
 export const STORYBOOK_TOKEN_PREFIX = "/_s/";
+/** The path prefix of a read grant (ADR 0051, decision 4): `/_r/<token>/`, never `/_s/`. */
+export const STORYBOOK_READ_PREFIX = "/_r/";
+/**
+ * The path prefix of the exchange on a content host (ADR 0051, decision 5): `/_x/<token>/`. It exists
+ * on content hosts only and is never `/_r/` or `/_s/`.
+ */
+export const STORYBOOK_EXCHANGE_PREFIX = "/_x/";
+/**
+ * The cookie a content host sets after the exchange (ADR 0051, decision 5). The `__Host-` prefix forces
+ * `Secure`, `Path=/` and no `Domain`, so it stays on the one host. Its value is a sealed `cookie`
+ * token naming the build and the expiry; the content host checks it on every request.
+ */
+export const STORYBOOK_GRANT_COOKIE = "__Host-storyshelf-grant";
+/** Lifetime of a read grant, in seconds (1 hour); the longest a `read` token may claim. */
+export const STORYBOOK_READ_TTL = 3600;
+/** Lifetime of an exchange token, in seconds (60); the longest an `exchange` token may claim. */
+export const STORYBOOK_EXCHANGE_TTL = 60;
+/** Lifetime of the sealed value of a content host's grant cookie, in seconds (1 hour). */
+export const STORYBOOK_COOKIE_TTL = 3600;
 /** Regex source of a token, shared by the shape check and the log redaction. */
 export const STORYBOOK_TOKEN_SOURCE = "[A-Za-z0-9_-]{8,200}\\.[A-Za-z0-9_-]{43}";
 
@@ -36,17 +57,39 @@ export const MIN_CAPTURES_PER_SLICE = 50;
 export const MIN_STORYBOOK_URL_TTL_OVERRIDE =
   Math.ceil((MIN_CAPTURES_PER_SLICE * PER_CAPTURE_BUDGET_MS) / 1000) + STORYBOOK_URL_TTL_GRACE;
 
-/** Domain separation: the signing key is derived from the secret with this context, nothing else uses it. */
-const KEY_CONTEXT = "storyshelf/storybook-url/v1";
+/**
+ * Domain separation: each purpose has its own key, derived from the secret with its own context, so
+ * a token minted for one purpose never verifies for the other (ADR 0051, decision 4). The capture
+ * context is the one tokens have always used.
+ */
+const KEY_CONTEXTS: Record<StorybookTokenPurpose, string> = {
+  capture: "storyshelf/storybook-url/v1",
+  read: "storyshelf/storybook-read/v1",
+  exchange: "storyshelf/storybook-exchange/v1",
+  cookie: "storyshelf/storybook-cookie/v1",
+};
+
+/** Lifetime of a purpose that has a fixed one, and the longest it may claim. */
+const PURPOSE_TTL: Partial<Record<StorybookTokenPurpose, number>> = {
+  read: STORYBOOK_READ_TTL,
+  exchange: STORYBOOK_EXCHANGE_TTL,
+  cookie: STORYBOOK_COOKIE_TTL,
+};
 const TOKEN_SHAPE = new RegExp(`^${STORYBOOK_TOKEN_SOURCE}$`, "u");
-const CLAIMS_SHAPE = /^([A-Za-z0-9_-]{1,64}):([A-Za-z0-9_-]{1,64}):(\d{1,12})(?::(capture))?$/u;
+const CLAIMS_SHAPE =
+  /^([A-Za-z0-9_-]{1,64}):([A-Za-z0-9_-]{1,64}):(\d{1,12})(?::(capture|read|exchange|cookie))?$/u;
 
 /**
- * What a token was minted for. `capture` marks the tokens the server mints for a render pass or
- * slice (`storybookUrlSource`); it is the only claim that may opt into browser-private caching of
- * the build's assets. Interactive preview grants and legacy tokens carry none.
+ * What a token was minted for, signed into it and verified against the route that receives it.
+ * `capture` marks the tokens the server mints for a render pass or slice (`storybookUrlSource`); it
+ * is the only claim that may opt into browser-private caching of the build's assets, and `/_s/`
+ * accepts nothing else. `read` marks a read grant for one viewer's browser (`/_r/`, ADR 0051): one
+ * hour at most, signed with its own key, verified with the current secret only. `exchange` (ADR 0051,
+ * decision 5) is the 60 second token a portal redirect hands to a content host's `/_x/`; `cookie` is
+ * the sealed value of that host's grant cookie, never the exchange token itself. Like `read`, both
+ * verify with the current secret only and each has its own key, so no purpose opens another's route.
  */
-export type StorybookTokenPurpose = "capture";
+export type StorybookTokenPurpose = "capture" | "read" | "exchange" | "cookie";
 
 /** What a valid token grants: read-only access to one build's static files until `expiresAt`. */
 export interface StorybookTokenClaims {
@@ -54,8 +97,8 @@ export interface StorybookTokenClaims {
   buildId: string;
   /** Unix seconds. */
   expiresAt: number;
-  /** Set only on tokens minted for a render pass; absent on previews and legacy tokens. */
-  purpose?: StorybookTokenPurpose;
+  /** What the token was minted for; a legacy token minted with none is never accepted. */
+  purpose: StorybookTokenPurpose;
 }
 
 /** Inputs for {@link signStorybookToken}. */
@@ -64,10 +107,13 @@ export interface SignStorybookTokenInput {
   secret: SecretInput;
   projectId: string;
   buildId: string;
-  /** Lifetime in seconds; defaults to {@link DEFAULT_STORYBOOK_URL_TTL}. See {@link storybookUrlTtl}. */
+  /**
+   * Lifetime in seconds; defaults to {@link DEFAULT_STORYBOOK_URL_TTL} for a capture token (see
+   * {@link storybookUrlTtl}) and {@link STORYBOOK_READ_TTL} for a read grant, which may not claim more.
+   */
   ttlSeconds?: number | undefined;
-  /** What the token is for; omit for an interactive preview. Signed into the token. */
-  purpose?: StorybookTokenPurpose | undefined;
+  /** What the token is for. Signed into the token and into its key. */
+  purpose: StorybookTokenPurpose;
   /** Clock override for tests (ms). */
   now?: number | undefined;
 }
@@ -82,46 +128,71 @@ export type StorybookTokenResult =
 
 /** Sign a token for one build. Throws on an empty secret, bad ids or a lifetime out of range. */
 export function signStorybookToken(input: SignStorybookTokenInput): string {
-  const ttl = input.ttlSeconds ?? DEFAULT_STORYBOOK_URL_TTL;
-  assertStorybookUrlTtl(ttl);
+  const { purpose } = input;
+  const ttl = lifetimeOf(input);
   const secret = currentSecret(input.secret);
   const expiresAt = Math.floor((input.now ?? Date.now()) / 1000) + ttl;
-  const claims = `${input.projectId}:${input.buildId}:${expiresAt}${
-    input.purpose === undefined ? "" : `:${input.purpose}`
-  }`;
+  const claims = `${input.projectId}:${input.buildId}:${expiresAt}:${purpose}`;
   if (!CLAIMS_SHAPE.test(claims)) {
     throw new Error("Cannot sign a Storybook URL: unexpected project or build id");
   }
   const payload = Buffer.from(claims, "utf8").toString("base64url");
-  return `${payload}.${signature(secret, payload)}`;
+  return `${payload}.${signature(secret, purpose, payload)}`;
+}
+
+/** The lifetime a token is minted with, checked against the range and the purpose's own ceiling. */
+function lifetimeOf(input: SignStorybookTokenInput): number {
+  const ttl = input.ttlSeconds ?? PURPOSE_TTL[input.purpose] ?? DEFAULT_STORYBOOK_URL_TTL;
+  const longest = PURPOSE_TTL[input.purpose];
+  if (longest === undefined) {
+    assertStorybookUrlTtl(ttl);
+  } else if (!Number.isInteger(ttl) || ttl < MIN_STORYBOOK_URL_TTL || ttl > longest) {
+    throw new Error(
+      `A ${input.purpose} token lasts at most ${String(longest)} seconds, got ${String(ttl)}`,
+    );
+  }
+  return ttl;
 }
 
 /**
- * Check a token against the current secret and, during a rotation, the previous one. The signature
- * is checked (in constant time) before the payload is read, and every failure looks the same to
- * the caller except for `reason`, which is for the server's own log.
+ * Check a token for one purpose. A `capture` token verifies against the current secret and, during
+ * a rotation, the previous one (ADR 0007); a `read` grant against the current secret only, so a
+ * rotation ends every read grant at once (ADR 0051, decision 4). The key is the purpose's own, so a
+ * token of the other purpose fails on its signature, and a token with no purpose is refused. The
+ * signature is checked (in constant time) before the payload is read, and every failure looks the
+ * same to the caller except for `reason`, which is for the server's own log.
  */
 export function verifyStorybookToken(
   token: unknown,
   secret: SecretInput,
+  purpose: StorybookTokenPurpose,
   now: number = Date.now(),
 ): StorybookTokenResult {
   if (typeof token !== "string" || !TOKEN_SHAPE.test(token)) {
     return { ok: false, reason: "malformed" };
   }
   const [payload = "", given = ""] = token.split(".");
-  const signed = secretsOf(secret).some((key) =>
-    timingSafeEqualString(signature(key, payload), given),
-  );
+  const keys = purpose === "capture" ? secretsOf(secret) : currentOnly(secret);
+  const signed = keys.some((key) => timingSafeEqualString(signature(key, purpose, payload), given));
   if (!signed) {
     return { ok: false, reason: "signature" };
   }
-  return claimsOf(payload, Math.floor(now / 1000));
+  return claimsOf(payload, Math.floor(now / 1000), purpose);
 }
 
-/** The path of a token's root: `/_s/<token>/`. */
+/** The path of a capture token's root: `/_s/<token>/`. */
 export function storybookTokenPath(token: string): string {
   return `${STORYBOOK_TOKEN_PREFIX}${token}/`;
+}
+
+/** The path of an exchange token's root on a content host: `/_x/<token>/`. */
+export function storybookExchangePath(token: string): string {
+  return `${STORYBOOK_EXCHANGE_PREFIX}${token}/`;
+}
+
+/** The path of a read grant's root: `/_r/<token>/`. */
+export function storybookReadPath(token: string): string {
+  return `${STORYBOOK_READ_PREFIX}${token}/`;
 }
 
 /**
@@ -166,23 +237,38 @@ export function assertStorybookUrlTtl(seconds: number): void {
   }
 }
 
-function claimsOf(payload: string, nowSeconds: number): StorybookTokenResult {
+function claimsOf(
+  payload: string,
+  nowSeconds: number,
+  expected: StorybookTokenPurpose,
+): StorybookTokenResult {
   const match = CLAIMS_SHAPE.exec(Buffer.from(payload, "base64url").toString("utf8"));
   if (!match) {
     return { ok: false, reason: "malformed" };
   }
   const [, projectId = "", buildId = "", exp = "", purpose] = match;
   const expiresAt = Number(exp);
+  const failure = claimsFailure(expiresAt, nowSeconds, purpose === expected, expected);
+  return failure
+    ? { ok: false, reason: failure }
+    : { ok: true, claims: { projectId, buildId, expiresAt, purpose: expected } };
+}
+
+/** Why verified claims are still refused: a wrong purpose, expired, or claiming more than allowed. */
+function claimsFailure(
+  expiresAt: number,
+  nowSeconds: number,
+  purposeMatches: boolean,
+  expected: StorybookTokenPurpose,
+): StorybookTokenFailure | undefined {
+  if (!purposeMatches) {
+    return "scope";
+  }
   if (expiresAt <= nowSeconds) {
-    return { ok: false, reason: "expired" };
+    return "expired";
   }
-  if (expiresAt > nowSeconds + MAX_STORYBOOK_URL_TTL) {
-    return { ok: false, reason: "scope" };
-  }
-  return {
-    ok: true,
-    claims: { projectId, buildId, expiresAt, ...(purpose === "capture" ? { purpose } : {}) },
-  };
+  const longest = PURPOSE_TTL[expected] ?? MAX_STORYBOOK_URL_TTL;
+  return expiresAt > nowSeconds + longest ? "scope" : undefined;
 }
 
 /** The key tokens are signed with; throws when none is configured. */
@@ -194,13 +280,19 @@ function currentSecret(secret: SecretInput): string {
   return current;
 }
 
+/** The current secret alone, for a purpose a rotation must end at once. */
+function currentOnly(secret: SecretInput): string[] {
+  const current = typeof secret === "object" ? secret.current : secret;
+  return current ? [current] : [];
+}
+
 /** Every key a token may verify with: the current secret and, during a rotation, the previous one. */
 function secretsOf(secret: SecretInput): string[] {
   const keys = typeof secret === "object" ? [secret.current, secret.previous] : [secret];
   return keys.filter((key): key is string => key !== undefined && key !== "");
 }
 
-function signature(secret: string, payload: string): string {
-  const key = createHmac("sha256", secret).update(KEY_CONTEXT).digest();
+function signature(secret: string, purpose: StorybookTokenPurpose, payload: string): string {
+  const key = createHmac("sha256", secret).update(KEY_CONTEXTS[purpose]).digest();
   return createHmac("sha256", key).update(payload).digest("base64url");
 }

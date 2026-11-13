@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/app",
-  "version": "0.9.0",
+  "version": "0.11.0",
   "description": "StoryShelf app: Hono app, API routes, and server-rendered UI over @storyshelf/core.",
   "keywords": [
     "chromatic-alternative",
@@ -55,6 +55,7 @@
     "storybook": "storybook dev -p 6006",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "RUN_INTEGRATION=1 vitest run subdomain-browser.integration.test.ts",
     "test:watch": "vitest",
     "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/jobs.integration.test.ts src/capture-status-fanout.test.ts src/routers/design.integration.test.ts src/routers/published-compression.test.ts"
   },

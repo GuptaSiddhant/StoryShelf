@@ -1,4 +1,10 @@
-import { BuildModel, MemberModel, ProjectModel, TokenModel } from "@storyshelf/core/models";
+import {
+  BuildModel,
+  BuildReviewModel,
+  MemberModel,
+  ProjectModel,
+  TokenModel,
+} from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sha256, storybookDir } from "@storyshelf/core/utils";
@@ -123,6 +129,7 @@ async function boot(
         ...init,
         headers: {
           cookie: `storyshelf_session=${id}`,
+          "sec-fetch-site": "same-origin",
           "content-type": "application/json",
         },
       });
@@ -156,7 +163,11 @@ async function publish(booted: Booted, branch: string): Promise<string> {
   const { build } = (await created.json()) as { build: { id: string } };
   const upload = await booted.app.request(`/api/v1/projects/gate/builds/${build.id}/zip`, {
     method: "PUT",
-    headers: { cookie: "storyshelf_session=dev", "content-type": "application/zip" },
+    headers: {
+      cookie: "storyshelf_session=dev",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/zip",
+    },
     body: new Uint8Array(storybookZip()),
   });
   expect(upload.status).toBe(202);
@@ -222,6 +233,31 @@ describe("hosting-only review", () => {
     await vi.waitFor(() => {
       expect(booted.statuses("storyshelf/review").at(-1)).toBe("success");
     });
+    await booted.app.lifecycle.teardown();
+  });
+
+  it("never lets an approval computed before a rejection overwrite it", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    const { db } = booted;
+    const write = db.updateWhere.bind(db);
+    let raced = false;
+    // Alice's approval is computed from her verdict alone; Bob's rejection lands and decides the
+    // build before her write reaches the database (ADR 0046, decision 3).
+    db.updateWhere = async (table, rowId, values, where) => {
+      if (!raced && (values as { status?: string }).status === "approved") {
+        raced = true;
+        await new BuildReviewModel(db).add(id, "bob", "rejected");
+        await new BuildModel(db).setStatus(id, "rejected");
+      }
+      return await write(table, rowId, values, where);
+    };
+
+    const response = await booted.as("alice")(`/builds/${id}/reviews`, verdict("approved"));
+
+    expect(response.status).toBeLessThan(300);
+    expect(raced).toBe(true);
+    expect(await statusOf(booted, id)).toBe("rejected");
     await booted.app.lifecycle.teardown();
   });
 
@@ -429,7 +465,7 @@ describe("an accepted build whose Storybook content is gone", () => {
       expect(await refused.text()).toContain("Storybook content unavailable, see build page");
 
       const page = await booted.app.request(`/projects/gate/builds/${build.id}`, {
-        headers: { cookie: "storyshelf_session=alice" },
+        headers: { cookie: "storyshelf_session=alice", "sec-fetch-site": "same-origin" },
       });
       const html = await page.text();
       expect(html).toContain("Storybook content unavailable");
