@@ -187,6 +187,35 @@ export async function renderLabelDetailPage(
   );
 }
 
+/** Read-only table of the project's label types. */
+function LabelTypesTable(props: { labelTypes: LabelType[] }): ReturnType<typeof Table> {
+  const { labelTypes } = props;
+  return (
+    <Table label="Label types">
+      <table>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Name</th>
+            <th>Template</th>
+          </tr>
+        </thead>
+        <tbody>
+          {labelTypes.map((labelType) => (
+            <tr key={labelType.id}>
+              <td>
+                <Badge tone="neutral">{labelType.key}</Badge>
+              </td>
+              <td>{labelType.name}</td>
+              <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Table>
+  );
+}
+
 /** Label types overview page (architecture.md `GET /projects/:slug/labels`). */
 export async function renderLabelsPage(slug: string): Promise<RenderedContent | null> {
   const projects = await new ProjectModel(getStore().db).list();
@@ -217,28 +246,7 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
           description="No label types are configured for this project."
         />
       ) : (
-        <Table label="Label types">
-          <table>
-            <thead>
-              <tr>
-                <th>Key</th>
-                <th>Name</th>
-                <th>Template</th>
-              </tr>
-            </thead>
-            <tbody>
-              {labelTypes.map((labelType) => (
-                <tr key={labelType.id}>
-                  <td>
-                    <Badge tone="neutral">{labelType.key}</Badge>
-                  </td>
-                  <td>{labelType.name}</td>
-                  <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
+        <LabelTypesTable labelTypes={labelTypes} />
       )}
     </DocumentLayout>
   );
