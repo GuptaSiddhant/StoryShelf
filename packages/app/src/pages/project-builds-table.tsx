@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -87,7 +88,7 @@ function BuildSummaryCell({
   project: Project;
   build: Build;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <div class={buildCell}>
       <strong>
@@ -110,7 +111,7 @@ function BuildActions({
   build: Build;
   source: SkipSource | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   // The diff page is a testing route; hosting-only instances link to the build page.
   const needsReview = build.status === "reviewing" && testingEnabled();
   // A skipped build has no Storybook of its own: link the source's, while it is available.

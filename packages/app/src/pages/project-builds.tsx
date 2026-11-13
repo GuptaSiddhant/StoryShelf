@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
@@ -63,14 +64,54 @@ function matches(build: Build, filters: BuildFilters): boolean {
   );
 }
 
+/** Branch select that submits on change and keeps the status filter. */
+function BranchFilter(props: {
+  base: string;
+  filters: BuildFilters;
+  branches: string[];
+  skippedTotal: number;
+}): ReturnType<typeof SelectField> {
+  const { base, filters, branches, skippedTotal } = props;
+  return (
+    <form
+      method="get"
+      action={base}
+      hx-get={base}
+      hx-trigger="change"
+      hx-target="body"
+      hx-push-url="true"
+    >
+      {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
+      {skippedTotal > 0 ? (
+        <CheckField
+          label={`Show skipped (${skippedTotal})`}
+          name="skipped"
+          value="1"
+          checked={showsSkipped(filters)}
+        />
+      ) : null}
+      <SelectField
+        label="Branch"
+        name="branch"
+        layout="inline"
+        value={filters.branch ?? ""}
+        options={[
+          { value: "", label: "All branches" },
+          ...branches.map((branch) => ({ value: branch, label: branch })),
+        ]}
+      />
+    </form>
+  );
+}
+
 /** Status chips (with counts) plus a branch select that applies instantly. */
 function BuildsToolbar(props: {
   project: Project;
   all: Build[];
   filters: BuildFilters;
-  base: string;
 }): ReturnType<typeof HStack> {
-  const { all, filters, base } = props;
+  const { project, all, filters } = props;
+  const base = createUrlBuilder("/", contentHostSuffix(getStore().config)).buildsList(project.slug);
   const skippedTotal = all.filter((build) => build.status === "skipped").length;
   const visible = all.filter((build) => showsSkipped(filters) || build.status !== "skipped");
   // Keep the selected branch in the list even when only skipped builds were on it.
@@ -102,36 +143,86 @@ function BuildsToolbar(props: {
           active: (filters.status ?? "") === item.value,
         }))}
       />
-      <form
-        method="get"
-        action={base}
-        hx-get={base}
-        hx-trigger="change"
-        hx-target="body"
-        hx-push-url="true"
-      >
-        {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
-        {skippedTotal > 0 ? (
-          <CheckField
-            label={`Show skipped (${skippedTotal})`}
-            name="skipped"
-            value="1"
-            checked={showsSkipped(filters)}
-          />
-        ) : null}
-        <SelectField
-          label="Branch"
-          name="branch"
-          layout="inline"
-          value={filters.branch ?? ""}
-          options={[
-            { value: "", label: "All branches" },
-            ...branches.map((branch) => ({ value: branch, label: branch })),
-          ]}
-        />
-      </form>
+      <BranchFilter base={base} filters={filters} branches={branches} skippedTotal={skippedTotal} />
     </HStack>
   );
+}
+
+/** The build table, or an empty state that explains whether a filter or skipping hides builds. */
+function BuildsList(props: {
+  project: Project;
+  all: Build[];
+  builds: Build[];
+  sources: Awaited<ReturnType<typeof loadSkipSources>>;
+  query: BuildFilters;
+}): ReturnType<typeof EmptyState> | ReturnType<typeof BuildsTable> {
+  const { project, all, builds, sources, query } = props;
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
+  if (builds.length > 0) {
+    return <BuildsTable project={project} builds={builds} sources={sources} />;
+  }
+  const skippedTotal = all.filter((build) => build.status === "skipped").length;
+  if (skippedTotal > 0 && skippedTotal === all.length && !showsSkipped(query)) {
+    return (
+      <EmptyState
+        title="Every build here was skipped"
+        description={`No story changed in any of the ${skippedTotal} builds, so none was captured. Show skipped to see them.`}
+        action={
+          <Button
+            variant="secondary"
+            href={listHref(urls.buildsList(project.slug), { ...query, skipped: "1" })}
+          >
+            Show skipped
+          </Button>
+        }
+      />
+    );
+  }
+  const filtered = Boolean(query.status ?? query.branch);
+  return (
+    <EmptyState
+      title="No builds"
+      description={
+        filtered
+          ? "No builds match the current filter."
+          : "Upload your first build with the CLI. Builds appear here once uploaded."
+      }
+      action={
+        filtered ? (
+          <Button variant="secondary" href={urls.buildsList(project.slug)}>
+            Clear filters
+          </Button>
+        ) : null
+      }
+    />
+  );
+}
+
+/** The page title, the repository and default branch, and the settings link. */
+function BuildsHeader(props: { project: Project }): ReturnType<typeof PageHeader> {
+  const { project } = props;
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
+  return (
+    <PageHeader
+      title="Builds"
+      description={
+        <>
+          {project.gitRepository ?? project.slug} · default branch{" "}
+          <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
+        </>
+      }
+      actions={
+        <Button variant="secondary" icon="settings" href={urls.settings(project.slug)}>
+          Settings
+        </Button>
+      }
+    />
+  );
+}
+
+/** Hiding skipped builds also drops a `status=skipped` filter, which would match nothing. */
+function effectiveFilters(raw: BuildFilters): BuildFilters {
+  return raw.status === "skipped" && !showsSkipped(raw) ? { ...raw, status: undefined } : raw;
 }
 
 /** Project builds page: filterable build history for one project. */
@@ -139,11 +230,7 @@ export async function renderProjectBuildsPage(
   slug: string,
   rawQuery: BuildFilters = {},
 ): Promise<RenderedContent | null> {
-  // Hiding skipped builds also drops a `status=skipped` filter, which would match nothing.
-  const query: BuildFilters =
-    rawQuery.status === "skipped" && !showsSkipped(rawQuery)
-      ? { ...rawQuery, status: undefined }
-      : rawQuery;
+  const query = effectiveFilters(rawQuery);
   const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
@@ -151,12 +238,7 @@ export async function renderProjectBuildsPage(
   }
   const all = await new BuildModel(getStore().db).list(project.id);
   const builds = all.filter((build) => matches(build, query));
-  const skippedTotal = all.filter((build) => build.status === "skipped").length;
-  const onlySkipped = skippedTotal > 0 && skippedTotal === all.length;
   const sources = await loadSkipSources(builds);
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
-  const filtered = Boolean(query.status ?? query.branch);
-  const everySkipped = builds.length === 0 && onlySkipped && !showsSkipped(query);
   const health = await loadHealthPanel(project);
 
   return (
@@ -164,63 +246,14 @@ export async function renderProjectBuildsPage(
       title={project.name}
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
     >
-      <PageHeader
-        title="Builds"
-        description={
-          <>
-            {project.gitRepository ?? project.slug} · default branch{" "}
-            <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
-          </>
-        }
-        actions={
-          <Button variant="secondary" icon="settings" href={urls.settings(project.slug)}>
-            Settings
-          </Button>
-        }
-      />
+      <BuildsHeader project={project} />
       <VStack>
         <HealthSlot project={project} data={health} />
         {testingEnabled() ? (
           <InheritedRatioCard builds={all.filter((build) => build.status !== "skipped")} />
         ) : null}
-        <BuildsToolbar
-          project={project}
-          all={all}
-          filters={query}
-          base={urls.buildsList(project.slug)}
-        />
-        {everySkipped ? (
-          <EmptyState
-            title="Every build here was skipped"
-            description={`No story changed in any of the ${skippedTotal} builds, so none was captured. Show skipped to see them.`}
-            action={
-              <Button
-                variant="secondary"
-                href={listHref(urls.buildsList(project.slug), { ...query, skipped: "1" })}
-              >
-                Show skipped
-              </Button>
-            }
-          />
-        ) : builds.length === 0 ? (
-          <EmptyState
-            title="No builds"
-            description={
-              filtered
-                ? "No builds match the current filter."
-                : "Upload your first build with the CLI. Builds appear here once uploaded."
-            }
-            action={
-              filtered ? (
-                <Button variant="secondary" href={urls.buildsList(project.slug)}>
-                  Clear filters
-                </Button>
-              ) : null
-            }
-          />
-        ) : (
-          <BuildsTable project={project} builds={builds} sources={sources} />
-        )}
+        <BuildsToolbar project={project} all={all} filters={query} />
+        <BuildsList project={project} all={all} builds={builds} sources={sources} query={query} />
       </VStack>
     </DocumentLayout>
   );

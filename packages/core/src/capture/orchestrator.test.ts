@@ -1,4 +1,5 @@
 import AdmZip from "adm-zip";
+import { createHash } from "node:crypto";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -171,7 +172,7 @@ async function signedUrlLifetime(patch: Record<string, unknown>): Promise<number
   );
   const call = render.mock.calls[0] as [{ storybookUrl?: string }] | undefined;
   const token = /\/_s\/([^/]+)\//u.exec(call?.[0].storybookUrl ?? "")?.[1] ?? "";
-  const result = verifyStorybookToken(token, "s3cret-s3cret-s3cret");
+  const result = verifyStorybookToken(token, "s3cret-s3cret-s3cret", "capture");
   return result.ok ? Math.round(result.claims.expiresAt - Date.now() / 1000) : -1;
 }
 
@@ -284,10 +285,14 @@ describe("executeCaptureJob", () => {
       gitBranch: "main",
       isDefault: true,
     });
-    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const index = new AdmZip(zipWithIndex()).readFile("index.json") as Buffer;
+    const hash = createHash("sha256").update(index).digest("hex");
+    await storage.write(`content/${hash}`, index);
     const manifestKey = `${storybookDir(project.id, build.id)}/manifest.json`;
-    await storage.write(manifestKey, Buffer.from("{}"));
+    const manifest = Buffer.from(JSON.stringify({ "index.json": hash }));
+    await storage.write(manifestKey, manifest);
     const write = vi.spyOn(storage, "write");
+    const readStream = vi.spyOn(storage, "readStream");
     const { runner } = fakeRunner();
 
     await executeCaptureJob(
@@ -299,7 +304,38 @@ describe("executeCaptureJob", () => {
     expect(
       written.filter((key) => key.includes("/storybook/") || key.startsWith("content/")),
     ).toEqual([]);
-    expect((await storage.read(manifestKey)).toString()).toBe("{}");
+    expect((await storage.read(manifestKey)).toString()).toBe(manifest.toString());
+    // No zip was ever stored, and capture never asked for one.
+    expect(readStream).not.toHaveBeenCalled();
+  });
+
+  it("removes the materialized Storybook when capture fails", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    const index = new AdmZip(zipWithIndex()).readFile("index.json") as Buffer;
+    const hash = createHash("sha256").update(index).digest("hex");
+    await storage.write(`content/${hash}`, index);
+    await storage.write(
+      `${storybookDir(project.id, build.id)}/manifest.json`,
+      Buffer.from(JSON.stringify({ "index.json": hash })),
+    );
+    const { runner } = fakeRunner();
+    vi.spyOn(runner, "render").mockRejectedValue(new Error("boom"));
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    ).catch(() => null);
+
+    expect(
+      await readdir(join(scratchDir, ".storyshelf-scratch", project.id)).catch(() => []),
+    ).toEqual([]);
   });
 
   it("records the build's use of the persisted content, so retention knows who uses it", async () => {
@@ -727,7 +763,7 @@ describe("executeCaptureJob", () => {
       ).toMatch(/\/_s\//u);
       const project = await db.list(db.tables.projects);
       const token = /\/_s\/([^/]+)\//u.exec(urls[0] ?? "")?.[1] ?? "";
-      expect(verifyStorybookToken(token, "s3cret-s3cret-s3cret")).toMatchObject({
+      expect(verifyStorybookToken(token, "s3cret-s3cret-s3cret", "capture")).toMatchObject({
         ok: true,
         claims: { projectId: project[0]?.id, buildId },
       });

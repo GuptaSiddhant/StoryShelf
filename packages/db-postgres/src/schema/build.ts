@@ -35,13 +35,15 @@ export const builds = pgTable(
     reviewRequestedCycle: integer("review_requested_cycle"),
     captureJobId: text("capture_job_id"),
     skippedFromBuildId: text("skipped_from_build_id"),
+    manifestSha256: text("manifest_sha256"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
   (t) => [
     index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
-    index("builds_git_branch_idx").on(t.gitBranch),
     index("builds_skipped_from_idx").on(t.skippedFromBuildId),
+    index("builds_project_created_idx").on(t.projectId, t.createdAt),
+    index("builds_project_branch_created_idx").on(t.projectId, t.gitBranch, t.createdAt),
   ],
 );
 
@@ -73,6 +75,7 @@ export interface Build {
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
   skippedFromBuildId: string | null;
+  manifestSha256: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -109,6 +109,61 @@ const storage = createS3Storage({
 
 Credentials come from the SDK's default chain, so `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` stay Fly secrets and are never passed in code. See `apps/fly-app` in the repository for the demo's wiring, including how it falls back to the volume when no bucket is set and a one-time copy of existing objects.
 
+## CDN in front of published builds
+
+Published Storybook files can sit behind a CDN. What a CDN may keep is decided by the `Cache-Control` each answer carries, which the server sets per request. A CDN must obey it: do not add a default TTL, do not override `private`, and do not cache by URL when the response is `private`.
+
+| Route | Who gets it | `Cache-Control` | A shared cache (CDN) may store it |
+| --- | --- | --- | --- |
+| `/_/<buildId>/*` (a ULID short link) | a public build, or any build on an instance without sign-in | `public, max-age=31536000, immutable` | yes, indefinitely |
+| `/projects/:slug/storybook/build/<buildId>/*` | the same | `public, max-age=31536000, immutable` | yes, indefinitely |
+| `/_/<slug>/` (the project's latest build) | the same | `public, max-age=60` | yes, for a minute |
+| `/_/<slug>/*` (a slug, not the root) | the same | `public, max-age=3600` | yes, for an hour |
+| `/projects/:slug/storybook/build/<buildId>/` (the landing page, not a file) | the same | `public, no-cache` | revalidate only |
+| a private build, signed-in viewer with a role | `session` | `private, no-cache` | no |
+| `/_s/:token/*` (a signed URL) | the token holder | `private, no-store`; a capture grant may get `private, max-age=N` when `captureAssets.cacheMaxAgeSeconds` is set | no |
+| `/_r/:token/*` (a read grant) | the token holder | `private, no-store` | no |
+
+Rules for the CDN:
+
+- **Public builds** are safe to cache for good: the build's URL names its content, so an entry never goes stale.
+- **Private projects** must bypass the cache. Their answers are `private`, and a CDN that stores them would serve one viewer's private build to anyone who asks for the same URL.
+- **`/_s/` and `/_r/` must bypass the cache.** They are signed, carry the token in the URL, and are `no-store` (a successful capture-grant answer may use `private`, never `public`).
+- **Compression.** When `publishedCompression` is on, the answer varies by `Accept-Encoding`; the server sends `Vary: Accept-Encoding`, and the CDN must key its cache on it.
+- **Never** add `public` or `s-maxage` to an answer the origin marked `private`. Authorization is decided at the origin, so a CDN that keeps a private answer serves it without the check.
+
+A 404 for a private build is the same for every caller and carries no `Cache-Control`; configure the CDN not to cache 404s on these paths, so that a build published later appears at once.
+
+## Running several instances
+
+Several instances can share one database and one storage adapter. Some state is shared between them and some is per process; this decides what a configured limit means.
+
+**Shared** (one copy, seen by every instance):
+
+- the database, including the capture and publish job queue (`capture_jobs`): any instance may take a job, and a lease recovers work from an instance that stops;
+- published files and manifests in the storage adapter;
+- the AI token budget: usage is counted from the database, so the daily limit holds across instances;
+- sessions and signed URLs, provided every instance has the same `SECRET`. Set it once and share it.
+
+**Per process** (each instance has its own copy):
+
+- the manifest cache (a bounded cache per storage adapter) and the catalog cache (`catalog.json` by build id): a cold instance reads storage once; the entries are immutable, so this never causes a stale answer;
+- the rate-limit buckets: a client's count lives in the instance it reaches;
+- the remote-browser connection limiter (`maxConnections`), and the page limit of each capture run (it is set per run and the adaptive controller is per run, so every instance renders its own runs' pages);
+- the capture consumer: each instance runs its own, so `CAPTURE_CONCURRENCY` applies per instance.
+
+What this means for configured limits with N instances:
+
+| Limit | Total across N instances |
+| --- | --- |
+| `/api/v1/*`, sign-in and signed-URL rate limits | up to N × the configured count for one client, when a load balancer spreads that client over instances |
+| `CAPTURE_CONCURRENCY` | N × the value captures run at once; each capture drives a browser |
+| remote-browser `maxConnections` | N × the value connections to a remote service; divide a provider's session limit by N |
+| pages rendered at once by capture runs | N × the page count of one run: each instance runs its own jobs |
+| AI token budget | not multiplied: it is counted from the database |
+
+Choose each per-instance value as the total limit divided by N. For rate limits, a load balancer that keeps one client on one instance (sticky sessions) keeps the count exact for that client.
+
 ## Remote browsers
 
 Rendering scales on the browser side, not by adding processes: every instance runs the same `testing` configuration, so every instance offers the same targets. To take browsers off the app host, list remote services in the runner's `browsers` (a self-hosted Playwright server, Azure Playwright Workspaces, a CDP service) and the host needs no installed browsers. `sessions` per service is the page cap per instance; divide a provider's parallel-session limit among instances. See [Remote browsers](/guides/remote-browsers/).

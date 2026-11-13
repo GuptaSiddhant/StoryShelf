@@ -121,3 +121,16 @@ describe("ProjectModel", () => {
     expect(deleted).toBeNull();
   });
 });
+
+describe("ProjectModel slugs and hosts (ADR 0051)", () => {
+  it.each([
+    ["admin", "admin-project"],
+    ["WWW", "www-project"],
+    ["01ARZ3NDEKTSV4RRFFQ69G5FAV", "01arz3ndektsv4rrffq69g5fav-project"],
+  ])("never gives a project the host label %s", async (name, slug) => {
+    const { db } = makeDatabase();
+    const model = new ProjectModel(db, { projects: db.tables.projects });
+    expect((await model.create({ name, gitRepository: "o/r" })).slug).toBe(slug);
+    expect((await model.create({ name, gitRepository: "o/r" })).slug).toBe(`${slug}-2`);
+  });
+});

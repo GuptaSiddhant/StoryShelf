@@ -44,8 +44,11 @@ visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates ha
 **Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
 `PollableCaptureQueue` (this queue and the IPC queue of a forked child) and runs a
 handler per job `kind`: `capture` is wired to `createDispatchJob`; `publish` and `notify` register
-through `handlers`; a job whose kind has no handler is failed with `no handler registered for job
-kind "<kind>"`. A slot is taken before polling (the database queue uses `startPollLoop`, other
+through `handlers`; on the database queue the consumer calls `claimOnly` with its handler kinds, so a poll never
+claims a kind it cannot run (a queue that does not filter by kind fails such a job with `no handler
+registered for job kind "<kind>"`). Every payload carries a version `v` (absent = 1); a job newer
+than the handler's `payloadVersion` is handed back (`handBack`: queued again after a delay, attempt
+count restored, outcome `handed-back`) without spending an attempt (ADR 0053). A slot is taken before polling (the database queue uses `startPollLoop`, other
 queues a slot loop with the idle backoff of 250 ms doubling to 5 s for queues that return empty at
 once). A failing job is requeued with delay `1000 ms * 2^attempts` (capped at 30 s) until its last
 attempt (a handler may state its own `backoff`, and a job its own `maxAttempts`), `attempt >= maxAttempts` for the database queue (`attempts >= maxRetries` for queues that
@@ -67,3 +70,9 @@ jitter). Tests: the pollable cases of `queueContractSuite` and `databaseQueueMul
 one SQLite file, plus gated live runs on Postgres, MySQL and Turso.
 
 > **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs the database queue and the queue of a forked child. There is no `testing.queue` option: `testing` needs a `runner` and the database queue is the only queue.
+
+### Clock
+
+Every lease is an absolute timestamp on the clock of the copy that wrote it. `isoAt` (`packages/core/src/capture/db-queue/clock.ts`) stamps each `visible_at`, claim, renewal and expiry check from that copy's runtime `now`, and every copy compares another copy's lease with its own `now`. The queue therefore assumes the copies' clocks agree. Run every copy with NTP or the platform's time sync.
+
+A holder renews its lease to `its now + leaseMs` every `min(30 s, leaseMs / 3)` (`keeper.ts`), so its last renewal is up to one interval old. If two copies' clocks differ by `leaseMs − renewal interval` or more, a copy can see a live holder's lease as expired and take the job over. With the default lease of 300 s that is about 270 s. Ordinary clock drift is far below that, but a host that has drifted by minutes must be fixed before it runs a copy.

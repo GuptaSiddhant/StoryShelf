@@ -7,6 +7,8 @@
  */
 import {
   duplicateGroupsSql,
+  gatedMigration,
+  sqlSchemaLevelStore,
   logSkippedIndex,
   parseUniqueIndex,
 } from "@storyshelf/core/adapter/database";
@@ -100,6 +102,7 @@ const BUILD_SKIPPED_FROM_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS skipped_from_build_id TEXT";
 const BUILD_SKIPPED_FROM_INDEX =
   "CREATE INDEX IF NOT EXISTS builds_skipped_from_idx ON builds (skipped_from_build_id)";
+const BUILD_MANIFEST_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS manifest_sha256 TEXT";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
@@ -156,6 +159,13 @@ const NOTIFICATION_LAST_DELIVERED_ALTER =
 const BUILDS_GITSHA_DEDUP = "DROP INDEX IF EXISTS builds_project_gitsha_idx";
 const BUILDS_GITSHA_INDEX =
   "CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha)";
+
+/** Build lists read `(project_id [, git_branch]) ORDER BY created_at DESC`; these serve it without a sort. */
+const BUILDS_LIST_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS builds_project_created_idx ON builds (project_id, created_at)",
+  "CREATE INDEX IF NOT EXISTS builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
+  "DROP INDEX IF EXISTS builds_git_branch_idx",
+];
 
 const PROJECT_BROWSERS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browsers TEXT";
 const PROJECT_MODES_ALLOWLIST_ALTER =
@@ -264,8 +274,13 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_TEST_RESULTS_ALTER);
   await run(BUILD_REVIEW_CYCLE_ALTER);
   await run(BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
+  await migrateBuildRunColumns(run);
+}
+
+async function migrateBuildRunColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_CAPTURE_JOB_ALTER);
   await run(BUILD_CAPTURE_GENERATION_ALTER);
+  await run(BUILD_MANIFEST_SHA_ALTER);
 }
 
 /** The column first, then the index on it: the DDL cannot index a column an old table lacks. */
@@ -290,11 +305,12 @@ const MIGRATION_LOCK_KEY = 5_370_011_001;
 export async function runMigrationsLocked(
   session: MigrationSession,
   logger?: Logger,
+  release?: string,
 ): Promise<void> {
   await session(async (run) => {
     await run(`SELECT pg_advisory_lock(${MIGRATION_LOCK_KEY})`);
     try {
-      await runMigrations(run, logger);
+      await runMigrations(run, logger, release);
     } finally {
       await run(`SELECT pg_advisory_unlock(${MIGRATION_LOCK_KEY})`);
     }
@@ -302,7 +318,22 @@ export async function runMigrationsLocked(
 }
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+export async function runMigrations(
+  run: MigrationRunner,
+  logger?: Logger,
+  release?: string,
+): Promise<void> {
+  await gatedMigration({
+    release,
+    logger,
+    store: sqlSchemaLevelStore(run, "postgres"),
+    migrate: async () => {
+      await migrateEverything(run, logger);
+    },
+  });
+}
+
+async function migrateEverything(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await run(DDL);
   await migrateCoreColumns(run);
@@ -340,6 +371,15 @@ async function migrateRunA11yDefault(run: MigrationRunner): Promise<void> {
   await run(RUN_A11Y_DEFAULT_ALTER);
 }
 
+async function migrateBuildsListIndexes(run: MigrationRunner): Promise<void> {
+  await run(BUILDS_GITSHA_DEDUP);
+  await run(BUILDS_GITSHA_INDEX);
+  for (const statement of BUILDS_LIST_INDEXES) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered DDL
+    await run(statement);
+  }
+}
+
 async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await run(STORYBOOK_META_ALTER);
   await migrateRunA11yDefault(run);
@@ -349,8 +389,7 @@ async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await run(WEBHOOK_SECRET_DROP);
   await run(TOKEN_USER_ALTER);
   await run(MEMBER_SOURCE_ALTER);
-  await run(BUILDS_GITSHA_DEDUP);
-  await run(BUILDS_GITSHA_INDEX);
+  await migrateBuildsListIndexes(run);
 }
 
 async function applyIdentityStatements(run: MigrationRunner, logger?: Logger): Promise<void> {

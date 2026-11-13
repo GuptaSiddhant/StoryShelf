@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { redactSecrets } from "./redact.ts";
 import {
@@ -6,9 +7,12 @@ import {
   MIN_CAPTURES_PER_SLICE,
   MIN_STORYBOOK_URL_TTL_OVERRIDE,
   PER_CAPTURE_BUDGET_MS,
+  STORYBOOK_READ_PREFIX,
+  STORYBOOK_READ_TTL,
   STORYBOOK_TOKEN_PREFIX,
   STORYBOOK_URL_TTL_GRACE,
   signStorybookToken,
+  storybookReadPath,
   storybookTokenPath,
   storybookUrlTtl,
   storybookUrlTtlOverrideError,
@@ -16,18 +20,25 @@ import {
 } from "./storybook-token.ts";
 
 const NOW = Date.UTC(2026, 0, 1);
-const base = { secret: "s3cret", projectId: "01PROJECT", buildId: "01BUILD", now: NOW };
+const base = {
+  secret: "s3cret",
+  projectId: "01PROJECT",
+  buildId: "01BUILD",
+  now: NOW,
+  purpose: "capture",
+} as const;
 
 describe("signStorybookToken / verifyStorybookToken", () => {
   it("round-trips the project, build and expiry", () => {
     const token = signStorybookToken(base);
-    const result = verifyStorybookToken(token, "s3cret", NOW + 1000);
+    const result = verifyStorybookToken(token, "s3cret", "capture", NOW + 1000);
     expect(result).toEqual({
       ok: true,
       claims: {
         projectId: "01PROJECT",
         buildId: "01BUILD",
         expiresAt: NOW / 1000 + DEFAULT_STORYBOOK_URL_TTL,
+        purpose: "capture",
       },
     });
   });
@@ -39,17 +50,17 @@ describe("signStorybookToken / verifyStorybookToken", () => {
   it("refuses a tampered payload (another build) and a tampered signature", () => {
     const [, sig = ""] = signStorybookToken(base).split(".");
     const other = signStorybookToken({ ...base, buildId: "01OTHER" }).split(".")[0];
-    expect(verifyStorybookToken(`${other}.${sig}`, "s3cret", NOW)).toEqual({
+    expect(verifyStorybookToken(`${other}.${sig}`, "s3cret", "capture", NOW)).toEqual({
       ok: false,
       reason: "signature",
     });
     const [payload = ""] = signStorybookToken(base).split(".");
     const flipped = `${payload}.${sig.slice(0, -1)}${sig.endsWith("A") ? "B" : "A"}`;
-    expect(verifyStorybookToken(flipped, "s3cret", NOW).ok).toBe(false);
+    expect(verifyStorybookToken(flipped, "s3cret", "capture", NOW).ok).toBe(false);
   });
 
   it("refuses a token signed with another secret", () => {
-    expect(verifyStorybookToken(signStorybookToken(base), "other", NOW)).toEqual({
+    expect(verifyStorybookToken(signStorybookToken(base), "other", "capture", NOW)).toEqual({
       ok: false,
       reason: "signature",
     });
@@ -57,23 +68,27 @@ describe("signStorybookToken / verifyStorybookToken", () => {
 
   it("accepts the previous secret during a rotation, and only then", () => {
     const token = signStorybookToken({ ...base, secret: "old" });
-    expect(verifyStorybookToken(token, { current: "new", previous: "old" }, NOW).ok).toBe(true);
-    expect(verifyStorybookToken(token, "new", NOW).ok).toBe(false);
+    expect(
+      verifyStorybookToken(token, { current: "new", previous: "old" }, "capture", NOW).ok,
+    ).toBe(true);
+    expect(verifyStorybookToken(token, "new", "capture", NOW).ok).toBe(false);
   });
 
   it("expires at the boundary and never revives later", () => {
     const token = signStorybookToken({ ...base, ttlSeconds: 120 });
-    expect(verifyStorybookToken(token, "s3cret", NOW + 119_000).ok).toBe(true);
-    expect(verifyStorybookToken(token, "s3cret", NOW + 120_000)).toEqual({
+    expect(verifyStorybookToken(token, "s3cret", "capture", NOW + 119_000).ok).toBe(true);
+    expect(verifyStorybookToken(token, "s3cret", "capture", NOW + 120_000)).toEqual({
       ok: false,
       reason: "expired",
     });
-    expect(verifyStorybookToken(token, "s3cret", NOW + 10 * 24 * 3600_000).ok).toBe(false);
+    expect(verifyStorybookToken(token, "s3cret", "capture", NOW + 10 * 24 * 3600_000).ok).toBe(
+      false,
+    );
   });
 
   it("refuses a token that claims more than the longest lifetime, even when signed", () => {
     const far = signStorybookToken({ ...base, ttlSeconds: MAX_STORYBOOK_URL_TTL });
-    expect(verifyStorybookToken(far, "s3cret", NOW - 3600_000)).toEqual({
+    expect(verifyStorybookToken(far, "s3cret", "capture", NOW - 3600_000)).toEqual({
       ok: false,
       reason: "scope",
     });
@@ -91,7 +106,7 @@ describe("signStorybookToken / verifyStorybookToken", () => {
       "..",
       "%00.%00",
     ]) {
-      expect(verifyStorybookToken(bad, "s3cret", NOW)).toEqual({
+      expect(verifyStorybookToken(bad, "s3cret", "capture", NOW)).toEqual({
         ok: false,
         reason: "malformed",
       });
@@ -99,14 +114,13 @@ describe("signStorybookToken / verifyStorybookToken", () => {
   });
 
   it("never verifies against an empty secret", () => {
-    expect(verifyStorybookToken(signStorybookToken(base), "", NOW).ok).toBe(false);
+    expect(verifyStorybookToken(signStorybookToken(base), "", "capture", NOW).ok).toBe(false);
   });
 
-  it("separates its key from the raw secret (a raw HMAC of the payload does not verify)", async () => {
-    const { createHmac } = await import("node:crypto");
+  it("separates its key from the raw secret (a raw HMAC of the payload does not verify)", () => {
     const [payload = ""] = signStorybookToken(base).split(".");
     const forged = `${payload}.${createHmac("sha256", "s3cret").update(payload).digest("base64url")}`;
-    expect(verifyStorybookToken(forged, "s3cret", NOW).ok).toBe(false);
+    expect(verifyStorybookToken(forged, "s3cret", "capture", NOW).ok).toBe(false);
   });
 
   it("refuses to sign without a secret, with odd ids or an out-of-range lifetime", () => {
@@ -118,56 +132,125 @@ describe("signStorybookToken / verifyStorybookToken", () => {
   });
 });
 
-describe("capture purpose claim", () => {
-  it("round-trips a signed capture purpose, and a token without one has none", () => {
-    const capture = verifyStorybookToken(
-      signStorybookToken({ ...base, purpose: "capture" }),
-      "s3cret",
-      NOW + 1000,
+describe("purposes", () => {
+  const read = { ...base, purpose: "read" } as const;
+
+  it("round-trips each purpose, and signs it into the payload", () => {
+    for (const purpose of ["capture", "read"] as const) {
+      const token = signStorybookToken({ ...base, purpose });
+      const payload = Buffer.from(token.split(".")[0] ?? "", "base64url").toString("utf8");
+      expect(payload.split(":")).toHaveLength(4);
+      expect(verifyStorybookToken(token, "s3cret", purpose, NOW + 1000)).toMatchObject({
+        ok: true,
+        claims: { purpose },
+      });
+    }
+  });
+
+  it("refuses a read grant for capture and a capture token for read, on the signature", () => {
+    const capture = signStorybookToken(base);
+    const grant = signStorybookToken(read);
+    expect(verifyStorybookToken(grant, "s3cret", "capture", NOW + 1000)).toEqual({
+      ok: false,
+      reason: "signature",
+    });
+    expect(verifyStorybookToken(capture, "s3cret", "read", NOW + 1000)).toEqual({
+      ok: false,
+      reason: "signature",
+    });
+  });
+
+  it("refuses a token with no purpose, as the legacy preview tokens were", () => {
+    const expiresAt = Math.floor(NOW / 1000) + 600;
+    const payload = Buffer.from(`01PROJECT:01BUILD:${String(expiresAt)}`).toString("base64url");
+    const key = createHmac("sha256", "s3cret").update("storyshelf/storybook-url/v1").digest();
+    const legacy = `${payload}.${createHmac("sha256", key).update(payload).digest("base64url")}`;
+    expect(verifyStorybookToken(legacy, "s3cret", "capture", NOW + 1000)).toEqual({
+      ok: false,
+      reason: "scope",
+    });
+    expect(verifyStorybookToken(legacy, "s3cret", "read", NOW + 1000).ok).toBe(false);
+  });
+
+  it("cannot change purpose by editing the payload: the purpose is signed", () => {
+    const [grantPayload = ""] = signStorybookToken(read).split(".");
+    const [, captureSig = ""] = signStorybookToken(base).split(".");
+    expect(verifyStorybookToken(`${grantPayload}.${captureSig}`, "s3cret", "read", NOW).ok).toBe(
+      false,
     );
-    expect(capture).toMatchObject({ ok: true, claims: { purpose: "capture" } });
-    const plain = verifyStorybookToken(signStorybookToken(base), "s3cret", NOW + 1000);
-    expect(plain.ok && "purpose" in plain.claims).toBe(false);
-  });
-
-  it("keeps the legacy three-part token format for a token without a purpose", () => {
-    // Tokens minted before the purpose claim existed are exactly this shape and must keep working.
-    const token = signStorybookToken(base);
-    const payload = Buffer.from(token.split(".")[0] ?? "", "base64url").toString("utf8");
-    expect(payload.split(":")).toHaveLength(3);
-    const result = verifyStorybookToken(token, "s3cret", NOW + 1000);
-    expect(result).toMatchObject({ ok: true, claims: { projectId: "01PROJECT" } });
-    expect(result.ok && result.claims.purpose).toBeUndefined();
-  });
-
-  it("cannot be added or removed by editing the payload: the purpose is signed", () => {
-    const withPurpose = signStorybookToken({ ...base, purpose: "capture" });
-    const without = signStorybookToken(base);
-    const [capturePayload = "", captureSig = ""] = withPurpose.split(".");
-    const [plainPayload = "", plainSig = ""] = without.split(".");
-    expect(verifyStorybookToken(`${plainPayload}.${captureSig}`, "s3cret", NOW).ok).toBe(false);
-    expect(verifyStorybookToken(`${capturePayload}.${plainSig}`, "s3cret", NOW).ok).toBe(false);
+    expect(verifyStorybookToken(`${grantPayload}.${captureSig}`, "s3cret", "capture", NOW).ok).toBe(
+      false,
+    );
   });
 
   it("refuses a signed token whose purpose is not a known one", () => {
     const expiresAt = Math.floor(NOW / 1000) + 600;
     const claims = `01PROJECT:01BUILD:${String(expiresAt)}:admin`;
     const payload = Buffer.from(claims).toString("base64url");
-    expect(verifyStorybookToken(`${payload}.${"A".repeat(43)}`, "s3cret", NOW)).toEqual({
+    expect(verifyStorybookToken(`${payload}.${"A".repeat(43)}`, "s3cret", "read", NOW)).toEqual({
       ok: false,
       reason: "signature",
     });
   });
 
-  it("keeps the capture token within the token shape for ULID ids", () => {
+  it("keeps a token within the token shape for ULID ids", () => {
     const token = signStorybookToken({
       ...base,
       projectId: "01JABCDEFGHJKMNPQRSTVWXYZ0",
       buildId: "01JABCDEFGHJKMNPQRSTVWXYZ1",
-      purpose: "capture",
     });
     expect(token).toMatch(/^[A-Za-z0-9_-]{8,200}\.[A-Za-z0-9_-]{43}$/u);
-    expect(verifyStorybookToken(token, "s3cret", NOW + 1000).ok).toBe(true);
+    expect(verifyStorybookToken(token, "s3cret", "capture", NOW + 1000).ok).toBe(true);
+  });
+});
+
+describe("read grants", () => {
+  const read = { ...base, purpose: "read" } as const;
+
+  it("last one hour by default and never longer, to mint or to accept", () => {
+    const grant = signStorybookToken(read);
+    expect(verifyStorybookToken(grant, "s3cret", "read", NOW + 1000)).toMatchObject({
+      ok: true,
+      claims: { expiresAt: NOW / 1000 + STORYBOOK_READ_TTL },
+    });
+    expect(verifyStorybookToken(grant, "s3cret", "read", NOW + STORYBOOK_READ_TTL * 1000)).toEqual({
+      ok: false,
+      reason: "expired",
+    });
+    expect(() => signStorybookToken({ ...read, ttlSeconds: STORYBOOK_READ_TTL + 1 })).toThrow(
+      "at most",
+    );
+  });
+
+  it("refuses a read grant that claims more than an hour even when it was signed", () => {
+    const expiresAt = Math.floor(NOW / 1000) + STORYBOOK_READ_TTL + 600;
+    const payload = Buffer.from(`01PROJECT:01BUILD:${String(expiresAt)}:read`).toString(
+      "base64url",
+    );
+    const key = createHmac("sha256", "s3cret").update("storyshelf/storybook-read/v1").digest();
+    const token = `${payload}.${createHmac("sha256", key).update(payload).digest("base64url")}`;
+    expect(verifyStorybookToken(token, "s3cret", "read", NOW)).toEqual({
+      ok: false,
+      reason: "scope",
+    });
+  });
+
+  it("verify with the current secret only: a rotation ends every grant, a capture token survives it", () => {
+    const grant = signStorybookToken({ ...read, secret: "old" });
+    const capture = signStorybookToken({ ...base, secret: "old" });
+    const rotated = { current: "new", previous: "old" };
+    expect(verifyStorybookToken(grant, rotated, "read", NOW).ok).toBe(false);
+    expect(verifyStorybookToken(grant, "old", "read", NOW).ok).toBe(true);
+    expect(verifyStorybookToken(capture, rotated, "capture", NOW).ok).toBe(true);
+  });
+
+  it("has its own prefix, which redaction scrubs like the capture one", () => {
+    const token = signStorybookToken(read);
+    expect(STORYBOOK_READ_PREFIX).toBe("/_r/");
+    expect(storybookReadPath("tok")).toBe("/_r/tok/");
+    expect(redactSecrets(`GET ${storybookReadPath(token)}iframe.html?id=a`)).toBe(
+      "GET /_r/[redacted]/iframe.html?id=a",
+    );
   });
 });
 

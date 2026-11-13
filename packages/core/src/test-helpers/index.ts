@@ -29,6 +29,7 @@ export {
   type MultiInstanceOptions,
   type SharedDatabaseFactory,
 } from "./queue-multi-instance.ts";
+export { databaseQueueHandBackSuite } from "./queue-hand-back.ts";
 export { databaseQueueSingleFlightSuite } from "./queue-single-flight.ts";
 export { createManualClock, type ManualClock } from "./manual-clock.ts";
 export { runnerContractSuite } from "./runner-contract.ts";
@@ -45,11 +46,29 @@ export {
   type BuildReferenceContractFixtureRunner,
 } from "./build-reference-contract.ts";
 export {
+  retentionSkippedContractSuite,
+  type RetentionSkippedRunner,
+} from "./retention-skipped-contract.ts";
+export {
   retentionActivationContractSuite,
   type RetentionActivationHarness,
   type RetentionActivationHarnessRunner,
   type SeededBaseline,
   type SeededSnapshot,
 } from "./retention-activation-contract.ts";
+export {
+  compareCoreRowsWithDrizzle,
+  compareRequiredWithDdl,
+  compareDdlWithDrizzle,
+  CORE_ROW_TABLES,
+  indexStatementsIn,
+  parseDdl,
+  readCoreRowFields,
+  typeFamily,
+  type GetTableConfig,
+  type ParityAllowance,
+  type ParsedDdl,
+} from "./schema-parity.ts";
 
 export { publicNetworkForTests } from "./public-network.ts";
+export { describeSchemaLevelContract, type SchemaLevelHarness } from "./schema-level-contract.ts";

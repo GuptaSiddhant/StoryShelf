@@ -143,11 +143,12 @@ export function registerNotificationChannels(app: ShelfRouter): void {
   app.openapi(createChannelRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    const valid = NotificationChannelModel.validateInput(
+    const valid = await NotificationChannelModel.validateInput(
       getStore().notifiers,
       body.provider,
       body.config,
       { projectId: project.id, hasSecret: body.secret !== undefined },
+      body.secret,
     );
     if (!valid.ok) {
       return c.json(errorBody(valid.message), 400);
@@ -244,11 +245,12 @@ export function registerSystemChannels(app: ShelfRouter): void {
   app.openapi(createSystemRoute, async (c) => {
     requireSiteAdmin(c);
     const body = c.req.valid("json");
-    const valid = NotificationChannelModel.validateInput(
+    const valid = await NotificationChannelModel.validateInput(
       getStore().notifiers,
       body.provider,
       body.config,
       { projectId: null, hasSecret: body.secret !== undefined },
+      body.secret,
     );
     if (!valid.ok) {
       return c.json(errorBody(valid.message), 400);

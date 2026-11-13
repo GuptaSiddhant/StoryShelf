@@ -6,6 +6,7 @@ import type { BuildStateSource } from "../../adapters/notifier/build-state.ts";
  */
 import { channelPrefix, statusesForBuild, writeBuildState } from "../../adapters/notifier/index.ts";
 import { isStateProvider } from "../../adapters/notifier/provider.ts";
+import { contentHostSuffix } from "../../content-hosts.ts";
 import { latestVerdicts } from "../../models/build-review-status.ts";
 import { BuildReviewModel } from "../../models/build-review.ts";
 import { BuildModel } from "../../models/build.ts";
@@ -68,7 +69,7 @@ export async function writeTo(
     build,
     projectSlug: project.slug,
     prefix: channelPrefix(target.channel),
-    urls: createUrlBuilder(origin, deps.config.publishedBaseDomain),
+    urls: createUrlBuilder(origin, contentHostSuffix(deps.config)),
     flags: deps.flags(project),
     publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
     source: (await skipSourceOf(deps, build)) ?? undefined,

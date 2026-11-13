@@ -6,8 +6,9 @@
   "scripts": {
     "build": "rolldown -c rolldown.config.ts",
     "start": "node dist/server.mjs",
-    "lint": "oxlint --type-aware --type-check server.ts ai.ts ai.test.ts vitest.config.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts && oxlint sprite",
+    "lint": "oxlint --type-aware --type-check server.ts ai.ts ai.test.ts vitest.config.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts e2e/golden-path.test.ts && oxlint sprite",
     "test": "vitest run",
+    "test:e2e": "STORYSHELF_E2E=1 vitest run e2e/golden-path.test.ts",
     "dev": "node --conditions=source --experimental-transform-types server.ts"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "@storyshelf/design-figma": "workspace:*",
     "@storyshelf/notify-chat": "workspace:*",
     "@storyshelf/notify-email": "workspace:*",
+    "@storyshelf/notify-git": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "playwright-core": "1.63.0",
     "rolldown": "*",
     "typescript": "catalog:",
     "vitest": "catalog:"

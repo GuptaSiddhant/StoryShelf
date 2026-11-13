@@ -7,6 +7,7 @@ import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { gatedSyncMigration } from "./gated-migration.ts";
 import { rollbackQuietly } from "./lifecycle-transaction.ts";
 import {
   execUnless,
@@ -15,6 +16,7 @@ import {
   reportSkippedIndex,
   toleratedFor,
 } from "./migration-errors.ts";
+import { applyConnectionPragmas, type SqliteConnectionOptions } from "./pragmas.ts";
 import {
   activateRetention,
   attachRetention,
@@ -30,13 +32,18 @@ declare const __PKG_VERSION__: string | undefined;
  * Create a SQLite-backed DatabaseAdapter using node:sqlite and Drizzle ORM.
  *
  * @param path - Filesystem path to the SQLite database file.
+ * @param options - `synchronous: "full"` syncs every commit (survives a power cut); default `"normal"`.
  * @returns A DatabaseAdapter backed by the given SQLite file (WAL mode).
  */
-export function createSqliteDatabase(path: string): DatabaseAdapter {
+export function createSqliteDatabase(
+  path: string,
+  options: SqliteConnectionOptions = {},
+): DatabaseAdapter {
   ensureDbDir(path);
   const sqlite = new DatabaseSync(path, { returnArrays: true });
-  sqlite.exec("PRAGMA journal_mode = WAL");
-  sqlite.exec("PRAGMA busy_timeout = 5000");
+  applyConnectionPragmas((sql) => {
+    sqlite.exec(sql);
+  }, options);
   const callback = createCallback(sqlite);
   const db = drizzle(callback, { schema });
   const retention: RetentionActivation = {};
@@ -52,9 +59,8 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
         category: "database",
       },
       tables: schema,
-      migrate: async ({ logger }) => {
-        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
-        runMigrations(sqlite, logger);
+      migrate: async ({ logger, release }) => {
+        await migrateGated(sqlite, logger, release);
         await activateRetention(path, retention);
       },
       close: () => {
@@ -80,6 +86,13 @@ const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 const BUILDS_GITSHA_DEDUP = "DROP INDEX IF EXISTS builds_project_gitsha_idx";
 const BUILDS_GITSHA_INDEX =
   "CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha)";
+
+/** Build lists read `(project_id [, git_branch]) ORDER BY created_at DESC`; these serve it without a sort. */
+const BUILDS_LIST_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS builds_project_created_idx ON builds (project_id, created_at)",
+  "CREATE INDEX IF NOT EXISTS builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
+  "DROP INDEX IF EXISTS builds_git_branch_idx",
+];
 
 type ProxyMethod = "run" | "all" | "values" | "get";
 
@@ -181,6 +194,30 @@ function applyIdentityStatements(sqlite: DatabaseSync, logger: Logger | undefine
   sqlite.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
 }
 
+/** Migrate, skip or refuse by the release recorded in `schema_meta` (ADR 0053). */
+async function migrateGated(
+  sqlite: DatabaseSync,
+  logger: Logger | undefined,
+  release: string | undefined,
+): Promise<void> {
+  await gatedSyncMigration(
+    {
+      exec: (sql) => {
+        sqlite.exec(sql);
+      },
+      all: (sql) => sqlite.prepare(sql).all(),
+    },
+    {
+      release,
+      logger,
+      migrate: async () => {
+        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
+        runMigrations(sqlite, logger);
+      },
+    },
+  );
+}
+
 function runMigrations(sqlite: DatabaseSync, logger: Logger | undefined): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
   sqlite.exec(DDL);
@@ -205,4 +242,5 @@ function dropWebhookSecret(sqlite: DatabaseSync): void {
 function migrateBuildsGitShaIndex(sqlite: DatabaseSync): void {
   sqlite.exec(BUILDS_GITSHA_DEDUP);
   sqlite.exec(BUILDS_GITSHA_INDEX);
+  for (const statement of BUILDS_LIST_INDEXES) sqlite.exec(statement);
 }

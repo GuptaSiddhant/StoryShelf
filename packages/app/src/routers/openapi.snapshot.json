@@ -2522,7 +2522,7 @@
         },
         "responses": {
           "200": {
-            "description": "Manifest stored",
+            "description": "Manifest stored, or the same manifest was already accepted (no-op)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2539,6 +2539,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The build already accepted a different manifest",
             "content": {
               "application/json": {
                 "schema": {
@@ -6210,6 +6220,97 @@
         "x-storyshelf-class": "hosting"
       }
     },
+    "/api/v1/admin/check-storage": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Check that storage holds what the database references (read-only)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Storage consistency report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "buildsChecked": {
+                      "type": "integer"
+                    },
+                    "baselinesChecked": {
+                      "type": "integer"
+                    },
+                    "builds": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "buildId": {
+                            "type": "string"
+                          },
+                          "missing": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": ["buildId", "missing"]
+                      }
+                    },
+                    "unreadableManifests": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "missingBaselineImages": {
+                      "type": "integer"
+                    },
+                    "unreferencedBlobs": {
+                      "type": "integer"
+                    },
+                    "sampled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "buildsChecked",
+                    "baselinesChecked",
+                    "builds",
+                    "unreadableManifests",
+                    "missingBaselineImages",
+                    "unreferencedBlobs",
+                    "sampled"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "hosting"
+      }
+    },
     "/api/v1/admin/purge": {
       "post": {
         "tags": ["Admin"],
@@ -6261,7 +6362,7 @@
     "/api/v1/projects/{slug}/builds/{buildId}/preview-token": {
       "get": {
         "tags": ["Review"],
-        "summary": "Get a fresh signed root for a build's preview frame",
+        "summary": "Get a fresh read-grant root for a build's preview frame",
         "parameters": [
           {
             "schema": {
@@ -6282,7 +6383,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The signed root (`/_s/<token>`) to frame the build's Storybook under",
+            "description": "The read-grant root (`/_r/<token>`) to frame the build's Storybook under",
             "content": {
               "application/json": {
                 "schema": {
@@ -6308,7 +6409,7 @@
             }
           }
         },
-        "x-storyshelf-class": "testing"
+        "x-storyshelf-class": "hosting"
       }
     }
   }

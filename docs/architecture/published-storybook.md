@@ -27,11 +27,31 @@ A published Storybook is addressed by **build** or **label** (`build` is a reser
 
 `/storybook` and `/storybook/:key/:value` are **resolvers** that 302-redirect to `/storybook/build/<id>/`; Storybook files (`iframe.html`, `index.json`, `assets/*.js`, `sb-manager/*`, …) are served only under `/storybook/build/:buildId/...`. This keeps label resolution from colliding with static-file serving — Storybook emits nested paths like `assets/foo.js` that are otherwise indistinguishable from a `key/value` label. The public/auth check from ADR 0011 applies to all three.
 
-### Subdomains (optional)
+### Subdomain hosting and legacy links
 
-For sharing, a published Storybook can also be served on a **per-project subdomain** — opt-in via `publishedBaseDomain` (e.g. `stories.example.com`) plus a wildcard DNS record (`*.stories.example.com`) and a wildcard TLS cert:
+With `storybookHosting: { mode: "subdomain", baseDomain }` (ADR 0051, decision 5) the app routes by
+`Host` (`hostDispatch`): the portal is the configured `publicBaseUrl`, a build is served at the root of
+`<build-id>.<baseDomain>` (lower-case ULID), and `<project-slug>.<baseDomain>` is an alias host. Any other
+host answers 404. The portal never serves uploaded bytes in this mode, but every path link above stays a
+valid entry point (#360):
 
-- `:slug.stories.example.com` → latest published Storybook on the default branch
-- `:buildId.:slug.stories.example.com` → a specific build
+| Old link                                         | Subdomain mode                                                                    |
+| ------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `/projects/:slug/storybook[?query]`              | resolver → canonical path → content host of the latest approved default build     |
+| `/projects/:slug/storybook/:key/:value[?query]`  | resolver → canonical path → content host of the latest build with that label      |
+| `/projects/:slug/storybook/build/:id/<path>[?q]` | `302` to `<id>.<baseDomain>/<path>?q`; `?storyId=` becomes the manager's `?path=` |
+| `/_/:buildId/<path>[?q]` and `/_/:slug/<path>`   | `302` to that build's content host, `<path>` and query kept                       |
+| `<slug>.<baseDomain>/<anything>[?q]`             | `302` to the portal's `/projects/:slug/storybook?q` (the path is not kept)        |
 
-Subdomains serve the Storybook at the domain **root**, so no asset-path rewriting is needed (Storybook's static build expects root serving). They serve **published Storybooks only** — the review UI stays on the main domain at `/projects/:slug/...`. Label values are not exposed as subdomains (DNS labels cannot contain `/`); labels remain on the path-based URLs above. Without `publishedBaseDomain`, the path-based URLs are the only published surface (and stay the default for `localhost` and hosts without a wildcard record). The URL builder (`createUrlBuilder`) switches between path and subdomain forms based on config, but it only builds links: the app does no host-based routing, so a reverse proxy in front of it must deliver the wildcard hosts (native routing is #358; ADR 0010).
+Every hop checks `publishedAccess` on the portal first, so a private link keeps its access rules: a public
+build goes straight to its content host; a private one goes through the 60-second `/_x/` exchange, which
+sets that host's own one-hour `__Host-storyshelf-grant` cookie; a viewer with no role gets what a missing
+build gets (#497). Only navigations are redirected; a script or fetch of a legacy path gets the identical
+404, so an old `<script src>` or `fetch()` to a path URL stops working. Redirect targets are built from
+configuration and the re-encoded path, never from the request's `Host`, so no path or query can send a
+viewer to another host. A slug link follows the newest approved build; a build-id link stays on its build.
+
+Migration and rollback: switching to `subdomain` signs everyone out once (the portal cookie becomes
+`__Host-`) and turns path links into redirects; switching back to `trusted` or `sandboxed` makes them serve
+in place again, while content-host and alias links stop serving builds: outside `subdomain` mode the app does not route by `Host`, so the operator removes the wildcard hosts from the proxy, or they reach the portal. The two-level `<build-id>.<slug>.<domain>` shape of the retired
+`publishedBaseDomain` is not routed in any mode (ADR 0051, decision 6).

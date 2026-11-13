@@ -15,6 +15,19 @@ import type { MigrationContext } from "./skipped-index.ts";
 export class ReferenceGenerationConflict extends Error {}
 
 export {
+  decideMigration,
+  gatedMigration,
+  sqlSchemaLevelStore,
+  normalizeRelease,
+  SchemaTooNewError,
+  type GatedMigration,
+  type MigrationDecision,
+  type SchemaLevelDialect,
+  type SchemaLevelQuery,
+  type SchemaLevelStore,
+} from "./schema-level.ts";
+
+export {
   duplicateGroupsSql,
   logSkippedIndex,
   parseUniqueIndex,
@@ -38,6 +51,7 @@ export interface Tables {
   buildComponents: Table;
   buildReviews: Table;
   siteSettings: Table;
+  schemaMeta: Table;
   snapshots: Table;
   baselines: Table;
   comments: Table;
@@ -96,7 +110,11 @@ export function clampListLimit(limit?: number): number | undefined {
 export interface ListOptions {
   /** SQL WHERE condition. */
   where?: SQL;
-  /** SQL ORDER BY condition. */
+  /**
+   * SQL ORDER BY condition. Every adapter appends `id` as the final tie-break,
+   * and orders by `id` alone when this is omitted, so equal sort keys come back
+   * in the same (creation) order on every dialect.
+   */
   orderBy?: SQL;
   /** Maximum number of rows to return. */
   limit?: number;
