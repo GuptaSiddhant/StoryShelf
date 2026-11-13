@@ -58,7 +58,9 @@ export function startBranchGcTimer(
   logger: Logger,
   testing = false,
   ready: () => Promise<{ ok: boolean }> = async () => await Promise.resolve({ ok: true }),
-  reclaimCopies: () => Promise<void> = async () => await Promise.resolve(),
+  reclaimCopies: () => Promise<void> = async () => {
+    await Promise.resolve();
+  },
 ): BranchGcTimer | null {
   const branchTtlDays =
     config.branchTtlDays === undefined ? DEFAULT_BRANCH_TTL_DAYS : config.branchTtlDays;

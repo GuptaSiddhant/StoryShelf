@@ -65,10 +65,8 @@ export async function reclaimBuildCopies(deps: ReclaimCopiesDeps): Promise<Recla
   if (progress.done) return { ...result, done: true };
   const page = await listPage(deps.db, progress.after);
   const visited = await visitPage(deps, settings, page, result);
-  if (visited && page.length < RECLAIM_COPIES_PAGE) {
-    await settings.set(RECLAIM_COPIES_KEY, JSON.stringify({ done: true }));
-    result.done = true;
-  }
+  result.done = visited && page.length < RECLAIM_COPIES_PAGE;
+  if (result.done) await settings.set(RECLAIM_COPIES_KEY, JSON.stringify({ done: true }));
   deps.logger?.info({ ...result }, "build copy reclaim ran");
   return result;
 }
@@ -139,10 +137,7 @@ async function reclaimCopies(
   result: ReclaimCopiesResult,
 ): Promise<void> {
   const { prefix, manifest } = source;
-  const present = new Set((await deps.storage.list(prefix)).map((key) => key.slice(prefix.length)));
-  const copies = Object.entries(manifest).filter(
-    ([rel]) => rel !== "manifest.json" && present.has(rel),
-  );
+  const copies = await storedCopies(deps.storage, prefix, manifest);
   if (copies.length === 0) return;
   if (!(await recorded(deps, build, copies))) {
     result.skipped += 1;
@@ -153,11 +148,29 @@ async function reclaimCopies(
   await mapLimit(deletable, IO_CONCURRENCY, async ([rel]) => {
     await deps.storage.delete(`${prefix}${rel}`);
   });
-  result.reclaimed += deletable.length;
-  result.kept += copies.length - deletable.length;
-  if (copies.length > deletable.length) {
-    deps.logger?.info({ buildId: build.id, kept: copies.length - deletable.length }, "copies kept");
-  }
+  tally(deps, build, result, { deleted: deletable.length, kept: copies.length - deletable.length });
+}
+
+/** The manifest's entries that still have a per-build copy; never `manifest.json` itself. */
+async function storedCopies(
+  storage: StorageAdapter,
+  prefix: string,
+  manifest: Record<string, string>,
+): Promise<[string, string][]> {
+  const present = new Set((await storage.list(prefix)).map((key) => key.slice(prefix.length)));
+  return Object.entries(manifest).filter(([rel]) => rel !== "manifest.json" && present.has(rel));
+}
+
+/** Add one build's counts to the result; the log names the build and the count, never a path. */
+function tally(
+  deps: ReclaimCopiesDeps,
+  build: BuildRow,
+  result: ReclaimCopiesResult,
+  counts: { deleted: number; kept: number },
+): void {
+  result.reclaimed += counts.deleted;
+  result.kept += counts.kept;
+  if (counts.kept > 0) deps.logger?.info({ buildId: build.id, kept: counts.kept }, "copies kept");
 }
 
 /** The manifest's usable entries; undefined with no manifest (legacy build), null when unreadable. */
