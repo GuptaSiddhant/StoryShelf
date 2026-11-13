@@ -15,6 +15,7 @@ import {
   reportSkippedIndex,
   toleratedFor,
 } from "./migration-errors.ts";
+import { applyConnectionPragmas, type SqliteConnectionOptions } from "./pragmas.ts";
 import {
   activateRetention,
   attachRetention,
@@ -30,13 +31,16 @@ declare const __PKG_VERSION__: string | undefined;
  * Create a SQLite-backed DatabaseAdapter using node:sqlite and Drizzle ORM.
  *
  * @param path - Filesystem path to the SQLite database file.
+ * @param options - `synchronous: "full"` syncs every commit (survives a power cut); default `"normal"`.
  * @returns A DatabaseAdapter backed by the given SQLite file (WAL mode).
  */
-export function createSqliteDatabase(path: string): DatabaseAdapter {
+export function createSqliteDatabase(
+  path: string,
+  options: SqliteConnectionOptions = {},
+): DatabaseAdapter {
   ensureDbDir(path);
   const sqlite = new DatabaseSync(path, { returnArrays: true });
-  sqlite.exec("PRAGMA journal_mode = WAL");
-  sqlite.exec("PRAGMA busy_timeout = 5000");
+  applyConnectionPragmas((sql) => sqlite.exec(sql), options);
   const callback = createCallback(sqlite);
   const db = drizzle(callback, { schema });
   const retention: RetentionActivation = {};

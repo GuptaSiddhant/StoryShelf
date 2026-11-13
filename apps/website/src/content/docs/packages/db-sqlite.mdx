@@ -21,6 +21,21 @@ import { PackageManagers } from "starlight-package-managers";
 
 <Readme heading="API" />
 
+## Durability
+
+The adapter runs SQLite in WAL mode with `synchronous = NORMAL`. A commit does not wait for the disk to flush, so writes are faster, and the trade-off is:
+
+- **An application crash loses nothing.** Every committed transaction is in the write-ahead log.
+- **An operating-system crash or power loss can lose the last committed transactions**, but never corrupts the database.
+
+For a host that must keep every committed transaction through a power cut, opt out to a sync on every commit:
+
+```ts
+createSqliteDatabase("/var/lib/storyshelf/shelf.db", { synchronous: "full" });
+```
+
+The `better-sqlite3` and `bun:sqlite` presets take the same `synchronous` option. D1 and Turso manage durability themselves and are unaffected.
+
 ## When to use it
 
 Use SQLite for a single-node deployment or local development. Pair it with [local storage](../storage-local/) for the simplest self-hosted setup.
