@@ -252,7 +252,7 @@ describe("git channel status fan-out", () => {
       wanted: "approved",
     });
 
-    const url = `${BASE}/projects/${project.slug}/builds/${createdBuild.id}`;
+    const url = `${BASE}/projects/${project.slug}/builds/${createdBuild.id}/diff`;
     const storybook = `${BASE}/projects/${project.slug}/storybook/build/${createdBuild.id}/`;
     const a = await finalStates(gitA, {
       "storyshelf/testing": "success",

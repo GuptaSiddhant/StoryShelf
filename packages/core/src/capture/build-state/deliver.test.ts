@@ -32,7 +32,7 @@ describe("deliverBuildState", () => {
     ]);
     expect(w.git.calls.at(-1)?.target.kind).toBe("comment");
     expect(w.git.calls[0]?.url).toBe(
-      `https://shelf.example.com/projects/${w.project.slug}/builds/${w.build.id}`,
+      `https://shelf.example.com/projects/${w.project.slug}/builds/${w.build.id}/diff`,
     );
     expect(w.git.secrets).toEqual(["ghp_token"]);
   });
@@ -45,7 +45,7 @@ describe("deliverBuildState", () => {
     };
     await deliverBuildState(deps, { buildId: w.build.id, channelId: w.channelId });
     expect(w.git.calls[0]?.url).toBe(
-      `https://detected.example.com/projects/${w.project.slug}/builds/${w.build.id}`,
+      `https://detected.example.com/projects/${w.project.slug}/builds/${w.build.id}/diff`,
     );
   });
 
