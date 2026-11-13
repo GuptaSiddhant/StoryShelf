@@ -45,7 +45,7 @@ async function seed(options: { token: boolean }) {
     createdAt: NOW,
     updatedAt: NOW,
   } as never);
-  for (const file of FILES) {
+  const seedFile = async (file: (typeof FILES)[number]): Promise<void> => {
     await db.insert(db.tables.snapshots, {
       id: `snap-${file.name}`,
       projectId: "p1",
@@ -71,7 +71,8 @@ async function seed(options: { token: boolean }) {
       createdAt: NOW,
       updatedAt: NOW,
     } as never);
-  }
+  };
+  await Promise.all(FILES.map(async (file) => await seedFile(file)));
   const node = async (id: string, fileKey: string, nodeId: string, extra: object) =>
     await db.insert(db.tables.designNodes, {
       id,
@@ -92,9 +93,11 @@ async function seed(options: { token: boolean }) {
       ...extra,
     } as never);
   // Changed after the baseline was approved; gone; unchanged since. Menu's design was never fetched.
-  await node("Button node", "KEY", "1:2", { lastModified: "2026-02-01T00:00:00.000Z" });
-  await node("Tag file", "TAG", "", { state: "deleted", lastModified: null });
-  await node("Input node", "INP", "3:4", {});
+  await Promise.all([
+    node("Button node", "KEY", "1:2", { lastModified: "2026-02-01T00:00:00.000Z" }),
+    node("Tag file", "TAG", "", { state: "deleted", lastModified: null }),
+    node("Input node", "INP", "3:4", {}),
+  ]);
   if (options.token) await new DesignCredentialModel(db, SECRET).set("p1", "figma", "figd_token");
   return createShelfApp({
     testing: { runner: stubRunner() },
