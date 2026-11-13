@@ -1,5 +1,5 @@
-import type { StateAnnotation } from "@storyshelf/core/adapter/notifier";
-import { httpJson } from "@storyshelf/core/utils";
+import type { StateAnnotation } from "../../adapters/notifier/index.ts";
+import { httpJson } from "../../utils/index.ts";
 import { githubHeaders, repoPath } from "./github-api.ts";
 import { findingKey, findingsHash, markedHash } from "./github-check-mapper.ts";
 import type { CheckRepo, ExistingRun } from "./github-check.ts";

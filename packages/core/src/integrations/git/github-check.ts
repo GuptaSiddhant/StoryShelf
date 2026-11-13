@@ -1,6 +1,6 @@
-import type { StateAnnotation } from "@storyshelf/core/adapter/notifier";
-import type { Logger } from "@storyshelf/core/logger";
-import { httpJson } from "@storyshelf/core/utils";
+import type { StateAnnotation } from "../../adapters/notifier/index.ts";
+import type { Logger } from "../../logger.ts";
+import { httpJson } from "../../utils/index.ts";
 import { githubHeaders, repoPath } from "./github-api.ts";
 import { planAnnotations } from "./github-check-annotations.ts";
 import {

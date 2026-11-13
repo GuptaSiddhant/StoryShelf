@@ -1,5 +1,5 @@
-import { notifierContractSuite } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
+import { notifierContractSuite } from "../../test-helpers/index.ts";
 import { gitLogNotifier } from "./log.ts";
 
 notifierContractSuite("git-log", () => gitLogNotifier);

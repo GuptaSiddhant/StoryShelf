@@ -1,5 +1,5 @@
-import type { NotifierState } from "@storyshelf/core/adapter/notifier";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { NotifierState } from "../../adapters/notifier/index.ts";
 import { mapState } from "./github-mapper.ts";
 import { findPrNumber } from "./github-pr.ts";
 

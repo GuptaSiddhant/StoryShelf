@@ -4,8 +4,8 @@ import type {
   StateAnnotation,
   StateNotifierAdapter,
   StateNotifierMetadata,
-} from "@storyshelf/core/adapter/notifier";
-import type { Logger } from "@storyshelf/core/logger";
+} from "../../adapters/notifier/index.ts";
+import type { Logger } from "../../logger.ts";
 import { describeState } from "./describe.ts";
 
 /** What a host-specific writer does for each target kind. */
