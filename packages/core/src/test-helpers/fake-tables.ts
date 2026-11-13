@@ -63,6 +63,7 @@ const projects = defineTable("projects", {
   playTimeoutMs: "play_timeout_ms",
   runA11y: "run_a11y",
   runTests: "run_tests",
+  switchStories: "switch_stories",
   detectUnstable: "detect_unstable",
   browser: "browser",
   viewports: "viewports",
