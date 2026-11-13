@@ -520,6 +520,12 @@ export interface ShelfTestingOptions {
    * boot if it cannot.
    */
   mode?: "auto" | "in-process" | "fork";
+  /**
+   * Operator veto of story switching (ADR 0052, decision 2). `false` forbids a project's
+   * `switchStories` setting for the whole server; unset or `true` leaves the choice to each
+   * project (the setting itself defaults to off).
+   */
+  switchStories?: boolean;
   /** Screenshot comparison, shared by capture and the re-diff endpoint. */
   compare?: ShelfCompareOptions;
   /** Image library selection; see {@link ShelfImagesOptions}. */
