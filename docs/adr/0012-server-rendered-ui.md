@@ -43,7 +43,7 @@ air-gapped friendly.
 - The theme follows the OS through `prefers-color-scheme`. A manual override (light, dark, system) is
   persisted in a cookie so the server renders the right theme class on first paint, with no flash.
 - Brand config is `ui: { name, logo, favicon, theme }` passed to `createShelfApp`. Environment
-  variables (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a
+  variables (`SHELF_BRAND_NAME`, `SHELF_LOGO_URL`) supply defaults so self-hosters can rebrand with a
   `docker run` and no code.
 - `BrandTheme` is a token set (accent, surface, text, border, status colors) with light and dark
   variants. Optional fields (`accentContrast`, `ring`, `surface.subtle`, `text.muted`, `borderSubtle`,
