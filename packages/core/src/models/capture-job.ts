@@ -367,6 +367,34 @@ export class CaptureJobModel {
     });
   }
 
+  /**
+   * Hand a running attempt back without spending it: the job row is queued again, claimable at
+   * once, and its `maxAttempts` grows by one so the attempt number just used does not count
+   * (numbers stay unique and increasing, so a holder's receipt is never reused). Applies only while
+   * the job row is `running` on `attempt` with no cancel asked, as read in `job`; the job write
+   * comes first and is conditional, so a lost race (a cancel, a takeover) writes nothing. Resolves
+   * true when applied; the attempt row then ends `released` (a crash before that leaves it to its
+   * lease, which the next claim retires).
+   */
+  async release(job: CaptureJobRow, attempt: number, now: string): Promise<boolean> {
+    const row = (await this.#db.updateWhere(
+      this.#table,
+      job.jobId,
+      { status: "queued", maxAttempts: job.maxAttempts + 1, visibleAt: now, updatedAt: now },
+      allOf(
+        eq(this.#c.status, "running"),
+        eq(this.#c.attempt, attempt),
+        eq(this.#c.maxAttempts, job.maxAttempts),
+        isNull(this.#c.cancelRequestedAt),
+      ),
+    )) as unknown as CaptureJobRow | null;
+    if (row?.status !== "queued" || row.maxAttempts !== job.maxAttempts + 1) {
+      return false;
+    }
+    await this.finishAttempt(attemptRowId(job.jobId, attempt), "released", now);
+    return true;
+  }
+
   /** Flag a row as cancel-requested; the flag is never cleared. */
   async flagCancel(id: string, now: string): Promise<void> {
     await this.#db.update(this.#table, id, { cancelRequestedAt: now, updatedAt: now });
@@ -507,6 +535,8 @@ interface JobColumns {
   rerunRequestedAt: Column;
   status: Column;
   attempt: Column;
+  maxAttempts: Column;
+  cancelRequestedAt: Column;
   visibleAt: Column;
   createdAt: Column;
 }
@@ -522,6 +552,8 @@ function jobColumns(table: Table): JobColumns {
     rerunRequestedAt: col(table, "rerunRequestedAt"),
     status: col(table, "status"),
     attempt: col(table, "attempt"),
+    maxAttempts: col(table, "maxAttempts"),
+    cancelRequestedAt: col(table, "cancelRequestedAt"),
     visibleAt: col(table, "visibleAt"),
     createdAt: col(table, "createdAt"),
   };

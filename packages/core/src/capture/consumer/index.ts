@@ -19,7 +19,7 @@ import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
 import { createShelfLogger, type Logger } from "../../logger.ts";
 import { recommendedBuildConcurrency } from "../../utils/resources.ts";
 import { startPollLoop, type PollLoop } from "../db-queue/poll-loop.ts";
-import { REAL_TIMERS } from "../db-queue/timers.ts";
+import { REAL_TIMERS, type QueueTimers } from "../db-queue/timers.ts";
 import type { DatabaseCaptureQueue } from "../db-queue/types.ts";
 import { createCaptureHandler } from "./capture-handler.ts";
 import { startSlotLoop } from "./loop.ts";
@@ -47,37 +47,115 @@ export function createCaptureConsumer(options: CaptureConsumerOptions): CaptureC
   options.queue.setLogger?.(logger.child({ component: options.queue.metadata.kind }));
   const rt = buildRuntime(options, logger);
   const slots = options.config?.concurrency ?? recommendedBuildConcurrency();
-  let session: Promise<void> | null = null;
-  let requestStop: (() => void) | null = null;
-  let stopRequested = false;
+  let active: ActiveSession | null = null;
   return {
-    isRunning: () => session !== null,
+    isRunning: () => active !== null,
     start: async () => {
-      if (session !== null) {
+      if (active !== null) {
         return;
       }
-      const stopped = Promise.withResolvers<null>();
-      stopRequested = false;
-      requestStop = (): void => {
-        stopRequested = true;
-        stopped.resolve(null);
-      };
-      session = consume({
-        options,
-        rt,
-        slots,
-        stopped: stopped.promise,
-        isStopped: () => stopRequested,
-      });
-      await session.finally(() => {
-        session = null;
+      const session = openSession({ options, rt, slots });
+      active = session;
+      await session.done.finally(() => {
+        active = null;
       });
     },
-    stop: async () => {
-      requestStop?.();
-      await session?.catch(() => {});
+    stop: async (stopOptions) => {
+      active?.requestStop();
+      await drain(
+        active?.done.catch(() => {}),
+        stopOptions?.graceMs,
+        {
+          timers: options.timers ?? REAL_TIMERS,
+          handBack: () => {
+            active?.giveUp();
+          },
+          logger,
+        },
+      );
     },
   };
+}
+
+/** One running start-to-drain session and the two ways to end it early. */
+interface ActiveSession {
+  done: Promise<void>;
+  /** Stop polling; the session ends once the jobs in flight have. */
+  requestStop(): void;
+  /** The drain's time is up: running jobs are cancelled and handed back to the queue. */
+  giveUp(): void;
+}
+
+function openSession(c: Pick<Consuming, "options" | "rt" | "slots">): ActiveSession {
+  const stopped = Promise.withResolvers<null>();
+  const handBack = Promise.withResolvers<null>();
+  let stopRequested = false;
+  c.rt.handBack = handBack.promise.then(() => {});
+  return {
+    done: consume({ ...c, stopped: stopped.promise, isStopped: () => stopRequested }),
+    requestStop: () => {
+      stopRequested = true;
+      stopped.resolve(null);
+    },
+    giveUp: () => {
+      handBack.resolve(null);
+    },
+  };
+}
+
+/** Share of the grace kept to hand jobs back (at most), once the drain has had the rest. */
+const HAND_BACK_RESERVE_MS = 2000;
+
+/** Wait for the drained session: without a grace for as long as it takes, else {@link drainWithin}. */
+async function drain(
+  running: Promise<void> | undefined,
+  graceMs: number | undefined,
+  ctx: { timers: QueueTimers; handBack: () => void; logger: Logger },
+): Promise<void> {
+  if (running === undefined) {
+    return;
+  }
+  await (graceMs === undefined ? running : drainWithin(running, graceMs, ctx));
+}
+
+/**
+ * Wait for `running` (the drained session) for the grace minus a reserve, then hand the jobs still
+ * running back and wait for that for the reserve. Resolves by the end of the grace either way.
+ */
+async function drainWithin(
+  running: Promise<void>,
+  graceMs: number,
+  ctx: { timers: QueueTimers; handBack: () => void; logger: Logger },
+): Promise<void> {
+  const reserve = Math.min(HAND_BACK_RESERVE_MS, Math.max(0, graceMs) / 2);
+  if (await settledWithin(running, graceMs - reserve, ctx.timers)) {
+    return;
+  }
+  ctx.logger.warn({ graceMs }, "shutdown drain timed out; handing running jobs back");
+  ctx.handBack();
+  if (!(await settledWithin(running, reserve, ctx.timers))) {
+    ctx.logger.warn("jobs were not all handed back in time; their leases recover them");
+  }
+}
+
+/** True when `work` settled within `ms`. */
+async function settledWithin(
+  work: Promise<void>,
+  ms: number,
+  timers: QueueTimers,
+): Promise<boolean> {
+  const timedOut = Promise.withResolvers<false>();
+  const handle = timers.setTimeout(
+    () => {
+      timedOut.resolve(false);
+    },
+    Math.max(0, ms),
+  );
+  try {
+    return await Promise.race([work.then(() => true as const), timedOut.promise]);
+  } finally {
+    timers.clearTimeout(handle);
+  }
 }
 
 interface Consuming {

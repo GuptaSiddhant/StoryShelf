@@ -50,10 +50,10 @@ export function combineConsumers(consumers: CaptureConsumer[]): CaptureConsumer 
         }),
       );
     },
-    stop: async () => {
+    stop: async (options) => {
       await Promise.all(
         consumers.map(async (consumer) => {
-          await consumer.stop();
+          await consumer.stop(options);
         }),
       );
     },

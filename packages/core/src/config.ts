@@ -288,6 +288,16 @@ const MAX_TRUSTED_HOPS = 10;
 const TRUSTED_PROXY_PATTERN = /^[\da-f:.]+(?:\/\d{1,3})?$/iu;
 
 /**
+ * Map a `SHUTDOWN_GRACE_SECONDS` environment value to the drain bound of `lifecycle.teardown`, in
+ * ms: unset, empty or not a positive number is `undefined` (an unbounded drain). Set it a few
+ * seconds below the platform's stop timeout (Fly 5 s, Cloud Run 10 s, ECS 30 s by default).
+ */
+export function parseShutdownGraceMs(raw?: string): number | undefined {
+  const seconds = Number(raw?.trim() === "" ? Number.NaN : raw);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : undefined;
+}
+
+/**
  * Map a `TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
  * or `0` is off; `fly` is Fly.io; digits are a hop count; anything else is a comma-separated list
  * of IPs or CIDRs (checked by {@link validateConfig}).

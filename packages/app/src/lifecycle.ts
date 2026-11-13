@@ -56,11 +56,16 @@ export function startConsumer(cell: LifecycleCell, logger: Logger): void {
   });
 }
 
-/** Stop polling and wait for the jobs in flight to finish (the SIGTERM drain). */
-async function stopConsumer(cell: LifecycleCell): Promise<void> {
+/**
+ * Stop polling and drain the jobs in flight (the SIGTERM drain): unbounded, or, given `graceMs`,
+ * until the grace is spent, when the jobs left are handed back to the queue.
+ */
+async function stopConsumer(cell: LifecycleCell, graceMs?: number): Promise<void> {
   cell.consumerStopped = true;
-  await cell.consumer?.stop();
-  await cell.consumerRun;
+  await cell.consumer?.stop(graceMs === undefined ? undefined : { graceMs });
+  if (graceMs === undefined) {
+    await cell.consumerRun;
+  }
 }
 
 /** Wait for tracked boot tasks, bounded so a hung task can never block shutdown. */
@@ -293,9 +298,9 @@ function createLifecycle(
       cell.consumerStopped = false;
       startConsumer(cell, logger);
     },
-    teardown: async () => {
+    teardown: async (teardownOptions) => {
       timer?.stop();
-      await stopConsumer(cell);
+      await stopConsumer(cell, teardownOptions?.graceMs);
       await drainBackground(cell);
       await settleInsightJobs();
       await options.ai?.teardown();

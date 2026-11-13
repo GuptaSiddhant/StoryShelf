@@ -102,7 +102,12 @@ export interface CaptureConsumerOptions {
 export interface CaptureConsumer {
   /** Start consuming. Resolves once stopped and drained; rejects when the image engine cannot load. */
   start(): Promise<void>;
-  /** Stop polling and wait for the jobs in flight to finish (SIGTERM drain). */
-  stop(): Promise<void>;
+  /**
+   * Stop polling and drain the jobs in flight (SIGTERM). Without `graceMs` it waits for them with
+   * no limit. With it, it resolves within `graceMs`: jobs still running when the drain's share of
+   * it is over are cancelled and handed back to the queue, claimable at once, without spending an
+   * attempt.
+   */
+  stop(options?: { graceMs?: number }): Promise<void>;
   isRunning(): boolean;
 }

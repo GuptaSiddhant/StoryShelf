@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTrustProxy, validateConfig } from "./config.ts";
+import { parseShutdownGraceMs, parseTrustProxy, validateConfig } from "./config.ts";
 
 describe("validateConfig", () => {
   it("accepts the serverTiming opt-in", () => {
@@ -124,5 +124,15 @@ describe("trustProxy", () => {
       "10.0.0.0/16",
       "2001:db8::/32",
     ]);
+  });
+});
+
+describe("parseShutdownGraceMs", () => {
+  it("reads seconds as ms and treats anything else as unbounded", () => {
+    expect(parseShutdownGraceMs("25")).toBe(25_000);
+    expect(parseShutdownGraceMs("1.5")).toBe(1500);
+    for (const raw of [undefined, "", "  ", "0", "-3", "soon"]) {
+      expect(parseShutdownGraceMs(raw)).toBeUndefined();
+    }
   });
 });

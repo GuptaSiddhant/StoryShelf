@@ -5,7 +5,7 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
-import { parseTrustProxy } from "@storyshelf/core/config";
+import { parseShutdownGraceMs, parseTrustProxy } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
@@ -186,11 +186,11 @@ const server = serve({ fetch: app.fetch, port }, () => {
   logger.info({ port, dataDir }, "StoryShelf fly server listening");
 });
 
-// Teardown is idempotent and logs its own errors; close the listener either way.
+// Teardown is idempotent (SHUTDOWN_GRACE_SECONDS bounds its job drain) and logs its own errors; close the listener either way.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     app.lifecycle
-      .teardown()
+      .teardown({ graceMs: parseShutdownGraceMs(process.env["SHUTDOWN_GRACE_SECONDS"]) })
       .catch(() => {}) // Intentionally empty — teardown errors are already logged
       .finally(() => {
         server.close();

@@ -26,10 +26,18 @@ export interface JobRuntime {
   lease?: { renewEveryMs?: number; checkMs?: number } | undefined;
   /** Wall-clock bound of one job in ms; absent means unbounded (tests). */
   maxJobMs?: number | undefined;
+  /**
+   * Settles when the shutdown drain ran out of time (`stop({ graceMs })`): every job still running
+   * is cancelled and handed back to the queue without spending its attempt. Set per session.
+   */
+  handBack?: Promise<void> | undefined;
 }
 
 /** Why a job's handler stopped: it finished (or threw), or the queue took the job away. */
-type Race = { kind: "settled"; error?: unknown } | { kind: "ended"; end: LeaseEnd };
+type Race =
+  | { kind: "settled"; error?: unknown }
+  | { kind: "ended"; end: LeaseEnd }
+  | { kind: "handback" };
 
 /** Run `job` in the slot the caller holds; never rejects. */
 export async function runJob(rt: JobRuntime, job: ConsumerJob): Promise<void> {
@@ -114,14 +122,25 @@ async function runHandler(
   logger.info("consumer picked up job");
   const run = invoke(handler, job, { logger, touch, signal: keeper.signal });
   try {
-    const raced = await Promise.race([run, endOf(keeper)]);
-    return raced.kind === "ended"
-      ? await abandon(rt, held, raced.end)
-      : await settle(rt, held, raced);
+    return await endOfRace(rt, held, await Promise.race([run, endOf(keeper), handedBack(rt)]));
   } finally {
     keeper.stop();
     run.catch(() => {});
   }
+}
+
+/** Settle the job by how the race ended. */
+async function endOfRace(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+  raced: Race,
+): Promise<JobOutcome> {
+  if (raced.kind === "handback") {
+    return await handBackJob(rt, held);
+  }
+  return raced.kind === "ended"
+    ? await abandon(rt, held, raced.end)
+    : await settle(rt, held, raced);
 }
 
 function keepLease(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKeeper {
@@ -153,6 +172,31 @@ async function invoke(
 
 async function endOf(keeper: JobLeaseKeeper): Promise<Race> {
   return { kind: "ended", end: await keeper.ended };
+}
+
+/** Resolves when the shutdown drain gave up on running jobs; never when no drain is bounded. */
+async function handedBack(rt: JobRuntime): Promise<Race> {
+  await (rt.handBack ?? new Promise<never>(() => {}));
+  return { kind: "handback" };
+}
+
+/**
+ * The shutdown drain ran out of time: stop the work, then hand the job back so another instance
+ * claims it at once and the attempt is not spent. A job that was cancelled meanwhile is left to
+ * its cancel (the queue ignores a release of a flagged job). A queue that cannot release leaves the
+ * job to its lease.
+ */
+async function handBackJob(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+): Promise<JobOutcome> {
+  const { job, handler, logger } = held;
+  logger.warn("shutdown grace over; handing the job back");
+  await handler.cancel?.(job).catch((error: unknown) => {
+    logger.warn({ err: error }, "failed to cancel the running job");
+  });
+  await rt.queue.release?.(job);
+  return "released";
 }
 
 /** The handler returned: ack, or retry / fail on its error. */

@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import { parseTrustProxy } from "@storyshelf/core/config";
+import { parseShutdownGraceMs, parseTrustProxy } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
@@ -175,7 +175,9 @@ const server = serve({ fetch: app.fetch, port }, () => {
 });
 
 const shutdown = async (): Promise<void> => {
-  await app.lifecycle.teardown();
+  await app.lifecycle.teardown({
+    graceMs: parseShutdownGraceMs(process.env["SHUTDOWN_GRACE_SECONDS"]),
+  });
   server.close();
 };
 process.on("SIGTERM", () => {
