@@ -152,6 +152,13 @@ const BUILDS_GITSHA_DEDUP = "DROP INDEX IF EXISTS builds_project_gitsha_idx";
 const BUILDS_GITSHA_INDEX =
   "CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha)";
 
+/** Build lists read `(project_id [, git_branch]) ORDER BY created_at DESC`; these serve it without a sort. */
+const BUILDS_LIST_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS builds_project_created_idx ON builds (project_id, created_at)",
+  "CREATE INDEX IF NOT EXISTS builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
+  "DROP INDEX IF EXISTS builds_git_branch_idx",
+];
+
 const PROJECT_BROWSERS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browsers TEXT";
 const PROJECT_MODES_ALLOWLIST_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS modes_allowlist TEXT";
@@ -328,6 +335,15 @@ async function migrateRunA11yDefault(run: MigrationRunner): Promise<void> {
   await run(RUN_A11Y_DEFAULT_ALTER);
 }
 
+async function migrateBuildsListIndexes(run: MigrationRunner): Promise<void> {
+  await run(BUILDS_GITSHA_DEDUP);
+  await run(BUILDS_GITSHA_INDEX);
+  for (const statement of BUILDS_LIST_INDEXES) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered DDL
+    await run(statement);
+  }
+}
+
 async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await run(STORYBOOK_META_ALTER);
   await migrateRunA11yDefault(run);
@@ -337,8 +353,7 @@ async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await run(WEBHOOK_SECRET_DROP);
   await run(TOKEN_USER_ALTER);
   await run(MEMBER_SOURCE_ALTER);
-  await run(BUILDS_GITSHA_DEDUP);
-  await run(BUILDS_GITSHA_INDEX);
+  await migrateBuildsListIndexes(run);
 }
 
 async function applyIdentityStatements(run: MigrationRunner, logger?: Logger): Promise<void> {
