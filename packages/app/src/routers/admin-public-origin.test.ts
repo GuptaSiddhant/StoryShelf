@@ -46,7 +46,7 @@ async function seedApp(options: {
     storage,
     logger: silent,
     config: { secret: "origin-test-secret", ...options.config },
-    ...(options.notifiers ? { notifications: { notifiers: options.notifiers } } : {}),
+    notifications: { notifiers: options.notifiers ?? [] },
     ...(role ? { auth: stubAuth({ id: "u1", email: "a@b.c", name: "A", role }) } : {}),
   });
   await app.lifecycle.setup();
