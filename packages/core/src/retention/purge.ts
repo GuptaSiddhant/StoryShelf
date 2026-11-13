@@ -26,7 +26,7 @@ export {
   type SweepTables,
 } from "./screenshot-sweep.ts";
 import { col } from "../models/columns.ts";
-export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
+export { purgeAiData, STALE_RUN_MS, type AiPurgeResult, type AiRetention } from "./ai.ts";
 export {
   deleteClaimedBuild,
   type BuildDeletionDeps,

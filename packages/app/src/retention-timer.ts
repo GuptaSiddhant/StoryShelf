@@ -1,12 +1,14 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import type { Auth } from "@storyshelf/core/auth";
 import type { ShelfConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 /* oxlint-disable typescript/promise-function-async -- interval helpers return promise factories */
 import { ProjectModel } from "@storyshelf/core/models";
-import { Retention, purgeAiData } from "@storyshelf/core/retention";
+import { Retention, purgeAiData, type AiRetention } from "@storyshelf/core/retention";
 
 const DEFAULT_BRANCH_TTL_DAYS = 30;
+const DEFAULT_EXPIRED_AUTH_TTL_DAYS = 7;
 const DEFAULT_BRANCH_GC_INTERVAL_MS = 86_400_000;
 
 /** Handle for the background branch-GC interval; call `stop()` on server shutdown. */
@@ -24,6 +26,12 @@ interface SweepContext {
   /** Build purge TTL; undefined: scheduled build purge is off (the default). */
   purgeTtlDays: number | undefined;
   testing: boolean;
+  /** AI table retention windows from config (days; null keeps rows). */
+  retention: AiRetention;
+  /** Days after expiry that session and verification rows are deleted; null keeps them. */
+  expiredAuthTtlDays: number | null;
+  /** Auth singleton whose expired rows are swept, when auth is on. */
+  auth: Auth | undefined;
   /** Resolves with the adapter setup result; a sweep waits for it and runs only when it succeeded. */
   ready: () => Promise<{ ok: boolean }>;
   /** Queues the per-build copy sweep; the job does the work. */
@@ -58,6 +66,7 @@ export function startBranchGcTimer(
   logger: Logger,
   testing = false,
   ready: () => Promise<{ ok: boolean }> = async () => await Promise.resolve({ ok: true }),
+  auth?: Auth,
   reclaimCopies: () => Promise<void> = async () => {
     await Promise.resolve();
   },
@@ -65,7 +74,8 @@ export function startBranchGcTimer(
   const branchTtlDays =
     config.branchTtlDays === undefined ? DEFAULT_BRANCH_TTL_DAYS : config.branchTtlDays;
   const intervalMs = config.branchGcIntervalMs ?? DEFAULT_BRANCH_GC_INTERVAL_MS;
-  if ((branchTtlDays === null && config.purgeTtlDays === undefined) || intervalMs <= 0) {
+  // The AI-data and expired-auth sweeps always run, so only a non-positive interval turns it off.
+  if (intervalMs <= 0) {
     return null;
   }
   const context: SweepContext = {
@@ -75,6 +85,12 @@ export function startBranchGcTimer(
     branchTtlDays,
     purgeTtlDays: config.purgeTtlDays,
     testing,
+    retention: { insightDays: config.insightsTtlDays, usageDays: config.aiUsageTtlDays },
+    expiredAuthTtlDays:
+      config.expiredAuthTtlDays === undefined
+        ? DEFAULT_EXPIRED_AUTH_TTL_DAYS
+        : config.expiredAuthTtlDays,
+    auth,
     ready,
     reclaimCopies,
     stopped: false,
@@ -117,8 +133,22 @@ async function sweep(context: SweepContext): Promise<void> {
   }
   await stage(context, "build copy reclaim", context.reclaimCopies);
   await stage(context, "AI data cleanup", async () => {
-    await purgeAiData(db, new Date(), context.logger);
+    await purgeAiData(db, new Date(), context.logger, context.retention);
   });
+  await stage(context, "expired auth rows", async () => {
+    await sweepExpiredAuth(context);
+  });
+}
+
+/** Delete session and verification rows that expired `expiredAuthTtlDays` ago (batched by the auth engine). */
+async function sweepExpiredAuth(context: SweepContext): Promise<void> {
+  const { auth, expiredAuthTtlDays } = context;
+  if (!auth?.purgeExpired || expiredAuthTtlDays === null) return;
+  const cutoff = new Date(Date.now() - expiredAuthTtlDays * 86_400_000).toISOString();
+  const removed = await auth.purgeExpired(cutoff);
+  if (removed.sessions > 0 || removed.verifications > 0) {
+    context.logger.info(removed, "expired auth rows removed");
+  }
 }
 
 /** Run one stage of the sweep; a failure is logged and leaves the next stage to run. */

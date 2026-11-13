@@ -35,6 +35,7 @@ import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import { createClientIpResolver } from "./middleware/client-ip.ts";
+import { compression } from "./middleware/compression.ts";
 import {
   authGate,
   notFoundPage,
@@ -237,6 +238,9 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
  */
 function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
   app.use("*", hostDispatch());
+  // Gzip portal HTML pages and JSON (#868). After hostDispatch, so content and alias hosts, which
+  // serve published files with their own handling, never reach it.
+  app.use("*", compression());
   app.use("*", sameSiteWrites(config));
 }
 

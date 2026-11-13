@@ -53,6 +53,7 @@ export async function extractStorybookToScratch(
     ? shardScratchDir(scratchDir, projectId, buildId, shardId)
     : jobScratchDir(scratchDir, projectId, buildId);
   const targetDir = join(base, "storybook");
+  await rm(join(base, "storybook.complete"), { force: true });
   const root = await prepareTargetDir(targetDir);
   const source = await storage.readStream(storybookZipPath(projectId, buildId));
   await extractZipStream(source, root, limits, signal);
