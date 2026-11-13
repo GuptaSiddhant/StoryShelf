@@ -33,14 +33,20 @@ set_demo_browser() {
 }
 
 # The demo's AI profile (#992): AI insights only show once a site admin picks a profile. Set only
-# when it differs, so a re-run is a no-op. The profile must be configured on the server (it is when
-# ANTHROPIC_API_KEY is set on Fly); otherwise the server answers 400 and the seed stops.
+# when it differs, so a re-run is a no-op. The profile exists only when the server has AI configured
+# (ANTHROPIC_API_KEY on Fly); without it the server answers 400 "Unknown AI profile", so the seed
+# warns and carries on without insights. Any other failure still stops the seed.
 set_demo_ai_profile() {
-  local current
+  local current code
   current="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG" | jq -r '.aiProfile // empty')"
   [ "$current" = "default" ] && return 0
-  curl -fsS "${AUTH[@]}" -X PATCH "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
-    -d '{"aiProfile":"default"}'
+  code="$(curl -sS "${AUTH[@]}" -X PATCH "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
+    -w '%{http_code}' -d '{"aiProfile":"default"}')"
+  case "$code" in
+    2*) ;;
+    400) echo "::warning::AI profile \"default\" is not configured on this server (no ANTHROPIC_API_KEY); seeding without AI insights." ;;
+    *) echo "::error::PATCH aiProfile answered '$code'"; exit 1 ;;
+  esac
 }
 
 sha_for() { printf '%s:%s' "$1" "$(sha256sum "$STATIC/index.json" | cut -c1-64)" | sha256sum | cut -c1-40; }
