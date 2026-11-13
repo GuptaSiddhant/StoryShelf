@@ -11,10 +11,10 @@ import { readdirSync } from "node:fs";
 import { availableParallelism, cpus } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import type { ImageCodec, ImageEngine } from "../src/codec.ts";
-import { loadCodec } from "../src/codecs.ts";
-import { diffImages } from "../src/engine.ts";
-import { DEFAULT_DIFF_OPTIONS } from "../src/options.ts";
+import type { ImageCodec, ImageEngine } from "../src/diff/codec.ts";
+import { loadCodec } from "../src/diff/codecs.ts";
+import { diffImages } from "../src/diff/engine.ts";
+import { DEFAULT_DIFF_OPTIONS } from "../src/diff/options.ts";
 
 const DIR = path.resolve(process.argv[2] ?? "../../apps/website/src/assets/screenshots");
 const ENGINES: ImageEngine[] = ["pngjs", "sharp"];

@@ -20,14 +20,14 @@ export default defineConfig({
   platform: "node",
   // Absolute paths so the build works from any CWD (package dir locally,
   // repo root in Docker).
-  // `worker` is the diff pool's thread entry: `@storyshelf/image` spawns `new URL("worker.mjs", import.meta.url)`,
+  // `worker` is the diff pool's thread entry: `@storyshelf/core` spawns `new URL("worker.mjs", import.meta.url)`,
   // and once it is inlined into server.mjs that resolves next to it. Without it the pool would
   // silently fall back to diffing on the main thread.
   input: {
     server: resolve(root, "apps/fly-app/server.ts"),
     // `migrate-to-s3.sh` runs this once on the machine: it shares the bundle's inlined AWS SDK.
     "migrate-to-s3": resolve(root, "apps/fly-app/migrate-to-s3.ts"),
-    worker: resolve(root, "packages/image/src/worker.ts"),
+    worker: resolve(root, "packages/core/src/diff/worker.ts"),
   },
   output: {
     dir: resolve(root, "apps/fly-app/dist"),
