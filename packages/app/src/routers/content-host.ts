@@ -178,14 +178,18 @@ async function exchangeRefusal(
   return opens && verified.claims.buildId === build.id ? null : "exchange for another build";
 }
 
-/** Serve a request for `<project-slug>.<baseDomain>`: a redirect to the portal's project Storybook. */
+/**
+ * Serve a request for `<project-slug>.<baseDomain>`: a redirect to the portal's project Storybook. The
+ * query is kept (a `?path=/story/<id>` deep link still opens its story); the path is not, because the
+ * alias names a project, not a build's file.
+ */
 export function serveAliasHost(c: Context, origins: HostingOrigins, slug: string): Response {
   if (!isRead(c)) {
     return refuseToken(c, "method");
   }
   c.header("cache-control", "no-store");
   return c.redirect(
-    `${portalOriginOf(origins)}/projects/${encodeURIComponent(slug)}/storybook`,
+    `${portalOriginOf(origins)}/projects/${encodeURIComponent(slug)}/storybook${new URL(c.req.url).search}`,
     302,
   );
 }

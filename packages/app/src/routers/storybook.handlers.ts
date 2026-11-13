@@ -100,7 +100,16 @@ export async function redirectToLatestBuild(c: Context): Promise<Response> {
   if (!(await publishedAccess(build, project))) {
     return denied(c, hidden);
   }
-  return c.redirect(`/projects/${slug}/storybook/build/${build.id}/`, 302);
+  return c.redirect(`/projects/${slug}/storybook/build/${build.id}/${searchOf(c)}`, 302);
+}
+
+/**
+ * The request's query, kept through a resolver hop so a deep link (`?path=/story/<id>`,
+ * `?storyId=<id>`) still opens its story once it reaches the build. Re-serialized by `URL`, so it
+ * stays a query: it can never become a path, a host or a header.
+ */
+function searchOf(c: Context): string {
+  return new URL(c.req.url).search;
 }
 
 /**
@@ -314,5 +323,5 @@ async function labelRedirect(
   if (!build || !(await publishedAccess(build, project))) {
     return denied(c, hidden);
   }
-  return c.redirect(`/projects/${project.slug}/storybook/build/${buildId}/`, 302);
+  return c.redirect(`/projects/${project.slug}/storybook/build/${buildId}/${searchOf(c)}`, 302);
 }
