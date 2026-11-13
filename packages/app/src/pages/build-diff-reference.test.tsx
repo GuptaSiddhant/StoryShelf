@@ -4,36 +4,40 @@ import { describe, expect, it } from "vitest";
 import type { BaselineReference } from "../routers/baseline-reference.ts";
 import { CompareStage } from "../ui/components.tsx";
 import type { DesignSource } from "./build-diff-model.ts";
-import { BaselineReferenceNotice, ComparisonSources } from "./build-diff-reference.tsx";
+import { BaselineReferenceLine, ComparisonSources } from "./build-diff-reference.tsx";
 
 async function render(reference: BaselineReference): Promise<string> {
   const app = new Hono().get("/", (c): Response | Promise<Response> =>
-    c.html(<BaselineReferenceNotice reference={reference} />),
+    c.html(<BaselineReferenceLine reference={reference} projectSlug="demo" />),
   );
   return await (await app.request("/")).text();
 }
 
-describe("baseline reference notice", () => {
-  it("explains missing and unavailable references", async () => {
-    expect(await render({ kind: "none" })).toContain("No baseline at capture");
+describe("baseline reference line", () => {
+  it("explains missing and unavailable references without a live region", async () => {
+    const none = await render({ kind: "none" });
+    expect(none).toContain("No baseline at capture");
     expect(await render({ kind: "unavailable" })).toContain("Baseline reference unavailable");
+    expect(none).not.toContain("role=");
   });
-  it("renders the branch, verified build, and missing image", async () => {
+  it("names a branch baseline and links its commit to the reference build", async () => {
     const html = await render({
       kind: "known",
       branch: "feature/x",
       defaultBranch: false,
-      updatedAt: "2026-01-01",
+      updatedAt: "2026-01-01T00:00:00.000Z",
       imageAvailable: false,
       build: { id: "build1", gitSha: "abcdef123" } as Build,
     });
-    expect(html).toContain("Accepted branch");
-    expect(html).toContain("feature/x");
-    expect(html).toContain("build1");
-    expect(html).toContain("abcdef1");
-    expect(html).toContain("baseline image is unavailable");
+    expect(html).toContain("vs feature/x, accepted on this branch");
+    expect(html).toContain('href="/projects/demo/builds/build1"');
+    expect(html).toContain(">abcdef1</a>");
+    // The exact time is on the <time>, not printed as a raw ISO string.
+    expect(html).toContain('datetime="2026-01-01T00:00:00.000Z"');
+    expect(html).not.toContain(">2026-01-01T00:00:00.000Z<");
+    expect(html).not.toContain('role="alert"');
   });
-  it("reports missing build details on the default branch", async () => {
+  it("says when the reference build is unknown on the default branch", async () => {
     const html = await render({
       kind: "known",
       branch: "main",
@@ -42,8 +46,8 @@ describe("baseline reference notice", () => {
       imageAvailable: true,
       build: null,
     });
-    expect(html).toContain("Default branch");
-    expect(html).toContain("Reference build and commit are unavailable");
+    expect(html).toContain("vs main ·");
+    expect(html).toContain("reference build unknown");
   });
 });
 

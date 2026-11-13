@@ -296,6 +296,80 @@ describe("CompareStage", () => {
   });
 });
 
+/** The two scaled SVGs of a rendered stage (baseline first). */
+function scaledSvgs(html: string): string[] {
+  return [...html.matchAll(/<svg class="stage__img"[^>]*>[\s\S]*?<\/svg>/gu)].map(
+    (match) => match[0],
+  );
+}
+
+/** A 100×100 baseline beside a 120×100 current, both sizes known. */
+const sized = (
+  <CompareStage
+    baselineSrc="/b.png"
+    currentSrc="/c.png"
+    diffSrc={null}
+    subject="Card"
+    baselineSize={{ width: 100, height: 100 }}
+    currentSize={{ width: 120, height: 100 }}
+  />
+);
+
+describe("CompareStage scale", () => {
+  it("draws both images against the wider width, at natural size, with no style values", async () => {
+    const html = await render(sized);
+    const [baseline = "", current = ""] = scaledSvgs(html);
+    // One box for both (120 wide): a shared scale min(1, pane / 120).
+    expect(baseline).toContain('viewBox="0 0 120 100"');
+    expect(current).toContain('viewBox="0 0 120 100"');
+    expect(baseline).toContain('width="120"');
+    // Each image keeps its own natural size inside that box, so the drawn ratio is 100:120.
+    expect(baseline).toMatch(/<image href="\/b\.png" width="100" height="100"/u);
+    expect(current).toMatch(/<image href="\/c\.png" width="120" height="100"/u);
+    expect(html).not.toContain("style=");
+  });
+
+  it("names each scaled image like the plain one", async () => {
+    const svgs = scaledSvgs(await render(sized));
+    expect(svgs).toHaveLength(2);
+    expect(svgs[0]).toContain('role="img" aria-label="Baseline for Card"');
+  });
+
+  it("never upscales in Fit, and shows each size in its pane label", async () => {
+    const html = await render(sized);
+    // Capped at the pane, never stretched past natural width (the old rule was width: 100%).
+    expect(html).toMatch(/\.stage__img\{display:block;max-width:100%;height:auto;/u);
+    expect(html).toContain("<span>100×100</span>");
+    expect(html).toContain("<span>120×100</span>");
+  });
+});
+
+describe("CompareStage layout", () => {
+  it("falls back to plain images when a size is unknown", async () => {
+    const html = await render(
+      <CompareStage
+        baselineSrc="/b.png"
+        currentSrc="/c.png"
+        diffSrc={null}
+        subject="Card"
+        currentSize={{ width: 120, height: 100 }}
+      />,
+    );
+    expect(html).not.toContain('<svg class="stage__img"');
+    expect(html).toContain('alt="Baseline for Card"');
+  });
+
+  it("is two columns, with the diff only in the diff mode", async () => {
+    const html = await render(sized);
+    expect(html).toMatch(
+      /\.stage__grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/u,
+    );
+    expect(html).toMatch(
+      /:not\(\[data-view="diff"\]\) \.stage__pane\[data-pane="diff"\]\{display:none/u,
+    );
+  });
+});
+
 describe("CompareStage panes", () => {
   it("makes a pane with an image a named, keyboard-focusable group, and leaves an empty pane alone", async () => {
     const html = await render(

@@ -1,5 +1,6 @@
 import { BaselineModel, BuildModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Baseline, Build, Project, Snapshot } from "@storyshelf/core/schema";
+import { Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runWithStore, type Store } from "../store.ts";
 import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
@@ -108,6 +109,37 @@ describe("baseline reference", () => {
       inherited: true,
     } as Snapshot);
     expect(await load()).toMatchObject({ kind: "known", defaultBranch: false, build: null });
+  });
+});
+
+describe("baseline image size", () => {
+  it("reads the legacy baseline's natural size from its PNG header", async () => {
+    vi.spyOn(BaselineModel.prototype, "resolve").mockResolvedValue(baseline);
+    vi.spyOn(SnapshotModel.prototype, "get").mockResolvedValue(null);
+    const header = Buffer.alloc(24);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header, 0);
+    header.write("IHDR", 12, "latin1");
+    header.writeUInt32BE(100, 16);
+    header.writeUInt32BE(90, 20);
+    const sized = {
+      ...store,
+      storage: { exists: async () => true, readStream: async () => Readable.from([header]) },
+    } as unknown as Store;
+    const result = await runWithStore(
+      sized,
+      async () => await loadBaselineReference(project, build, snapshot),
+    );
+    expect(result).toMatchObject({ kind: "known", imageSize: { width: 100, height: 90 } });
+  });
+  it("has no size when the baseline image is missing", async () => {
+    vi.spyOn(BaselineModel.prototype, "resolve").mockResolvedValue(baseline);
+    vi.spyOn(SnapshotModel.prototype, "get").mockResolvedValue(null);
+    const missing = { ...store, storage: { exists: async () => false } } as unknown as Store;
+    const result = await runWithStore(
+      missing,
+      async () => await loadBaselineReference(project, build, snapshot),
+    );
+    expect(result).toMatchObject({ kind: "known", imageAvailable: false, imageSize: null });
   });
 });
 

@@ -409,3 +409,20 @@ describe("review page: accessibility violations", () => {
     expect(await pageWith("not json")).not.toContain("Accessibility:");
   });
 });
+
+describe("review page action bar", () => {
+  it("docks the action bar in the comparison card, with the keys inside the buttons", async () => {
+    const { html } = await reviewPage();
+    const card = html.slice(html.indexOf("review-comparison-card"));
+    // The bar is the card's footer: it comes after the stage and before the comment thread.
+    expect(card.indexOf("data-compare")).toBeLessThan(card.indexOf('role="toolbar"'));
+    expect(html.indexOf('role="toolbar"')).toBeLessThan(html.indexOf("Add comment"));
+    expect(html).toMatch(/<button[^>]*data-approve[^>]*aria-keyshortcuts="a"/u);
+    expect(html).toMatch(/<button[^>]*data-reject[^>]*aria-keyshortcuts="r"/u);
+    // Approve is the one filled button; Reject is secondary with danger text.
+    expect(html).toMatch(/class="[^"]*btn-danger-secondary-sm[^"]*"[^>]*data-reject/u);
+    // The hint row ("j k navigate a approve r reject") is gone: only the ? help button stays.
+    expect(html).not.toContain("navigate");
+    expect(html).toContain("data-shortcuts-open");
+  });
+});
