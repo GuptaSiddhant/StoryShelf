@@ -7,6 +7,11 @@ export interface FakeStorage {
   objects: Map<string, Buffer>;
 }
 
+/** The error a missing object raises, shaped like the local adapter's `ENOENT`. */
+function missing(path: string): Error {
+  return Object.assign(new Error(`no object at "${path}"`), { code: "ENOENT" });
+}
+
 /** Create an in-memory storage adapter for capture pipeline tests. */
 export function makeStorage(): FakeStorage {
   const objects = new Map<string, Buffer>();
@@ -15,7 +20,7 @@ export function makeStorage(): FakeStorage {
     read: async (path) => {
       const found = objects.get(path);
       if (found === undefined) {
-        throw new Error(`no object at "${path}"`);
+        throw missing(path);
       }
       return await Promise.resolve(found);
     },
@@ -42,7 +47,7 @@ export function makeStorage(): FakeStorage {
     readStream: async (path) => {
       const found = objects.get(path);
       if (found === undefined) {
-        throw new Error(`no object at "${path}"`);
+        throw missing(path);
       }
       return await Promise.resolve(Readable.from([found]));
     },
