@@ -238,6 +238,9 @@ importers:
       '@storyshelf/notify-email':
         specifier: workspace:*
         version: link:../../packages/notify-email
+      '@storyshelf/notify-git':
+        specifier: workspace:*
+        version: link:../../packages/notify-git
       '@storyshelf/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -260,6 +263,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
+      playwright-core:
+        specifier: 1.63.0
+        version: 1.63.0
       rolldown:
         specifier: '*'
         version: 1.2.15
