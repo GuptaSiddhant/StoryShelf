@@ -1,5 +1,5 @@
-import type { DesignCallOptions, DesignMeta, DesignRef } from "@storyshelf/core/adapter/design";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { DesignCallOptions, DesignMeta, DesignRef } from "../../../adapters/design.ts";
 import { fetchFigmaMetas, fetchFigmaRenders } from "./api.ts";
 import {
   figmaWithRender,

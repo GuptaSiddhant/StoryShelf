@@ -118,7 +118,7 @@ describe("health endpoints", () => {
   it("POST /api/v1/health is open when auth is disabled", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const app = createShelfApp({ database: db, storage, logger: silentLogger, design: false });
     await app.lifecycle.setup();
     const response = await app.request("/api/v1/health", { method: "POST" });
     expect(response.status).toBe(200);

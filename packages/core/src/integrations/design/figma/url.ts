@@ -1,5 +1,5 @@
 /** Figma URL parsing: validates design links and extracts the file key and node id. */
-import type { DesignRef } from "@storyshelf/core/adapter/design";
+import type { DesignRef } from "../../../adapters/design.ts";
 
 const FIGMA_HOSTS = new Set(["figma.com", "www.figma.com"]);
 const FILE_PATH = /^\/(?:file|design|proto|board|make)\/(?<key>[A-Za-z0-9]+)(?:\/|$)/u;

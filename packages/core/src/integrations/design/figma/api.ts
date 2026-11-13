@@ -1,12 +1,12 @@
+import type { Buffer } from "node:buffer";
 /** Figma REST client: batched metadata and render fetches with a personal access token, via the shared HTTP helper. */
 import type {
   DesignCallOptions,
   DesignClient,
   DesignMeta,
   DesignRef,
-} from "@storyshelf/core/adapter/design";
-import { HttpError, httpBytes, httpJson, type HttpRequestOptions } from "@storyshelf/core/utils";
-import type { Buffer } from "node:buffer";
+} from "../../../adapters/design.ts";
+import { HttpError, httpBytes, httpJson, type HttpRequestOptions } from "../../../utils/index.ts";
 
 const FIGMA_API = "https://api.figma.com/v1";
 /**

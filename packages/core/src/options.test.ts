@@ -24,7 +24,7 @@ describe("resolveShelfOptions", () => {
       design: (builtIn) => [...builtIn, design],
       notifications: { notifiers: false, config: { fromName: "Shelf" } },
     });
-    expect(resolved.design).toEqual([design]);
+    expect(resolved.design?.map((p) => p.metadata.kind)).toEqual(["figma", "fake"]);
     expect(resolved.notifications?.notifiers).toEqual([]);
     expect(resolved.notifications?.email).toEqual([]);
     expect(resolved.notifications?.config).toEqual({ fromName: "Shelf" });
