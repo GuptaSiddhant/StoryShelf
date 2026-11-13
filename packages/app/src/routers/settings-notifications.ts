@@ -97,7 +97,13 @@ async function createChannelRecord(
   form: FormData,
 ): Promise<Response> {
   const config = channelConfig(provider, target, form);
-  const checked = NotificationChannelModel.validateInput(getStore().notifiers, provider, config);
+  const checked = await NotificationChannelModel.validateInput(
+    getStore().notifiers,
+    provider,
+    config,
+    undefined,
+    provider === "email" ? undefined : target,
+  );
   if (!checked.ok) {
     return checked.field === "provider"
       ? await providerError(c, checked.message)

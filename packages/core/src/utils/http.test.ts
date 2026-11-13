@@ -1,7 +1,9 @@
+import { propagation } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Logger } from "../logger.ts";
 import { recordSpans, type RecordedSpan } from "../test-helpers/span-recorder.ts";
 import { HttpError, httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";
+import { overrideGuardedNetwork } from "./outbound-fetch.ts";
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });
@@ -400,5 +402,51 @@ describe("destination: project", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect((error as Error).message).not.toContain("10.9.8.7");
     expect(`${(error as Error).message}${lines.join("")}`).not.toContain("secret");
+  });
+});
+
+describe("traceparent", () => {
+  // Core ships no OpenTelemetry SDK, so stand in for the propagator an operator would register.
+  beforeEach(() => {
+    propagation.setGlobalPropagator({
+      inject: (_context, carrier) => {
+        (carrier as Record<string, string>)["traceparent"] =
+          `00-${"a".repeat(32)}-${"b".repeat(16)}-01`;
+      },
+      extract: (context) => context,
+      fields: () => ["traceparent"],
+    });
+  });
+  afterEach(() => {
+    propagation.disable();
+  });
+
+  it("is sent to an operator destination", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => {
+      await Promise.resolve();
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await httpStatus("https://example.com/hook");
+    const headers = fetchMock.mock.calls[0]?.[1].headers as Record<string, string>;
+    expect(headers["traceparent"]).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/u);
+  });
+
+  it("is not sent to a project destination", async () => {
+    const seen: Record<string, string>[] = [];
+    const restore = overrideGuardedNetwork({
+      transport: async (_target, init) => {
+        await Promise.resolve();
+        seen.push(init.headers);
+        return new Response(null, { status: 204 });
+      },
+    });
+    try {
+      await httpStatus("https://93.184.216.34/hook", { destination: "project" });
+    } finally {
+      restore();
+    }
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toHaveProperty("traceparent");
   });
 });

@@ -138,6 +138,14 @@ export interface OutboundConfig {
   allowHttp?: boolean;
 }
 
+/**
+ * Which reverse proxies in front of this server may name the client (`ShelfConfig.trustProxy`).
+ * A number trusts that many hops counted from this server, whatever their address; a list trusts
+ * peers whose address is one of these IPs or CIDRs; `"fly"` trusts Fly.io's proxy and reads its
+ * `Fly-Client-IP` header. A forwarded header from a peer that is not trusted is never read.
+ */
+export type TrustProxy = number | string[] | "fly";
+
 /** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
 export interface ShelfConfig {
   /** Policy for project-set outbound URLs; see {@link OutboundConfig}. */
@@ -178,6 +186,12 @@ export interface ShelfConfig {
    * helper document; falls back to the request origin when unset.
    */
   publicBaseUrl?: string;
+  /**
+   * Proxies allowed to report the client's IP, which keys rate limits (see {@link TrustProxy}).
+   * Unset keeps the socket peer, so behind a load balancer every client shares the proxy's
+   * buckets. Hosts map it from `TRUST_PROXY` with {@link parseTrustProxy}.
+   */
+  trustProxy?: TrustProxy;
   /**
    * Working directory for capture and inline statics extraction. Defaults to
    * `<os.tmpdir()>/storyshelf`; publishing and capture extract there.
@@ -284,6 +298,42 @@ export const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.objec
 });
 
 /** Zod schema validating the shelf-level configuration. */
+/** Most trusted hops `trustProxy` may count (a longer proxy chain is a misconfiguration). */
+const MAX_TRUSTED_HOPS = 10;
+
+/** Shape of one `trustProxy` entry: an IPv4/IPv6 address with an optional prefix length. */
+const TRUSTED_PROXY_PATTERN = /^[\da-f:.]+(?:\/\d{1,3})?$/iu;
+
+/**
+ * Map a `TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
+ * or `0` is off; `fly` is Fly.io; digits are a hop count; anything else is a comma-separated list
+ * of IPs or CIDRs (checked by {@link validateConfig}).
+ */
+export function parseTrustProxy(raw?: string): TrustProxy | undefined {
+  const value = raw?.trim() ?? "";
+  if (value === "" || value === "false" || value === "0") {
+    return undefined;
+  }
+  if (value === "fly") {
+    return "fly";
+  }
+  if (/^\d+$/u.test(value)) {
+    return Number(value);
+  }
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+}
+
+const trustedProxyEntry = z.string().regex(TRUSTED_PROXY_PATTERN, "an IP address or CIDR");
+
+const trustProxySchema: z.ZodType<TrustProxy> = z.union([
+  z.number().int().min(1).max(MAX_TRUSTED_HOPS),
+  z.literal("fly"),
+  z.array(trustedProxyEntry).min(1, "at least one IP address or CIDR"),
+]);
+
 export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .object({
     outbound: z
@@ -308,6 +358,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     storybookHosting: storybookHostingSchema.optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     publicBaseUrl: z.string().url().optional(),
+    trustProxy: trustProxySchema.optional(),
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     branchTtlDays: z.number().int().positive().nullable().optional(),
