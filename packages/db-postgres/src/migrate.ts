@@ -103,6 +103,8 @@ const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
+const SWITCH_STORIES_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS switch_stories BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
@@ -228,8 +230,14 @@ async function migrateProjectExtras(run: MigrationRunner, logger?: Logger): Prom
   await migrateSnapshotColumns(run, logger);
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
-  await run(RUN_TESTS_ALTER);
+  await migrateProjectSwitches(run);
   await migrateRecentColumns(run);
+}
+
+/** Per-project capture switches added after `run_a11y`; each is an idempotent `ADD COLUMN`. */
+async function migrateProjectSwitches(run: MigrationRunner): Promise<void> {
+  await run(RUN_TESTS_ALTER);
+  await run(SWITCH_STORIES_ALTER);
 }
 
 /** Columns added after the first adapter release; each is an idempotent `ADD COLUMN IF NOT EXISTS`. */

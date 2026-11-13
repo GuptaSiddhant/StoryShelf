@@ -4,6 +4,7 @@
  * handle, as its `tx` store.
  */
 import type { ListOptions, TxStore } from "@storyshelf/core/adapter/database";
+import { listSelection } from "@storyshelf/core/adapter/database";
 import type { SQL, Table } from "drizzle-orm";
 import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
@@ -73,7 +74,11 @@ export async function listMany<T extends Table>(
   table: T,
   opts: ListOptions = {},
 ): Promise<T["$inferSelect"][]> {
-  const query = applyListOptions(drizzle.select().from(table), opts, idOf(table));
+  const query = applyListOptions(
+    drizzle.select(listSelection(table, opts.columns)).from(table),
+    opts,
+    idOf(table),
+  );
   const rows: unknown = await query.all();
   return rows as T["$inferSelect"][];
 }
@@ -137,7 +142,7 @@ export interface DrizzleLike {
   update(table: AnySQLiteTable): {
     set(values: unknown): { where(where: SQL): { returning(): { get(): MaybePromise<unknown> } } };
   };
-  select(): { from(table: AnySQLiteTable): DrizzleSelectChain };
+  select(fields?: Record<string, unknown>): { from(table: AnySQLiteTable): DrizzleSelectChain };
   delete(table: AnySQLiteTable): { where(where: SQL): { run(): MaybePromise<unknown> } };
   $count(table: AnySQLiteTable, where?: SQL): MaybePromise<number>;
   all<T>(query: SQL): MaybePromise<T[]>;

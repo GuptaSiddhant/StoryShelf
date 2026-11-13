@@ -21,7 +21,7 @@ async function arm(options: {
   ready?: () => Promise<{ ok: boolean }>;
 }) {
   const { db } = makeDatabase();
-  const { storage } = makeStorage();
+  const { storage, objects } = makeStorage();
   await db.insert(db.tables.projects, {
     id: "p",
     name: "P",
@@ -54,7 +54,7 @@ async function arm(options: {
     if (typeof scheduled !== "function") throw new Error("retention timer was not scheduled");
     await (scheduled as () => Promise<void>)();
   };
-  return { db, timer, run, purge, warn, error };
+  return { db, storage, objects, timer, run, purge, warn, error };
 }
 
 describe("background retention", () => {
@@ -186,6 +186,55 @@ describe("background retention", () => {
       );
       expect(await db.get(db.tables.aiUsage, "expired")).toBeNull();
       timer?.stop();
+    });
+
+    it("reclaims per-build copies whose blob exists, keeping the manifest, and resumes next sweep", async () => {
+      const hash = "a".repeat(64);
+      const { db, objects, run } = await arm({ capability: false, config: {} });
+      await db.insert(db.tables.builds, {
+        id: "b1",
+        projectId: "p",
+        gitSha: "x",
+        gitBranch: "main",
+        status: "approved",
+        retentionState: "available",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      objects.set(
+        "p/builds/b1/storybook/manifest.json",
+        Buffer.from(JSON.stringify({ "a.js": hash })),
+      );
+      objects.set("p/builds/b1/storybook/a.js", Buffer.from("a"));
+      objects.set(`content/${hash}`, Buffer.from("a"));
+      await run();
+      expect(objects.has("p/builds/b1/storybook/a.js")).toBe(false);
+      expect(objects.has("p/builds/b1/storybook/manifest.json")).toBe(true);
+      expect(objects.has(`content/${hash}`)).toBe(true);
+    });
+
+    it("stops the copy reclaim when the timer is stopped", async () => {
+      const { db, objects, run, timer } = await arm({ capability: false, config: {} });
+      await db.insert(db.tables.builds, {
+        id: "b1",
+        projectId: "p",
+        gitSha: "x",
+        gitBranch: "main",
+        status: "approved",
+        retentionState: "available",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      const hash = "a".repeat(64);
+      objects.set(
+        "p/builds/b1/storybook/manifest.json",
+        Buffer.from(JSON.stringify({ "a.js": hash })),
+      );
+      objects.set("p/builds/b1/storybook/a.js", Buffer.from("a"));
+      objects.set(`content/${hash}`, Buffer.from("a"));
+      timer?.stop();
+      await run();
+      expect(objects.has("p/builds/b1/storybook/a.js")).toBe(true);
     });
 
     it("still runs when branch GC is off, because the build purge is on", async () => {
