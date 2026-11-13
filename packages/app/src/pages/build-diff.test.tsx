@@ -85,12 +85,6 @@ describe("review workspace page", () => {
     expect(html).toContain("All 3");
   });
 
-  it("groups the snapshot list under one component header and labels each dot", async () => {
-    const { html } = await reviewPage();
-    expect(html.match(/<h3 class="[^"]*film-group-head/gu)).toHaveLength(1);
-    expect(html).toContain('<span class="visually-hidden">changed</span>');
-  });
-
   it("selects the first open snapshot and offers approve/reject with toasts", async () => {
     const { html } = await reviewPage();
     expect(html).toContain("data-approve");
@@ -118,6 +112,14 @@ describe("review workspace page", () => {
   it("uses the wide layout so the workspace is not capped at the reading width", async () => {
     const { html } = await reviewPage();
     expect(html).toContain("ss-shell-content-wide-");
+  });
+});
+
+describe("review page snapshot list", () => {
+  it("groups under one component header and labels each status dot", async () => {
+    const { html } = await reviewPage();
+    expect(html.match(/<h3 class="[^"]*film-group-head/gu)).toHaveLength(1);
+    expect(html).toContain('<span class="visually-hidden">changed</span>');
   });
 });
 

@@ -31,10 +31,11 @@ const snap = (
 const project = { slug: "demo" } as Project;
 const build = { id: "b1" } as Build;
 
+const titled = (id: string, storyTitle: string): Snapshot =>
+  ({ ...snap(id, "changed"), storyTitle }) as Snapshot;
+
 describe("groupSnapshots order", () => {
   it("sorts groups by component title and keeps first-appearance order within one", () => {
-    const titled = (id: string, storyTitle: string): Snapshot =>
-      ({ ...snap(id, "changed"), storyTitle }) as Snapshot;
     const order = groupSnapshots([titled("1", "Zeta"), titled("2", "Alpha"), titled("3", "Zeta")]);
     expect(order.map((group) => group.primary.id)).toEqual(["2", "1", "3"]);
   });
