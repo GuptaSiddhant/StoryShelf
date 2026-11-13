@@ -62,7 +62,7 @@ function recordingNotifier(sent: string[]): NotifierProvider {
 async function seed(status: string, testing = true, sent: string[] = []) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await createTestProject(db, db.tables, { name: "app" });
+  const project = await createTestProject(db, db.tables, { name: "web" });
   const created = await createTestBuild(db, db.tables, project.id);
   // `reviewing` is only reached from `capturing`, as a run finalizes.
   if (status === "reviewing") await new BuildModel(db).setStatus(created.id, "capturing");
@@ -75,7 +75,7 @@ async function seed(status: string, testing = true, sent: string[] = []) {
     notifications: { notifiers: [recordingNotifier(sent)] },
     ...(testing ? { testing: { runner: stubRunner() } } : {}),
   });
-  const url = `/api/v1/projects/app/builds/${created.id}/cancel`;
+  const url = `/api/v1/projects/web/builds/${created.id}/cancel`;
   await createDatabaseCaptureQueue(db, { kinds: ["capture"] }).enqueueJob({
     kind: "capture",
     buildId: created.id,
@@ -117,7 +117,7 @@ describe("POST /builds/:buildId/cancel", () => {
   it("raises build:cancelled, never build:failed", async () => {
     const sent: string[] = [];
     const { app, url } = await seed("capturing", true, sent);
-    const created = await app.request("/api/v1/projects/app/notification-channels", {
+    const created = await app.request("/api/v1/projects/web/notification-channels", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ provider: "log", config: {} }),
@@ -135,7 +135,7 @@ describe("POST /builds/:buildId/cancel", () => {
     await builds.setStatus(build.id, "approved");
     await builds.setStatus(build.id, "failed");
     expect((await builds.get(build.id))?.status).toBe("cancelled");
-    const retried = await app.request(`/api/v1/projects/app/builds/${build.id}/retry`, {
+    const retried = await app.request(`/api/v1/projects/web/builds/${build.id}/retry`, {
       method: "POST",
     });
     expect(retried.status).toBe(202);
@@ -144,7 +144,7 @@ describe("POST /builds/:buildId/cancel", () => {
 
   it("answers 404 for an unknown build and without testing (class testing)", async () => {
     const { app } = await seed("capturing");
-    const missing = await app.request("/api/v1/projects/app/builds/nope/cancel", {
+    const missing = await app.request("/api/v1/projects/web/builds/nope/cancel", {
       method: "POST",
     });
     expect(missing.status).toBe(404);

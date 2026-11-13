@@ -155,6 +155,7 @@ const builds = defineTable("builds", {
   reviewCycle: "review_cycle",
   reviewRequestedCycle: "review_requested_cycle",
   captureJobId: "capture_job_id",
+  manifestSha256: "manifest_sha256",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
