@@ -39,6 +39,8 @@ export interface AdapterSetupContext {
   readonly config: ShelfConfig;
   /** Scoped logger for setup-time diagnostics. */
   readonly logger: Logger;
+  /** Running release (`major.minor.patch`), when the host knows it; the database adapter records it. */
+  readonly release?: string | undefined;
 }
 
 /** Result of an adapter's ongoing health probe. */

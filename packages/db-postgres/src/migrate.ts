@@ -7,6 +7,8 @@
  */
 import {
   duplicateGroupsSql,
+  gatedMigration,
+  sqlSchemaLevelStore,
   logSkippedIndex,
   parseUniqueIndex,
 } from "@storyshelf/core/adapter/database";
@@ -291,11 +293,12 @@ const MIGRATION_LOCK_KEY = 5_370_011_001;
 export async function runMigrationsLocked(
   session: MigrationSession,
   logger?: Logger,
+  release?: string,
 ): Promise<void> {
   await session(async (run) => {
     await run(`SELECT pg_advisory_lock(${MIGRATION_LOCK_KEY})`);
     try {
-      await runMigrations(run, logger);
+      await runMigrations(run, logger, release);
     } finally {
       await run(`SELECT pg_advisory_unlock(${MIGRATION_LOCK_KEY})`);
     }
@@ -303,7 +306,22 @@ export async function runMigrationsLocked(
 }
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+export async function runMigrations(
+  run: MigrationRunner,
+  logger?: Logger,
+  release?: string,
+): Promise<void> {
+  await gatedMigration({
+    release,
+    logger,
+    store: sqlSchemaLevelStore(run, "postgres"),
+    migrate: async () => {
+      await migrateEverything(run, logger);
+    },
+  });
+}
+
+async function migrateEverything(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await run(DDL);
   await migrateCoreColumns(run);
