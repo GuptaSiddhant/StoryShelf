@@ -53,14 +53,19 @@ describe("resolveSettings from the environment", () => {
   it.each([
     ["1", true],
     ["true", true],
+    ["", true],
     ["0", false],
-    ["", false],
+    ["false", false],
   ])("reads STORYSHELF_REUSE_PAGES=%j as %j", (raw, expected) => {
     expect(settingsFor({ STORYSHELF_REUSE_PAGES: raw }).reusePages).toBe(expected);
   });
 });
 
 describe("resolveSettings options", () => {
+  it("reuses pages by default", () => {
+    expect(settingsFor({}).reusePages).toBe(true);
+  });
+
   it("prefers an explicit option over the environment, an explicit false included", () => {
     const settings = settingsFor(
       {

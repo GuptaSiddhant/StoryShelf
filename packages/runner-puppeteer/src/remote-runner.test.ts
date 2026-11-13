@@ -103,15 +103,20 @@ const fake = vi.hoisted(() => {
     createBrowserContext: async () => {
       state.contextsOpened += 1;
       let closed = false;
+      const opened: ReturnType<typeof makePage>[] = [];
       return await Promise.resolve({
         newPage: async () => {
           state.pagesOpened += 1;
-          return await Promise.resolve(makePage());
+          const page = makePage();
+          opened.push(page);
+          return await Promise.resolve(page);
         },
         close: async () => {
           if (!closed) {
             closed = true;
             state.contextsClosed += 1;
+            // Closing a context closes its pages, as a real browser does.
+            await Promise.all(opened.map(async (page) => await page.close()));
           }
           await Promise.resolve();
         },
