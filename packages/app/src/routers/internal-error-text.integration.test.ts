@@ -28,6 +28,7 @@ function boot() {
     storage,
     logger: logger as never,
     testing: { runner: stubRunner() },
+    notifications: { notifiers: [] },
   });
   const json = async (method: string, path: string, body?: unknown) =>
     await app.request(`/api/v1${path}`, {
