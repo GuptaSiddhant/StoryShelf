@@ -159,14 +159,14 @@ export async function renderProjectBuildsPage(
 
   return (
     <DocumentLayout
-      title={project.name}
+      title={`Builds · ${project.name}`}
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
     >
       <PageHeader
         title="Builds"
         description={
           <>
-            {project.gitRepository ?? project.slug} · default branch{" "}
+            {project.gitRepository ? `${project.gitRepository} · ` : ""}default branch{" "}
             <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
           </>
         }

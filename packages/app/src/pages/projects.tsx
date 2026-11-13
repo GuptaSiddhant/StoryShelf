@@ -86,7 +86,6 @@ function ProjectGrid({
           summary={summary}
           urls={{
             library: urls.library(summary.project.slug),
-            storybook: urls.short(summary.project.slug),
             review: summary.latest
               ? urls.buildDiff(summary.project.slug, summary.latest.id)
               : urls.library(summary.project.slug),

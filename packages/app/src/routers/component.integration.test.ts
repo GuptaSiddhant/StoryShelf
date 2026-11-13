@@ -195,7 +195,7 @@ describe("component page", () => {
     const library = await (await get(app, "/projects/app/library")).text();
     expect(library).toContain('href="/projects/app/components/src/Button.stories.tsx"');
     const review = await (await get(app, "/projects/app/builds/b2/diff?snapshot=s5")).text();
-    expect(review).toContain("View component");
+    expect(review).toContain("View in Library");
     // Links from a build or review page carry that build's id.
     expect(review).toContain(
       "/projects/app/components/src/Button.stories.tsx?build=b2#button--primary",
