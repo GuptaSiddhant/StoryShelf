@@ -2,6 +2,7 @@
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { columnsExcept } from "../adapters/database.ts";
 import { allowedFrom, enteringFrom } from "../lifecycle/build-lifecycle.ts";
 import type { Logger } from "../logger.ts";
 import type { Build } from "../schema/build.ts";
@@ -51,6 +52,9 @@ export interface BuildTables {
 }
 
 /** Data operations for build records. */
+/** A build row without its stored Storybook test results, as {@link BuildModel.listSummary} returns it. */
+export type BuildSummary = Omit<Build, "testResults">;
+
 export class BuildModel {
   private readonly tables: BuildTables;
   private readonly db: DatabaseAdapter;
@@ -95,6 +99,14 @@ export class BuildModel {
   }
 
   async list(projectId: string, filter: BuildListFilter = {}): Promise<Build[]> {
+    return await this.listColumns(projectId, filter);
+  }
+
+  private async listColumns(
+    projectId: string,
+    filter: BuildListFilter,
+    columns?: readonly string[],
+  ): Promise<Build[]> {
     const conditions = this.listConditions(projectId, filter);
     if (filter.labelKey && filter.labelValue) {
       const ids = await this.buildIdsWithLabel(projectId, filter.labelKey, filter.labelValue);
@@ -107,7 +119,17 @@ export class BuildModel {
       where: and(...conditions),
       orderBy: desc(col(this.tables.builds, "createdAt")),
       ...(filter.limit === undefined ? {} : { limit: filter.limit }),
+      ...(columns === undefined ? {} : { columns }),
     })) as unknown as Build[];
+  }
+
+  /**
+   * {@link list} without `testResults` (a large JSON text), for a caller that only reads the
+   * build's own fields, such as a library or component page choosing the newest build.
+   */
+  async listSummary(projectId: string, filter: BuildListFilter = {}): Promise<BuildSummary[]> {
+    const columns = columnsExcept(this.tables.builds, "testResults");
+    return await this.listColumns(projectId, filter, columns);
   }
 
   /** The status and branch conditions of a listing, after the project's own. */

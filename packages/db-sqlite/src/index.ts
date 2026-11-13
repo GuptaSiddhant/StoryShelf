@@ -7,6 +7,7 @@ import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { gatedSyncMigration } from "./gated-migration.ts";
 import { rollbackQuietly } from "./lifecycle-transaction.ts";
 import {
   execUnless,
@@ -58,9 +59,8 @@ export function createSqliteDatabase(
         category: "database",
       },
       tables: schema,
-      migrate: async ({ logger }) => {
-        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
-        runMigrations(sqlite, logger);
+      migrate: async ({ logger, release }) => {
+        await migrateGated(sqlite, logger, release);
         await activateRetention(path, retention);
       },
       close: () => {
@@ -192,6 +192,30 @@ function applyIdentityStatements(sqlite: DatabaseSync, logger: Logger | undefine
     }
   }
   sqlite.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
+}
+
+/** Migrate, skip or refuse by the release recorded in `schema_meta` (ADR 0053). */
+async function migrateGated(
+  sqlite: DatabaseSync,
+  logger: Logger | undefined,
+  release: string | undefined,
+): Promise<void> {
+  await gatedSyncMigration(
+    {
+      exec: (sql) => {
+        sqlite.exec(sql);
+      },
+      all: (sql) => sqlite.prepare(sql).all(),
+    },
+    {
+      release,
+      logger,
+      migrate: async () => {
+        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
+        runMigrations(sqlite, logger);
+      },
+    },
+  );
 }
 
 function runMigrations(sqlite: DatabaseSync, logger: Logger | undefined): void {
