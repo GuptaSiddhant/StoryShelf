@@ -11,6 +11,7 @@ import {
   VStack,
   formatSize,
   sizesDiffer,
+  statusLabel,
   statusTone,
   type ImageSize,
 } from "../ui/components.tsx";
@@ -185,7 +186,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
         </h2>
         <p class={viewerMeta}>
           <Badge tone={statusTone(selected.status)} icon>
-            {selected.status}
+            {statusLabel(selected.status)}
           </Badge>
           <UnstableBadge snapshot={selected} />
           <span>

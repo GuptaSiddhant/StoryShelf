@@ -10,6 +10,7 @@ import {
   Meta,
   PageHeader,
   Table,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
@@ -50,7 +51,7 @@ function LabelBuildRow(props: {
         </Meta>
       </td>
       <td>
-        <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+        <Badge tone={statusTone(build.status)}>{statusLabel(build.status)}</Badge>
       </td>
       <td>
         <div>{build.authorName ?? "—"}</div>

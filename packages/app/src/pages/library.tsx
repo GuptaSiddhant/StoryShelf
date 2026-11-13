@@ -14,6 +14,7 @@ import {
   Meta,
   PageHeader,
   SelectField,
+  statusLabel,
   statusTone,
   Badge,
 } from "../ui/components.tsx";
@@ -183,7 +184,7 @@ function LibraryHeader(props: {
             {build.gitBranch} · {build.gitSha.slice(0, 7)}
           </a>{" "}
           · {new Date(build.createdAt).toLocaleString()}{" "}
-          <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+          <Badge tone={statusTone(build.status)}>{statusLabel(build.status)}</Badge>
         </>
       }
       actions={

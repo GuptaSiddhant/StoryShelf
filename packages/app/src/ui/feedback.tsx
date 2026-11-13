@@ -219,9 +219,7 @@ const statValueTones: Record<StatTone, Promise<string>> = {
 const statLabel = css`
   /* stat-label */
   color: var(--text-secondary);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
 `;
 
 const metaText = css`

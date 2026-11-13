@@ -1,6 +1,6 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Kbd, statusTone } from "../ui/components.tsx";
+import { Badge, Button, Kbd, statusLabel, statusTone } from "../ui/components.tsx";
 import {
   actionBar,
   actionGroup,
@@ -253,7 +253,7 @@ export function DiffActionBar(
         <DecisionButtons project={project} build={build} selected={selected} target={target} />
       ) : (
         <Badge tone={statusTone(selected.status)} icon>
-          {selected.status}
+          {statusLabel(selected.status)}
         </Badge>
       )}
       <div class={actionHints}>

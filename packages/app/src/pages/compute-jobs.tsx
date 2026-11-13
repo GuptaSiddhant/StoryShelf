@@ -11,6 +11,7 @@ import {
   SectionTitle,
   Table,
   VStack,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
 
@@ -36,7 +37,7 @@ function QueueRow(props: { slug: string; job: QueueView }): Rendered {
         <a href={`/projects/${slug}/builds/${job.buildId}`}>{job.buildId.slice(0, 8)}</a>
       </td>
       <td>
-        <Badge tone={statusTone(job.status)}>{job.status}</Badge>
+        <Badge tone={statusTone(job.status)}>{statusLabel(job.status)}</Badge>
       </td>
       <td>
         <Meta as="span">{new Date(job.queuedAt).toLocaleTimeString()}</Meta>
@@ -117,7 +118,7 @@ function BuildRow(props: {
         </Meta>
       </td>
       <td>
-        <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+        <Badge tone={statusTone(build.status)}>{statusLabel(build.status)}</Badge>
       </td>
       <td>
         <Meta as="span">
