@@ -90,7 +90,7 @@ controls only its build's path and can never take over the app.
   - `/offline` is the offline home page. It is static and rendered by the worker from IndexedDB:
     one link per kept project, with the build's commit and the time of the last sync.
   - Responses built from the cache carry the same content-type and security headers that
-    `servePublishedFile` sends.
+    `servePublishedFile` sends. (see amendment 2026-11-11)
 - **Limits on private data.**
   - `POST /auth/logout` answers with `Clear-Site-Data: "cache", "storage"`. That clears Cache
     Storage and IndexedDB and unregisters the worker. Before that, the page unsubscribes the
@@ -165,3 +165,10 @@ controls only its build's path and can never take over the app.
   vectors, avoids a new production dependency.
 - **A cached app shell for offline review.** Rejected: review needs the server, and cached
   authenticated HTML leaks between users on a shared machine.
+
+## Amendment, 2026-11-11 (hosting modes, #916)
+
+- **Offline Storybooks require `trusted` mode** (path hosting on the app origin, ADR 0010 amendment). Only there can the worker serve a Storybook for the app origin's navigations. In the other modes `GET /api/v1/offline` and the opt-in UI say so, and nothing is cached. A sandboxed Storybook has an opaque origin that the worker does not control, and a worker per subdomain would orphan each build's cache and be cleared only on the app origin.
+- **The worker never copies a sandbox header.** Its answers must not carry a sandbox header copied from published files. The claim in section 3 that cached answers carry the same security headers as `servePublishedFile` is withdrawn.
+- **Trusted-mode threat.** In `trusted` mode uploaded code runs on the app origin, so it can read and poison that origin's Cache Storage and IndexedDB, including other projects' offline copies. The cache is therefore not a boundary between projects in that mode.
+- **Order.** Install, web push and the offline home page do not wait for the hosting modes. The offline-Storybook slice waits for `config.storybookHosting` (#356).

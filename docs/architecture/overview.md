@@ -13,8 +13,8 @@ A self-hosted visual testing platform for Storybook. Run visual regression tests
 ```
 Developer pushes code
   → CI runs: npx storyshelf upload --token=xxx
-  → CLI builds Storybook (if needed), zips the static build
-  → CLI uploads the zip + metadata (sha, branch, message, author) to StoryShelf server
+  → CLI builds Storybook only when the build directory is missing (or with --force-build), then streams the directory as a zip (file by file when the server's inline limit refuses the zip)
+  → CLI uploads the zip + metadata (git sha, branch, message, author, labels, affected-only) to StoryShelf server
   → Server creates a build, stores the zip, and enqueues capture (async, returns 202)
   → The server's job consumer: unzip → serve statics → render every story via Playwright
   → Server runs pixel diff against per-branch baselines (fallback to default branch)

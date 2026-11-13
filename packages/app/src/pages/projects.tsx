@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
@@ -101,7 +102,7 @@ function ProjectGrid({
 /** Projects overview: searchable project cards with review state, plus setup help. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
   const { db, user, config } = getStore();
-  const urls = createUrlBuilder("/", config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(config));
   const projects = await new ProjectModel(db).list();
   const summaries = await Promise.all(projects.map((project) => summarize(project)));
   const canCreate = !user || user.role === "admin" || user.role === "member";

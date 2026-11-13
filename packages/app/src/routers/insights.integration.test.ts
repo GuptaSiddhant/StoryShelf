@@ -34,6 +34,7 @@ const auth = stubAuth(null, {
 
 const cookie = (who: keyof typeof users): Record<string, string> => ({
   cookie: `storyshelf_session=${who}`,
+  "sec-fetch-site": "same-origin",
   "content-type": "application/json",
 });
 

@@ -223,8 +223,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     // Disabled story is not counted
     expect(final.snapshotCount).toBeGreaterThan(0);
-    // 7 plain captures + 5 from the Themed modes stories + 5 accessibility stories; the disabled story adds none.
-    expect(final.snapshotCount).toBeLessThan(18);
+    // 7 plain captures + 5 from the Themed modes stories + 5 accessibility stories + 8 leaking
+    // stories (ADR 0052); the disabled story adds none.
+    expect(final.snapshotCount).toBeLessThan(26);
 
     const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`);
     const snapshots = await readJson<Snapshot[]>(res);

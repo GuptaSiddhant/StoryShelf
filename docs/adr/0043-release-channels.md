@@ -118,7 +118,7 @@ The owner asked for short notes, with the detail kept in `CHANGELOG.md`.
 
 The owner decided that readers and demo visitors see only released behaviour.
 
-- **Website.**
+- **Website** (the `/next/` part was dropped on 2026-11-11, see below).
   - `/` is built from the latest stable release tag. `/next/` is built from `main`, carries an
     "unreleased" banner and is kept out of search engines (`noindex`, canonical links to stable).
   - One Pages workflow builds both, with separate search indexes, on every push to `main` and every
@@ -130,6 +130,20 @@ The owner decided that readers and demo visitors see only released behaviour.
   - There is no `next` demo for now. The owner may host one on another cloud later.
   - The app's own Storybook upload (`app-storybook.yml`) still runs on every push to `main`: it uses
     the demo as a CI tool, not as release documentation.
+
+## Amendment, 2026-11-11 (next by hand, previews of main, stable-only docs)
+
+The owner decided that weekly and P0 releases make a daily `next` build unnecessary.
+
+- **`next` only by hand.** Decision 3 changes: `release.yml` has no schedule, and a `next` build is
+  published only by a `workflow_dispatch` with channel `next` while changesets are pending. Use it,
+  for example, before a breaking minor so early users can install `@next`.
+- **`main` is previewed, not published.** Decision 8 changes: `release-preview.yml` also runs on
+  pushes to `main` that change a package, so `main` installs from pkg.pr.new (`@main` or a commit)
+  and adds nothing to npm.
+- **The website has one version.** The 2026-11-10 `/next/` build is dropped: `main` is not something
+  users install, so docs for it would describe what nobody can run. The website is built from the
+  latest stable release tag only, and deployed after each stable release.
 
 ## Operations
 

@@ -50,6 +50,11 @@ export interface EnginePasskeyInfo {
 
 /** Auth singleton: the shelf authentication surface (not an adapter). */
 export interface Auth {
+  /**
+   * Whether the session cookie is the `__Host-` one (`HOST_SESSION_COOKIE`), which `subdomain`
+   * hosting requires (ADR 0051, decision 9). Absent or false: the `__Secure-` / plain names.
+   */
+  hostSessionCookie?: boolean;
   /** Raw engine handler (mount at `/api/auth/*`). */
   handler: (request: Request) => Response | Promise<Response>;
   /** Login methods in display order (drives the login page). */
@@ -88,6 +93,11 @@ export interface Auth {
   createSession: (user: AuthUser) => Promise<string>;
   /** Revoke one session by token (accepts the signed cookie value). */
   destroySession: (sessionToken: string) => Promise<void>;
+  /**
+   * Delete expired `session` and `verification` rows whose `expires_at` is before `cutoffIso`, in
+   * bounded batches. Better Auth never sweeps them itself, so the retention timer calls this.
+   */
+  purgeExpired?: (cutoffIso: string) => Promise<{ sessions: number; verifications: number }>;
 }
 
 /** Minimum password length for local accounts (matches legacy policy). */

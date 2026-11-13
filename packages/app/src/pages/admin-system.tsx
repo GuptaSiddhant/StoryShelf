@@ -1,5 +1,6 @@
 import type { RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import type { RetentionPause } from "@storyshelf/core/adapter/database";
+import { storybookHostingOf } from "@storyshelf/core/config";
 import type { ShelfConfig } from "@storyshelf/core/config";
 import type { CredentialProbe } from "@storyshelf/core/models";
 import type { CaptureHostSummary } from "@storyshelf/core/utils";
@@ -226,7 +227,7 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
       {capture ? <CaptureSizing capture={capture} /> : null}
       <Meta>
         Scratch dir {formatOptional(config.scratchDir)} · Published domain{" "}
-        {formatOptional(config.publishedBaseDomain)} · Max upload{" "}
+        {formatOptional(storybookHostingOf(config)?.baseDomain)} · Max upload{" "}
         {formatOptional(config.maxUploadBytes)} bytes
       </Meta>
     </Card>
