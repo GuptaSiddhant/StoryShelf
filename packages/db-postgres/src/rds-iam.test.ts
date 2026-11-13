@@ -1,11 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const poolConfigs: Record<string, unknown>[] = [];
+const queries: string[] = [];
+let failQueries = false;
+const pools: { end: ReturnType<typeof vi.fn> }[] = [];
+
+/** Answer like a server unless `failQueries` is set. */
+async function answer(sql: string): Promise<{ rows: unknown[] }> {
+  queries.push(sql);
+  if (failQueries) {
+    throw new Error("connection refused");
+  }
+  return { rows: [] };
+}
 vi.mock("pg", () => ({
   Pool: vi.fn(function pool(this: Record<string, unknown>, config: Record<string, unknown>) {
     poolConfigs.push(config);
-    this["query"] = vi.fn(async () => ({ rows: [] }));
+    this["query"] = vi.fn(answer);
+    this["connect"] = vi.fn(async () => ({ query: answer, release: vi.fn() }));
     this["end"] = vi.fn(async () => {});
+    pools.push(this as { end: ReturnType<typeof vi.fn> });
   }),
 }));
 
@@ -35,6 +49,9 @@ function passwordOf(index = 0): () => Promise<string> {
 
 afterEach(() => {
   poolConfigs.length = 0;
+  queries.length = 0;
+  pools.length = 0;
+  failQueries = false;
 });
 
 describe("createRdsIamDatabase", () => {
@@ -103,5 +120,33 @@ describe("createRdsIamDatabase", () => {
       region: "eu-west-1",
     });
     vi.doUnmock("@aws-sdk/rds-signer");
+  });
+
+  describe("lifecycle", () => {
+    const setupInput = { config: {}, logger: undefined as never };
+
+    it("sets up twice without error", async () => {
+      const db = createRdsIamDatabase({ ...base, signer: fakeSigner() });
+      await db.lifecycle?.setup(setupInput);
+      await db.lifecycle?.setup(setupInput);
+      expect(queries.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS projects"))).toBe(true);
+    });
+
+    it("reports health ok, rejects when the database is unreachable, and not ok once closed", async () => {
+      const db = createRdsIamDatabase({ ...base, signer: fakeSigner() });
+      expect(await db.lifecycle?.health()).toEqual({ ok: true });
+      failQueries = true;
+      await expect(db.lifecycle?.health()).rejects.toThrow("connection refused");
+      failQueries = false;
+      await db.lifecycle?.teardown();
+      expect((await db.lifecycle?.health())?.ok).toBe(false);
+    });
+
+    it("tears down twice, ending the pool it owns", async () => {
+      const db = createRdsIamDatabase({ ...base, signer: fakeSigner() });
+      await db.lifecycle?.teardown();
+      await db.lifecycle?.teardown();
+      expect(pools[0]?.end).toHaveBeenCalled();
+    });
   });
 });
