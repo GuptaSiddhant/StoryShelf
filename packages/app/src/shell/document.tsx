@@ -102,7 +102,7 @@ const AppChrome: FC<{
   <>
     <div class={shellRoot}>
       <Sidebar nav={nav} name={name} logo={logo} />
-      <div>
+      <div data-shell-main>
         <TopBar nav={nav} />
         <main
           id="main-content"

@@ -13,6 +13,7 @@ async function page(
   seed?: (db: Db) => Promise<void>,
   ui?: Record<string, unknown>,
   testing = true,
+  headers?: Record<string, string>,
 ): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -24,7 +25,7 @@ async function page(
     ...(ui ? { ui } : {}),
     logger: createShelfLogger({ level: "silent" }),
   });
-  return await (await app.request(path)).text();
+  return await (await app.request(path, headers ? { headers } : undefined)).text();
 }
 
 const twoProjects = async (db: Db): Promise<void> => {
@@ -176,5 +177,21 @@ describe("top bar and sidebar footer", () => {
     expect(projects).toContain('aria-label="Project: All projects"');
     expect(projects).not.toContain('aria-label="Breadcrumb"');
     expect(admin).not.toContain('aria-label="Breadcrumb"');
+  });
+});
+
+describe("landmarks and headings", () => {
+  it("the not-found page has one h1, a main, and the app chrome for a signed-in visitor", async () => {
+    const html = await page("/projects/missing/builds", undefined, undefined, true, {
+      accept: "text/html",
+    });
+    expect(html.match(/<h1[ >]/gu)).toHaveLength(1);
+    expect(html).toContain('id="main-content"');
+    expect(html).toContain('aria-label="Primary"');
+  });
+
+  it("the collapse button says whether the sidebar is expanded", async () => {
+    const html = await page("/projects");
+    expect(html).toMatch(/<button[^>]*data-sidebar-collapse[^>]*aria-expanded="true"/u);
   });
 });

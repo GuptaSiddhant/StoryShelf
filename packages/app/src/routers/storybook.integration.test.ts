@@ -159,7 +159,11 @@ describe("storybook routes", () => {
     const { app } = await seededApp();
     const response = await app.request("/projects/test-project/storybook/build/b1/");
     expect(response.status).toBe(200);
-    expect(await response.text()).toContain("iframe");
+    const body = await response.text();
+    expect(body).toContain("iframe");
+    // Landmarks: one h1 and a main around the frame.
+    expect(body.match(/<h1[ >]/gu)).toHaveLength(1);
+    expect(body).toMatch(/<main>[\s\S]*<iframe/u);
   });
 
   it("serves a preparing state when statics are not yet extracted", async () => {
@@ -509,6 +513,6 @@ describe("short links for a signed-out visitor (auth on)", () => {
     const responses = await Promise.all(paths.map(async (path) => await app.request(path)));
     expect(
       responses.map((response) => [response.status, response.headers.get("location")]),
-    ).toEqual(paths.map(() => [302, "/auth/login"]));
+    ).toEqual(paths.map((path) => [302, `/auth/login?return_to=${encodeURIComponent(path)}`]));
   });
 });

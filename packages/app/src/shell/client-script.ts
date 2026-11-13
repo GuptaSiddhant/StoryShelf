@@ -86,32 +86,57 @@ function foldPart(): string {
   `;
 }
 
-/** Desktop rail collapse (persisted) and the mobile drawer. */
-function sidebarPart(): string {
+/** The mobile drawer: focus moves in on open, the page behind is inert, focus returns on close. */
+function drawerPart(): string {
   return `
+    function syncCollapse(){
+      var c=document.querySelector('[data-sidebar-collapse]');
+      if(c){ c.setAttribute('aria-expanded',document.documentElement.getAttribute('data-sidebar')==='rail'?'false':'true'); }
+    }
+    inits.push(syncCollapse);
     function setDrawer(open){
       var sidebar=document.getElementById('sidebar');
       if(!sidebar) return;
+      var wasOpen=sidebar.classList.contains('sidebar--open');
       sidebar.classList.toggle('sidebar--open',open);
+      // The page behind an open drawer is not reachable by Tab or a screen reader.
+      var main=document.querySelector('[data-shell-main]');
+      if(main){ if(open){ main.setAttribute('inert',''); } else { main.removeAttribute('inert'); } }
+      if(open&&!wasOpen){
+        var first=sidebar.querySelector('a[href]');
+        if(first) try{ first.focus(); }catch(_){}
+      }
       var backdrop=document.querySelector('[data-sidebar-backdrop]');
       if(backdrop){ backdrop.hidden=!open; }
       var btn=document.querySelector('[data-sidebar-toggle]');
       if(btn){ btn.setAttribute('aria-expanded',open?'true':'false'); }
-    }
+    }`;
+}
+
+/** Desktop rail collapse (persisted) and the mobile drawer. */
+function sidebarPart(): string {
+  return `
     document.addEventListener('click',function(e){
       var t=e.target instanceof Element ? e.target : null;
       if(!t) return;
       if(t.closest('[data-sidebar-toggle]')){
         var sidebar=document.getElementById('sidebar');
         setDrawer(!(sidebar&&sidebar.classList.contains('sidebar--open')));
+        if(!(sidebar&&sidebar.classList.contains('sidebar--open'))){
+          var tg=t.closest('[data-sidebar-toggle]');
+          if(tg) tg.focus();
+        }
       } else if(t.closest('[data-sidebar-backdrop]')){
         setDrawer(false);
+        var tb=document.querySelector('[data-sidebar-toggle]');
+        if(tb) tb.focus();
       } else if(t.closest('[data-nav-fold]')){
         toggleGroup(t.closest('[data-nav-fold]').getAttribute('data-nav-fold'));
       } else if(t.closest('[data-sidebar-collapse]')){
         var next=document.documentElement.getAttribute('data-sidebar')==='rail' ? 'full' : 'rail';
         shell.applySidebar(next);
         shell.writeCookie(shell.sidebarCookie,next);
+        syncCollapse();
       }
     });
     document.addEventListener('keydown',function(e){
@@ -409,6 +434,16 @@ function focusPart(): string {
   return `
     document.addEventListener('htmx:afterSwap',function(e){
       var target=e.detail && e.detail.target;
+      if(target===document.body){
+        // A whole-page swap (review verdict, next snapshot, a failed sign-in) drops the focused
+        // element: put focus on the page's main heading so keyboard and screen-reader users stay.
+        var heading=document.querySelector('[data-focus-heading]') || document.querySelector('main h1');
+        if(heading){
+          if(!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex','-1');
+          try{ heading.focus({preventScroll:true}); }catch(_){}
+        }
+        return;
+      }
       if(target&&target.querySelector&&target!==document.body){
         var focusable=target.querySelector('[autofocus], input, select, textarea, button');
         if(focusable) try{ focusable.focus(); }catch(_){}
@@ -433,6 +468,7 @@ export function clientScript(): string {
     csrfPart(),
     originPart(),
     themePart(),
+    drawerPart(),
     sidebarPart(),
     foldPart(),
     dropdownPart(),

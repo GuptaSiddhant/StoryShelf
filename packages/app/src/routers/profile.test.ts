@@ -87,7 +87,7 @@ describe("profile page", () => {
   it("redirects anonymous users to login", async () => {
     const response = await testApp(await seed()).request("/profile");
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/auth/login");
+    expect(response.headers.get("location")).toBe("/auth/login?return_to=%2Fprofile");
   });
 
   it("renders the user, provider, and memberships", async () => {
