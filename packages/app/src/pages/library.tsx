@@ -18,6 +18,7 @@ import {
   Badge,
 } from "../ui/components.tsx";
 import { ProjectDesignLinks } from "./design-links.tsx";
+import { GetStarted } from "./get-started.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 import { LibraryGrid } from "./library-grid.tsx";
 import { entriesFromSnapshots, groupLibrary, type LibraryGroup } from "./library-model.ts";
@@ -37,7 +38,7 @@ export async function renderLibraryPage(
   const project = await new ProjectModel(getStore().db).getBySlug(slug);
   if (!project) return null;
   const build = await getLibraryBuild(project, branch);
-  if (!build) return renderEmptyLibrary(project);
+  if (!build) return await renderEmptyLibrary(project);
   const data = await loadLibraryData(project, build);
   if (data.groups.length === 0) return renderNoStories(project, build);
   return (
@@ -110,7 +111,8 @@ async function distinctBranches(projectId: string): Promise<string[]> {
   return [...new Set(buildsList.map((b) => b.gitBranch))].toSorted((a, b) => a.localeCompare(b));
 }
 
-function renderEmptyLibrary(project: Project): RenderedContent {
+async function renderEmptyLibrary(project: Project): Promise<RenderedContent> {
+  const origin = await getStore().publicOrigin?.url();
   return (
     <DocumentLayout
       title="Library"
@@ -122,7 +124,7 @@ function renderEmptyLibrary(project: Project): RenderedContent {
           <>All stories/components from the latest build on {project.gitDefaultBranch}.</>
         }
       />
-      <EmptyState title="No builds yet" description="Upload a build to populate the library." />
+      <GetStarted project={project} origin={origin} />
     </DocumentLayout>
   );
 }
