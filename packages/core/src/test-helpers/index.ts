@@ -67,3 +67,4 @@ export {
 } from "./schema-parity.ts";
 
 export { publicNetworkForTests } from "./public-network.ts";
+export { describeSchemaLevelContract, type SchemaLevelHarness } from "./schema-level-contract.ts";
