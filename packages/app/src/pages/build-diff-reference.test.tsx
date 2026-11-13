@@ -30,7 +30,7 @@ describe("baseline reference line", () => {
       build: { id: "build1", gitSha: "abcdef123" } as Build,
     });
     expect(html).toContain("vs feature/x, accepted on this branch");
-    expect(html).toContain('href="/projects/demo/builds/build1"');
+    expect(html).toContain('href="/projects/demo/builds/build1/diff"');
     expect(html).toContain(">abcdef1</a>");
     // The exact time is on the <time>, not printed as a raw ISO string.
     expect(html).toContain('datetime="2026-01-01T00:00:00.000Z"');

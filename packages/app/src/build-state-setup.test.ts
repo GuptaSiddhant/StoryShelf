@@ -81,7 +81,7 @@ describe("setupBuildState", () => {
     await wiring.publisher.request(w.build.id);
     expect(w.git.calls.map((call) => call.target.kind)).toEqual(["status", "status", "comment"]);
     expect(w.git.calls[0]?.url).toBe(
-      `https://shelf.example.com/projects/${w.project.slug}/builds/${w.build.id}`,
+      `https://shelf.example.com/projects/${w.project.slug}/builds/${w.build.id}/diff`,
     );
   });
 
