@@ -282,13 +282,44 @@ async function openBuildApp(logger: typeof silent = silent) {
   return { app, git, token, urlOf };
 }
 
+/** A project channel, enabled or not: the banner is about enabled channels only (#1018). */
+async function addChannel(
+  db: ReturnType<typeof makeDatabase>["db"],
+  enabled: boolean,
+): Promise<void> {
+  const project = await createTestProject(db, db.tables);
+  await new NotificationChannelModel(db, undefined, "origin-test-secret").create({
+    projectId: project.id,
+    provider: "fake-git",
+    config: {},
+    secret: "token",
+    enabled,
+  });
+}
+
 describe("notifications without a public origin", () => {
   const paused = "Notifications are paused until a public URL is set";
 
-  it("warns on the System page while notifiers are wired and no origin resolves", async () => {
+  it("warns on the System page while a channel is enabled and no origin resolves", async () => {
+    const git = makeFakeStateNotifier();
+    const { db } = makeDatabase();
+    const app = await seedApp({ db, notifiers: [git.provider] });
+    await addChannel(db, true);
+    expect(await (await app.request("/admin")).text()).toContain(paused);
+  });
+
+  it("stays quiet with notifiers wired but no channel configured (#1018)", async () => {
     const git = makeFakeStateNotifier();
     const app = await seedApp({ notifiers: [git.provider] });
-    expect(await (await app.request("/admin")).text()).toContain(paused);
+    expect(await (await app.request("/admin")).text()).not.toContain(paused);
+  });
+
+  it("stays quiet when every channel is disabled (#1018)", async () => {
+    const git = makeFakeStateNotifier();
+    const { db } = makeDatabase();
+    const app = await seedApp({ db, notifiers: [git.provider] });
+    await addChannel(db, false);
+    expect(await (await app.request("/admin")).text()).not.toContain(paused);
   });
 
   it("stays quiet with an origin, or with no notifier wired", async () => {
@@ -298,8 +329,9 @@ describe("notifications without a public origin", () => {
       config: { publicBaseUrl: ORIGIN },
     });
     expect(await (await withOrigin.request("/admin")).text()).not.toContain(paused);
-    const noNotifiers = await seedApp({ notifiers: false });
-    expect(await (await noNotifiers.request("/admin")).text()).not.toContain(paused);
+    // No channel configured: quiet even with the built-in notifiers wired (#1018).
+    const noChannel = await seedApp({});
+    expect(await (await noChannel.request("/admin")).text()).not.toContain(paused);
   });
 
   it("asks again for the state of open builds once an admin confirms an origin", async () => {
@@ -369,7 +401,9 @@ describe("notifications without a public origin", () => {
 
   it("stays paused after a report: a detected origin counts only once confirmed", async () => {
     const git = makeFakeStateNotifier();
-    const app = await seedApp({ notifiers: [git.provider] });
+    const { db } = makeDatabase();
+    const app = await seedApp({ db, notifiers: [git.provider] });
+    await addChannel(db, true);
     const token = await csrfFrom(app);
     expect((await report(app, token, { origin: ORIGIN })).status).toBe(201);
     expect(await (await app.request("/admin")).text()).toContain(paused);
