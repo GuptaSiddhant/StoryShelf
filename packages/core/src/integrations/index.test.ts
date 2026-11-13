@@ -5,7 +5,6 @@ import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import { makeFakeDesign } from "../test-helpers/fake-design.ts";
 import {
   BUILT_IN_INTEGRATIONS,
-  chatNotifiers,
   INTEGRATION_GROUPS,
   resolveShelfIntegrations,
   type BuiltInIntegrations,
@@ -32,8 +31,15 @@ const builtIn: BuiltInIntegrations = {
 };
 
 describe("BUILT_IN_INTEGRATIONS", () => {
-  it("holds the chat notifiers and is frozen; each move task adds its own", () => {
-    expect(BUILT_IN_INTEGRATIONS.notifiers).toEqual(expect.arrayContaining([...chatNotifiers]));
+  it("holds the git and chat notifiers and is frozen; each move task adds its own", () => {
+    expect(BUILT_IN_INTEGRATIONS.notifiers.map((entry) => entry.metadata.kind)).toEqual([
+      "github",
+      "gitlab",
+      "git-log",
+      "slack-webhook",
+      "teams-workflow",
+      "log",
+    ]);
     expect(BUILT_IN_INTEGRATIONS.email).toEqual([]);
     expect(BUILT_IN_INTEGRATIONS.design).toEqual([]);
     expect(Object.isFrozen(BUILT_IN_INTEGRATIONS)).toBe(true);

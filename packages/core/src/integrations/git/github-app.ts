@@ -1,9 +1,9 @@
-import { httpJson } from "@storyshelf/core/utils";
 /**
  * GitHub App authentication without dependencies: an RS256 JWT signed with `node:crypto`, traded
  * for an installation token that is cached per channel until shortly before it expires.
  */
 import { createHash, createSign } from "node:crypto";
+import { httpJson } from "../../utils/index.ts";
 import { apiBase, githubHeaders } from "./github-api.ts";
 
 /** The App credentials of one channel. */

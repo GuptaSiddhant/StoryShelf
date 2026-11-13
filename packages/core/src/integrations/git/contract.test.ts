@@ -1,4 +1,4 @@
-import { stateNotifierContractSuite } from "@storyshelf/core/test-helpers";
+import { stateNotifierContractSuite } from "../../test-helpers/index.ts";
 import { gitHubNotifier, gitLabNotifier } from "./index.ts";
 
 stateNotifierContractSuite("github", () => gitHubNotifier, { owner: "acme", repo: "widgets" });

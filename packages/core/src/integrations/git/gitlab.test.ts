@@ -1,5 +1,5 @@
-import { publicNetworkForTests } from "@storyshelf/core/test-helpers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { publicNetworkForTests } from "../../test-helpers/index.ts";
 import { gitLabNotifier } from "./gitlab.ts";
 import { bodyOf, stubFetch } from "./test-fetch.ts";
 

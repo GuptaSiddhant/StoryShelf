@@ -6,7 +6,7 @@
 export {
   chatNotifiers,
   chatTogglesSchema,
-  logConfigSchema,
+  chatLogConfigSchema as logConfigSchema,
   logNotifier,
   slackWebhookConfigSchema,
   slackWebhookNotifier,

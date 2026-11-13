@@ -151,7 +151,8 @@ describe("findings in the summary", () => {
   });
 
   it("hashes the set, not the order, and tells a changed finding from an unchanged one", () => {
-    expect(findingsHash(findings.toReversed())).toBe(findingsHash(findings));
+    // oxlint-disable-next-line unicorn/no-array-reverse -- toReversed not available in type-aware lint lib
+    expect(findingsHash([...findings].reverse())).toBe(findingsHash(findings));
     const changed = [findings[0], findings[1], { ...annotation(2), message: "other" }];
     expect(findingsHash(changed as typeof findings)).not.toBe(findingsHash(findings));
     expect(findingsHash([])).not.toBe(findingsHash(findings));
