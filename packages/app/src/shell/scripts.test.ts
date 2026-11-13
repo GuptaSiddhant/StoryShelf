@@ -478,3 +478,63 @@ describe("signed preview frame", () => {
     expect(page.part("disclosure")?.hidden).toBe(false);
   });
 });
+
+/** A page with the drawer, its toggle, and a page body behind it, with the client script running. */
+function drawerPage() {
+  const dom = new JSDOM(
+    `<body><button data-sidebar-toggle aria-expanded="false">Menu</button>
+      <aside id="sidebar"><a href="/a">First</a><a href="/b">Second</a></aside>
+      <div data-sidebar-backdrop hidden></div>
+      <div data-shell-main><main><h1 data-focus-heading>Heading</h1></main></div></body>`,
+    { runScripts: "outside-only", url: "https://shelf.test/" },
+  );
+  dom.window.eval(bootScript());
+  dom.window.eval(clientScript());
+  return dom.window;
+}
+
+describe("shell focus handling", () => {
+  it("moves focus into the open drawer, makes the page inert, and gives focus back on close", () => {
+    const { document } = drawerPage();
+    const toggle = document.querySelector<HTMLElement>("[data-sidebar-toggle]");
+    const main = document.querySelector<HTMLElement>("[data-shell-main]");
+    toggle?.click();
+    expect(document.activeElement?.textContent).toBe("First");
+    expect(main?.hasAttribute("inert")).toBe(true);
+    toggle?.click();
+    expect(main?.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("closes the drawer with Escape and returns focus to the toggle", () => {
+    const { document, KeyboardEvent } = drawerPage();
+    const toggle = document.querySelector<HTMLElement>("[data-sidebar-toggle]");
+    toggle?.click();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(document.querySelector("[data-shell-main]")?.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("focuses the main heading after a whole-page swap", () => {
+    const { document, CustomEvent } = drawerPage();
+    expect(document.activeElement).toBe(document.body);
+    document.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { detail: { target: document.body } }),
+    );
+    expect(document.activeElement?.textContent).toBe("Heading");
+  });
+
+  it("keeps aria-expanded of the collapse button in step with the rail", () => {
+    const dom = new JSDOM(
+      `<body><button data-sidebar-collapse aria-expanded="true"></button></body>`,
+      { runScripts: "outside-only", url: "https://shelf.test/" },
+    );
+    dom.window.eval(bootScript());
+    dom.window.eval(clientScript());
+    const button = dom.window.document.querySelector<HTMLElement>("[data-sidebar-collapse]");
+    button?.click();
+    expect(button?.getAttribute("aria-expanded")).toBe("false");
+    button?.click();
+    expect(button?.getAttribute("aria-expanded")).toBe("true");
+  });
+});

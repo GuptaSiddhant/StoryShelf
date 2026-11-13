@@ -96,7 +96,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
   return (
     <VStack>
       <div class={viewerHead}>
-        <h2 class={viewerTitle}>
+        <h2 class={viewerTitle} id="snapshot-heading" tabindex={-1} data-focus-heading>
           {selected.storyTitle} / {selected.storyName}
         </h2>
         <p class={viewerMeta}>

@@ -119,34 +119,39 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
     (group) => a11yFindingsOf(a11yCarrierOf(group.representative, group.members)).length > 0,
   ).length;
   return (
-    <aside class={filmstrip} aria-label="Snapshots">
-      <div class={filmstripHead}>
-        <Segmented
-          label="Filter snapshots"
-          data-filter-switch
-          items={[
-            {
-              label: `Needs review ${progress.pending}`,
-              value: "review",
-              active: filter === "review",
-            },
-            { label: `All ${groups.length}`, value: "all", active: filter === "all" },
-            { label: `Done ${progress.done}`, value: "done" },
-            ...(withA11y > 0 ? [{ label: `A11y ${withA11y}`, value: "a11y" }] : []),
-          ]}
-        />
-      </div>
-      <div data-diff-nav data-current={selectedId} data-filter={filter} class={filteredList}>
-        {groups.map((group): HtmlEscapedString | Promise<HtmlEscapedString> => (
-          <FilmItem
-            key={group.key}
-            project={project}
-            build={build}
-            group={group}
-            active={group.members.some((snap) => snap.id === selectedId)}
+    <>
+      <a class="skip-link" href="#snapshot-heading" data-skip-to-comparison>
+        Skip to comparison
+      </a>
+      <aside class={filmstrip} aria-label="Snapshots">
+        <div class={filmstripHead}>
+          <Segmented
+            label="Filter snapshots"
+            data-filter-switch
+            items={[
+              {
+                label: `Needs review ${progress.pending}`,
+                value: "review",
+                active: filter === "review",
+              },
+              { label: `All ${groups.length}`, value: "all", active: filter === "all" },
+              { label: `Done ${progress.done}`, value: "done" },
+              ...(withA11y > 0 ? [{ label: `A11y ${withA11y}`, value: "a11y" }] : []),
+            ]}
           />
-        ))}
-      </div>
-    </aside>
+        </div>
+        <div data-diff-nav data-current={selectedId} data-filter={filter} class={filteredList}>
+          {groups.map((group): HtmlEscapedString | Promise<HtmlEscapedString> => (
+            <FilmItem
+              key={group.key}
+              project={project}
+              build={build}
+              group={group}
+              active={group.members.some((snap) => snap.id === selectedId)}
+            />
+          ))}
+        </div>
+      </aside>
+    </>
   );
 }

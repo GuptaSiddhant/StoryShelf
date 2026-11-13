@@ -44,6 +44,11 @@ export function componentBuildHistory(
   });
 }
 
+/** An import path without its leading `./`, so a URL path and a catalog `./src/A.tsx` compare equal. */
+function bareImportPath(path: string): string {
+  return path.replace(/^\.\//u, "");
+}
+
 /**
  * Where a component stands against the project's latest build. `latest` holds that build's
  * component rows, or null when it has no catalog (the answer is then unknown, never "deleted").
@@ -57,10 +62,16 @@ export function catalogPresence(
   if (!latest || !newest) {
     return { kind: "unknown" };
   }
-  if (latest.some((row) => row.importPath === importPath)) {
+  const wanted = bareImportPath(importPath);
+  if (latest.some((row) => bareImportPath(row.importPath) === wanted)) {
     return { kind: "present" };
   }
-  const moved = latest.find((row) => row.title === newest.component.title && row.importPath !== "");
+  const moved = latest.find(
+    (row) =>
+      row.title === newest.component.title &&
+      row.importPath !== "" &&
+      bareImportPath(row.importPath) !== wanted,
+  );
   return moved
     ? { kind: "moved", to: moved.importPath, title: moved.title }
     : { kind: "deleted", lastSeen: newest.build };

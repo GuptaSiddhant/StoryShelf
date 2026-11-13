@@ -58,7 +58,20 @@ describe("the sign-in gate", () => {
   ])("sends an anonymous visitor to login for %s", async (link) => {
     const response = await (await anonymousApp()).request(link);
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/auth/login");
+    expect(response.headers.get("location")).toBe(
+      `/auth/login?return_to=${encodeURIComponent(link)}`,
+    );
+  });
+
+  it("keeps the destination (path and query) for a plain and an HTMX request", async () => {
+    const app = await anonymousApp();
+    const target = "/projects/app/builds?branch=main";
+    const expected = `/auth/login?return_to=${encodeURIComponent(target)}`;
+    const plain = await app.request(target);
+    expect(plain.headers.get("location")).toBe(expected);
+    const htmx = await app.request(target, { headers: { "HX-Request": "true" } });
+    expect(htmx.status).toBe(204);
+    expect(htmx.headers.get("HX-Redirect")).toBe(expected);
   });
 
   it.each([
