@@ -60,7 +60,6 @@ export {
 } from "./insight.ts";
 export {
   BuildModel,
-  SkipSourceRefused,
   isPublicBuild,
   type BuildCreateInput,
   type BuildListFilter,
@@ -176,3 +175,4 @@ export {
   type ResolvedPublicOrigin,
   type StoredPublicOrigin,
 } from "./public-origin.ts";
+export { SkipSourceRefused } from "./skip-source-refused.ts";

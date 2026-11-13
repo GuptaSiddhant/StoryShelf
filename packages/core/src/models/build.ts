@@ -8,6 +8,7 @@ import type { Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
+import { SkipSourceRefused } from "./skip-source-refused.ts";
 
 /** The verdict statuses; a build leaving them for `pending` is reopened. */
 const REVIEWED: ReadonlySet<BuildStatus> = new Set<BuildStatus>(["approved", "rejected"]);
@@ -847,11 +848,6 @@ function nextStamp(): string {
 /** `and` of conditions, which is never undefined when it is given at least one. */
 function allOf(first: SQL, ...rest: SQL[]): SQL {
   return and(first, ...rest) ?? first;
-}
-
-/** A skip was refused because its source is not (or no longer) an eligible one (ADR 0044). */
-export class SkipSourceRefused extends Error {
-  override readonly name = "SkipSourceRefused";
 }
 
 /** The row of a skipped build repeating `source` (a real build). */

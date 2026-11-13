@@ -3,8 +3,9 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
 import type { Build } from "../schema/build.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
-import { BuildModel, SkipSourceRefused, isPublicBuild } from "./build.ts";
+import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
+import { SkipSourceRefused } from "./skip-source-refused.ts";
 
 function buildTables(db: DatabaseAdapter) {
   return {
