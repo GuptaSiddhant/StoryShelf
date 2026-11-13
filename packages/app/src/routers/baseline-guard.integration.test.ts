@@ -748,7 +748,7 @@ describe("inherited baseline origin", () => {
     const html = await (
       await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
     ).text();
-    expect(html).toContain('href="/projects/test-project/builds/original"');
+    expect(html).toContain('href="/projects/test-project/builds/original/diff"');
     expect(html).toContain(">abcdef1</a>");
   });
 });
