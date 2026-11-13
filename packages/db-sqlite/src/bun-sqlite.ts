@@ -58,7 +58,9 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
   const owned = !options.client;
   const client = options.client ?? openDatabase(options);
   if (owned) {
-    applyConnectionPragmas((sql) => client.exec(sql), options);
+    applyConnectionPragmas((sql) => {
+      client.exec(sql);
+    }, options);
   }
   const db = drizzle(client, { schema });
 

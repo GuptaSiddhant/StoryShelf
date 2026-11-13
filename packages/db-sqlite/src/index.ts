@@ -40,7 +40,9 @@ export function createSqliteDatabase(
 ): DatabaseAdapter {
   ensureDbDir(path);
   const sqlite = new DatabaseSync(path, { returnArrays: true });
-  applyConnectionPragmas((sql) => sqlite.exec(sql), options);
+  applyConnectionPragmas((sql) => {
+    sqlite.exec(sql);
+  }, options);
   const callback = createCallback(sqlite);
   const db = drizzle(callback, { schema });
   const retention: RetentionActivation = {};

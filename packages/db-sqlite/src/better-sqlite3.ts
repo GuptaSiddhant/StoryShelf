@@ -60,7 +60,9 @@ export function createBetterSqlite3Database(
   const owned = !options.client;
   const client = options.client ?? openDatabase(options);
   if (owned) {
-    applyConnectionPragmas((sql) => client.exec(sql), options);
+    applyConnectionPragmas((sql) => {
+      client.exec(sql);
+    }, options);
   }
   const db = drizzle(client, { schema });
 
