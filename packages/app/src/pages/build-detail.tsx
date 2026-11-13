@@ -13,6 +13,7 @@ import {
   Meta,
   SectionTitle,
   VStack,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
 import { a11ySummaryNote, type A11ySummary } from "./a11y-violations.tsx";
@@ -91,7 +92,7 @@ function AttemptsCard(props: { attempts: BuildDetailsData["attempts"] }): Render
         <details key={attempt.id} open={index === attempts.length - 1}>
           <summary>
             Attempt {attempt.attemptNo}{" "}
-            <Badge tone={statusTone(attempt.status)}>{attempt.status}</Badge>{" "}
+            <Badge tone={statusTone(attempt.status)}>{statusLabel(attempt.status)}</Badge>{" "}
             <Meta as="span">
               {attempt.storyCount} stories
               {attempt.reqId ? ` · ${attempt.reqId}` : ""}

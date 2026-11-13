@@ -101,7 +101,7 @@ describe("library without testing", () => {
     );
     const body = await (await app.request("/projects/lib/library")).text();
     expect(body).toContain("Only/New");
-    expect(body).toContain("pending");
+    expect(body).toContain("Pending");
     expect(body).not.toContain("Components/Button");
     expect(build.id).not.toBe(newer.id);
   });
@@ -169,7 +169,7 @@ describe("library with testing", () => {
     } as never);
     const body = await (await app.request("/projects/lib/library")).text();
     expect(body).toContain("/snapshots/snap1/image");
-    expect(body).toContain("changed");
+    expect(body).toContain("Changed");
     // the uncaptured Card story is still listed from the catalog
     expect(body).toContain("Components/Card");
     expect(body).toContain("storyId=components-card--basic");

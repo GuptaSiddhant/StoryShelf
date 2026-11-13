@@ -71,9 +71,9 @@ const shellSidebar = css`
     margin: var(--space-4) 0 var(--space-1);
     padding: 0 var(--space-3);
     color: var(--text-secondary);
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     font-weight: 600;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     white-space: nowrap;
   }
