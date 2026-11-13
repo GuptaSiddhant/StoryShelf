@@ -1,3 +1,5 @@
+import { contentHostLabel, isAliasLabel } from "./content-hosts.ts";
+
 /** Options of {@link UrlBuilder.component}. */
 export interface ComponentUrlOptions {
   /** Show this build's states, results and comments instead of the newest build that has the file. */
@@ -52,15 +54,23 @@ export interface UrlBuilder {
   short(id: string): string;
 }
 
+/** The scheme prefix of a content link: the root's own, or protocol-relative for a relative root. */
+function contentScheme(root: string): string {
+  return /^https?:\/\//iu.test(root) ? `${new URL(root).protocol}//` : "//";
+}
+
 /**
  * Create a URL builder rooted at the given base URL.
  *
  * @param baseUrl - Public root URL of the shelf server.
- * @param publishedBaseDomain - Optional wildcard domain for published Storybooks.
+ * @param contentHosts - `subdomain` hosting only (ADR 0051): `<baseDomain>[:port]`, as
+ *   `contentHostSuffix(config)` gives it. A build then links to its content host
+ *   `<build-id>.<contentHosts>` and a project to its alias host `<slug>.<contentHosts>`.
  * @returns The URL builder.
  */
-export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string): UrlBuilder {
+export function createUrlBuilder(baseUrl: string, contentHosts?: string): UrlBuilder {
   const root = baseUrl.replace(/\/+$/u, "");
+  const scheme = contentScheme(root);
 
   return {
     projectsList: () => root || "/",
@@ -90,14 +100,14 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
         : `${page}${encodePath(path)}${componentQuery(options)}`;
     },
     storybook: (slug) =>
-      publishedBaseDomain
-        ? `https://${slug}.${publishedBaseDomain}`
+      contentHosts && isAliasLabel(slug)
+        ? `${scheme}${slug}.${contentHosts}`
         : `${root}/projects/${slug}/storybook`,
     storybookLabel: (slug, key, value) =>
       `${root}/projects/${slug}/storybook/${encodeURIComponent(key)}/${encodePath(value)}`,
     storybookBuild: (slug, buildId) =>
-      publishedBaseDomain
-        ? `https://${buildId}.${slug}.${publishedBaseDomain}`
+      contentHosts
+        ? `${scheme}${contentHostLabel(buildId)}.${contentHosts}`
         : `${root}/projects/${slug}/storybook/build/${buildId}`,
     settings: (slug) => `${root}/projects/${slug}/settings`,
     short: (id) => `${root}/_/${id}/`,

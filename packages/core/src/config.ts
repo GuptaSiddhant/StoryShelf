@@ -16,6 +16,23 @@ import {
 } from "./storybook-hosting.ts";
 
 export type { StorybookHostingConfig, StorybookHostingMode } from "./storybook-hosting.ts";
+export {
+  assertPortalOutsideContentHosts,
+  classifyHost,
+  contentHostLabel,
+  contentHostSuffix,
+  contentOriginOf,
+  hostingModeOf,
+  hostingOriginsOf,
+  hostingOriginsOfConfig,
+  isAliasLabel,
+  isReservedLabel,
+  isUlidShape,
+  portalOriginOf,
+  RESERVED_HOST_LABELS,
+  storybookHostingOf,
+} from "./content-hosts.ts";
+export type { HostClass, HostingOrigins } from "./content-hosts.ts";
 
 /** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {
@@ -187,6 +204,12 @@ export interface ShelfConfig {
    * retention (ADR 0039).
    */
   purgeTtlDays?: number;
+  /** Insight rows (all kinds) older than this many days are deleted daily; null keeps them (default 180). */
+  insightsTtlDays?: number | null;
+  /** AI usage rows older than this many days are deleted daily; null keeps them (default 400, covers every budget window). */
+  aiUsageTtlDays?: number | null;
+  /** Expired session and verification rows are deleted this many days after expiry; null keeps them (default 7). */
+  expiredAuthTtlDays?: number | null;
   /** Branch baseline TTL, days; null disables branch GC (default 30). */
   branchTtlDays?: number | null;
   /** Branch GC interval, ms; daily sweep via interval clock (default 86_400_000). */
@@ -345,6 +368,9 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     branchTtlDays: z.number().int().positive().nullable().optional(),
+    insightsTtlDays: z.number().int().positive().nullable().optional(),
+    aiUsageTtlDays: z.number().int().positive().nullable().optional(),
+    expiredAuthTtlDays: z.number().int().positive().nullable().optional(),
     branchGcIntervalMs: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),

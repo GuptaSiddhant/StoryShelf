@@ -54,6 +54,19 @@ describe("createPublishCompleter", () => {
     expect(log.calls.some((c) => c.level === "error" && c.message === "publish failed")).toBe(true);
   });
 
+  it("releases the manifest claim on a failed publish, and keeps it on success", async () => {
+    const { db, build, completer } = await setup();
+    const builds = new BuildModel(db);
+    await builds.claimManifest(build.id, "a".repeat(64));
+    await completer.complete(build.id, { ok: true });
+    expect((await builds.get(build.id))?.manifestSha256).toBe("a".repeat(64));
+    const failing = await setup();
+    const failingBuilds = new BuildModel(failing.db);
+    await failingBuilds.claimManifest(failing.build.id, "a".repeat(64));
+    await failing.completer.complete(failing.build.id, { ok: false, error: "bad" });
+    expect((await failingBuilds.get(failing.build.id))?.manifestSha256).toBeNull();
+  });
+
   it("leaves a non-default branch pending", async () => {
     const { build, completer, statusOf } = await setup({ branch: "feature/x" });
     await completer.complete(build.id, { ok: true });
