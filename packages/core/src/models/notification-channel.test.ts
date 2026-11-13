@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { NotifierProvider } from "../adapters/notifier/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
+import { overrideOutboundResolver } from "../utils/outbound.ts";
 import { NotificationChannelModel } from "./notification-channel.ts";
 
 const TEST_SECRET = "test-server-secret-32-chars-long!!";
@@ -63,48 +64,95 @@ describe("NotificationChannelModel", () => {
     expect(await model(db).get(created.id)).toBeNull();
   });
 
-  it("validates channel input against the notifier schema", () => {
+  it("validates channel input against the notifier schema", async () => {
     const email = {
       metadata: { kind: "email", schema: z.object({ to: z.string() }) },
     } as unknown as NotifierProvider;
-    expect(NotificationChannelModel.validateInput([email], "email", { to: "a@b.c" })).toEqual({
-      ok: true,
-    });
-    expect(NotificationChannelModel.validateInput([email], "slack", {})).toMatchObject({
+    expect(await NotificationChannelModel.validateInput([email], "email", { to: "a@b.c" })).toEqual(
+      {
+        ok: true,
+      },
+    );
+    expect(await NotificationChannelModel.validateInput([email], "slack", {})).toMatchObject({
       ok: false,
       field: "provider",
     });
-    expect(NotificationChannelModel.validateInput([email], "email", {})).toMatchObject({
+    expect(await NotificationChannelModel.validateInput([email], "email", {})).toMatchObject({
       ok: false,
       field: "config",
     });
   });
 
-  it("requires a project and a token for state (git) providers", () => {
+  it("requires a project and a token for state (git) providers", async () => {
     const git = {
       metadata: { kind: "github", delivery: "state", schema: z.object({ owner: z.string() }) },
     } as unknown as NotifierProvider;
     const config = { owner: "acme" };
     expect(
-      NotificationChannelModel.validateInput([git], "github", config, {
+      await NotificationChannelModel.validateInput([git], "github", config, {
         projectId: "p1",
         hasSecret: true,
       }),
     ).toEqual({ ok: true });
     expect(
-      NotificationChannelModel.validateInput([git], "github", config, {
+      await NotificationChannelModel.validateInput([git], "github", config, {
         projectId: null,
         hasSecret: true,
       }),
     ).toMatchObject({ ok: false, field: "provider" });
     expect(
-      NotificationChannelModel.validateInput([git], "github", config, {
+      await NotificationChannelModel.validateInput([git], "github", config, {
         projectId: "p1",
         hasSecret: false,
       }),
     ).toMatchObject({ ok: false, field: "secret" });
     expect(NotificationChannelModel.isStateKind([git], "github")).toBe(true);
     expect(NotificationChannelModel.isStateKind([git], "slack")).toBe(false);
+  });
+
+  it("refuses private or local chat and GitLab destinations when saved", async () => {
+    const kinds = ["slack", "teams", "gitlab"].map(
+      (kind) =>
+        ({
+          metadata: { kind, schema: z.object({ host: z.string().optional() }) },
+        }) as unknown as NotifierProvider,
+    );
+    const restore = overrideOutboundResolver(async (name) => [
+      { address: name === "internal.example" ? "10.0.0.5" : "93.184.216.34", family: 4 },
+    ]);
+    try {
+      for (const url of [
+        "https://127.0.0.1/h",
+        "https://169.254.169.254/h",
+        "https://internal.example/h",
+      ]) {
+        const slack = await NotificationChannelModel.validateInput(
+          kinds,
+          "slack",
+          {},
+          undefined,
+          url,
+        );
+        expect(slack).toMatchObject({ ok: false, field: "secret" });
+        expect(JSON.stringify(slack)).not.toMatch(/10\.0\.0\.5|169\.254/u);
+        const gitlab = await NotificationChannelModel.validateInput(kinds, "gitlab", { host: url });
+        expect(gitlab).toMatchObject({ ok: false, field: "config", issues: [{ path: "host" }] });
+      }
+      expect(
+        await NotificationChannelModel.validateInput(
+          kinds,
+          "teams",
+          {},
+          undefined,
+          "https://hooks.example/x",
+        ),
+      ).toEqual({ ok: true });
+      expect(await NotificationChannelModel.validateInput(kinds, "gitlab", {})).toEqual({
+        ok: true,
+      });
+    } finally {
+      restore();
+    }
   });
 
   it("records the last delivery error with its time and clears it on success", async () => {
