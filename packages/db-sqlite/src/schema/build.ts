@@ -40,7 +40,8 @@ export const builds = sqliteTable(
   },
   (t) => [
     index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
-    index("builds_git_branch_idx").on(t.gitBranch),
+    index("builds_project_created_idx").on(t.projectId, t.createdAt),
+    index("builds_project_branch_created_idx").on(t.projectId, t.gitBranch, t.createdAt),
   ],
 );
 
