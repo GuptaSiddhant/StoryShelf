@@ -138,6 +138,7 @@ export function buildAdapter(
   options: ShelfAuthOptions,
 ): Auth {
   return {
+    hostSessionCookie: options.hostSessionCookie === true,
     handler: async (request: Request): Promise<Response> => await shelf.handler(request),
     loginMethods: (): EngineLoginMethod[] => describeLoginMethods(options),
     // eslint-disable-next-line require-await -- Auth.setup is async; validation is sync

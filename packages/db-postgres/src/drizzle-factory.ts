@@ -1,6 +1,6 @@
 import type { DrizzleAdapterOptions, ListOptions } from "@storyshelf/core/adapter/database";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
-import type { SQL } from "drizzle-orm";
+import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
 
 /** Chainable filter surface shared by dialect select chains. */
 export interface ChainFilter<C> {
@@ -10,14 +10,20 @@ export interface ChainFilter<C> {
   offset(n: number): C;
 }
 
-export function applyListOptions<C extends ChainFilter<C>>(query: C, opts: ListOptions): C {
+/**
+ * Apply `where`, a deterministic order, `limit` and `offset`. The order is the
+ * caller's `orderBy` with `id` appended as the final tie-break, or `id` alone.
+ */
+export function applyListOptions<C extends ChainFilter<C>>(
+  query: C,
+  opts: ListOptions,
+  id: SQLWrapper,
+): C {
   let current = query;
   if (opts.where) {
     current = current.where(opts.where);
   }
-  if (opts.orderBy) {
-    current = current.orderBy(opts.orderBy);
-  }
+  current = current.orderBy(opts.orderBy ? sql`${opts.orderBy}, ${id}` : sql`${id}`);
   if (opts.limit !== undefined) {
     current = current.limit(opts.limit);
   }
