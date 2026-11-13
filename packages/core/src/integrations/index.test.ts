@@ -31,8 +31,12 @@ const builtIn: BuiltInIntegrations = {
 };
 
 describe("BUILT_IN_INTEGRATIONS", () => {
-  it("ships Figma as the design provider and is frozen; each move task adds its own", () => {
-    expect(BUILT_IN_INTEGRATIONS.notifiers).toEqual([]);
+  it("holds the git notifiers and Figma, and is frozen; each move task adds its own", () => {
+    expect(BUILT_IN_INTEGRATIONS.notifiers.map((entry) => entry.metadata.kind)).toEqual([
+      "github",
+      "gitlab",
+      "git-log",
+    ]);
     expect(BUILT_IN_INTEGRATIONS.email).toEqual([]);
     expect(BUILT_IN_INTEGRATIONS.design.map((p) => p.metadata.kind)).toEqual(["figma"]);
     expect(Object.isFrozen(BUILT_IN_INTEGRATIONS)).toBe(true);
@@ -51,7 +55,11 @@ describe("BUILT_IN_INTEGRATIONS", () => {
 describe("resolveShelfIntegrations", () => {
   it("gives the built-ins of every group when nothing is set", () => {
     expect(resolveShelfIntegrations({}, builtIn)).toEqual(builtIn);
-    expect(resolveShelfIntegrations({}).design.map((p) => p.metadata.kind)).toEqual(["figma"]);
+    expect(resolveShelfIntegrations({})).toEqual({
+      notifiers: [...BUILT_IN_INTEGRATIONS.notifiers],
+      email: [],
+      design: [...BUILT_IN_INTEGRATIONS.design],
+    });
   });
 
   it("resolves each group by its own form", () => {

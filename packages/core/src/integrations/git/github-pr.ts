@@ -1,4 +1,4 @@
-import { httpJson } from "@storyshelf/core/utils";
+import { httpJson } from "../../utils/index.ts";
 import { githubHeaders, repoPath } from "./github-api.ts";
 
 interface AssociatedPull {

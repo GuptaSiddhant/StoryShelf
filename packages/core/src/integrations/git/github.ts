@@ -1,5 +1,5 @@
-import type { StateNotifierProvider } from "@storyshelf/core/adapter/notifier";
-import type { Logger } from "@storyshelf/core/logger";
+import type { StateNotifierProvider } from "../../adapters/notifier/index.ts";
+import type { Logger } from "../../logger.ts";
 import { installationToken } from "./github-app.ts";
 import { postCheckRun } from "./github-check.ts";
 import { upsertPrComment } from "./github-comment.ts";

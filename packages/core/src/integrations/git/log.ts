@@ -1,6 +1,6 @@
-import type { StateNotifierProvider } from "@storyshelf/core/adapter/notifier";
-import type { Logger } from "@storyshelf/core/logger";
 import { z } from "zod";
+import type { StateNotifierProvider } from "../../adapters/notifier/index.ts";
+import type { Logger } from "../../logger.ts";
 import { packageVersion } from "./version.ts";
 
 /** Validation schema for the log provider config (accepts anything). */

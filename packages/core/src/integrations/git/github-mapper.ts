@@ -1,4 +1,4 @@
-import type { NotifierState } from "@storyshelf/core/adapter/notifier";
+import type { NotifierState } from "../../adapters/notifier/index.ts";
 
 /**
  * GitHub's commit states. It has no cancelled state, so a cancelled build shows `error`, its

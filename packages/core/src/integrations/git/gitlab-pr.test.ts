@@ -1,6 +1,6 @@
-import type { NotifierState } from "@storyshelf/core/adapter/notifier";
-import { publicNetworkForTests } from "@storyshelf/core/test-helpers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { NotifierState } from "../../adapters/notifier/index.ts";
+import { publicNetworkForTests } from "../../test-helpers/index.ts";
 import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
 import { mapState } from "./gitlab-mapper.ts";
 import { findMrIid } from "./gitlab-pr.ts";

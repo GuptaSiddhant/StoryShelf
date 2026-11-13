@@ -142,7 +142,8 @@ describe("postCheckRun", () => {
     ]);
     await postCheckRun(repo, { ...input, state: "success", description: "Passed" });
     const writes = calls.slice(1);
-    expect(writes.map((call) => call.url).toSorted()).toEqual([
+    // oxlint-disable-next-line unicorn/no-array-sort, unicorn/no-useless-spread -- toSorted not available in type-aware lint lib
+    expect([...writes.map((call) => call.url)].sort()).toEqual([
       "https://api.github.com/repos/acme/widgets/check-runs/12",
       "https://api.github.com/repos/acme/widgets/check-runs/9",
     ]);

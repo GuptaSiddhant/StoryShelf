@@ -9,6 +9,7 @@ import type { EmailSender } from "../adapters/email-sender.ts";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import { designReasons, emailSenderReasons, notifierReasons } from "../adapters/validate.ts";
 import { createFigmaDesign, figmaOAuthFromEnv } from "./design/figma/index.ts";
+import { gitNotifiers } from "./git/index.ts";
 import {
   resolveIntegrationGroup,
   type IntegrationGroup,
@@ -24,7 +25,7 @@ export interface BuiltInIntegrations {
 
 /** Every built-in integration, by group. */
 export const BUILT_IN_INTEGRATIONS: BuiltInIntegrations = Object.freeze({
-  notifiers: Object.freeze([]),
+  notifiers: Object.freeze([...gitNotifiers]),
   email: Object.freeze([]),
   // Figma OAuth stays off without the operator's client id and secret; personal tokens still work.
   design: Object.freeze([createFigmaDesign({ oauth: figmaOAuthFromEnv() })]),
@@ -67,6 +68,16 @@ export function resolveShelfIntegrations(
     design: resolveIntegrationGroup(groups.design, builtIn.design, options.design),
   };
 }
+
+export {
+  gitHubNotifier,
+  gitLabNotifier,
+  gitLogNotifier,
+  gitNotifiers,
+  githubConfigSchema,
+  gitlabConfigSchema,
+  logConfigSchema,
+} from "./git/index.ts";
 
 export {
   assertUniqueKinds,

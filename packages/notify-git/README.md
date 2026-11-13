@@ -1,3 +1,5 @@
+> **Deprecated.** The git integration is built into `@storyshelf/core` (ADR 0049); import it from `@storyshelf/core/integrations`. This package is a re-export and stops being published one minor release after this one.
+
 # @storyshelf/notify-git
 
 Git notification providers for StoryShelf: a `state` channel makes GitHub or GitLab show the current state of a build as a commit status (the merge gate) and a single pull-request or merge-request comment. No git-provider SDK (it depends only on `@storyshelf/core` and `zod`): every call goes through `@storyshelf/core/utils` (`httpJson`: timeout + retry with `Retry-After`).
