@@ -142,9 +142,6 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
   warnOnServerless(options, runtime.logger);
   const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
   attachLifecycle(app, options, runtime, cell);
-  if (runtime.config.serverTiming === true) {
-    app.use("*", serverTiming(true));
-  }
   const queues = wireQueues(scoped, runtime, cell);
   wireMiddleware(app, {
     ...runtime,
@@ -222,6 +219,10 @@ function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
   app.use("*", hostDispatch());
   // Gzip portal HTML pages and JSON (#868). After hostDispatch, so content and alias hosts, which
   // serve published files with their own handling, never reach it.
+  // Server-Timing (#872), opt-in, outside compression so the header lands on the final answer.
+  if (config.serverTiming === true) {
+    app.use("*", serverTiming(true));
+  }
   app.use("*", compression());
   app.use("*", sameSiteWrites(config));
 }
