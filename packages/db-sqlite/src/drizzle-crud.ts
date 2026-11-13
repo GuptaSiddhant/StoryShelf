@@ -5,7 +5,7 @@
  */
 import type { ListOptions, TxStore } from "@storyshelf/core/adapter/database";
 import type { SQL, Table } from "drizzle-orm";
-import { and, eq, getTableColumns } from "drizzle-orm";
+import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export async function updateWhereOne<T extends AnySQLiteTable>(
@@ -73,20 +73,22 @@ export async function listMany<T extends Table>(
   table: T,
   opts: ListOptions = {},
 ): Promise<T["$inferSelect"][]> {
-  const query = applyListOptions(drizzle.select().from(table), opts);
+  const query = applyListOptions(drizzle.select().from(table), opts, idOf(table));
   const rows: unknown = await query.all();
   return rows as T["$inferSelect"][];
 }
 
-/** The `where`, `orderBy`, `limit` and `offset` the caller asked for, in that order. */
-function applyListOptions(query: DrizzleSelectChain, opts: ListOptions): DrizzleSelectChain {
+/** The `where`, `orderBy` (with an `id` tie-break), `limit` and `offset`, in that order. */
+function applyListOptions(
+  query: DrizzleSelectChain,
+  opts: ListOptions,
+  id: SQLiteColumn,
+): DrizzleSelectChain {
   let next = query;
   if (opts.where) {
     next = next.where(opts.where);
   }
-  if (opts.orderBy) {
-    next = next.orderBy(opts.orderBy);
-  }
+  next = next.orderBy(opts.orderBy ? sql`${opts.orderBy}, ${id}` : sql`${id}`);
   if (opts.limit !== undefined) {
     next = next.limit(opts.limit);
   }

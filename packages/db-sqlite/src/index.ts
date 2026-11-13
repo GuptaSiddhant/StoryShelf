@@ -87,6 +87,13 @@ const BUILDS_GITSHA_DEDUP = "DROP INDEX IF EXISTS builds_project_gitsha_idx";
 const BUILDS_GITSHA_INDEX =
   "CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha)";
 
+/** Build lists read `(project_id [, git_branch]) ORDER BY created_at DESC`; these serve it without a sort. */
+const BUILDS_LIST_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS builds_project_created_idx ON builds (project_id, created_at)",
+  "CREATE INDEX IF NOT EXISTS builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
+  "DROP INDEX IF EXISTS builds_git_branch_idx",
+];
+
 type ProxyMethod = "run" | "all" | "values" | "get";
 
 /**
@@ -211,4 +218,5 @@ function dropWebhookSecret(sqlite: DatabaseSync): void {
 function migrateBuildsGitShaIndex(sqlite: DatabaseSync): void {
   sqlite.exec(BUILDS_GITSHA_DEDUP);
   sqlite.exec(BUILDS_GITSHA_INDEX);
+  for (const statement of BUILDS_LIST_INDEXES) sqlite.exec(statement);
 }
