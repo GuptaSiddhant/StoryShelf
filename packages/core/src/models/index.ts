@@ -58,7 +58,13 @@ export {
   type InsightStartResult,
   type InsightTables,
 } from "./insight.ts";
-export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter } from "./build.ts";
+export {
+  BuildModel,
+  isPublicBuild,
+  type BuildCreateInput,
+  type BuildListFilter,
+  type BuildSummary,
+} from "./build.ts";
 export {
   RECENT_BUILDS_FOR_INHERITED_RATIO,
   averageInheritedRatio,
@@ -148,7 +154,7 @@ export {
 } from "./notification-subscription.ts";
 export { ProjectModel, type ProjectCreateInput } from "./project.ts";
 export { ProjectGroupMappingModel } from "./project-group-mapping.ts";
-export { SnapshotModel, type SnapshotCreateInput } from "./snapshot.ts";
+export { SnapshotModel, type SnapshotCreateInput, type SnapshotSummary } from "./snapshot.ts";
 export { TokenModel } from "./token.ts";
 export { UserModel } from "./user.ts";
 export { WebhookModel, type WebhookCreateInput } from "./webhook.ts";
