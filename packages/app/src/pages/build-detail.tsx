@@ -139,7 +139,7 @@ export function detailItems(
     { label: "Changed / new", value: build.changedCount },
     { label: "Approved / unchanged", value: build.approvedCount },
     { label: "Accessibility findings", value: a11y.findings, note: a11ySummaryNote(a11y) },
-  ];
+  ].filter((item) => Boolean(item.value) || item.label === "Accessibility findings");
 }
 
 /** Captured-how line: affected or full capture, and the labels. */
@@ -178,7 +178,7 @@ export function BuildDetails(props: BuildDetailsProps): Rendered {
   const { project, build, details, staleCount, canReview } = props;
   const { review } = details;
   return (
-    <Disclosure title="Build details">
+    <Disclosure title="Build details" open={build.status === "failed"}>
       <VStack>
         <BuildTags build={build} details={details} />
         <DefinitionList items={detailItems(build, details, props.snapshotCount, props.a11y)} />

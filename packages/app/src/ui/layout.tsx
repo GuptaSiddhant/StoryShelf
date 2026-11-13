@@ -1,5 +1,7 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { Icon } from "./icons/icon.tsx";
+import type { IconName } from "./icons/paths.ts";
 const cardBase = css`
   /* card */
   background: var(--surface-card);
@@ -155,7 +157,114 @@ export const CardSection: FC<{ divider?: boolean; children?: unknown }> = ({
   return <div class={divider ? cardSectionDivider : cardSection}>{children}</div>;
 };
 
-/** Page header with title, description, meta line, and actions (breadcrumbs live in the top bar). */
+type StatusTone = "neutral" | "success" | "warning" | "danger" | "info";
+
+const stripBase = css`
+  /* status-strip */
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-muted);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+`;
+const stripEdge: Record<StatusTone, Promise<string>> = {
+  neutral: stripBase,
+  success: css`
+    /* status-strip-success */
+    ${stripBase}
+    border-left-color: var(--status-approved);
+  `,
+  warning: css`
+    /* status-strip-warning */
+    ${stripBase}
+    border-left-color: var(--status-new);
+  `,
+  danger: css`
+    /* status-strip-danger */
+    ${stripBase}
+    border-left-color: var(--status-rejected);
+  `,
+  info: css`
+    /* status-strip-info */
+    ${stripBase}
+    border-left-color: var(--status-info);
+  `,
+};
+const stripRow = css`
+  /* status-strip-row */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+`;
+const stripTitle = css`
+  /* status-strip-title */
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+`;
+const stripMeta = css`
+  /* status-strip-meta */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+`;
+const stripDetail = css`
+  /* status-strip-detail */
+  flex: 1 1 16rem;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+`;
+
+/** The status strip: a 3 px status-coloured edge, the status as the heading, one primary action. */
+const StatusStrip: FC<{
+  title: unknown;
+  meta?: unknown;
+  detail?: unknown;
+  actions?: unknown;
+  status: { tone: StatusTone; icon?: IconName };
+  id?: string;
+  oob?: boolean;
+}> = ({ title, meta, detail, actions, status, id, oob }) => (
+  <header class={stripEdge[status.tone]} id={id} hx-swap-oob={oob ? "true" : undefined}>
+    <div class={stripRow}>
+      <h1 class={stripTitle}>
+        {status.icon ? <Icon name={status.icon} /> : null}
+        {title}
+      </h1>
+      {meta ? <p class={stripMeta}>{meta}</p> : null}
+    </div>
+    {detail || actions ? (
+      <div class={stripRow}>
+        <div class={stripDetail}>{detail}</div>
+        {actions ? <div class={pageHeaderActions}>{actions}</div> : null}
+      </div>
+    ) : null}
+  </header>
+);
+
+/**
+ * Page header with title, description, meta line, and actions (breadcrumbs live in the top bar).
+ * With `status` it becomes the status strip: the title is the status, `detail` is the line under it
+ * (progress, or the reason), and `actions` hold the one primary button.
+ */
 export const PageHeader: FC<{
   title: unknown;
   description?: unknown;
@@ -163,7 +272,28 @@ export const PageHeader: FC<{
   actions?: unknown;
   /** `2` for a section header on a page whose own heading is the h1 (one h1 per page). */
   level?: 1 | 2;
-}> = ({ title, description, meta, actions, level = 1 }) => {
+  /** Renders the status-strip variant, edged in the tone's colour. */
+  status?: { tone: StatusTone; icon?: IconName };
+  /** Status strip only: the second line (progress bar or failure reason). */
+  detail?: unknown;
+  /** Status strip only: an element id, so an HTMX swap can find the header. */
+  id?: string;
+  /** Status strip only: mark the header for an out-of-band swap. */
+  oob?: boolean;
+}> = ({ title, description, meta, actions, level = 1, status, detail, id, oob }) => {
+  if (status) {
+    return (
+      <StatusStrip
+        title={title}
+        meta={meta}
+        detail={detail}
+        actions={actions}
+        status={status}
+        id={id}
+        oob={oob}
+      />
+    );
+  }
   return (
     <div class={pageHeader}>
       <div class={pageHeaderRow}>

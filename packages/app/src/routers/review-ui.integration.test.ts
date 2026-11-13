@@ -598,7 +598,7 @@ describe("the build page with testing", () => {
     const id = await publish(booted, "feature/z");
     const html = await (await booted.page("alice", `/builds/${id}/diff`)).text();
     const changes = html.indexOf("Changes in this build");
-    const empty = html.indexOf("No snapshots");
+    const empty = html.indexOf("Waiting for a capture worker");
     const verdict = html.indexOf("Approve build");
     expect(changes).toBeGreaterThan(-1);
     expect(verdict).toBeGreaterThan(changes);

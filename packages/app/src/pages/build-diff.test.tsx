@@ -5,6 +5,16 @@ import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 
+/** Moves a freshly created (pending) build to `reviewing`, the status the review page expects. */
+async function startReview(
+  db: ReturnType<typeof makeDatabase>["db"],
+  buildId: string,
+): Promise<void> {
+  const builds = new BuildModel(db);
+  await builds.setStatus(buildId, "capturing");
+  await builds.setStatus(buildId, "reviewing");
+}
+
 interface Seeded {
   html: string;
   firstId: string;
@@ -50,6 +60,7 @@ async function reviewPage(
     gitBranch: "feature/x",
     authorName: "Ada Lovelace",
   });
+  await startReview(db, build.id);
   const ids = await seedSnapshots(db, project.id, build.id);
   const app = createShelfApp({
     testing: { runner: stubRunner() },
@@ -182,6 +193,7 @@ async function multiBrowserPage(query: (ids: Record<string, string>) => string):
     gitSha: "abc1234def",
     gitBranch: "feature/x",
   });
+  await startReview(db, build.id);
   const ids = await seedMultiBrowser(db, project.id, build.id);
   const app = createShelfApp({
     testing: { runner: stubRunner() },
@@ -377,7 +389,7 @@ describe("review page: accessibility violations", () => {
 
   it("sums the findings in the header and offers an a11y filter on the snapshot list", async () => {
     const html = await pageWith(JSON.stringify([VIOLATION, "label (critical): x"]));
-    expect(html).toContain("2 a11y findings");
+    expect(html).toMatch(/Accessibility findings<\/dt><dd[^>]*>2/u);
     expect(html).toMatch(/data-filter-switch[\s\S]*A11y 1/u);
     expect(html).toContain('data-filter="a11y"');
     expect(html).toContain("data-a11y");
