@@ -3,7 +3,7 @@
 "@storyshelf/app": minor
 ---
 
-Added: `design`, `notifications.notifiers` and `notifications.email` take an array, a function or `false`.
+Added: integration options take an array, a function of the built-ins, or `false` (ADR 0049).
 
 ADR 0049, decision 3. Each integration group now accepts an array (exactly these, as before), a
 function `(builtIn) => list` that adds a custom provider, replaces a built-in of the same kind or
