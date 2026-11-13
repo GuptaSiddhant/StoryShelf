@@ -24,7 +24,7 @@ const PGLITE_SDK = "^0.5.8";
 const MYSQL2_SDK = "^3.9.0";
 const PLANETSCALE_SDK = "^1.19.0";
 const TIDBCLOUD_SDK = "^0.1.0";
-/** Email peer SDK pin (must match @storyshelf/notify-email peerDependencies). */
+/** Email peer SDK pin (keep in line with the optional `nodemailer` peer of @storyshelf/core). */
 const NODEMAILER_SDK = "^10.0.12";
 
 const DB_PACKAGE: Record<DatabaseChoice, string> = {

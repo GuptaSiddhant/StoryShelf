@@ -1,4 +1,4 @@
-import { notifierContractSuite } from "@storyshelf/core/test-helpers";
+import { notifierContractSuite } from "../../test-helpers/index.ts";
 import { createEmailNotifier } from "./email.ts";
 import { logPreset } from "./log.ts";
 

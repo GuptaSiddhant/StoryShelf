@@ -31,11 +31,12 @@ const builtIn: BuiltInIntegrations = {
 };
 
 describe("BUILT_IN_INTEGRATIONS", () => {
-  it("holds the git notifiers and is frozen; each move task adds its own", () => {
+  it("holds the git notifiers and the email notifier, frozen; each move task adds its own", () => {
     expect(BUILT_IN_INTEGRATIONS.notifiers.map((entry) => entry.metadata.kind)).toEqual([
       "github",
       "gitlab",
       "git-log",
+      "email",
     ]);
     expect(BUILT_IN_INTEGRATIONS.email).toEqual([]);
     expect(BUILT_IN_INTEGRATIONS.design).toEqual([]);
