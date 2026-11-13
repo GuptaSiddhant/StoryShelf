@@ -46,6 +46,10 @@ export {
   type BuildReferenceContractFixtureRunner,
 } from "./build-reference-contract.ts";
 export {
+  retentionSkippedContractSuite,
+  type RetentionSkippedRunner,
+} from "./retention-skipped-contract.ts";
+export {
   retentionActivationContractSuite,
   type RetentionActivationHarness,
   type RetentionActivationHarnessRunner,
