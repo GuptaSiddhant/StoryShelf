@@ -15,7 +15,7 @@ import {
   type CaptureHandlerOptions,
 } from "@storyshelf/core/capture";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { currentTraceparent } from "@storyshelf/observability";
 import { notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
@@ -63,7 +63,7 @@ function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => 
  * captures it queues. Shard jobs go back onto the same queue the capture came from.
  */
 export function setupCapture(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   delivery: Delivery,
   logger: Logger,
@@ -99,7 +99,7 @@ export function setupCapture(
 }
 
 function captureHandlerOptions(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   delivery: Delivery,
   logger: Logger,

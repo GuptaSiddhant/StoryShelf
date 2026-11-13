@@ -1,4 +1,4 @@
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { BuildComponentModel } from "@storyshelf/core/models";
 import {
   createTestBuild,
@@ -14,16 +14,16 @@ import { setupPublishing } from "./publish-setup.ts";
 
 const logger = pino({ level: "silent" });
 
-function options(): ShelfOptions {
+function options(): ResolvedShelfOptions {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  return { database: db, storage } as unknown as ShelfOptions;
+  return { database: db, storage } as unknown as ResolvedShelfOptions;
 }
 
 const buildState = { request: vi.fn(async () => {}) };
 const reviewRequested = vi.fn(async () => {});
 
-function jobsFor(opts: ShelfOptions, serverless: boolean) {
+function jobsFor(opts: ResolvedShelfOptions, serverless: boolean) {
   return createJobQueue(opts, serverless ? [] : ["publish"], 2);
 }
 

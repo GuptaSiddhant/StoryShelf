@@ -102,6 +102,10 @@
       "source": "./src/insights/index.ts",
       "default": "./dist/insights.mjs"
     },
+    "./integrations": {
+      "source": "./src/integrations/index.ts",
+      "default": "./dist/integrations.mjs"
+    },
     "./logger": {
       "source": "./src/logger.ts",
       "default": "./dist/logger.mjs"
@@ -172,6 +176,7 @@
       "./config": "./dist/config.mjs",
       "./diff": "./dist/diff.mjs",
       "./insights": "./dist/insights.mjs",
+      "./integrations": "./dist/integrations.mjs",
       "./logger": "./dist/logger.mjs",
       "./models": "./dist/models.mjs",
       "./orm": "./dist/orm.mjs",

@@ -1,4 +1,4 @@
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { Retention } from "@storyshelf/core/retention";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -86,7 +86,7 @@ describe("background retention", () => {
         database: db,
         storage,
         ...(testing ? { testing: {} } : {}),
-      } as ShelfOptions;
+      } as ResolvedShelfOptions;
       const runtime = {
         config: { branchGcIntervalMs: 120_000 },
         logger: createShelfLogger({ level: "silent" }),

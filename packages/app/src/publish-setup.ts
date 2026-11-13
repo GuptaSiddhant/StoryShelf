@@ -19,7 +19,7 @@ import {
   type KindHandler,
   type PublishCompleter,
 } from "@storyshelf/core/capture";
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel } from "@storyshelf/core/models";
@@ -55,7 +55,7 @@ export type PublishService = Pick<
  * `delivery.reviewRequested` asks the reviewers for a verdict on a build that waits for one.
  */
 export function setupPublishing(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   captureWillRun: boolean,
