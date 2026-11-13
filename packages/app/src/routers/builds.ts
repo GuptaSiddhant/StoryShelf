@@ -114,6 +114,7 @@ import {
   unauthorized,
 } from "./schemas.ts";
 import { registerSnapshots } from "./snapshots.ts";
+import { registerStoryStatus } from "./story-status.ts";
 /** Register the build list, upload, fetch, retry, and delete endpoints. */
 export function registerBuilds(app: ShelfRouter): void {
   app.openapi(listBuildsRoute, async (c) => {
@@ -270,6 +271,7 @@ export function registerBuilds(app: ShelfRouter): void {
   });
 
   registerSnapshots(app);
+  registerStoryStatus(app);
   registerComments(app);
   registerBuildReviews(app);
   registerBuildChangeset(app);
