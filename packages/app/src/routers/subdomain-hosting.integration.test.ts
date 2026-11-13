@@ -442,13 +442,19 @@ describe("the exchange and the grant cookie", () => {
 });
 
 describe("alias hosts", () => {
-  it("redirect every path to the portal's project Storybook", async () => {
+  it("redirect every path to the portal's project Storybook, keeping only the query", async () => {
     const { app } = await boot();
-    for (const path of ["/", "/anything?x=1", "/iframe.html"]) {
+    for (const [path, search] of [
+      ["/", ""],
+      ["/anything?x=1", "?x=1"],
+      ["/iframe.html", ""],
+    ] as const) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- sequential, short
       const response = await get(app, `https://test-project.${BASE}${path}`, NAV);
       expect(response.status).toBe(302);
-      expect(response.headers.get("location")).toBe(`${PORTAL}/projects/test-project/storybook`);
+      expect(response.headers.get("location")).toBe(
+        `${PORTAL}/projects/test-project/storybook${search}`,
+      );
     }
   });
 
