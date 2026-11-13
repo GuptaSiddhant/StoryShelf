@@ -39,13 +39,21 @@ export const Badges = jsxStory(() => (
 
 export const BuildStatusBadges = jsxStory(() => (
   <HStack>
-    {["approved", "unchanged", "new", "changed", "rejected", "failed", "pending", "cancelled"].map(
-      (status) => (
-        <Badge key={status} tone={statusTone(status)} icon>
-          {status}
-        </Badge>
-      ),
-    )}
+    {[
+      "approved",
+      "unchanged",
+      "new",
+      "changed",
+      "rejected",
+      "failed",
+      "pending",
+      "cancelled",
+      "skipped",
+    ].map((status) => (
+      <Badge key={status} tone={statusTone(status)} icon>
+        {status}
+      </Badge>
+    ))}
   </HStack>
 ));
 

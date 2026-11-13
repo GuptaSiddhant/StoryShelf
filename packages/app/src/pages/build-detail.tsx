@@ -39,6 +39,7 @@ import {
   snapshotGrid,
 } from "../ui/styles/review.ts";
 import { a11ySummaryNote, a11ySummaryOf } from "./a11y-violations.tsx";
+import { renderSkippedBuildPage } from "./build-detail-skipped.tsx";
 import { snapshotVariant } from "./build-diff-model.ts";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
@@ -75,6 +76,9 @@ export async function renderBuildDetailPage(
   const project = await new ProjectModel(db).get(build.projectId);
   if (!project) {
     return null;
+  }
+  if (build.status === "skipped") {
+    return await renderSkippedBuildPage(project, build);
   }
   const snapshots = await new SnapshotModel(db).listByBuild(build.id);
   const attempts = await new CaptureAttemptModel(db).listByBuild(build.id);

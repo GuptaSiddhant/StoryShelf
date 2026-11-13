@@ -13,6 +13,7 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
+import { type SkipSource, noStoryChangedText, skipSourceSha } from "./skipped-source.ts";
 const buildCell = css`
   /* build-cell */
   display: grid;
@@ -57,6 +58,28 @@ function changeSummary(build: Build): string {
   return parts.join(" · ");
 }
 
+/** "No story changed since a1b2c3d", the sha linking to the build this one repeats. */
+function SkippedSummary({
+  project,
+  build,
+  source,
+}: {
+  project: Project;
+  build: Build;
+  source: SkipSource | undefined;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const sha = skipSourceSha(build, source);
+  if (!source?.build || !sha) {
+    return <>{noStoryChangedText(sha)}</>;
+  }
+  return (
+    <>
+      No story changed since <a href={urls.build(project.slug, source.build.id)}>{sha}</a>
+    </>
+  );
+}
+
 function BuildSummaryCell({
   project,
   build,
@@ -81,13 +104,20 @@ function BuildSummaryCell({
 function BuildActions({
   project,
   build,
+  source,
 }: {
   project: Project;
   build: Build;
+  source: SkipSource | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   // The diff page is a testing route; hosting-only instances link to the build page.
   const needsReview = build.status === "reviewing" && testingEnabled();
+  // A skipped build has no Storybook of its own: link the source's, while it is available.
+  const skipped = build.status === "skipped";
+  const storybookId = skipped ? source?.build?.id : build.id;
+  const showStorybook = skipped ? source?.storybook === true && Boolean(storybookId) : true;
+  const storybookLabel = skipped ? "View source Storybook" : "View Storybook";
   return (
     <HStack wrap={false} justify="end">
       <Button
@@ -99,14 +129,16 @@ function BuildActions({
       >
         {needsReview ? "Review" : "View"}
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        icon="external-link"
-        href={urls.short(build.id)}
-        aria-label="View Storybook"
-        title="View Storybook"
-      />
+      {showStorybook ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="external-link"
+          href={urls.short(storybookId ?? build.id)}
+          aria-label={storybookLabel}
+          title={storybookLabel}
+        />
+      ) : null}
     </HStack>
   );
 }
@@ -114,9 +146,11 @@ function BuildActions({
 function BuildRow({
   project,
   build,
+  source,
 }: {
   project: Project;
   build: Build;
+  source: SkipSource | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <tr>
@@ -129,7 +163,13 @@ function BuildRow({
         </Badge>
       </td>
       <td>
-        <Meta as="span">{changeSummary(build)}</Meta>
+        <Meta as="span">
+          {build.status === "skipped" ? (
+            <SkippedSummary project={project} build={build} source={source} />
+          ) : (
+            changeSummary(build)
+          )}
+        </Meta>
       </td>
       <td>
         <div class={authorCell}>
@@ -143,7 +183,7 @@ function BuildRow({
         </Meta>
       </td>
       <td class="nowrap">
-        <BuildActions project={project} build={build} />
+        <BuildActions project={project} build={build} source={source} />
       </td>
     </tr>
   );
@@ -153,9 +193,12 @@ function BuildRow({
 export function BuildsTable({
   project,
   builds,
+  sources = new Map(),
 }: {
   project: Project;
   builds: Build[];
+  /** What each skipped build repeats, keyed by the skipped build's id. */
+  sources?: Map<string, SkipSource>;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <Table label="Builds">
@@ -174,7 +217,12 @@ export function BuildsTable({
         </thead>
         <tbody>
           {builds.map((build) => (
-            <BuildRow key={build.id} project={project} build={build} />
+            <BuildRow
+              key={build.id}
+              project={project}
+              build={build}
+              source={sources.get(build.id)}
+            />
           ))}
         </tbody>
       </table>
