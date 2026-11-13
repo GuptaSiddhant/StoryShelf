@@ -28,6 +28,8 @@ export interface StateWriter {
   }): Promise<void>;
   /** Create or update the single review comment of the build keyed by `url`. */
   comment(input: { sha: string; url: string; markdown: string }): Promise<unknown>;
+  /** Whether the host says `sha` is on `branch`; see `StateNotifierAdapter.commitOnBranch`. */
+  commitOnBranch?(input: { sha: string; branch: string }): Promise<boolean>;
 }
 
 /** Build the runtime adapter that routes a target kind to the writer. */
@@ -38,6 +40,9 @@ export function createStateAdapter(
 ): StateNotifierAdapter {
   return {
     metadata,
+    ...(writer.commitOnBranch === undefined
+      ? {}
+      : { commitOnBranch: writer.commitOnBranch.bind(writer) }),
     async setState({ target, state, url }): Promise<void> {
       if (target.kind === "status") {
         await writer.status({

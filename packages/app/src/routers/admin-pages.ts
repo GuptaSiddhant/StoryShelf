@@ -1,5 +1,7 @@
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { Auth } from "@storyshelf/core/auth";
+import { ProjectModel } from "@storyshelf/core/models";
 import { describeCaptureHost } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
@@ -48,7 +50,7 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
         credentials,
         aiEnabled: getStore().ai !== undefined,
         testing,
-        hiddenSnapshots: testing ? 0 : await countHiddenSnapshots(db),
+        ...(await projectFacts(db, testing)),
         ...(await captureView()),
         // Only a host that runs capture jobs (one with `testing`) is sized here.
         capture: capturesHere === true ? describeCaptureHost(captureConcurrency) : null,
@@ -114,4 +116,24 @@ async function publicOriginView(): Promise<AdminSystemData["publicOrigin"]> {
     // Only a deployment with admins can learn an origin from one.
     learns: authEnabled,
   };
+}
+
+/** Snapshots hidden by hosting-only mode, or the projects that count default-branch claims unverified. */
+async function projectFacts(
+  db: DatabaseAdapter,
+  testing: boolean | undefined,
+): Promise<Pick<AdminSystemData, "hiddenSnapshots" | "unverifiedDefault">> {
+  return testing
+    ? { hiddenSnapshots: 0, unverifiedDefault: await unverifiedDefaultProjects(db) }
+    : { hiddenSnapshots: await countHiddenSnapshots(db), unverifiedDefault: [] };
+}
+
+/** Projects that turned default-branch verification off (shown on the System page). */
+async function unverifiedDefaultProjects(
+  db: DatabaseAdapter,
+): Promise<{ name: string; slug: string }[]> {
+  const projects = await new ProjectModel(db).list();
+  return projects
+    .filter((project) => project.requireVerifiedDefault === false)
+    .map((project) => ({ name: project.name, slug: project.slug }));
 }

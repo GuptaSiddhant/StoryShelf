@@ -24,6 +24,9 @@ export const projects = sqliteTable("projects", {
   aiProfile: text("ai_profile"),
   reviewEnabled: integer("review_enabled", { mode: "boolean" }).notNull().default(true),
   reviewApprovals: integer("review_approvals").notNull().default(1),
+  requireVerifiedDefault: integer("require_verified_default", { mode: "boolean" })
+    .notNull()
+    .default(true),
   storybookUrlTtlSeconds: integer("storybook_url_ttl_seconds"),
   componentOwners: text("component_owners"),
   createdAt: text("created_at").notNull(),
@@ -54,6 +57,7 @@ export interface Project {
   aiProfile: string | null;
   reviewEnabled: boolean;
   reviewApprovals: number;
+  requireVerifiedDefault: boolean;
   storybookUrlTtlSeconds: number | null;
   componentOwners: string | null;
   createdAt: string;
