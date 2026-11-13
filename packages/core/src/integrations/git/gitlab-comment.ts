@@ -1,5 +1,5 @@
-import type { Logger } from "@storyshelf/core/logger";
-import { httpJson } from "@storyshelf/core/utils";
+import type { Logger } from "../../logger.ts";
+import { httpJson } from "../../utils/index.ts";
 import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
 import { findMrIid } from "./gitlab-pr.ts";
 import type { GitLabProject } from "./gitlab-status.ts";

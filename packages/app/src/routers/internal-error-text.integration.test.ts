@@ -28,7 +28,8 @@ function boot() {
     storage,
     logger: logger as never,
     testing: { runner: stubRunner() },
-    notifications: { notifiers: [] },
+    // No notifier: boot tasks would otherwise prime the public-origin cache and bypass the mocks.
+    notifications: { notifiers: false },
   });
   const json = async (method: string, path: string, body?: unknown) =>
     await app.request(`/api/v1${path}`, {

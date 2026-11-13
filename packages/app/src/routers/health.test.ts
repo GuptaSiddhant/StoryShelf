@@ -118,12 +118,7 @@ describe("health endpoints", () => {
   it("POST /api/v1/health is open when auth is disabled", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const app = createShelfApp({
-      database: db,
-      storage,
-      logger: silentLogger,
-      notifications: { notifiers: [] },
-    });
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
     await app.lifecycle.setup();
     const response = await app.request("/api/v1/health", { method: "POST" });
     expect(response.status).toBe(200);
@@ -132,7 +127,14 @@ describe("health endpoints", () => {
       adapters: { category: string; state: string }[];
     };
     expect(body.status).toBe("ok");
-    expect(body.adapters.map((a) => a.category).toSorted()).toEqual(["database", "storage"]);
+    expect(body.adapters.map((a) => a.category).toSorted()).toEqual([
+      "database",
+      "notifier",
+      "notifier",
+      "notifier",
+      "notifier",
+      "storage",
+    ]);
     expect(body.adapters.every((a) => a.state === "ok")).toBe(true);
   });
 

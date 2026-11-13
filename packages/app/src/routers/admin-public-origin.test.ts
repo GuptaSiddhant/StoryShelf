@@ -46,7 +46,7 @@ async function seedApp(options: {
     storage,
     logger: silent,
     config: { secret: "origin-test-secret", ...options.config },
-    ...(options.notifiers ? { notifications: { notifiers: options.notifiers } } : {}),
+    ...(options.notifiers === undefined ? {} : { notifications: { notifiers: options.notifiers } }),
     ...(role ? { auth: stubAuth({ id: "u1", email: "a@b.c", name: "A", role }) } : {}),
   });
   await app.lifecycle.setup();
@@ -298,7 +298,7 @@ describe("notifications without a public origin", () => {
       config: { publicBaseUrl: ORIGIN },
     });
     expect(await (await withOrigin.request("/admin")).text()).not.toContain(paused);
-    const noNotifiers = await seedApp({ notifiers: [] });
+    const noNotifiers = await seedApp({ notifiers: false });
     expect(await (await noNotifiers.request("/admin")).text()).not.toContain(paused);
   });
 

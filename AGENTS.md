@@ -112,7 +112,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `BuildStatePublisher.request(buildId)` (app: `requestBuildState`) queues one `notify` job per git
   channel. A new status is a new case in `statusesForBuild`; a refused write throws so the consumer
   retries. GitHub check runs share that mapper
-  (`packages/notify-git/src/github-check-mapper.ts`); the private key is the channel secret and must
+  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the channel secret and must
   never appear in config, logs, errors or API output.
 - **`cancelled` is terminal.** Cancel through `announceBuildStatus` (`build:cancelled`; no
   `build:failed` / `sys:capture-failed`). `BuildModel.update`/`setStatus` refuse other statuses for a

@@ -1,5 +1,5 @@
-import type { Logger } from "@storyshelf/core/logger";
-import { httpJson } from "@storyshelf/core/utils";
+import type { Logger } from "../../logger.ts";
+import { httpJson } from "../../utils/index.ts";
 import { githubHeaders, repoPath } from "./github-api.ts";
 import { findPrNumber } from "./github-pr.ts";
 import type { GitHubRepo } from "./github-status.ts";

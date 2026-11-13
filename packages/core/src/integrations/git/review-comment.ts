@@ -1,4 +1,4 @@
-import type { Logger } from "@storyshelf/core/logger";
+import type { Logger } from "../../logger.ts";
 import { commentMarker } from "./describe.ts";
 
 /** A review thread (PR or MR) hosting a single StoryShelf comment. */

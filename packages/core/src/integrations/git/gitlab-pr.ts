@@ -1,4 +1,4 @@
-import { httpJson } from "@storyshelf/core/utils";
+import { httpJson } from "../../utils/index.ts";
 import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
 
 interface CommitMergeRequest {

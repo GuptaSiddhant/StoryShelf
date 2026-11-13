@@ -1,5 +1,5 @@
 /** Human text for a build state and the comment marker shared by GitHub and GitLab. */
-import type { NotifierState } from "@storyshelf/core/adapter/notifier";
+import type { NotifierState } from "../../adapters/notifier/index.ts";
 
 /** Short description shown beside a commit status. */
 export function describeState(state: NotifierState): string {
