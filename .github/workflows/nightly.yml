@@ -61,3 +61,5 @@ jobs:
   fly:
     name: fly
     uses: ./.github/workflows/fly-dry-run.yml
+    with:
+      e2e: true
