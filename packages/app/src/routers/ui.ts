@@ -132,6 +132,7 @@ export function registerUiPages(app: ShelfRouter): void {
     const html = await renderProjectBuildsPage(c.req.param("slug"), {
       status: c.req.query("status"),
       branch: c.req.query("branch"),
+      skipped: c.req.query("skipped"),
     });
     if (!html) {
       return c.notFound();

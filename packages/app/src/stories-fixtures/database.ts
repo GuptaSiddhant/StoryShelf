@@ -4,19 +4,22 @@ import { makeDatabase } from "@storyshelf/core/test-helpers";
 import {
   baselines,
   buildComponents,
+  BUILD_PURGED,
   builds,
   catalogEntries,
   comments,
   otherProject,
   project,
+  skippedBuilds,
   snapshots,
 } from "./dataset.ts";
 
 /**
  * Which data a page story renders over: `populated` is the "Design system" project with builds
- * in every state, `empty` has one project and no builds, `blank` has no projects at all.
+ * in every state, `empty` has one project and no builds, `blank` has no projects at all, and
+ * `skipped-only` has a project whose every build was skipped.
  */
-export type StoryDataset = "populated" | "empty" | "blank";
+export type StoryDataset = "populated" | "empty" | "blank" | "skipped-only";
 
 interface Seeded {
   db: DatabaseAdapter;
@@ -50,9 +53,10 @@ async function insertBuilds(db: DatabaseAdapter): Promise<void> {
   await insertAll(db, db.tables.comments, comments);
 }
 
-/** What every populated build publishes. */
+/** What every populated build publishes, except the build whose Storybook retention removed. */
 const PUBLISHED: CatalogLoader = {
-  load: async () => await Promise.resolve({ v: 1, entries: catalogEntries }),
+  load: async (_projectId, buildId) =>
+    await Promise.resolve(buildId === BUILD_PURGED ? null : { v: 1, entries: catalogEntries }),
   refresh: async () => await Promise.resolve({ v: 1, entries: catalogEntries }),
 };
 
@@ -62,6 +66,10 @@ export async function seedStoryDatabase(dataset: StoryDataset): Promise<Seeded> 
   if (dataset === "blank") return { db, catalog: NO_CATALOG };
   await insertAll(db, db.tables.projects, [project, otherProject]);
   if (dataset === "empty") return { db, catalog: NO_CATALOG };
+  if (dataset === "skipped-only") {
+    await insertAll(db, db.tables.builds, skippedBuilds());
+    return { db, catalog: PUBLISHED };
+  }
   await insertBuilds(db);
   return { db, catalog: PUBLISHED };
 }

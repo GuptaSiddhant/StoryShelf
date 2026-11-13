@@ -7,6 +7,7 @@ import { getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
   Button,
+  CheckField,
   EmptyState,
   HStack,
   PageHeader,
@@ -17,13 +18,27 @@ import {
 import { HealthSlot } from "./health-panel.tsx";
 import { InheritedRatioCard } from "./inherited-ratio-card.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
-const STATUSES = ["reviewing", "approved", "rejected", "failed", "cancelled", "pending"] as const;
+import { loadSkipSources } from "./skipped-source.ts";
+
+const STATUSES = [
+  "reviewing",
+  "approved",
+  "rejected",
+  "failed",
+  "cancelled",
+  "pending",
+  "skipped",
+] as const;
 
 /** Current list filters (from the query string). */
 interface BuildFilters {
   status?: string;
   branch?: string;
+  /** `"1"` shows skipped builds (hidden by default, ADR 0044). */
+  skipped?: string;
 }
+
+const showsSkipped = (filters: BuildFilters): boolean => filters.skipped === "1";
 
 function listHref(base: string, filters: BuildFilters): string {
   const params = new URLSearchParams();
@@ -33,12 +48,16 @@ function listHref(base: string, filters: BuildFilters): string {
   if (filters.branch) {
     params.set("branch", filters.branch);
   }
+  if (showsSkipped(filters)) {
+    params.set("skipped", "1");
+  }
   const query = params.toString();
   return query ? `${base}?${query}` : base;
 }
 
 function matches(build: Build, filters: BuildFilters): boolean {
   return (
+    (showsSkipped(filters) || build.status !== "skipped") &&
     (!filters.status || build.status === filters.status) &&
     (!filters.branch || build.gitBranch === filters.branch)
   );
@@ -52,15 +71,19 @@ function BuildsToolbar(props: {
   base: string;
 }): ReturnType<typeof HStack> {
   const { all, filters, base } = props;
-  const branches = [...new Set(all.map((build) => build.gitBranch))].toSorted();
-  const inBranch = all.filter((build) => !filters.branch || build.gitBranch === filters.branch);
+  const skippedTotal = all.filter((build) => build.status === "skipped").length;
+  const visible = all.filter((build) => showsSkipped(filters) || build.status !== "skipped");
+  const branches = [...new Set(visible.map((build) => build.gitBranch))].toSorted();
+  const inBranch = visible.filter((build) => !filters.branch || build.gitBranch === filters.branch);
   const count = (status: string): number =>
     inBranch.filter((build) => build.status === status).length;
   const items = [
     { label: `All ${inBranch.length}`, value: "", status: undefined },
-    ...STATUSES.filter((status) => count(status) > 0 || filters.status === status).map(
-      (status) => ({ label: `${status} ${count(status)}`, value: status, status }),
-    ),
+    ...STATUSES.filter(
+      (status) =>
+        (status !== "skipped" || showsSkipped(filters)) &&
+        (count(status) > 0 || filters.status === status),
+    ).map((status) => ({ label: `${status} ${count(status)}`, value: status, status })),
   ];
   return (
     <HStack justify="between">
@@ -82,6 +105,14 @@ function BuildsToolbar(props: {
         hx-push-url="true"
       >
         {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
+        {skippedTotal > 0 ? (
+          <CheckField
+            label={`Show skipped (${skippedTotal})`}
+            name="skipped"
+            value="1"
+            checked={showsSkipped(filters)}
+          />
+        ) : null}
         <SelectField
           label="Branch"
           name="branch"
@@ -109,8 +140,12 @@ export async function renderProjectBuildsPage(
   }
   const all = await new BuildModel(getStore().db).list(project.id);
   const builds = all.filter((build) => matches(build, query));
+  const skippedTotal = all.filter((build) => build.status === "skipped").length;
+  const onlySkipped = skippedTotal > 0 && skippedTotal === all.length;
+  const sources = await loadSkipSources(builds);
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const filtered = Boolean(query.status ?? query.branch);
+  const everySkipped = builds.length === 0 && onlySkipped && !showsSkipped(query);
   const health = await loadHealthPanel(project);
 
   return (
@@ -134,14 +169,29 @@ export async function renderProjectBuildsPage(
       />
       <VStack>
         <HealthSlot project={project} data={health} />
-        {testingEnabled() ? <InheritedRatioCard builds={all} /> : null}
+        {testingEnabled() ? (
+          <InheritedRatioCard builds={all.filter((build) => build.status !== "skipped")} />
+        ) : null}
         <BuildsToolbar
           project={project}
           all={all}
           filters={query}
           base={urls.buildsList(project.slug)}
         />
-        {builds.length === 0 ? (
+        {everySkipped ? (
+          <EmptyState
+            title="Every build here was skipped"
+            description={`No story changed in any of the ${skippedTotal} builds, so none was captured. Show skipped to see them.`}
+            action={
+              <Button
+                variant="secondary"
+                href={listHref(urls.buildsList(project.slug), { ...query, skipped: "1" })}
+              >
+                Show skipped
+              </Button>
+            }
+          />
+        ) : builds.length === 0 ? (
           <EmptyState
             title="No builds"
             description={
@@ -158,7 +208,7 @@ export async function renderProjectBuildsPage(
             }
           />
         ) : (
-          <BuildsTable project={project} builds={builds} />
+          <BuildsTable project={project} builds={builds} sources={sources} />
         )}
       </VStack>
     </DocumentLayout>
