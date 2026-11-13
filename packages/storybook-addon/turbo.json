@@ -3,10 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "test": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/packages/app/src/routers/openapi.snapshot.json"
-      ]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/app/src/routers/openapi.snapshot.json"]
     }
   }
 }
