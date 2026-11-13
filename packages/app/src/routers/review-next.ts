@@ -30,7 +30,7 @@ async function advanceTarget(target: {
   buildId: string;
   snapshotId: string;
 }): Promise<string | null> {
-  const snapshots = await new SnapshotModel(getStore().db).listByBuild(target.buildId);
+  const snapshots = await new SnapshotModel(getStore().db).listByBuildSummary(target.buildId);
   const next = nextOpenSnapshotId(snapshots, target.snapshotId);
   return next === null
     ? null

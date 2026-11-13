@@ -138,6 +138,47 @@ export function databaseContractSuite(label: string, make: DatabaseFactory): voi
       }
     }, 30_000);
 
+    it("reads only the requested columns, plus id, in the same order", async () => {
+      const adapter = await make();
+      await adapter.lifecycle?.setup({
+        config: {},
+        logger: createShelfLogger({ level: "silent" }),
+      });
+      const table = adapter.tables.projects;
+      const columns = getTableColumns(table);
+      const prefix = `columns-contract-${randomUUID()}`;
+      const ids = ["b", "a"].map((suffix) => `${prefix}-${suffix}`);
+      try {
+        const now = new Date().toISOString();
+        await Promise.all(
+          ids.map(
+            async (id) =>
+              await adapter.insert(table, {
+                id,
+                name: "same",
+                slug: id,
+                createdAt: now,
+                updatedAt: now,
+              }),
+          ),
+        );
+        const where = like(columns["id"]!, `${prefix}-%`);
+        const rows = await adapter.list(table, { where, columns: ["slug"] });
+        expect(rows.map((row) => Object.keys(row).toSorted())).toEqual([
+          ["id", "slug"],
+          ["id", "slug"],
+        ]);
+        expect(idsOf(rows)).toEqual(ids.toSorted());
+        await expect(adapter.list(table, { where, columns: ["nope"] })).rejects.toThrow(/nope/u);
+      } finally {
+        try {
+          await Promise.all(ids.map(async (id) => await adapter.remove(table, id)));
+        } finally {
+          await adapter.lifecycle?.teardown();
+        }
+      }
+    }, 30_000);
+
     it("keeps the lifecycle rule (absent or all three hooks)", async () => {
       const adapter = await make();
       const lifecycle = adapter.lifecycle as
