@@ -44,7 +44,7 @@ set_demo_ai_profile() {
     -w '%{http_code}' -d '{"aiProfile":"default"}')"
   case "$code" in
     2*) ;;
-    400) echo "::warning::AI profile \"default\" is not configured on this server (no ANTHROPIC_API_KEY); seeding without AI insights." ;;
+    400 | 501) echo "AI is not configured on this server; leaving the demo without an AI profile." ;;
     *) echo "::error::PATCH aiProfile answered '$code'"; exit 1 ;;
   esac
 }
