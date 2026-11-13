@@ -53,6 +53,10 @@
       "source": "./src/pglite.ts",
       "default": "./dist/pglite.mjs"
     },
+    "./rds-iam": {
+      "source": "./src/rds-iam.ts",
+      "default": "./dist/rds-iam.mjs"
+    },
     "./schema": {
       "source": "./src/schema/index.ts",
       "default": "./dist/schema.mjs"
@@ -71,6 +75,7 @@
       "./neon-http": "./dist/neon-http.mjs",
       "./pg": "./dist/pg.mjs",
       "./pglite": "./dist/pglite.mjs",
+      "./rds-iam": "./dist/rds-iam.mjs",
       "./schema": "./dist/schema.mjs",
       "./vercel": "./dist/vercel.mjs",
       "./package.json": "./package.json"
@@ -105,12 +110,16 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
+    "@aws-sdk/rds-signer": "^3.0.0",
     "@electric-sql/pglite": "^0.5.8",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/postgres": "^0.10.0",
     "pg": "^8.0.0"
   },
   "peerDependenciesMeta": {
+    "@aws-sdk/rds-signer": {
+      "optional": true
+    },
     "pg": {
       "optional": true
     },

@@ -34,6 +34,13 @@ declare const __PKG_VERSION__: string | undefined;
 export interface PgDatabaseOptions {
   url?: string;
   connectionString?: string;
+  /** Discrete connection fields, used when no `url` is given (the `rds-iam` preset). */
+  host?: string;
+  port?: number;
+  database?: string;
+  user?: string;
+  /** A password, or a function `pg` calls for every new connection (a fresh IAM token). */
+  password?: string | (() => string | Promise<string>);
   ssl?: unknown;
   max?: number;
   idleTimeoutMillis?: number;
@@ -50,22 +57,14 @@ export interface PgDatabaseOptions {
  */
 export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
   const connectionString = options.connectionString ?? options.url;
-  if (!options.client && !connectionString) {
+  if (!options.client && !connectionString && !options.host) {
     throw new Error(
-      "createPgDatabase: provide `url` (or `connectionString`) or a preconfigured `client`",
+      "createPgDatabase: provide `url` (or `connectionString`), `host`, or a preconfigured `client`",
     );
   }
 
   const owned = !options.client;
-  const pool =
-    options.client ??
-    new Pool({
-      connectionString,
-      ssl: options.ssl,
-      max: options.max,
-      idleTimeoutMillis: options.idleTimeoutMillis,
-      connectionTimeoutMillis: options.connectionTimeoutMillis,
-    });
+  const pool = options.client ?? newPool(options, connectionString);
   const db = drizzle(pool, { schema });
   const retention: RetentionActivation = {};
   // Only a pool hands each transaction its own session; one injected connection shares them all,
@@ -97,6 +96,22 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
     },
   });
   return attachRetention(adapter, retention);
+}
+
+/** An owned pool from URL-or-fields options. */
+function newPool(options: PgDatabaseOptions, connectionString: string | undefined): Pool {
+  return new Pool({
+    connectionString,
+    host: options.host,
+    port: options.port,
+    database: options.database,
+    user: options.user,
+    password: options.password,
+    ssl: options.ssl,
+    max: options.max,
+    idleTimeoutMillis: options.idleTimeoutMillis,
+    connectionTimeoutMillis: options.connectionTimeoutMillis,
+  });
 }
 
 /** Close an owned client: pools end, bare clients disconnect. */
