@@ -87,6 +87,20 @@ const fake = vi.hoisted(() => {
       state.pagesOpened += 1;
       return await Promise.resolve(page);
     },
+    // The default page pool opens a context per page and resets it between captures.
+    newContext: async () =>
+      await Promise.resolve({
+        newPage: async () => {
+          state.pagesOpened += 1;
+          return await Promise.resolve(page);
+        },
+        clearCookies: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        close: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+      }),
     close: async (): Promise<void> => {
       state.closed += 1;
       await Promise.resolve();
@@ -533,7 +547,8 @@ describe("a remote browser lost mid-pass", () => {
     // nothing was scheduled after it.
     expect(onCapture).toHaveBeenCalledOnce();
     expect(fake.state.screenshots).toBe(2);
-    expect(fake.state.gotos).toHaveLength(2);
+    // The pool's `about:blank` reset between captures is not a story navigation.
+    expect(fake.state.gotos.filter((url) => url !== "about:blank")).toHaveLength(2);
     const lostWarnings = warn.mock.calls.filter(([, message]) =>
       String(message).includes("remote browser lost"),
     );

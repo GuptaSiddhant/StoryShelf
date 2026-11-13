@@ -15,6 +15,7 @@ export {
   refusalFor,
   resolveBrowsers,
 } from "./browsers.ts";
+export { switchStoriesEnabled, switchStoriesVetoed } from "./switch-stories.ts";
 export {
   NO_ORIGIN_REASON,
   NO_SECRET_REASON,
@@ -177,7 +178,7 @@ export {
 export { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "./dispatch.ts";
 export { ContentCollectingError, recordContentUses } from "./content-uses.ts";
 export { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
-export { materializeStorybook, prepareStorybook } from "./materialize.ts";
+export { MissingContentError, materializeStorybook, prepareStorybook } from "./materialize.ts";
 export * from "./publish/index.ts";
 export * from "./catalog/index.ts";
 export {

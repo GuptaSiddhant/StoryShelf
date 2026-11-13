@@ -45,6 +45,7 @@ export class ProjectModel {
       ...(input.executePlay === undefined ? {} : { executePlay: input.executePlay }),
       ...(input.runA11y === undefined ? {} : { runA11y: input.runA11y }),
       ...(input.runTests === undefined ? {} : { runTests: input.runTests }),
+      ...(input.switchStories === undefined ? {} : { switchStories: input.switchStories }),
       ...(input.detectUnstable === undefined ? {} : { detectUnstable: input.detectUnstable }),
       ...(input.playTimeoutMs === undefined ? {} : { playTimeoutMs: input.playTimeoutMs }),
       ...(input.reviewEnabled === undefined ? {} : { reviewEnabled: input.reviewEnabled }),
@@ -138,6 +139,8 @@ export interface ProjectCreateInput {
   runA11y?: boolean;
   /** Run Storybook 10 `.test()` entries as interaction tests (column default false when omitted). */
   runTests?: boolean;
+  /** Switch stories inside one loaded page (column default false when omitted; ADR 0052). */
+  switchStories?: boolean;
   detectUnstable?: boolean;
   /** Per-story play timeout in milliseconds (column default applies when omitted). */
   playTimeoutMs?: number;
