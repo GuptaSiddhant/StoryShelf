@@ -155,12 +155,78 @@ jobs:
           version: ${{ needs.validate.outputs.version }}
           dist-tag: ${{ needs.validate.outputs.dist_tag }}
 
-  # The tag and the GitHub Release. They follow a successful npm publish, and the tag is what marks
+  # The container image (#887, ADR 0050): `ghcr.io/guptasiddhant/storyshelf:<version>` and `latest`
+  # (with Chromium), plus `<version>-hosting` and `latest-hosting` (no browser). Stable releases only:
+  # a `next` build never reaches here. amd64 and arm64, with SBOM and provenance attestations. It
+  # authenticates with GITHUB_TOKEN (`packages: write`); no extra secret. Re-pushing a version
+  # overwrites its tags, so a re-run of a stable release is safe.
+  publish-image:
+    name: publish container image
+    needs: [detect, validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # provenance attestation
+      attestations: write
+    env:
+      IMAGE: ghcr.io/guptasiddhant/storyshelf
+      VERSION: ${{ needs.validate.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: full
+            suffix: ""
+          - variant: hosting
+            suffix: "-hosting"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.detect.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/server-image/Dockerfile
+          target: ${{ matrix.variant }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}${{ matrix.suffix }}
+            ${{ env.IMAGE }}:latest${{ matrix.suffix }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ needs.detect.outputs.sha }}
+            org.opencontainers.image.licenses=MIT
+          cache-from: type=gha,scope=image-${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=image-${{ matrix.variant }}
+
+  # The tag and the GitHub Release. They follow a successful npm publish and image push, and the tag is what marks
   # the version released: until it exists, every push to main (and a manual re-run) retries the
   # stable path. Both steps tolerate "already exists".
   github-release:
     name: tag and GitHub Release
-    needs: [detect, validate, publish-npm]
+    needs: [detect, validate, publish-npm, publish-image]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the tag through the API and the release

@@ -104,16 +104,14 @@ export async function servePublishedFile(
   c: Context,
   request: PublishedFileRequest,
 ): Promise<Response | null> {
-  const { storage, config } = getStore();
+  const { storage } = getStore();
   const { projectId, buildId, rel } = request;
   const located = await locatePublishedFile(storage, projectId, buildId, rel);
-  const mime = mimeFor(rel);
-  const gzipOffered = Boolean(
-    config.publishedCompression &&
-    located.contentHash !== undefined &&
-    isCompressible(mime) &&
-    acceptsGzip(c.req.header("accept-encoding")),
-  );
+  const gzipOffered = offersGzip(c, rel, located.contentHash);
+  const unchanged = notModified(c, request, located.contentHash, gzipOffered);
+  if (unchanged) {
+    return unchanged;
+  }
   // Bytes are needed to gzip, and to hash a legacy file for its ETag; everything else streams.
   const needsBytes =
     gzipOffered || (located.contentHash === undefined && request.access === "session");
@@ -125,6 +123,16 @@ export async function servePublishedFile(
     needsBytes ? "bytes" : "stream",
   );
   return file ? await respondWithFile(c, request, file, gzipOffered) : null;
+}
+
+/** Whether the answer may be the gzip copy: enabled, content-addressed, text-like and accepted. */
+function offersGzip(c: Context, rel: string, contentHash: string | undefined): boolean {
+  return Boolean(
+    getStore().config.publishedCompression &&
+    contentHash !== undefined &&
+    isCompressible(mimeFor(rel)) &&
+    acceptsGzip(c.req.header("accept-encoding")),
+  );
 }
 
 /** The answer for a file that exists: gzip when offered, a `304` when a viewer's copy is current. */
@@ -140,10 +148,7 @@ async function respondWithFile(
     gzipOffered && file.bytes
       ? await publishedGzip(storage, file.contentHash, file.bytes, mime)
       : undefined;
-  const validators =
-    request.access === "session"
-      ? sessionValidator(c, file, compressed !== undefined)
-      : { headers: {}, fresh: false };
+  const validators = validatorOf(c, request, file, compressed !== undefined);
   const common = {
     ...answerHeaders(request, file.contentHash !== undefined),
     ...validators.headers,
@@ -202,22 +207,64 @@ function answerHeaders(
 }
 
 /**
- * The `ETag` of a session answer and whether the request's `If-None-Match` already holds it. The tag
- * is the manifest content hash (the sha-256 of the bytes for a legacy file with none), and a gzip
- * answer is a different representation with its own tag.
+ * The `ETag` of an answer and whether the request's `If-None-Match` already holds it. The tag is the
+ * manifest content hash, and a gzip answer is a different representation with its own tag. A legacy
+ * file has no manifest hash: only a signed-in viewer's answer, which is read as bytes anyway, is
+ * hashed for one, so a public or signed answer for it carries no validator.
  */
-function sessionValidator(
+function validatorOf(
   c: Context,
+  request: PublishedFileRequest,
   file: { bytes?: Buffer; contentHash?: string },
   gzip: boolean,
-): { headers: { etag: string }; fresh: boolean } {
+): { headers: { etag?: string }; fresh: boolean } {
   const hash =
     file.contentHash ??
-    createHash("sha256")
-      .update(file.bytes ?? "")
-      .digest("hex");
-  const etag = `"${hash}${gzip ? "-gzip" : ""}"`;
+    (request.access === "session"
+      ? createHash("sha256")
+          .update(file.bytes ?? "")
+          .digest("hex")
+      : undefined);
+  if (hash === undefined) {
+    return { headers: {}, fresh: false };
+  }
+  const etag = etagOf(hash, gzip);
+  return { headers: { etag }, fresh: holdsTag(c, etag) };
+}
+
+/** The entity tag of a content hash; the gzip copy is another representation. */
+function etagOf(hash: string, gzip: boolean): string {
+  return `"${hash}${gzip ? "-gzip" : ""}"`;
+}
+
+/** Whether `If-None-Match` lists `etag` (weak or strong). */
+function holdsTag(c: Context, etag: string): boolean {
   const given = c.req.header("if-none-match") ?? "";
-  const fresh = given.split(",").some((tag) => tag.trim() === etag || tag.trim() === `W/${etag}`);
-  return { headers: { etag }, fresh };
+  return given.split(",").some((tag) => tag.trim() === etag || tag.trim() === `W/${etag}`);
+}
+
+/**
+ * A `304` answered from the manifest alone, with no storage read, when the viewer already holds the
+ * file's current tag. Only {@link servePublishedFile} calls it, after the route's access check
+ * granted `request.access`, so it reveals nothing a refusal hides. Headers are the 200's, so a
+ * signed URL keeps `SIGNED_URL_HEADERS`.
+ */
+function notModified(
+  c: Context,
+  request: PublishedFileRequest,
+  contentHash: string | undefined,
+  gzipOffered: boolean,
+): Response | null {
+  if (contentHash === undefined) {
+    return null;
+  }
+  const etag = etagOf(contentHash, gzipOffered);
+  if (!holdsTag(c, etag)) {
+    return null;
+  }
+  return c.body(null, 304, {
+    ...answerHeaders(request, true),
+    etag,
+    ...(getStore().config.publishedCompression ? { vary: "Accept-Encoding" } : {}),
+  });
 }
