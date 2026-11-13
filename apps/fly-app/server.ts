@@ -5,11 +5,13 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
+import { parseTrustProxy } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
 import { chatNotifiers } from "@storyshelf/notify-chat";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
+import { gitLogNotifier } from "@storyshelf/notify-git";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -43,6 +45,12 @@ const authPassword = env["AUTH_PASSWORD"];
 const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
+// Rate limits key on the client, not Fly's proxy (#911): on Fly (`FLY_APP_NAME` is set by the
+// platform) trust `Fly-Client-IP` unless `TRUST_PROXY` says otherwise; `TRUST_PROXY=false` opts out.
+const trustProxy =
+  env["TRUST_PROXY"] === undefined && env["FLY_APP_NAME"]
+    ? "fly"
+    : parseTrustProxy(env["TRUST_PROXY"]);
 
 function buildAuthUi(): AuthUiConfig | undefined {
   const pairs: Array<[string, string | undefined]> = [
@@ -120,7 +128,9 @@ shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
 shelfLogger.info(aiLogFields(ai), "ai insights");
 
 // Notifications: SMTP sender from SMTP_* env (undefined keeps invites
-// out-of-band); chat + email providers serve stored channels.
+// out-of-band); chat + email providers serve stored channels. The `git-log` provider writes git
+// statuses to the server log only (no outbound call); a channel uses it only when someone creates
+// one through the API, so the deployed demo is unchanged. The browser golden-path test (#941) uses it.
 const emailSender = smtpPresetFromEnv(env, shelfLogger);
 const emailNotifiers = emailSender
   ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
@@ -133,7 +143,7 @@ const app = createShelfApp({
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   ai,
   notifications: {
-    notifiers: [...chatNotifiers, ...emailNotifiers],
+    notifiers: [...chatNotifiers, ...emailNotifiers, gitLogNotifier],
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   auth:
@@ -159,6 +169,7 @@ const app = createShelfApp({
     migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken,
     publicBaseUrl,
+    ...(trustProxy === undefined ? {} : { trustProxy }),
     scratchDir: dataDir,
     ...(purgeTtlDays === undefined ? {} : { purgeTtlDays }),
     // Emit Server-Timing response headers (total + db/storage roll-ups).
