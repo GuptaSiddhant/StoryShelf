@@ -396,4 +396,8 @@ describe("statusTone", () => {
     expect(statusTone("failed")).toBe("danger");
     expect(statusTone("approved")).toBe("success");
   });
+
+  it("shows a skipped build neutral: routine, neither good news nor a problem", () => {
+    expect(statusTone("skipped")).toBe("neutral");
+  });
 });
