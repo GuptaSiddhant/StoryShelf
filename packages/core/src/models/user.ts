@@ -33,6 +33,21 @@ export class UserModel {
     return rows[0] ?? null;
   }
 
+  /** Fetch a user by email (as typed, then lower-cased; sign-in stores the IdP's address), or null when no account has it. */
+  async getByEmail(email: string): Promise<User | null> {
+    const typed = email.trim();
+    if (typed === "") return null;
+    return (await this.findEmail(typed)) ?? (await this.findEmail(typed.toLowerCase()));
+  }
+
+  private async findEmail(email: string): Promise<User | null> {
+    const rows = (await this.db.list(this.tables.users, {
+      where: eq(col(this.tables.users, "email"), email),
+      limit: 1,
+    })) as unknown as User[];
+    return rows[0] ?? null;
+  }
+
   /**
    * Insert or update a user row from an authenticated identity (login sync).
    * Email, name, avatar, and site role refresh on every login; the row id

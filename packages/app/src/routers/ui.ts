@@ -29,6 +29,7 @@ import {
   returnPathOf,
 } from "./design.handlers.ts";
 import { flash } from "./flash.ts";
+import { registerGetStarted } from "./get-started.tsx";
 import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
@@ -234,5 +235,6 @@ export function registerUiPages(app: ShelfRouter): void {
   });
 
   registerDesignCoverage(app);
+  registerGetStarted(app);
   registerSettingsPages(app);
 }

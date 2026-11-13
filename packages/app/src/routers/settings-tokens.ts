@@ -27,7 +27,12 @@ async function handleCreateToken(c: Context): Promise<Response> {
     userId: getStore().user?.id ?? null,
   });
   flash(c, "Token created — copy it now, it is shown once");
-  return c.html((await renderSettingsPage(c, "tokens", { secret: value })) ?? "");
+  return c.html(
+    (await renderSettingsPage(c, "tokens", {
+      secret: value,
+      origin: await getStore().publicOrigin?.url(),
+    })) ?? "",
+  );
 }
 
 async function handleDeleteToken(c: Context): Promise<Response> {

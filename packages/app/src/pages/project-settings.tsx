@@ -73,6 +73,8 @@ export interface SettingsFormState {
   errors?: Record<string, string>;
   globalError?: string;
   secret?: string;
+  /** Confirmed public origin, for the upload command shown with a new token. */
+  origin?: string;
   /** Label type key whose edit form is open (labels tab). */
   editKey?: string;
   /** Members tab: a refused component-owners submission, shown again as typed. */

@@ -6,25 +6,39 @@ import {
   Alert,
   Button,
   Card,
+  CodeBlock,
   Field,
   FormActions,
   Meta,
   SectionTitle,
   Table,
 } from "../ui/components.tsx";
+import { uploadCommand } from "./get-started.tsx";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
 export function renderSettingsTokens(
   project: Project,
   tokens: Omit<Token, "hash">[],
   isAdmin: boolean,
-  formState?: { globalError?: string; secret?: string },
+  formState?: { globalError?: string; secret?: string; origin?: string },
 ): unknown {
   return (
     <div class="grid max-w-form">
       {formState?.secret ? (
         <Alert tone="success" title="Token created">
-          Copy now — shown once: <code>{formState.secret}</code>
+          <div id="new-token" tabindex={-1}>
+            Copy it now — it is shown once.
+            <CodeBlock code={formState.secret} label="Copy token" />
+            <Meta>Then upload from CI:</Meta>
+            <CodeBlock
+              code={uploadCommand({
+                slug: project.slug,
+                origin: formState.origin,
+                token: formState.secret,
+              })}
+              label="Copy upload command"
+            />
+          </div>
         </Alert>
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}

@@ -13,6 +13,7 @@ import {
   SelectField,
   VStack,
 } from "../ui/components.tsx";
+import { GetStarted } from "./get-started.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 const STATUSES = ["reviewing", "approved", "rejected", "failed", "cancelled", "pending"] as const;
 
@@ -111,11 +112,16 @@ function BuildsList(props: {
   project: Project;
   builds: Build[];
   filtered: boolean;
+  origin: string | undefined;
+  none: boolean;
 }): ReturnType<typeof EmptyState> | ReturnType<typeof BuildsTable> {
   const { project, builds, filtered } = props;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   if (builds.length > 0) {
     return <BuildsTable project={project} builds={builds} />;
+  }
+  if (props.none) {
+    return <GetStarted project={project} origin={props.origin} />;
   }
   return (
     <EmptyState
@@ -172,7 +178,13 @@ export async function renderProjectBuildsPage(
           filters={query}
           base={urls.buildsList(project.slug)}
         />
-        <BuildsList project={project} builds={builds} filtered={filtered} />
+        <BuildsList
+          project={project}
+          builds={builds}
+          filtered={filtered}
+          origin={await getStore().publicOrigin?.url()}
+          none={all.length === 0}
+        />
       </VStack>
     </DocumentLayout>
   );

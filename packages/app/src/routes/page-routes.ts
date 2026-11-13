@@ -27,6 +27,8 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "POST /projects/:slug/settings/design/components/:id/delete": "hosting",
   "POST /projects/:slug/settings/design/:provider/token": "hosting",
   "POST /projects/:slug/settings/design/:provider/token/delete": "hosting",
+  "POST /projects/:slug/get-started/token": "hosting",
+  "GET /projects/:slug/get-started/status": "hosting",
   "POST /projects/:slug/settings/tokens": "hosting",
   "POST /projects/:slug/settings/tokens/:tokenId/delete": "hosting",
   "POST /projects/:slug/settings/webhooks": "hosting",
