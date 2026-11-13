@@ -277,7 +277,9 @@ describe("background retention", () => {
       vi.useRealTimers();
       expect(purgeExpired).toHaveBeenCalledOnce();
       const cutoff = Date.parse(purgeExpired.mock.calls[0]?.[0] as string);
-      expect(Date.now() - cutoff).toBeGreaterThan(3 * 86_400_000 - 10_000);
+      // The sweep ran 1h after the timer started, so the cutoff is 3 days before that moment.
+      expect(Date.now() - cutoff).toBeGreaterThan(3 * 86_400_000 - 3_700_000);
+      expect(Date.now() - cutoff).toBeLessThan(3 * 86_400_000);
     });
 
     it("keeps expired auth rows when the window is null", async () => {
