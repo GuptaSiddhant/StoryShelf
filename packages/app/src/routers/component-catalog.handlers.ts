@@ -7,7 +7,7 @@ import {
   type EntryChanges,
 } from "@storyshelf/core/capture";
 import { BuildComponentModel, BuildModel } from "@storyshelf/core/models";
-import type { ComponentPresence } from "@storyshelf/core/models";
+import type { BuildSummary, ComponentPresence } from "@storyshelf/core/models";
 import type { Build, BuildComponent, Project } from "@storyshelf/core/schema";
 import { catalogOf, getStore } from "../store.ts";
 
@@ -36,11 +36,11 @@ export interface ComponentCatalogView {
 }
 
 /** Newest build on the default branch, else the newest at all; the library's own choice. */
-export async function latestProjectBuild(project: Project): Promise<Build | undefined> {
+export async function latestProjectBuild(project: Project): Promise<BuildSummary | undefined> {
   const builds = new BuildModel(getStore().db);
   return (
-    (await builds.list(project.id, { branch: project.gitDefaultBranch, limit: 1 }))[0] ??
-    (await builds.list(project.id, { limit: 1 }))[0]
+    (await builds.listSummary(project.id, { branch: project.gitDefaultBranch, limit: 1 }))[0] ??
+    (await builds.listSummary(project.id, { limit: 1 }))[0]
   );
 }
 
