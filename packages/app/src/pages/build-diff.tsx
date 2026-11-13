@@ -7,7 +7,7 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
 import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
 import { DocumentLayout, type NavConfig, type RenderedContent } from "../shell/document.tsx";
-import { EmptyState, type ImageSize } from "../ui/components.tsx";
+import { Alert, EmptyState, type ImageSize } from "../ui/components.tsx";
 import { canvasColumn, comparisonCard, workspace } from "../ui/styles/review-layout.ts";
 import { a11ySummaryOf } from "./a11y-violations.tsx";
 import { BuildDetails, ReviewOnlySection, type BuildDetailsData } from "./build-detail.tsx";
@@ -17,7 +17,7 @@ import { BuildEmptyState } from "./build-diff-empty.tsx";
 import { ReviewNotices } from "./build-diff-environment.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
 import { InsightSlot } from "./build-diff-insight.tsx";
-import { groupOf, reviewProgress } from "./build-diff-model.ts";
+import { REVIEW_CANVAS_ID, groupOf, reviewProgress } from "./build-diff-model.ts";
 import { DiffNav } from "./build-diff-nav.tsx";
 import { ShortcutsDialog } from "./build-diff-shortcuts.tsx";
 import type { LinkedUsageItem } from "./build-diff-usage.tsx";
@@ -56,7 +56,8 @@ export interface BuildDiffData {
   /** Natural size of the selected snapshot's screenshot, read from its PNG header. */
   currentSize?: ImageSize | null;
 }
-interface DiffReviewGridProps {
+/** What the review stage renders: the page data with the selected snapshot resolved. */
+export interface DiffReviewGridProps {
   project: Project;
   build: Build;
   snapshots: Snapshot[];
@@ -105,49 +106,79 @@ function SnapshotComments(props: {
   );
 }
 
+/** "Every change reviewed", once a build with changes has nothing left open. */
+function DoneNotice(props: {
+  snapshots: Snapshot[];
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const progress = reviewProgress(props.snapshots);
+  if (progress.reviewable === 0 || progress.pending > 0) {
+    return null;
+  }
+  return (
+    <Alert tone="success" role="status" title="Review complete">
+      {progress.reviewable === 1
+        ? "The one change in this build is reviewed."
+        : `All ${progress.reviewable} changes in this build are reviewed.`}
+    </Alert>
+  );
+}
+
+/**
+ * The viewer, comments and action bar of the selected snapshot. Approve and reject swap this
+ * column in place (`renderReviewSwap`), so it keeps one id across renders.
+ */
+export function ReviewCanvas(
+  props: DiffReviewGridProps,
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, snapshots, selected, canReview, hasBaseline, drifted } = props;
+  return (
+    <div class={canvasColumn} id={REVIEW_CANVAS_ID}>
+      {selected ? (
+        <>
+          <DoneNotice snapshots={snapshots} />
+          {/* The comparison card: the action bar is its footer, docked while the card is in view. */}
+          <div class={comparisonCard}>
+            <DiffViewer
+              project={project}
+              build={build}
+              selected={selected}
+              siblings={groupOf(snapshots, selected.id)?.members}
+              hasBaseline={hasBaseline}
+              reference={props.reference}
+              defaultComparison={props.defaultComparison}
+              drifted={drifted[selected.id]}
+              usage={props.usage}
+              design={props.design}
+              publishedBaseDomain={props.publishedBaseDomain}
+              currentSize={props.currentSize}
+            />
+            <DiffActionBar
+              project={project}
+              build={build}
+              snapshots={snapshots}
+              selected={selected}
+              canReview={canReview}
+              drifted={drifted}
+            />
+          </div>
+          <SnapshotComments grid={props} selected={selected} />
+        </>
+      ) : (
+        <EmptyState description="Select a snapshot to review." />
+      )}
+    </div>
+  );
+}
+
 /** Snapshot nav plus the viewer/comments column for the selected snapshot. */
 function DiffReviewGrid(
   props: DiffReviewGridProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, snapshots, selected, canReview, hasBaseline, drifted } = props;
-  const { usage, design, publishedBaseDomain } = props;
+  const { project, build, snapshots, selected } = props;
   return (
     <div class={workspace}>
       <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
-      <div class={canvasColumn}>
-        {selected ? (
-          <>
-            {/* The comparison card: the action bar is its footer, docked while the card is in view. */}
-            <div class={comparisonCard}>
-              <DiffViewer
-                project={project}
-                build={build}
-                selected={selected}
-                siblings={groupOf(snapshots, selected.id)?.members}
-                hasBaseline={hasBaseline}
-                reference={props.reference}
-                defaultComparison={props.defaultComparison}
-                drifted={drifted[selected.id]}
-                usage={usage}
-                design={design}
-                publishedBaseDomain={publishedBaseDomain}
-                currentSize={props.currentSize}
-              />
-              <DiffActionBar
-                project={project}
-                build={build}
-                snapshots={snapshots}
-                selected={selected}
-                canReview={canReview}
-                drifted={drifted}
-              />
-            </div>
-            <SnapshotComments grid={props} selected={selected} />
-          </>
-        ) : (
-          <EmptyState description="Select a snapshot to review." />
-        )}
-      </div>
+      <ReviewCanvas {...props} />
     </div>
   );
 }

@@ -1,13 +1,9 @@
 import { BuildModel } from "@storyshelf/core/models";
-import { CommentModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
-import { SnapshotModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { ShelfRouter } from "../app-types.ts";
-import { loadInsightPanel } from "../insights/panel.ts";
-import { loadBuildDetails } from "../pages/build-detail.tsx";
-import { renderBuildDiffPage, selectedSnapshot } from "../pages/build-diff.tsx";
+import { renderBuildDiffPage } from "../pages/build-diff.tsx";
 import { renderComponentPage } from "../pages/component-detail.tsx";
 import { renderActiveQueue } from "../pages/compute-jobs.tsx";
 import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
@@ -17,24 +13,14 @@ import { renderProjectCreatePage } from "../pages/project-create.tsx";
 import { renderProjectsPage } from "../pages/projects.tsx";
 import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
-import { loadBaselineView } from "./baseline-guard.ts";
-import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
-import { isBuildAuthor } from "./comment-triage.ts";
+import { loadBuildDiffData } from "./build-diff-data.ts";
 import { loadComponentPage } from "./component.handlers.ts";
 import { registerDesignCoverage } from "./design-coverage.ts";
-import {
-  designUrlsFor,
-  loadDesignResolutions,
-  loadReviewDesign,
-  returnPathOf,
-} from "./design.handlers.ts";
+import { returnPathOf } from "./design.handlers.ts";
 import { flash } from "./flash.ts";
 import { registerGetStarted } from "./get-started.tsx";
 import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
-import { linkedUsageFor } from "./links.handlers.ts";
-import { readPngSize } from "./png-size.ts";
-import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
 import { getQueueView } from "./settings-insights.ts";
 import { registerSettingsPages } from "./settings.ts";
 function asString(value: FormDataEntryValue | null): string | undefined {
@@ -139,50 +125,9 @@ export function registerUiPages(app: ShelfRouter): void {
     if (!build || build.projectId !== project.id) {
       return c.notFound();
     }
-    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-    const comments = await new CommentModel(getStore().db).listByBuild(build.id);
-    const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
-    const { user, authEnabled } = getStore();
-    const canReview = !authEnabled || Boolean(user);
-    const canManage = (await reviewCapabilities(project)).canComment;
-    const canTriage = canManage || isBuildAuthor(build);
-    const selected = selectedSnapshot(snapshots, snapshotId);
-    const design = selected
-      ? await loadReviewDesign(
-          project,
-          selected,
-          designUrlsFor(await loadDesignResolutions(project, snapshots), selected),
-          returnPathOf(c),
-        ).catch(() => [])
-      : [];
-    return c.html(
-      renderBuildDiffPage({
-        project,
-        build,
-        snapshots,
-        comments,
-        selectedId: snapshotId,
-        canReview,
-        canTriage,
-        canManage,
-        names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),
-        hasBaseline,
-        drifted,
-        reference: selected ? await loadBaselineReference(project, build, selected) : undefined,
-        defaultComparison: selected ? await loadDefaultComparison(project, build, selected) : null,
-        insight: await loadInsightPanel(project, build),
-        details: await loadBuildDetails(project, build),
-        design,
-        usage: await linkedUsageFor(
-          c,
-          project,
-          build.id,
-          selectedSnapshot(snapshots, snapshotId)?.storyImportPath ?? null,
-        ).catch(() => []),
-        publishedBaseDomain: getStore().config.publishedBaseDomain,
-        currentSize: selected ? await readPngSize(selected.screenshotPath) : null,
-      }),
-    );
+    const returnPath = returnPathOf(c);
+    const data = await loadBuildDiffData(c, project, build, { snapshotId, returnPath });
+    return c.html(renderBuildDiffPage(data));
   });
 
   app.get("/projects/:slug/labels", async (c) => {

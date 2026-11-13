@@ -31,6 +31,8 @@ export interface DiffHeaderProps {
   canManage?: boolean;
   /** Loaded build details; without them the header assumes capture is on. */
   details?: BuildDetailsData;
+  /** Mark the header for an out-of-band swap (the in-place answer to approve and reject). */
+  oob?: boolean;
 }
 
 function buildBase(project: Project, build: Build): string {
@@ -196,6 +198,8 @@ export function DiffHeader(props: DiffHeaderProps): Rendered {
   return (
     <PageHeader
       title={view.label}
+      id="review-header"
+      oob={props.oob}
       status={{ tone: view.tone, icon: view.icon }}
       meta={<HeaderMeta build={build} />}
       detail={<HeaderDetail {...props} />}

@@ -240,8 +240,10 @@ const StatusStrip: FC<{
   detail?: unknown;
   actions?: unknown;
   status: { tone: StatusTone; icon?: IconName };
-}> = ({ title, meta, detail, actions, status }) => (
-  <header class={stripEdge[status.tone]}>
+  id?: string;
+  oob?: boolean;
+}> = ({ title, meta, detail, actions, status, id, oob }) => (
+  <header class={stripEdge[status.tone]} id={id} hx-swap-oob={oob ? "true" : undefined}>
     <div class={stripRow}>
       <h1 class={stripTitle}>
         {status.icon ? <Icon name={status.icon} /> : null}
@@ -274,10 +276,22 @@ export const PageHeader: FC<{
   status?: { tone: StatusTone; icon?: IconName };
   /** Status strip only: the second line (progress bar or failure reason). */
   detail?: unknown;
-}> = ({ title, description, meta, actions, level = 1, status, detail }) => {
+  /** Status strip only: an element id, so an HTMX swap can find the header. */
+  id?: string;
+  /** Status strip only: mark the header for an out-of-band swap. */
+  oob?: boolean;
+}> = ({ title, description, meta, actions, level = 1, status, detail, id, oob }) => {
   if (status) {
     return (
-      <StatusStrip title={title} meta={meta} detail={detail} actions={actions} status={status} />
+      <StatusStrip
+        title={title}
+        meta={meta}
+        detail={detail}
+        actions={actions}
+        status={status}
+        id={id}
+        oob={oob}
+      />
     );
   }
   return (
