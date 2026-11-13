@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { publicNetworkForTests } from "@storyshelf/core/test-helpers";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gitLabNotifier } from "./gitlab.ts";
 import { bodyOf, stubFetch } from "./test-fetch.ts";
 
@@ -17,7 +18,13 @@ function adapter(config: unknown) {
   return gitLabNotifier.create({ config, secret: "glpat-test" });
 }
 
+let restoreNetwork: (() => void) | undefined;
+beforeEach(() => {
+  restoreNetwork = publicNetworkForTests();
+});
+
 afterEach(() => {
+  restoreNetwork?.();
   vi.unstubAllGlobals();
 });
 

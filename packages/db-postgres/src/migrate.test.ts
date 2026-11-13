@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it, vi } from "vitest";
-import { runMigrations } from "./migrate.ts";
+import { runMigrations, runMigrationsLocked } from "./migrate.ts";
 
 /** Run SQL through PGlite as the shared migration runner does (multi-statement allowed). */
 function runnerFor(client: PGlite): (sql: string) => Promise<unknown[]> {
@@ -743,5 +743,45 @@ describe("runMigrations: build retention schema", () => {
     expect(await retentionShape(upgraded)).toEqual(await retentionShape(fresh));
     await fresh.close();
     await upgraded.close();
+  }, 60_000);
+});
+
+describe("runMigrationsLocked", () => {
+  it("holds the advisory lock around every migration statement and releases it", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    const seen: string[] = [];
+    await runMigrationsLocked(
+      async (use) =>
+        await use(async (sql) => {
+          seen.push(sql);
+          return await run(sql);
+        }),
+    );
+    expect(seen[0]).toMatch(/^SELECT pg_advisory_lock\(/u);
+    expect(seen.at(-1)).toMatch(/^SELECT pg_advisory_unlock\(/u);
+    expect(seen.length).toBeGreaterThan(3);
+    await client.close();
+  }, 60_000);
+
+  it("releases the lock and rethrows when a migration fails", async () => {
+    const seen: string[] = [];
+    const throwing = async (sql: string): Promise<unknown[]> => {
+      seen.push(sql);
+      if (sql.includes("pg_advisory")) return [];
+      throw new Error("boom");
+    };
+    await expect(runMigrationsLocked(async (use) => await use(throwing))).rejects.toThrow("boom");
+    expect(seen.at(-1)).toMatch(/pg_advisory_unlock/u);
+  });
+
+  it("lets two concurrent setups on an empty database both succeed", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    const session = async <T>(use: (r: typeof run) => Promise<T>): Promise<T> => await use(run);
+    await expect(
+      Promise.all([runMigrationsLocked(session), runMigrationsLocked(session)]),
+    ).resolves.toBeDefined();
+    await client.close();
   }, 60_000);
 });

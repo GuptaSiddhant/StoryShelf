@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { jsonRefusal } from "./api-errors.ts";
+import { createClientIpResolver, type ClientIpResolver } from "./client-ip.ts";
 
 interface RateLimitEntry {
   count: number;
@@ -12,38 +13,26 @@ export interface RateLimitOptions {
   keyGenerator?: (c: Context) => string;
 }
 
-/** Direct peer IP from server runtimes exposing the socket (unspoofable TCP source). */
-function peerIp(c: Pick<Context, "env">): string | undefined {
-  const env = (c.env ?? {}) as {
-    incoming?: { socket?: { remoteAddress?: unknown } };
-    server?: { incoming?: { socket?: { remoteAddress?: unknown } } };
-  };
-  const address =
-    env.incoming?.socket?.remoteAddress ?? env.server?.incoming?.socket?.remoteAddress;
-  return typeof address === "string" && address ? address : undefined;
-}
+/** The resolver for an app without `trustProxy`: the socket peer, else the unverified fallback. */
+const defaultClientIp = createClientIpResolver();
 
 /**
- * Rate-limit identity for one bucket prefix: direct peer first, then the
- * first `X-Forwarded-For` entry (client-controlled, so only a fallback),
- * then `X-Real-IP`, then a shared bucket. Deployments behind proxies with
- * many users behind one peer IP share that peer's budget.
+ * Rate-limit identity for one bucket prefix, from the app's client-IP resolver
+ * (`createClientIpResolver(config.trustProxy)`): `<prefix>:<ip>` for the peer or a client named
+ * by a trusted proxy, `<prefix>:fwd:<ip>` for the unverified fallback (no socket, no
+ * `trustProxy`), else one shared `<prefix>:anonymous` bucket. Without `trustProxy`, every client
+ * behind a load balancer shares the proxy's bucket.
  */
-export function rateLimitKey(prefix: string): (c: Context) => string {
+export function rateLimitKey(
+  prefix: string,
+  clientIp: ClientIpResolver = defaultClientIp,
+): (c: Context) => string {
   return (c) => {
-    const peer = peerIp(c);
-    if (peer) {
-      return `${prefix}:${peer}`;
+    const client = clientIp(c);
+    if (!client) {
+      return `${prefix}:anonymous`;
     }
-    const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-    if (forwarded) {
-      return `${prefix}:fwd:${forwarded}`;
-    }
-    const real = c.req.header("x-real-ip")?.trim();
-    if (real) {
-      return `${prefix}:fwd:${real}`;
-    }
-    return `${prefix}:anonymous`;
+    return client.source === "unverified" ? `${prefix}:fwd:${client.ip}` : `${prefix}:${client.ip}`;
   };
 }
 
@@ -120,15 +109,19 @@ function applyLimit(
  * Create a rate limiter with its own bucket store, so each app instance
  * counts independently. Limiters built from the same `rateLimit` factory that
  * resolve to the same key share one counter (e.g. `/api/v1/*` and
- * `/api/v1/tokens/*` both bill the caller's `api:` bucket).
+ * `/api/v1/tokens/*` both bill the caller's `api:` bucket). `clientIp` names the caller
+ * (`createClientIpResolver(config.trustProxy)`).
  */
-export function createRateLimiter(): (options: RateLimitOptions) => MiddlewareHandler {
+export function createRateLimiter(
+  clientIp: ClientIpResolver = defaultClientIp,
+): (options: RateLimitOptions) => MiddlewareHandler {
   const bucketFor = createBucketStore();
+  const defaultKey = rateLimitKey("api", clientIp);
 
   return (options) => {
     const { windowMs, max, keyGenerator } = options;
     return async (c, next) => {
-      const key = keyGenerator ? keyGenerator(c) : rateLimitKey("api")(c);
+      const key = keyGenerator ? keyGenerator(c) : defaultKey(c);
       const now = Date.now();
       const limited = applyLimit(c, bucketFor(key, now, windowMs), max, now);
       if (!limited) {

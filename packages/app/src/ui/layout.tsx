@@ -161,12 +161,18 @@ export const PageHeader: FC<{
   description?: unknown;
   meta?: unknown;
   actions?: unknown;
-}> = ({ title, description, meta, actions }) => {
+  /** `2` for a section header on a page whose own heading is the h1 (one h1 per page). */
+  level?: 1 | 2;
+}> = ({ title, description, meta, actions, level = 1 }) => {
   return (
     <div class={pageHeader}>
       <div class={pageHeaderRow}>
         <div>
-          <h1 class={pageHeaderTitle}>{title}</h1>
+          {level === 1 ? (
+            <h1 class={pageHeaderTitle}>{title}</h1>
+          ) : (
+            <h2 class={pageHeaderTitle}>{title}</h2>
+          )}
           {description ? <p class={pageHeaderDesc}>{description}</p> : null}
           {meta ? <p class={pageHeaderMeta}>{meta}</p> : null}
         </div>

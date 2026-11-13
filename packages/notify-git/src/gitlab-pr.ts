@@ -19,6 +19,7 @@ export async function findMrIid(opts: {
     const url = `${base}/api/v4/projects/${pid}/repository/commits/${encodeURIComponent(opts.sha)}/merge_requests`;
     const data = await httpJson<CommitMergeRequest[]>(url, {
       headers: gitlabHeaders(opts.token),
+      destination: "project",
     });
     return data[0]?.iid;
   } catch {

@@ -338,14 +338,22 @@ const alertTitle = css`
 `;
 
 /** Centered empty state with an optional title and call-to-action. */
-export const EmptyState: FC<{ title?: string; description?: string; action?: unknown }> = ({
-  title,
-  description,
-  action,
-}) => {
+export const EmptyState: FC<{
+  title?: string;
+  description?: string;
+  action?: unknown;
+  /** `1` when the empty state is the whole page (a not-found page); a section's is an h2. */
+  headingLevel?: 1 | 2;
+}> = ({ title, description, action, headingLevel = 2 }) => {
   return (
     <div class={emptyWrap}>
-      {title ? <h2 class={emptyTitle}>{title}</h2> : null}
+      {title ? (
+        headingLevel === 1 ? (
+          <h1 class={emptyTitle}>{title}</h1>
+        ) : (
+          <h2 class={emptyTitle}>{title}</h2>
+        )
+      ) : null}
       {description ? <p class={emptyDesc}>{description}</p> : null}
       {action ? <div class={emptyAction}>{action}</div> : null}
     </div>

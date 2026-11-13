@@ -192,7 +192,7 @@ export function DiffActionBar(
   const around = neighbours(snapshots, selected.id);
   const target = decisionTarget(props);
   return (
-    <div class={actionBar} role="toolbar" aria-label="Review actions">
+    <div class={actionBar} data-action-bar role="toolbar" aria-label="Review actions">
       <div class={actionGroup}>
         <StepButton target={around.prev} project={project} build={build} direction="prev" />
         <span class={actionPosition} aria-live="polite">

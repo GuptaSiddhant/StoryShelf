@@ -126,7 +126,9 @@ async function observed(response: Response): Promise<Record<string, unknown>> {
       .replaceAll(privateBuildId, ":id")
       .replaceAll(UNKNOWN_BUILD_ID, ":id")
       // Every page carries a fresh CSRF token, whatever the request.
-      .replaceAll(/name="csrf-token" content="[^"]*"/gu, 'name="csrf-token" content=":token"'),
+      .replaceAll(/name="csrf-token" content="[^"]*"/gu, 'name="csrf-token" content=":token"')
+      // ...and so does the sign-out form in the chrome a signed-in visitor's not-found page keeps.
+      .replaceAll(/name="csrf_token" value="[^"]*"/gu, 'name="csrf_token" value=":token"'),
     cacheControl: response.headers.get("cache-control"),
     contentType: response.headers.get("content-type"),
     location: response.headers

@@ -100,3 +100,25 @@ describe("review stage: compare to design", () => {
     expect(html).not.toContain("Compare against");
   });
 });
+
+describe("review stage: no baseline", () => {
+  it("shows only the screenshot for a new snapshot: no mode switch and no diff pane", async () => {
+    const app = new Hono().get("/", (c): Response | Promise<Response> =>
+      c.html(
+        <DiffViewer
+          project={project}
+          build={build}
+          selected={{ ...selected, status: "new", diffPath: null, baselineVersion: null }}
+          hasBaseline={{ s1: false }}
+        />,
+      ),
+    );
+    const html = await (await app.request("/")).text();
+    expect(html).toContain("New story — no baseline yet. Approve to set the baseline.");
+    expect(html).toContain('data-single=""');
+    expect(html).toContain('data-pane="current"');
+    expect(html).not.toContain("data-compare-mode");
+    expect(html).not.toContain('data-pane="diff"');
+    expect(html).not.toContain("data-compare-swipe");
+  });
+});

@@ -1,10 +1,17 @@
 import type { NotifierState } from "@storyshelf/core/adapter/notifier";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { publicNetworkForTests } from "@storyshelf/core/test-helpers";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
 import { mapState } from "./gitlab-mapper.ts";
 import { findMrIid } from "./gitlab-pr.ts";
 
+let restoreNetwork: (() => void) | undefined;
+beforeEach(() => {
+  restoreNetwork = publicNetworkForTests();
+});
+
 afterEach(() => {
+  restoreNetwork?.();
   vi.unstubAllGlobals();
 });
 
@@ -47,13 +54,7 @@ function mockFetch(json: unknown, ok = true): void {
     "fetch",
     vi.fn(async () => {
       await Promise.resolve();
-      return {
-        ok,
-        json: async (): Promise<unknown> => {
-          await Promise.resolve();
-          return json;
-        },
-      };
+      return Response.json(json, { status: ok ? 200 : 404 });
     }),
   );
 }

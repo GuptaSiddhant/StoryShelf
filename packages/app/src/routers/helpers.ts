@@ -93,18 +93,25 @@ async function resolveProjectByToken(
   const authHeader = c.req.header("authorization");
   // The bootstrap admin token is not a project token: let callers grant it as admin.
   if (authHeader?.startsWith("Bearer ") && !requestHasAdminToken(c)) {
-    const token = authHeader.slice("Bearer ".length);
-    const found = await new TokenModel(getStore().db).findByHash(sha256(token));
-    if (!found) {
-      unauthorized();
-    }
-    const project = await new ProjectModel(getStore().db).get(found.projectId);
-    if (!project || project.slug !== slug) {
-      forbidden();
-    }
-    return { project, token: found };
+    return await bearerProject(authHeader.slice("Bearer ".length), slug);
   }
   return null;
+}
+
+/** The project and token a bearer `token` grants for `slug`: 401 when unknown, 403 for another project. */
+async function bearerProject(
+  token: string,
+  slug: string,
+): Promise<{ project: Project; token: Token }> {
+  const found = await new TokenModel(getStore().db).findByHash(sha256(token));
+  if (!found) {
+    unauthorized();
+  }
+  const project = await new ProjectModel(getStore().db).get(found.projectId);
+  if (!project || project.slug !== slug) {
+    forbidden();
+  }
+  return { project, token: found };
 }
 
 /**
@@ -180,21 +187,28 @@ export async function resolveAuthorizedProject(
 ): Promise<Project> {
   const viaToken = await resolveProjectByToken(c, slug);
   if (viaToken) {
-    const role = await tokenProjectRole(viaToken.token, viaToken.project.id);
-    if (!role || !minRoles.includes(role)) {
-      forbidden();
-    }
-    return viaToken.project;
+    return await authorizeToken(viaToken, minRoles);
   }
   const found = await findProjectBySlug(slug);
   if (!found) {
     notFound("Project not found");
   }
-  if (requestHasAdminToken(c)) {
-    return found;
+  if (!requestHasAdminToken(c)) {
+    await assertRole(found.id, ...minRoles);
   }
-  await assertRole(found.id, ...minRoles);
   return found;
+}
+
+/** The token's project when its owner's effective role is one of `minRoles`; 403 otherwise. */
+async function authorizeToken(
+  { project, token }: { project: Project; token: Token },
+  minRoles: readonly ProjectRole[],
+): Promise<Project> {
+  const role = await tokenProjectRole(token, project.id);
+  if (!role || !minRoles.includes(role)) {
+    forbidden();
+  }
+  return project;
 }
 
 /**
@@ -204,7 +218,7 @@ export async function resolveAuthorizedProject(
  * token without an owner) is refused.
  */
 export async function resolveReviewer(c: Context): Promise<string | null> {
-  const { authEnabled, user, db } = getStore();
+  const { authEnabled, user } = getStore();
   if (!authEnabled) {
     return null;
   }
@@ -215,9 +229,13 @@ export async function resolveReviewer(c: Context): Promise<string | null> {
   if (!header?.startsWith("Bearer ")) {
     return unauthorized();
   }
-  const token = requestHasAdminToken(c)
-    ? null
-    : await new TokenModel(db).findByHash(sha256(header.slice("Bearer ".length)));
+  return await tokenReviewer(requestHasAdminToken(c) ? null : header.slice("Bearer ".length));
+}
+
+/** The user owning bearer `secret` (null for the admin token); 403 when no user can be traced. */
+async function tokenReviewer(secret: string | null): Promise<string> {
+  const { db } = getStore();
+  const token = secret === null ? null : await new TokenModel(db).findByHash(sha256(secret));
   if (!token?.userId || !(await new UserModel(db).get(token.userId))) {
     throw new HTTPException(403, {
       message: "A verdict needs a user: use a token created by the reviewer or sign in",

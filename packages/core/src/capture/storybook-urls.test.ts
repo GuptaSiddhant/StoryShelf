@@ -32,7 +32,7 @@ describe("storybookUrlSource", () => {
     expect(await source("chromium")).toBeUndefined();
     const url = await source("chromium@farm");
     expect(url).toMatch(/^https:\/\/shelf\.test\/_s\/[\w-]+\.[\w-]+\/$/u);
-    expect(verifyStorybookToken(tokenOf(url), "k")).toMatchObject({
+    expect(verifyStorybookToken(tokenOf(url), "k", "capture")).toMatchObject({
       ok: true,
       claims: { projectId: "01PROJECT", buildId: "01BUILD", purpose: "capture" },
     });
@@ -43,7 +43,7 @@ describe("storybookUrlSource", () => {
     const first = tokenOf(await source("chromium@farm", { budgetMs: 60_000 }));
     const second = tokenOf(await source("chromium@farm", { budgetMs: 60_000 }));
     for (const token of [first, second]) {
-      expect(verifyStorybookToken(token, "k")).toMatchObject({
+      expect(verifyStorybookToken(token, "k", "capture")).toMatchObject({
         ok: true,
         claims: { purpose: "capture" },
       });
@@ -56,8 +56,8 @@ describe("storybookUrlSource", () => {
       subject,
     );
     const token = tokenOf(await source("chromium@farm"));
-    expect(verifyStorybookToken(token, "new").ok).toBe(true);
-    expect(verifyStorybookToken(token, "old").ok).toBe(false);
+    expect(verifyStorybookToken(token, "new", "capture").ok).toBe(true);
+    expect(verifyStorybookToken(token, "old", "capture").ok).toBe(false);
   });
 
   it("derives the lifetime from the pass budget, between the floor and the ceiling", async () => {
@@ -66,6 +66,7 @@ describe("storybookUrlSource", () => {
       const result = verifyStorybookToken(
         tokenOf(await source("chromium@farm", { budgetMs })),
         "k",
+        "capture",
       );
       return result.ok ? Math.round(result.claims.expiresAt - Date.now() / 1000) : -1;
     };
@@ -87,6 +88,7 @@ describe("storybookUrlSource", () => {
     const result = verifyStorybookToken(
       tokenOf(await source("chromium@farm", { budgetMs: 1e9 })),
       "k",
+      "capture",
     );
     expect(result.ok && result.claims.expiresAt - Date.now() / 1000).toBeLessThanOrEqual(600);
     expect(result.ok && result.claims.expiresAt - Date.now() / 1000).toBeGreaterThan(590);
