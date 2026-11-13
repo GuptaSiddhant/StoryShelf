@@ -53,5 +53,6 @@ Each current ADR below lists the archived ones it supersedes.
 | 0049 | Built-in Integrations and Fewer Packages (accepted)                          | —                                  |
 | 0050 | Cloud Deployment Without Cloud Packages (accepted)                           | —                                  |
 | 0051 | Storybook Hosting Modes and Access Contract                                  | —                                  |
+| 0052 | Switching Stories Inside One Loaded Page During Capture (proposed)           | —                                  |
 
 Implementation work is tracked in GitHub issues; the ordered pickup list is issue #370.

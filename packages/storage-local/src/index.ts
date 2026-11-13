@@ -127,7 +127,7 @@ function buildStreamMethods(root: string): Pick<StorageAdapter, "writeStream" | 
     async readStream(path) {
       const target = toAbsolute(root, path);
       if (!(await pathExists(target))) {
-        throw new Error(`No object at "${path}"`);
+        throw Object.assign(new Error(`No object at "${path}"`), { code: "ENOENT" });
       }
       return createReadStream(target);
     },

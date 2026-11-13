@@ -5,10 +5,15 @@
  * signed URL route (`/_s/:token/*`) all end here, each bringing the access {@link publishedAccess}
  * granted.
  */
-import { readPublishedFileInfo } from "@storyshelf/core/capture";
+import {
+  locatePublishedFile,
+  openPublishedFile,
+  type OpenedPublishedFile,
+} from "@storyshelf/core/capture";
 import { isSafeSegment, mimeFor, type StorybookTokenClaims } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 import { getStore } from "../store.ts";
 import { signedCacheControl, SIGNED_NO_STORE } from "./capture-cache.ts";
 import {
@@ -20,7 +25,7 @@ import {
   type PublishedFamily,
   type PublishedFreshness,
 } from "./published-access.ts";
-import { acceptsGzip, publishedGzip } from "./published-compression.ts";
+import { acceptsGzip, isCompressible, publishedGzip } from "./published-compression.ts";
 
 /**
  * Headers of every signed URL answer: a token URL must not be indexed or leaked by `Referer`, and
@@ -91,23 +96,40 @@ export async function servePublishedFile(
   c: Context,
   request: PublishedFileRequest,
 ): Promise<Response | null> {
+  const { storage, config } = getStore();
   const { projectId, buildId, rel } = request;
-  const file = await readPublishedFileInfo(getStore().storage, projectId, buildId, rel);
-  return file ? await respondWithFile(c, request, file) : null;
+  const located = await locatePublishedFile(storage, projectId, buildId, rel);
+  const mime = mimeFor(rel);
+  const gzipOffered = Boolean(
+    config.publishedCompression &&
+    located.contentHash !== undefined &&
+    isCompressible(mime) &&
+    acceptsGzip(c.req.header("accept-encoding")),
+  );
+  // Bytes are needed to gzip, and to hash a legacy file for its ETag; everything else streams.
+  const needsBytes =
+    gzipOffered || (located.contentHash === undefined && request.access === "session");
+  const file = await openPublishedFile(
+    storage,
+    projectId,
+    buildId,
+    rel,
+    needsBytes ? "bytes" : "stream",
+  );
+  return file ? await respondWithFile(c, request, file, gzipOffered) : null;
 }
-
-type PublishedFile = NonNullable<Awaited<ReturnType<typeof readPublishedFileInfo>>>;
 
 /** The answer for a file that exists: gzip when offered, a `304` when a viewer's copy is current. */
 async function respondWithFile(
   c: Context,
   request: PublishedFileRequest,
-  file: PublishedFile,
+  file: OpenedPublishedFile,
+  gzipOffered: boolean,
 ): Promise<Response> {
   const { storage, config } = getStore();
   const mime = mimeFor(request.rel);
   const compressed =
-    config.publishedCompression && acceptsGzip(c.req.header("accept-encoding"))
+    gzipOffered && file.bytes
       ? await publishedGzip(storage, file.contentHash, file.bytes, mime)
       : undefined;
   const validators =
@@ -120,13 +142,30 @@ async function respondWithFile(
     ...(config.publishedCompression ? { vary: "Accept-Encoding" } : {}),
   };
   if (validators.fresh) {
+    file.stream?.destroy();
     return c.body(null, 304, common);
   }
-  return c.body(new Uint8Array(compressed ?? file.bytes), 200, {
+  return respondBody(c, file, compressed, {
     ...common,
     "content-type": mime,
     ...(compressed ? { "content-encoding": "gzip" } : {}),
   });
+}
+
+/** A `200` with the gzip copy, the bytes, or the storage stream when nothing needed buffering. */
+function respondBody(
+  c: Context,
+  file: OpenedPublishedFile,
+  compressed: Buffer | undefined,
+  headers: Record<string, string>,
+): Response {
+  const bytes = compressed ?? file.bytes;
+  if (bytes) {
+    return c.body(new Uint8Array(bytes), 200, headers);
+  }
+  return file.stream
+    ? c.body(Readable.toWeb(file.stream) as ReadableStream, 200, headers)
+    : c.body(new Uint8Array(), 200, headers);
 }
 
 /** `Cache-Control` and CORS of an answer: a signed URL's own rules, or the normal published policy. */
@@ -160,10 +199,14 @@ function answerHeaders(
  */
 function sessionValidator(
   c: Context,
-  file: { bytes: Buffer; contentHash?: string },
+  file: { bytes?: Buffer; contentHash?: string },
   gzip: boolean,
 ): { headers: { etag: string }; fresh: boolean } {
-  const hash = file.contentHash ?? createHash("sha256").update(file.bytes).digest("hex");
+  const hash =
+    file.contentHash ??
+    createHash("sha256")
+      .update(file.bytes ?? "")
+      .digest("hex");
   const etag = `"${hash}${gzip ? "-gzip" : ""}"`;
   const given = c.req.header("if-none-match") ?? "";
   const fresh = given.split(",").some((tag) => tag.trim() === etag || tag.trim() === `W/${etag}`);
