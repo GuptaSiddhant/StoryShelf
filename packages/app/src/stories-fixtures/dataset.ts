@@ -3,6 +3,8 @@ import type {
   Baseline,
   Build,
   BuildComponent,
+  CaptureAttempt,
+  CaptureLog,
   Comment,
   Project,
   Snapshot,
@@ -305,3 +307,37 @@ export const buildComponents: BuildComponent[] = [BUILD_MAIN, BUILD_REVIEW].flat
     };
   }),
 );
+
+/** The failed build's one capture attempt, and the error that ended it. */
+export const captureAttempts: CaptureAttempt[] = [
+  {
+    id: id("ATT001"),
+    projectId: PROJECT_ID,
+    buildId: BUILD_FAILED,
+    attemptNo: 1,
+    status: "failed",
+    error: "page.goto: 404 for iframe.html\n    at capture (runner.ts:42)",
+    reqId: null,
+    storyCount: 0,
+    failedCount: 0,
+    queuedAt: hoursAgo(20),
+    startedAt: hoursAgo(19.9),
+    finishedAt: hoursAgo(19.8),
+    createdAt: hoursAgo(20),
+    updatedAt: hoursAgo(19.8),
+  },
+];
+
+export const captureLogs: CaptureLog[] = [
+  {
+    id: id("LOG001"),
+    projectId: PROJECT_ID,
+    buildId: BUILD_FAILED,
+    attemptId: id("ATT001"),
+    seq: 1,
+    level: "error",
+    message: "page.goto: 404 for iframe.html",
+    fields: null,
+    createdAt: hoursAgo(19.8),
+  },
+];
