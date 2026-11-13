@@ -121,22 +121,25 @@ describe("NotificationChannelModel", () => {
       { address: name === "internal.example" ? "10.0.0.5" : "93.184.216.34", family: 4 },
     ]);
     try {
-      for (const url of [
+      const urls = [
         "https://127.0.0.1/h",
         "https://169.254.169.254/h",
         "https://internal.example/h",
-      ]) {
-        const slack = await NotificationChannelModel.validateInput(
-          kinds,
-          "slack",
-          {},
-          undefined,
-          url,
-        );
-        expect(slack).toMatchObject({ ok: false, field: "secret" });
-        expect(JSON.stringify(slack)).not.toMatch(/10\.0\.0\.5|169\.254/u);
-        const gitlab = await NotificationChannelModel.validateInput(kinds, "gitlab", { host: url });
-        expect(gitlab).toMatchObject({ ok: false, field: "config", issues: [{ path: "host" }] });
+      ];
+      const slack = await Promise.all(
+        urls.map((url) =>
+          NotificationChannelModel.validateInput(kinds, "slack", {}, undefined, url),
+        ),
+      );
+      const gitlab = await Promise.all(
+        urls.map((host) => NotificationChannelModel.validateInput(kinds, "gitlab", { host })),
+      );
+      for (const result of slack) {
+        expect(result).toMatchObject({ ok: false, field: "secret" });
+        expect(JSON.stringify(result)).not.toMatch(/10\.0\.0\.5|169\.254/u);
+      }
+      for (const result of gitlab) {
+        expect(result).toMatchObject({ ok: false, field: "config", issues: [{ path: "host" }] });
       }
       expect(
         await NotificationChannelModel.validateInput(
