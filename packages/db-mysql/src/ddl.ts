@@ -53,12 +53,14 @@ CREATE TABLE IF NOT EXISTS builds (
   review_cycle INT NOT NULL DEFAULT 0,
   review_requested_cycle INT,
   capture_job_id VARCHAR(26),
+  manifest_sha256 VARCHAR(64),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_builds_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha);
-CREATE INDEX builds_git_branch_idx ON builds (git_branch);
+CREATE INDEX builds_project_created_idx ON builds (project_id, created_at);
+CREATE INDEX builds_project_branch_created_idx ON builds (project_id, git_branch, created_at);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id VARCHAR(64) PRIMARY KEY,
   project_id VARCHAR(64) NOT NULL,

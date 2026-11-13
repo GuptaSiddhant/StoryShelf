@@ -218,6 +218,24 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("runs WAL with synchronous=NORMAL by default and FULL on opt-out", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-"));
+    try {
+      const normal = createSqliteDatabase(join(dir, "normal.db"));
+      await initDb(normal);
+      expect(await pragmaValue(normal, "synchronous")).toBe(1);
+      await closeDb(normal);
+
+      const full = createSqliteDatabase(join(dir, "full.db"), { synchronous: "full" });
+      await initDb(full);
+      expect(await pragmaValue(full, "synchronous")).toBe(2);
+      expect(await pragmaValue(full, "journal_mode")).toBe("wal");
+      await closeDb(full);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("cascades attempt history when a build is removed (purge parity)", async () => {
     const db = createSqliteDatabase(":memory:");
     await initDb(db);
@@ -756,3 +774,10 @@ describe("createSqliteDatabase", () => {
     }
   });
 });
+
+/** Read a single PRAGMA value; rows are arrays or objects depending on the driver. */
+async function pragmaValue(db: DatabaseAdapter, name: string): Promise<unknown> {
+  const rows = await db.all<unknown>(sql.raw(`PRAGMA ${name}`));
+  const row = rows[0];
+  return Array.isArray(row) ? row[0] : Object.values(row as object)[0];
+}
