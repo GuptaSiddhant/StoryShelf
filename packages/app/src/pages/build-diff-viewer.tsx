@@ -167,7 +167,7 @@ function ViewComponentButton(props: {
       size="sm"
       href={`${urls.component(project.slug, selected.storyImportPath, { build: selected.buildId })}#${selected.storyId}`}
     >
-      View component
+      View in Library
     </Button>
   );
 }

@@ -8,7 +8,7 @@
 
 - **Tabs** (`?tab=`): **Stories** (a click-to-load preview of one story, `?story=<id>`, and every story and docs entry of the file with links into the published Storybook), **History** (the builds that hold the file from `build_components`: story count and whether its stories changed since the build before on the same branch, with added, removed and renamed counts from the two catalogs; with `testing` also one row per captured build with states changed and worst status, linking to that build's diff). With `testing` also **States** (one card per story, `#<storyId>` anchors, linking to its `diff?snapshot=`), **Design** (the design strip and reference panes; empty state without a link) and **Linked** (packages the states use, from `build_package_usage`). The page opens on States once the file was captured, else on Stories.
 - **Tombstones:** a file missing from the latest default-branch build resolves by its last-seen title to `moved to <newPath>`, else shows `last seen in build X`; a file no build holds is a real 404. Without `testing` the answer comes from the catalog rows of the latest build; with `testing` and captured snapshots, from the snapshots.
-- **Link-ins:** library title groups, the review viewer (`View component`, anchored at the story), build cards, the Figma popover, and #123 usage badges (`Story →` to the upstream project's component page; the upstream's stories come from its snapshots, or from its catalog when it has none).
+- **Link-ins:** library title groups, the review viewer (`View in Library`, anchored at the story), build cards, the Figma popover, and #123 usage badges (`Story →` to the upstream project's component page; the upstream's stories come from its snapshots, or from its catalog when it has none).
 
 ## Library Page
 

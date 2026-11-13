@@ -10,7 +10,7 @@
  * an organizational detail.
  */
 export { Button, Tabs } from "./buttons.tsx";
-export { Alert, Badge, EmptyState, Meta, Stat, statusTone } from "./feedback.tsx";
+export { Alert, Badge, EmptyState, Meta, Stat, statusLabel, statusTone } from "./feedback.tsx";
 export { CheckField, Field, FormActions, SelectField, TextareaField } from "./forms.tsx";
 export { Card, CardSection, PageHeader, SectionTitle } from "./layout.tsx";
 export { HStack, VStack } from "./stacks.tsx";

@@ -289,6 +289,11 @@ const dot = css`
 
 export const statusDots = {
   neutral: dot,
+  quiet: css`
+    /* status-dot-quiet */
+    ${dot}
+    background: var(--status-approved);
+  `,
   success: css`
     /* status-dot-success */
     ${dot}

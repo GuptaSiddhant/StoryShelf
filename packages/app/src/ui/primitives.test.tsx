@@ -468,6 +468,6 @@ describe("statusTone", () => {
   it("shows a cancelled build neutral: neither a failure nor a success", () => {
     expect(statusTone("cancelled")).toBe("neutral");
     expect(statusTone("failed")).toBe("danger");
-    expect(statusTone("approved")).toBe("success");
+    expect(statusTone("approved")).toBe("quiet");
   });
 });
