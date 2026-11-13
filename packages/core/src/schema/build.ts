@@ -52,6 +52,11 @@ export interface Build {
    * until a manifest claims it, and again after a failed publish releases it.
    */
   manifestSha256?: string | null;
+  /**
+   * The newer build that cancelled this one as superseded (ADR 0045). Set in the write that cancels;
+   * the build stays `cancelled`. Null for any other build.
+   */
+  supersededByBuildId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

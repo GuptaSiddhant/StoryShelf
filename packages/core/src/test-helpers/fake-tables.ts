@@ -74,6 +74,7 @@ const projects = defineTable("projects", {
   reviewApprovals: "review_approvals",
   storybookUrlTtlSeconds: "storybook_url_ttl_seconds",
   componentOwners: "component_owners",
+  cancelSuperseded: "cancel_superseded",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -156,6 +157,7 @@ const builds = defineTable("builds", {
   reviewRequestedCycle: "review_requested_cycle",
   captureJobId: "capture_job_id",
   manifestSha256: "manifest_sha256",
+  supersededByBuildId: "superseded_by_build_id",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

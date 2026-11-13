@@ -49,6 +49,7 @@ export class ProjectModel {
       ...(input.playTimeoutMs === undefined ? {} : { playTimeoutMs: input.playTimeoutMs }),
       ...(input.reviewEnabled === undefined ? {} : { reviewEnabled: input.reviewEnabled }),
       ...(input.reviewApprovals === undefined ? {} : { reviewApprovals: input.reviewApprovals }),
+      ...(input.cancelSuperseded === undefined ? {} : { cancelSuperseded: input.cancelSuperseded }),
       createdAt: now,
       updatedAt: now,
     })) as unknown as Project;
@@ -145,4 +146,6 @@ export interface ProjectCreateInput {
   reviewEnabled?: boolean;
   /** Approvals a build needs with `testing` off (column default 1 when omitted). */
   reviewApprovals?: number;
+  /** Cancel superseded builds (column default true when omitted; ADR 0045). */
+  cancelSuperseded?: boolean;
 }

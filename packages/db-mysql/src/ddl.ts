@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_approvals INT NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INT,
   component_owners TEXT,
+  cancel_superseded TINYINT(1) NOT NULL DEFAULT true,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 );
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS builds (
   review_requested_cycle INT,
   capture_job_id VARCHAR(26),
   manifest_sha256 VARCHAR(64),
+  superseded_by_build_id VARCHAR(26),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_builds_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

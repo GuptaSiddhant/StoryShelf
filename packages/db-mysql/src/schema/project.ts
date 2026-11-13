@@ -27,6 +27,7 @@ export const projects = mysqlTable("projects", {
   reviewApprovals: int("review_approvals").notNull().default(1),
   storybookUrlTtlSeconds: int("storybook_url_ttl_seconds"),
   componentOwners: text("component_owners"),
+  cancelSuperseded: boolean("cancel_superseded").notNull().default(true),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
   updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
 });
@@ -57,6 +58,7 @@ export interface Project {
   reviewApprovals: number;
   storybookUrlTtlSeconds: number | null;
   componentOwners: string | null;
+  cancelSuperseded: boolean;
   createdAt: string;
   updatedAt: string;
 }

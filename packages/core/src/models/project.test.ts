@@ -134,3 +134,14 @@ describe("ProjectModel slugs and hosts (ADR 0051)", () => {
     expect((await model.create({ name, gitRepository: "o/r" })).slug).toBe(`${slug}-2`);
   });
 });
+
+describe("ProjectModel: cancelSuperseded (ADR 0045)", () => {
+  it("is stored when given at creation and left to the column default otherwise", async () => {
+    const { db } = makeDatabase();
+    const model = new ProjectModel(db, { projects: db.tables.projects });
+    expect(await model.create({ name: "Off", cancelSuperseded: false })).toMatchObject({
+      cancelSuperseded: false,
+    });
+    expect((await model.create({ name: "Default" })).cancelSuperseded).toBeUndefined();
+  });
+});

@@ -96,6 +96,10 @@ const BUILD_CAPTURE_JOB_BACKFILL =
 const BUILD_CAPTURE_GENERATION_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS capture_generation INTEGER NOT NULL DEFAULT 0";
 const BUILD_MANIFEST_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS manifest_sha256 TEXT";
+const BUILD_SUPERSEDED_BY_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS superseded_by_build_id TEXT";
+const PROJECT_CANCEL_SUPERSEDED_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS cancel_superseded BOOLEAN NOT NULL DEFAULT true";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
@@ -273,6 +277,8 @@ async function migrateBuildRunColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_CAPTURE_JOB_ALTER);
   await run(BUILD_CAPTURE_GENERATION_ALTER);
   await run(BUILD_MANIFEST_SHA_ALTER);
+  await run(BUILD_SUPERSEDED_BY_ALTER);
+  await run(PROJECT_CANCEL_SUPERSEDED_ALTER);
 }
 
 /** Runs `use` with one dedicated connection's row-query runner, then releases the connection. */

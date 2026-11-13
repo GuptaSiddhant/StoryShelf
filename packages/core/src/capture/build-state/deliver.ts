@@ -73,6 +73,7 @@ export async function writeTo(
     publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
     approvals: await approvalsOf(deps, build, project),
     changes: await changesOf(deps, build, project),
+    supersededBy: await supersededByOf(deps, build),
   });
   if (states.statuses.length === 0) {
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
@@ -166,4 +167,16 @@ async function changesOf(
 ): Promise<Snapshot[] | undefined> {
   const wanted = deps.flags(project).testing && build.changedCount > 0;
   return wanted ? await new SnapshotModel(deps.db).listByBuild(build.id) : undefined;
+}
+
+/** The newer build that cancelled this one (ADR 0045), or undefined for any other build. */
+async function supersededByOf(
+  deps: BuildStateDeps,
+  build: Build,
+): Promise<{ id: string; sha: string } | undefined> {
+  if (build.status !== "cancelled" || !build.supersededByBuildId) {
+    return undefined;
+  }
+  const newer = await new BuildModel(deps.db).get(build.supersededByBuildId);
+  return newer ? { id: newer.id, sha: newer.gitSha } : undefined;
 }

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS projects (
   review_approvals INTEGER NOT NULL DEFAULT 1,
   storybook_url_ttl_seconds INTEGER,
   component_owners TEXT,
+  cancel_superseded BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS builds (
   review_requested_cycle INTEGER,
   capture_job_id TEXT,
   manifest_sha256 TEXT,
+  superseded_by_build_id TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

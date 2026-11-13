@@ -7,6 +7,8 @@ import type { Logger } from "../logger.ts";
 import type { Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
+import { supersedeBuilds } from "./build-supersede.ts";
+import type { SupersedeOptions, SupersedingBuild } from "./build-supersede.ts";
 import { col } from "./columns.ts";
 
 /** The verdict statuses; a build leaving them for `pending` is reopened. */
@@ -267,6 +269,20 @@ export class BuildModel {
     )) as unknown as Build | null;
     if (written?.status === "pending") return written;
     return attempts > 1 ? await this.reopen(id, values, attempts - 1) : null;
+  }
+
+  /**
+   * Cancel the builds `newBuild` supersedes (ADR 0045): the ids of `ids` in the same project and
+   * branch, of another commit, created before `newBuild`, still cancellable, and without a verdict
+   * or comment. Each is moved to `cancelled` with `superseded_by_build_id` in one conditional write.
+   * Returns the ids it cancelled; any other id is ignored, never an error.
+   */
+  async supersede(
+    newBuild: SupersedingBuild,
+    ids: readonly string[],
+    options?: SupersedeOptions,
+  ): Promise<string[]> {
+    return await supersedeBuilds(this.db, newBuild, ids, options);
   }
 
   /**

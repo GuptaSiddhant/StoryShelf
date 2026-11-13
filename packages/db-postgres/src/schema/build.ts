@@ -35,6 +35,7 @@ export const builds = pgTable(
     reviewRequestedCycle: integer("review_requested_cycle"),
     captureJobId: text("capture_job_id"),
     manifestSha256: text("manifest_sha256"),
+    supersededByBuildId: text("superseded_by_build_id"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -73,6 +74,7 @@ export interface Build {
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
   manifestSha256: string | null;
+  supersededByBuildId: string | null;
   createdAt: string;
   updatedAt: string;
 }
