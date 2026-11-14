@@ -9,7 +9,8 @@ import {
 import type { BuildStatus } from "@storyshelf/core/types";
 import { storybookDir } from "@storyshelf/core/utils";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as gitStatus from "../git-status.ts";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 
@@ -237,6 +238,34 @@ describe("POST /builds/skipped", () => {
     expect((await post(source.id, { idempotencyKey: "run-2" })).status).toBe(201);
   });
 
+  it("finishes the labels and the announcement on a retry after a failure following the insert", async () => {
+    const { build, post, db } = await seed();
+    const source = await build("base", "approved");
+    const labels = [{ key: "persistent", value: "true" }];
+    const attach = vi
+      .spyOn(LabelModel.prototype, "attach")
+      .mockRejectedValueOnce(new Error("boom"));
+    const first = await post(source.id, { idempotencyKey: "run-1", labels });
+    expect(first.status).toBe(500);
+    attach.mockRestore();
+    const [stored] = await new BuildModel(db).list(source.projectId, { status: "skipped" });
+    expect(stored).toBeDefined();
+    expect(await new LabelModel(db).listForBuild(String(stored?.id))).toEqual([]);
+
+    const requested = vi.spyOn(gitStatus, "requestBuildState");
+    const retry = await post(source.id, { idempotencyKey: "run-1", labels });
+    expect(retry.status).toBe(200);
+    expect(((await retry.json()) as { build: { id: string } }).build.id).toBe(stored?.id);
+    expect(
+      (await new LabelModel(db).listForBuild(String(stored?.id))).map((label) => label.typeKey),
+    ).toEqual(["persistent"]);
+    expect(requested).toHaveBeenCalledWith(stored?.id);
+    // A second retry adds no label twice.
+    expect((await post(source.id, { idempotencyKey: "run-1", labels })).status).toBe(200);
+    expect(await new LabelModel(db).listForBuild(String(stored?.id))).toHaveLength(1);
+    requested.mockRestore();
+  });
+
   it("attaches labels, including persistent", async () => {
     const { build, post, db } = await seed();
     const source = await build("base", "approved");
@@ -295,11 +324,12 @@ describe("POST /builds/skipped", () => {
     const source = await build("base", "approved");
     const created = (await (await post(source.id)).json()) as { build: { id: string } };
     const models = new BuildModel(db);
-    const first = await models.supersedeSkipped(project.id, "main", "head", "first");
-    const second = await models.supersedeSkipped(project.id, "main", "head", "second");
-    expect(first.map((row) => row.id)).toEqual([created.build.id]);
-    expect(second).toEqual([]);
-    expect((await models.get(created.build.id))?.supersededByBuildId).toBe("first");
+    const input = { gitSha: "head", gitBranch: "main" };
+    const first = await models.createSuperseding(project.id, input);
+    const second = await models.createSuperseding(project.id, input);
+    expect(first.replaced.map((row) => row.id)).toEqual([created.build.id]);
+    expect(second.replaced).toEqual([]);
+    expect((await models.get(created.build.id))?.supersededByBuildId).toBe(first.build.id);
   });
 
   it("answers 409 for a project that runs Storybook tests", async () => {

@@ -69,26 +69,31 @@ export class BuildModel {
   }
 
   async create(projectId: string, input: BuildCreateInput): Promise<Build> {
-    const now = new Date().toISOString();
-    return (await this.db.insert(this.tables.builds, {
-      id: ulid(),
-      projectId,
-      gitSha: input.gitSha,
-      gitBranch: input.gitBranch,
-      isDefault: input.isDefault ?? false,
-      authorEmail: input.authorEmail,
-      authorName: input.authorName,
-      message: input.message,
-      public: input.public ?? false,
-      affectedOnly: input.affectedOnly ?? true,
-      baselineSha: input.baselineSha ?? null,
-      changedFiles: serializePaths(input.changedFiles),
-      affectedImportPaths: serializePaths(input.affectedImportPaths),
-      status: "pending",
-      captureGeneration: 0,
-      createdAt: now,
-      updatedAt: now,
-    })) as unknown as Build;
+    return (await this.db.insert(
+      this.tables.builds,
+      newBuildRow(projectId, input),
+    )) as unknown as Build;
+  }
+
+  /**
+   * Create a normal build and, in the same transaction (the adapter's, where it has one), replace
+   * every skipped build of its project, branch and commit that is not yet replaced by setting its
+   * `supersededByBuildId` (ADR 0044, decision 4). A failure while replacing rolls the insert back,
+   * so no normal build is left behind. Returns the new build and the skipped builds it replaced;
+   * the caller announces after the commit.
+   */
+  async createSuperseding(
+    projectId: string,
+    input: BuildCreateInput,
+  ): Promise<{ build: Build; replaced: Build[] }> {
+    const run = async (store: TxStore): Promise<{ build: Build; replaced: Build[] }> => {
+      const build = (await store.insert(
+        this.tables.builds,
+        newBuildRow(projectId, input),
+      )) as unknown as Build;
+      return { build, replaced: await this.replaceSkipped(build, store) };
+    };
+    return this.db.transact ? await this.db.transact(run) : await run(this.db);
   }
 
   /**
@@ -209,37 +214,26 @@ export class BuildModel {
     return found ?? null;
   }
 
-  /**
-   * Normal build creation replaces any skipped build of the same project, branch and commit
-   * (ADR 0044, decision 4): each one that is not yet replaced gets `supersededByBuildId`. Returns
-   * the replaced builds. A build never replaces itself.
-   */
-  async supersedeSkipped(
-    projectId: string,
-    gitBranch: string,
-    gitSha: string,
-    replacementId: string,
-  ): Promise<Build[]> {
-    const skipped = (await this.db.list(this.tables.builds, {
+  /** Mark the unreplaced skipped builds of `build`'s commit as replaced by it. */
+  private async replaceSkipped(build: Build, store: TxStore): Promise<Build[]> {
+    const builds = this.tables.builds;
+    const skipped = (await store.list(builds, {
       where: and(
-        eq(col(this.tables.builds, "projectId"), projectId),
-        eq(col(this.tables.builds, "gitBranch"), gitBranch),
-        eq(col(this.tables.builds, "gitSha"), gitSha),
-        eq(col(this.tables.builds, "status"), "skipped"),
-        isNull(col(this.tables.builds, "supersededByBuildId")),
+        eq(col(builds, "projectId"), build.projectId),
+        eq(col(builds, "gitBranch"), build.gitBranch),
+        eq(col(builds, "gitSha"), build.gitSha),
+        eq(col(builds, "status"), "skipped"),
+        isNull(col(builds, "supersededByBuildId")),
       ),
     })) as unknown as Build[];
     const replaced: Build[] = [];
-    for (const build of skipped) {
-      // Compare-and-set on the column: a concurrent caller that got there first keeps its row.
+    for (const row of skipped) {
       // oxlint-disable-next-line no-await-in-loop -- a handful of rows at most (one per lost response)
-      const row = (await this.db.updateWhere(
-        this.tables.builds,
-        build.id,
-        { supersededByBuildId: replacementId, updatedAt: new Date().toISOString() },
-        isNull(col(this.tables.builds, "supersededByBuildId")),
-      )) as unknown as Build | null;
-      if (row?.supersededByBuildId === replacementId) replaced.push(row);
+      const updated = await store.update(builds, row.id, {
+        supersededByBuildId: build.id,
+        updatedAt: new Date().toISOString(),
+      });
+      replaced.push(updated as unknown as Build);
     }
     return replaced;
   }
@@ -920,6 +914,30 @@ function nextStamp(): string {
 /** `and` of conditions, which is never undefined when it is given at least one. */
 function allOf(first: SQL, ...rest: SQL[]): SQL {
   return and(first, ...rest) ?? first;
+}
+
+/** The row of a normal build, created `pending`. */
+function newBuildRow(projectId: string, input: BuildCreateInput): Record<string, unknown> {
+  const now = new Date().toISOString();
+  return {
+    id: ulid(),
+    projectId,
+    gitSha: input.gitSha,
+    gitBranch: input.gitBranch,
+    isDefault: input.isDefault ?? false,
+    authorEmail: input.authorEmail,
+    authorName: input.authorName,
+    message: input.message,
+    public: input.public ?? false,
+    affectedOnly: input.affectedOnly ?? true,
+    baselineSha: input.baselineSha ?? null,
+    changedFiles: serializePaths(input.changedFiles),
+    affectedImportPaths: serializePaths(input.affectedImportPaths),
+    status: "pending",
+    captureGeneration: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 /** The row of a skipped build repeating `source` (a real build). */

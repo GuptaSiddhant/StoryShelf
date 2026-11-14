@@ -64,19 +64,17 @@ describe.each(["pre-review.sql", "pre-449.sql"])("skipped builds on the %s datab
     expect((await builds.findByIdempotencyKey("p-custom", "run-1"))?.id).toBe(first.id);
     expect(await builds.findByIdempotencyKey("other", "run-1")).toBeNull();
     await expect(builds.createSkipped(keyed)).rejects.toThrow();
-    const replacement = await builds.create("p-custom", {
+    const { build: replacement, replaced } = await builds.createSuperseding("p-custom", {
       gitSha: "ccccccc3333",
       gitBranch: "main",
     });
-    const replaced = await builds.supersedeSkipped(
-      "p-custom",
-      "main",
-      "ccccccc3333",
-      replacement.id,
-    );
     expect(replaced.map((build) => build.id)).toEqual([first.id]);
     expect((await builds.get(first.id))?.supersededByBuildId).toBe(replacement.id);
-    expect(await builds.supersedeSkipped("p-custom", "main", "ccccccc3333", "x")).toEqual([]);
+    const again = await builds.createSuperseding("p-custom", {
+      gitSha: "ccccccc3333",
+      gitBranch: "main",
+    });
+    expect(again.replaced).toEqual([]);
     await db.lifecycle?.teardown();
 
     const sqlite = new DatabaseSync(path, { readOnly: true });

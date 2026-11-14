@@ -40,7 +40,7 @@ export async function createBuildRecord(
       message: "gitSha and gitBranch are required (revision SHA and baseline namespace)",
     });
   }
-  const build = await new BuildModel(db).create(project.id, {
+  const { build, replaced } = await new BuildModel(db).createSuperseding(project.id, {
     gitSha: meta.gitSha,
     gitBranch: meta.gitBranch,
     isDefault: meta.gitBranch === project.gitDefaultBranch,
@@ -50,11 +50,15 @@ export async function createBuildRecord(
     affectedOnly: meta.affectedOnly,
     baselineSha: await resolveBaselineSha(db, project.id, meta.gitBranch, meta.gitSha),
   });
+  // A skipped build of this commit left by a lost response was replaced in the same transaction
+  // (ADR 0044, decision 4); its state is requested again once the new build is committed.
+  for (const skipped of replaced) {
+    // oxlint-disable-next-line no-await-in-loop -- a handful of rows at most
+    await requestBuildState(skipped.id);
+  }
   if (meta.labels && meta.labels.length > 0) {
     await attachLabels(db, project.id, build.id, meta.labels);
   }
-  // A skipped build of this commit left by a lost response is replaced (ADR 0044, decision 4).
-  await new BuildModel(db).supersedeSkipped(project.id, meta.gitBranch, meta.gitSha, build.id);
   await emitWebhookEvent(
     db,
     { webhooks: getStore().db.tables.webhooks },
@@ -352,7 +356,11 @@ export async function attachLabels(
   labels: { key: string; value: string }[],
 ): Promise<void> {
   const models = new LabelModel(db);
+  const attached = new Set(
+    (await models.listForBuild(buildId)).map((label) => `${label.typeKey}\u0000${label.value}`),
+  );
   for (const { key, value } of labels) {
+    if (attached.has(`${key}\u0000${value}`)) continue;
     const existing = await models.getType(projectId, key);
     if (!existing) {
       await models.createType(projectId, { key, name: key });

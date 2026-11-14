@@ -715,3 +715,52 @@ describe("BuildModel: skipped builds (ADR 0044)", () => {
     await expect(model.resetStatus("missing", "pending")).rejects.toThrow("Build not found");
   });
 });
+
+describe("BuildModel.createSuperseding", () => {
+  async function seed() {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const source = await model.create("p1", { gitSha: "base", gitBranch: "main" });
+    await model.setStatus(source.id, "approved");
+    const skipped = await model.createSkipped({
+      projectId: "p1",
+      gitSha: "head",
+      gitBranch: "main",
+      sourceBuildId: source.id,
+      changedFiles: [],
+    });
+    return { db, model, skipped };
+  }
+
+  it("inserts the build and replaces the skipped build of its commit together", async () => {
+    const { model, skipped } = await seed();
+    const { build, replaced } = await model.createSuperseding("p1", {
+      gitSha: "head",
+      gitBranch: "main",
+    });
+    expect(build.status).toBe("pending");
+    expect(replaced.map((row) => row.id)).toEqual([skipped.id]);
+    expect((await model.get(skipped.id))?.supersededByBuildId).toBe(build.id);
+  });
+
+  it("leaves no normal build behind when replacing the skipped build fails", async () => {
+    const { db, model, skipped } = await seed();
+    const real = db.transact;
+    if (!real) throw new Error("the fake database has transactions");
+    db.transact = async (run) =>
+      await real(async (tx) => {
+        return await run({
+          ...tx,
+          update: async () => {
+            throw new Error("supersede failed");
+          },
+        });
+      });
+    await expect(
+      model.createSuperseding("p1", { gitSha: "head", gitBranch: "main" }),
+    ).rejects.toThrow("supersede failed");
+    const rows = await model.list("p1", {});
+    expect(rows.filter((row) => row.gitSha === "head").map((row) => row.id)).toEqual([skipped.id]);
+    expect((await model.get(skipped.id))?.supersededByBuildId ?? null).toBeNull();
+  });
+});

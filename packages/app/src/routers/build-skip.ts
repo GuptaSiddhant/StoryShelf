@@ -145,7 +145,8 @@ export function registerBuildSkip(app: ShelfRouter): void {
 
 /**
  * The skipped build for this request: the one a repeated `idempotencyKey` already created
- * (`created: false`), or a new one after the catalog check, with its labels and announcements.
+ * (`created: false`), or a new one after the catalog check. Either way the follow-up steps run, so
+ * a retry finishes whatever a failure after the insert left undone (ADR 0044, decision 4).
  */
 async function recordSkipped(
   project: Project,
@@ -155,17 +156,29 @@ async function recordSkipped(
     project.id,
     input.idempotencyKey,
   );
-  if (existing) return { build: existing, created: false };
+  if (existing) {
+    await finishSkipped(existing, input);
+    return { build: existing, created: false };
+  }
   await assertSameCatalog(project, input);
   const { build, raced } = await createChecked(project, input);
-  // The request that lost a race for the key returns the winner's build and repeats nothing.
-  if (raced) return { build, created: false };
+  await finishSkipped(build, input);
+  return { build, created: !raced };
+}
+
+/**
+ * The steps after the insert: attach the labels (an upsert, so a repeat adds none twice) and
+ * announce the build, which queues one notify job per channel and build. All are idempotent.
+ */
+async function finishSkipped(
+  build: Build,
+  input: z.infer<typeof skippedBuildSchema>,
+): Promise<void> {
   if (input.labels && input.labels.length > 0) {
-    await attachLabels(getStore().db, project.id, build.id, input.labels);
+    await attachLabels(getStore().db, build.projectId, build.id, input.labels);
   }
   await announceBuildStatus(build.id, "skipped");
   await requestBuildState(build.id);
-  return { build, created: true };
 }
 
 /**
