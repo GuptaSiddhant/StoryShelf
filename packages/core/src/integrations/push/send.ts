@@ -1,8 +1,8 @@
 import type { Logger } from "../../logger.ts";
 import { HttpError, httpStatus, redactSecrets, redactUrlForLog } from "../../utils/index.ts";
 import { encryptPayload } from "./encrypt.ts";
-import type { PushChannelConfig, PushPayload, VapidConfig } from "./types.ts";
-import { vapidAuthorization } from "./vapid.ts";
+import type { PushChannelConfig, PushPayload } from "./types.ts";
+import type { Vapid } from "./vapid.ts";
 
 /** Seconds a push service keeps an undelivered message (a day). */
 const TTL_SECONDS = 86_400;
@@ -19,7 +19,7 @@ export class PushGoneError extends Error {
 }
 
 /** The error a failed send surfaces: no key, endpoint or response body, in message or cause. */
-function failureOf(error: unknown, vapid: VapidConfig): Error {
+function failureOf(error: unknown): Error {
   if (error instanceof HttpError) {
     if (error.status === 404 || error.status === 410) {
       return new PushGoneError(error.status);
@@ -28,14 +28,14 @@ function failureOf(error: unknown, vapid: VapidConfig): Error {
     return new Error(message, { cause: new Error(message) });
   }
   const text = error instanceof Error ? error.message : String(error);
-  const message = `push delivery failed: ${redactSecrets(text.replaceAll(vapid.privateKey, "[redacted]"))}`;
+  const message = `push delivery failed: ${redactSecrets(text)}`;
   return new Error(message, { cause: new Error(message) });
 }
 
 /** Headers of one delivery: VAPID identity, encoding and lifetime. */
-function requestHeaders(vapid: VapidConfig, endpoint: string): Record<string, string> {
+function requestHeaders(vapid: Vapid, endpoint: string): Record<string, string> {
   return {
-    authorization: vapidAuthorization(vapid, endpoint),
+    authorization: vapid.authorization(endpoint),
     "content-encoding": "aes128gcm",
     "content-type": "application/octet-stream",
     ttl: String(TTL_SECONDS),
@@ -49,7 +49,7 @@ function requestHeaders(vapid: VapidConfig, endpoint: string): Record<string, st
  * @throws {Error} for every other failure, with no key, endpoint or response body in its message.
  */
 export async function sendPush(
-  vapid: VapidConfig,
+  vapid: Vapid,
   device: PushChannelConfig,
   payload: PushPayload,
   logger?: Logger,
@@ -66,6 +66,6 @@ export async function sendPush(
     });
     logger?.debug({ url: redactUrlForLog(device.endpoint) }, "push delivered");
   } catch (error) {
-    throw failureOf(error, vapid);
+    throw failureOf(error);
   }
 }

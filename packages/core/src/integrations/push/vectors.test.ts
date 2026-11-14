@@ -1,4 +1,4 @@
-import { createECDH } from "node:crypto";
+import { createECDH, createPrivateKey } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { fromBase64Url, toBase64Url } from "./base64url.ts";
 import { encryptPayload, MAX_PLAINTEXT_BYTES } from "./encrypt.ts";
@@ -60,7 +60,17 @@ describe("RFC 8292 VAPID", () => {
       privateKey: toBase64Url(ecdh.getPrivateKey()),
       subject: "mailto:push@example.com",
     };
-    const jwt = signVapidJwt(vapid, "https://push.example.net", 1_000_000);
+    const key = createPrivateKey({
+      format: "jwk",
+      key: {
+        kty: "EC",
+        crv: "P-256",
+        d: vapid.privateKey,
+        x: toBase64Url(ecdh.getPublicKey().subarray(1, 33)),
+        y: toBase64Url(ecdh.getPublicKey().subarray(33, 65)),
+      },
+    });
+    const jwt = signVapidJwt(key, vapid.subject, "https://push.example.net", 1_000_000);
     expect(verifyVapidJwt(jwt, vapid.publicKey)).toBe(true);
     const claims = JSON.parse(Buffer.from(jwt.split(".")[1] ?? "", "base64url").toString()) as {
       aud: string;

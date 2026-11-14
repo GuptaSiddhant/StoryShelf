@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
+import { vapidConfigFromEnv } from "@storyshelf/core/integrations/push";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
@@ -115,12 +116,17 @@ const emailNotifiers = emailSender
   ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
   : [];
 
+// Web push (ADR 0048): off without SHELF_VAPID_PUBLIC_KEY and SHELF_VAPID_PRIVATE_KEY; the subject
+// (SHELF_VAPID_SUBJECT) is then required.
+const vapid = vapidConfigFromEnv(env);
+
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifications: {
+    ...(vapid ? { vapid } : {}),
     notifiers: [...chatNotifiers, ...emailNotifiers],
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },

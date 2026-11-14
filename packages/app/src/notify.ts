@@ -24,6 +24,7 @@ import {
   MemberModel,
   NotificationChannelModel,
   NotificationSubscriptionModel,
+  PushSubscriptionModel,
   UserModel,
   type PublicOriginResolver,
 } from "@storyshelf/core/models";
@@ -44,7 +45,7 @@ export type ReviewRoute = "subscription" | "default" | "assigned";
  */
 export type ReviewTarget =
   | { kind: "channel"; channelId: string }
-  | { kind: "user"; userId: string; provider: string; route: ReviewRoute };
+  | { kind: "user"; userId: string; provider: string; route: ReviewRoute; deviceId?: string };
 
 /** One review request to one recipient, as queued: references only. */
 export interface ReviewRequestJob {
@@ -56,7 +57,7 @@ export interface ReviewRequestJob {
 
 /** A resolved recipient; a person's carries who they are and why they get the message. */
 interface Addressed extends NotificationChannel {
-  reviewer?: { userId: string; route: ReviewRoute };
+  reviewer?: { userId: string; route: ReviewRoute; deviceId?: string };
 }
 
 /** Explicit dependencies for background fan-out (no request scope). */
@@ -265,17 +266,49 @@ async function targetsForSub(
   for (const kind of wired.filter((entry) => !kinds.personal.has(entry))) {
     kinds.skipped(sub.id, kind);
   }
-  return wired
-    .filter((kind) => kinds.personal.has(kind))
-    .map((kind) => ({
-      id: `sub:${sub.id}:${kind}`,
-      projectId: sub.projectId,
-      provider: kind,
-      config: { to: user.email },
-      events: [],
-      enabled: true,
-      reviewer: { userId: user.id, route },
-    }));
+  const targets = await Promise.all(
+    wired
+      .filter((kind) => kinds.personal.has(kind))
+      .map(async (kind) => await personalTargets(db, sub, user, kind, route)),
+  );
+  return targets.flat();
+}
+
+/**
+ * The targets of one personal kind: an address for email, and for web push one per device the
+ * person registered (none while they have registered none, so push stays off until they enable it
+ * on a device). Each device is its own target, so a refusal is retried for that device alone.
+ */
+async function personalTargets(
+  db: DatabaseAdapter,
+  sub: NotificationSubscriptionRow,
+  user: Pick<User, "id" | "email">,
+  kind: string,
+  route: ReviewRoute,
+): Promise<Addressed[]> {
+  if (kind !== "push") {
+    return [
+      {
+        id: `sub:${sub.id}:${kind}`,
+        projectId: sub.projectId,
+        provider: kind,
+        config: { to: user.email },
+        events: [],
+        enabled: true,
+        reviewer: { userId: user.id, route },
+      },
+    ];
+  }
+  const devices = await new PushSubscriptionModel(db).listForUser(user.id);
+  return devices.map((device) => ({
+    id: `sub:${sub.id}:push:${device.id}`,
+    projectId: sub.projectId,
+    provider: kind,
+    config: { endpoint: device.endpoint, p256dh: device.p256dh, auth: device.auth },
+    events: [],
+    enabled: true,
+    reviewer: { userId: user.id, route, deviceId: device.id },
+  }));
 }
 
 /**
@@ -368,6 +401,7 @@ function referenceOf(channel: Addressed): ReviewTarget {
         userId: channel.reviewer.userId,
         provider: channel.provider,
         route: channel.reviewer.route,
+        ...(channel.reviewer.deviceId === undefined ? {} : { deviceId: channel.reviewer.deviceId }),
       };
 }
 
@@ -425,7 +459,10 @@ export async function resolveReviewTarget(
       ? await assignedTargets(deps.db, projectId, target.userId, kinds)
       : await subscriberTargets(deps.db, projectId, REVIEW_REQUESTED, data, kinds, new Set());
   return found.find(
-    (entry) => entry.reviewer?.userId === target.userId && entry.provider === target.provider,
+    (entry) =>
+      entry.reviewer?.userId === target.userId &&
+      entry.provider === target.provider &&
+      entry.reviewer.deviceId === target.deviceId,
   );
 }
 

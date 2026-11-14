@@ -6,6 +6,7 @@ import { toBase64Url } from "./base64url.ts";
 import { vapidConfigFromEnv } from "./config.ts";
 import { createPushNotifier } from "./notifier.ts";
 import { PushGoneError } from "./send.ts";
+import { createVapid } from "./vapid.ts";
 
 function keyPair(): { publicKey: string; privateKey: string } {
   const ecdh = createECDH("prime256v1");
@@ -16,7 +17,8 @@ function keyPair(): { publicKey: string; privateKey: string } {
   };
 }
 
-const vapid = { ...keyPair(), subject: "mailto:ops@example.com" };
+const vapidConfig = { ...keyPair(), subject: "mailto:ops@example.com" };
+const vapid = createVapid(vapidConfig);
 const device = keyPair();
 const config = {
   endpoint: "https://push.example.net/p/secret-path-token",
@@ -81,7 +83,9 @@ describe("push notifier", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
-        Promise.resolve(new Response(`${vapid.privateKey} ${config.endpoint}`, { status: 400 })),
+        Promise.resolve(
+          new Response(`${vapidConfig.privateKey} ${config.endpoint}`, { status: 400 }),
+        ),
       ),
     );
     const adapter = createPushNotifier(vapid).create({ config, logger: logger as never });
@@ -90,18 +94,52 @@ describe("push notifier", () => {
       .catch((error_: unknown) => error_);
     expect(error).toBeInstanceOf(Error);
     const seen = `${(error as Error).message}${(error as Error).stack ?? ""}${lines.join("")}`;
-    expect(seen).not.toContain(vapid.privateKey);
+    expect(seen).not.toContain(vapidConfig.privateKey);
     expect(seen).not.toContain("secret-path-token");
   });
 
-  it("scrubs the private key from a network failure", async () => {
+  it("tells onGone about a 410 and ends without an error", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => Promise.reject(new Error(`boom ${vapid.privateKey}`))),
+      vi.fn(() => Promise.resolve(new Response("gone", { status: 410 }))),
     );
+    const gone = vi.fn(() => Promise.resolve());
+    const adapter = createPushNotifier(vapid, { onGone: gone }).create({ config });
+    await adapter.send({ channel, formatted });
+    expect(gone).toHaveBeenCalledWith(config);
+  });
+
+  it("still throws for other failures with onGone set", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("busy", { status: 503 }))),
+    );
+    const gone = vi.fn(() => Promise.resolve());
+    const adapter = createPushNotifier(vapid, { onGone: gone }).create({ config });
+    await expect(adapter.send({ channel, formatted })).rejects.toThrow("HTTP 503");
+    expect(gone).not.toHaveBeenCalled();
+  });
+
+  it("sends a one-line body and only a relative link", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 201 })));
+    vi.stubGlobal("fetch", fetchMock);
+    const spy = vi.spyOn(await import("./encrypt.ts"), "encryptPayload");
     const adapter = createPushNotifier(vapid).create({ config });
-    const error = await adapter.send({ channel, formatted }).catch((error_: unknown) => error_);
-    expect((error as Error).message).not.toContain(vapid.privateKey);
+    await adapter.send({
+      channel,
+      formatted: {
+        ...formatted,
+        summary: "Shelf: build:failed on main",
+        url: "https://shelf.example.com/projects/p/builds/b1",
+      },
+    });
+    const sent = spy.mock.calls[0]?.[0];
+    expect(JSON.parse(String(sent))).toEqual({
+      title: "Build failed",
+      body: "Shelf: build:failed on main",
+      url: "/projects/p/builds/b1",
+    });
+    spy.mockRestore();
   });
 
   it("rejects a config without an endpoint", () => {
@@ -113,6 +151,12 @@ describe("vapidConfigFromEnv", () => {
   it("is off without both keys", () => {
     expect(vapidConfigFromEnv({})).toBeUndefined();
     expect(vapidConfigFromEnv({ SHELF_VAPID_PUBLIC_KEY: "a" })).toBeUndefined();
+  });
+
+  it("requires a subject once both keys are set", () => {
+    expect(() =>
+      vapidConfigFromEnv({ SHELF_VAPID_PUBLIC_KEY: "a", SHELF_VAPID_PRIVATE_KEY: "b" }),
+    ).toThrow("SHELF_VAPID_SUBJECT is required");
   });
 
   it("reads the keys and subject", () => {

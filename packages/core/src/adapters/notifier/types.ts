@@ -32,6 +32,10 @@ export interface FormattedNotification {
   text: string;
   markdown: string;
   html: string;
+  /** One line a short surface (a push) shows: the headline and, for an assignment, its reason. */
+  summary?: string;
+  /** Absolute link to the page the message is about; present only under a confirmed public origin. */
+  url?: string;
 }
 
 /** A configured project-level channel row (storage-agnostic view). */
