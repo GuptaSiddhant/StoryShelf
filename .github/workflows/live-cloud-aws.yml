@@ -92,8 +92,9 @@ jobs:
 
   # The customer path (#891, ADR 0050): apply the AWS module's `examples/minimal` with the current
   # release image, smoke-test the running stack, destroy it. Real AWS, billed: it runs only when the
-  # repository variable LIVE_AWS_MODULE_APPLY is "1", which stays off until the image reads the
-  # rds-iam variables the module sets (see the module README, "Image contract"). Uses the same AWS
+  # repository variable LIVE_AWS_MODULE_APPLY is "1". First boot is unattended: each task's `db-init`
+  # container creates the app database user and grants it `rds_iam` before the app starts (module
+  # README, "Database: IAM authentication"), so the smoke test needs no manual step. Uses the same AWS
   # secrets as live-s3. Destroy runs even when the apply or the smoke test fails.
   module-apply:
     runs-on: ubuntu-latest

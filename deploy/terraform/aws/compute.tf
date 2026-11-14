@@ -20,6 +20,49 @@ locals {
     { name = "DATABASE_URL", valueFrom = var.existing_database_url_secret_arn },
   ]
 
+  # The master secret is JSON ({"username","password"}); ECS picks one key per reference.
+  oidc_secrets = var.enable_cognito ? [
+    { name = "OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret[0].arn },
+  ] : []
+
+  db_init_secrets = local.create_database ? [
+    { name = "PGUSER", valueFrom = "${aws_db_instance.main[0].master_user_secret[0].secret_arn}:username::" },
+    { name = "PGPASSWORD", valueFrom = "${aws_db_instance.main[0].master_user_secret[0].secret_arn}:password::" },
+  ] : []
+
+  # Idempotent: runs on every task start, as the master user, over TLS. RDS cannot grant rds_iam
+  # itself, so without this every task would fail at database setup and ECS would restart it forever.
+  db_init_script = <<-EOT
+    set -e
+    psql -v ON_ERROR_STOP=1 -v app_user=${local.database_user} -v app_db=${local.database_name} <<'SQL'
+    SELECT format('CREATE ROLE %I LOGIN', :'app_user') WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'app_user') \gexec
+    SELECT format('GRANT rds_iam TO %I', :'app_user') \gexec
+    SELECT format('GRANT ALL ON DATABASE %I TO %I', :'app_db', :'app_user') \gexec
+    SELECT format('GRANT ALL ON SCHEMA public TO %I', :'app_user') \gexec
+    SQL
+  EOT
+
+  db_init_container = local.create_database ? [{
+    name      = "db-init"
+    image     = var.database_init_image
+    essential = false
+    command   = ["sh", "-c", local.db_init_script]
+    environment = [
+      { name = "PGHOST", value = aws_db_instance.main[0].address },
+      { name = "PGDATABASE", value = local.database_name },
+      { name = "PGSSLMODE", value = "require" },
+    ]
+    secrets = local.db_init_secrets
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.app.name
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "db-init"
+      }
+    }
+  }] : []
+
   remote_browser_secrets = concat(
     var.remote_browser_endpoint_secret_arn == "" ? [] : [{ name = "REMOTE_BROWSER_ENDPOINT", valueFrom = var.remote_browser_endpoint_secret_arn }],
     var.remote_browser_token_secret_arn == "" ? [] : [{ name = "REMOTE_BROWSER_TOKEN", valueFrom = var.remote_browser_token_secret_arn }],
@@ -126,10 +169,11 @@ resource "aws_ecs_task_definition" "app" {
   execution_role_arn       = aws_iam_role.execution.arn
   task_role_arn            = aws_iam_role.task.arn
 
-  container_definitions = jsonencode([{
+  container_definitions = jsonencode(concat(local.db_init_container, [{
     name         = "app"
     image        = local.image
     essential    = true
+    dependsOn    = local.create_database ? [{ containerName = "db-init", condition = "SUCCESS" }] : []
     stopTimeout  = local.stop_timeout
     portMappings = [{ containerPort = 3000, protocol = "tcp" }]
     environment = concat([
@@ -139,13 +183,13 @@ resource "aws_ecs_task_definition" "app" {
       { name = "TRUST_PROXY", value = "1" },
       { name = "SHUTDOWN_GRACE_SECONDS", value = tostring(var.shutdown_grace_seconds) },
       { name = "DATABASE_POOL_MAX", value = tostring(var.database_pool_size) },
+      { name = "AUTH_EMAIL", value = var.auth_email },
     ], local.database_environment)
     secrets = concat([
       { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
       { name = "AUTH_PASSWORD", valueFrom = aws_secretsmanager_secret.auth_password.arn },
-      { name = "OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret.arn },
       { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
-    ], local.database_secrets, local.remote_browser_secrets)
+    ], local.oidc_secrets, local.database_secrets, local.remote_browser_secrets)
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -154,7 +198,7 @@ resource "aws_ecs_task_definition" "app" {
         awslogs-stream-prefix = "app"
       }
     }
-  }])
+  }]))
 
   tags = var.tags
 }
@@ -191,6 +235,7 @@ resource "aws_ecs_service" "app" {
     aws_secretsmanager_secret_version.shelf_secret,
     aws_secretsmanager_secret_version.auth_password,
     aws_secretsmanager_secret_version.oidc_client_secret,
+    aws_db_instance.main,
     aws_secretsmanager_secret_version.admin_token,
     aws_iam_role_policy.task,
     aws_iam_role_policy.execution_secrets,

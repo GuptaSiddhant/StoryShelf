@@ -59,7 +59,7 @@ variable "allow_http" {
 }
 
 variable "saml_metadata_url" {
-  description = "SAML metadata URL for Cognito federation (Entra, Okta). Empty skips federation."
+  description = "SAML metadata URL for Cognito federation (Entra, Okta). Empty skips federation. Used only with enable_cognito."
   type        = string
   default     = ""
 }
@@ -137,6 +137,35 @@ variable "deletion_protection" {
   description = "Protect the created database from deletion and keep a final snapshot; with false the bucket is also emptied on destroy. Turn it off for throwaway stacks."
   type        = bool
   default     = true
+}
+
+variable "database_backup_retention_days" {
+  description = "Days RDS keeps automated backups (point-in-time recovery). The database holds baselines and reviews, so 0 (off) is refused."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.database_backup_retention_days >= 1 && var.database_backup_retention_days <= 35
+    error_message = "database_backup_retention_days must be 1-35."
+  }
+}
+
+variable "database_init_image" {
+  description = "Image of the db-init container that creates the app's database user before the app starts (it needs psql). Override it to pull from a mirror."
+  type        = string
+  default     = "public.ecr.aws/docker/library/postgres:16-alpine"
+}
+
+variable "enable_cognito" {
+  description = "Create the Cognito user pool, client and OIDC_CLIENT_SECRET. Off by default: the image does not read OIDC yet, so they would be unused."
+  type        = bool
+  default     = false
+}
+
+variable "auth_email" {
+  description = "Email of the local admin login created from AUTH_PASSWORD (AUTH_EMAIL)."
+  type        = string
+  default     = "admin@example.com"
 }
 
 variable "remote_browser_endpoint_secret_arn" {

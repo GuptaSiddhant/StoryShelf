@@ -7,6 +7,7 @@ resource "aws_secretsmanager_secret" "shelf_secret" {
 }
 
 resource "aws_secretsmanager_secret" "oidc_client_secret" {
+  count       = var.enable_cognito ? 1 : 0
   name_prefix = "${var.name}/OIDC_CLIENT_SECRET-"
 
   tags = var.tags
@@ -60,7 +61,8 @@ resource "aws_secretsmanager_secret_version" "admin_token" {
 
 # Operator-provided: a placeholder is written once and then left alone.
 resource "aws_secretsmanager_secret_version" "oidc_client_secret" {
-  secret_id     = aws_secretsmanager_secret.oidc_client_secret.id
+  count         = var.enable_cognito ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.oidc_client_secret[0].id
   secret_string = "change-me"
 
   lifecycle {

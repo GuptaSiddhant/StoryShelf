@@ -3,7 +3,7 @@ import "reflect-metadata";
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import { parseTrustProxy } from "@storyshelf/core/config";
+import { parseShutdownGraceMs, parseTrustProxy } from "@storyshelf/core/config";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -15,7 +15,9 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * Everything comes from the environment: `DATABASE_URL`, or `DATABASE_IAM_HOST` + `DATABASE_IAM_USER` +
  * `DATABASE_IAM_NAME` + `DATABASE_IAM_REGION` for RDS IAM login (SQLite on `/data` when neither is set),
  * `DATABASE_POOL_MAX`, `AWS_BUCKET`
- * (local storage on `/data` when unset), `SECRET`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`,
+ * (local storage on `/data` when unset), `SECRET`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `AUTH_EMAIL`, `SMTP_*`,
+ * `SHUTDOWN_GRACE_SECONDS` (bound of the SIGTERM drain, a few seconds below the platform's stop timeout),
+ * `SHUTDOWN_GRACE_SECONDS` (drain bound on SIGTERM),
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
  * unless set) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Bundled by
  * rolldown (`rolldown.config.ts`).
@@ -104,7 +106,7 @@ const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     app.lifecycle
-      .teardown()
+      .teardown({ graceMs: parseShutdownGraceMs(env["SHUTDOWN_GRACE_SECONDS"]) })
       .catch(() => {}) // Intentionally empty — teardown errors are already logged
       .finally(() => {
         server.close();

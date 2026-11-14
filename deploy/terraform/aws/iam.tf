@@ -16,7 +16,8 @@ locals {
   app_secret_arns = compact([
     aws_secretsmanager_secret.shelf_secret.arn,
     aws_secretsmanager_secret.auth_password.arn,
-    aws_secretsmanager_secret.oidc_client_secret.arn,
+    var.enable_cognito ? aws_secretsmanager_secret.oidc_client_secret[0].arn : "",
+    local.create_database ? aws_db_instance.main[0].master_user_secret[0].secret_arn : "",
     aws_secretsmanager_secret.admin_token.arn,
     var.existing_database_url_secret_arn,
     var.remote_browser_endpoint_secret_arn,
