@@ -8,6 +8,7 @@
       "@hono/*",
       "hono",
       "pino",
+      "pg",
       "drizzle-orm",
       "zod",
       "pixelmatch",

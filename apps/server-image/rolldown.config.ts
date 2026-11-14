@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 import { defineConfig } from "rolldown";
 
 // `sharp` is the optional native image engine: it must resolve at runtime, never be inlined.
-const EXTERNAL = /^(pino(\/|$)|playwright(-core)?(\/|$)|sharp(\/|$))/u;
+// `pg` (the rds-iam preset) stays external too: inlined, its `pg-pool` resolves to the ESM entry and
+// `pg`'s CommonJS `require` gets a module namespace instead of the class (`Class extends value #<Object>`).
+const EXTERNAL = /^(pino(\/|$)|pg(\/|$)|playwright(-core)?(\/|$)|sharp(\/|$))/u;
 
 const root = resolve(import.meta.dirname ?? ".", "../..");
 
@@ -51,6 +53,7 @@ export default defineConfig({
       "@storyshelf/storage-local": resolve(root, "packages/storage-local/src/index.ts"),
       "@storyshelf/runner-playwright": resolve(root, "packages/runner-playwright/src/index.ts"),
       "@storyshelf/auth": resolve(root, "packages/auth/src/index.ts"),
+      "@storyshelf/db-postgres/rds-iam": resolve(root, "packages/db-postgres/src/rds-iam.ts"),
       "@storyshelf/db-postgres": resolve(root, "packages/db-postgres/src/index.ts"),
       "@storyshelf/db-mysql": resolve(root, "packages/db-mysql/src/index.ts"),
     },

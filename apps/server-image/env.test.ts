@@ -3,6 +3,7 @@ import {
   browsersFromEnv,
   captureEnabled,
   databaseFromEnv,
+  poolMaxFromEnv,
   storageFromEnv,
   type Factories,
 } from "./env.ts";
@@ -13,6 +14,7 @@ function factories() {
   const set = {
     sqlite: make("sqlite"),
     postgres: make("postgres"),
+    rdsIam: make("rds-iam"),
     mysql: make("mysql"),
     s3: make("s3"),
     local: make("local"),
@@ -31,7 +33,7 @@ describe("databaseFromEnv", () => {
     const { set, as } = factories();
     databaseFromEnv({ DATABASE_URL: "postgresql://u:p@h/db" }, "/data", as);
     databaseFromEnv({ DATABASE_URL: "mysql://u:p@h/db" }, "/data", as);
-    expect(set.postgres).toHaveBeenCalledWith("postgresql://u:p@h/db");
+    expect(set.postgres).toHaveBeenCalledWith("postgresql://u:p@h/db", undefined);
     expect(set.mysql).toHaveBeenCalledWith("mysql://u:p@h/db");
   });
 
@@ -43,6 +45,75 @@ describe("databaseFromEnv", () => {
     expect(() => databaseFromEnv({ DATABASE_URL: "sqlite://secret-pw" }, "/data", as)).not.toThrow(
       /secret-pw/u,
     );
+  });
+});
+
+describe("databaseFromEnv with DATABASE_IAM_HOST", () => {
+  const iam = {
+    DATABASE_IAM_HOST: "db.abc.us-east-1.rds.amazonaws.com",
+    DATABASE_IAM_USER: "shelf",
+    DATABASE_IAM_NAME: "shelf",
+    DATABASE_IAM_REGION: "us-east-1",
+  };
+
+  it("uses the rds-iam preset and never SQLite or a URL", () => {
+    const { set, as } = factories();
+    expect(databaseFromEnv(iam, "/data", as).log).toEqual({ database: "postgres-rds-iam" });
+    expect(set.rdsIam).toHaveBeenCalledWith({
+      host: iam.DATABASE_IAM_HOST,
+      user: "shelf",
+      database: "shelf",
+      region: "us-east-1",
+    });
+    expect(set.sqlite).not.toHaveBeenCalled();
+    expect(set.postgres).not.toHaveBeenCalled();
+  });
+
+  it("takes the region from AWS_REGION, the port and the pool size", () => {
+    const { set, as } = factories();
+    const { DATABASE_IAM_REGION: _region, ...rest } = iam;
+    databaseFromEnv(
+      { ...rest, AWS_REGION: "eu-west-1", DATABASE_IAM_PORT: "5433", DATABASE_POOL_MAX: "4" },
+      "/data",
+      as,
+    );
+    expect(set.rdsIam).toHaveBeenCalledWith({
+      host: iam.DATABASE_IAM_HOST,
+      user: "shelf",
+      database: "shelf",
+      region: "eu-west-1",
+      port: 5433,
+      max: 4,
+    });
+  });
+
+  it("refuses to boot when a variable is missing, naming it", () => {
+    const { set, as } = factories();
+    expect(() =>
+      databaseFromEnv({ DATABASE_IAM_HOST: iam.DATABASE_IAM_HOST }, "/data", as),
+    ).toThrow(
+      /DATABASE_IAM_USER, DATABASE_IAM_NAME, DATABASE_IAM_REGION \(or AWS_REGION\) is missing/u,
+    );
+    expect(set.sqlite).not.toHaveBeenCalled();
+  });
+
+  it("refuses to boot with DATABASE_URL as well", () => {
+    const { as } = factories();
+    expect(() =>
+      databaseFromEnv({ ...iam, DATABASE_URL: "postgres://u:secret-pw@h/db" }, "/data", as),
+    ).toThrow(/not both/u);
+  });
+});
+
+describe("DATABASE_POOL_MAX", () => {
+  it("sizes the Postgres pool", () => {
+    const { set, as } = factories();
+    databaseFromEnv({ DATABASE_URL: "postgres://u:p@h/db", DATABASE_POOL_MAX: "7" }, "/d", as);
+    expect(set.postgres).toHaveBeenCalledWith("postgres://u:p@h/db", 7);
+  });
+
+  it.each(["0", "-1", "2.5", "many"])("refuses %s", (value) => {
+    expect(() => poolMaxFromEnv({ DATABASE_POOL_MAX: value })).toThrow(/positive whole number/u);
   });
 });
 
