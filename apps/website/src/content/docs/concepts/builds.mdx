@@ -91,6 +91,15 @@ curl "$SHELF/api/v1/projects/my-app/builds?label_key=pr&label_value=42"
 
 Stable label URLs (`/projects/:slug/labels/:key/:value`) always resolve to the latest build for that value.
 
+## Superseded builds
+
+When you push again before an earlier build finishes capturing, that build only costs runner time. `storyshelf upload` asks the server for the branch's in-flight builds, compares their commits with your git history, and names the ones the new commit replaces:
+
+- **Superseded:** a commit that is an ancestor of the one you upload (a normal push), or a commit that no longer exists in your clone while the one you upload is the branch's tip on `origin` (a force push).
+- **Kept:** the same commit, a descendant (a re-run of CI on an old commit), and anything git cannot decide. The CLI prints a line when a build could not be decided.
+
+The project setting `cancel_superseded` decides on the server whether the named builds are cancelled, and only builds still capturing are touched; a build in review is never cancelled. The step never fails an upload, and nothing is sent to a server that does not support it. CI needs history to see ancestors, so use `fetch-depth: 0` (or enough depth to reach the previous commits) on the checkout, and let `git ls-remote origin` reach the repository. See [CI setup](/guides/ci/).
+
 ## Related
 
 - [Baselines & branches](/concepts/baselines/) — which screenshot is the expected one

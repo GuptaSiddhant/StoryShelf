@@ -61,6 +61,8 @@ export interface BuildCreateInput {
   authorName?: string;
   affectedOnly?: boolean;
   labels?: { key: string; value: string }[];
+  /** Older in-flight builds this one replaces (ADR 0045); the server decides. */
+  supersedes?: string[];
 }
 
 /** Affected-capture computation posted after build creation. */
@@ -103,6 +105,8 @@ interface Client {
     };
     builds: {
       createJson: (slug: string, json: BuildCreateInput) => Promise<BuildCreated>;
+      /** The branch's builds still working, as `{ id, sha }` (404 on an old server or testing off). */
+      inFlight: (slug: string, branch: string) => Promise<{ id: string; sha: string }[]>;
       uploadZip: (uploadUrl: string, body: NodeJS.ReadableStream) => Promise<unknown>;
       /** File-by-file upload, step 1: which of these content hashes the server lacks. */
       dedup: (slug: string, buildId: string, hashes: string[]) => Promise<string[]>;
@@ -241,6 +245,11 @@ function createFileUploadApi(
   };
 }
 
+/** An answer that is not a list (an unexpected server) counts as no in-flight builds. */
+function toInFlight(answer: unknown): { id: string; sha: string }[] {
+  return Array.isArray(answer) ? (answer as { id: string; sha: string }[]) : [];
+}
+
 function createBuildsApi(
   baseUrl: string,
   authHeaders: Record<string, string>,
@@ -254,6 +263,13 @@ function createBuildsApi(
         headers: requestHeaders("application/json"),
         body: JSON.stringify(json),
       })) as BuildCreated,
+    inFlight: async (slug: string, branch: string) =>
+      toInFlight(
+        await fetchJson(
+          `${baseUrl}/api/v1/projects/${slug}/builds/in-flight?branch=${encodeURIComponent(branch)}`,
+          { headers: requestHeaders() },
+        ),
+      ),
     uploadZip: async (uploadUrl: string, body: NodeJS.ReadableStream) => {
       const init = {
         method: "PUT",

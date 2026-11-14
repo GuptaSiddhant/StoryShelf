@@ -49,6 +49,9 @@ function stubServer(
       await Promise.resolve();
       const path = new URL(url).pathname.replace("/api/v1/projects/demo", "");
       const method = init?.method ?? "GET";
+      if (path.endsWith("/builds/in-flight")) {
+        return json([]);
+      }
       seen.push({ method, path, body: init?.body });
       if (path.endsWith("/builds") && method === "POST") {
         return json({ build: { id: "b1" }, uploadUrl: "/api/v1/projects/demo/builds/b1/zip" });
