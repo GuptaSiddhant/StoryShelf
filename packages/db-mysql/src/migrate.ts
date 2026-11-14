@@ -57,6 +57,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
   { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  {
+    table: "projects",
+    column: "require_verified_default",
+    definition: "TINYINT(1) NOT NULL DEFAULT 1",
+  },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
     table: "snapshots",
@@ -99,6 +104,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "affected_import_paths", definition: "TEXT" },
   { table: "builds", column: "inherited_count", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "test_results", definition: "TEXT" },
+  { table: "builds", column: "branch_verified", definition: "VARCHAR(16) NULL" },
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },

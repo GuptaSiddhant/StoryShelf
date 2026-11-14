@@ -21,6 +21,7 @@ projects (
   detect_unstable     boolean NOT NULL DEFAULT true,   -- re-render a changed snapshot once and flag it when the two renders differ (advisory; `capture/stability.ts`)
   review_enabled      boolean NOT NULL DEFAULT true,   -- review on: non-default builds wait for a verdict (ADR 0013, decision 1)
   review_approvals    integer NOT NULL DEFAULT 1,      -- approvals a build needs with `testing` off (ADR 0013, decision 3)
+  require_verified_default boolean NOT NULL DEFAULT true, -- a default-branch claim no git channel can check fails closed (ADR 0009, amendment 2026-11-13)
   storybook_url_ttl_seconds integer,           -- lifetime of the signed Storybook URLs of a render; NULL derives it from the build (ADR 0007, decision 5)
   created_at          text NOT NULL,
   updated_at          text NOT NULL
@@ -31,7 +32,8 @@ builds (
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   git_sha             text NOT NULL,
   git_branch          text NOT NULL,
-  is_default          boolean NOT NULL DEFAULT false,  -- git_branch == project.git_default_branch at capture time
+  is_default          boolean NOT NULL DEFAULT false,  -- the claim at upload; the capture job replaces it with `defaultBranchStanding` before anything reads it (ADR 0009, amendment 2026-11-13)
+  branch_verified     text,                    -- the git host's answer to a default-branch claim: verified|refused|unreachable|unverified; NULL when nothing is claimed
   author_email        text,
   author_name         text,
   message             text,

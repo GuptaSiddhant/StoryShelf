@@ -1,6 +1,7 @@
 import type { StateNotifierProvider } from "../../adapters/notifier/index.ts";
 import type { Logger } from "../../logger.ts";
 import { installationToken } from "./github-app.ts";
+import { commitOnBranch } from "./github-branch.ts";
 import { postCheckRun } from "./github-check.ts";
 import { upsertPrComment } from "./github-comment.ts";
 import { githubConfigSchema, type GitHubConfig } from "./github-config.ts";
@@ -37,6 +38,7 @@ export const gitHubNotifier: StateNotifierProvider = {
           : postCommitStatus(await repo(), input));
       },
       comment: async (input) => await upsertPrComment(await repo(), { ...input, logger }),
+      commitOnBranch: async (input) => await commitOnBranch(await repo(), input),
     };
     return createStateAdapter(getMetadata(), writer, logger);
   },
