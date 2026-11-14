@@ -58,7 +58,13 @@ export {
   type InsightStartResult,
   type InsightTables,
 } from "./insight.ts";
-export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter } from "./build.ts";
+export {
+  BuildModel,
+  isPublicBuild,
+  type BuildCreateInput,
+  type BuildListFilter,
+  type SkippedBuildInput,
+} from "./build.ts";
 export {
   RECENT_BUILDS_FOR_INHERITED_RATIO,
   averageInheritedRatio,
@@ -169,3 +175,4 @@ export {
   type ResolvedPublicOrigin,
   type StoredPublicOrigin,
 } from "./public-origin.ts";
+export { SkipSourceRefused } from "./skip-source-refused.ts";

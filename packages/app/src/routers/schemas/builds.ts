@@ -26,6 +26,8 @@ export const buildSchema = z
     affectedImportPaths: z.string().nullable(),
     /** JSON array of the build's Storybook `.test()` results (id, title, name, status, error); null when none ran. */
     testResults: z.string().nullable().optional(),
+    /** For a `skipped` build, the real build whose outcome it repeats (ADR 0044). */
+    skippedFromBuildId: z.string().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

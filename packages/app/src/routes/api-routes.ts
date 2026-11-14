@@ -57,6 +57,8 @@ export const API_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "GET /api/v1/openapi.json": "hosting",
   "GET /api/v1/docs": "hosting",
   // testing
+  "GET /api/v1/projects/:slug/builds/skip-source": "testing",
+  "POST /api/v1/projects/:slug/builds/skipped": "testing",
   "POST /api/v1/projects/:slug/builds/:buildId/affected": "testing",
   "POST /api/v1/projects/:slug/builds/:buildId/retry": "testing",
   "POST /api/v1/projects/:slug/builds/:buildId/cancel": "testing",

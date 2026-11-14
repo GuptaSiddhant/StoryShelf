@@ -5,6 +5,7 @@ import type { Build } from "../schema/build.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
+import { SkipSourceRefused } from "./skip-source-refused.ts";
 
 function buildTables(db: DatabaseAdapter) {
   return {
@@ -604,6 +605,31 @@ const skip = (sourceBuildId: string, gitSha = "bbbbbbb2222") => ({
   gitBranch: "main",
   sourceBuildId,
   changedFiles: ["README.md"],
+});
+
+describe("BuildModel: skip eligibility (ADR 0044, decision 3)", () => {
+  it("is the newest build of another commit, whatever its status, and only approved counts", async () => {
+    const { model, source } = await setUpSkipped();
+    expect((await model.skipCandidate("p1", "main", "head"))?.id).toBe(source.id);
+    expect((await model.findSkipSource("p1", "main", "head"))?.id).toBe(source.id);
+    expect(await model.skipCandidate("p1", "main", source.gitSha)).toBeNull();
+    expect(await model.eligibleSkipSource(null)).toBeNull();
+  });
+
+  it("refuses a source that is no longer the candidate, writing nothing", async () => {
+    const { model, source } = await setUpSkipped();
+    await model.setStatus(source.id, "rejected");
+    await expect(model.createSkippedIfEligible(skip(source.id))).rejects.toBeInstanceOf(
+      SkipSourceRefused,
+    );
+    expect(await model.skippedFrom(source.id)).toEqual([]);
+  });
+
+  it("creates the build when the source is still the candidate", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkippedIfEligible(skip(source.id));
+    expect(skipped).toMatchObject({ status: "skipped", skippedFromBuildId: source.id });
+  });
 });
 
 describe("BuildModel: skipped builds (ADR 0044)", () => {

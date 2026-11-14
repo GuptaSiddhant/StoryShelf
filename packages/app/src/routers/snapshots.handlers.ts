@@ -9,6 +9,7 @@ import { findDriftedSnapshots, isBaselineChanged, isOpenSnapshot } from "./basel
 import {
   APPROVER_ROLES,
   approveSnapshot,
+  assertNotSkipped,
   buildForProject,
   refreshBuild,
   snapshotForBuild,
@@ -43,7 +44,9 @@ async function authorizeApprover(
   { slug, buildId }: BuildParams,
 ): Promise<{ project: Project; build: Build }> {
   const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-  return { project, build: await buildForProject(project.id, buildId) };
+  const build = await buildForProject(project.id, buildId);
+  assertNotSkipped(build, "reviewed");
+  return { project, build };
 }
 
 /**

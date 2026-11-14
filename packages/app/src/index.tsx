@@ -340,6 +340,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       logger,
       authEnabled,
       testing: options.testing !== undefined,
+      skippedBuilds: options.skippedBuilds === true,
       enqueueCapture,
       captureQueue,
       capturesHere,

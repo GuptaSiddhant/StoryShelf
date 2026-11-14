@@ -30,6 +30,8 @@ export interface Store {
   sessionId: string;
   /** `options.testing` is set: capture, compare and baselines run here (ADR 0006). */
   testing: boolean;
+  /** `options.skippedBuilds` is on: the skip-source and skipped-build endpoints answer (ADR 0044). */
+  skippedBuilds?: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
   /** This instance runs capture jobs itself, so retry and the compute-jobs controls apply. */

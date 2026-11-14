@@ -27,12 +27,15 @@ export function requireTesting(enabled: boolean) {
   };
 }
 
-/** The last matched handler that the table classifies (middleware matches come first). */
+/**
+ * The first matched handler that the table classifies (middleware matches carry no class, so they
+ * are skipped). Hono answers with the first registered handler that matches, so when a static route
+ * and a parameter route overlap (`builds/skip-source` and `builds/:buildId`) the first one is the
+ * route that runs, and its class is the one that counts.
+ */
 export function matchedRouteClass(c: Context): RouteClass | undefined {
-  const routes = matchedRoutes(c);
-  for (let index = routes.length - 1; index >= 0; index -= 1) {
-    const route = routes[index];
-    const routeClass = route && classOfRoute(route.method, route.path);
+  for (const route of matchedRoutes(c)) {
+    const routeClass = classOfRoute(route.method, route.path);
     if (routeClass !== undefined) {
       return routeClass;
     }
