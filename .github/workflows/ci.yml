@@ -295,6 +295,21 @@ jobs:
           nubx vitest run src/retention-activation.test.ts
           nubx vitest run src/retention-pool-presets.test.ts
 
+      # A stalled WebSocket leaves nothing in the test output (#1067): show what the server and the
+      # proxy saw, and whether the server was still running the statement.
+      - name: Show the service containers and live sessions after a failure
+        if: ${{ failure() }}
+        run: |
+          for id in $(docker ps -a --format '{{.ID}}'); do
+            echo "::group::docker logs $(docker inspect --format '{{.Config.Image}}' "$id")"
+            docker logs --tail 80 "$id" 2>&1 || true
+            echo "::endgroup::"
+          done
+          echo "::group::pg_stat_activity"
+          PGPASSWORD=test-password psql -h 127.0.0.1 -U postgres -d storyshelf_test -c \
+            "SELECT pid, state, wait_event_type, wait_event, now() - query_start AS running, left(query, 80) AS query FROM pg_stat_activity WHERE datname = 'storyshelf_test'" || true
+          echo "::endgroup::"
+
   website:
     name: website
     needs: changes
