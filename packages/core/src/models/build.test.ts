@@ -716,24 +716,24 @@ describe("BuildModel: skipped builds (ADR 0044)", () => {
   });
 });
 
-describe("BuildModel.createSuperseding", () => {
-  async function seed() {
-    const { db } = makeDatabase();
-    const model = new BuildModel(db, buildTables(db));
-    const source = await model.create("p1", { gitSha: "base", gitBranch: "main" });
-    await model.setStatus(source.id, "approved");
-    const skipped = await model.createSkipped({
-      projectId: "p1",
-      gitSha: "head",
-      gitBranch: "main",
-      sourceBuildId: source.id,
-      changedFiles: [],
-    });
-    return { db, model, skipped };
-  }
+async function seedSkipped() {
+  const { db } = makeDatabase();
+  const model = new BuildModel(db, buildTables(db));
+  const source = await model.create("p1", { gitSha: "base", gitBranch: "main" });
+  await model.setStatus(source.id, "approved");
+  const skipped = await model.createSkipped({
+    projectId: "p1",
+    gitSha: "head",
+    gitBranch: "main",
+    sourceBuildId: source.id,
+    changedFiles: [],
+  });
+  return { db, model, skipped };
+}
 
+describe("BuildModel.createSuperseding", () => {
   it("inserts the build and replaces the skipped build of its commit together", async () => {
-    const { model, skipped } = await seed();
+    const { model, skipped } = await seedSkipped();
     const { build, replaced } = await model.createSuperseding("p1", {
       gitSha: "head",
       gitBranch: "main",
@@ -744,7 +744,7 @@ describe("BuildModel.createSuperseding", () => {
   });
 
   it("leaves no normal build behind when replacing the skipped build fails", async () => {
-    const { db, model, skipped } = await seed();
+    const { db, model, skipped } = await seedSkipped();
     const real = db.transact;
     if (!real) throw new Error("the fake database has transactions");
     db.transact = async (run) =>
