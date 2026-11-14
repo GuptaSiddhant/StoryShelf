@@ -257,8 +257,10 @@ jobs:
           --health-timeout=5s
           --health-retries=12
       # Neon's WebSocket proxy in front of the same server, so `./neon` runs both suites for real.
+      # Pinned by digest (the `latest` of 2026-11-14) so a new upstream build cannot change this job
+      # unseen. #1067 first blamed `latest`, but passing and failing runs pulled this same digest.
       wsproxy:
-        image: ghcr.io/neondatabase/wsproxy:latest
+        image: ghcr.io/neondatabase/wsproxy@sha256:7f2e2149aa6a57ba382a140102fba44f5053f3e44389ccc18adcecf896054efb
         env:
           APPEND_PORT: postgres:5432
           ALLOW_ADDR_REGEX: ".*"
