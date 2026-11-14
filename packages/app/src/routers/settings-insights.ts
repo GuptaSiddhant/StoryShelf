@@ -4,7 +4,7 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import { loadHealthPanel } from "../insights/health-panel.ts";
 import { a11ySummaryOf } from "../pages/a11y-violations.tsx";
 import type { QueueView } from "../pages/compute-jobs.tsx";
-import { captureTimingsOf, queueViewOf } from "../pages/insights-model.ts";
+import { captureTimingsOf, queueViewOf, type StorageUsageView } from "../pages/insights-model.ts";
 import type { SettingsInsightsData } from "../pages/settings-insights.tsx";
 import { getStore, testingEnabled } from "../store.ts";
 import { currentProjectRole } from "./helpers.ts";
@@ -46,6 +46,12 @@ async function loadLatest(builds: Build[]): Promise<SettingsInsightsData["latest
   return { build, timings: captureTimingsOf(snapshots), a11y: a11ySummaryOf(snapshots) };
 }
 
+/** The weight of the project's live published content, from the sizes the database recorded; null when the adapter cannot say. */
+async function loadStorage(projectId: string): Promise<StorageUsageView | null> {
+  const lifecycle = getStore().db.buildReferenceLifecycle;
+  return lifecycle ? await lifecycle.contentUsage(projectId) : null;
+}
+
 /**
  * What the Insights tab shows. The capture numbers and the jobs list load only for the Insights
  * tab itself and with testing on; any other tab asks with `full: false` just to know whether to
@@ -56,6 +62,7 @@ export async function loadSettingsInsights(
   full: boolean,
 ): Promise<SettingsInsightsData> {
   const health = await loadHealthPanel(project);
+  const storage = full ? await loadStorage(project.id) : null;
   if (!full || !testingEnabled()) {
     return {
       builds: [],
@@ -64,6 +71,7 @@ export async function loadSettingsInsights(
       latest: null,
       queue: [],
       canRetry: false,
+      storage,
     };
   }
   const builds = await new BuildModel(getStore().db).list(project.id);
@@ -74,5 +82,6 @@ export async function loadSettingsInsights(
     latest: await loadLatest(builds),
     queue: await getQueueView(project.id),
     canRetry: await canManageJobs(project.id),
+    storage,
   };
 }

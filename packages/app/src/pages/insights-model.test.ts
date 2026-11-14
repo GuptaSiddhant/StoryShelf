@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captureTimingsOf, formatDurationMs, queueViewOf } from "./insights-model.ts";
+import { captureTimingsOf, formatBytes, formatDurationMs, queueViewOf } from "./insights-model.ts";
 
 describe("captureTimingsOf", () => {
   it("is null when no snapshot reports a duration", () => {
@@ -39,5 +39,21 @@ describe("queueViewOf", () => {
 
   it("shows nothing for a project without builds in the queue", () => {
     expect(queueViewOf([entry("theirs-1")], new Set())).toEqual([]);
+  });
+});
+
+describe("formatBytes", () => {
+  it("shows bytes below a kilobyte, then one decimal up to 100 and none above", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(812)).toBe("812 B");
+    expect(formatBytes(4_820_000)).toBe("4.8 MB");
+    expect(formatBytes(1_240_000_000)).toBe("1.2 GB");
+    expect(formatBytes(512_000_000)).toBe("512 MB");
+  });
+
+  it("carries into the next unit at 1000 and stops at terabytes", () => {
+    expect(formatBytes(999)).toBe("999 B");
+    expect(formatBytes(1000)).toBe("1.0 KB");
+    expect(formatBytes(2_500_000_000_000_000)).toBe("2500 TB");
   });
 });
