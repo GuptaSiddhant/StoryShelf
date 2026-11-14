@@ -422,3 +422,17 @@ describe("runMigrations: a unique index over rows that already repeat its key", 
     ).rejects.toThrow("Duplicate entry");
   });
 });
+
+describe("runMigrations: push_subscriptions (ADR 0048)", () => {
+  it("creates the table with a unique endpoint and a user foreign key that cascades", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+    const create = queries.find((sql) =>
+      sql.startsWith("CREATE TABLE IF NOT EXISTS push_subscriptions"),
+    );
+    expect(create).toContain("endpoint VARCHAR(512) NOT NULL UNIQUE");
+    expect(create).toContain("FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+    expect(FOREIGN_KEYS.some((key) => key.table === "push_subscriptions")).toBe(true);
+    expect(DDL).toContain("CREATE TABLE IF NOT EXISTS push_subscriptions");
+  });
+});

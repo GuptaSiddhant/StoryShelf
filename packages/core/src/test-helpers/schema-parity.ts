@@ -459,6 +459,7 @@ export const CORE_ROW_TABLES: CoreRowTables = {
   ProjectMember: "project_members",
   NotificationChannelRow: "notification_channels",
   NotificationSubscriptionRow: "notification_subscriptions",
+  PushSubscriptionRow: "push_subscriptions",
   ProjectGroupMapping: "project_group_mappings",
   Project: "projects",
   SchemaMeta: "schema_meta",

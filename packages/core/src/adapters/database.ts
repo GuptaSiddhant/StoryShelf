@@ -71,6 +71,7 @@ export interface Tables {
   aiBudgetAlerts: Table;
   notificationChannels: Table;
   notificationSubscriptions: Table;
+  pushSubscriptions: Table;
   users: Table;
   userInviteTokens: Table;
   projectMembers: Table;

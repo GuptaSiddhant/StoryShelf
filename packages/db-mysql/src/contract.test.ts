@@ -12,7 +12,11 @@
  * Run vitest directly: `nub run test` goes through turbo, which does not pass `MYSQL_URL` on.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { buildLifecycleContractSuite, databaseContractSuite } from "@storyshelf/core/test-helpers";
+import {
+  buildLifecycleContractSuite,
+  databaseContractSuite,
+  pushSubscriptionContractSuite,
+} from "@storyshelf/core/test-helpers";
 import { afterAll, describe } from "vitest";
 import { createMysqlDatabase } from "./index.ts";
 
@@ -45,5 +49,6 @@ describe.skipIf(url === undefined || url === "")(
     };
     databaseContractSuite("mysql", make);
     buildLifecycleContractSuite("mysql", make);
+    pushSubscriptionContractSuite("mysql", make);
   },
 );
