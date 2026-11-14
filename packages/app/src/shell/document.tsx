@@ -2,10 +2,11 @@ import { raw } from "hono/html";
 import type { FC } from "hono/jsx";
 import { assetManifest } from "../asset-manifest.ts";
 import { getCsrfToken } from "../middleware/csrf.ts";
+import { MANIFEST_PATH } from "../routers/manifest.ts";
 import { getStore } from "../store.ts";
 import { Style, css } from "../ui/css.ts";
 import { baseStyle } from "../ui/styles.ts";
-import { DARK_THEME, LIGHT_THEME } from "../ui/theme.ts";
+import { DARK_THEME, LIGHT_THEME, type BrandTheme } from "../ui/theme.ts";
 import { BareShell } from "./bare.tsx";
 import { bootScript } from "./boot-script.ts";
 import type { NavConfig } from "./nav.ts";
@@ -72,8 +73,10 @@ const DocumentHead: FC<{
   name: string;
   csrfToken: string;
   styles: string;
+  light: BrandTheme;
+  dark: BrandTheme;
   sidebarDefault?: "rail" | undefined;
-}> = ({ title, name, csrfToken, styles, sidebarDefault }) => (
+}> = ({ title, name, csrfToken, styles, light, dark, sidebarDefault }) => (
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -82,6 +85,9 @@ const DocumentHead: FC<{
     {/* Favicon is the product's own mark, not brandable: it identifies
         StoryShelf in the tab strip. `ui.logo` stays overridable. */}
     <link rel="icon" type="image/svg+xml" href={assetManifest.mark.href} />
+    <link rel="manifest" href={MANIFEST_PATH} />
+    <meta name="theme-color" content={light.surface.base} media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content={dark.surface.base} media="(prefers-color-scheme: dark)" />
     <title>
       {title} · {name}
     </title>
@@ -142,6 +148,8 @@ export const DocumentLayout: FC<{
           name={name}
           csrfToken={getCsrfToken(config.secret, sessionId)}
           styles={baseStyle(light, dark)}
+          light={light}
+          dark={dark}
           sidebarDefault={nav?.sidebarDefault}
         />
         <body>
