@@ -1,7 +1,7 @@
+import { withSpan } from "@storyshelf/core/telemetry";
 import { afterEach, describe, expect, it } from "vitest";
 import { otelLogMixin } from "./logs.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
-import { withSpan } from "./tracing.ts";
 
 describe("otelLogMixin", () => {
   let telemetry: TestTelemetry | undefined;

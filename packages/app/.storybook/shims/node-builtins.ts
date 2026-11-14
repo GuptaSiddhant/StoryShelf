@@ -38,6 +38,7 @@ export const fileURLToPath = fn("url.fileURLToPath");
 export const pathToFileURL = fn("url.pathToFileURL");
 export { Buffer } from "./buffer.ts";
 export const createHmac = fn("crypto.createHmac");
+export const createSign = fn("crypto.createSign");
 export const createCipheriv = fn("crypto.createCipheriv");
 export const createDecipheriv = fn("crypto.createDecipheriv");
 export const randomBytes = fn("crypto.randomBytes");

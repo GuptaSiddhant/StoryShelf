@@ -25,6 +25,7 @@ export const projects = pgTable("projects", {
   aiProfile: text("ai_profile"),
   reviewEnabled: boolean("review_enabled").notNull().default(true),
   reviewApprovals: integer("review_approvals").notNull().default(1),
+  requireVerifiedDefault: boolean("require_verified_default").notNull().default(true),
   storybookUrlTtlSeconds: integer("storybook_url_ttl_seconds"),
   componentOwners: text("component_owners"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
@@ -56,6 +57,7 @@ export interface Project {
   aiProfile: string | null;
   reviewEnabled: boolean;
   reviewApprovals: number;
+  requireVerifiedDefault: boolean;
   storybookUrlTtlSeconds: number | null;
   componentOwners: string | null;
   createdAt: string;

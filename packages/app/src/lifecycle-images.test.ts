@@ -1,4 +1,4 @@
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { expect, it, vi } from "vitest";
@@ -17,7 +17,7 @@ vi.mock("@storyshelf/core/diff", () => ({
 it("fails readiness, under the images category, when the image engine cannot load", async () => {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage } as unknown as ShelfOptions;
+  const options = { database: db, storage } as unknown as ResolvedShelfOptions;
   const runtime = {
     config: { branchTtlDays: null },
     logger: pino({ level: "silent" }),

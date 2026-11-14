@@ -94,3 +94,14 @@ export const RetentionAndNotificationsPaused = pageStory(() =>
     }),
   ),
 );
+
+export const UnverifiedDefaultBranch = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      unverifiedDefault: [
+        { name: "Design system", slug: "design-system" },
+        { name: "Web app", slug: "web-app" },
+      ],
+    }),
+  ),
+);

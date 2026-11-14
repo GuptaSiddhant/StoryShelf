@@ -88,17 +88,19 @@ export async function writeTo(
   });
 }
 
+/** What reading a project's git channels needs. */
+export type ChannelDeps = Pick<BuildStateDeps, "db" | "notifiers" | "secret"> & {
+  logger?: BuildStateDeps["logger"] | undefined;
+};
+
 /** The project's enabled channels with a wired `state` provider; unreadable secrets are logged and skipped. */
-export async function stateTargets(
-  deps: BuildStateDeps,
-  projectId: string,
-): Promise<StateTarget[]> {
+export async function stateTargets(deps: ChannelDeps, projectId: string): Promise<StateTarget[]> {
   const model = channelModel(deps);
   const rows = await model.list(projectId);
   return rows.flatMap((row) => {
     const view = row.enabled ? model.toView(row) : null;
     if (row.enabled && view === null) {
-      deps.logger.warn(
+      deps.logger?.warn(
         { channelId: row.id, provider: row.provider },
         "failed to decrypt channel secret",
       );
@@ -128,12 +130,15 @@ async function loadTarget(
   return targetOf(deps, view)[0] ?? "no-provider";
 }
 
-function targetOf(deps: BuildStateDeps, channel: StateTarget["channel"]): StateTarget[] {
+function targetOf(
+  deps: Pick<ChannelDeps, "notifiers">,
+  channel: StateTarget["channel"],
+): StateTarget[] {
   const provider = deps.notifiers.find((candidate) => candidate.metadata.kind === channel.provider);
   return provider !== undefined && isStateProvider(provider) ? [{ channel, provider }] : [];
 }
 
-function channelModel(deps: BuildStateDeps): NotificationChannelModel {
+function channelModel(deps: Pick<ChannelDeps, "db" | "secret">): NotificationChannelModel {
   return new NotificationChannelModel(
     deps.db,
     { notificationChannels: deps.db.tables.notificationChannels },

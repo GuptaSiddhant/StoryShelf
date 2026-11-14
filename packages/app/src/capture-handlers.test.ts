@@ -1,5 +1,5 @@
 import type { ConsumerJob } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -184,7 +184,11 @@ describe("handlerFor", () => {
     vi.mocked(createCaptureHandler).mockReturnValue(inProcess as never);
     vi.mocked(shouldForkCapture).mockReturnValue(false);
 
-    const handler = handlerFor({ testing: {} } as unknown as ShelfOptions, handlerOptions, parts);
+    const handler = handlerFor(
+      { testing: {} } as unknown as ResolvedShelfOptions,
+      handlerOptions,
+      parts,
+    );
 
     expect(handler).toBe(inProcess);
     expect(createCaptureHandler).toHaveBeenCalledWith(handlerOptions);
@@ -204,7 +208,7 @@ describe("handlerFor", () => {
         images: { engine: "sharp" },
         compare: { threads: 2 },
       },
-    } as unknown as ShelfOptions;
+    } as unknown as ResolvedShelfOptions;
 
     const handler = handlerFor(options, handlerOptions, parts);
 

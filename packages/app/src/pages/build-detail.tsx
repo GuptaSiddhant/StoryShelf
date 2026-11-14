@@ -17,6 +17,7 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { a11ySummaryNote, type A11ySummary } from "./a11y-violations.tsx";
+import { DefaultBranchNotice } from "./build-branch-notice.tsx";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { TestsCard } from "./build-tests.tsx";
 import { ChangeRequestsCard } from "./review-change-requests.tsx";
@@ -183,6 +184,9 @@ export function BuildDetails(props: BuildDetailsProps): Rendered {
       <VStack>
         <BuildTags build={build} details={details} />
         <DefinitionList items={detailItems(build, details, props.snapshotCount, props.a11y)} />
+        {details.testing ? (
+          <DefaultBranchNotice project={project} build={build} canReview={canReview} />
+        ) : null}
         {details.testing && staleCount > 0 ? (
           <StaleBaselineNotice
             project={project}
