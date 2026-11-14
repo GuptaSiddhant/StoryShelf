@@ -242,6 +242,61 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
+      playwright-core:
+        specifier: 1.63.0
+        version: 1.63.0(zod@4.6.7)
+      rolldown:
+        specifier: '*'
+        version: 1.2.15
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+
+  apps/server-image:
+    dependencies:
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 1.19.17(hono@4.13.14)
+      '@storyshelf/app':
+        specifier: workspace:*
+        version: link:../../packages/app
+      '@storyshelf/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@storyshelf/db-mysql':
+        specifier: workspace:*
+        version: link:../../packages/db-mysql
+      '@storyshelf/db-postgres':
+        specifier: workspace:*
+        version: link:../../packages/db-postgres
+      '@storyshelf/db-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/db-sqlite
+      '@storyshelf/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+      '@storyshelf/runner-playwright':
+        specifier: workspace:*
+        version: link:../../packages/runner-playwright
+      '@storyshelf/storage-local':
+        specifier: workspace:*
+        version: link:../../packages/storage-local
+      '@storyshelf/storage-s3':
+        specifier: workspace:*
+        version: link:../../packages/storage-s3
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       rolldown:
         specifier: '*'
         version: 1.2.15
@@ -1284,6 +1339,30 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(vitest@5.0.5)
+      oxfmt:
+        specifier: 'catalog:'
+        version: 0.65.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.90.0(oxlint-tsgolint@7.0.2005)
+      oxlint-tsgolint:
+        specifier: 'catalog:'
+        version: 7.0.2005
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+
+  packages/storybook-addon:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0

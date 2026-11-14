@@ -3,11 +3,11 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { HealthBadge } from "../insights/health-panel.ts";
 import {
   Badge,
-  Button,
   Card,
   Meta,
   RelativeTime,
   Thumbnail,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
@@ -63,15 +63,6 @@ const latestRow = css`
   font-size: var(--text-sm);
 `;
 
-const cardFooter = css`
-  /* project-footer */
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-`;
-
 /** What the overview shows about a project's most recent build. */
 export interface ProjectSummary {
   project: Project;
@@ -120,7 +111,7 @@ function LatestBuild({
       <Meta as="span" mono>
         {latest.gitBranch} · {latest.gitSha.slice(0, 7)}
       </Meta>
-      <Badge tone={statusTone(latest.status)}>{latest.status}</Badge>
+      <Badge tone={statusTone(latest.status)}>{statusLabel(latest.status)}</Badge>
       <RelativeTime value={latest.createdAt} />
     </div>
   );
@@ -154,10 +145,10 @@ function Previews({
   );
 }
 
-/** One project in the overview grid: previews, latest build, review state, actions. */
+/** One project in the overview grid: previews, latest build, review state. The title opens the project. */
 export function ProjectCard(props: {
   summary: ProjectSummary;
-  urls: { library: string; settings: string; storybook: string; review: string };
+  urls: { library: string; review: string };
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { summary, urls } = props;
   const { project, latest, previews, pending } = summary;
@@ -190,17 +181,6 @@ export function ProjectCard(props: {
             </Badge>
           </a>
         ) : null}
-      </div>
-      <div class={cardFooter}>
-        <Button variant="secondary" size="sm" icon="image" href={urls.library}>
-          Library
-        </Button>
-        <Button variant="ghost" size="sm" icon="external-link" href={urls.storybook}>
-          Storybook
-        </Button>
-        <Button variant="ghost" size="sm" icon="settings" href={urls.settings}>
-          Settings
-        </Button>
       </div>
     </Card>
   );

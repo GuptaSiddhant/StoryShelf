@@ -3,6 +3,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { flash } from "./flash.ts";
@@ -12,10 +13,6 @@ import { runSwitchOffPass } from "./review-switch-off.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** General project settings (name, repo, thresholds) and danger-zone delete. */
 export function registerGeneralSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings", async (c) => c.html(await renderSettingsPage(c, "general")));
-  app.get("/projects/:slug/settings/tests", async (c) =>
-    c.html(await renderSettingsPage(c, "tests")),
-  );
   app.post("/projects/:slug/settings", handleGeneralUpdate);
   app.post("/projects/:slug/settings/tests", handleTestsUpdate);
   app.post("/projects/:slug/settings/review", handleReviewUpdate);
@@ -87,7 +84,7 @@ async function persistGeneralUpdate(
       ...(fields.browser && fields.browser !== project.browser ? { browsers: null } : {}),
     });
     flash(c, "Project settings saved");
-    return hxRedirect(c, `/projects/${slug}/settings`);
+    return hxRedirect(c, settingsHref(slug, "general"));
   } catch (error) {
     const message = publicMessage(error, "Failed to update");
     return c.html((await renderSettingsPage(c, "general", { globalError: message })) ?? "", 400);
@@ -156,7 +153,7 @@ async function persistTestsUpdate(
       playTimeoutMs: playTimeoutMs ?? undefined,
     });
     flash(c, "Test settings saved");
-    return hxRedirect(c, `/projects/${slug}/settings/tests`);
+    return hxRedirect(c, settingsHref(slug, "tests"));
   } catch (error) {
     const message = publicMessage(error, "Failed to update");
     return c.html((await renderSettingsPage(c, "tests", { globalError: message })) ?? "", 400);
@@ -186,7 +183,7 @@ async function handleReviewUpdate(c: Context): Promise<Response> {
   const approvals = approvalsOf(form, project);
   if (approvals === null) {
     return c.html(
-      (await renderSettingsPage(c, "general", {
+      (await renderSettingsPage(c, "review", {
         errors: { reviewApprovals: `Enter a whole number from 1 to ${MAX_APPROVALS}` },
       })) ?? "",
       400,
@@ -198,7 +195,7 @@ async function handleReviewUpdate(c: Context): Promise<Response> {
   });
   const accepted = await runSwitchOffPass(project, updated);
   flash(c, reviewSavedMessage(accepted));
-  return hxRedirect(c, `/projects/${slug}/settings`);
+  return hxRedirect(c, settingsHref(slug, "review"));
 }
 
 /** The approvals count of the form (the current one when blank); null when it is not 1 to 20. */

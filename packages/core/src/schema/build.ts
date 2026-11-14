@@ -62,6 +62,11 @@ export interface Build {
    * overwrites a newer run's ownership. Starts at 0.
    */
   captureGeneration?: number;
+  /**
+   * Hash of the manifest the file-by-file upload accepted (write-once publish, ADR 0051). Null
+   * until a manifest claims it, and again after a failed publish releases it.
+   */
+  manifestSha256?: string | null;
   createdAt: string;
   updatedAt: string;
 }

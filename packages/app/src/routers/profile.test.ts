@@ -76,18 +76,22 @@ function testApp(seeded: Seeded): ReturnType<typeof createShelfApp> {
 function postForm(path: string, form: FormData, app: ReturnType<typeof createShelfApp>) {
   return app.request(path, {
     method: "POST",
-    headers: { cookie: "storyshelf_session=ok", "x-csrf-token": getCsrfToken(secret, "ok") },
+    headers: {
+      cookie: "storyshelf_session=ok",
+      "sec-fetch-site": "same-origin",
+      "x-csrf-token": getCsrfToken(secret, "ok"),
+    },
     body: form,
   });
 }
 
-const session = { cookie: "storyshelf_session=ok" };
+const session = { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" };
 
 describe("profile page", () => {
   it("redirects anonymous users to login", async () => {
     const response = await testApp(await seed()).request("/profile");
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/auth/login");
+    expect(response.headers.get("location")).toBe("/auth/login?return_to=%2Fprofile");
   });
 
   it("renders the user, provider, and memberships", async () => {

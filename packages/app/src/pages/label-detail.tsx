@@ -10,6 +10,7 @@ import {
   Meta,
   PageHeader,
   Table,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
@@ -50,7 +51,7 @@ function LabelBuildRow(props: {
         </Meta>
       </td>
       <td>
-        <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+        <Badge tone={statusTone(build.status)}>{statusLabel(build.status)}</Badge>
       </td>
       <td>
         <div>{build.authorName ?? "—"}</div>
@@ -164,10 +165,13 @@ export async function renderLabelDetailPage(
     <DocumentLayout
       title={`${key}: ${value}`}
       nav={{
-        active: "labels",
+        active: "settings",
         projectSlug: project.slug,
         projectName: project.name,
-        trail: [{ label: `${labelType ? labelType.name : key}: ${value}` }],
+        trail: [
+          { label: "Labels", href: `/projects/${project.slug}/labels` },
+          { label: `${labelType ? labelType.name : key}: ${value}` },
+        ],
       }}
     >
       <LabelDetailHeader project={project} labelKey={key} value={value} labelType={labelType} />
@@ -184,6 +188,35 @@ export async function renderLabelDetailPage(
   );
 }
 
+/** Read-only table of the project's label types. */
+function LabelTypesTable(props: { labelTypes: LabelType[] }): ReturnType<typeof Table> {
+  const { labelTypes } = props;
+  return (
+    <Table label="Label types">
+      <table>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Name</th>
+            <th>Template</th>
+          </tr>
+        </thead>
+        <tbody>
+          {labelTypes.map((labelType) => (
+            <tr key={labelType.id}>
+              <td>
+                <Badge tone="neutral">{labelType.key}</Badge>
+              </td>
+              <td>{labelType.name}</td>
+              <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Table>
+  );
+}
+
 /** Label types overview page (architecture.md `GET /projects/:slug/labels`). */
 export async function renderLabelsPage(slug: string): Promise<RenderedContent | null> {
   const projects = await new ProjectModel(getStore().db).list();
@@ -196,7 +229,12 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
   return (
     <DocumentLayout
       title={`Labels · ${project.name}`}
-      nav={{ active: "labels", projectSlug: project.slug, projectName: project.name }}
+      nav={{
+        active: "settings",
+        projectSlug: project.slug,
+        projectName: project.name,
+        trail: [{ label: "Labels" }],
+      }}
     >
       <PageHeader
         title="Labels"
@@ -209,28 +247,7 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
           description="No label types are configured for this project."
         />
       ) : (
-        <Table label="Label types">
-          <table>
-            <thead>
-              <tr>
-                <th>Key</th>
-                <th>Name</th>
-                <th>Template</th>
-              </tr>
-            </thead>
-            <tbody>
-              {labelTypes.map((labelType) => (
-                <tr key={labelType.id}>
-                  <td>
-                    <Badge tone="neutral">{labelType.key}</Badge>
-                  </td>
-                  <td>{labelType.name}</td>
-                  <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
+        <LabelTypesTable labelTypes={labelTypes} />
       )}
     </DocumentLayout>
   );

@@ -94,6 +94,27 @@ describe("runMigrations: an existing run_a11y = false", () => {
   }, 60_000);
 });
 
+describe("runMigrations: projects.switch_stories", () => {
+  it("is added to an older table with a constant false default", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      ALTER TABLE projects DROP COLUMN switch_stories;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const project = await client.query<{ switch_stories: boolean }>(
+      "SELECT switch_stories FROM projects WHERE id = 'p'",
+    );
+    expect(project.rows).toEqual([{ switch_stories: false }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: builds and projects gain later columns", () => {
   it("adds inherited_count, test_results and run_tests to older tables, with defaults", async () => {
     const client = new PGlite();

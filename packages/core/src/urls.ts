@@ -1,3 +1,5 @@
+import { contentHostLabel, isAliasLabel } from "./content-hosts.ts";
+
 /** Options of {@link UrlBuilder.component}. */
 export interface ComponentUrlOptions {
   /** Show this build's states, results and comments instead of the newest build that has the file. */
@@ -33,6 +35,7 @@ export interface UrlBuilder {
   project(slug: string): string;
   projectsNew(): string;
   buildsList(slug: string): string;
+  /** The one build page (overview and review). `GET /projects/:slug/builds/:id` still redirects to it for old links. */
   build(slug: string, buildId: string): string;
   buildDiff(slug: string, buildId: string): string;
   /** Review page of one snapshot: the build's diff page with that snapshot selected. */
@@ -48,19 +51,30 @@ export interface UrlBuilder {
   storybook(slug: string): string;
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
+  /** The project settings page on its first tab (General). */
   settings(slug: string): string;
+  /** One tab of the project settings: `general`, `capture`, `review`, `access` or `insights`. */
+  settingsTab(slug: string, tab: string): string;
   short(id: string): string;
+}
+
+/** The scheme prefix of a content link: the root's own, or protocol-relative for a relative root. */
+function contentScheme(root: string): string {
+  return /^https?:\/\//iu.test(root) ? `${new URL(root).protocol}//` : "//";
 }
 
 /**
  * Create a URL builder rooted at the given base URL.
  *
  * @param baseUrl - Public root URL of the shelf server.
- * @param publishedBaseDomain - Optional wildcard domain for published Storybooks.
+ * @param contentHosts - `subdomain` hosting only (ADR 0051): `<baseDomain>[:port]`, as
+ *   `contentHostSuffix(config)` gives it. A build then links to its content host
+ *   `<build-id>.<contentHosts>` and a project to its alias host `<slug>.<contentHosts>`.
  * @returns The URL builder.
  */
-export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string): UrlBuilder {
+export function createUrlBuilder(baseUrl: string, contentHosts?: string): UrlBuilder {
   const root = baseUrl.replace(/\/+$/u, "");
+  const scheme = contentScheme(root);
 
   return {
     projectsList: () => root || "/",
@@ -68,7 +82,7 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     project: (slug) => `${root}/projects/${slug}`,
     projectsNew: () => `${root}/projects/new`,
     buildsList: (slug) => `${root}/projects/${slug}/builds`,
-    build: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}`,
+    build: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff`,
     buildDiff: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff`,
     snapshot: (slug, buildId, snapshotId) =>
       `${root}/projects/${slug}/builds/${buildId}/diff?snapshot=${encodeURIComponent(snapshotId)}`,
@@ -90,16 +104,17 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
         : `${page}${encodePath(path)}${componentQuery(options)}`;
     },
     storybook: (slug) =>
-      publishedBaseDomain
-        ? `https://${slug}.${publishedBaseDomain}`
+      contentHosts && isAliasLabel(slug)
+        ? `${scheme}${slug}.${contentHosts}`
         : `${root}/projects/${slug}/storybook`,
     storybookLabel: (slug, key, value) =>
       `${root}/projects/${slug}/storybook/${encodeURIComponent(key)}/${encodePath(value)}`,
     storybookBuild: (slug, buildId) =>
-      publishedBaseDomain
-        ? `https://${buildId}.${slug}.${publishedBaseDomain}`
+      contentHosts
+        ? `${scheme}${contentHostLabel(buildId)}.${contentHosts}`
         : `${root}/projects/${slug}/storybook/build/${buildId}`,
-    settings: (slug) => `${root}/projects/${slug}/settings`,
+    settings: (slug) => `${root}/projects/${slug}/settings/general`,
+    settingsTab: (slug, tab) => `${root}/projects/${slug}/settings/${tab}`,
     short: (id) => `${root}/_/${id}/`,
   };
 }

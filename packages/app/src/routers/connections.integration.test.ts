@@ -189,7 +189,9 @@ describe("connect flow", () => {
     const anonymous = await seed({ user: null });
     const res = await anonymous.app.request("/connections/figma/start");
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/auth/login");
+    expect(res.headers.get("location")).toBe(
+      `/auth/login?return_to=${encodeURIComponent("/connections/figma/start")}`,
+    );
   });
 
   it("disconnects only with a CSRF token", async () => {

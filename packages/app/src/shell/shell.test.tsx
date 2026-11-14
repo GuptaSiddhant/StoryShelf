@@ -13,6 +13,7 @@ async function page(
   seed?: (db: Db) => Promise<void>,
   ui?: Record<string, unknown>,
   testing = true,
+  headers?: Record<string, string>,
 ): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -24,7 +25,7 @@ async function page(
     ...(ui ? { ui } : {}),
     logger: createShelfLogger({ level: "silent" }),
   });
-  return await (await app.request(path)).text();
+  return await (await app.request(path, headers ? { headers } : undefined)).text();
 }
 
 const twoProjects = async (db: Db): Promise<void> => {
@@ -46,26 +47,47 @@ describe("app shell", () => {
     const html = await page("/projects");
     expect(html).toMatch(/sidebar__link--active[^>]*href="\/projects"/u);
     expect(html).not.toContain(">Library<");
-    expect(html).toContain(">Developer<");
+    expect(html).not.toContain(">Developer<");
   });
+});
 
-  it("shows project nav and a switcher listing every project inside a project", async () => {
+describe("sidebar groups", () => {
+  it("groups a project's entries by task, one sidebar entry per page", async () => {
     const html = await page("/projects/alpha/builds", twoProjects);
-    for (const label of ["Library", "Builds", "Jobs", "Labels", "Settings"]) {
+    for (const label of ["Builds", "Library", "Settings"]) {
       expect(html).toContain(`<span class="sidebar__label">${label}</span>`);
     }
+    for (const gone of ["Jobs", "Labels", "API docs", "OpenAPI spec"]) {
+      expect(html).not.toContain(`<span class="sidebar__label">${gone}</span>`);
+    }
+    expect(html).toContain('data-nav-fold="project"');
     expect(html).toContain('aria-label="Project: Alpha"');
     expect(html).toContain(">Beta<");
-    expect(html).toContain('aria-current="true"');
     expect(html).toContain("All projects");
   });
 
-  it("hides the Jobs entry on a hosting-only instance", async () => {
-    const html = await page("/projects/alpha/builds", twoProjects, undefined, false);
-    for (const label of ["Library", "Builds", "Labels", "Settings"]) {
-      expect(html).toContain(`<span class="sidebar__label">${label}</span>`);
-    }
-    expect(html).not.toContain('<span class="sidebar__label">Jobs</span>');
+  it("gives every sidebar link an accessible name and tooltip for the icon rail", async () => {
+    const html = await page("/projects/alpha/builds", twoProjects);
+    expect(html).toContain('aria-label="Builds" data-tooltip="Builds"');
+  });
+
+  it("keeps Insights and Labels under Settings", async () => {
+    const insights = await page("/projects/alpha/settings/insights", twoProjects);
+    expect(insights).toMatch(
+      /sidebar__link--active[^>]*href="\/projects\/alpha\/settings\/general"/u,
+    );
+    const labels = await page("/projects/alpha/labels", twoProjects);
+    expect(labels).toMatch(
+      /sidebar__link--active[^>]*href="\/projects\/alpha\/settings\/general"/u,
+    );
+  });
+
+  it("puts API docs and the OpenAPI spec in a help menu in the sidebar footer", async () => {
+    const html = await page("/projects");
+    const footer = html.slice(html.indexOf('class="sidebar__footer'), html.indexOf("</aside>"));
+    expect(footer).toContain('aria-label="Help"');
+    expect(footer).toContain('href="/api/v1/docs"');
+    expect(footer).toContain('href="/api/v1/openapi.json"');
   });
 
   it("offers Light, Dark, and System in the theme menu", async () => {
@@ -126,12 +148,12 @@ describe("top bar and sidebar footer", () => {
 
   it("shows the project picker and the page's ancestors, not the page itself", async () => {
     const section = await page("/projects/alpha/builds", twoProjects);
-    const deeper = await page("/projects/alpha/settings/tokens", twoProjects);
+    const deeper = await page("/projects/alpha/settings/access", twoProjects);
     expect(bar(section)).toContain('aria-label="Project: Alpha"');
     expect(bar(section)).not.toContain('aria-label="Breadcrumb"');
     expect(bar(deeper)).toContain('aria-label="Breadcrumb"');
     expect(bar(deeper)).toContain(">Settings</a>");
-    expect(bar(deeper)).not.toContain("Tokens");
+    expect(bar(deeper)).not.toContain("Access");
   });
 
   it("labels the picker for assistive tech even though phones show only its icon", async () => {
@@ -155,5 +177,21 @@ describe("top bar and sidebar footer", () => {
     expect(projects).toContain('aria-label="Project: All projects"');
     expect(projects).not.toContain('aria-label="Breadcrumb"');
     expect(admin).not.toContain('aria-label="Breadcrumb"');
+  });
+});
+
+describe("landmarks and headings", () => {
+  it("the not-found page has one h1, a main, and the app chrome for a signed-in visitor", async () => {
+    const html = await page("/projects/missing/builds", undefined, undefined, true, {
+      accept: "text/html",
+    });
+    expect(html.match(/<h1[ >]/gu)).toHaveLength(1);
+    expect(html).toContain('id="main-content"');
+    expect(html).toContain('aria-label="Primary"');
+  });
+
+  it("the collapse button says whether the sidebar is expanded", async () => {
+    const html = await page("/projects");
+    expect(html).toMatch(/<button[^>]*data-sidebar-collapse[^>]*aria-expanded="true"/u);
   });
 });

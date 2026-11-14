@@ -7,12 +7,26 @@
  * packages (`@storyshelf/db-sqlite`, `@storyshelf/db-postgres`).
  */
 import type { SQL } from "drizzle-orm";
+import { getTableColumns } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
 import type { MigrationContext } from "./skipped-index.ts";
 
 /** A fenced reference write lost its generation race and should be retried. */
 export class ReferenceGenerationConflict extends Error {}
+
+export {
+  decideMigration,
+  gatedMigration,
+  sqlSchemaLevelStore,
+  normalizeRelease,
+  SchemaTooNewError,
+  type GatedMigration,
+  type MigrationDecision,
+  type SchemaLevelDialect,
+  type SchemaLevelQuery,
+  type SchemaLevelStore,
+} from "./schema-level.ts";
 
 export {
   duplicateGroupsSql,
@@ -38,6 +52,7 @@ export interface Tables {
   buildComponents: Table;
   buildReviews: Table;
   siteSettings: Table;
+  schemaMeta: Table;
   snapshots: Table;
   baselines: Table;
   comments: Table;
@@ -96,12 +111,47 @@ export function clampListLimit(limit?: number): number | undefined {
 export interface ListOptions {
   /** SQL WHERE condition. */
   where?: SQL;
-  /** SQL ORDER BY condition. */
+  /**
+   * SQL ORDER BY condition. Every adapter appends `id` as the final tie-break,
+   * and orders by `id` alone when this is omitted, so equal sort keys come back
+   * in the same (creation) order on every dialect.
+   */
   orderBy?: SQL;
   /** Maximum number of rows to return. */
   limit?: number;
   /** Number of rows to skip. */
   offset?: number;
+  /**
+   * Column keys (as named on the table object) to read. Omitted: every column. Rows come back
+   * without the other keys, so only pass it where the caller never reads them, and type the result
+   * accordingly. `id` is always read, so the tie-break order is unchanged.
+   */
+  columns?: readonly string[];
+}
+
+/** Every column key of `table` except `omit`: the `columns` of a list that skips only large columns. */
+export function columnsExcept(table: Table, ...omit: readonly string[]): string[] {
+  return Object.keys(getTableColumns(table)).filter((key) => !omit.includes(key));
+}
+
+/**
+ * The Drizzle selection for a list that reads only `columns` (plus `id`), or `undefined` for every
+ * column. The one place the projection is built, so each dialect and the fake agree on it.
+ */
+export function listSelection(
+  table: Table,
+  columns: readonly string[] | undefined,
+): Record<string, unknown> | undefined {
+  if (columns === undefined) {
+    return undefined;
+  }
+  const all = getTableColumns(table);
+  const keys = new Set(["id", ...columns]);
+  const unknown = [...keys].filter((key) => !(key in all));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown column(s) for list: ${unknown.join(", ")}`);
+  }
+  return Object.fromEntries([...keys].map((key) => [key, all[key]]));
 }
 
 /**
@@ -236,7 +286,15 @@ export interface BuildReferenceLifecycle {
     buildId: string,
     hashes: readonly string[],
     staleBefore?: string,
+    sizes?: ReadonlyMap<string, number>,
   ): Promise<string[]>;
+  /**
+   * What the project's live content weighs, from the sizes recorded with each use: one SQL
+   * aggregate, never a storage listing. A blob counts once however many builds use it, and only
+   * while some use of it is unreleased. `unsized` counts the blobs with no recorded size (uses
+   * recorded before sizes were kept); they add nothing to `bytes`.
+   */
+  contentUsage(projectId: string): Promise<ContentUsage>;
   /**
    * Claim for deletion, under the pass's `token` (a fresh id per collector pass), every hash whose
    * uses are all released, the latest release older than `idleBefore` (an ISO instant), and no
@@ -258,6 +316,16 @@ export interface BuildReferenceLifecycle {
   abandonContentClaim(hash: string, token: string): Promise<void>;
   /** The blob of a claimed hash is deleted: drop its `content_uses` rows, if the token still holds it. */
   finishContentCollection(hash: string, token: string): Promise<void>;
+}
+
+/** The weight of a project's live shared content; see {@link BuildReferenceLifecycle.contentUsage}. */
+export interface ContentUsage {
+  /** Sum of the recorded sizes of the project's distinct live blobs. */
+  bytes: number;
+  /** Distinct live blobs with a recorded size. */
+  blobs: number;
+  /** Distinct live blobs with no recorded size. */
+  unsized: number;
 }
 
 /**

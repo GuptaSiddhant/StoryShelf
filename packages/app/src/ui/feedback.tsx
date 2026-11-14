@@ -2,7 +2,8 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
 import type { IconName } from "./icons/paths.ts";
-type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
+type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info" | "quiet";
+type AlertTone = Exclude<BadgeTone, "quiet">;
 type StatTone = "neutral" | "success" | "warning";
 
 const badgeBase = css`
@@ -47,6 +48,23 @@ const badgeTones: Record<BadgeTone, Promise<string>> = {
     color: var(--status-rejected-fg);
     border-color: var(--status-rejected-border);
   `,
+  quiet: css`
+    /* badge-quiet */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    &::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--status-approved);
+    }
+  `,
   info: css`
     /* badge-info */
     ${badgeBase}
@@ -63,6 +81,7 @@ const toneIcons: Record<BadgeTone, IconName> = {
   warning: "alert-triangle",
   danger: "x-circle",
   info: "info",
+  quiet: "check-circle",
 };
 
 const alertBase = css`
@@ -77,7 +96,7 @@ const alertBase = css`
   font-size: var(--text-base);
 `;
 
-const alertTones: Record<BadgeTone, Promise<string>> = {
+const alertTones: Record<AlertTone, Promise<string>> = {
   neutral: css`
     /* alert-neutral */
     ${alertBase}
@@ -108,7 +127,7 @@ const alertTones: Record<BadgeTone, Promise<string>> = {
   `,
 };
 
-const alertIconTones: Record<BadgeTone, Promise<string>> = {
+const alertIconTones: Record<AlertTone, Promise<string>> = {
   neutral: css`
     /* alert-icon-neutral */
     margin-top: 0.1rem;
@@ -200,9 +219,7 @@ const statValueTones: Record<StatTone, Promise<string>> = {
 const statLabel = css`
   /* stat-label */
   color: var(--text-secondary);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
 `;
 
 const metaText = css`
@@ -260,16 +277,22 @@ export const Badge: FC<{ tone?: BadgeTone; icon?: boolean; children?: unknown }>
 }) => {
   return (
     <span class={badgeTones[tone]}>
-      {icon ? <Icon name={toneIcons[tone]} size="sm" /> : null}
+      {icon && tone !== "quiet" ? <Icon name={toneIcons[tone]} size="sm" /> : null}
       {children}
     </span>
   );
 };
 
-/** Map a build or snapshot status string to its badge tone. */
+/** Sentence-case label for a status; `reviewing` reads "Needs review". */
+export function statusLabel(status: string): string {
+  const text = status === "reviewing" ? "needs review" : status;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Map a build or snapshot status string to its badge tone: settled states are quiet. */
 export function statusTone(status: string): BadgeTone {
   if (isSuccessStatus(status)) {
-    return "success";
+    return "quiet";
   }
   if (isDangerStatus(status)) {
     return "danger";
@@ -312,7 +335,7 @@ function isInfoStatus(status: string): boolean {
  * nested live regions are announced twice by some screen readers).
  */
 export const Alert: FC<{
-  tone?: BadgeTone;
+  tone?: AlertTone;
   title?: string;
   role?: "alert" | "status" | "none";
   children?: unknown;
@@ -338,14 +361,22 @@ const alertTitle = css`
 `;
 
 /** Centered empty state with an optional title and call-to-action. */
-export const EmptyState: FC<{ title?: string; description?: string; action?: unknown }> = ({
-  title,
-  description,
-  action,
-}) => {
+export const EmptyState: FC<{
+  title?: string;
+  description?: string;
+  action?: unknown;
+  /** `1` when the empty state is the whole page (a not-found page); a section's is an h2. */
+  headingLevel?: 1 | 2;
+}> = ({ title, description, action, headingLevel = 2 }) => {
   return (
     <div class={emptyWrap}>
-      {title ? <h2 class={emptyTitle}>{title}</h2> : null}
+      {title ? (
+        headingLevel === 1 ? (
+          <h1 class={emptyTitle}>{title}</h1>
+        ) : (
+          <h2 class={emptyTitle}>{title}</h2>
+        )
+      ) : null}
       {description ? <p class={emptyDesc}>{description}</p> : null}
       {action ? <div class={emptyAction}>{action}</div> : null}
     </div>

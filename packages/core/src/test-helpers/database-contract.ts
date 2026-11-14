@@ -10,7 +10,7 @@
  * databaseContractSuite("sqlite", () => createSqliteDatabase(":memory:"));
  * ```
  */
-import { getTableColumns, ne } from "drizzle-orm";
+import { asc, desc, getTableColumns, like, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
@@ -33,6 +33,10 @@ const REQUIRED_METHODS = [
 
 /** Build the adapter under test (sync or async factories both work). */
 export type DatabaseFactory = () => DatabaseAdapter | Promise<DatabaseAdapter>;
+
+function idsOf(rows: Record<string, unknown>[]): unknown[] {
+  return rows.map((row) => row["id"]);
+}
 
 /** Run the database contract against a factory. */
 export function databaseContractSuite(label: string, make: DatabaseFactory): void {
@@ -85,6 +89,90 @@ export function databaseContractSuite(label: string, make: DatabaseFactory): voi
       } finally {
         try {
           await adapter.remove(table, id);
+        } finally {
+          await adapter.lifecycle?.teardown();
+        }
+      }
+    }, 30_000);
+
+    it("lists in id order, with id as the final tie-break", async () => {
+      const adapter = await make();
+      await adapter.lifecycle?.setup({
+        config: {},
+        logger: createShelfLogger({ level: "silent" }),
+      });
+      const table = adapter.tables.projects;
+      const columns = getTableColumns(table);
+      const prefix = `order-contract-${randomUUID()}`;
+      // Inserted out of id order, with one shared sort key.
+      const ids = ["c", "a", "b"].map((suffix) => `${prefix}-${suffix}`);
+      try {
+        const now = new Date().toISOString();
+        await Promise.all(
+          ids.map(
+            async (id) =>
+              await adapter.insert(table, {
+                id,
+                name: "same",
+                slug: id,
+                createdAt: now,
+                updatedAt: now,
+              }),
+          ),
+        );
+        const where = like(columns["id"]!, `${prefix}-%`);
+        const sorted = ids.toSorted();
+        expect(idsOf(await adapter.list(table, { where }))).toEqual(sorted);
+        const byName = await adapter.list(table, { where, orderBy: asc(columns["name"]!) });
+        expect(idsOf(byName)).toEqual(sorted);
+        const byNameDesc = await adapter.list(table, { where, orderBy: desc(columns["name"]!) });
+        expect(idsOf(byNameDesc)).toEqual(sorted);
+        const page = await adapter.list(table, { where, limit: 1, offset: 1 });
+        expect(idsOf(page)).toEqual([sorted[1]]);
+      } finally {
+        try {
+          await Promise.all(ids.map(async (id) => await adapter.remove(table, id)));
+        } finally {
+          await adapter.lifecycle?.teardown();
+        }
+      }
+    }, 30_000);
+
+    it("reads only the requested columns, plus id, in the same order", async () => {
+      const adapter = await make();
+      await adapter.lifecycle?.setup({
+        config: {},
+        logger: createShelfLogger({ level: "silent" }),
+      });
+      const table = adapter.tables.projects;
+      const columns = getTableColumns(table);
+      const prefix = `columns-contract-${randomUUID()}`;
+      const ids = ["b", "a"].map((suffix) => `${prefix}-${suffix}`);
+      try {
+        const now = new Date().toISOString();
+        await Promise.all(
+          ids.map(
+            async (id) =>
+              await adapter.insert(table, {
+                id,
+                name: "same",
+                slug: id,
+                createdAt: now,
+                updatedAt: now,
+              }),
+          ),
+        );
+        const where = like(columns["id"]!, `${prefix}-%`);
+        const rows = await adapter.list(table, { where, columns: ["slug"] });
+        expect(rows.map((row) => Object.keys(row).toSorted())).toEqual([
+          ["id", "slug"],
+          ["id", "slug"],
+        ]);
+        expect(idsOf(rows)).toEqual(ids.toSorted());
+        await expect(adapter.list(table, { where, columns: ["nope"] })).rejects.toThrow(/nope/u);
+      } finally {
+        try {
+          await Promise.all(ids.map(async (id) => await adapter.remove(table, id)));
         } finally {
           await adapter.lifecycle?.teardown();
         }

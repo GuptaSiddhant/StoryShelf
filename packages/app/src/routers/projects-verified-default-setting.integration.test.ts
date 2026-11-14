@@ -46,16 +46,16 @@ describe("project requireVerifiedDefault setting", () => {
     expect(created.requireVerifiedDefault).toBe(false);
   });
 
-  it("shows the toggle checked on the Tests tab and saves it from the form", async () => {
+  it("shows the toggle checked on the Capture & tests tab and saves it from the form", async () => {
     const { app, json } = boot();
     const created = (await (await json("POST", "/projects", { name: "Form" })).json()) as Row;
-    const tab = `/projects/${created.slug}/settings/tests`;
+    const tab = `/projects/${created.slug}/settings/capture`;
     expect(await (await app.request(tab)).text()).toMatch(
       /name="requireVerifiedDefault"[^>]*checked/u,
     );
 
     const save = async (fields: Record<string, string>) =>
-      await app.request(tab, {
+      await app.request(`/projects/${created.slug}/settings/tests`, {
         method: "POST",
         headers: {
           "content-type": "application/x-www-form-urlencoded",

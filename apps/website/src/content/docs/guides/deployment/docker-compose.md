@@ -3,34 +3,69 @@ title: Docker Compose
 description: Self-host StoryShelf with Docker Compose, local Postgres, and filesystem storage.
 ---
 
-The simplest self-hosted deploy — one compose file, no cloud dependencies.
+The simplest self-hosted deploy: one container, no cloud dependencies. Every stable release publishes
+`ghcr.io/guptasiddhant/storyshelf` for `linux/amd64` and `linux/arm64`, with an SBOM and provenance
+attestation. The same image is mirrored to Docker Hub as `docker.io/guptasiddhant/storyshelf`, from
+the first release that has the mirror configured. The examples below use the GHCR name.
+
+:::caution
+The container image is published from v0.12.0. Until that release, build it from the repository's [Dockerfile](https://github.com/GuptaSiddhant/StoryShelf/blob/main/apps/server-image/Dockerfile).
+:::
+
+## Quick start
+
+```sh
+docker run -p 3000:3000 -v storyshelf:/data ghcr.io/guptasiddhant/storyshelf
+```
+
+Open `http://localhost:3000`. With no other settings, the image keeps SQLite and uploaded files on the
+`/data` volume and captures with its bundled Chromium. It runs as a non-root user under `tini`, and its
+`HEALTHCHECK` calls `/api/v1/health`.
+
+## Tags
+
+| Tag                              | Contents                                                       |
+| -------------------------------- | -------------------------------------------------------------- |
+| `:<version>`, `:latest`          | The app and Chromium for server-side capture.                  |
+| `:<version>-hosting`, `:latest-hosting` | No browser, capture off (`SHELF_CAPTURE=off`): hosting and review only. |
+
+Pin `:<version>` in production. A `next` build is never pushed.
+
+## Settings
+
+Everything comes from the environment:
+
+| Variable                                                  | Effect                                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `DATABASE_URL`                                            | `postgres://…` or `mysql://…`. Unset: SQLite at `/data/shelf.db`.        |
+| `AWS_BUCKET`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`         | S3-compatible storage (credentials from the AWS SDK chain). Unset: `/data`. |
+| `SECRET`                                                  | At least 32 characters; encrypts stored credentials.                     |
+| `PUBLIC_BASE_URL`                                         | The public origin; required for notification links.                      |
+| `AUTH_PASSWORD`, `AUTH_EMAIL`                             | Bootstrap the local admin (needs `SECRET`).                              |
+| `SMTP_*`                                                  | Email notifications and invites.                                         |
+| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` | Adds `chromium@azure` (Azure Playwright Workspaces, experimental). Off unless both are set. |
+| `SHELF_CAPTURE=off`                                       | Hosting only: no capture, compare or baselines.                          |
 
 ## Compose file
 
 ```yaml
 services:
   storyshelf:
-    image: storyshelf:latest
+    image: ghcr.io/guptasiddhant/storyshelf:latest
     ports:
       - "3000:3000"
     volumes:
-      - storyshelf-data:/app/data
+      - storyshelf-data:/data
     environment:
-      - SECRET=$(openssl rand -hex 32) # ≥ 32 chars
-      - CAPTURE_CONCURRENCY=2
-      - PURGE_TTL_DAYS=30
-      - BRANCH_TTL_DAYS=30
-      - BRANCH_GC_INTERVAL_MS=86400000
+      - SECRET=change-me-to-32-or-more-random-characters
+      - PUBLIC_BASE_URL=http://localhost:3000
+      # Postgres instead of SQLite:
+      # - DATABASE_URL=postgres://storyshelf:password@db:5432/storyshelf
       # Auth — see /guides/auth/
       # - AUTH_PASSWORD=a-long-admin-password   # ≥ 12 chars (local admin)
-      # - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
-      # - OIDC_CLIENT_ID=storyshelf
-      # - OIDC_CLIENT_SECRET=secret
 volumes:
   storyshelf-data:
 ```
-
-Swap the database for `@storyshelf/db-postgres` or `@storyshelf/db-sqlite/turso` without changing the rest of the stack.
 
 ## Published Storybook subdomains
 

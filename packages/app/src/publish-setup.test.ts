@@ -6,11 +6,13 @@ import {
   makeDatabase,
   makeStorage,
 } from "@storyshelf/core/test-helpers";
-import { storybookDir } from "@storyshelf/core/utils";
+import { publishedBrotliPath, publishedGzipPath, storybookDir } from "@storyshelf/core/utils";
+import { createHash } from "node:crypto";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { createJobQueue } from "./job-queue.ts";
 import { setupPublishing } from "./publish-setup.ts";
+import { settlePrecompression } from "./routers/published-precompress.ts";
 
 const logger = pino({ level: "silent" });
 
@@ -37,7 +39,7 @@ describe("setupPublishing", () => {
     });
     expect(wiring.enqueuePublish).toBeTypeOf("function");
     expect(wiring.handler?.run).toBeTypeOf("function");
-    expect(wiring.afterPublish).toHaveLength(3);
+    expect(wiring.afterPublish).toHaveLength(4);
   });
 
   it("wires no job side on a host that polls no publish jobs (serverless)", () => {
@@ -193,5 +195,52 @@ describe("setupPublishing: review requests", () => {
     expect(await publish(false, {}, "feat", { ok: false, error: "x" })).toBe(0);
     expect(await publish(false, { reviewEnabled: false }, "feat", { ok: true })).toBe(0);
     expect(await publish(true, {}, "feat", { ok: true })).toBe(0);
+  });
+});
+
+describe("setupPublishing: compressed copies", () => {
+  const source = Buffer.from("export const story = () => 1;\n".repeat(200));
+  const hash = createHash("sha256").update(source).digest("hex");
+
+  async function publishWith(config: { publishedCompression?: boolean }, outcome: { ok: boolean }) {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    const opts = { database: db, storage } as unknown as ResolvedShelfOptions;
+    const project = await createTestProject(db, db.tables);
+    const build = await createTestBuild(db, db.tables, project.id);
+    objects.set(
+      `${storybookDir(project.id, build.id)}/manifest.json`,
+      Buffer.from(JSON.stringify({ "main.js": hash })),
+    );
+    objects.set(`content/${hash}`, source);
+    const wiring = setupPublishing(opts, config, logger, false, {
+      jobs: jobsFor(opts, false),
+      buildState,
+      reviewRequested,
+    });
+    await wiring.completer.complete(
+      build.id,
+      outcome.ok ? { ok: true } : { ok: false, error: "x" },
+    );
+    await settlePrecompression(storage);
+    return objects;
+  }
+
+  it("writes the gzip and brotli copies when publishing ends and compression is on", async () => {
+    const objects = await publishWith({ publishedCompression: true }, { ok: true });
+    expect(objects.has(publishedBrotliPath(hash))).toBe(true);
+    expect(objects.has(publishedGzipPath(hash))).toBe(true);
+  });
+
+  it("writes none when compression is off or the publish failed", async () => {
+    for (const [config, outcome] of [
+      [{}, { ok: true }],
+      [{ publishedCompression: true }, { ok: false }],
+    ] as const) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- independent cases, run in turn
+      const objects = await publishWith(config, outcome);
+      expect(objects.has(publishedBrotliPath(hash))).toBe(false);
+      expect(objects.has(publishedGzipPath(hash))).toBe(false);
+    }
   });
 });

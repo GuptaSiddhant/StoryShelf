@@ -118,6 +118,12 @@ export function publishedGzipPath(hash: string): string {
   return `derived/published-gzip/${hash}.gz`;
 }
 
+/** Disposable brotli representation of a content-addressed published file. */
+export function publishedBrotliPath(hash: string): string {
+  if (!isContentHash(hash)) throw new Error("Invalid published content hash");
+  return `derived/published-br/${hash}.br`;
+}
+
 /** Storage path for an uploaded Storybook zip. */
 export function storybookZipPath(projectId: string, buildId: string): string {
   assertSegments([projectId, buildId]);

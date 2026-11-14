@@ -63,7 +63,7 @@ describe("statusesForBuild: the testing status", () => {
       context: "storyshelf/testing",
       state,
       description,
-      url: "https://shelf.example.com/projects/web/builds/b1",
+      url: "https://shelf.example.com/projects/web/builds/b1/diff",
     });
   });
 
@@ -132,7 +132,7 @@ describe("statusesForBuild: which statuses exist", () => {
     expect(gate(set)).toMatchObject({
       state: "success",
       description: "Review is off",
-      url: "https://shelf.example.com/projects/web/builds/b1",
+      url: "https://shelf.example.com/projects/web/builds/b1/diff",
     });
     expect(set.comment?.state).toBe("success");
   });
@@ -171,7 +171,7 @@ describe("statusesForBuild: storybook", () => {
   it("is pending while publishing and failed when it failed, linking the build", () => {
     expect(run({ publishing: "pending" }).statuses.at(-1)).toMatchObject({
       state: "pending",
-      url: "https://shelf.example.com/projects/web/builds/b1",
+      url: "https://shelf.example.com/projects/web/builds/b1/diff",
     });
     expect(run({ publishing: "failure" }).statuses.at(-1)).toMatchObject({
       state: "failure",
@@ -214,7 +214,7 @@ describe("statusesForBuild: no status waits forever (every build status x publis
         state: "failure",
         informational: true,
         description: "Storybook content unavailable, see build page",
-        url: "https://shelf.example.com/projects/web/builds/b1",
+        url: "https://shelf.example.com/projects/web/builds/b1/diff",
       });
     }
   });
@@ -263,11 +263,11 @@ describe("statusesForBuild: the comment", () => {
   it("is keyed by the build page and carries state, summary and Storybook link", () => {
     const { comment } = run({ build: { status: "reviewing" } });
     expect(comment).toMatchObject({
-      url: "https://shelf.example.com/projects/web/builds/b1",
+      url: "https://shelf.example.com/projects/web/builds/b1/diff",
       state: "pending",
     });
     expect(comment?.markdown).toContain(
-      "[View build](https://shelf.example.com/projects/web/builds/b1)",
+      "[View build](https://shelf.example.com/projects/web/builds/b1/diff)",
     );
     expect(comment?.markdown).toContain("Visual tests: Review open: 3 changes to review");
     expect(comment?.markdown).toContain("Snapshots: 10 total, 4 changed, 1 approved, 0 rejected");
@@ -350,7 +350,7 @@ describe("statusesForBuild: progress and annotations", () => {
       build: { status: "reviewing" },
       changes: [change(1)],
     });
-    expect(gate(set)?.url).toBe("https://shelf.example.com/shelf/projects/web/builds/b1");
+    expect(gate(set)?.url).toBe("https://shelf.example.com/shelf/projects/web/builds/b1/diff");
     expect(gate(set)?.annotations?.[0]?.url).toBe(
       "https://shelf.example.com/shelf/projects/web/builds/b1/diff?snapshot=S1",
     );

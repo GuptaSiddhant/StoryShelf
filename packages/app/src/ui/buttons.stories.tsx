@@ -6,7 +6,14 @@ import { Button, HStack, Tabs, VStack } from "./components.tsx";
 const meta: Meta = { title: "UI/Button" };
 export default meta;
 
-const variants = ["primary", "secondary", "ghost", "danger", "outline"] as const;
+const variants = [
+  "primary",
+  "secondary",
+  "ghost",
+  "danger",
+  "danger-secondary",
+  "outline",
+] as const;
 
 export const Variants = jsxStory(() => (
   <VStack>
@@ -42,6 +49,9 @@ export const WithIcon = jsxStory(() => (
       Copy
     </Button>
     <Button variant="danger" icon="x">
+      Reject
+    </Button>
+    <Button variant="danger-secondary" size="sm" icon="x">
       Reject
     </Button>
   </HStack>

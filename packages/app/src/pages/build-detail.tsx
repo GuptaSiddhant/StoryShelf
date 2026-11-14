@@ -1,54 +1,74 @@
 import { groupComponents, parseTestResults } from "@storyshelf/core/capture";
-import { BuildModel } from "@storyshelf/core/models";
-import { CaptureAttemptModel } from "@storyshelf/core/models";
-import { CaptureLogModel } from "@storyshelf/core/models";
-import { LabelModel } from "@storyshelf/core/models";
-import { ProjectModel } from "@storyshelf/core/models";
-import { SnapshotModel } from "@storyshelf/core/models";
-import { CANCELLABLE_BUILD_STATUSES } from "@storyshelf/core/types";
-import { createUrlBuilder } from "@storyshelf/core/urls";
+import { CaptureAttemptModel, CaptureLogModel, LabelModel } from "@storyshelf/core/models";
+import type { Build, CaptureAttempt, CaptureLog, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { loadBaselineView } from "../routers/baseline-guard.ts";
-import {
-  designUrlsFor,
-  loadDesignResolutions,
-  providerNameFor,
-} from "../routers/design.handlers.ts";
-import { loadReviewSection } from "../routers/review-section.handlers.ts";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
+import { loadReviewSection, type ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { catalogOf, getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
-  Button,
   Card,
-  EmptyState,
+  DefinitionList,
+  Disclosure,
   HStack,
   Meta,
-  PageHeader,
   SectionTitle,
-  Stat,
-  Thumbnail,
   VStack,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
-import {
-  snapshotCard,
-  snapshotCardBody,
-  snapshotCardHead,
-  snapshotCardMeta,
-  snapshotGrid,
-} from "../ui/styles/review.ts";
-import { a11ySummaryNote, a11ySummaryOf } from "./a11y-violations.tsx";
+import { a11ySummaryNote, type A11ySummary } from "./a11y-violations.tsx";
 import { DefaultBranchNotice } from "./build-branch-notice.tsx";
-import { snapshotVariant } from "./build-diff-model.ts";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
-import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { TestsCard } from "./build-tests.tsx";
-import { DesignButtons } from "./design-links.tsx";
 import { ChangeRequestsCard } from "./review-change-requests.tsx";
 import { ChangesetCard } from "./review-changeset.tsx";
 import { CommentsCard } from "./review-comments.tsx";
 import { VerdictCard } from "./review-verdict.tsx";
+
+type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
+
+/** Everything the build page's details panel and header read besides the snapshots. */
+export interface BuildDetailsData {
+  /** Whether capture is on; off, the page is review only. */
+  testing: boolean;
+  /** An accepted build that was uploaded without capture. */
+  published: boolean;
+  labels: { typeKey: string; value: string }[];
+  /** Catalog counts; null when the build has no catalog. */
+  components: number | null;
+  stories: number | null;
+  attempts: { attempt: CaptureAttempt; logs: CaptureLog[] }[];
+  /** Review section; null while the project has review off. */
+  review: ReviewSectionData | null;
+}
+
+/** Load what the build page needs beyond the snapshots (attempts, labels, catalog, review). */
+export async function loadBuildDetails(project: Project, build: Build): Promise<BuildDetailsData> {
+  const { db } = getStore();
+  const logs = new CaptureLogModel(db);
+  const attempts = await new CaptureAttemptModel(db).listByBuild(build.id).catch(() => []);
+  const withLogs = await Promise.all(
+    attempts.map(async (attempt) => ({
+      attempt,
+      logs: await logs.listByAttempt(attempt.id).catch(() => []),
+    })),
+  );
+  const [catalog, labels] = await Promise.all([
+    catalogOf()
+      .load(project.id, build.id)
+      .catch(() => null),
+    new LabelModel(db).listForBuild(build.id).catch(() => []),
+  ]);
+  return {
+    testing: testingEnabled(),
+    published: build.status === "approved" && attempts.length === 0,
+    labels,
+    components: catalog ? groupComponents(catalog.entries).length : null,
+    stories: catalog ? catalog.entries.filter((entry) => entry.type === "story").length : null,
+    attempts: withLogs,
+    review: await loadReviewSection(project, build, catalog).catch(() => null),
+  };
+}
 
 /** Map a capture log level to its badge tone. */
 function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -58,396 +78,141 @@ function logTone(level: string): "neutral" | "success" | "warning" | "danger" | 
   if (level === "warn") {
     return "warning";
   }
-  if (level === "info") {
-    return "info";
-  }
-  return "neutral";
+  return level === "info" ? "info" : "neutral";
 }
-/** Build overview page: snapshot grid, bulk actions, and build comments. */
-export async function renderBuildDetailPage(
-  buildId: string,
-  usageByStory: Map<string, LinkedUsageItem[]> = new Map(),
-): Promise<RenderedContent | null> {
-  const { db } = getStore();
-  const build = await new BuildModel(db).get(buildId);
-  if (!build) {
+
+function AttemptsCard(props: { attempts: BuildDetailsData["attempts"] }): Rendered | null {
+  const { attempts } = props;
+  if (attempts.length === 0) {
     return null;
   }
-  const project = await new ProjectModel(db).get(build.projectId);
-  if (!project) {
-    return null;
-  }
-  const snapshots = await new SnapshotModel(db).listByBuild(build.id);
-  const attempts = await new CaptureAttemptModel(db).listByBuild(build.id);
-  const logs = new CaptureLogModel(db);
-  const attemptLogs = new Map<string, Awaited<ReturnType<typeof logs.listByAttempt>>>();
-  /* oxlint-disable-next-line eslint/no-await-in-loop -- attempts are few; sequential reads keep code simple */
-  for (const attempt of attempts) {
-    attemptLogs.set(attempt.id, await logs.listByAttempt(attempt.id));
-  }
-  const canReview = !getStore().authEnabled || Boolean(getStore().user);
-  const { drifted } = await loadBaselineView(project, build, snapshots);
-  const designs = await loadDesignResolutions(project, snapshots).catch(() => new Map());
-  const staleCount = Object.keys(drifted).length;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
-  const testing = testingEnabled();
-  const published = build.status === "approved" && attempts.length === 0;
-  const [catalog, labels] = await Promise.all([
-    catalogOf()
-      .load(project.id, build.id)
-      .catch(() => null),
-    new LabelModel(db).listForBuild(build.id),
-  ]);
-  const review = await loadReviewSection(project, build, catalog);
-  const components = catalog ? groupComponents(catalog.entries) : [];
-  const storyCount = catalog?.entries.filter((entry) => entry.type === "story").length ?? 0;
-
-  const grouped = new Map<string, typeof snapshots>();
-  for (const snap of snapshots) {
-    const key = snap.status;
-    const list = grouped.get(key) ?? [];
-    list.push(snap);
-    grouped.set(key, list);
-  }
-  const a11y = a11ySummaryOf(snapshots);
-  const selective = build.affectedOnly && build.affectedImportPaths !== null;
-
   return (
-    <DocumentLayout
-      title={`Build ${build.gitBranch}`}
-      nav={{
-        active: "builds",
-        projectSlug: project.slug,
-        projectName: project.name,
-        trail: [{ label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}` }],
-      }}
-    >
-      <PageHeader
-        title={
-          <>
-            {build.gitBranch} <Meta as="span">· {build.gitSha.slice(0, 7)}</Meta>{" "}
-            <Badge tone={statusTone(build.status)}>{published ? "Published" : build.status}</Badge>
-            {testing && selective ? (
-              <>
-                {" "}
-                <Badge tone="info">affected capture</Badge>
-              </>
-            ) : null}
-            {testing && !build.affectedOnly ? (
-              <>
-                {" "}
-                <Badge tone="neutral">full capture</Badge>
-              </>
-            ) : null}
-            {labels.map((label): HtmlEscapedString | Promise<HtmlEscapedString> => (
-              <span key={`${label.typeKey}:${label.value}`}>
-                {" "}
-                <Badge tone="neutral">
-                  {label.typeKey}: {label.value}
-                </Badge>
-              </span>
-            ))}
-          </>
-        }
-        description={
-          <>
-            {build.message ?? "No message"}{" "}
-            {build.authorName
-              ? `· ${build.authorName}${build.authorEmail ? ` <${build.authorEmail}>` : ""}`
-              : ""}{" "}
-            · {new Date(build.createdAt).toLocaleString()}
-            {testing && selective ? (
-              <>
-                {" "}
-                · {build.snapshotCount - build.inheritedCount} rendered, {build.inheritedCount}{" "}
-                inherited
-              </>
-            ) : null}
-          </>
-        }
-        actions={
-          <>
-            {testing ? (
-              <Button variant="primary" href={urls.buildDiff(project.slug, build.id)}>
-                Review diffs
-              </Button>
-            ) : null}
-            <Button variant={testing ? "ghost" : "primary"} href={urls.short(build.id)}>
-              View Storybook
-            </Button>
-            {testing ? (
-              <form
-                method="post"
-                action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
-                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
-                hx-target="body"
-              >
-                <Button variant="secondary" type="submit">
-                  Retry capture
-                </Button>
-              </form>
-            ) : null}
-            {testing && CANCELLABLE_BUILD_STATUSES.includes(build.status) ? (
-              <form
-                method="post"
-                action={`/api/v1/projects/${project.slug}/builds/${build.id}/cancel`}
-                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/cancel`}
-                hx-target="body"
-              >
-                <Button variant="danger" size="sm" type="submit">
-                  Cancel build
-                </Button>
-              </form>
-            ) : null}
-          </>
-        }
-      />
-
-      {testing ? (
-        <DefaultBranchNotice project={project} build={build} canReview={canReview} />
-      ) : null}
-
-      {testing && staleCount > 0 ? (
-        <StaleBaselineNotice
-          project={project}
-          build={build}
-          staleCount={staleCount}
-          canReview={canReview}
-        />
-      ) : null}
-
-      <div class="mb-1">
-        <div class="grid grid--3">
-          {catalog ? (
-            <>
-              <Card>
-                <Stat label="Components" value={components.length} />
-              </Card>
-              <Card>
-                <Stat label="Stories" value={storyCount} />
-              </Card>
-            </>
-          ) : null}
-          {testing ? (
-            <>
-              <Card>
-                <Stat label="Snapshots" value={snapshots.length} />
-              </Card>
-              <Card>
-                <Stat label="Inherited" value={build.inheritedCount} />
-                <Meta>Reused from the baseline without rendering.</Meta>
-              </Card>
-              <Card>
-                <Stat label="Changed / new" value={build.changedCount} tone="warning" />
-              </Card>
-              <Card>
-                <Stat label="Approved / unchanged" value={build.approvedCount} tone="success" />
-              </Card>
-              <Card>
-                <Stat
-                  label="Accessibility findings"
-                  value={a11y.findings}
-                  tone={a11y.findings > 0 ? "warning" : "neutral"}
-                />
-                <Meta>{a11ySummaryNote(a11y)}</Meta>
-              </Card>
-            </>
-          ) : null}
-        </div>
-      </div>
-
-      {testing && attempts.length > 0 ? (
-        <Card>
-          <SectionTitle>Capture attempts</SectionTitle>
-          {attempts.map((attempt, index): HtmlEscapedString | Promise<HtmlEscapedString> => (
-            <details key={attempt.id} open={index === attempts.length - 1}>
-              <summary>
-                Attempt {attempt.attemptNo}{" "}
-                <Badge tone={statusTone(attempt.status)}>{attempt.status}</Badge>{" "}
-                <Meta as="span">
-                  {attempt.storyCount} stories
-                  {attempt.reqId ? ` · ${attempt.reqId}` : ""}
-                </Meta>
-              </summary>
-              {attempt.error ? <Meta as="pre">{attempt.error}</Meta> : null}
-              <div class="mt-1">
-                <VStack>
-                  {(attemptLogs.get(attempt.id) ?? []).map(
-                    (line): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                      <HStack key={line.id} align="baseline" wrap={false}>
-                        <Badge tone={logTone(line.level)}>{line.level}</Badge>
-                        <span>{line.message}</span>
-                        {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
-                      </HStack>
-                    ),
-                  )}
-                </VStack>
-              </div>
-            </details>
-          ))}
-        </Card>
-      ) : null}
-
-      <TestsCard results={parseTestResults(build.testResults)} />
-
-      {testing && canReview && (build.status === "reviewing" || build.status === "comparing") ? (
-        <div class="mb-1">
-          <Card>
-            <HStack>
-              <Meta as="span">Bulk actions:</Meta>
-              <form
-                method="post"
-                action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
-                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
-                hx-target="body"
-                hx-confirm="Approve all remaining changes?"
-                data-toast="Approved all remaining changes"
-              >
-                <Button variant="primary" size="sm" type="submit">
-                  Approve all
-                </Button>
-              </form>
-              <form
-                method="post"
-                action={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
-                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
-                hx-target="body"
-                hx-confirm="Reject all remaining changes?"
-                data-toast="Rejected all remaining changes"
-                data-toast-tone="warning"
-              >
-                <Button variant="danger" size="sm" type="submit">
-                  Reject all
-                </Button>
-              </form>
-              <Meta as="span">Or review individually in the diff view.</Meta>
-            </HStack>
-          </Card>
-        </div>
-      ) : null}
-
-      {review ? (
-        <div class="mb-1">
-          <VStack>
-            {testing ? null : <VerdictCard data={review} />}
-            <ChangeRequestsCard data={review} />
-            <ChangesetCard data={review} />
-          </VStack>
-        </div>
-      ) : null}
-
-      {!testing ? null : snapshots.length === 0 ? (
-        <EmptyState
-          title="No snapshots yet"
-          description="Capture is pending or failed. Try retrying capture."
-        />
-      ) : (
-        <div class={snapshotGrid}>
-          {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
-            <div key={snap.id} class={snapshotCard}>
-              <div class={snapshotCardHead}>
-                <Badge tone={statusTone(snap.status)}>{snap.status}</Badge>
-                {snap.inherited ? (
-                  <>
-                    {" "}
-                    <Badge tone="neutral">inherited</Badge>
-                  </>
-                ) : null}
-                <span class={snapshotCardMeta}>
-                  {snapshotVariant(snap)} · {snap.viewportWidth}×{snap.viewportHeight}
-                </span>
-              </div>
-              <div class={snapshotCardBody}>
-                <a href={`${urls.buildDiff(project.slug, build.id)}?snapshot=${snap.id}`}>
-                  <Thumbnail
-                    src={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/image`}
-                    alt={`${snap.storyTitle} / ${snap.storyName}`}
-                  />
-                </a>
-                <SectionTitle>
-                  {snap.storyTitle} <Meta as="span">/ {snap.storyName}</Meta>
-                </SectionTitle>
-                <Meta as="div">
-                  {snap.storyId}
-                  {snap.diffRatio !== null && snap.diffRatio !== undefined
-                    ? ` · diff ${(snap.diffRatio * 100).toFixed(2)}%`
-                    : ""}
-                  {snap.diffPixels === null || snap.diffPixels === undefined
-                    ? ""
-                    : ` · ${snap.diffPixels} px`}
-                </Meta>
-                {snap.storyImportPath && usageByStory.has(snap.storyImportPath) ? (
-                  <LinkedUsage
-                    usage={usageByStory.get(snap.storyImportPath) ?? []}
-                    publishedBaseDomain={getStore().config.publishedBaseDomain}
-                  />
-                ) : null}
-                <HStack>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    href={`${urls.buildDiff(project.slug, build.id)}?snapshot=${snap.id}`}
-                  >
-                    Review
-                  </Button>
-                  <Button variant="ghost" size="sm" href={urls.short(build.id)}>
-                    View Storybook
-                  </Button>
-                  {snap.storyImportPath ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      href={`${urls.component(project.slug, snap.storyImportPath, { build: snap.buildId })}#${snap.storyId}`}
-                    >
-                      Component
-                    </Button>
-                  ) : null}
-                  <DesignButtons
-                    urls={designUrlsFor(designs, snap)}
-                    providerName={providerNameFor}
-                  />
-                  {canReview && (snap.status === "new" || snap.status === "changed") ? (
-                    <>
-                      <form
-                        method="post"
-                        action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/approve`}
-                        hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/approve`}
-                        hx-target="body"
-                        data-toast={`Approved ${snap.storyName}`}
-                      >
-                        <Button variant="ghost" size="sm" type="submit">
-                          Approve
-                        </Button>
-                      </form>
-                      <form
-                        method="post"
-                        action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/reject`}
-                        hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/reject`}
-                        hx-target="body"
-                        data-toast={`Rejected ${snap.storyName}`}
-                        data-toast-tone="warning"
-                      >
-                        <Button variant="ghost" size="sm" type="submit">
-                          Reject
-                        </Button>
-                      </form>
-                    </>
-                  ) : null}
+    <Card>
+      <SectionTitle>Capture attempts</SectionTitle>
+      {attempts.map(({ attempt, logs }, index): Rendered => (
+        <details key={attempt.id} open={index === attempts.length - 1}>
+          <summary>
+            Attempt {attempt.attemptNo}{" "}
+            <Badge tone={statusTone(attempt.status)}>{statusLabel(attempt.status)}</Badge>{" "}
+            <Meta as="span">
+              {attempt.storyCount} stories
+              {attempt.reqId ? ` · ${attempt.reqId}` : ""}
+            </Meta>
+          </summary>
+          {attempt.error ? <Meta as="pre">{attempt.error}</Meta> : null}
+          <div class="mt-1">
+            <VStack>
+              {logs.map((line): Rendered => (
+                <HStack key={line.id} align="baseline" wrap={false}>
+                  <Badge tone={logTone(line.level)}>{line.level}</Badge>
+                  <span>{line.message}</span>
+                  {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
                 </HStack>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {review ? (
-        <div class="mt-1">
-          <VStack>
-            {testing ? <VerdictCard data={review} /> : null}
-            <CommentsCard data={review} />
-          </VStack>
-        </div>
-      ) : null}
-    </DocumentLayout>
+              ))}
+            </VStack>
+          </div>
+        </details>
+      ))}
+    </Card>
   );
+}
+
+/** The build's numbers as label/value pairs (capture counts only with capture on). */
+export function detailItems(
+  build: Build,
+  details: BuildDetailsData,
+  snapshotCount: number,
+  a11y: A11ySummary,
+): { label: string; value: string | number; note?: string }[] {
+  const catalog =
+    details.components === null || details.stories === null
+      ? []
+      : [
+          { label: "Components", value: details.components },
+          { label: "Stories", value: details.stories },
+        ];
+  if (!details.testing) {
+    return catalog;
+  }
+  return [
+    ...catalog,
+    { label: "Snapshots", value: snapshotCount },
+    { label: "Inherited (reused without rendering)", value: build.inheritedCount },
+    { label: "Changed / new", value: build.changedCount },
+    { label: "Approved / unchanged", value: build.approvedCount },
+    { label: "Accessibility findings", value: a11y.findings, note: a11ySummaryNote(a11y) },
+  ].filter((item) => Boolean(item.value) || item.label === "Accessibility findings");
+}
+
+/** Captured-how line: affected or full capture, and the labels. */
+function BuildTags(props: { build: Build; details: BuildDetailsData }): Rendered {
+  const { build, details } = props;
+  const selective = build.affectedOnly && build.affectedImportPaths !== null;
+  return (
+    <HStack>
+      {details.testing ? (
+        <Badge tone={selective ? "info" : "neutral"}>
+          {selective ? "affected capture" : "full capture"}
+        </Badge>
+      ) : null}
+      {details.labels.map((label): Rendered => (
+        <Badge key={`${label.typeKey}:${label.value}`} tone="neutral">
+          {label.typeKey}: {label.value}
+        </Badge>
+      ))}
+    </HStack>
+  );
+}
+
+interface BuildDetailsProps {
+  project: Project;
+  build: Build;
+  details: BuildDetailsData;
+  snapshotCount: number;
+  a11y: A11ySummary;
+  staleCount: number;
+  canReview: boolean;
+  tests: ReturnType<typeof parseTestResults>;
+}
+
+/** The collapsed details panel: numbers, changes, stale baseline, tests, attempts, review state. */
+export function BuildDetails(props: BuildDetailsProps): Rendered {
+  const { project, build, details, staleCount, canReview } = props;
+  const { review } = details;
+  return (
+    <Disclosure title="Build details" open={build.status === "failed"}>
+      <VStack>
+        <BuildTags build={build} details={details} />
+        <DefinitionList items={detailItems(build, details, props.snapshotCount, props.a11y)} />
+        {details.testing ? (
+          <DefaultBranchNotice project={project} build={build} canReview={canReview} />
+        ) : null}
+        {details.testing && staleCount > 0 ? (
+          <StaleBaselineNotice
+            project={project}
+            build={build}
+            staleCount={staleCount}
+            canReview={canReview}
+          />
+        ) : null}
+        {review ? <ChangesetCard data={review} /> : null}
+        <TestsCard results={props.tests} />
+        <AttemptsCard attempts={details.attempts} />
+        {review && details.testing ? <VerdictCard data={review} /> : null}
+        {review ? <ChangeRequestsCard data={review} /> : null}
+        {review && details.testing ? <CommentsCard data={review} /> : null}
+      </VStack>
+    </Disclosure>
+  );
+}
+
+/** Review-only builds (capture off) keep the verdict and discussion in view, not behind the panel. */
+export function ReviewOnlySection(props: { details: BuildDetailsData }): Rendered | null {
+  const { review, testing } = props.details;
+  return review && !testing ? (
+    <VStack>
+      <VerdictCard data={review} />
+      <CommentsCard data={review} />
+    </VStack>
+  ) : null;
 }

@@ -687,6 +687,53 @@
         },
         "required": ["ok", "rediffed", "statusChanged", "missingScreenshots"]
       },
+      "StoryStatus": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "capturing",
+                  "comparing",
+                  "reviewing",
+                  "approved",
+                  "rejected",
+                  "failed",
+                  "cancelled"
+                ]
+              },
+              "reviewPath": {
+                "type": "string",
+                "description": "Path and query of the build's review page, no scheme or host"
+              }
+            },
+            "required": ["status", "reviewPath"]
+          },
+          "stories": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["pending", "new", "unchanged", "changed", "approved", "rejected"],
+                  "description": "Worst snapshot status across the story's rows"
+                },
+                "design": {
+                  "type": "string",
+                  "enum": ["stale", "deleted"]
+                }
+              },
+              "required": ["status"]
+            }
+          }
+        },
+        "required": ["build", "stories"]
+      },
       "Comment": {
         "type": "object",
         "properties": {
@@ -2533,7 +2580,7 @@
         },
         "responses": {
           "200": {
-            "description": "Manifest stored",
+            "description": "Manifest stored, or the same manifest was already accepted (no-op)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2550,6 +2597,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The build already accepted a different manifest",
             "content": {
               "application/json": {
                 "schema": {
@@ -2805,11 +2862,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Snapshot approved",
+            "description": "Snapshot approved. An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Ok"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -2870,11 +2932,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Snapshot rejected",
+            "description": "Snapshot rejected. An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Ok"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -2998,11 +3065,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Every open snapshot of the story and mode approved and each engine's baseline promoted",
+            "description": "Every open snapshot of the story and mode approved and each engine's baseline promoted. An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GroupDecisionResult"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -3071,11 +3143,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Every open snapshot of the story and mode rejected",
+            "description": "Every open snapshot of the story and mode rejected. An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GroupDecisionResult"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -3190,6 +3267,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
+      }
+    },
+    "/api/v1/projects/{slug}/builds/{buildId}/story-status": {
+      "get": {
+        "tags": ["Review"],
+        "summary": "Per-story review state of a build",
+        "description": "Read-only state for the Storybook addon (ADR 0042): the worst snapshot status of each story and a design problem where one is known. Stories with no snapshot are omitted. Never carries images, signed URLs, comments or reviewer identities. Answers `Cache-Control: private, no-store`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "buildId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The build's per-story state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -6209,6 +6344,97 @@
           },
           "409": {
             "description": "No previousSecret configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "hosting"
+      }
+    },
+    "/api/v1/admin/check-storage": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Check that storage holds what the database references (read-only)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Storage consistency report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "buildsChecked": {
+                      "type": "integer"
+                    },
+                    "baselinesChecked": {
+                      "type": "integer"
+                    },
+                    "builds": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "buildId": {
+                            "type": "string"
+                          },
+                          "missing": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": ["buildId", "missing"]
+                      }
+                    },
+                    "unreadableManifests": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "missingBaselineImages": {
+                      "type": "integer"
+                    },
+                    "unreferencedBlobs": {
+                      "type": "integer"
+                    },
+                    "sampled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "buildsChecked",
+                    "baselinesChecked",
+                    "builds",
+                    "unreadableManifests",
+                    "missingBaselineImages",
+                    "unreferencedBlobs",
+                    "sampled"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

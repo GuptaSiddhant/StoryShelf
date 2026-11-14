@@ -99,7 +99,7 @@ function figmaApi(handler: (url: string) => Response): ReturnType<typeof vi.spyO
 describe("design settings", () => {
   it("manages design files, component mappings and the write-only token", async () => {
     const { app, design, credentials } = await seed();
-    const page = await (await app.request("/projects/app/settings/design")).text();
+    const page = await (await app.request("/projects/app/settings/capture")).text();
     expect(page).toContain("Design files");
     expect(page).toContain("No design files linked.");
     expect(page).toContain("Component mapping");
@@ -123,7 +123,7 @@ describe("design settings", () => {
       "/projects/app/settings/design/figma/token",
       post({ token: "figd_secret_value" }),
     );
-    const withToken = await (await app.request("/projects/app/settings/design")).text();
+    const withToken = await (await app.request("/projects/app/settings/capture")).text();
     expect(withToken).toContain("Not used yet");
     expect(withToken).not.toContain("figd_secret_value");
     expect(await credentials.get("p1", "figma")).toBe("figd_secret_value");
@@ -184,8 +184,11 @@ describe("design surfaces", () => {
     // Button ×2 states + Tag; Card has none.
     expect(html.match(/>Figma</gu)).toHaveLength(3);
 
-    const detail = await (await app.request("/projects/app/builds/b1")).text();
-    expect(detail.match(/>Figma</gu)).toHaveLength(3);
+    const detail = await (
+      await app.request("/projects/app/builds/b1/diff?snapshot=tag-default")
+    ).text();
+    expect(detail).toContain("Open in Figma");
+    expect(detail).toContain("https://www.figma.com/design/MANUAL/Tag");
   });
 
   it("shows nothing on the review page without a link", async () => {
@@ -313,6 +316,7 @@ const asUser = (session: string, body: Record<string, string>) =>
     headers: {
       "content-type": "application/x-www-form-urlencoded",
       cookie: `storyshelf_session=${session}`,
+      "sec-fetch-site": "same-origin",
       "x-csrf-token": getCsrfToken(SECRET, session),
     },
     body: new URLSearchParams(body).toString(),
@@ -445,7 +449,7 @@ describe("design hardening", () => {
     apiWith({ "1:2": { document: { name: "Button" } } });
     await reviewHtml(app);
     expect((await credentials.info("p1", "figma"))?.status).toBe("ok");
-    const page = await (await app.request("/projects/app/settings/design")).text();
+    const page = await (await app.request("/projects/app/settings/capture")).text();
     expect(page).toMatch(/Rotate within (?:9|10) days/u);
   });
 
@@ -583,14 +587,14 @@ async function bare() {
 describe("without a design provider", () => {
   it("shows an empty Design tab and no design actions anywhere", async () => {
     const { app } = await bare();
-    const settings = await (await app.request("/projects/app/settings/design")).text();
+    const settings = await (await app.request("/projects/app/settings/capture")).text();
     expect(settings).toContain("No design provider configured");
     expect(settings).not.toContain("Component mapping");
     const library = await (await app.request("/projects/app/library")).text();
     expect(library).not.toContain(">Figma<");
     const review = await (await app.request("/projects/app/builds/b1/diff?snapshot=s1")).text();
     expect(review).not.toContain("Open in");
-    const card = await (await app.request("/projects/app/builds/b1")).text();
+    const card = await (await app.request("/projects/app/builds/b1/diff")).text();
     expect(card).not.toContain(">Figma<");
   });
 

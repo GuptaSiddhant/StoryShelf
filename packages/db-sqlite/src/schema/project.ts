@@ -15,6 +15,7 @@ export const projects = sqliteTable("projects", {
   playTimeoutMs: integer("play_timeout_ms").notNull().default(10_000),
   runA11y: integer("run_a11y", { mode: "boolean" }).notNull().default(true),
   runTests: integer("run_tests", { mode: "boolean" }).notNull().default(false),
+  switchStories: integer("switch_stories", { mode: "boolean" }).notNull().default(false),
   detectUnstable: integer("detect_unstable", { mode: "boolean" }).notNull().default(true),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
@@ -48,6 +49,7 @@ export interface Project {
   playTimeoutMs: number;
   runA11y: boolean;
   runTests: boolean;
+  switchStories: boolean;
   detectUnstable: boolean;
   browser: string;
   viewports: string | null;

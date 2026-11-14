@@ -87,15 +87,19 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       category: "database",
     },
     tables: schema,
-    migrate: async ({ logger }) => {
-      await runMigrationsLocked(async (use) => {
-        const reserved = await client.reserve();
-        try {
-          return await use(async (sql) => await reserved.unsafe(sql));
-        } finally {
-          reserved.release();
-        }
-      }, logger);
+    migrate: async ({ logger, release }) => {
+      await runMigrationsLocked(
+        async (use) => {
+          const reserved = await client.reserve();
+          try {
+            return await use(async (sql) => await reserved.unsafe(sql));
+          } finally {
+            reserved.release();
+          }
+        },
+        logger,
+        release,
+      );
       // postgres.js opens a real session per transaction, so row locks hold between processes.
       await activateRetention(db, retention);
     },

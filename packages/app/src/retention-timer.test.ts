@@ -1,3 +1,4 @@
+import type { Auth } from "@storyshelf/core/auth";
 import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { Retention } from "@storyshelf/core/retention";
@@ -20,7 +21,7 @@ async function arm(options: {
   ready?: () => Promise<{ ok: boolean }>;
 }) {
   const { db } = makeDatabase();
-  const { storage } = makeStorage();
+  const { storage, objects } = makeStorage();
   await db.insert(db.tables.projects, {
     id: "p",
     name: "P",
@@ -53,7 +54,7 @@ async function arm(options: {
     if (typeof scheduled !== "function") throw new Error("retention timer was not scheduled");
     await (scheduled as () => Promise<void>)();
   };
-  return { db, timer, run, purge, warn, error };
+  return { db, storage, objects, timer, run, purge, warn, error };
 }
 
 describe("background retention", () => {
@@ -187,6 +188,79 @@ describe("background retention", () => {
       timer?.stop();
     });
 
+    it("reclaims per-build copies whose blob exists, keeping the manifest, and resumes next sweep", async () => {
+      const hash = "a".repeat(64);
+      const { db, objects, run } = await arm({ capability: false, config: {} });
+      await db.insert(db.tables.builds, {
+        id: "b1",
+        projectId: "p",
+        gitSha: "x",
+        gitBranch: "main",
+        status: "approved",
+        retentionState: "available",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      objects.set(
+        "p/builds/b1/storybook/manifest.json",
+        Buffer.from(JSON.stringify({ "a.js": hash })),
+      );
+      objects.set("p/builds/b1/storybook/a.js", Buffer.from("a"));
+      objects.set(`content/${hash}`, Buffer.from("a"));
+      await run();
+      expect(objects.has("p/builds/b1/storybook/a.js")).toBe(false);
+      expect(objects.has("p/builds/b1/storybook/manifest.json")).toBe(true);
+      expect(objects.has(`content/${hash}`)).toBe(true);
+    });
+
+    it("then deletes the upload zip of a build that holds a manifest", async () => {
+      const hash = "a".repeat(64);
+      const { db, objects, run } = await arm({ capability: false, config: {} });
+      await db.insert(db.tables.builds, {
+        id: "b1",
+        projectId: "p",
+        gitSha: "x",
+        gitBranch: "main",
+        status: "approved",
+        retentionState: "available",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      objects.set(
+        "p/builds/b1/storybook/manifest.json",
+        Buffer.from(JSON.stringify({ "a.js": hash })),
+      );
+      objects.set("p/builds/b1/storybook.zip", Buffer.from("zip"));
+      objects.set(`content/${hash}`, Buffer.from("a"));
+      await run();
+      expect(objects.has("p/builds/b1/storybook.zip")).toBe(false);
+      expect(objects.has("p/builds/b1/storybook/manifest.json")).toBe(true);
+    });
+
+    it("stops the copy reclaim when the timer is stopped", async () => {
+      const { db, objects, run, timer } = await arm({ capability: false, config: {} });
+      await db.insert(db.tables.builds, {
+        id: "b1",
+        projectId: "p",
+        gitSha: "x",
+        gitBranch: "main",
+        status: "approved",
+        retentionState: "available",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      const hash = "a".repeat(64);
+      objects.set(
+        "p/builds/b1/storybook/manifest.json",
+        Buffer.from(JSON.stringify({ "a.js": hash })),
+      );
+      objects.set("p/builds/b1/storybook/a.js", Buffer.from("a"));
+      objects.set(`content/${hash}`, Buffer.from("a"));
+      timer?.stop();
+      await run();
+      expect(objects.has("p/builds/b1/storybook/a.js")).toBe(true);
+    });
+
     it("still runs when branch GC is off, because the build purge is on", async () => {
       const { timer, run, purge } = await arm({
         capability: true,
@@ -253,13 +327,47 @@ describe("background retention", () => {
       timer?.stop();
     });
 
-    it("schedules nothing when both are off", async () => {
+    it("schedules nothing when the interval is not positive", async () => {
       const { db } = makeDatabase();
       const { storage } = makeStorage();
       const logger = createShelfLogger({ level: "silent" });
       expect(
-        startBranchGcTimer(db, storage, { branchTtlDays: null } as ShelfConfig, logger),
+        startBranchGcTimer(db, storage, { branchGcIntervalMs: 0 } as ShelfConfig, logger),
       ).toBeNull();
+    });
+
+    it("sweeps expired auth rows with the configured window", async () => {
+      vi.useFakeTimers();
+      const { db } = makeDatabase();
+      const { storage } = makeStorage();
+      const logger = createShelfLogger({ level: "silent" });
+      const purgeExpired = vi.fn().mockResolvedValue({ sessions: 1, verifications: 2 });
+      const auth = { purgeExpired } as unknown as Auth;
+      const config = { branchTtlDays: null, expiredAuthTtlDays: 3 } as ShelfConfig;
+      const timer = startBranchGcTimer(db, storage, config, logger, false, undefined, auth);
+      await vi.advanceTimersByTimeAsync(3_600_001);
+      timer?.stop();
+      vi.useRealTimers();
+      expect(purgeExpired).toHaveBeenCalledOnce();
+      const cutoff = Date.parse(purgeExpired.mock.calls[0]?.[0] as string);
+      // The sweep ran 1h after the timer started, so the cutoff is 3 days before that moment.
+      expect(Date.now() - cutoff).toBeGreaterThan(3 * 86_400_000 - 3_700_000);
+      expect(Date.now() - cutoff).toBeLessThan(3 * 86_400_000);
+    });
+
+    it("keeps expired auth rows when the window is null", async () => {
+      vi.useFakeTimers();
+      const { db } = makeDatabase();
+      const { storage } = makeStorage();
+      const logger = createShelfLogger({ level: "silent" });
+      const purgeExpired = vi.fn();
+      const auth = { purgeExpired } as unknown as Auth;
+      const config = { branchTtlDays: null, expiredAuthTtlDays: null } as ShelfConfig;
+      const timer = startBranchGcTimer(db, storage, config, logger, false, undefined, auth);
+      await vi.advanceTimersByTimeAsync(3_600_001);
+      timer?.stop();
+      vi.useRealTimers();
+      expect(purgeExpired).not.toHaveBeenCalled();
     });
   });
 });

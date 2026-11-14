@@ -1,7 +1,7 @@
 {
   "name": "storyshelf",
   "version": "0.11.0",
-  "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
+  "description": "StoryShelf CLI: self-hosted visual testing and review for Storybook.",
   "keywords": [
     "ci",
     "cli",

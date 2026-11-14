@@ -36,7 +36,7 @@ async function seed(
 ) {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  const project = await createTestProject(db, db.tables, { name: "app" });
+  const project = await createTestProject(db, db.tables, { name: "web" });
   const builds = new BuildModel(db);
   const publish = async (sha: string, createdAt: string, index: unknown, branch = "main") => {
     const created = await createTestBuild(db, db.tables, project.id, {
@@ -90,12 +90,12 @@ async function seed(
 }
 
 const page = async (app: Awaited<ReturnType<typeof seed>>["app"], path: string) =>
-  await (await app.request(`/projects/app/components/${path}`)).text();
+  await (await app.request(`/projects/web/components/${path}`)).text();
 
 describe("component page without testing", () => {
   it("shows the stories and docs of the newest build, with a click-to-load sandboxed preview", async () => {
     const { app, b2 } = await seed();
-    const response = await app.request("/projects/app/components/src/Button.stories.tsx");
+    const response = await app.request("/projects/web/components/src/Button.stories.tsx");
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("Components/Button");
@@ -108,7 +108,7 @@ describe("component page without testing", () => {
     expect(html).toContain('id="preview"');
     expect(html).toMatch(
       new RegExp(
-        `<template data-preview-template[^>]*><iframe[^>]*src="/projects/app/storybook/build/${b2.id}/iframe.html\\?id=button--primary&amp;viewMode=story"`,
+        `<template data-preview-template[^>]*><iframe[^>]*src="/projects/web/storybook/build/${b2.id}/iframe.html\\?id=button--primary&amp;viewMode=story"`,
         "u",
       ),
     );
@@ -137,8 +137,8 @@ describe("component page without testing", () => {
     const { app, b1, b2 } = await seed();
     const html = await page(app, "src/Button.stories.tsx?tab=history");
     expect(html).toContain("Published builds");
-    expect(html).toContain(`/projects/app/builds/${b2.id}`);
-    expect(html).toContain(`/projects/app/builds/${b1.id}`);
+    expect(html).toContain(`/projects/web/builds/${b2.id}`);
+    expect(html).toContain(`/projects/web/builds/${b1.id}`);
     expect(html).toContain("changed");
     expect(html).toContain("2 added");
     expect(html).toContain("1 renamed");
@@ -149,7 +149,7 @@ describe("component page without testing", () => {
     const { app } = await seed();
     const moved = await page(app, "src/Card.stories.tsx");
     expect(moved).toContain("This component moved");
-    expect(moved).toContain("/projects/app/components/src/ui/Card.stories.tsx");
+    expect(moved).toContain("/projects/web/components/src/ui/Card.stories.tsx");
     const deleted = await page(app, "src/Old.stories.tsx");
     expect(deleted).toContain("Not in the latest build");
     expect(deleted).toContain("sha-b1");
@@ -157,8 +157,8 @@ describe("component page without testing", () => {
 
   it("404s for files no build holds, empty paths and unknown projects", async () => {
     const { app } = await seed();
-    expect((await app.request("/projects/app/components/src/Nope.stories.tsx")).status).toBe(404);
-    expect((await app.request("/projects/app/components/")).status).toBe(404);
+    expect((await app.request("/projects/web/components/src/Nope.stories.tsx")).status).toBe(404);
+    expect((await app.request("/projects/web/components/")).status).toBe(404);
     expect((await app.request("/projects/zzz/components/src/Button.stories.tsx")).status).toBe(404);
   });
 
@@ -180,10 +180,10 @@ describe("component page without testing", () => {
   it("answers 404 for a build that is unknown or belongs to no such project, and 200 'Not in this build' for one without the file", async () => {
     const { app, b2 } = await seed();
     expect(
-      (await app.request("/projects/app/components/src/Button.stories.tsx?build=nope")).status,
+      (await app.request("/projects/web/components/src/Button.stories.tsx?build=nope")).status,
     ).toBe(404);
     const missing = await app.request(
-      `/projects/app/components/src/Old.stories.tsx?build=${b2.id}`,
+      `/projects/web/components/src/Old.stories.tsx?build=${b2.id}`,
     );
     expect(missing.status).toBe(200);
     const html = await missing.text();
@@ -202,7 +202,7 @@ describe("component page without testing", () => {
     const html = await page(app, "src/Button.stories.tsx");
     expect(html).toContain("Components/Button");
     expect(((await db.list(db.tables.buildComponents)) as unknown[]).length).toBeGreaterThan(0);
-    expect(project.slug).toBe("app");
+    expect(project.slug).toBe("web");
   });
 
   it("does not offer a frame for a private build under sign-in", async () => {
@@ -237,10 +237,10 @@ describe("component page without testing", () => {
     const { app, project, b2 } = await seed({ auth: true, testing: true, secret });
     const html = await page(app, "src/Button.stories.tsx");
     expect(html).toContain(
-      `data-preview-refresh-url="/api/v1/projects/app/builds/${b2.id}/preview-token"`,
+      `data-preview-refresh-url="/api/v1/projects/web/builds/${b2.id}/preview-token"`,
     );
     expect(html).toContain("data-preview-refresh-seconds=");
-    const response = await app.request(`/api/v1/projects/app/builds/${b2.id}/preview-token`);
+    const response = await app.request(`/api/v1/projects/web/builds/${b2.id}/preview-token`);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     const { base } = (await response.json()) as { base: string };
@@ -249,13 +249,13 @@ describe("component page without testing", () => {
       ok: true,
       claims: { projectId: project.id, buildId: b2.id },
     });
-    expect((await app.request("/api/v1/projects/app/builds/nope/preview-token")).status).toBe(404);
+    expect((await app.request("/api/v1/projects/web/builds/nope/preview-token")).status).toBe(404);
   });
 
   it("offers no refresh for a frame that needs no token", async () => {
     const { app, b2 } = await seed({ auth: true, publicBuilds: true });
     expect(await page(app, "src/Button.stories.tsx")).not.toContain("data-preview-refresh-url");
-    expect((await app.request(`/api/v1/projects/app/builds/${b2.id}/preview-token`)).status).toBe(
+    expect((await app.request(`/api/v1/projects/web/builds/${b2.id}/preview-token`)).status).toBe(
       404,
     );
   });
@@ -309,7 +309,7 @@ describe("component page with testing", () => {
     const html = await page(app, "src/Button.stories.tsx");
     expect(html).toContain("Design/Button");
     expect(html).toContain('id="button--primary"');
-    expect(html).toContain("changed");
+    expect(html).toContain("Changed");
     const stories = await page(app, "src/Button.stories.tsx?tab=stories");
     expect(stories).toContain(">Tertiary<");
     const history = await page(app, "src/Button.stories.tsx?tab=history");

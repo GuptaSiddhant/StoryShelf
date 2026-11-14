@@ -27,6 +27,7 @@ import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
 import { logInvalidDesigns } from "./design.ts";
 import { assertModeCaps, enrichStories } from "./enrich.ts";
 import { classifyFailures } from "./failure-sets.ts";
+import { prepareStorybook } from "./materialize.ts";
 import { captureAcrossBrowsers, type MatrixInput } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
@@ -36,7 +37,7 @@ import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
 import { detectUnstableRenders } from "./stability.ts";
-import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
+import { persistStorybookStatics } from "./statics.ts";
 import { storybookUrlSource } from "./storybook-urls.ts";
 import { StorybookAdapter } from "./storybook.ts";
 import { loadTarget } from "./target.ts";
@@ -246,14 +247,9 @@ async function runCapturePhases(
       "capture.extract",
       async () =>
         await withSpan("capture.extract", async () => {
-          return await extractStorybookToScratch(
-            options.storage,
-            options.scratchDir,
-            project.id,
-            build.id,
-            undefined,
-            options.limits,
-          );
+          return await prepareStorybook(options.storage, options.scratchDir, project.id, build.id, {
+            limits: options.limits,
+          });
         }),
     );
     const extractDuration = performance.now() - extractStart;

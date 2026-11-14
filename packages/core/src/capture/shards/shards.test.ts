@@ -1,4 +1,5 @@
 import AdmZip from "adm-zip";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,7 +12,7 @@ import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { ProjectModel } from "../../models/project.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
 import { makeDatabase, makeStorage } from "../../test-helpers/fake-adapters.ts";
-import { storybookZipPath } from "../../utils/paths.ts";
+import { storybookDir, storybookZipPath } from "../../utils/paths.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "../orchestrator.ts";
 import { parseTestResults } from "../tests.ts";
 import { executeCaptureShard, type ShardOutcome } from "./execute.ts";
@@ -701,6 +702,24 @@ describe("sharded capture", () => {
     const { readdir } = await import("node:fs/promises");
     const shardsDir = join(scratchDir, ".storyshelf-scratch", w.project.id, w.build.id, "shards");
     expect(await readdir(shardsDir).catch(() => [])).toEqual([]);
+  });
+
+  it("renders a shard from the manifest and blobs once the zip is gone", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    const index = new AdmZip(zipOfStories(25)).readFile("index.json") as Buffer;
+    const hash = createHash("sha256").update(index).digest("hex");
+    const { storage } = w;
+    await storage.write(`content/${hash}`, index);
+    await storage.write(
+      `${storybookDir(w.project.id, w.build.id)}/manifest.json`,
+      Buffer.from(JSON.stringify({ "index.json": hash })),
+    );
+    await storage.delete(storybookZipPath(w.project.id, w.build.id));
+    await w.runShard(w.queued[0] as ShardJob);
+    const { readdir } = await import("node:fs/promises");
+    const buildDir = join(scratchDir, ".storyshelf-scratch", w.project.id, w.build.id);
+    expect(await readdir(join(buildDir, "shards")).catch(() => [])).toEqual([]);
   });
 
   it("does not pull a shard's scratch out from under a worker that started during the plan", async () => {
