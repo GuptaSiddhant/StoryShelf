@@ -65,7 +65,7 @@ function testApp(db: DatabaseAdapter, shelf: ShelfAuth): ReturnType<typeof creat
     storage,
     auth: shelf.adapter,
     logger: silentLogger,
-    config: { secret: SECRET },
+    config: { secret: SECRET, publicBaseUrl: BASE_URL },
   });
 }
 

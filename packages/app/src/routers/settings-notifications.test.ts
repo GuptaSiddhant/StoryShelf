@@ -103,6 +103,7 @@ function postForm(
     method: "POST",
     headers: {
       cookie: "storyshelf_session=ok",
+      "sec-fetch-site": "same-origin",
       "content-type": "application/x-www-form-urlencoded",
       "x-csrf-token": getCsrfToken(secret, "ok"),
     },
@@ -205,7 +206,7 @@ describe("notifications settings tab", () => {
     );
     expect(saved.status).not.toBe(401);
     const page = await app.request("/projects/notify-project/settings/review", {
-      headers: { cookie: "storyshelf_session=ok" },
+      headers: { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" },
     });
     expect(await page.text()).toContain('value="build:approved" checked');
   });
@@ -294,8 +295,8 @@ describe("notifications settings tab", () => {
     ]);
     expect(row).toMatchObject({ enabled: false, reviewRequests: true });
     const html = await (
-      await app.request("/projects/notify-project/settings/review", {
-        headers: { cookie: "storyshelf_session=ok" },
+      await app.request(path, {
+        headers: { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" },
       })
     ).text();
     expect(html).toMatch(/name="reviewRequests"[^>]*checked/u);
@@ -322,7 +323,7 @@ describe("notifications settings tab", () => {
     const seeded = await seed();
     const app = testApp(seeded, true);
     const page = await app.request("/projects/notify-project/settings/review", {
-      headers: { cookie: "storyshelf_session=ok" },
+      headers: { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" },
     });
     const html = await page.text();
     for (const entry of LISTED_TOPICS) {
@@ -341,7 +342,11 @@ describe("notifications settings tab", () => {
     const app = testApp(seeded, true);
     const path = "/projects/notify-project/settings/review";
     const page = async () =>
-      await (await app.request(path, { headers: { cookie: "storyshelf_session=ok" } })).text();
+      await (
+        await app.request(path, {
+          headers: { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" },
+        })
+      ).text();
     expect(await page()).toContain("Emails you when a build waits for a verdict");
 
     const subscriptions = new NotificationSubscriptionModel(seeded.db);

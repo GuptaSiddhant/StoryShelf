@@ -1,4 +1,5 @@
 /** The library's component list: one card per title, from the catalog, with snapshots layered on. */
+import { contentHostSuffix } from "@storyshelf/core/config";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -90,7 +91,7 @@ function LibraryCard(props: {
 /** Component page of a group (its story file), when the index names one. */
 function componentHref(project: Project, group: LibraryGroup): string | undefined {
   return group.importPath
-    ? createUrlBuilder("/", getStore().config.publishedBaseDomain).component(
+    ? createUrlBuilder("/", contentHostSuffix(getStore().config)).component(
         project.slug,
         group.importPath,
       )
@@ -122,7 +123,7 @@ function StoryLinks(props: {
   project: Project;
   build: Build;
 }): Rendered {
-  const base = createUrlBuilder("/", getStore().config.publishedBaseDomain).storybookBuild(
+  const base = createUrlBuilder("/", contentHostSuffix(getStore().config)).storybookBuild(
     props.project.slug,
     props.build.id,
   );

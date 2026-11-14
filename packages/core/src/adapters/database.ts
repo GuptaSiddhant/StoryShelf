@@ -7,12 +7,26 @@
  * packages (`@storyshelf/db-sqlite`, `@storyshelf/db-postgres`).
  */
 import type { SQL } from "drizzle-orm";
+import { getTableColumns } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
 import type { MigrationContext } from "./skipped-index.ts";
 
 /** A fenced reference write lost its generation race and should be retried. */
 export class ReferenceGenerationConflict extends Error {}
+
+export {
+  decideMigration,
+  gatedMigration,
+  sqlSchemaLevelStore,
+  normalizeRelease,
+  SchemaTooNewError,
+  type GatedMigration,
+  type MigrationDecision,
+  type SchemaLevelDialect,
+  type SchemaLevelQuery,
+  type SchemaLevelStore,
+} from "./schema-level.ts";
 
 export {
   duplicateGroupsSql,
@@ -38,6 +52,7 @@ export interface Tables {
   buildComponents: Table;
   buildReviews: Table;
   siteSettings: Table;
+  schemaMeta: Table;
   snapshots: Table;
   baselines: Table;
   comments: Table;
@@ -96,12 +111,47 @@ export function clampListLimit(limit?: number): number | undefined {
 export interface ListOptions {
   /** SQL WHERE condition. */
   where?: SQL;
-  /** SQL ORDER BY condition. */
+  /**
+   * SQL ORDER BY condition. Every adapter appends `id` as the final tie-break,
+   * and orders by `id` alone when this is omitted, so equal sort keys come back
+   * in the same (creation) order on every dialect.
+   */
   orderBy?: SQL;
   /** Maximum number of rows to return. */
   limit?: number;
   /** Number of rows to skip. */
   offset?: number;
+  /**
+   * Column keys (as named on the table object) to read. Omitted: every column. Rows come back
+   * without the other keys, so only pass it where the caller never reads them, and type the result
+   * accordingly. `id` is always read, so the tie-break order is unchanged.
+   */
+  columns?: readonly string[];
+}
+
+/** Every column key of `table` except `omit`: the `columns` of a list that skips only large columns. */
+export function columnsExcept(table: Table, ...omit: readonly string[]): string[] {
+  return Object.keys(getTableColumns(table)).filter((key) => !omit.includes(key));
+}
+
+/**
+ * The Drizzle selection for a list that reads only `columns` (plus `id`), or `undefined` for every
+ * column. The one place the projection is built, so each dialect and the fake agree on it.
+ */
+export function listSelection(
+  table: Table,
+  columns: readonly string[] | undefined,
+): Record<string, unknown> | undefined {
+  if (columns === undefined) {
+    return undefined;
+  }
+  const all = getTableColumns(table);
+  const keys = new Set(["id", ...columns]);
+  const unknown = [...keys].filter((key) => !(key in all));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown column(s) for list: ${unknown.join(", ")}`);
+  }
+  return Object.fromEntries([...keys].map((key) => [key, all[key]]));
 }
 
 /**

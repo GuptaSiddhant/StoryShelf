@@ -41,7 +41,7 @@ export interface AdvanceTarget {
  */
 async function reviewSwap(c: Context, target: AdvanceTarget): Promise<Response> {
   const { project, build } = target;
-  const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
+  const snapshots = await new SnapshotModel(getStore().db).listByBuildSummary(build.id);
   const shown = nextOpenSnapshotId(snapshots, target.snapshotId) ?? target.snapshotId;
   const url = snapshotPageUrl(project, build, shown);
   const data = await loadBuildDiffData(c, project, build, { snapshotId: shown, returnPath: url });

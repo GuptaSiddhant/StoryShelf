@@ -1,4 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 /**
  * Publishing wiring (ADR 0006, decision 10): the completer every upload route ends in, and the
  * `publish` job kind on the shared database queue. Its handler runs on every instance with a
@@ -25,6 +26,7 @@ import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import type { JobQueue } from "./job-queue.ts";
+import { precompressBuild } from "./routers/published-precompress.ts";
 
 /** What request handlers and the consumer use of publishing. */
 export interface PublishWiring {
@@ -72,9 +74,14 @@ export function setupPublishing(
     storage: options.storage,
     logger: logger.child({ component: "catalog" }),
   });
-  const afterPublish = publishHooks(catalog, captureWillRun, delivery, options.database);
+  const afterPublish = publishHooks(catalog, captureWillRun, delivery, options.database, {
+    enabled: config.publishedCompression === true,
+    storage: options.storage,
+    logger: logger.child({ component: "precompress" }),
+  });
   const completer = createPublishCompleter({
     db: options.database,
+    storage: options.storage,
     captureWillRun,
     afterPublish,
     logger,
@@ -133,9 +140,19 @@ function publishHooks(
   captureWillRun: boolean,
   delivery: Pick<Parameters<typeof setupPublishing>[4], "buildState" | "reviewRequested">,
   db: DatabaseAdapter,
+  compression: { enabled: boolean; storage: StorageAdapter; logger: Logger },
 ): AfterPublishHook[] {
   return [
     createCatalogHook(catalog),
+    // The gzip and brotli copies of a published build, made in the background so the first request
+    // is already compressed. It never delays or fails the publish.
+    // oxlint-disable-next-line typescript/promise-function-async -- queues work and returns; nothing to await
+    ({ build, outcome }) => {
+      if (compression.enabled && outcome.ok) {
+        precompressBuild(compression.storage, build.projectId, build.id, compression.logger);
+      }
+      return Promise.resolve();
+    },
     async ({ build }) => {
       await delivery.buildState.request(build.id);
     },

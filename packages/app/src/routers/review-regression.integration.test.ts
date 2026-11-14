@@ -131,7 +131,11 @@ async function give(
   const identity: Record<string, string> =
     "token" in caller
       ? { authorization: `Bearer ${caller.token}` }
-      : { cookie: `storyshelf_session=${caller.user}`, "x-csrf-token": getCsrfToken("s", who) };
+      : {
+          cookie: `storyshelf_session=${caller.user}`,
+          "sec-fetch-site": "same-origin",
+          "x-csrf-token": getCsrfToken("s", who),
+        };
   const form = channel === "form";
   const path = form
     ? `/projects/gate/builds/${id}/reviews`
@@ -153,7 +157,11 @@ async function give(
 async function createBuild(booted: Booted, uploaded = true): Promise<string> {
   const created = await booted.app.request("/api/v1/projects/gate/builds", {
     method: "POST",
-    headers: { cookie: "storyshelf_session=admin", "content-type": "application/json" },
+    headers: {
+      cookie: "storyshelf_session=admin",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/json",
+    },
     body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/x" }),
   });
   expect(created.status).toBe(202);
@@ -170,7 +178,7 @@ async function createBuild(booted: Booted, uploaded = true): Promise<string> {
 
 async function page(booted: Booted, user: string, path: string): Promise<string> {
   const response = await booted.app.request(`/projects/gate${path}`, {
-    headers: { cookie: `storyshelf_session=${user}` },
+    headers: { cookie: `storyshelf_session=${user}`, "sec-fetch-site": "same-origin" },
   });
   expect(response.status).toBe(200);
   return await response.text();
@@ -334,7 +342,11 @@ function failingRunner(release: Promise<null>) {
 async function uploadStories(booted: Booted): Promise<string> {
   const created = await booted.app.request("/api/v1/projects/gate/builds", {
     method: "POST",
-    headers: { cookie: "storyshelf_session=admin", "content-type": "application/json" },
+    headers: {
+      cookie: "storyshelf_session=admin",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/json",
+    },
     body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/x" }),
   });
   const { build } = (await created.json()) as { build: { id: string } };
@@ -352,7 +364,11 @@ async function uploadStories(booted: Booted): Promise<string> {
   );
   const upload = await booted.app.request(`/api/v1/projects/gate/builds/${build.id}/zip`, {
     method: "PUT",
-    headers: { cookie: "storyshelf_session=admin", "content-type": "application/zip" },
+    headers: {
+      cookie: "storyshelf_session=admin",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/zip",
+    },
     body: new Uint8Array(zip.toBuffer()),
   });
   expect(upload.status).toBe(202);

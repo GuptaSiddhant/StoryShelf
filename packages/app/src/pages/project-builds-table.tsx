@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -65,7 +66,7 @@ function BuildSummaryCell({
   project: Project;
   build: Build;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <div class={buildCell}>
       <strong>
@@ -86,7 +87,7 @@ function BuildActions({
   project: Project;
   build: Build;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   // The diff page is a testing route; hosting-only instances link to the build page.
   const needsReview = build.status === "reviewing" && testingEnabled();
   return (

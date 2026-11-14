@@ -1,4 +1,5 @@
 // oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
@@ -132,7 +133,7 @@ async function renderEmptyLibrary(project: Project): Promise<RenderedContent> {
 
 /** A build with nothing to list: still publishing, failed, or its Storybook is gone. */
 function renderNoStories(project: Project, build: Build): RenderedContent {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const preparing = build.status === "pending";
   return (
     <DocumentLayout
@@ -172,7 +173,7 @@ function LibraryHeader(props: {
   branches: string[];
 }): Rendered {
   const { project, build } = props;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <PageHeader
       title="Library"

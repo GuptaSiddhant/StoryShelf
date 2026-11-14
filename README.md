@@ -24,6 +24,17 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
 
+## Quick start
+
+```sh
+docker run -p 3000:3000 -v storyshelf:/data ghcr.io/guptasiddhant/storyshelf
+```
+
+Open <http://localhost:3000>. SQLite and local storage live on the `/data` volume, and capture uses the
+image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64`
+(`:<version>`, `:latest`, and `-hosting` variants without a browser); see the
+[Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose.
+
 ## StoryShelf vs Chromatic
 
 | | Chromatic (SaaS) | StoryShelf (self-hosted) |
@@ -57,7 +68,7 @@ packages/
 apps/
   dev-server/     dev-server      — local dev server (from TS source via nub watch)
   website/        website         — public docs (Astro Starlight)
-  fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
+  fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on a stable release via fly.yml)
 fixtures/
   storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
   storybook-9/    storybook-fixture -- SB 9 Vite React

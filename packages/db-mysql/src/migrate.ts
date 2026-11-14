@@ -7,6 +7,8 @@
  * duplicate-index error from a repeated DDL statement is ignored.
  */
 import {
+  gatedMigration,
+  sqlSchemaLevelStore,
   duplicateGroupsSql,
   logSkippedIndex,
   parseUniqueIndex,
@@ -57,6 +59,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
   { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  { table: "projects", column: "switch_stories", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
     table: "snapshots",
@@ -103,6 +106,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
   { table: "builds", column: "capture_generation", definition: "INTEGER NOT NULL DEFAULT 0" },
+  { table: "builds", column: "manifest_sha256", definition: "VARCHAR(64) NULL" },
   {
     table: "notification_subscriptions",
     column: "review_requests",
@@ -161,7 +165,22 @@ const IDENTITY_INDEXES = [
 ];
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+export async function runMigrations(
+  run: MigrationRunner,
+  logger?: Logger,
+  release?: string,
+): Promise<void> {
+  await gatedMigration({
+    release,
+    logger,
+    store: sqlSchemaLevelStore(run, "mysql"),
+    migrate: async () => {
+      await migrateEverything(run, logger);
+    },
+  });
+}
+
+async function migrateEverything(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);
@@ -180,6 +199,22 @@ async function ensureColumns(run: MigrationRunner): Promise<void> {
   }
 }
 
+async function migrateBuildsListIndexes(run: MigrationRunner): Promise<void> {
+  await ensureIndex(
+    run,
+    "builds",
+    "builds_project_created_idx",
+    "CREATE INDEX builds_project_created_idx ON builds (project_id, created_at)",
+  );
+  await ensureIndex(
+    run,
+    "builds",
+    "builds_project_branch_created_idx",
+    "CREATE INDEX builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
+  );
+  await dropIndexIfExists(run, "builds", "builds_git_branch_idx");
+}
+
 async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<void> {
   await dropIndexIfExists(run, "snapshots", "snapshots_build_story_viewport_idx");
   await dropIndexIfExists(run, "baselines", "baselines_project_story_viewport_branch_idx");
@@ -196,6 +231,7 @@ async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<vo
     "builds_project_gitsha_idx",
     "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)",
   );
+  await migrateBuildsListIndexes(run);
   await ensureUniqueIndex(
     run,
     "design_links",

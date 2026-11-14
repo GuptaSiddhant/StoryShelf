@@ -41,7 +41,7 @@ const index = {
 async function seed(options: { testing?: boolean; status?: string; catalogued?: boolean } = {}) {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  const project = await createTestProject(db, db.tables, { name: "app" });
+  const project = await createTestProject(db, db.tables, { name: "web" });
   const created = await createTestBuild(db, db.tables, project.id);
   // `reviewing` is only reached from `capturing`, as a run finalizes.
   if (options.status === "reviewing") await new BuildModel(db).setStatus(created.id, "capturing");

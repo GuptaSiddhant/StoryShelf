@@ -3,6 +3,7 @@
  * full page (`ui.ts`) and for the in-place swap that follows an approve or reject
  * (`review-next.ts`), so both show the same thing.
  */
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { CommentModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
@@ -65,7 +66,7 @@ export async function loadBuildDiffData(
     usage: await linkedUsageFor(c, project, build.id, selected?.storyImportPath ?? null).catch(
       () => [],
     ),
-    publishedBaseDomain: config.publishedBaseDomain,
+    publishedBaseDomain: contentHostSuffix(config),
     currentSize: selected ? await readPngSize(selected.screenshotPath) : null,
   };
 }

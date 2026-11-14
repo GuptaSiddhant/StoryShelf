@@ -147,6 +147,7 @@ async function boot(project: Record<string, unknown> = {}) {
       ...init,
       headers: {
         cookie: `storyshelf_session=${id}`,
+        "sec-fetch-site": "same-origin",
         "x-csrf-token": getCsrfToken("s", id),
         ...(init.headers as Record<string, string> | undefined),
       },

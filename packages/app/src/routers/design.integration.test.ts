@@ -316,6 +316,7 @@ const asUser = (session: string, body: Record<string, string>) =>
     headers: {
       "content-type": "application/x-www-form-urlencoded",
       cookie: `storyshelf_session=${session}`,
+      "sec-fetch-site": "same-origin",
       "x-csrf-token": getCsrfToken(SECRET, session),
     },
     body: new URLSearchParams(body).toString(),
