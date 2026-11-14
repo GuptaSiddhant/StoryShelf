@@ -8,8 +8,8 @@ import { notificationChannelModel } from "./scoped-models.ts";
 import { asString, renderSettingsPage } from "./settings.handlers.ts";
 
 const CONFIG_FIELDS = ["owner", "repo", "host", "prefix"] as const;
-/** Only the GitHub provider reads these: how it shows a build and the App that posts check runs. */
-const GITHUB_FIELDS = ["mode", "appId", "installationId"] as const;
+/** Only the GitHub provider reads these: how it shows a build, the App that posts check runs and the GHES API base. */
+const GITHUB_FIELDS = ["mode", "appId", "installationId", "apiUrl"] as const;
 
 /** The provider config from the form; blank optional fields are left out. */
 function gitConfig(provider: string, form: FormData): Record<string, string> {

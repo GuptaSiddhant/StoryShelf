@@ -216,17 +216,21 @@ export class NotificationChannelModel {
   }
 }
 
-/** Refuse a chat webhook URL or GitLab host that is private or local; never echoes an address. */
+/** The config field that holds the destination URL of a git provider, when it has one. */
+const GIT_HOST_FIELD: Record<string, string> = { gitlab: "host", github: "apiUrl" };
+
+/** Refuse a chat webhook URL, GitLab host or GHES API base that is private or local; never echoes an address. */
 async function destinationProblem(
   provider: string,
   config: unknown,
   secret: string | undefined,
 ): Promise<ChannelValidation> {
-  const host = (config as { host?: unknown } | null)?.host;
+  const hostField = GIT_HOST_FIELD[provider];
+  const host = hostField ? (config as Record<string, unknown> | null)?.[hostField] : undefined;
   const [field, url] =
     provider === "slack" || provider === "teams"
       ? (["secret", secret] as const)
-      : provider === "gitlab" && typeof host === "string"
+      : typeof host === "string"
         ? (["config", host] as const)
         : ([null, undefined] as const);
   if (field === null || !url) {
@@ -239,7 +243,7 @@ async function destinationProblem(
   const message = outboundReasonText(reason);
   return field === "secret"
     ? { ok: false, field, message }
-    : { ok: false, field, message, issues: [{ path: "host", message }] };
+    : { ok: false, field, message, issues: [{ path: hostField ?? "host", message }] };
 }
 
 /** Git channels belong to one project and carry their own token. */

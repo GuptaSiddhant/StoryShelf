@@ -56,9 +56,9 @@ StoryShelf makes outbound connections only for the integrations you configure:
 
 ### URLs that projects set
 
-Project admins set some of those URLs: webhooks, Slack and Teams channels and GitLab hosts. The server refuses any of them that is not `https`, or that resolves to a loopback, private (RFC 1918), link-local (such as a cloud metadata service), unique-local, CGNAT, multicast or unspecified address, IPv4 or IPv6. A webhook is checked when it is saved and the check runs again on every send, because DNS can change. The request connects to the address that was checked, and a redirect is checked as a new destination (at most three hops). A refusal logs only the URL's origin and a reason code, never the resolved address.
+Project admins set some of those URLs: webhooks, Slack and Teams channels, GitLab hosts and the GitHub Enterprise Server API base. The server refuses any of them that is not `https`, or that resolves to a loopback, private (RFC 1918), link-local (such as a cloud metadata service), unique-local, CGNAT, multicast or unspecified address, IPv4 or IPv6. A webhook is checked when it is saved and the check runs again on every send, because DNS can change. The request connects to the address that was checked, and a redirect is checked as a new destination (at most three hops). A refusal logs only the URL's origin and a reason code, never the resolved address.
 
-URLs the operator configures (AI providers, remote browsers, storage endpoints, SMTP) are not affected. To let projects reach a self-hosted GitLab or Mattermost on a private network, list its exact host in `config.outbound.allowHosts`. See [Configuration](/guides/config/#outbound-urls-set-by-projects).
+URLs the operator configures (AI providers, remote browsers, storage endpoints, SMTP) are not affected. To let projects reach a self-hosted GitLab, GitHub Enterprise Server or Mattermost on a private network, list its exact host in `config.outbound.allowHosts`. See [Configuration](/guides/config/#outbound-urls-set-by-projects).
 
 There is no analytics, telemetry or update check in the server. The web UI ships its own scripts, styles and fonts and loads nothing from a CDN; the only content it can show from elsewhere is a profile picture, when your sign-in provider supplies one.
 

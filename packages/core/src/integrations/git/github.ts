@@ -29,6 +29,7 @@ export const gitHubNotifier: StateNotifierProvider = {
       token: await token(),
       owner: cfg.owner,
       repo: cfg.repo,
+      apiUrl: cfg.apiUrl,
       logger,
     });
     const writer: StateWriter = {
@@ -49,7 +50,12 @@ function tokenSource(cfg: GitHubConfig, secret: string): () => Promise<string> {
   if (cfg.mode !== "checks" || cfg.appId === undefined || cfg.installationId === undefined) {
     return async () => await Promise.resolve(secret);
   }
-  const creds = { appId: cfg.appId, installationId: cfg.installationId, privateKey: secret };
+  const creds = {
+    appId: cfg.appId,
+    installationId: cfg.installationId,
+    apiUrl: cfg.apiUrl,
+    privateKey: secret,
+  };
   return async () => await installationToken(creds);
 }
 

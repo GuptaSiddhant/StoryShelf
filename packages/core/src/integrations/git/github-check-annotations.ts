@@ -78,8 +78,7 @@ async function listAnnotations(
   seen: ListedAnnotation[],
 ): Promise<ListedAnnotation[]> {
   const url = repoPath(
-    repo.owner,
-    repo.repo,
+    repo,
     `/check-runs/${String(id)}/annotations?per_page=${String(LIST_PAGE)}&page=${String(page)}`,
   );
   const listed = await httpJson<ListedAnnotation[]>(url, { headers: githubHeaders(repo.token) });

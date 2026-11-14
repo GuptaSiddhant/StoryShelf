@@ -12,7 +12,7 @@ interface IssueComment {
 
 /** Fetch-backed review thread (comments) for a pull request. */
 function createThread(repo: GitHubRepo, prNumber: number): ReviewThread {
-  const threadUrl = repoPath(repo.owner, repo.repo, `/issues/${prNumber}/comments`);
+  const threadUrl = repoPath(repo, `/issues/${prNumber}/comments`);
   const headers = githubHeaders(repo.token);
   return {
     list: async () => {
@@ -21,7 +21,7 @@ function createThread(repo: GitHubRepo, prNumber: number): ReviewThread {
     },
     update: async (id, body) => {
       const updated = await httpJson<IssueComment>(
-        repoPath(repo.owner, repo.repo, `/issues/comments/${String(id)}`),
+        repoPath(repo, `/issues/comments/${String(id)}`),
         { method: "PATCH", headers, json: { body } },
       );
       return String(updated.id);
@@ -49,7 +49,7 @@ export async function upsertPrComment(
     sha: input.sha,
     logger: input.logger,
     resolveNumber: async () =>
-      await findPrNumber({ token, owner, repo: repo.repo, sha: input.sha }),
+      await findPrNumber({ token, owner, repo: repo.repo, apiUrl: repo.apiUrl, sha: input.sha }),
     thread: (prNumber) => createThread(repo, prNumber),
   });
 }
