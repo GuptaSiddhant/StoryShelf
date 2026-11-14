@@ -14,6 +14,7 @@ import { createClient, normalizeBaseUrl, RequestError, type BuildCreated } from 
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
 import { isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
+import { parseLabels } from "./labels.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 import { trySkipUnchanged } from "./upload-skip.ts";
@@ -249,17 +250,6 @@ function assertUploadOptions(
 
 function shouldSkipUpload(skip: string | undefined, branch: string | undefined): boolean {
   return Boolean(skip && branch && picomatch.isMatch(branch, skip));
-}
-
-/** Parse `--label key=value` flags into label pairs. */
-function parseLabels(flags: string[] | undefined): { key: string; value: string }[] {
-  return (flags ?? []).map((flag) => {
-    const eq = flag.indexOf("=");
-    if (eq <= 0) {
-      throw new Error(`--label must be key=value, got "${flag}"`);
-    }
-    return { key: flag.slice(0, eq), value: flag.slice(eq + 1) };
-  });
 }
 
 /** Zip the built Storybook directory as a stream (bounded memory). */
