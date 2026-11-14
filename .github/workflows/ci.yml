@@ -389,6 +389,47 @@ jobs:
             docker rm -f smoke
           done
 
+      # The smoke above boots with no database variables, so it cannot see a missing runtime module
+      # on the RDS IAM path (the signer and pg are loaded only there). Boot the full image with a
+      # complete IAM configuration aimed at a closed port: it must get as far as the connection
+      # (ECONNREFUSED), never ERR_MODULE_NOT_FOUND, and never fall back to SQLite.
+      - name: RDS IAM path loads its modules
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          set -e
+          docker run -d --name iam \
+            -e AWS_ACCESS_KEY_ID=x -e AWS_SECRET_ACCESS_KEY=y \
+            -e DATABASE_IAM_HOST=127.0.0.1 -e DATABASE_IAM_PORT=1 \
+            -e DATABASE_IAM_USER=shelf -e DATABASE_IAM_NAME=shelf -e DATABASE_IAM_REGION=us-east-1 \
+            storyshelf:ci
+          for _ in $(seq 1 30); do
+            docker logs iam > iam.log 2>&1 || true
+            if grep -q 'ECONNREFUSED\|ERR_MODULE_NOT_FOUND' iam.log; then break; fi
+            sleep 1
+          done
+          cat iam.log
+          docker rm -f iam
+          if grep -q 'ERR_MODULE_NOT_FOUND' iam.log || ! grep -q 'ECONNREFUSED' iam.log; then
+            echo "::error::the RDS IAM path did not reach the database connection"
+            exit 1
+          fi
+
+      # The step above stops at ECONNREFUSED, before pg asks for a password, so it never signs a
+      # token and would not notice the signer going missing again. The image carries only the root
+      # node_modules, so the bundle must hold `@aws-sdk/rds-signer` itself: no bare import of any
+      # `@aws-sdk/*` may remain in the built files.
+      - name: Bundle has no bare @aws-sdk import
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          set -e
+          docker run --rm --entrypoint sh storyshelf:ci -c \
+            "grep -rnE '(import\\(|from ) ?[\"'\"'\"']@aws-sdk' dist --include='*.js' --include='*.mjs' || true" > bare.log
+          cat bare.log
+          if [ -s bare.log ]; then
+            echo "::error::dist imports @aws-sdk by bare name; the image has no such module at runtime"
+            exit 1
+          fi
+
   # Terraform modules under deploy/ (#891, ADR 0050): fmt, validate and tflint for every module.
   # Runs only for a change that can alter them; the filter lives in this job so `changes` stays untouched.
   deploy:
@@ -446,6 +487,7 @@ jobs:
           done
 
   # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
+
   # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child
   # checks, so requiring those by name would wait forever. This passes when every job passed or
   # was skipped.

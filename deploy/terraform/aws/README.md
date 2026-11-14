@@ -189,18 +189,23 @@ database subnet group).
 
 ## Image contract
 
-The module passes these to the image. Variables marked _pending_ are set by the module but are read
-by the image only once the image wires them (tracked on #891); until then the image ignores them.
+The module passes these to the image. Every variable below is read by the image except the two
+marked _not read_, which the image does not use yet.
 
-| Variable                                                     | Source                             | Status  |
-| ------------------------------------------------------------ | ---------------------------------- | ------- |
-| `AWS_BUCKET`, `AWS_REGION`, `PUBLIC_BASE_URL`, `TRUST_PROXY` | module                             | read    |
-| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | read    |
-| `SECRET`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                | Secrets Manager                    | read    |
-| `DATABASE_URL`                                               | `existing_database_url_secret_arn` | read    |
-| `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`             | the created RDS instance           | pending |
-| `DATABASE_POOL_MAX`                                          | `database_pool_size`               | pending |
-| `REMOTE_BROWSER_ENDPOINT`, `REMOTE_BROWSER_TOKEN`            | secret references                  | pending |
+| Variable                                                     | Source                             | Status   |
+| ------------------------------------------------------------ | ---------------------------------- | -------- |
+| `AWS_BUCKET`, `AWS_REGION`, `PUBLIC_BASE_URL`, `TRUST_PROXY` | module                             | read     |
+| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | read     |
+| `SECRET`, `ADMIN_TOKEN`, `AUTH_PASSWORD`                     | Secrets Manager                    | read     |
+| `DATABASE_URL`                                               | `existing_database_url_secret_arn` | read     |
+| `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`             | the created RDS instance           | read     |
+| `DATABASE_POOL_MAX`                                          | `database_pool_size`               | read     |
+| `OIDC_CLIENT_SECRET` (Cognito)                               | Secrets Manager                    | not read |
+| `REMOTE_BROWSER_ENDPOINT`, `REMOTE_BROWSER_TOKEN`            | secret references                  | not read |
+
+The image reads the `DATABASE_IAM_*` variables through the `db-postgres/rds-iam` preset. It refuses
+to start when they are set but incomplete, and never falls back to SQLite. Cognito sign-in is not
+wired: the image does not read the OIDC settings yet, so sign in with `AUTH_PASSWORD`.
 
 ## Checks
 

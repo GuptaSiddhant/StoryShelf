@@ -36,7 +36,7 @@ USER node
 RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
     nub install --frozen-lockfile
 COPY --chown=node:node --from=pruner /app/out/full ./
-# Bundle the workspace into one file; pino, Playwright and sharp stay external (rolldown.config.ts).
+# Bundle the workspace into one file; pino, pg, Playwright and sharp stay external (rolldown.config.ts).
 RUN nubx rolldown -c apps/server-image/rolldown.config.ts
 
 # Shared by both variants: the bundle, tini and a non-root user that owns /data.
