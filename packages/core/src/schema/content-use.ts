@@ -11,6 +11,8 @@ export interface ContentUse {
   buildId: string;
   contentHash: string;
   createdAt: string;
+  /** Bytes of the blob, set when the use is recorded; null for a use recorded before sizes were kept. */
+  sizeBytes: number | null;
   /** Set once, when the build's cleanup released the use; the row is kept for the grace period. */
   releasedAt: string | null;
   /** Set when a collector claimed the hash for deletion; no new use of the hash is admitted. */

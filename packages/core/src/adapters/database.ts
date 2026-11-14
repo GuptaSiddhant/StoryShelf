@@ -286,7 +286,15 @@ export interface BuildReferenceLifecycle {
     buildId: string,
     hashes: readonly string[],
     staleBefore?: string,
+    sizes?: ReadonlyMap<string, number>,
   ): Promise<string[]>;
+  /**
+   * What the project's live content weighs, from the sizes recorded with each use: one SQL
+   * aggregate, never a storage listing. A blob counts once however many builds use it, and only
+   * while some use of it is unreleased. `unsized` counts the blobs with no recorded size (uses
+   * recorded before sizes were kept); they add nothing to `bytes`.
+   */
+  contentUsage(projectId: string): Promise<ContentUsage>;
   /**
    * Claim for deletion, under the pass's `token` (a fresh id per collector pass), every hash whose
    * uses are all released, the latest release older than `idleBefore` (an ISO instant), and no
@@ -308,6 +316,16 @@ export interface BuildReferenceLifecycle {
   abandonContentClaim(hash: string, token: string): Promise<void>;
   /** The blob of a claimed hash is deleted: drop its `content_uses` rows, if the token still holds it. */
   finishContentCollection(hash: string, token: string): Promise<void>;
+}
+
+/** The weight of a project's live shared content; see {@link BuildReferenceLifecycle.contentUsage}. */
+export interface ContentUsage {
+  /** Sum of the recorded sizes of the project's distinct live blobs. */
+  bytes: number;
+  /** Distinct live blobs with a recorded size. */
+  blobs: number;
+  /** Distinct live blobs with no recorded size. */
+  unsized: number;
 }
 
 /**

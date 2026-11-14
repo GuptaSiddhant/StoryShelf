@@ -493,6 +493,7 @@ CREATE TABLE IF NOT EXISTS content_uses (
   content_hash TEXT NOT NULL,
   project_id TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
+  size_bytes BIGINT,
   released_at TIMESTAMPTZ,
   collecting_at TIMESTAMPTZ,
   claim_token TEXT,

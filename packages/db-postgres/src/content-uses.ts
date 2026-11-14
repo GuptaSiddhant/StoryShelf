@@ -1,3 +1,4 @@
+import type { ContentUsage } from "@storyshelf/core/adapter/database";
 /**
  * Build uses of shared content and its claim for collection (ADR 0039). A use and a collector's
  * claim of one blob must end in exactly one outcome, so both take a transaction-scoped advisory
@@ -50,6 +51,7 @@ export async function recordContentUses(
   buildId: string,
   hashes: readonly string[],
   staleBefore?: string,
+  sizes?: ReadonlyMap<string, number>,
 ): Promise<string[]> {
   const distinct = [...new Set(hashes)];
   return await inTransaction(db, async (tx) => {
@@ -62,8 +64,10 @@ export async function recordContentUses(
     if (claimed.size > 0) return distinct.filter((hash) => claimed.has(hash));
     await clearAbandonedClaims(tx, distinct, staleBefore);
     const now = new Date().toISOString();
-    await tx.query(sql`INSERT INTO content_uses (build_id, content_hash, project_id, created_at)
-      SELECT ${buildId}, h, ${projectId}, ${instant(now)} FROM ${textRows(distinct)} AS h
+    const uses = JSON.stringify(distinct.map((hash) => ({ hash, size: sizes?.get(hash) ?? null })));
+    await tx.query(sql`INSERT INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
+      SELECT ${buildId}, use->>'hash', ${projectId}, ${instant(now)}, (use->>'size')::bigint
+      FROM jsonb_array_elements(${uses}::jsonb) AS use
       ON CONFLICT DO NOTHING`);
     return [];
   });
@@ -171,5 +175,32 @@ export async function finishContentCollection(
     await query(
       sql`DELETE FROM content_uses WHERE content_hash = ${hash} AND claim_token = ${token}`,
     );
+  });
+}
+
+/**
+ * What the project's live content weighs (see the capability): one row per distinct hash with an
+ * unreleased use, its size the largest recorded for it (the same blob has one size; a null never
+ * wins over a recorded one).
+ */
+export async function contentUsage(
+  db: LifecycleDatabase,
+  projectId: string,
+): Promise<ContentUsage> {
+  return await inTransaction(db, async (tx) => {
+    const rows = await tx.query(sql`SELECT
+        COALESCE(SUM(size), 0)::float8 AS bytes,
+        COUNT(size) AS blobs,
+        COUNT(*) - COUNT(size) AS unsized
+      FROM (
+        SELECT content_hash, MAX(size_bytes) AS size FROM content_uses
+        WHERE project_id = ${projectId} AND released_at IS NULL GROUP BY content_hash
+      ) AS live`);
+    const [row] = rows;
+    return {
+      bytes: Number(row?.["bytes"] ?? 0),
+      blobs: Number(row?.["blobs"] ?? 0),
+      unsized: Number(row?.["unsized"] ?? 0),
+    };
   });
 }
