@@ -25,10 +25,6 @@ locals {
   labels = merge(var.labels, { app = "storyshelf" })
 }
 
-data "google_project" "current" {
-  project_id = var.project_id
-}
-
 resource "google_project_service" "apis" {
   for_each = local.apis
 
