@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
+import { vapidConfigFromEnv } from "@storyshelf/core/integrations/push";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { chatNotifiers } from "@storyshelf/notify-chat";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
@@ -49,11 +50,16 @@ const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
 
+// Web push (ADR 0048): off without SHELF_VAPID_PUBLIC_KEY and SHELF_VAPID_PRIVATE_KEY; the subject
+// (SHELF_VAPID_SUBJECT) is then required.
+const vapid = vapidConfigFromEnv(env);
+
 const app = createShelfApp({
   database,
   storage,
   ...(testing ? { testing } : {}),
   notifications: {
+    ...(vapid ? { vapid } : {}),
     notifiers: [
       ...chatNotifiers,
       ...(emailSender ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })] : []),

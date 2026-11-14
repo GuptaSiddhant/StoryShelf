@@ -119,10 +119,15 @@ export function formatNotification(
   const subject = `${resolved.subjectPrefix} ${headline(event)}`.trim();
   const lines = [`${name}: ${headline(event)}`, ...reasonLines(event)];
   appendDetails(lines, event, resolved);
+  const summary = lines.slice(0, 1 + reasonLines(event).length).join(" · ");
   if (brand?.reviewUrl) {
     lines.push(brand.reviewUrl);
   }
-  return envelope(subject, lines, brand);
+  return {
+    ...envelope(subject, lines, brand),
+    summary,
+    ...(brand?.reviewUrl ? { url: brand.reviewUrl } : {}),
+  };
 }
 
 /** Format a site-wide admin alert (no project scope, always verbose). */

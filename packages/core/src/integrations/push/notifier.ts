@@ -3,19 +3,26 @@ import type {
   MessageNotifierProvider,
 } from "../../adapters/notifier/index.ts";
 import type { Logger } from "../../logger.ts";
-import { sendPush } from "./send.ts";
+import { payloadOf } from "./payload.ts";
+import { PushGoneError, sendPush } from "./send.ts";
 import { pushChannelConfigSchema } from "./types.ts";
-import type { PushPayload, VapidConfig } from "./types.ts";
+import type { PushChannelConfig } from "./types.ts";
+import type { Vapid } from "./vapid.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
 /**
  * Create the `push` provider (ADR 0048): one adapter per device, addressed to a person.
- * A 404 or 410 answer throws `PushGoneError` so the caller deletes the device's row.
+ * A 404 or 410 answer means the device is gone: `onGone` is told (the host deletes its row) and the
+ * send ends without an error, since there is nothing left to retry. Without `onGone` it throws
+ * `PushGoneError`.
  */
 export function createPushNotifier(
-  vapid: VapidConfig,
-  defaults: { logger?: Logger; link?: (text: string) => string | undefined } = {},
+  vapid: Vapid,
+  defaults: {
+    logger?: Logger;
+    onGone?: (device: PushChannelConfig) => Promise<void>;
+  } = {},
 ): MessageNotifierProvider {
   return {
     metadata: getMetadata(),
@@ -25,11 +32,14 @@ export function createPushNotifier(
       return {
         metadata: getMetadata(),
         async send(input): Promise<void> {
-          const payload: PushPayload = {
-            title: input.formatted.subject,
-            body: input.formatted.text,
-          };
-          await sendPush(vapid, device, payload, input.logger ?? logger);
+          try {
+            await sendPush(vapid, device, payloadOf(input.formatted), input.logger ?? logger);
+          } catch (error) {
+            if (!(error instanceof PushGoneError) || defaults.onGone === undefined) {
+              throw error;
+            }
+            await defaults.onGone(device);
+          }
         },
       };
     },
