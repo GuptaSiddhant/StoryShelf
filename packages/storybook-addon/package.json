@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storybook-addon",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Read-only Storybook addon: a review badge beside each story in a Storybook published by StoryShelf, linking to the review.",
   "keywords": [
     "addon",

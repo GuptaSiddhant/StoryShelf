@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/notify-email",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Deprecated: the email integration moved into @storyshelf/core (ADR 0049); this package re-exports it.",
   "keywords": [
     "email",

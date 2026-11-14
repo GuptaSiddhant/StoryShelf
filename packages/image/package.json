@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/image",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Deprecated: the StoryShelf image engine now lives in @storyshelf/core/diff. This package re-exports it.",
   "keywords": [
     "diff",
