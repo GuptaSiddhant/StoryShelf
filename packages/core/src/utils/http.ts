@@ -103,7 +103,9 @@ export interface HttpRequestOptions {
   headers?: Record<string, string>;
   /** Body serialized as JSON with a `content-type` header. */
   json?: unknown;
-  /** Body serialized as `application/x-www-form-urlencoded` (ignored when `json` is set). */
+  /** Raw bytes sent as given; the caller sets `content-type` (ignored when `json` is set). */
+  body?: Uint8Array;
+  /** Body serialized as `application/x-www-form-urlencoded` (ignored when `json` or `body` is set). */
   form?: Record<string, string>;
   /** Per-attempt timeout in milliseconds (default 30s). */
   timeoutMs?: number;
@@ -128,6 +130,8 @@ export interface HttpTextOptions {
   headers?: Record<string, string>;
   /** Body serialized as JSON with a `content-type` header. */
   json?: unknown;
+  /** Raw bytes sent as given; the caller sets `content-type` (ignored when `json` is set). */
+  body?: Uint8Array;
   /** Per-attempt timeout in milliseconds (default 30s). */
   timeoutMs?: number;
   /** Total attempts including the first (default 3). */
@@ -280,14 +284,16 @@ async function backoff(
 
 function buildRequest(options: HttpRequestOptions): {
   headers: Record<string, string>;
-  body: string | undefined;
+  body: string | Uint8Array | undefined;
   method: string;
 } {
   const headers: Record<string, string> = { ...options.headers };
-  let body: string | undefined;
+  let body: string | Uint8Array | undefined;
   if (options.json !== undefined) {
     headers["content-type"] = "application/json";
     body = JSON.stringify(options.json);
+  } else if (options.body) {
+    body = options.body;
   } else if (options.form) {
     headers["content-type"] = "application/x-www-form-urlencoded";
     body = new URLSearchParams(options.form).toString();
@@ -354,7 +360,7 @@ async function doFetchResponse(
       : await fetch(url, {
           method: request.method,
           headers: request.headers,
-          body: request.body,
+          body: request.body as BodyInit | undefined,
           signal,
         });
   if (!response.ok) {

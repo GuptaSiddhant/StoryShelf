@@ -16,6 +16,7 @@ const config = libConfig({
   "adapter/webhook-events": "./src/adapters/webhook-events.ts",
   "adapter/notifier": "./src/adapters/notifier/index.ts",
   "adapter/email-sender": "./src/adapters/email-sender.ts",
+  "integrations/push": "./src/integrations/push/index.ts",
   logger: "./src/logger.ts",
   capture: "./src/capture/index.ts",
   config: "./src/config.ts",

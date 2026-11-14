@@ -14,7 +14,7 @@ import {
 export interface GuardedInit {
   method: string;
   headers: Record<string, string>;
-  body?: string;
+  body?: string | Uint8Array;
   signal: AbortSignal;
 }
 
