@@ -12,16 +12,29 @@ resource "aws_secretsmanager_secret" "oidc_client_secret" {
   tags = var.tags
 }
 
+# The local admin login: the image enables sign-in when AUTH_PASSWORD and SECRET are both set, so
+# the stack never boots open. Sign in as AUTH_EMAIL (default admin@example.com).
+resource "aws_secretsmanager_secret" "auth_password" {
+  name_prefix = "${var.name}/AUTH_PASSWORD-"
+
+  tags = var.tags
+}
+
 resource "aws_secretsmanager_secret" "admin_token" {
   name_prefix = "${var.name}/ADMIN_TOKEN-"
 
   tags = var.tags
 }
 
-# SECRET and ADMIN_TOKEN are generated, so their values also sit in the Terraform state: keep the
+# SECRET, AUTH_PASSWORD and ADMIN_TOKEN are generated, so their values also sit in the Terraform state: keep the
 # state in an encrypted backend with restricted access.
 resource "random_password" "shelf_secret" {
   length  = 48
+  special = false
+}
+
+resource "random_password" "auth_password" {
+  length  = 32
   special = false
 }
 
@@ -33,6 +46,11 @@ resource "random_password" "admin_token" {
 resource "aws_secretsmanager_secret_version" "shelf_secret" {
   secret_id     = aws_secretsmanager_secret.shelf_secret.id
   secret_string = random_password.shelf_secret.result
+}
+
+resource "aws_secretsmanager_secret_version" "auth_password" {
+  secret_id     = aws_secretsmanager_secret.auth_password.id
+  secret_string = random_password.auth_password.result
 }
 
 resource "aws_secretsmanager_secret_version" "admin_token" {

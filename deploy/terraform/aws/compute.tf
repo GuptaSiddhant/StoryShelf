@@ -33,6 +33,13 @@ resource "aws_lb" "main" {
   subnets            = local.public_subnet_ids
 
   tags = var.tags
+
+  lifecycle {
+    precondition {
+      condition     = var.domain_name != "" || var.allow_http
+      error_message = "Set domain_name to serve HTTPS, or set allow_http = true to accept plain HTTP for a throwaway stack."
+    }
+  }
 }
 
 resource "aws_lb_target_group" "app" {
@@ -135,6 +142,7 @@ resource "aws_ecs_task_definition" "app" {
     ], local.database_environment)
     secrets = concat([
       { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
+      { name = "AUTH_PASSWORD", valueFrom = aws_secretsmanager_secret.auth_password.arn },
       { name = "OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret.arn },
       { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
     ], local.database_secrets, local.remote_browser_secrets)
@@ -181,6 +189,7 @@ resource "aws_ecs_service" "app" {
     aws_lb_listener.http,
     aws_lb_listener.https,
     aws_secretsmanager_secret_version.shelf_secret,
+    aws_secretsmanager_secret_version.auth_password,
     aws_secretsmanager_secret_version.oidc_client_secret,
     aws_secretsmanager_secret_version.admin_token,
     aws_iam_role_policy.task,

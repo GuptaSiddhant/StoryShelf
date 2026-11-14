@@ -100,34 +100,39 @@ locals {
 
 resource "aws_security_group" "alb" {
   name        = "${var.name}-alb"
-  description = "Load balancer ingress"
+  description = "Load balancer: ingress from allowed_cidr_blocks, egress to the app tasks only"
   vpc_id      = local.vpc_id
 
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTP (redirects to HTTPS when a domain is set)"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "To the app tasks"
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = var.tags
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_https" {
+  for_each          = toset(var.allowed_cidr_blocks)
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTPS"
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+  cidr_ipv4         = each.value
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_http" {
+  for_each          = toset(var.allowed_cidr_blocks)
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTP (redirects to HTTPS when a domain is set)"
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+  cidr_ipv4         = each.value
+}
+
+resource "aws_vpc_security_group_egress_rule" "alb_to_app" {
+  security_group_id            = aws_security_group.alb.id
+  description                  = "To the app tasks"
+  from_port                    = 3000
+  to_port                      = 3000
+  ip_protocol                  = "tcp"
+  referenced_security_group_id = aws_security_group.app.id
 }
 
 resource "aws_security_group" "app" {

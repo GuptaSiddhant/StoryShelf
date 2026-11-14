@@ -12,9 +12,11 @@ Pin a release with a git source (`?ref=v<version>`), and give `image_version` th
 module "storyshelf" {
   source = "git::https://github.com/GuptaSiddhant/StoryShelf.git//deploy/terraform/aws?ref=v0.12.0"
 
-  name          = "storyshelf"
-  region        = "us-east-1"
-  image_version = "0.12.0"
+  name                = "storyshelf"
+  region              = "us-east-1"
+  image_version       = "0.12.0"
+  domain_name         = "shelf.example.com"
+  allowed_cidr_blocks = ["203.0.113.0/24"] # your office or VPN; ["0.0.0.0/0"] publishes the app
 }
 ```
 
@@ -47,6 +49,8 @@ security group admits only the ALB. The database is reachable from the task secu
 | `region`                             | `us-east-1`                        | Must match the provider's region                                                   |
 | `image_repository`                   | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror                                                        |
 | `vpc_id`                             | `""`                               | Existing VPC; subnets are found by their `Tier` tag (`public`, `private`)          |
+| `allowed_cidr_blocks`                | required                           | IPv4 ranges that may reach the load balancer; `["0.0.0.0/0"]` publishes the app    |
+| `allow_http`                         | `false`                            | Plain HTTP without a domain; the plan fails otherwise                              |
 | `domain_name`                        | `""`                               | Enables HTTPS (see "Domain and TLS")                                               |
 | `saml_metadata_url`                  | `""`                               | Cognito SAML federation                                                            |
 | `task_cpu` / `task_memory`           | `2048` / `4096`                    | Capture renders in the container: do not go much lower                             |
@@ -73,8 +77,16 @@ never values.
 
 App secrets reach the task as ECS `secrets` references from Secrets Manager. No output carries a value.
 
-- **`SECRET`, `ADMIN_TOKEN`** are generated (`random_password`). Their values are also in the
-  Terraform state: keep the state in an encrypted backend with restricted access.
+- **`SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`** are generated (`random_password`). **Terraform
+  state holds their values, so it must be encrypted** (for example an S3 backend with KMS and a
+  restricted bucket policy) and readable by few people.
+- **Sign-in.** The image turns sign-in on when `AUTH_PASSWORD` and `SECRET` are both set, and the
+  module always sets both, so the app never boots open. Read the password with
+  `aws secretsmanager get-secret-value --secret-id "$(terraform output -raw auth_password_secret_arn)"`
+  and sign in as `admin@example.com` (or `AUTH_EMAIL`). The load balancer admits only
+  `allowed_cidr_blocks`.
+- **Cognito.** The user pool and `OIDC_CLIENT_SECRET` are created and passed to the task, but the
+  image does not read them yet: OIDC sign-in is not wired.
 - **`OIDC_CLIENT_SECRET`** is an operator step. Terraform writes `change-me` once and never
   overwrites it. Put the real value in and restart the service:
 
@@ -89,7 +101,7 @@ The app connects with the `db-postgres/rds-iam` preset: a short-lived token from
 every new connection, verified against the Amazon RDS root certificates. There is no database
 password for the app to read, and nothing to rotate.
 
-**One operator step.** RDS cannot create an IAM database user. Once, connect with the master
+**One operator step (Terraform cannot do it: the database has no public route).** RDS cannot grant `rds_iam` to a user. Once, connect with the master
 secret (`db_master_secret_arn`) from inside the VPC and run:
 
 ```sql
@@ -158,7 +170,7 @@ only (`execution_role_policy_json`).
 
 ## Domain and TLS
 
-Without `domain_name` the ALB serves plain HTTP only. With one, the module creates a Route 53 zone,
+Without `domain_name` the plan fails unless `allow_http = true`, which serves plain HTTP (passwords and session cookies unencrypted): use it for throwaway stacks only. With a domain, the module creates a Route 53 zone,
 an ACM certificate validated by DNS in it, an HTTPS listener and a 301 from port 80. ACM validates
 only once the domain's name servers point at the new zone, so apply in two steps:
 

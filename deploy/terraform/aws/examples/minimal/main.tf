@@ -39,6 +39,11 @@ module "storyshelf" {
   region        = var.region
   image_version = var.image_version
 
+  # A throwaway stack served over plain HTTP, open to the internet. A real stack sets domain_name
+  # and narrows allowed_cidr_blocks.
+  allow_http          = true
+  allowed_cidr_blocks = ["0.0.0.0/0"]
+
   # A throwaway stack: delete the database and bucket on destroy.
   deletion_protection = false
 }

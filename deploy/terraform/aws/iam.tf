@@ -15,6 +15,7 @@ locals {
   # Secrets the task receives as ECS `secrets` references (read by the execution role).
   app_secret_arns = compact([
     aws_secretsmanager_secret.shelf_secret.arn,
+    aws_secretsmanager_secret.auth_password.arn,
     aws_secretsmanager_secret.oidc_client_secret.arn,
     aws_secretsmanager_secret.admin_token.arn,
     var.existing_database_url_secret_arn,

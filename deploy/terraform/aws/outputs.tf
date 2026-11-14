@@ -53,6 +53,11 @@ output "admin_token_secret_arn" {
   value       = aws_secretsmanager_secret.admin_token.arn
 }
 
+output "auth_password_secret_arn" {
+  description = "Secrets Manager ARN of the generated admin password (read it with the AWS CLI; it is not an output value)."
+  value       = aws_secretsmanager_secret.auth_password.arn
+}
+
 output "oidc_client_secret_arn" {
   description = "Secrets Manager ARN to put the real OIDC client secret into."
   value       = aws_secretsmanager_secret.oidc_client_secret.arn

@@ -42,6 +42,22 @@ variable "domain_name" {
   default     = ""
 }
 
+variable "allowed_cidr_blocks" {
+  description = "IPv4 CIDR blocks allowed to reach the load balancer. Required, with no default, so exposure is always a decision: use your office or VPN ranges, or [\"0.0.0.0/0\"] to publish the app."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.allowed_cidr_blocks) > 0 && alltrue([for cidr in var.allowed_cidr_blocks : can(cidrhost(cidr, 0))])
+    error_message = "allowed_cidr_blocks must list at least one valid IPv4 CIDR block."
+  }
+}
+
+variable "allow_http" {
+  description = "Serve plain HTTP when domain_name is empty. Off by default: without a domain the load balancer has no certificate, and passwords and session cookies would cross the network unencrypted. Turn it on only for a throwaway stack."
+  type        = bool
+  default     = false
+}
+
 variable "saml_metadata_url" {
   description = "SAML metadata URL for Cognito federation (Entra, Okta). Empty skips federation."
   type        = string

@@ -30,3 +30,26 @@ resource "aws_s3_bucket_public_access_block" "storybook" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+# Versioning keeps every overwritten and deleted object; expire the old versions so they do not
+# accumulate (baselines are re-written on approval).
+resource "aws_s3_bucket_lifecycle_configuration" "storybook" {
+  bucket = aws_s3_bucket.storybook.id
+
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.storybook]
+}
