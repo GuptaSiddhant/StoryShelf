@@ -418,6 +418,17 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS notification_subscriptions_project_user_idx ON notification_subscriptions (project_id, user_id);
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  label TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  last_success_at TIMESTAMPTZ,
+  failure_count INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS insights (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

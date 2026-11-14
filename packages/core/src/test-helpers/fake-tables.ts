@@ -502,6 +502,18 @@ const notificationSubscriptions = defineTable("notification_subscriptions", {
   createdAt: "created_at",
 });
 
+const pushSubscriptions = defineTable("push_subscriptions", {
+  id: "id",
+  userId: "user_id",
+  endpoint: "endpoint",
+  p256dh: "p256dh",
+  auth: "auth",
+  label: "label",
+  createdAt: "created_at",
+  lastSuccessAt: "last_success_at",
+  failureCount: "failure_count",
+});
+
 const contentUses = defineTable("content_uses", {
   projectId: "project_id",
   buildId: "build_id",
@@ -546,5 +558,6 @@ export const fakeSchema: Tables = {
   aiBudgetAlerts,
   notificationChannels,
   notificationSubscriptions,
+  pushSubscriptions,
   contentUses,
 };

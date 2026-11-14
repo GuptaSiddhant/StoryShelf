@@ -1,9 +1,14 @@
-import { buildLifecycleContractSuite, databaseContractSuite } from "@storyshelf/core/test-helpers";
+import {
+  buildLifecycleContractSuite,
+  databaseContractSuite,
+  pushSubscriptionContractSuite,
+} from "@storyshelf/core/test-helpers";
 import { createPostgresDatabase } from "./index.ts";
 import { createPgliteDatabase } from "./pglite.ts";
 
 databaseContractSuite("pglite", () => createPgliteDatabase());
 buildLifecycleContractSuite("pglite", () => createPgliteDatabase());
+pushSubscriptionContractSuite("pglite", () => createPgliteDatabase());
 
 // Real Postgres, on the same disposable database the live lifecycle suite uses (see
 // build-reference-lifecycle.test.ts): the pair test only creates its own projects and builds.
