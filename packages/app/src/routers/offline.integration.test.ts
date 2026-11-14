@@ -1,3 +1,4 @@
+import type { StorybookHostingConfig } from "@storyshelf/core/config";
 import { MemberModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { contentKey, storybookDir } from "@storyshelf/core/utils";
@@ -18,13 +19,14 @@ const users = [
   { id: "outsider", email: "out@example.com", name: "Out", role: "member" as const },
 ];
 
-const auth = stubAuth(null, {
-  check: async (request: Request) => {
-    const cookie = request.headers.get("cookie") ?? "";
-    const id = /storyshelf_session=(?<id>\w+)/u.exec(cookie)?.groups?.["id"];
-    return await Promise.resolve(users.find((user) => user.id === id) ?? null);
-  },
-});
+const check = async (request: Request) => {
+  const cookie = request.headers.get("cookie") ?? "";
+  const id = /storyshelf_session=(?<id>\w+)/u.exec(cookie)?.groups?.["id"];
+  return await Promise.resolve(users.find((user) => user.id === id) ?? null);
+};
+const auth = stubAuth(null, { check });
+/** `subdomain` mode refuses to boot without the engine that issues the `__Host-` cookie. */
+const subdomainAuth = stubAuth(null, { check, hostSessionCookie: true });
 
 function project(id: string, slug: string) {
   return {
@@ -37,27 +39,37 @@ function project(id: string, slug: string) {
     updatedAt: NOW,
   };
 }
-function build(id: string, projectId: string, status: string, branch = "main") {
+function build(id: string, projectId: string, status: string, branch = "main", isPublic = false) {
   return {
     id,
     projectId,
     gitSha: "c".repeat(40),
     gitBranch: branch,
     isDefault: branch === "main",
-    public: false,
+    public: isPublic,
     status,
     createdAt: NOW,
     updatedAt: NOW,
   };
 }
 
-async function boot(options: { noAuth?: boolean; maxOfflineDays?: number } = {}) {
+interface BootOptions {
+  noAuth?: boolean;
+  maxOfflineDays?: number;
+  hosting?: StorybookHostingConfig;
+  publicBuild?: boolean;
+}
+
+async function boot(options: BootOptions = {}) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   await db.insert(db.tables.projects, project("p1", "private-ok"));
   await db.insert(db.tables.projects, project("p2", "no-build"));
   await db.insert(db.tables.projects, project("p3", "unpublished"));
-  await db.insert(db.tables.builds, build("b1", "p1", "approved") as never);
+  await db.insert(
+    db.tables.builds,
+    build("b1", "p1", "approved", "main", options.publicBuild === true) as never,
+  );
   await db.insert(db.tables.builds, build("b2", "p3", "approved") as never);
   await db.insert(db.tables.builds, build("b3", "p2", "approved", "feature/x") as never);
   await Promise.all(
@@ -83,10 +95,13 @@ async function boot(options: { noAuth?: boolean; maxOfflineDays?: number } = {})
   const app = createShelfApp({
     database: db,
     storage,
-    ...(options.noAuth === true ? {} : { auth }),
+    ...(options.noAuth === true
+      ? {}
+      : { auth: options.hosting?.mode === "subdomain" ? subdomainAuth : auth }),
     config: {
       secret: "s",
       publicBaseUrl: "https://shelf.example",
+      ...(options.hosting ? { storybookHosting: options.hosting } : {}),
       ...(options.maxOfflineDays === undefined
         ? {}
         : { offline: { maxOfflineDays: options.maxOfflineDays } }),
@@ -97,7 +112,7 @@ async function boot(options: { noAuth?: boolean; maxOfflineDays?: number } = {})
   const get = async (session: string | null, slugs: string): Promise<Response> => {
     const headers = new Headers();
     if (session) headers.set("cookie", `storyshelf_session=${session}`);
-    return await app.request(`/api/v1/offline?projects=${slugs}`, { headers });
+    return await app.request(`https://shelf.example/api/v1/offline?projects=${slugs}`, { headers });
   };
   return { get };
 }
@@ -155,5 +170,32 @@ describe("GET /api/v1/offline", () => {
     const { get } = await boot({ noAuth: true });
     const body = (await (await get(null, "private-ok")).json()) as { projects: unknown[] };
     expect(body.projects).toHaveLength(1);
+  });
+});
+
+describe("GET /api/v1/offline outside trusted hosting mode (ADR 0048, amendment 2026-11-11)", () => {
+  it.each([
+    ["sandboxed", { mode: "sandboxed" }],
+    ["subdomain", { mode: "subdomain", baseDomain: "content.example" }],
+  ] as const)("never offers a public build in %s mode", async (mode, hosting) => {
+    const { get } = await boot({ hosting, publicBuild: true });
+    for (const session of [null, "admin", "view"]) {
+      // oxlint-disable-next-line no-await-in-loop -- three callers, in order
+      const response = await get(session, "private-ok");
+      expect(response.status).toBe(200);
+      // oxlint-disable-next-line no-await-in-loop -- three callers, in order
+      expect(await response.json()).toEqual({
+        projects: [],
+        reason: "hosting-mode",
+        hostingMode: mode,
+      });
+    }
+  });
+
+  it("still offers a public build in trusted mode, with no reason", async () => {
+    const { get } = await boot({ hosting: { mode: "trusted" }, publicBuild: true });
+    const body = (await (await get(null, "private-ok")).json()) as Record<string, unknown>;
+    expect(body["projects"]).toHaveLength(1);
+    expect(body).not.toHaveProperty("reason");
   });
 });

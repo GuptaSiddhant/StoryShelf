@@ -767,6 +767,15 @@
               },
               "required": ["slug", "name", "buildId", "commit", "entries", "maxOfflineDays"]
             }
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["hosting-mode"],
+            "description": "Present when offline Storybooks are off for this deployment's hosting mode"
+          },
+          "hostingMode": {
+            "type": "string",
+            "description": "The hosting mode, present with `reason`"
           }
         },
         "required": ["projects"]
@@ -3384,7 +3393,7 @@
       "get": {
         "tags": ["Builds"],
         "summary": "Offline sync of default-branch Storybooks",
-        "description": "For each requested project the caller may read, the latest published build on its default branch with its file manifest (ADR 0048). A project that is unknown, hidden or has no such build is left out. Answers `Cache-Control: private, no-store`. At most 100 slugs.",
+        "description": "For each requested project the caller may read, the latest published build on its default branch with its file manifest (ADR 0048). A project that is unknown, hidden or has no such build is left out. Only `trusted` hosting mode supports offline Storybooks (ADR 0048, amendment 2026-11-11); in any other mode the list is empty with `reason: \"hosting-mode\"`, so the next sync deletes what a device kept. Answers `Cache-Control: private, no-store`. At most 100 slugs.",
         "parameters": [
           {
             "schema": {
