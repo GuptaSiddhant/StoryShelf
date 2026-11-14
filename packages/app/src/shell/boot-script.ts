@@ -1,3 +1,10 @@
+/** Registers the app's service worker (ADR 0048) once the page has loaded. */
+export const SERVICE_WORKER_REGISTRATION = `if('serviceWorker' in navigator){
+      window.addEventListener('load',function(){
+        navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(){});
+      });
+    }`;
+
 /**
  * Runs in `<head>` before first paint so the saved theme and sidebar state
  * apply without a flash. Exposes cookie helpers to the client script.
@@ -31,11 +38,7 @@ export function bootScript(sidebarDefault?: "rail"): string {
     if(theme){ applyTheme(theme); }
     var savedSidebar=readCookie(sidebarCookie);
     applySidebar(savedSidebar===null&&${buildPage} ? 'rail' : savedSidebar);
-    if('serviceWorker' in navigator){
-      window.addEventListener('load',function(){
-        navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(){});
-      });
-    }
+    ${SERVICE_WORKER_REGISTRATION}
     window.__storyshelfShell={
       readCookie:readCookie,writeCookie:writeCookie,applyTheme:applyTheme,applySidebar:applySidebar,
       themeCookie:themeCookie,sidebarCookie:sidebarCookie
