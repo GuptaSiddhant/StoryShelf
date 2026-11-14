@@ -10,7 +10,7 @@
 /** Baseline row as stored in the `baselines` table. */
 export type { Baseline } from "./baseline.ts";
 /** Build row as stored in the `builds` table. */
-export type { Build } from "./build.ts";
+export type { BranchVerification, Build } from "./build.ts";
 /** A capture attempt and its log lines for a single build run. */
 export type { CaptureAttempt, CaptureLog, CaptureLogLevel } from "./capture-attempt.ts";
 export type { CaptureShard, CaptureShardKind, CaptureShardStatus } from "./capture-shard.ts";
@@ -26,6 +26,7 @@ export type {
 export type { BuildReview } from "./build-review.ts";
 /** Component row of a published build (`build_components`). */
 export type { BuildComponent } from "./build-component.ts";
+export { SCHEMA_META_ID, type SchemaMeta } from "./schema-meta.ts";
 export type { SiteSetting } from "./site-setting.ts";
 /** Review comment row as stored in the `comments` table. */
 export type { Comment, CommentMention } from "./comment.ts";

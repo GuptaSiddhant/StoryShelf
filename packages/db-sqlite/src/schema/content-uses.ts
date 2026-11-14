@@ -1,4 +1,4 @@
-import { index, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /** A build's use of one shared content blob; see the core `ContentUse` row type. */
 export const contentUses = sqliteTable(
@@ -8,6 +8,7 @@ export const contentUses = sqliteTable(
     contentHash: text("content_hash").notNull(),
     projectId: text("project_id").notNull(),
     createdAt: text("created_at").notNull(),
+    sizeBytes: integer("size_bytes"),
     releasedAt: text("released_at"),
     collectingAt: text("collecting_at"),
     claimToken: text("claim_token"),
@@ -24,6 +25,7 @@ export interface ContentUse {
   contentHash: string;
   projectId: string;
   createdAt: string;
+  sizeBytes: number | null;
   releasedAt: string | null;
   collectingAt: string | null;
   claimToken: string | null;

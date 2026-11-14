@@ -1,6 +1,6 @@
 /*
  * StoryShelf docs theme: the app's design tokens mapped onto Starlight's.
- * Source of truth is packages/app/src/ui/theme.ts (zinc neutrals, #1d5fcf
+ * Source of truth is packages/app/src/ui/theme.ts (zinc neutrals, #5b3fd6
  * accent, 0.5rem radius, system font). Keep them in step.
  */
 
@@ -26,9 +26,9 @@
   --sl-color-gray-7: #18181b;
   --sl-color-black: #09090b;
 
-  --sl-color-accent-low: #12254a;
-  --sl-color-accent: #2e6be0;
-  --sl-color-accent-high: #8db4ff;
+  --sl-color-accent-low: #231b4d;
+  --sl-color-accent: #6f58e6;
+  --sl-color-accent-high: #bdb2ff;
 
   --sl-color-bg-nav: #111113;
   --sl-color-bg-sidebar: #111113;
@@ -48,9 +48,9 @@
   --sl-color-gray-7: #f4f4f5;
   --sl-color-black: #ffffff;
 
-  --sl-color-accent-low: #e6effc;
-  --sl-color-accent: #1d5fcf;
-  --sl-color-accent-high: #174ca6;
+  --sl-color-accent-low: #ece8fb;
+  --sl-color-accent: #5b3fd6;
+  --sl-color-accent-high: #4630a8;
 
   --sl-color-bg-nav: #fafafa;
   --sl-color-bg-sidebar: #fafafa;

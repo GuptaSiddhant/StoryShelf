@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS projects (
   play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
   run_a11y TINYINT(1) NOT NULL DEFAULT true,
   run_tests TINYINT(1) NOT NULL DEFAULT false,
+  switch_stories TINYINT(1) NOT NULL DEFAULT false,
   detect_unstable TINYINT(1) NOT NULL DEFAULT true,
   browser VARCHAR(64) NOT NULL DEFAULT 'chromium',
   viewports TEXT,
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS projects (
   ai_profile TEXT,
   review_enabled TINYINT(1) NOT NULL DEFAULT true,
   review_approvals INT NOT NULL DEFAULT 1,
+  require_verified_default TINYINT(1) NOT NULL DEFAULT true,
   storybook_url_ttl_seconds INT,
   component_owners TEXT,
   cancel_superseded TINYINT(1) NOT NULL DEFAULT true,
@@ -35,6 +37,7 @@ CREATE TABLE IF NOT EXISTS builds (
   git_sha VARCHAR(64) NOT NULL,
   git_branch VARCHAR(255) NOT NULL,
   is_default TINYINT(1) NOT NULL DEFAULT false,
+  branch_verified VARCHAR(16),
   author_email TEXT,
   author_name TEXT,
   message TEXT,
@@ -129,6 +132,11 @@ CREATE INDEX capture_jobs_poll_idx ON capture_jobs (kind, visible_at, status);
 CREATE INDEX capture_jobs_job_id_idx ON capture_jobs (job_id);
 CREATE INDEX capture_jobs_build_id_idx ON capture_jobs (build_id);
 CREATE INDEX capture_jobs_entry_created_idx ON capture_jobs (entry, created_at);
+CREATE TABLE IF NOT EXISTS schema_meta (
+  id VARCHAR(64) PRIMARY KEY,
+  version TEXT NOT NULL,
+  migrated_at DATETIME(3) NOT NULL
+);
 CREATE TABLE IF NOT EXISTS site_settings (
   id VARCHAR(64) PRIMARY KEY,
   value TEXT NOT NULL,
@@ -502,6 +510,7 @@ CREATE TABLE IF NOT EXISTS content_uses (
   content_hash VARCHAR(128) NOT NULL,
   project_id VARCHAR(64) NOT NULL,
   created_at DATETIME(3) NOT NULL,
+  size_bytes BIGINT NULL,
   released_at DATETIME(3) NULL,
   collecting_at DATETIME(3) NULL,
   claim_token VARCHAR(64) NULL,

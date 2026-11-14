@@ -14,6 +14,7 @@ import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { gatedSyncMigration } from "./gated-migration.ts";
 import {
   execUnless,
   isDuplicateColumn,
@@ -73,12 +74,8 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
       category: "database",
     },
     tables: schema,
-    migrate: async ({ logger }) => {
-      await assertReviewSchema(
-        async (table) =>
-          await Promise.resolve(parseTableInfo(client.query(`PRAGMA table_info(${table})`).all())),
-      );
-      runMigrations(client, logger);
+    migrate: async ({ logger, release }) => {
+      await migrateGated(client, logger, release);
     },
     close: () => {
       if (owned) {
@@ -182,6 +179,35 @@ function applyIdentityStatements(client: Database, logger: Logger | undefined): 
       );
     }
   }
+}
+
+/** Migrate, skip or refuse by the release recorded in `schema_meta` (ADR 0053). */
+async function migrateGated(
+  client: Database,
+  logger: Logger | undefined,
+  release: string | undefined,
+): Promise<void> {
+  await gatedSyncMigration(
+    {
+      exec: (sql) => {
+        client.exec(sql);
+      },
+      all: (sql) => client.query(sql).all(),
+    },
+    {
+      release,
+      logger,
+      migrate: async () => {
+        await assertReviewSchema(
+          async (table) =>
+            await Promise.resolve(
+              parseTableInfo(client.query(`PRAGMA table_info(${table})`).all()),
+            ),
+        );
+        runMigrations(client, logger);
+      },
+    },
+  );
 }
 
 function runMigrations(client: Database, logger: Logger | undefined): void {

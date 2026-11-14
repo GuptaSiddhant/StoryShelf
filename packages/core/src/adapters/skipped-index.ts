@@ -18,6 +18,8 @@ export interface SkippedIndex {
 /** What a driver's `migrate` is given by its lifecycle `setup`. */
 export interface MigrationContext {
   readonly logger?: Logger | undefined;
+  /** The running release (`major.minor.patch`); absent when unknown, which always migrates. */
+  readonly release?: string | undefined;
 }
 
 /** The `CREATE UNIQUE INDEX` parts a driver needs to report a skip, or `null` for another statement. */

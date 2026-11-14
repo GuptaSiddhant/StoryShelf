@@ -1,7 +1,7 @@
+import { createFigmaDesign } from "@storyshelf/core/integrations";
 import { DesignCredentialModel, DesignModel, MemberModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
-import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -183,7 +183,7 @@ async function seed(options: Options = {}) {
     storage,
     logger: pino({ level: "silent" }),
     config: { secret: SECRET, ...(auth ? { adminToken: ADMIN_TOKEN } : {}) },
-    ...(providers ? { design: [figma] } : {}),
+    design: providers ? [figma] : false,
     ...(auth ? { auth: stub } : {}),
   });
   return { app, db };
@@ -309,7 +309,7 @@ describe("design coverage page", () => {
     expect(drift).toContain("Drift can&#39;t be checked");
     expect(drift).toContain("Figma has no access token for this project");
     expect(drift).toContain("Open design settings");
-    expect(drift).toContain("/projects/app/settings/design");
+    expect(drift).toContain("/projects/app/settings/capture#design");
     // No all-clear, no count: the answer is unknown, not zero.
     expect(drift).not.toContain("Needs attention (");
     expect(drift).not.toContain("No drift found");
@@ -405,7 +405,7 @@ describe("design coverage page gating", () => {
     expect(unlinked).toContain("No design link (5)");
     expect(unlinked).not.toContain(">Kit/Menu<");
     // Without testing a component has no Design tab, so linking goes to the project's settings.
-    expect(unlinked).toContain("/projects/app/settings/design");
+    expect(unlinked).toContain("/projects/app/settings/capture#design");
     expect(unlinked).not.toContain("?tab=design");
     // Without snapshots nothing was compared with a baseline, so no link counts as up to date.
     expect(between(page, "current")).not.toContain("linked and match");

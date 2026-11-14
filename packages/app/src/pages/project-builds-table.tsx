@@ -11,6 +11,7 @@ import {
   Meta,
   RelativeTime,
   Table,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
@@ -94,20 +95,10 @@ function BuildActions({
       <Button
         variant={needsReview ? "primary" : "secondary"}
         size="sm"
-        href={
-          needsReview ? urls.buildDiff(project.slug, build.id) : urls.build(project.slug, build.id)
-        }
+        href={urls.buildDiff(project.slug, build.id)}
       >
         {needsReview ? "Review" : "View"}
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        icon="external-link"
-        href={urls.short(build.id)}
-        aria-label="View Storybook"
-        title="View Storybook"
-      />
     </HStack>
   );
 }
@@ -126,7 +117,7 @@ function BuildRow({
       </td>
       <td>
         <Badge tone={statusTone(build.status)} icon>
-          {build.status}
+          {statusLabel(build.status)}
         </Badge>
       </td>
       <td>

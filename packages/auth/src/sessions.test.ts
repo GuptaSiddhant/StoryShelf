@@ -3,7 +3,7 @@ import { ulid } from "@storyshelf/core/utils";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { describe, expect, it } from "vitest";
 import { baseAuthTables } from "./auth-tables.ts";
-import { listUserSessions } from "./sessions.ts";
+import { listUserSessions, purgeExpiredAuthRows } from "./sessions.ts";
 
 async function testDb(): Promise<DatabaseAdapter> {
   const db = createSqliteDatabase(":memory:");
@@ -73,5 +73,34 @@ describe("listUserSessions", () => {
     expect(sessions.map((session) => session.id)).toEqual([second, first]);
     expect(sessions[0]?.token).toContain("token-");
     expect(sessions[0]?.userAgent).toBe("ShelfTest/1.0");
+  });
+});
+
+describe("purgeExpiredAuthRows", () => {
+  it("removes expired sessions and verifications before the cutoff, keeps the rest", async () => {
+    const db = await testDb();
+    await seedUser(db, "u1");
+    const old = "2020-01-01T00:00:00.000Z";
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    await seedSession(db, "u1", old);
+    await seedSession(db, "u1", future);
+    for (const [id, expiresAt] of [
+      ["v-old", old],
+      ["v-new", future],
+    ] as const) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential seeding
+      await db.insert(baseAuthTables.verification, {
+        id,
+        identifier: "i",
+        value: "v",
+        expiresAt,
+        createdAt: old,
+        updatedAt: old,
+      });
+    }
+    const cutoff = new Date().toISOString();
+    expect(await purgeExpiredAuthRows(db, cutoff)).toEqual({ sessions: 1, verifications: 1 });
+    expect(await db.count(baseAuthTables.session)).toBe(1);
+    expect(await db.count(baseAuthTables.verification)).toBe(1);
   });
 });

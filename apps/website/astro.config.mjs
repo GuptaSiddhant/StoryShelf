@@ -39,7 +39,7 @@ export default defineConfig({
     mermaid({ autoTheme: true }),
     starlight({
       title: "StoryShelf",
-      description: "Self-hosted visual testing for Storybook.",
+      description: "An open-source, self-hosted alternative to Chromatic.",
       logo: { src: "./src/assets/logo.svg", alt: "" },
       components: {
         Hero: "./src/components/overrides/Hero.astro",
@@ -68,7 +68,7 @@ export default defineConfig({
           tag: "link",
           attrs: { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
         },
-        { tag: "meta", attrs: { name: "theme-color", content: "#1d5fcf" } },
+        { tag: "meta", attrs: { name: "theme-color", content: "#5b3fd6" } },
         {
           // Tables, and code blocks the page's own scripts left without a focus stop, that scroll
           // sideways on narrow screens must be keyboard-focusable.

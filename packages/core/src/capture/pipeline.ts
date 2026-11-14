@@ -302,7 +302,7 @@ async function persistInheritedSnapshot(
       sourceSnapshotId: sourceId,
     },
   );
-  const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
+  await snapshots.create(ctx.project.id, ctx.build.id, {
     ...comparison,
     browser,
     a11yViolations: await inheritedA11yJson(ctx.db, ctx.tables, {
@@ -324,14 +324,10 @@ async function persistInheritedSnapshot(
     sourceBuildId: inherited.baseline.sourceBuildId ?? null,
     baselineId: inherited.baseline.id,
     baselineVersion: inherited.baseline.updatedAt,
-  });
-  await snapshots.update(snapshot.id, {
     status: "unchanged",
     diffPixels: 0,
     diffRatio: 0,
     diffPassed: true,
-    diffPath: null,
-    infraHash,
   });
 }
 
@@ -457,8 +453,8 @@ async function createWithoutBaseline(
     infraHash: now.infraHash,
     mode: modeJsonOf(viewport),
     baselineVersion: NO_BASELINE,
+    status,
   });
-  await snapshots.setStatus(snapshot.id, status);
 
   if (accepted) {
     await promoteBaseline(ctx, {
@@ -593,19 +589,15 @@ function snapshotInput(input: BaselineCapture): Parameters<SnapshotModel["create
  * changed, and the new screenshot becomes the baseline.
  */
 async function persistMigration(input: BaselineCapture, change: EnvironmentChange): Promise<void> {
-  const { ctx, capture, viewport, screenshot, now } = input;
+  const { ctx, capture, viewport, screenshot } = input;
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     ...snapshotInput(input),
     envChange: JSON.stringify(change),
-  });
-  await snapshots.update(snapshot.id, {
     status: "unchanged",
-    diffPath: null,
     diffPixels: 0,
     diffRatio: 0,
     diffPassed: true,
-    infraHash: now.infraHash,
   });
   await upsertDefaultBaseline(ctx, snapshot.id, capture, screenshot, baselineFingerprintOf(input));
   ctx.logger?.debug(
@@ -616,7 +608,7 @@ async function persistMigration(input: BaselineCapture, change: EnvironmentChang
 
 /** Diff against the baseline; a feature-branch environment change rides along as `envChange`. */
 async function persistDiff(input: BaselineCapture): Promise<void> {
-  const { ctx, capture, screenshot, baseline, now, change } = input;
+  const { ctx, capture, screenshot, baseline, change } = input;
   const result = await diffStoredScreenshots(
     ctx.storage,
     ctx.project,
@@ -624,11 +616,6 @@ async function persistDiff(input: BaselineCapture): Promise<void> {
     screenshot,
     capture.story.parameters?.diffThreshold,
   );
-  const snapshots = new SnapshotModel(ctx.db, ctx.tables);
-  const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
-    ...snapshotInput(input),
-    ...(change ? { envChange: JSON.stringify(change) } : {}),
-  });
   const diff = diffPath(
     ctx.project.id,
     ctx.build.id,
@@ -637,14 +624,19 @@ async function persistDiff(input: BaselineCapture): Promise<void> {
     browserOf(capture),
   );
   const overlay = await writeDiffOverlay(ctx.storage, diff, result, result.passed);
-  await snapshots.update(snapshot.id, {
-    status: diffStatus(result.passed, ctx.build.isDefault),
-    diffPath: overlay,
-    diffPixels: result.diffPixels,
-    diffRatio: result.diffRatio,
-    diffPassed: result.passed,
-    infraHash: now.infraHash,
-  });
+  const snapshot = await new SnapshotModel(ctx.db, ctx.tables).create(
+    ctx.project.id,
+    ctx.build.id,
+    {
+      ...snapshotInput(input),
+      ...(change ? { envChange: JSON.stringify(change) } : {}),
+      status: diffStatus(result.passed, ctx.build.isDefault),
+      diffPath: overlay,
+      diffPixels: result.diffPixels,
+      diffRatio: result.diffRatio,
+      diffPassed: result.passed,
+    },
+  );
   if (ctx.build.isDefault) {
     await refreshDefaultBaseline(input, snapshot.id, result.passed);
   }

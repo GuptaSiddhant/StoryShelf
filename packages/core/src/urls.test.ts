@@ -207,4 +207,19 @@ describe("dot segments", () => {
     expect(hasDotSegment("a/b.")).toBe(false);
     expect(hasDotSegment("...")).toBe(false);
   });
+
+  it("builds the settings entry and one tab", () => {
+    const local = createUrlBuilder("/");
+    expect(local.settings("app")).toBe("/projects/app/settings/general");
+    expect(local.settingsTab("app", "access")).toBe("/projects/app/settings/access");
+  });
+});
+
+describe("build url", () => {
+  const urls = createUrlBuilder("https://shelf.example.com/");
+
+  it("points at the one build page, not the redirecting legacy path", () => {
+    expect(urls.build("app", "B1")).toBe("https://shelf.example.com/projects/app/builds/B1/diff");
+    expect(urls.build("app", "B1")).toBe(urls.buildDiff("app", "B1"));
+  });
 });

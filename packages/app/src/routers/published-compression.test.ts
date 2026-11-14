@@ -1,21 +1,13 @@
 import { makeStorage } from "@storyshelf/core/test-helpers";
-import { publishedGzipPath } from "@storyshelf/core/utils";
+import { publishedBrotliPath, publishedGzipPath } from "@storyshelf/core/utils";
 import { createHash, randomBytes } from "node:crypto";
-import { gunzipSync, gzipSync } from "node:zlib";
+import { brotliCompressSync, brotliDecompressSync, gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
-import { acceptsGzip, publishedGzip } from "./published-compression.ts";
+import { publishedGzip, publishedVariant } from "./published-compression.ts";
 
 const hashOf = (data: Buffer): string => createHash("sha256").update(data).digest("hex");
 
 describe("published gzip variants", () => {
-  it("negotiates gzip, respecting explicit refusal and invalid quality", () => {
-    expect(acceptsGzip("br, gzip;q=0.5")).toBe(true);
-    expect(acceptsGzip("*;q=1, gzip;q=0")).toBe(false);
-    expect(acceptsGzip("gzip;q=2")).toBe(false);
-    expect(acceptsGzip("gzip;q=abc")).toBe(false);
-    expect(acceptsGzip()).toBe(false);
-  });
-
   it("serves the original first and reuses a verified gzip variant", async () => {
     const { storage, objects } = makeStorage();
     const bytes = Buffer.from("storybook asset ".repeat(2_000));
@@ -189,5 +181,43 @@ describe("published gzip variants", () => {
     }
     await vi.waitFor(() => expect(gunzipSync(objects.get(path)!)).toEqual(bytes));
     expect(gunzipSync((await publishedGzip(storage, hash, bytes, "text/plain"))!)).toEqual(bytes);
+  });
+});
+
+describe("published brotli variants", () => {
+  it("serves the original first, then a verified brotli variant", async () => {
+    const { storage, objects } = makeStorage();
+    const bytes = Buffer.from("storybook asset ".repeat(2_000));
+    const hash = hashOf(bytes);
+    objects.set(`content/${hash}`, bytes);
+    const written = Promise.withResolvers<null>();
+    const write = storage.write.bind(storage);
+    vi.spyOn(storage, "write").mockImplementation(async (...args) => {
+      await write(...args);
+      written.resolve(null);
+    });
+    expect(
+      await publishedVariant(storage, hash, bytes, "application/javascript", "br"),
+    ).toBeUndefined();
+    await written.promise;
+    expect(objects.has(publishedBrotliPath(hash))).toBe(true);
+    expect(objects.has(publishedGzipPath(hash))).toBe(false);
+    const result = await publishedVariant(storage, hash, bytes, "application/javascript", "br");
+    expect(brotliDecompressSync(result!)).toEqual(bytes);
+  });
+
+  it("does not serve a corrupt or wrong-content brotli variant", async () => {
+    const { storage, objects } = makeStorage();
+    const bytes = Buffer.from("asset".repeat(1000));
+    const hash = hashOf(bytes);
+    objects.set(`content/${hash}`, bytes);
+    for (const variant of [
+      Buffer.from("partial"),
+      brotliCompressSync(Buffer.from("wrong".repeat(100))),
+    ]) {
+      objects.set(publishedBrotliPath(hash), variant);
+      // eslint-disable-next-line no-await-in-loop -- sequential cases share one store
+      expect(await publishedVariant(storage, hash, bytes, "text/plain", "br")).toBeUndefined();
+    }
   });
 });

@@ -94,6 +94,27 @@ describe("runMigrations: an existing run_a11y = false", () => {
   }, 60_000);
 });
 
+describe("runMigrations: projects.switch_stories", () => {
+  it("is added to an older table with a constant false default", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      ALTER TABLE projects DROP COLUMN switch_stories;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const project = await client.query<{ switch_stories: boolean }>(
+      "SELECT switch_stories FROM projects WHERE id = 'p'",
+    );
+    expect(project.rows).toEqual([{ switch_stories: false }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: builds and projects gain later columns", () => {
   it("adds inherited_count, test_results and run_tests to older tables, with defaults", async () => {
     const client = new PGlite();
@@ -782,6 +803,34 @@ describe("runMigrationsLocked", () => {
     await expect(
       Promise.all([runMigrationsLocked(session), runMigrationsLocked(session)]),
     ).resolves.toBeDefined();
+    await client.close();
+  }, 60_000);
+});
+
+describe("runMigrations: default-branch verification (#910)", () => {
+  it("turns verification on for existing projects and adds the build's answer column", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      ALTER TABLE projects DROP COLUMN require_verified_default;
+      ALTER TABLE builds DROP COLUMN branch_verified;
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, is_default, status, created_at, updated_at)
+        VALUES ('b', 'p', 'abc', 'main', true, 'approved', now(), now());
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const project = await client.query<{ require_verified_default: boolean }>(
+      "SELECT require_verified_default FROM projects WHERE id = 'p'",
+    );
+    expect(project.rows).toEqual([{ require_verified_default: true }]);
+    const build = await client.query<{ is_default: boolean; branch_verified: string | null }>(
+      "SELECT is_default, branch_verified FROM builds WHERE id = 'b'",
+    );
+    expect(build.rows).toEqual([{ is_default: true, branch_verified: null }]);
     await client.close();
   }, 60_000);
 });

@@ -8,7 +8,7 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import type { ConsumerJob, JobRunContext } from "@storyshelf/core/capture";
 import * as capture from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   BuildModel,
@@ -46,10 +46,13 @@ function runner() {
 /** Wire capture for `testing` over a fresh in-memory database. */
 const SCRATCH = { scratchDir: ".tmp/capture-setup-test" };
 
-function wire(testing?: ShelfOptions["testing"], config: { scratchDir?: string } = SCRATCH) {
+function wire(
+  testing?: ResolvedShelfOptions["testing"],
+  config: { scratchDir?: string } = SCRATCH,
+) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage, testing } as unknown as ShelfOptions;
+  const options = { database: db, storage, testing } as unknown as ResolvedShelfOptions;
   const jobs = createJobQueue(options, ["capture"], testing?.retries ?? 2);
   return {
     db,

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-13), for the owner to decide. It answers #913 under epic #889 and is a
+Accepted (2026-11-13, owner). It answers #913 under epic #889 and is a
 precondition of scaling by identical copies (ADR 0050, decision 6). It adds a rule to ADR 0002 and
 ADR 0041; it does not replace them. Statements marked `[inferred]` were not read in the code and must
 be confirmed by the implementation.

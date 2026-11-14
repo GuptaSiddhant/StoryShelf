@@ -16,6 +16,8 @@ export function tokenCss(light: BrandTheme, dark: BrandTheme): string {
 
 interface Fallbacks {
   accentContrast: string;
+  /** Info status when a theme sets none (never the accent). */
+  info: string;
   muted: string;
   subtle: string;
   sidebar: string;
@@ -28,6 +30,7 @@ interface Fallbacks {
 
 const LIGHT_FALLBACK: Fallbacks = {
   accentContrast: "#fff",
+  info: "#1d5fcf",
   muted: "#f4f4f5",
   subtle: "#fafafa",
   sidebar: "#ffffff",
@@ -39,6 +42,7 @@ const LIGHT_FALLBACK: Fallbacks = {
 
 const DARK_FALLBACK: Fallbacks = {
   accentContrast: "#09090b",
+  info: "#4f8fff",
   muted: "#27272a",
   subtle: "#18181b",
   sidebar: "#111113",
@@ -111,6 +115,7 @@ function brandVars(theme: BrandTheme, fb: Fallbacks): string {
       --status-approved: ${theme.status.approved};
       --status-new: ${theme.status.new};
       --status-rejected: ${theme.status.rejected};
+      --status-info: ${theme.status.info ?? fb.info};
       --sidebar-bg: ${theme.sidebarBg ?? fb.sidebar};`;
 }
 
@@ -129,11 +134,10 @@ function derivedVars(fb: Fallbacks): string {
       --accent-wash: ${mix("--accent", "4%", "--surface-base")};
       --accent-border: ${mix("--accent", "30%", "--border")};
       --accent-fg: ${mix("--accent", "88%", "--text-primary")};
-      --status-info: var(--accent);
       --status-approved-fg: ${mix("--status-approved", "60%", "--text-primary")};
       --status-new-fg: ${mix("--status-new", "60%", "--text-primary")};
       --status-rejected-fg: ${mix("--status-rejected", "60%", "--text-primary")};
-      --status-info-fg: var(--accent-fg);
+      --status-info-fg: ${mix("--status-info", "60%", "--text-primary")};
       --status-approved-bg: ${mix("--status-approved", fb.tint, "--surface-card")};
       --status-new-bg: ${mix("--status-new", fb.tint, "--surface-card")};
       --status-rejected-bg: ${mix("--status-rejected", fb.tint, "--surface-card")};

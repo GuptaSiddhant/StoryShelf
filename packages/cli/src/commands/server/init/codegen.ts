@@ -1,20 +1,10 @@
 import { DB_IMPORT, DB_INIT, dbPrelude, STORAGE_IMPORT, STORAGE_INIT } from "./adapter-snippets.ts";
 import {
   resolveDeployTarget,
-  wantsDesign,
-  wantsGit,
   wantsNotifications,
   wantsObservability,
   type Answers,
 } from "./answers.ts";
-
-/** The provider lists the generated `notifications.notifiers` spreads, in wiring order. */
-function notifierSpreads(answers: Answers): string[] {
-  return [
-    ...(wantsNotifications(answers) ? ["...chatNotifiers", "...emailNotifiers"] : []),
-    ...(wantsGit(answers) ? ["...gitNotifiers"] : []),
-  ];
-}
 
 const NAMED_IMPORT_RE = /^import \{ (?<names>[^}]+) \} from "(?<from>[^"]+)";$/u;
 
@@ -41,8 +31,6 @@ function buildImports(answers: Answers): string[] {
     `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
     ...(wantsObservability(answers) ? OBSERVABILITY_IMPORTS : []),
     ...authImports(answers),
-    ...(wantsGit(answers) ? [`import { gitNotifiers } from "@storyshelf/notify-git";`] : []),
-    ...(wantsDesign(answers) ? [DESIGN_IMPORT] : []),
     ...(wantsNotifications(answers) ? notificationImports(answers) : []),
   ]);
 }
@@ -52,8 +40,6 @@ const OBSERVABILITY_IMPORTS = [
   `import { otelLogMixin } from "@storyshelf/observability";`,
   `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
 ];
-
-const DESIGN_IMPORT = `import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";`;
 
 /** The auth imports: the password admin, or the OAuth preset of the deploy target (Cognito on AWS). */
 function authImports(answers: Answers): string[] {
@@ -72,8 +58,7 @@ function authImports(answers: Answers): string[] {
 
 function notificationImports(answers: Answers): string[] {
   return [
-    `import { chatNotifiers } from "@storyshelf/notify-chat";`,
-    `import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";`,
+    `import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";`,
     ...(answers.auth === "none" ? [] : [`import { createAuthSystemHook } from "@storyshelf/app";`]),
   ];
 }
@@ -90,25 +75,33 @@ function buildAdapterLines(answers: Answers): string[] {
 
 const EMAIL_SENDER_LINES = [
   `// SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
-  `const emailSender = smtpPresetFromEnv(process.env);`,
-  `const emailNotifiers = emailSender`,
-  `  ? [createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })]`,
-  `  : [];`,
+  `const emailSender = await smtpPresetFromEnv(process.env);`,
+];
+
+/** The built-in integrations stay registered; with SMTP, the built-in \`email\` notifier sends through it. */
+const EMAIL_NOTIFIERS_LINES = [
+  `  notifications: {`,
+  `    // Git, chat, email and Figma are built in; this swaps the built-in email notifier for SMTP.`,
+  `    notifiers: (builtIn) =>`,
+  `      emailSender`,
+  `        ? builtIn.map((provider) =>`,
+  `            provider.metadata.kind === "email"`,
+  `              ? createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })`,
+  `              : provider,`,
+  `          )`,
+  `        : builtIn,`,
+  `  },`,
 ];
 
 function buildRouterLines(answers: Answers): string[] {
-  const notifiers = notifierSpreads(answers);
   return [
     ...(wantsObservability(answers) ? OBSERVABILITY_SETUP_LINES : []),
     `const app = createShelfApp({`,
     `  database,`,
     `  storage,`,
     `  testing: { runner: captureRunner },`,
-    ...(notifiers.length > 0 ? [`  notifications: { notifiers: [${notifiers.join(", ")}] },`] : []),
+    ...(wantsNotifications(answers) ? EMAIL_NOTIFIERS_LINES : []),
     ...authLines(answers),
-    ...(wantsDesign(answers)
-      ? [`  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],`]
-      : []),
     ...(wantsObservability(answers) ? [`  logger: shelfLogger,`, `  observability,`] : []),
     ...CONFIG_AND_SETUP_LINES,
     ...(answers.auth === "password" ? PASSWORD_ADMIN_LINES : []),

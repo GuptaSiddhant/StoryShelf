@@ -1,16 +1,19 @@
 import type { RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
+import { readOwnerRules } from "@storyshelf/core/models";
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { testingEnabled } from "../store.ts";
-import { PageHeader, SubNavLayout } from "../ui/components.tsx";
-import type { IconName } from "../ui/components.tsx";
+import { getStore, testingEnabled } from "../store.ts";
+import { PageHeader, Tabs, VStack } from "../ui/components.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
 import { renderSettingsCapture } from "./settings-capture.tsx";
+import { ComponentOwnersCard } from "./settings-component-owners.tsx";
 import { renderSettingsDesign, type SettingsDesignData } from "./settings-design.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
+import { renderSettingsInsights, type SettingsInsightsData } from "./settings-insights.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import {
   renderSettingsLinks,
@@ -24,28 +27,27 @@ import {
   type SettingsNotificationChannel,
   type SettingsNotifyProvider,
 } from "./settings-notifications.tsx";
+import { renderSettingsReview } from "./settings-review.tsx";
+import {
+  SETTINGS_TABS,
+  TAB_LABELS,
+  sectionsOf,
+  type SettingsSection,
+  type SettingsTab,
+} from "./settings-tabs.ts";
 import { renderSettingsTests } from "./settings-tests.tsx";
+import { renderSettingsThresholds } from "./settings-thresholds.tsx";
 import { renderSettingsTokens } from "./settings-tokens.tsx";
 import { renderSettingsWebhooks, type SettingsWebhook } from "./settings-webhooks.tsx";
-
-/** Tabs available in the project settings section. */
-export type SettingsTab =
-  | "general"
-  | "capture"
-  | "tests"
-  | "labels"
-  | "links"
-  | "design"
-  | "tokens"
-  | "webhooks"
-  | "notifications"
-  | "members"
-  | "ai";
 
 /** Data required to render the project settings page with its active tab. */
 export interface ProjectSettingsData {
   project: Project;
   activeTab: SettingsTab;
+  /** The section a refused form belongs to: it alone shows `formState`. */
+  formSection?: SettingsSection | undefined;
+  /** The Insights tab; omitted when nothing on it applies (hosting-only, no AI). */
+  insights?: SettingsInsightsData | undefined;
   labelTypes: LabelType[];
   links: SettingsLink[];
   linkCandidates: SettingsLinkCandidate[];
@@ -71,6 +73,8 @@ export interface SettingsFormState {
   errors?: Record<string, string>;
   globalError?: string;
   secret?: string;
+  /** Confirmed public origin, for the upload command shown with a new token. */
+  origin?: string;
   /** Label type key whose edit form is open (labels tab). */
   editKey?: string;
   /** Members tab: a refused component-owners submission, shown again as typed. */
@@ -78,123 +82,110 @@ export interface SettingsFormState {
   ownerProblems?: { line: number; message: string }[];
 }
 
-function tabHref(project: Project, tab: SettingsTab): string {
-  return tab === "general"
-    ? `/projects/${project.slug}/settings`
-    : `/projects/${project.slug}/settings/${tab}`;
-}
-
-const TAB_LABELS: Record<SettingsTab, string> = {
-  general: "General",
-  capture: "Capture",
-  tests: "Tests",
-  labels: "Labels",
-  links: "Links",
-  design: "Design",
-  tokens: "Tokens",
-  webhooks: "Webhooks",
-  notifications: "Notifications",
-  members: "Members",
-  ai: "AI",
-};
-
-const TAB_ICONS: Record<SettingsTab, IconName> = {
-  general: "settings",
-  capture: "image",
-  tests: "activity",
-  labels: "tag",
-  links: "external-link",
-  design: "image",
-  tokens: "key",
-  webhooks: "webhook",
-  notifications: "bell",
-  members: "users",
-  ai: "sparkles",
-};
-
-/** Tabs whose pages are `testing` routes: hidden on a hosting-only instance. */
-const TESTING_TABS: ReadonlySet<SettingsTab> = new Set(["capture", "tests", "ai"]);
-
-const SETTINGS_TABS: SettingsTab[] = [
-  "general",
+/** Sections that are `testing` pages: hidden on a hosting-only instance. */
+const TESTING_SECTIONS: ReadonlySet<SettingsSection> = new Set([
+  "thresholds",
   "capture",
   "tests",
-  "labels",
-  "links",
-  "design",
-  "tokens",
-  "webhooks",
-  "notifications",
-  "members",
   "ai",
-];
+]);
 
-/** A tab shows when its page exists: `testing` tabs need testing, and the AI tab needs AI. */
-function settingsTabShown(tab: SettingsTab, data: ProjectSettingsData): boolean {
-  if (TESTING_TABS.has(tab) && !testingEnabled()) {
+/** A section shows when its page exists: `testing` sections need testing, and the AI section needs AI. */
+function sectionShown(section: SettingsSection, data: ProjectSettingsData): boolean {
+  if (TESTING_SECTIONS.has(section) && !testingEnabled()) {
     return false;
   }
-  return tab !== "ai" || data.ai?.available === true;
+  return section !== "ai" || data.ai?.available === true;
 }
 
-/** Project-behaviour tabs (general, tests, AI); undefined for any other tab. */
-function renderBehaviourTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
-  const { project, activeTab } = data;
-  if (activeTab === "general")
-    return renderSettingsGeneral(project, formState, data.isAdmin, data.targets);
-  if (activeTab === "capture")
-    return renderSettingsCapture(project, data.isAdmin, formState, data.targets);
-  if (activeTab === "ai") return renderSettingsAi(project, data.ai, formState);
-  return activeTab === "tests" ? renderSettingsTests(project, data.isAdmin, formState) : undefined;
+/** Whether the Insights tab has anything to show: capture numbers and jobs need testing, the digest needs AI. */
+export function insightsShown(insights: SettingsInsightsData | undefined): boolean {
+  return insights !== undefined && (insights.testing || insights.health !== null);
 }
 
-/** Labels, links, tokens, and webhooks tabs; undefined for any other tab. */
-function renderCatalogTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
-  const { project, activeTab, isAdmin } = data;
-  if (activeTab === "labels")
-    return renderSettingsLabels(project, data.labelTypes, isAdmin, formState);
-  if (activeTab === "links")
-    return renderSettingsLinks(project, data.links, data.linkCandidates, isAdmin, formState);
-  if (activeTab === "design") return renderSettingsDesign(project, data.design, isAdmin, formState);
-  if (activeTab === "tokens") return renderSettingsTokens(project, data.tokens, isAdmin, formState);
-  return activeTab === "webhooks"
-    ? renderSettingsWebhooks(project, data.webhooks, isAdmin, formState)
-    : undefined;
+/** The tabs the bar offers: Insights only when it has content. */
+export function shownTabs(data: ProjectSettingsData): SettingsTab[] {
+  return SETTINGS_TABS.filter((tab) => tab !== "insights" || insightsShown(data.insights));
 }
 
-function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
-  const { project, activeTab } = data;
-  const behaviour = renderBehaviourTab(data, formState);
-  if (behaviour !== undefined) return behaviour;
-  const catalog = renderCatalogTab(data, formState);
-  if (catalog !== undefined) return catalog;
-  if (activeTab === "notifications")
-    return renderSettingsNotifications(
-      project,
+type SectionRenderer = (data: ProjectSettingsData, formState?: SettingsFormState) => unknown;
+
+/** How each section renders; the Review & notifications sections are split off to stay readable. */
+const REVIEW_SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
+  review: (data, formState) => renderSettingsReview(data.project, formState, data.isAdmin),
+  owners: (data, formState) => (
+    <ComponentOwnersCard
+      project={data.project}
+      rules={readOwnerRules(data.project.componentOwners)}
+      isAdmin={data.isAdmin}
+      formState={formState}
+    />
+  ),
+  labels: (data, formState) =>
+    renderSettingsLabels(data.project, data.labelTypes, data.isAdmin, formState),
+  notifications: (data, formState) =>
+    renderSettingsNotifications(
+      data.project,
       data.notificationChannels,
       data.notifyProviders,
       data.mySubscription,
       data.isAdmin,
       formState,
       data.notificationsPaused,
-    );
-  if (activeTab === "members")
-    return renderSettingsMembers(
-      project,
-      data.members,
-      data.groupMappings,
-      data.isAdmin,
-      formState,
-    );
-  return null;
+    ),
+};
+
+const SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
+  ...REVIEW_SECTIONS,
+  general: (data, formState) => renderSettingsGeneral(data.project, formState, data.isAdmin),
+  links: (data, formState) =>
+    renderSettingsLinks(data.project, data.links, data.linkCandidates, data.isAdmin, formState),
+  thresholds: (data, formState) => renderSettingsThresholds(data.project, formState, data.isAdmin),
+  capture: (data, formState) =>
+    renderSettingsCapture(data.project, data.isAdmin, formState, data.targets),
+  tests: (data, formState) => renderSettingsTests(data.project, data.isAdmin, formState),
+  ai: (data, formState) => renderSettingsAi(data.project, data.ai, formState),
+  design: (data, formState) =>
+    renderSettingsDesign(data.project, data.design, data.isAdmin, formState),
+  members: (data, formState) =>
+    renderSettingsMembers(data.project, data.members, data.groupMappings, data.isAdmin, formState),
+  tokens: (data, formState) =>
+    renderSettingsTokens(data.project, data.tokens, data.isAdmin, formState),
+  webhooks: (data, formState) =>
+    renderSettingsWebhooks(data.project, data.webhooks, data.isAdmin, formState),
+  insights: (data) => (data.insights ? renderSettingsInsights(data.project, data.insights) : null),
+};
+
+function sectionBody(
+  section: SettingsSection,
+  data: ProjectSettingsData,
+  formState?: SettingsFormState,
+): unknown {
+  return SECTIONS[section]?.(data, formState) ?? null;
 }
 
-/** Project settings shell: tab navigation plus the active settings tab. */
+/** The sections of the active tab, each under its own anchor; a refused form shows only on its section. */
+function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
+  return (
+    <VStack>
+      {sectionsOf(data.activeTab)
+        .filter((section) => sectionShown(section, data))
+        .map((section) => (
+          <div id={section}>
+            {sectionBody(section, data, data.formSection === section ? formState : undefined)}
+          </div>
+        ))}
+    </VStack>
+  );
+}
+
+/** Project settings: grouped tabs across the top (the tab is in the URL) and the active tab's sections. */
 export function renderProjectSettingsPage(
   data: ProjectSettingsData,
   formState?: SettingsFormState,
 ): RenderedContent {
   const { project, activeTab } = data;
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <DocumentLayout
       title={`${project.name} · Settings`}
@@ -207,22 +198,19 @@ export function renderProjectSettingsPage(
     >
       <PageHeader
         title="Project settings"
-        description={
-          <>Manage general settings, labels, tokens, webhooks and members for {project.name}.</>
-        }
+        description={<>Settings, access and insights for {project.name}.</>}
       />
-
-      <SubNavLayout
+      <Tabs
         label="Settings sections"
-        items={SETTINGS_TABS.filter((tab) => settingsTabShown(tab, data)).map((tab) => ({
+        tabs={shownTabs(data).map((tab) => ({
           label: TAB_LABELS[tab],
-          href: tabHref(project, tab),
-          icon: TAB_ICONS[tab],
+          href: urls.settingsTab(project.slug, tab),
           active: activeTab === tab,
         }))}
-      >
-        {renderActiveTab(data, formState)}
-      </SubNavLayout>
+      />
+      {renderActiveTab(data, formState)}
     </DocumentLayout>
   );
 }
+
+export type { SettingsSection, SettingsTab };

@@ -3,6 +3,7 @@ import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
+import { stubRunner } from "../test-runner.ts";
 
 async function seed() {
   const { db } = makeDatabase();
@@ -34,9 +35,14 @@ function postForm(body: Record<string, string>) {
 describe("general settings capture browser", () => {
   it("renders the browser select defaulting to chromium", async () => {
     const { db, storage } = await seed();
-    const app = createShelfApp({ database: db, storage, logger: pino({ level: "silent" }) });
+    const app = createShelfApp({
+      testing: { runner: stubRunner() },
+      database: db,
+      storage,
+      logger: pino({ level: "silent" }),
+    });
 
-    const page = await app.request("/projects/browser-project/settings");
+    const page = await app.request("/projects/browser-project/settings/capture");
     expect(page.status).toBe(200);
     const html = await page.text();
     expect(html).toContain('name="browser"');
@@ -45,7 +51,12 @@ describe("general settings capture browser", () => {
 
   it("persists a valid browser from the general form", async () => {
     const { db, storage } = await seed();
-    const app = createShelfApp({ database: db, storage, logger: pino({ level: "silent" }) });
+    const app = createShelfApp({
+      testing: { runner: stubRunner() },
+      database: db,
+      storage,
+      logger: pino({ level: "silent" }),
+    });
 
     const saved = await app.request(
       "/projects/browser-project/settings",
@@ -59,13 +70,18 @@ describe("general settings capture browser", () => {
       browser: "firefox",
     });
 
-    const page = await app.request("/projects/browser-project/settings");
+    const page = await app.request("/projects/browser-project/settings/capture");
     expect(await page.text()).toContain('value="firefox" selected');
   });
 
   it("rejects an unknown browser from the general form", async () => {
     const { db, storage } = await seed();
-    const app = createShelfApp({ database: db, storage, logger: pino({ level: "silent" }) });
+    const app = createShelfApp({
+      testing: { runner: stubRunner() },
+      database: db,
+      storage,
+      logger: pino({ level: "silent" }),
+    });
 
     const saved = await app.request(
       "/projects/browser-project/settings",
@@ -76,7 +92,12 @@ describe("general settings capture browser", () => {
 
   it("accepts browser through the projects PATCH API and rejects unknown values", async () => {
     const { db, storage } = await seed();
-    const app = createShelfApp({ database: db, storage, logger: pino({ level: "silent" }) });
+    const app = createShelfApp({
+      testing: { runner: stubRunner() },
+      database: db,
+      storage,
+      logger: pino({ level: "silent" }),
+    });
     const jsonHeaders = { "content-type": "application/json" };
 
     const updated = await app.request("/api/v1/projects/browser-project", {

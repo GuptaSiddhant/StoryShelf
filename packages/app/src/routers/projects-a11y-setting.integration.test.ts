@@ -58,7 +58,9 @@ describe("project runA11y setting", () => {
       slug: string;
     };
     const tab = `/projects/${created.slug}/settings/tests`;
-    const page = await (await app.request(tab)).text();
+    const page = await (
+      await app.request(tab.replace("/settings/tests", "/settings/capture"))
+    ).text();
     expect(page).toMatch(/name="runA11y"[^>]*checked/u);
 
     const saved = await app.request(tab, {
@@ -74,6 +76,8 @@ describe("project runA11y setting", () => {
       runA11y?: boolean;
     };
     expect(after.runA11y).toBe(false);
-    expect(await (await app.request(tab)).text()).not.toMatch(/name="runA11y"[^>]*checked/u);
+    expect(
+      await (await app.request(tab.replace("/settings/tests", "/settings/capture"))).text(),
+    ).not.toMatch(/name="runA11y"[^>]*checked/u);
   });
 });

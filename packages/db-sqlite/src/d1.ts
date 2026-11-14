@@ -8,6 +8,7 @@
  * needed).
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { gatedMigration, sqlSchemaLevelStore } from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
 import { drizzle } from "drizzle-orm/d1";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
@@ -77,12 +78,25 @@ export function createD1Database(options: D1DatabaseOptions): DatabaseAdapter {
       supportsTesting: false,
     },
     tables: schema,
-    migrate: async ({ logger }) => {
-      // A binding that refuses PRAGMA has no columns to check, as in `ensureColumns`.
-      await assertReviewSchema(async (table) =>
-        parseTableInfo((await inspectRows(client, table)) ?? []),
-      );
-      await runMigrations(client, logger);
+    migrate: async ({ logger, release }) => {
+      await gatedMigration({
+        release,
+        logger,
+        store: sqlSchemaLevelStore(async (sql) => {
+          if (!/^\s*select/iu.test(sql)) {
+            await client.exec(sql);
+            return [];
+          }
+          return (await client.prepare(sql).bind().all()).results;
+        }, "sqlite"),
+        migrate: async () => {
+          // A binding that refuses PRAGMA has no columns to check, as in `ensureColumns`.
+          await assertReviewSchema(async (table) =>
+            parseTableInfo((await inspectRows(client, table)) ?? []),
+          );
+          await runMigrations(client, logger);
+        },
+      });
     },
     close: () => {
       // no-op: the Workers runtime owns the binding

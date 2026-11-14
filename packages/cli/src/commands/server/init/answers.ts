@@ -26,11 +26,12 @@ export interface Answers {
   database: DatabaseChoice;
   storage: StorageChoice;
   auth: AuthChoice;
-  git: GitChoice;
+  /** Ignored: git, chat and Figma are built in (ADR 0049). Kept so older answers still type. */
+  git?: GitChoice;
   docker: boolean;
-  /** Email + chat notification wiring. Absent in older mocked answers. */
+  /** SMTP for email notifications and auth mail (installs `nodemailer`). Absent in older mocked answers. */
   notifications?: boolean;
-  /** Figma design links via `@storyshelf/design-figma` (opt-in). Absent means off. */
+  /** Ignored: Figma is built in (ADR 0049). */
   design?: boolean;
   /** OpenTelemetry wiring (opt-in). Absent means off. */
   observability?: boolean;
@@ -56,19 +57,9 @@ export function resolveDeployTarget(answers: Answers): DeployTarget {
   return answers.deployTarget ?? (answers.docker ? "docker" : "local");
 }
 
-/** Whether the generated server wires the git providers (commit statuses on GitHub/GitLab). */
-export function wantsGit(answers: Answers): boolean {
-  return answers.git !== "none";
-}
-
-/** Whether the generated server wires notification providers (opt-in). */
+/** Whether the generated server wires an SMTP email transport (opt-in). */
 export function wantsNotifications(answers: Answers): boolean {
   return answers.notifications ?? false;
-}
-
-/** Whether the generated server wires the Figma design provider (opt-in). */
-export function wantsDesign(answers: Answers): boolean {
-  return answers.design ?? false;
 }
 
 /** Whether the generated server wires OpenTelemetry (opt-in). */

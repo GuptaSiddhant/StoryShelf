@@ -85,7 +85,8 @@ async function fetchManifest(storage: StorageAdapter, dir: string): Promise<Buil
   }
 }
 
-function parseManifest(bytes: Buffer): BuildManifest | null {
+/** Parse manifest bytes: null when they are not a JSON object; entries with a non-string hash are dropped. */
+export function parseManifest(bytes: Buffer): BuildManifest | null {
   const parsed: unknown = JSON.parse(bytes.toString("utf8"));
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     return null;

@@ -115,7 +115,7 @@ function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
     );
   }
   if (takesNoVerdict(data.build.status)) {
-    return <RetryBuild data={data} />;
+    return null;
   }
   if (!data.canVerdict) {
     return null;
@@ -165,27 +165,6 @@ function supersededLine(data: ReviewSectionData): Rendered {
       </a>
       .
     </>
-  );
-}
-
-/**
- * Retry for a build that failed or was cancelled, for the roles that may retry (developer and above,
- * the same ones that may comment) and only where capture is on, since the retry route is a testing
- * route. It posts like the Retry capture button of the build page.
- */
-function RetryBuild(props: { data: ReviewSectionData }): Rendered | null {
-  const { data } = props;
-  if (!data.testing || !data.canComment || data.build.supersededByBuildId) {
-    return null;
-  }
-  const url = `/api/v1/projects/${data.project.slug}/builds/${data.build.id}/retry`;
-  return (
-    <form method="post" action={url} hx-post={url} hx-target="body" class="mt-1">
-      {csrfField()}
-      <Button variant="secondary" size="sm" type="submit">
-        Retry capture
-      </Button>
-    </form>
   );
 }
 

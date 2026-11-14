@@ -10,7 +10,7 @@ import {
   type CaptureConsumer,
   type KindHandler,
 } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { Build, CaptureJobKind, Project } from "@storyshelf/core/schema";
 import { setupBuildState, type BuildStateWiring } from "./build-state-setup.ts";
@@ -48,7 +48,7 @@ export interface JobsWiring {
 
 /** Wire the queue, the handlers and the consumer for `options`. */
 export function setupJobs(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   env: NodeJS.ProcessEnv = process.env,
 ): JobsWiring {
@@ -95,7 +95,7 @@ export function setupJobs(
  * capture that holds every slot for minutes.
  */
 function queuesFor(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   serverless: boolean,
 ): { jobs: JobQueue; notifyJobs: JobQueue | null } {
   const testing = options.testing;
@@ -114,7 +114,7 @@ function queuesFor(
 
 /** Every consumer this instance runs; none on a host that polls nothing. */
 function consumersOf(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   jobs: JobQueue,
   wiring: {
@@ -143,7 +143,7 @@ function consumersOf(
 
 /** The consumer of the database queue: capture and publish jobs. */
 function databaseConsumer(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   jobs: JobQueue,
   wiring: {
@@ -189,7 +189,7 @@ const NOTIFY_CONCURRENCY = 4;
 
 /** The consumer of `notify` and `review-request` jobs, on its own queue so no capture or publish job can starve it. */
 function notifyConsumer(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   queue: JobQueue,
   handlers: { notify: KindHandler; "review-request"?: KindHandler },
@@ -232,7 +232,7 @@ async function assignedOrNone(
 
 /** Tells the project's reviewers a published build waits for a verdict (webhook and notifications). */
 function reviewRequestedFor(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   reviewRequests: NotifyDeps["reviewRequests"],
 ): (project: Project, build: Build) => Promise<void> {
@@ -260,7 +260,7 @@ function reviewRequestedFor(
 }
 
 /** The consumer's wall-clock bound for one job, when `testing.maxJobSeconds` states it. */
-function maxJobConfig(options: ShelfOptions): { maxJobSeconds?: number } {
+function maxJobConfig(options: ResolvedShelfOptions): { maxJobSeconds?: number } {
   const seconds = options.testing?.maxJobSeconds;
   return seconds === undefined ? {} : { maxJobSeconds: seconds };
 }

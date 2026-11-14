@@ -18,6 +18,16 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 - **`pending` builds** (waiting for a review verdict, ADR 0013 decision 9; `core/src/retention/pending.ts`): purged once their last activity (the build's `updated_at`, its newest comment, its newest `build_reviews` row) is older than `purgeTtlDays`. A pending build replaced by a newer one on its branch with no attempts, comments or verdicts is "superseded" and leaves at the same window; the latest-per-branch rule does not shield pending builds, and persistent ones are kept. No new status.
 - **Stale branch baselines:** branches whose latest build is older than `branchTtlDays` (default 30, `null` = disabled) are GC'd (`purgeStaleBranches` in `packages/core/src/retention/purge.ts`, which calls `BaselineModel.removeForBranch`). That deletes the branch's `baselines` rows. A baseline's file is deleted directly only when it is a legacy `baselines/{branch}/**` file. Content-addressed screenshots are shared, so they are not deleted here: the screenshot sweep (`retention/screenshot-sweep.ts`, which runs after branch GC) removes an unreferenced `{projectId}/content/{sha256}.png` once it has stood unreferenced for 24 h. The default branch is never GC'd.
 
+### Insights, AI usage and expired auth rows
+
+The same daily timer deletes three kinds of rows that nothing else removes (#866). Each window is a `ShelfConfig` setting in days, and `null` keeps the table's rows:
+
+- `insights`: every kind and status older than `insightsTtlDays` (default 180).
+- `ai_usage`: rows older than `aiUsageTtlDays` (default 400, so every per-project budget window still sees its history).
+- `session` and `verification`: rows whose `expires_at` passed more than `expiredAuthTtlDays` ago (default 7). Better Auth never sweeps these tables, so `Auth.purgeExpired` (implemented in `@storyshelf/auth`) does it.
+
+Every delete goes through `deleteInBatches` (`@storyshelf/core/utils`): 500 rows per read, at most 40 batches per pass, the rest on the next pass. This sweep runs even when branch GC is off.
+
 ### How a claimed purge removes a build
 
 Purge claims a build first, then finishes it in recorded steps (ADR 0039 decision 2; `packages/core/src/retention/build-deletion.ts`). Nothing is deleted before the tombstone commits:

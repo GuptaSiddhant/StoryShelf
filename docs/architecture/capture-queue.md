@@ -44,8 +44,11 @@ visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates ha
 **Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
 `PollableCaptureQueue` (this queue and the IPC queue of a forked child) and runs a
 handler per job `kind`: `capture` is wired to `createDispatchJob`; `publish` and `notify` register
-through `handlers`; a job whose kind has no handler is failed with `no handler registered for job
-kind "<kind>"`. A slot is taken before polling (the database queue uses `startPollLoop`, other
+through `handlers`; on the database queue the consumer calls `claimOnly` with its handler kinds, so a poll never
+claims a kind it cannot run (a queue that does not filter by kind fails such a job with `no handler
+registered for job kind "<kind>"`). Every payload carries a version `v` (absent = 1); a job newer
+than the handler's `payloadVersion` is handed back (`handBack`: queued again after a delay, attempt
+count restored, outcome `handed-back`) without spending an attempt (ADR 0053). A slot is taken before polling (the database queue uses `startPollLoop`, other
 queues a slot loop with the idle backoff of 250 ms doubling to 5 s for queues that return empty at
 once). A failing job is requeued with delay `1000 ms * 2^attempts` (capped at 30 s) until its last
 attempt (a handler may state its own `backoff`, and a job its own `maxAttempts`), `attempt >= maxAttempts` for the database queue (`attempts >= maxRetries` for queues that

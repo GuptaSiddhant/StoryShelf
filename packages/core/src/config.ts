@@ -9,6 +9,7 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
   storybookHostingSchema,
   validateStorybookHosting,
@@ -43,7 +44,7 @@ export interface BrandTheme {
   text: { primary: string; secondary: string; muted?: string };
   border: string;
   borderSubtle?: string;
-  status: { approved: string; new: string; rejected: string };
+  status: { approved: string; new: string; rejected: string; info?: string };
   sidebarBg?: string;
   topbarBg?: string;
   radius?: string;
@@ -204,6 +205,12 @@ export interface ShelfConfig {
    * retention (ADR 0039).
    */
   purgeTtlDays?: number;
+  /** Insight rows (all kinds) older than this many days are deleted daily; null keeps them (default 180). */
+  insightsTtlDays?: number | null;
+  /** AI usage rows older than this many days are deleted daily; null keeps them (default 400, covers every budget window). */
+  aiUsageTtlDays?: number | null;
+  /** Expired session and verification rows are deleted this many days after expiry; null keeps them (default 7). */
+  expiredAuthTtlDays?: number | null;
   /** Branch baseline TTL, days; null disables branch GC (default 30). */
   branchTtlDays?: number | null;
   /** Branch GC interval, ms; daily sweep via interval clock (default 86_400_000). */
@@ -214,7 +221,7 @@ export interface ShelfConfig {
    * Opt-in, off by default — some deployments prefer no timing headers.
    */
   serverTiming?: boolean;
-  /** Persist gzip variants for published Storybook files (default off). */
+  /** Persist gzip and brotli copies of published Storybook files, made when publishing ends (default off). */
   publishedCompression?: boolean;
   /**
    * Act on `supersedes` when a build is created (ADR 0045, decision 3): cancel the older in-flight
@@ -262,7 +269,12 @@ const brandThemeSchema: z.ZodType<BrandTheme> = z.object({
   text: z.object({ primary: z.string(), secondary: z.string(), muted: z.string().optional() }),
   border: z.string(),
   borderSubtle: z.string().optional(),
-  status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
+  status: z.object({
+    approved: z.string(),
+    new: z.string(),
+    rejected: z.string(),
+    info: z.string().optional(),
+  }),
   sidebarBg: z.string().optional(),
   topbarBg: z.string().optional(),
   radius: z.string().optional(),
@@ -369,6 +381,9 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     branchTtlDays: z.number().int().positive().nullable().optional(),
+    insightsTtlDays: z.number().int().positive().nullable().optional(),
+    aiUsageTtlDays: z.number().int().positive().nullable().optional(),
+    expiredAuthTtlDays: z.number().int().positive().nullable().optional(),
     branchGcIntervalMs: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
@@ -519,6 +534,12 @@ export interface ShelfTestingOptions {
    * boot if it cannot.
    */
   mode?: "auto" | "in-process" | "fork";
+  /**
+   * Operator veto of story switching (ADR 0052, decision 2). `false` forbids a project's
+   * `switchStories` setting for the whole server; unset or `true` leaves the choice to each
+   * project (the setting itself defaults to off).
+   */
+  switchStories?: boolean;
   /** Screenshot comparison, shared by capture and the re-diff endpoint. */
   compare?: ShelfCompareOptions;
   /** Image library selection; see {@link ShelfImagesOptions}. */
@@ -539,8 +560,17 @@ export interface ShelfTestingOptions {
 
 /** Notification options: who can deliver, over which transport, with what branding. */
 export interface ShelfNotificationsOptions {
-  /** Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these. */
-  notifiers?: NotifierProvider[];
+  /**
+   * Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these.
+   * An array lists exactly these; a function `(builtIn) => list` adds, replaces or filters the
+   * built-in notifiers; `false` wires none (ADR 0049).
+   */
+  notifiers?: IntegrationOption<NotifierProvider>;
+  /**
+   * Email transports, chosen like `notifiers`: an array, a function of the built-ins, or `false`
+   * (ADR 0049). Resolved and checked at startup; the app does not use the list yet.
+   */
+  email?: IntegrationOption<EmailSender>;
   /** Email transport. Listed here so its setup/teardown/validation hooks run with the app's. */
   emailSender?: EmailSender;
   /** Site-wide brand and sender settings for outgoing notifications. */
@@ -588,8 +618,11 @@ export interface ShelfOptions {
   auth?: Auth;
   /** AI insights surface (ADR 0016). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
-  /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
-  design?: DesignProvider[];
+  /**
+   * Design-tool providers (Figma, …) that resolve links, metadata and previews: an array (exactly
+   * these), a function `(builtIn) => list`, or `false` for none (ADR 0049).
+   */
+  design?: IntegrationOption<DesignProvider>;
   /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
   logger?: Logger;
@@ -601,6 +634,25 @@ export interface ShelfOptions {
    * observability package. Flushed on `app.lifecycle.teardown()`.
    */
   observability?: ObservabilityHandle;
+}
+
+/** Notification options after {@link resolveShelfOptions}: every integration group is a list. */
+export interface ResolvedNotificationsOptions extends Omit<
+  ShelfNotificationsOptions,
+  "notifiers" | "email"
+> {
+  notifiers?: NotifierProvider[];
+  email?: EmailSender[];
+}
+
+/**
+ * `ShelfOptions` after {@link resolveShelfOptions}: the integration groups are resolved, once, into
+ * the lists the app registers. `resolveShelfOptions` always sets them; they stay optional so a
+ * hand-built options object (tests, embedders) reads as "none".
+ */
+export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  design?: DesignProvider[];
+  notifications?: ResolvedNotificationsOptions;
 }
 
 /**

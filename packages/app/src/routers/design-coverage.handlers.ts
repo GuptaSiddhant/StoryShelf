@@ -21,6 +21,9 @@ import { getStore, testingEnabled } from "../store.ts";
 import { viewerIdOf } from "./design-connect.handlers.ts";
 import { nodeModel, providerNameFor } from "./design.handlers.ts";
 
+/** The part of a catalog entry that places a story in its file. */
+type StoryFile = Pick<CatalogEntry, "id" | "importPath">;
+
 /** Order of severity when a component links several designs: the worst one speaks for it. */
 const SEVERITY: readonly DesignDrift[] = ["deleted", "stale", "unknown", "current"];
 
@@ -91,7 +94,7 @@ function linkOf(
  */
 async function approvedVersions(
   project: Project,
-  entries: readonly CatalogEntry[],
+  entries: readonly StoryFile[],
 ): Promise<Map<string, string>> {
   if (!testingEnabled()) return new Map();
   const baselines = await new BaselineModel(getStore().db).list(project.id);
@@ -104,7 +107,7 @@ async function approvedVersions(
 /** The oldest `updatedAt` of the given baselines, by the normalized story file of their story. */
 function oldestPerFile(
   baselines: readonly Baseline[],
-  entries: readonly CatalogEntry[],
+  entries: readonly StoryFile[],
 ): Map<string, string> {
   const fileOf = new Map(
     entries.map((entry) => [entry.id, normalizeImportPath(entry.importPath)] as const),
@@ -180,4 +183,39 @@ function summarize(
       provider && !withToken.has(provider.metadata.kind) ? [provider.metadata.name] : [],
     ),
   };
+}
+
+/**
+ * The design drift of each story file of a build, worst link first, for the files that link a
+ * design (a file with none is absent). Reads stored nodes only; never calls a provider.
+ */
+export async function driftByFile(
+  project: Project,
+  snapshots: readonly Snapshot[],
+): Promise<Map<string, DesignDrift>> {
+  const { db, design } = getStore();
+  const manual = await new DesignModel(db, design).componentLinks(project.id);
+  const resolutions = resolveDesigns(manual, snapshots);
+  const urls = [...new Set([...resolutions.values()].flatMap((resolution) => resolution.urls))];
+  if (urls.length === 0) return new Map();
+  const [cached, withToken] = await Promise.all([
+    nodeModel()
+      .cachedFor(project.id, urls, viewerIdOf())
+      .catch(() => new Map<string, DesignNode>()),
+    providersWithToken(project, urls),
+  ]);
+  const files = snapshots.flatMap((snap) =>
+    snap.storyImportPath ? [{ id: snap.storyId, importPath: snap.storyImportPath }] : [],
+  );
+  const baselines = await approvedVersions(project, files);
+  return new Map(
+    [...resolutions].map(([file, resolution]) => [
+      file,
+      worst(
+        resolution.urls.map((url) =>
+          linkOf(url, cached.get(url), baselines.get(file) ?? null, withToken),
+        ),
+      ),
+    ]),
+  );
 }

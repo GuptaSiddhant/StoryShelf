@@ -38,7 +38,7 @@ export function renderSettingsDesign(
     return (
       <EmptyState
         title="No design provider configured"
-        description="Add a design provider (for example @storyshelf/design-figma) to createShelfApp({ design: [...] }) to link components to design files."
+        description="Figma is built in but the server turned it off. Pass a design list to createShelfApp({ design }) to link components to design files."
       />
     );
   }

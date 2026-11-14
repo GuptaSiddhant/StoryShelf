@@ -367,6 +367,29 @@ export class CaptureJobModel {
     });
   }
 
+  /**
+   * Give attempt `attempt` of a job back unrun: the job row is queued again, claimable from
+   * `visibleAt`, with the attempt count it had before the claim, and the attempt row is removed so
+   * the next claim can use its number. Nothing happens unless that attempt is the job's running one
+   * (a lease already lost to another instance is left alone). The job row is written first, so a
+   * crash between the two writes leaves an attempt whose lease runs out like any other.
+   */
+  async handBack(jobId: string, attempt: number, visibleAt: string, now: string): Promise<boolean> {
+    const row = await this.get(jobId);
+    if (row?.status !== "running" || row.attempt !== attempt) {
+      return false;
+    }
+    await this.#db.update(this.#table, jobId, {
+      status: "queued",
+      attempt: attempt - 1,
+      visibleAt,
+      startedAt: null,
+      updatedAt: now,
+    });
+    await this.#db.remove(this.#table, attemptRowId(jobId, attempt));
+    return true;
+  }
+
   /** Flag a row as cancel-requested; the flag is never cleared. */
   async flagCancel(id: string, now: string): Promise<void> {
     await this.#db.update(this.#table, id, { cancelRequestedAt: now, updatedAt: now });

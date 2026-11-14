@@ -164,7 +164,7 @@ nub run bench                      # warm-up run (dropped), then the median of 3
 nub run bench -- --runs 5 --out .tmp/bench.json
 ```
 
-It uploads the fixture with the built CLI three times (first, unchanged, one asset changed by a line) and reports:
+It uploads the fixture with the built CLI three times (first, unchanged, one asset changed by a line) and reports. Every upload passes `--full`, so the `unchanged` row is a **full capture of an unchanged build** (every story renders again; the bench fails if it captures fewer snapshots than the first upload). That is the row ADR 0052's speed gate compares. The fixtures also hold deliberately leaking stories (`Leaks`, ADR 0052 decision 9), so the bench's story count includes them:
 
 - **Storage:** bytes and objects after each upload and its capture, split into Storybook files (`content/`), per-build zips, screenshots and metadata.
 - **Capture:** wall time from upload to a finished build, the orchestrator's `timed()` sums (`db`, `storage`, `capture.extract`, `capture.render`, `capture.persist`) and render time per screenshot. Navigation, settle, screenshot and diff are inside `capture.render`: nothing records them separately yet.

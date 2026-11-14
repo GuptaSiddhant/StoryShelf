@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import type { SQL, SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { InsightKind, InsightRow } from "../schema/insight.ts";
+import { deleteInBatches } from "../utils/batched-delete.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
 
@@ -142,6 +143,11 @@ export class InsightModel {
     return where ? await this.removeWhere(where) : 0;
   }
 
+  /** Remove every insight row (any kind or status) created before `cutoffIso`, in batches. */
+  async purgeBefore(cutoffIso: string): Promise<number> {
+    return await this.removeWhere(lt(this.col("createdAt"), cutoffIso));
+  }
+
   /** Mark pending/running rows older than `cutoffIso` as interrupted. */
   async sweepStale(cutoffIso: string): Promise<number> {
     const stale = (await this.db.list(this.tables.insights, {
@@ -159,16 +165,7 @@ export class InsightModel {
   }
 
   private async removeWhere(where: SQL): Promise<number> {
-    const rows = (await this.db.list(this.tables.insights, {
-      where,
-      orderBy: asc(this.col("id")),
-    })) as unknown as InsightRow[];
-    await Promise.all(
-      rows.map(async (row) => {
-        await this.db.remove(this.tables.insights, row.id);
-      }),
-    );
-    return rows.length;
+    return await deleteInBatches(this.db, this.tables.insights, where, asc(this.col("id")));
   }
 
   private async findByKey(input: InsightStartInput): Promise<InsightRow | null> {

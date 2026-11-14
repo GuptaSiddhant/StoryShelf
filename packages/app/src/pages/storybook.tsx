@@ -22,6 +22,7 @@ export function renderStorybookPreparingPage(project: Project, build: Build, slu
       header a { color: inherit; text-decoration: none; }
       header .crumb { opacity: .7; }
       main { flex: 1; display: flex; align-items: center; justify-content: center; opacity: .7; }
+      .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     </style>
   </head>
   <body>
@@ -34,6 +35,7 @@ export function renderStorybookPreparingPage(project: Project, build: Build, slu
       <span class="crumb">· ${build.gitSha.slice(0, 7)}</span>
     </header>
     <main>
+      <h1 class="sr-only">Preparing preview</h1>
       <p>Preparing preview — this page refreshes automatically. <a href="/projects/${escapeAttr(slug)}/builds/${escapeAttr(build.id)}">View build status</a></p>
     </main>
   </body>
@@ -69,6 +71,8 @@ export function renderStorybookPage(
       header .spacer { flex: 1; }
       header .actions { display: flex; gap: .5rem; align-items: center; }
       header .btn-link { padding: .35rem .6rem; border: 1px solid var(--border, #ddd); border-radius: 6px; font-size: .85rem; background: var(--surface-card, #fff); cursor: pointer; }
+      main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+      .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
       iframe { flex: 1; border: 0; width: 100%; }
     </style>
   </head>
@@ -81,14 +85,22 @@ export function renderStorybookPage(
       <span class="branch">${escapeHtml(build.gitBranch)}</span>
       <span class="crumb">· ${build.gitSha.slice(0, 7)}</span>
       <span class="spacer"></span>
-      <span class="actions">
-        <a class="btn-link" href="./index.html" target="_blank" rel="noopener" title="Open full Storybook manager in new tab">View full Storybook ↗</a>
-        <button class="btn-link" type="button" data-copy-url="${escapeAttr(copyUrl)}" onclick="navigator.clipboard.writeText(location.origin+this.dataset.copyUrl).then(()=>{this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy link',1500)})">Copy link</button>
-      </span>
+      ${actionsHtml(copyUrl)}
     </header>
-    <iframe src="${escapeAttr(iframeSrc)}" title="${escapeAttr(project.name)} Storybook"></iframe>
+    <main>
+      <h1 class="sr-only">${escapeHtml(project.name)} Storybook</h1>
+      <iframe src="${escapeAttr(iframeSrc)}" title="${escapeAttr(project.name)} Storybook"></iframe>
+    </main>
   </body>
 </html>`;
+}
+
+/** The header's actions: open the full Storybook, copy this page's link. */
+function actionsHtml(copyUrl: string): string {
+  return `<span class="actions">
+        <a class="btn-link" href="./index.html" target="_blank" rel="noopener" title="Open full Storybook manager in new tab">View full Storybook ↗</a>
+        <button class="btn-link" type="button" data-copy-url="${escapeAttr(copyUrl)}" onclick="navigator.clipboard.writeText(location.origin+this.dataset.copyUrl).then(()=>{this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy link',1500)})">Copy link</button>
+      </span>`;
 }
 
 function storybookIframeSrc(storyId?: string, viewMode?: "docs"): string {

@@ -7,6 +7,8 @@
  * duplicate-index error from a repeated DDL statement is ignored.
  */
 import {
+  gatedMigration,
+  sqlSchemaLevelStore,
   duplicateGroupsSql,
   logSkippedIndex,
   parseUniqueIndex,
@@ -57,6 +59,14 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
   { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  {
+    table: "projects",
+    column: "require_verified_default",
+    definition: "TINYINT(1) NOT NULL DEFAULT 1",
+  },
+  { table: "projects", column: "switch_stories", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  // Expand step (ADR 0053): nullable, so the previous release keeps working against it.
+  { table: "content_uses", column: "size_bytes", definition: "BIGINT NULL" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
     table: "snapshots",
@@ -99,6 +109,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "affected_import_paths", definition: "TEXT" },
   { table: "builds", column: "inherited_count", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "test_results", definition: "TEXT" },
+  { table: "builds", column: "branch_verified", definition: "VARCHAR(16) NULL" },
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
@@ -164,7 +175,22 @@ const IDENTITY_INDEXES = [
 ];
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+export async function runMigrations(
+  run: MigrationRunner,
+  logger?: Logger,
+  release?: string,
+): Promise<void> {
+  await gatedMigration({
+    release,
+    logger,
+    store: sqlSchemaLevelStore(run, "mysql"),
+    migrate: async () => {
+      await migrateEverything(run, logger);
+    },
+  });
+}
+
+async function migrateEverything(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);

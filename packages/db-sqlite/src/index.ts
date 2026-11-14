@@ -2,11 +2,13 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
 import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { setTimeout as delay } from "node:timers/promises";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { gatedSyncMigration } from "./gated-migration.ts";
 import { rollbackQuietly } from "./lifecycle-transaction.ts";
 import {
   execUnless,
@@ -43,7 +45,7 @@ export function createSqliteDatabase(
   applyConnectionPragmas((sql) => {
     sqlite.exec(sql);
   }, options);
-  const callback = createCallback(sqlite);
+  const callback = createCallback(sqlite, BUSY_WAIT_MS);
   const db = drizzle(callback, { schema });
   const retention: RetentionActivation = {};
 
@@ -58,10 +60,11 @@ export function createSqliteDatabase(
         category: "database",
       },
       tables: schema,
-      migrate: async ({ logger }) => {
-        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
-        runMigrations(sqlite, logger);
+      migrate: async ({ logger, release }) => {
+        await migrateGated(sqlite, logger, release);
         await activateRetention(path, retention);
+        // From here the callback waits for a lock without blocking the event loop (`createCallback`).
+        sqlite.exec("PRAGMA busy_timeout = 0");
       },
       close: () => {
         sqlite.close();
@@ -123,12 +126,35 @@ function executeStatement(
   return { rows: stmt.all(...args) };
 }
 
-export function createCallback(sqlite: DatabaseSync): AsyncRemoteCallback {
+/** How long a statement waits for another connection's write lock (the old `busy_timeout`). */
+export const BUSY_WAIT_MS = 5000;
+const BUSY_POLL_MS = 10;
+
+/**
+ * The statement transport. With `busyWaitMs` > 0 a statement that finds the file locked by another
+ * connection waits with the event loop free, and tries again: SQLite's own `busy_timeout` sleeps
+ * the thread, and the holder (the reference lifecycle's connection, whose callback awaits) can
+ * only commit from this same loop, so a blocking wait could only end in "database is locked".
+ */
+export function createCallback(sqlite: DatabaseSync, busyWaitMs = 0): AsyncRemoteCallback {
   const callback = (async (sql: string, params: unknown[], method: ProxyMethod) => {
     await Promise.resolve();
-    return executeStatement(sqlite, sql, params, method);
+    const deadline = Date.now() + busyWaitMs;
+    while (true) {
+      try {
+        return executeStatement(sqlite, sql, params, method);
+      } catch (error) {
+        if (!isBusy(error) || Date.now() >= deadline) throw error;
+        // oxlint-disable-next-line eslint/no-await-in-loop -- wait for the competing writer to finish
+        await delay(BUSY_POLL_MS);
+      }
+    }
   }) as AsyncRemoteCallback;
   return callback;
+}
+
+function isBusy(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("database is locked");
 }
 
 function migrateCommentsTable(sqlite: DatabaseSync): void {
@@ -192,6 +218,30 @@ function applyIdentityStatements(sqlite: DatabaseSync, logger: Logger | undefine
     }
   }
   sqlite.exec(CAPTURE_JOB_BACKFILL); // not ignored: see its doc
+}
+
+/** Migrate, skip or refuse by the release recorded in `schema_meta` (ADR 0053). */
+async function migrateGated(
+  sqlite: DatabaseSync,
+  logger: Logger | undefined,
+  release: string | undefined,
+): Promise<void> {
+  await gatedSyncMigration(
+    {
+      exec: (sql) => {
+        sqlite.exec(sql);
+      },
+      all: (sql) => sqlite.prepare(sql).all(),
+    },
+    {
+      release,
+      logger,
+      migrate: async () => {
+        await assertReviewSchema(async (table) => await Promise.resolve(tableInfo(sqlite, table)));
+        runMigrations(sqlite, logger);
+      },
+    },
+  );
 }
 
 function runMigrations(sqlite: DatabaseSync, logger: Logger | undefined): void {

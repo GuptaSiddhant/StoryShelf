@@ -106,6 +106,7 @@ describe("assertOutboundUrl", () => {
     expect((error as Error).message).not.toContain("10.1.2.3");
     expect((error as Error).message).not.toContain("secret-path");
     expect(outboundReasonText("address-not-public")).not.toMatch(/\d+\.\d+/u);
+    expect(outboundReasonText("address-not-public")).toContain("outbound.allowHosts");
   });
 
   it("lets an allowlisted exact host reach a private address, over http", async () => {
@@ -169,5 +170,49 @@ describe("guardedFetch", () => {
     await expect(
       guardedFetch(`http://hook.example:${port}/`, init(), at("127.0.0.1")),
     ).rejects.toMatchObject({ reason: "too-many-redirects" });
+  });
+
+  describe("redirect credentials", () => {
+    it("drops credential headers on a cross-origin redirect", async () => {
+      const headersAtB: Record<string, unknown> = {};
+      const b = await listen((req, res) => {
+        Object.assign(headersAtB, req.headers);
+        res.end("ok");
+      });
+      const a = await listen((_req, res) => {
+        res.writeHead(302, { location: `http://b.example:${b}/` });
+        res.end();
+      });
+      configureOutbound({ allowHosts: ["a.example", "b.example"], allowHttp: true });
+      await guardedFetch(
+        `http://a.example:${a}/`,
+        {
+          ...init(),
+          headers: { authorization: "Bearer s", "PRIVATE-TOKEN": "t", "content-type": "x/y" },
+        },
+        at("127.0.0.1"),
+      );
+      const headers = headersAtB;
+      expect(headers["authorization"]).toBeUndefined();
+      expect(headers["private-token"]).toBeUndefined();
+    });
+
+    it("keeps them on a same-origin redirect", async () => {
+      const port = await listen((req, res) => {
+        if (req.url === "/") {
+          res.writeHead(302, { location: "/next" });
+          res.end();
+          return;
+        }
+        res.end(String(req.headers["authorization"]));
+      });
+      configureOutbound({ allowHosts: ["a.example"], allowHttp: true });
+      const response = await guardedFetch(
+        `http://a.example:${port}/`,
+        { ...init(), headers: { authorization: "Bearer s" } },
+        at("127.0.0.1"),
+      );
+      expect(await response.text()).toBe("Bearer s");
+    });
   });
 });

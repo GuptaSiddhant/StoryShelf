@@ -6,40 +6,46 @@
 # assertion (`GET /api/v1/projects` -> `[]`). Run from the repo root
 # (CI) or anywhere (the script cds to the repo root itself).
 #
-# Env overrides: PORT (default 4311), DATA_DIR (default .tmp/smoke-<run>).
+# Env overrides: PORT (default 4311), DATA_DIR (default .tmp/smoke-<run>), SMOKE_BASE_URL (assert
+# an already-running server, e.g. the container image, instead of booting the dev server).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-mkdir -p .tmp
-PORT="${PORT:-4311}"
-RUN_ID="${GITHUB_RUN_ID:-local}"
-DATA_DIR="${DATA_DIR:-.tmp/smoke-${RUN_ID}}"
-LOG=".tmp/smoke-${RUN_ID}.log"
+if [ -n "${SMOKE_BASE_URL:-}" ]; then
+  BASE="${SMOKE_BASE_URL%/}"
+  PORT="${BASE##*:}"
+else
+  mkdir -p .tmp
+  PORT="${PORT:-4311}"
+  RUN_ID="${GITHUB_RUN_ID:-local}"
+  DATA_DIR="${DATA_DIR:-.tmp/smoke-${RUN_ID}}"
+  LOG=".tmp/smoke-${RUN_ID}.log"
 
-# Auth must stay off: with AUTH_PASSWORD set but SECRET unset (or vice
-# versa) `/` redirects to login and the HTML assertion false-fails.
-unset SECRET AUTH_PASSWORD AUTH_VIEWER_PASSWORD STORYSHELF_ADMIN_TOKEN ADMIN_TOKEN PUBLIC_BASE_URL
+  # Auth must stay off: with AUTH_PASSWORD set but SECRET unset (or vice
+  # versa) `/` redirects to login and the HTML assertion false-fails.
+  unset SECRET AUTH_PASSWORD AUTH_VIEWER_PASSWORD STORYSHELF_ADMIN_TOKEN ADMIN_TOKEN PUBLIC_BASE_URL
 
-export PORT DATA_DIR
-export PATH="$HOME/.nub/bin:$PATH"
+  export PORT DATA_DIR
+  export PATH="$HOME/.nub/bin:$PATH"
 
-nub ./apps/dev-server/src/server.ts >"$LOG" 2>&1 &
-pid=$!
-cleanup() {
-  code=$?
-  kill "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-  if [ "$code" -ne 0 ]; then
-    echo "--- server log ($LOG) ---"
-    cat "$LOG"
-  fi
-  rm -rf "$DATA_DIR" "$LOG"
-  exit "$code"
-}
-trap cleanup EXIT
+  nub ./apps/dev-server/src/server.ts >"$LOG" 2>&1 &
+  pid=$!
+  cleanup() {
+    code=$?
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    if [ "$code" -ne 0 ]; then
+      echo "--- server log ($LOG) ---"
+      cat "$LOG"
+    fi
+    rm -rf "$DATA_DIR" "$LOG"
+    exit "$code"
+  }
+  trap cleanup EXIT
 
-BASE="http://127.0.0.1:$PORT"
+  BASE="http://127.0.0.1:$PORT"
+fi
 
 # Poll liveness: the setup gate can 503 the first requests during setup().
 for _ in $(seq 1 30); do

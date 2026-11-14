@@ -9,6 +9,7 @@ import type { McpServeOptions } from "./commands/mcp/serve.ts";
 import type { ProtectOptions } from "./commands/protect.ts";
 import type { PurgeOptions } from "./commands/purge.ts";
 import type { RetryOptions } from "./commands/retry.ts";
+import type { ServerCheckStorageOptions } from "./commands/server/check-storage.ts";
 import type { ServerInitOptions } from "./commands/server/init.ts";
 import type { ServerServeOptions } from "./commands/server/serve.ts";
 import type { UploadOptions } from "./commands/upload.ts";
@@ -108,6 +109,17 @@ function buildServerCommand(): Command {
         async () => (await import("./commands/server/serve.ts")).runServerServe,
       ),
     );
+  server
+    .command("check-storage")
+    .description("Read-only: report blobs the database references but storage lacks")
+    .requiredOption("--url <url>", "server base URL")
+    .option("--token <token>", "admin token (or STORYSHELF_ADMIN_TOKEN env)")
+    .option("--sample <n>", "check only the newest n builds", (value) => Math.trunc(Number(value)))
+    .action(
+      run<ServerCheckStorageOptions>(
+        async () => (await import("./commands/server/check-storage.ts")).runServerCheckStorage,
+      ),
+    );
   server.addCommand(serve, { isDefault: true });
   return server;
 }
@@ -158,6 +170,7 @@ function buildUploadCommand(): Command {
         "npm script to build Storybook (default build-storybook)",
       )
       .option("--force-build", "force rebuild even if buildDir exists")
+      .option("--zip", "upload one zip instead of only the changed files (older servers)")
       .option("--dry-run", "validate and build without sending any requests")
       .option("--skip <glob>", "skip upload for matching branch (glob)")
       .option("--message <message>", "build message")

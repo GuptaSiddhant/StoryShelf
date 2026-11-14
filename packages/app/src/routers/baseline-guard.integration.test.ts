@@ -144,6 +144,7 @@ function testLifecycle(db: DatabaseAdapter, beforeWrite?: LifecycleHook): BuildR
     markStorageDeleted: async () => "not-deleting",
     completeDeletion: async () => "not-deleting",
     recordContentUses: async () => [],
+    contentUsage: async () => ({ bytes: 0, blobs: 0, unsized: 0 }),
     claimContent: async () => [],
     holdsContentClaim: async () => false,
     abandonContentClaim: async () => {},
@@ -353,7 +354,7 @@ describe("approval guard for changed baselines", () => {
   });
 
   it.each(["approve", "reject"])(
-    "sends htmx to the next open snapshot after %s",
+    "swaps htmx to the next open snapshot after %s",
     async (action) => {
       const { app, db } = await setup();
       await db.insert(db.tables.snapshots, {
@@ -379,10 +380,14 @@ describe("approval guard for changed baselines", () => {
         "/projects/test-project/builds/f1/diff?snapshot=sf1",
       );
 
-      expect(response.headers.get("hx-redirect")).toBe(
+      // In place since #937: the next snapshot as HTML to swap in, its address pushed.
+      expect(response.status).toBe(200);
+      expect(response.headers.get("hx-push-url")).toBe(
         "/projects/test-project/builds/f1/diff?snapshot=sf-next",
       );
+      expect(response.headers.get("hx-redirect")).toBeNull();
       expect(response.headers.get("hx-refresh")).toBeNull();
+      expect(await response.text()).toMatch(/id="snapshot-heading"[^>]*>[^<]*Next/u);
     },
   );
 });
@@ -465,7 +470,7 @@ describe("re-diff after a baseline change", () => {
       app,
       "f1/snapshots/sf1/approve",
       true,
-      "/projects/test-project/builds/f1",
+      "/projects/test-project/builds",
     );
 
     expect(response.headers.get("hx-refresh")).toBe("true");
@@ -564,11 +569,11 @@ describe("review pages for changed baselines", () => {
     expect(await page(app, REVIEW)).not.toContain("Baseline changed since this build");
   });
 
-  it("surfaces the same notice on the build overview", async () => {
+  it("surfaces the notice on the build page, with Re-diff in its details", async () => {
     const { app, db } = await setup();
     await moveMainBaseline(db);
 
-    const body = await page(app, "/projects/test-project/builds/f1");
+    const body = await page(app, "/projects/test-project/builds/f1/diff");
 
     expect(body).toContain("Baseline changed since this build was captured");
     expect(body).toContain("Re-diff against current baselines");
@@ -681,9 +686,9 @@ describe("per-snapshot baseline presentation", () => {
     const feature = await (
       await app.request("/projects/test-project/builds/f1/diff?snapshot=sf2")
     ).text();
-    expect(main).toContain("Default branch");
-    expect(feature).toContain("Accepted branch");
-    expect(feature).toContain("Reference build and commit are unavailable");
+    expect(main).toContain("vs main ·");
+    expect(feature).toContain("vs feature/x, accepted on this branch");
+    expect(feature).toContain("reference build unknown");
   });
 });
 
@@ -744,7 +749,8 @@ describe("inherited baseline origin", () => {
     const html = await (
       await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
     ).text();
-    expect(html).toContain("Reference build original, commit abcdef1");
+    expect(html).toContain('href="/projects/test-project/builds/original/diff"');
+    expect(html).toContain(">abcdef1</a>");
   });
 });
 
@@ -779,7 +785,7 @@ describe("frozen comparison history", () => {
     const html = await (
       await app.request("/projects/test-project/builds/f1/diff?snapshot=sf1")
     ).text();
-    expect(html).toContain("Default branch");
+    expect(html).toContain("vs main ·");
     expect(html).toContain('alt="Baseline for T / A"');
     expect((await post(app, "f1/snapshots/sf1/approve")).status).toBe(409);
     for (const unsafePath of [

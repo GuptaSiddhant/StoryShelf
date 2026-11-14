@@ -3,7 +3,8 @@
 ## Status
 
 Accepted. Decision 4 is amended by ADR 0039 for deployments with `testing` (build references,
-irreversible tombstones and fail-closed purge).
+irreversible tombstones and fail-closed purge). Decision 2 is amended below (2026-11-13: who may
+claim the default branch, #910).
 
 Supersedes (archived): ADR 0009
 
@@ -200,3 +201,30 @@ removed mode or target leaves stale baselines, which are not pruned yet.
 - Whether the required-approvals count and the retention window for `pending` builds are project
   settings or defaults only.
 - Pruning stale `(story, mode, target)` baselines of a removed mode or target.
+
+## Amendment, 2026-11-13 (who may claim the default branch, #910)
+
+A build's branch and commit are whatever the uploader says, and every CI token may upload. Before
+this amendment a pull request's own CI job could name the default branch and so auto-approve its
+own changes, replace the default-branch baselines and post a passing status on its head commit.
+
+- **The git host confirms the claim.** In the capture job, before anything reads `isDefault`,
+  `defaultBranchStanding` asks each enabled git channel whether the commit is on the project's
+  default branch (GitHub compare, GitLab commit refs; `commitOnBranch` on the provider contract).
+  The answer is stored as `builds.branch_verified`: `verified`, `refused`, `unreachable` (the host
+  could not answer after the HTTP retries) or `unverified` (no channel can check). The job writes
+  the standing to `is_default`, so the pipeline, shards and review routes read the decision, never
+  the claim. Never decide default-ness anywhere else.
+- **Fail closed.** `refused` and `unreachable` builds are reviewed like feature-branch builds
+  against the default-branch baselines: nothing is auto-approved, no baseline moves and no orphan
+  is dropped until an approver accepts. `<prefix>/testing` says why ("Commit is not on main"), and
+  the build page offers a re-check, which captures the build again and asks the host again.
+- **`unverified` counts only when the project says so.** `projects.require_verified_default`
+  (default on, also for existing projects) makes an unverified claim fail closed. A project admin
+  may turn it off for a project with no git host; its unverified builds then count as before and
+  are marked on the build page and the System page.
+- **Rejected:** scoping tokens by branch (#910 option 1) needs every CI setup to mint and guard a
+  second token, and a leaked default-branch token is as bad as today. Documenting the risk only
+  (option 3) leaves the merge gate open to the pull request it guards.
+- **Upgrade:** a project without a git channel stops auto-approving default-branch builds until a
+  channel is connected or verification is turned off (a breaking change before 1.0, so a minor).

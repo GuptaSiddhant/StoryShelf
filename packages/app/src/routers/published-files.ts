@@ -15,6 +15,7 @@ import type { Context } from "hono";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { getStore } from "../store.ts";
+import { acceptedEncodings, type VariantEncoding } from "./accept-encoding.ts";
 import { signedCacheControl, SIGNED_NO_STORE } from "./capture-cache.ts";
 import {
   hostingMode,
@@ -26,7 +27,7 @@ import {
   type PublishedFamily,
   type PublishedFreshness,
 } from "./published-access.ts";
-import { acceptsGzip, isCompressible, publishedGzip } from "./published-compression.ts";
+import { isCompressible, publishedVariant } from "./published-compression.ts";
 
 /**
  * Headers of every signed URL answer: a token URL must not be indexed or leaked by `Referer`, and
@@ -104,19 +105,17 @@ export async function servePublishedFile(
   c: Context,
   request: PublishedFileRequest,
 ): Promise<Response | null> {
-  const { storage, config } = getStore();
+  const { storage } = getStore();
   const { projectId, buildId, rel } = request;
   const located = await locatePublishedFile(storage, projectId, buildId, rel);
-  const mime = mimeFor(rel);
-  const gzipOffered = Boolean(
-    config.publishedCompression &&
-    located.contentHash !== undefined &&
-    isCompressible(mime) &&
-    acceptsGzip(c.req.header("accept-encoding")),
-  );
-  // Bytes are needed to gzip, and to hash a legacy file for its ETag; everything else streams.
+  const offered = offeredEncodings(c, rel, located.contentHash);
+  const unchanged = notModified(c, request, located.contentHash, offered);
+  if (unchanged) {
+    return unchanged;
+  }
+  // Bytes are needed to compress, and to hash a legacy file for its ETag; everything else streams.
   const needsBytes =
-    gzipOffered || (located.contentHash === undefined && request.access === "session");
+    offered.length > 0 || (located.contentHash === undefined && request.access === "session");
   const file = await openPublishedFile(
     storage,
     projectId,
@@ -124,26 +123,61 @@ export async function servePublishedFile(
     rel,
     needsBytes ? "bytes" : "stream",
   );
-  return file ? await respondWithFile(c, request, file, gzipOffered) : null;
+  return file ? await respondWithFile(c, request, file, offered) : null;
 }
 
-/** The answer for a file that exists: gzip when offered, a `304` when a viewer's copy is current. */
+/**
+ * The copies the answer may be, best first (brotli, then gzip): none unless compression is enabled
+ * and the file is content-addressed, text-like and accepted in that encoding.
+ */
+function offeredEncodings(
+  c: Context,
+  rel: string,
+  contentHash: string | undefined,
+): VariantEncoding[] {
+  return getStore().config.publishedCompression &&
+    contentHash !== undefined &&
+    isCompressible(mimeFor(rel))
+    ? acceptedEncodings(c.req.header("accept-encoding"))
+    : [];
+}
+
+/** The best offered encoding that has a verified copy, or undefined (the original is served). */
+async function firstVariant(
+  file: OpenedPublishedFile,
+  mime: string,
+  offered: VariantEncoding[],
+): Promise<{ encoding: VariantEncoding; bytes: Buffer } | undefined> {
+  for (const encoding of offered) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- best encoding first, stop at the first copy
+    const bytes = await variantOf(file, mime, encoding);
+    if (bytes) return { encoding, bytes };
+  }
+  return undefined;
+}
+
+async function variantOf(
+  file: OpenedPublishedFile,
+  mime: string,
+  encoding: VariantEncoding,
+): Promise<Buffer | undefined> {
+  return file.bytes
+    ? await publishedVariant(getStore().storage, file.contentHash, file.bytes, mime, encoding)
+    : undefined;
+}
+
+/** The answer for a file that exists: the best compressed copy when offered, a `304` when a viewer's copy is current. */
 async function respondWithFile(
   c: Context,
   request: PublishedFileRequest,
   file: OpenedPublishedFile,
-  gzipOffered: boolean,
+  offered: VariantEncoding[],
 ): Promise<Response> {
-  const { storage, config } = getStore();
+  const { config } = getStore();
   const mime = mimeFor(request.rel);
-  const compressed =
-    gzipOffered && file.bytes
-      ? await publishedGzip(storage, file.contentHash, file.bytes, mime)
-      : undefined;
-  const validators =
-    request.access === "session"
-      ? sessionValidator(c, file, compressed !== undefined)
-      : { headers: {}, fresh: false };
+  const variant = await firstVariant(file, mime, offered);
+  const compressed = variant?.bytes;
+  const validators = validatorOf(c, request, file, variant?.encoding);
   const common = {
     ...answerHeaders(request, file.contentHash !== undefined),
     ...validators.headers,
@@ -156,11 +190,11 @@ async function respondWithFile(
   return respondBody(c, file, compressed, {
     ...common,
     "content-type": mime,
-    ...(compressed ? { "content-encoding": "gzip" } : {}),
+    ...(variant ? { "content-encoding": variant.encoding } : {}),
   });
 }
 
-/** A `200` with the gzip copy, the bytes, or the storage stream when nothing needed buffering. */
+/** A `200` with the compressed copy, the bytes, or the storage stream when nothing needed buffering. */
 function respondBody(
   c: Context,
   file: OpenedPublishedFile,
@@ -202,22 +236,67 @@ function answerHeaders(
 }
 
 /**
- * The `ETag` of a session answer and whether the request's `If-None-Match` already holds it. The tag
- * is the manifest content hash (the sha-256 of the bytes for a legacy file with none), and a gzip
- * answer is a different representation with its own tag.
+ * The `ETag` of an answer and whether the request's `If-None-Match` already holds it. The tag is the
+ * manifest content hash, and a gzip or brotli answer is a different representation with its own tag. A legacy
+ * file has no manifest hash: only a signed-in viewer's answer, which is read as bytes anyway, is
+ * hashed for one, so a public or signed answer for it carries no validator.
  */
-function sessionValidator(
+function validatorOf(
   c: Context,
+  request: PublishedFileRequest,
   file: { bytes?: Buffer; contentHash?: string },
-  gzip: boolean,
-): { headers: { etag: string }; fresh: boolean } {
+  encoding: VariantEncoding | undefined,
+): { headers: { etag?: string }; fresh: boolean } {
   const hash =
     file.contentHash ??
-    createHash("sha256")
-      .update(file.bytes ?? "")
-      .digest("hex");
-  const etag = `"${hash}${gzip ? "-gzip" : ""}"`;
+    (request.access === "session"
+      ? createHash("sha256")
+          .update(file.bytes ?? "")
+          .digest("hex")
+      : undefined);
+  if (hash === undefined) {
+    return { headers: {}, fresh: false };
+  }
+  const etag = etagOf(hash, encoding);
+  return { headers: { etag }, fresh: holdsTag(c, etag) };
+}
+
+/** The entity tag of a content hash; each compressed copy is another representation. */
+function etagOf(hash: string, encoding: VariantEncoding | undefined): string {
+  return `"${hash}${encoding ? `-${encoding}` : ""}"`;
+}
+
+/** Whether `If-None-Match` lists `etag` (weak or strong). */
+function holdsTag(c: Context, etag: string): boolean {
   const given = c.req.header("if-none-match") ?? "";
-  const fresh = given.split(",").some((tag) => tag.trim() === etag || tag.trim() === `W/${etag}`);
-  return { headers: { etag }, fresh };
+  return given.split(",").some((tag) => tag.trim() === etag || tag.trim() === `W/${etag}`);
+}
+
+/**
+ * A `304` answered from the manifest alone, with no storage read, when the viewer already holds the
+ * file's current tag. Only {@link servePublishedFile} calls it, after the route's access check
+ * granted `request.access`, so it reveals nothing a refusal hides. Headers are the 200's, so a
+ * signed URL keeps `SIGNED_URL_HEADERS`.
+ */
+function notModified(
+  c: Context,
+  request: PublishedFileRequest,
+  contentHash: string | undefined,
+  offered: VariantEncoding[],
+): Response | null {
+  if (contentHash === undefined) {
+    return null;
+  }
+  const tags = (offered.length > 0 ? offered : [undefined]).map((encoding) =>
+    etagOf(contentHash, encoding),
+  );
+  const etag = tags.find((tag) => holdsTag(c, tag));
+  if (!etag) {
+    return null;
+  }
+  return c.body(null, 304, {
+    ...answerHeaders(request, true),
+    etag,
+    ...(getStore().config.publishedCompression ? { vary: "Accept-Encoding" } : {}),
+  });
 }

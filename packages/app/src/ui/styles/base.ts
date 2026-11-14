@@ -7,6 +7,9 @@ function resetCss(): string {
   return `
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
+    /* A sticky review bar must not cover the focused element (WCAG 2.2 focus not obscured). */
+    html:has([data-action-bar]) { scroll-padding-bottom: 7rem; }
+    main:has([data-action-bar]) { padding-bottom: 7rem; }
     body { margin: 0; font-size: 14px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: var(--surface-base); color: var(--text-primary); line-height: 1.5; -webkit-font-smoothing: antialiased; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }

@@ -206,7 +206,7 @@ describe("snapshot usage API", () => {
     expect(html).not.toContain("Uses react");
   });
 
-  it("shows the badge on build detail cards, resolving upstreams once per build", async () => {
+  it("resolves upstreams once per build page", async () => {
     const { app, db } = await withUsage();
     await db.insert(
       db.tables.snapshots,
@@ -222,8 +222,8 @@ describe("snapshot usage API", () => {
       listed.push(table);
       return await (list as (...args: unknown[]) => Promise<unknown>)(table, ...rest);
     }) as typeof db.list;
-    const html = await (await app.request("/projects/app/builds/app-b1")).text();
-    expect(html.match(/Uses @acme\/ds v2\.4\.0/gu)).toHaveLength(2);
+    const html = await (await app.request("/projects/app/builds/app-b1/diff")).text();
+    expect(html.match(/Uses @acme\/ds v2\.4\.0/gu)).toHaveLength(1);
     expect(html).toContain("/projects/design-system/storybook/build/ds-b1?storyId=button--primary");
     const upstreamSnapshotReads = listed.filter((table) => table === db.tables.snapshots).length;
     expect(upstreamSnapshotReads).toBe(2); // the build's own snapshots + the upstream's, once
@@ -231,7 +231,7 @@ describe("snapshot usage API", () => {
 
   it("renders no badge on build detail without links", async () => {
     const { app } = await withUsage();
-    const html = await (await app.request("/projects/app/builds/app-b1")).text();
+    const html = await (await app.request("/projects/app/builds/app-b1/diff")).text();
     expect(html).not.toContain("Uses @acme/ds");
   });
 

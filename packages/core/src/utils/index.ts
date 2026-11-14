@@ -13,6 +13,7 @@ export {
   type SecretInput,
   type SecretKeys,
 } from "./encrypt.ts";
+export { DELETE_BATCH_SIZE, MAX_DELETE_BATCHES, deleteInBatches } from "./batched-delete.ts";
 export { isStorageNotFound } from "./storage-not-found.ts";
 export { hmacSha256, randomToken, sha256, timingSafeEqualString } from "./hash.ts";
 export { HttpError } from "./http.ts";
@@ -57,6 +58,7 @@ export {
   screenshotPath,
   storybookDir,
   storybookZipPath,
+  publishedBrotliPath,
   publishedGzipPath,
 } from "./paths.ts";
 export {

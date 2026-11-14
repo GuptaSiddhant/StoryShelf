@@ -42,7 +42,7 @@ export function buildLifecycle(options: DrizzleAdapterOptions): AdapterLifecycle
   let closed = false;
   return {
     setup: async (context) => {
-      await options.migrate({ logger: context.logger });
+      await options.migrate({ logger: context.logger, release: context.release });
     },
     teardown: async () => {
       if (closed) {

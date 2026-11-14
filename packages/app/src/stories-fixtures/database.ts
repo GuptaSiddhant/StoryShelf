@@ -5,6 +5,8 @@ import {
   baselines,
   buildComponents,
   builds,
+  captureAttempts,
+  captureLogs,
   catalogEntries,
   comments,
   otherProject,
@@ -48,6 +50,8 @@ async function insertBuilds(db: DatabaseAdapter): Promise<void> {
   await insertAll(db, db.tables.baselines, baselines);
   await insertAll(db, db.tables.buildComponents, buildComponents);
   await insertAll(db, db.tables.comments, comments);
+  await insertAll(db, db.tables.captureAttempts, captureAttempts);
+  await insertAll(db, db.tables.captureLogs, captureLogs);
 }
 
 /** What every populated build publishes. */

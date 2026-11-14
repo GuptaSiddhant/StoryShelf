@@ -88,6 +88,8 @@ export interface DatabaseJob extends PollableJob {
   maxAttempts: number;
   /** Kind-specific fields given at enqueue. */
   data: Record<string, unknown>;
+  /** Version of the payload (`data`); 1 for a row written before payloads were versioned. */
+  payloadVersion: number;
 }
 
 /** The database queue: a {@link PollableCaptureQueue} plus multi-kind enqueue and a local wake. */
@@ -106,6 +108,11 @@ export interface DatabaseCaptureQueue extends PollableCaptureQueue {
    * began, so no wake-up is lost), false after `ms`.
    */
   waitForWork(ms: number): Promise<boolean>;
+  /**
+   * Claim only these kinds from now on (those of `kinds` that are listed). The consumer calls it
+   * with the kinds it has handlers for, so a poll never claims a job it cannot run (ADR 0053).
+   */
+  claimOnly(kinds: readonly CaptureJobKind[]): void;
 }
 
 /** State shared by the queue's modules. */
@@ -114,6 +121,8 @@ export interface QueueRuntime {
   /** Stamps the build a capture job was queued for ({@link BuildModel.stampCaptureJob}). */
   builds: BuildModel;
   kinds: readonly CaptureJobKind[];
+  /** Kinds a poll claims: `kinds`, narrowed to the ones the consumer has a handler for. */
+  claimKinds?: readonly CaptureJobKind[];
   leaseMs: number;
   maxAttempts: number;
   owner: string;

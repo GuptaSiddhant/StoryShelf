@@ -43,10 +43,10 @@ function postForm(body: Record<string, string>) {
 describe("link settings", () => {
   it("renders the Links tab with upstream choices excluding the project itself", async () => {
     const { app } = await seed();
-    const html = await (await app.request("/projects/web-app/settings/links")).text();
+    const html = await (await app.request("/projects/web-app/settings/general")).text();
     expect(html).toContain("Linked packages");
     expect(html).toContain('value="design-system"');
-    expect(html).not.toContain('value="web-app"');
+    expect(html).not.toMatch(/<option[^>]*value="web-app"/u);
     expect(html).toContain("No packages linked.");
   });
 
@@ -61,7 +61,7 @@ describe("link settings", () => {
     expect(await model.listLinks("app")).toMatchObject([
       { packageName: "@acme/ds", upstreamId: "ds" },
     ]);
-    const page = await (await app.request("/projects/web-app/settings/links")).text();
+    const page = await (await app.request("/projects/web-app/settings/general")).text();
     expect(page).toContain("@acme/ds");
 
     await app.request(

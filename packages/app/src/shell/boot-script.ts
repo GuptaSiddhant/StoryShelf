@@ -2,11 +2,12 @@
  * Runs in `<head>` before first paint so the saved theme and sidebar state
  * apply without a flash. Exposes cookie helpers to the client script.
  */
-export function bootScript(): string {
+export function bootScript(sidebarDefault?: "rail"): string {
+  const buildPage = sidebarDefault === "rail";
   return `
   (function(){
     var themeCookie='storyshelf_theme';
-    var sidebarCookie='storyshelf_sidebar';
+    var sidebarCookie='storyshelf_sidebar${buildPage ? "_build" : ""}';
     function readCookie(name){
       var parts=document.cookie.split('; ');
       for(var i=0;i<parts.length;i++){
@@ -28,7 +29,8 @@ export function bootScript(): string {
     }
     var theme=readCookie(themeCookie);
     if(theme){ applyTheme(theme); }
-    applySidebar(readCookie(sidebarCookie));
+    var savedSidebar=readCookie(sidebarCookie);
+    applySidebar(savedSidebar===null&&${buildPage} ? 'rail' : savedSidebar);
     window.__storyshelfShell={
       readCookie:readCookie,writeCookie:writeCookie,applyTheme:applyTheme,applySidebar:applySidebar,
       themeCookie:themeCookie,sidebarCookie:sidebarCookie

@@ -87,6 +87,7 @@ const options = () => ({
   cwd: dir,
   buildDir: "storybook-static",
   full: true,
+  zip: true,
 });
 
 describe("upload over the inline limit", () => {

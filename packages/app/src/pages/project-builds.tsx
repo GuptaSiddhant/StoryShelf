@@ -2,9 +2,8 @@ import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
-import { loadHealthPanel } from "../insights/health-panel.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { getStore, testingEnabled } from "../store.ts";
+import { getStore } from "../store.ts";
 import {
   Badge,
   Button,
@@ -15,8 +14,7 @@ import {
   SelectField,
   VStack,
 } from "../ui/components.tsx";
-import { HealthSlot } from "./health-panel.tsx";
-import { InheritedRatioCard } from "./inherited-ratio-card.tsx";
+import { GetStarted } from "./get-started.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 const STATUSES = ["reviewing", "approved", "rejected", "failed", "cancelled", "pending"] as const;
 
@@ -115,11 +113,16 @@ function BuildsList(props: {
   project: Project;
   builds: Build[];
   filtered: boolean;
+  origin: string | undefined;
+  none: boolean;
 }): ReturnType<typeof EmptyState> | ReturnType<typeof BuildsTable> {
   const { project, builds, filtered } = props;
   const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   if (builds.length > 0) {
     return <BuildsTable project={project} builds={builds} />;
+  }
+  if (props.none) {
+    return <GetStarted project={project} origin={props.origin} />;
   }
   return (
     <EmptyState
@@ -154,37 +157,35 @@ export async function renderProjectBuildsPage(
   const builds = all.filter((build) => matches(build, query));
   const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const filtered = Boolean(query.status ?? query.branch);
-  const health = await loadHealthPanel(project);
 
   return (
     <DocumentLayout
-      title={project.name}
+      title={`Builds · ${project.name}`}
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
     >
       <PageHeader
         title="Builds"
         description={
           <>
-            {project.gitRepository ?? project.slug} · default branch{" "}
+            {project.gitRepository ? `${project.gitRepository} · ` : ""}default branch{" "}
             <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
           </>
         }
-        actions={
-          <Button variant="secondary" icon="settings" href={urls.settings(project.slug)}>
-            Settings
-          </Button>
-        }
       />
       <VStack>
-        <HealthSlot project={project} data={health} />
-        {testingEnabled() ? <InheritedRatioCard builds={all} /> : null}
         <BuildsToolbar
           project={project}
           all={all}
           filters={query}
           base={urls.buildsList(project.slug)}
         />
-        <BuildsList project={project} builds={builds} filtered={filtered} />
+        <BuildsList
+          project={project}
+          builds={builds}
+          filtered={filtered}
+          origin={await getStore().publicOrigin?.url()}
+          none={all.length === 0}
+        />
       </VStack>
     </DocumentLayout>
   );
