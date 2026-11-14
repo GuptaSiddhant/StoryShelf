@@ -11,13 +11,13 @@ import {
   type Context,
   type Span,
 } from "@opentelemetry/api";
-import { HttpError, redactSecrets } from "@storyshelf/core/utils";
+import { HttpError, redactSecrets } from "../utils/index.ts";
 
 /**
  * What a span records of a caught error: a copy with the same `name` and a `redactSecrets` message
  * (connection strings, tokens and keys stay out of exported spans), and for an `HttpError` its
  * status only, never the response body. The caller still gets the original error rethrown.
- * Intentional copy of core's `spanException` (ADR 0015 §5 no-cycle rule: do not deduplicate).
+ * Kept apart from `spanException` in `../tracing.ts` because it records an `HttpError` as `HTTP <status>`.
  */
 function recordedError(error: unknown): Error | string {
   if (!(error instanceof Error)) {

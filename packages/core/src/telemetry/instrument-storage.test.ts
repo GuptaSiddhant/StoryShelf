@@ -1,9 +1,9 @@
 import { SpanStatusCode } from "@opentelemetry/api";
-import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import type { Logger } from "@storyshelf/core/logger";
 import { Buffer } from "node:buffer";
 import { Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { StorageAdapter } from "../adapters/storage.ts";
+import type { Logger } from "../logger.ts";
 import { createInstrumentedStorage } from "./instrument-storage.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 
@@ -34,7 +34,8 @@ function createFakeStorage(): StorageAdapter & { setLoggerMock: (logger: Logger)
     },
     exists: async (path: string) => files.has(path),
     list: async (prefix: string) =>
-      [...files.keys()].filter((key) => key.startsWith(prefix)).toSorted(),
+      // oxlint-disable-next-line unicorn/no-array-sort, typescript/require-array-sort-compare -- toSorted not available in type-aware lint lib
+      [...files.keys()].filter((key) => key.startsWith(prefix)).sort(),
     writeStream: async (path: string, stream: Readable) => {
       const chunks: Buffer[] = [];
       for await (const chunk of stream) {

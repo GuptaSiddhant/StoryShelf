@@ -6,8 +6,8 @@ import {
   parentContext,
   TRACEPARENT_HEADER,
 } from "./propagate.ts";
+import { withSpan } from "./span.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
-import { withSpan } from "./tracing.ts";
 
 describe("trace propagation", () => {
   let telemetry: TestTelemetry | undefined;

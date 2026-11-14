@@ -48,10 +48,11 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
   (`core/ai`) and the pure evidence/redaction/budget code (`core/insights`) live in
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
 - `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
-- `@storyshelf/observability` root barrel is runtime-agnostic (`@opentelemetry/api`
-  only); the Node SDK lifecycle lives under `observability/node`. `core` never imports `observability` (no-cycle rule,
-  ADR 0015 §5) — cross-package span/propagation helpers are intentionally
-  duplicated, not shared.
+- `core/telemetry` (`packages/core/src/telemetry/`) holds the runtime-agnostic helpers over
+  `@opentelemetry/api`: `withSpan`, the propagation helpers, the memoized instruments, the database and
+  storage wrappers and the HTTP middleware (ADR 0049, decision 7). `@storyshelf/app` imports them from
+  there and does not depend on `@storyshelf/observability`. `@storyshelf/observability` re-exports them from its
+  root barrel and owns the Node SDK lifecycle under `observability/node`. `core` never imports `observability`.
 
 ## Schema layout (0.2.0 target, R2)
 

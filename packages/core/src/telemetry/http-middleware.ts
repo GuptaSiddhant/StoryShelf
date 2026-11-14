@@ -8,8 +8,8 @@
  */
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { context, trace, type Span } from "@opentelemetry/api";
-import { redactSecrets } from "@storyshelf/core/utils";
 import type { Context, MiddlewareHandler } from "hono";
+import { redactSecrets } from "../utils/index.ts";
 import type { HttpMiddlewareOptions } from "./types.ts";
 
 /** Copy request/user ids from the Hono context onto the active server span. */
