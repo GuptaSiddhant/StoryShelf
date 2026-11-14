@@ -53,6 +53,9 @@ export default defineConfig({
       "@storyshelf/storage-local": resolve(root, "packages/storage-local/src/index.ts"),
       "@storyshelf/runner-playwright": resolve(root, "packages/runner-playwright/src/index.ts"),
       "@storyshelf/auth": resolve(root, "packages/auth/src/index.ts"),
+      // The preset loads the signer with a dynamic import; the runtime image carries only the
+      // root `node_modules`, where the isolated linker does not put it, so inline this copy.
+      "@aws-sdk/rds-signer": resolve(root, "apps/server-image/node_modules/@aws-sdk/rds-signer"),
       "@storyshelf/db-postgres/rds-iam": resolve(root, "packages/db-postgres/src/rds-iam.ts"),
       "@storyshelf/db-postgres": resolve(root, "packages/db-postgres/src/index.ts"),
       "@storyshelf/db-mysql": resolve(root, "packages/db-mysql/src/index.ts"),

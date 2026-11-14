@@ -97,6 +97,26 @@ describe("databaseFromEnv with DATABASE_IAM_HOST", () => {
     expect(set.sqlite).not.toHaveBeenCalled();
   });
 
+  it("refuses to boot when only the host is missing, never reaching SQLite", () => {
+    const { set, as } = factories();
+    const { DATABASE_IAM_HOST: _host, ...rest } = iam;
+    expect(() => databaseFromEnv(rest, "/data", as)).toThrow(/DATABASE_IAM_HOST is missing/u);
+    expect(() => databaseFromEnv({ ...rest, DATABASE_IAM_HOST: "" }, "/data", as)).toThrow(
+      /DATABASE_IAM_HOST is missing/u,
+    );
+    expect(() => databaseFromEnv({ DATABASE_IAM_USER: "shelf" }, "/data", as)).toThrow(
+      /DATABASE_IAM_HOST, DATABASE_IAM_NAME/u,
+    );
+    expect(set.sqlite).not.toHaveBeenCalled();
+  });
+
+  it.each(["0", "70000", "5.5", "http"])("refuses DATABASE_IAM_PORT %s", (port) => {
+    const { as } = factories();
+    expect(() => databaseFromEnv({ ...iam, DATABASE_IAM_PORT: port }, "/data", as)).toThrow(
+      /DATABASE_IAM_PORT must be a positive whole number up to 65535/u,
+    );
+  });
+
   it("refuses to boot with DATABASE_URL as well", () => {
     const { as } = factories();
     expect(() =>
