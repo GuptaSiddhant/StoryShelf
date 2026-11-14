@@ -52,6 +52,29 @@ describe.each(["pre-review.sql", "pre-449.sql"])("skipped builds on the %s datab
     });
     expect((await builds.skippedFrom(source.id)).map((build) => build.id)).toEqual([skipped.id]);
     expect((await builds.get(source.id))?.skippedFromBuildId).toBeNull();
+    const keyed = {
+      projectId: "p-custom",
+      gitSha: "ccccccc3333",
+      gitBranch: "main",
+      sourceBuildId: source.id,
+      changedFiles: [],
+      idempotencyKey: "run-1",
+    };
+    const first = await builds.createSkipped(keyed);
+    expect((await builds.findByIdempotencyKey("p-custom", "run-1"))?.id).toBe(first.id);
+    expect(await builds.findByIdempotencyKey("other", "run-1")).toBeNull();
+    await expect(builds.createSkipped(keyed)).rejects.toThrow();
+    const { build: replacement, replaced } = await builds.createSuperseding("p-custom", {
+      gitSha: "ccccccc3333",
+      gitBranch: "main",
+    });
+    expect(replaced.map((build) => build.id)).toEqual([first.id]);
+    expect((await builds.get(first.id))?.supersededByBuildId).toBe(replacement.id);
+    const again = await builds.createSuperseding("p-custom", {
+      gitSha: "ccccccc3333",
+      gitBranch: "main",
+    });
+    expect(again.replaced).toEqual([]);
     await db.lifecycle?.teardown();
 
     const sqlite = new DatabaseSync(path, { readOnly: true });
@@ -64,5 +87,6 @@ describe.each(["pre-review.sql", "pre-449.sql"])("skipped builds on the %s datab
     sqlite.close();
     expect(column).toMatchObject({ notnull: 0 });
     expect(indexes).toContain("builds_skipped_from_idx");
+    expect(indexes).toContain("builds_project_idempotency_idx");
   });
 });

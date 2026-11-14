@@ -2,13 +2,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RequestError, type createClient } from "../client.ts";
+import { RequestError, createClient } from "../client.ts";
 import { trySkipUnchanged, type SkipContext } from "./upload-skip.ts";
 
 const computeAffected = vi.hoisted(() => vi.fn());
 vi.mock("@storyshelf/affected", () => ({ computeAffected, gitRepoRoot: (cwd: string) => cwd }));
 
 type Client = ReturnType<typeof createClient>;
+
+type Answer = () => Response | Promise<Response>;
 
 let dir: string;
 let lines: string[];
@@ -21,12 +23,27 @@ beforeEach(() => {
     return true;
   });
   computeAffected.mockReset();
+  writeIndex({
+    v: 5,
+    entries: {
+      "a--one": { id: "a--one", title: "A", name: "One", type: "story" },
+      "a--docs": { id: "a--docs", title: "A", name: "Docs", type: "docs" },
+      "a--test": { id: "a--test", title: "A", name: "T", type: "story", subtype: "test" },
+      "no-title": { id: "no-title" },
+    },
+  });
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   rmSync(dir, { recursive: true, force: true });
 });
+
+function writeIndex(document: unknown, name = "index.json"): void {
+  mkdirSync(join(dir, "storybook-static"), { recursive: true });
+  writeFileSync(join(dir, "storybook-static", name), JSON.stringify(document));
+}
 
 function ctx(extra: Partial<SkipContext> = {}): SkipContext {
   return {
@@ -58,6 +75,22 @@ function fakeClient(overrides: {
   return { client, skipSource, createSkipped };
 }
 
+/** The real client over a fake transport: the hint answers, `skipped` answers each creation call. */
+function httpClient(skipped: Answer): { client: Client; skippedCalls: string[] } {
+  const skippedCalls: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/builds/skip-source")) {
+        return Response.json({ sourceBuildId: "b0", sha: "basesha1234567" });
+      }
+      skippedCalls.push(typeof init?.body === "string" ? init.body : "");
+      return await skipped();
+    }),
+  );
+  return { client: createClient("http://shelf.test", "token"), skippedCalls };
+}
+
 function affected(paths: string[] | null, changed: string[] = [], reason: string | null = null) {
   computeAffected.mockResolvedValue({
     affectedImportPaths: paths,
@@ -79,6 +112,9 @@ describe("trySkipUnchanged", () => {
       gitBranch: "main",
       sourceBuildId: "b0",
       changedFiles: ["README.md"],
+      entryIds: ["a--one", "a--docs"],
+      idempotencyKey: expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      labels: [],
       message: "docs",
       author: { email: "a@b.c", name: undefined },
     });
@@ -109,36 +145,65 @@ describe("trySkipUnchanged", () => {
     expect(lines[0]).toContain("1 affected stories");
   });
 
-  it("uploads normally when a story file was removed", async () => {
-    affected([], ["src/gone.stories.tsx"]);
+  it("sends labels, including persistent", async () => {
+    affected([], ["README.md"]);
+    const { client, createSkipped } = fakeClient({});
+    await expect(
+      trySkipUnchanged(client, ctx({ label: ["persistent=true", "pr=a=b"] })),
+    ).resolves.toBe(true);
+    expect(createSkipped.mock.calls[0]?.[1]).toMatchObject({
+      labels: [
+        { key: "persistent", value: "true" },
+        { key: "pr", value: "a=b" },
+      ],
+    });
+  });
+
+  it("reads stories.json when there is no index.json", async () => {
+    rmSync(join(dir, "storybook-static", "index.json"));
+    writeIndex({ stories: { "b--x": { id: "b--x", kind: "B", story: "X" } } }, "stories.json");
+    affected([], []);
+    const { client, createSkipped } = fakeClient({});
+    await expect(trySkipUnchanged(client, ctx())).resolves.toBe(true);
+    expect(createSkipped.mock.calls[0]?.[1]).toMatchObject({ entryIds: ["b--x"] });
+  });
+
+  it("uploads normally when the index cannot be read", async () => {
+    rmSync(join(dir, "storybook-static", "index.json"));
+    affected([], []);
     const { client, createSkipped } = fakeClient({});
     await expect(trySkipUnchanged(client, ctx())).resolves.toBe(false);
     expect(createSkipped).not.toHaveBeenCalled();
-    expect(lines[0]).toContain("removed or renamed");
+    expect(lines[0]).toContain("index could not be read");
   });
 
-  it("still skips when a changed story file exists", async () => {
-    mkdirSync(join(dir, "src"));
-    writeFileSync(join(dir, "src", "a.stories.tsx"), "");
-    affected([], ["src/a.stories.tsx"]);
-    const { client } = fakeClient({});
-    await expect(trySkipUnchanged(client, ctx())).resolves.toBe(true);
-  });
-
-  it("uploads normally when labels are given", async () => {
-    const { client, skipSource } = fakeClient({});
-    await expect(trySkipUnchanged(client, ctx({ label: ["pr=1"] }))).resolves.toBe(false);
-    expect(skipSource).not.toHaveBeenCalled();
-  });
-
-  it("uploads normally when the server refuses with 409", async () => {
+  it("retries a network failure with the same key, and stops at the third attempt", async () => {
     affected([], []);
-    const { client } = fakeClient({
-      createSkipped: async () => {
-        throw new RequestError(409, "source moved");
-      },
+    let calls = 0;
+    const flaky = httpClient(() => {
+      calls += 1;
+      if (calls < 3) throw new TypeError("fetch failed");
+      return Response.json({ build: { id: "b9" }, buildUrl: "/x" }, { status: 201 });
     });
-    await expect(trySkipUnchanged(client, ctx())).resolves.toBe(false);
+    await expect(trySkipUnchanged(flaky.client, ctx())).resolves.toBe(true);
+    const keys = flaky.skippedCalls.map(
+      (body) => (JSON.parse(body) as { idempotencyKey: string }).idempotencyKey,
+    );
+    expect(keys).toHaveLength(3);
+    expect(new Set(keys).size).toBe(1);
+
+    const failing = httpClient(() => {
+      throw new TypeError("fetch failed");
+    });
+    await expect(trySkipUnchanged(failing.client, ctx())).resolves.toBe(false);
+    expect(failing.skippedCalls).toHaveLength(3);
+  });
+
+  it("does not retry a refusal, and uploads normally", async () => {
+    affected([], []);
+    const refused = httpClient(() => Response.json({ error: "source moved" }, { status: 409 }));
+    await expect(trySkipUnchanged(refused.client, ctx())).resolves.toBe(false);
+    expect(refused.skippedCalls).toHaveLength(1);
     expect(lines[0]).toContain("409");
   });
 

@@ -1,5 +1,5 @@
 import type { BuildStatus } from "@storyshelf/core/types";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { projects } from "./project.ts";
 
 /** Narrow `builds` table definition. */
@@ -35,6 +35,8 @@ export const builds = sqliteTable(
     reviewRequestedCycle: integer("review_requested_cycle"),
     captureJobId: text("capture_job_id"),
     skippedFromBuildId: text("skipped_from_build_id"),
+    supersededByBuildId: text("superseded_by_build_id"),
+    idempotencyKey: text("idempotency_key"),
     manifestSha256: text("manifest_sha256"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -42,6 +44,7 @@ export const builds = sqliteTable(
   (t) => [
     index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
     index("builds_skipped_from_idx").on(t.skippedFromBuildId),
+    uniqueIndex("builds_project_idempotency_idx").on(t.projectId, t.idempotencyKey),
     index("builds_project_created_idx").on(t.projectId, t.createdAt),
     index("builds_project_branch_created_idx").on(t.projectId, t.gitBranch, t.createdAt),
   ],
@@ -75,6 +78,8 @@ export interface Build {
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
   skippedFromBuildId: string | null;
+  supersededByBuildId: string | null;
+  idempotencyKey: string | null;
   manifestSha256: string | null;
   createdAt: string;
   updatedAt: string;

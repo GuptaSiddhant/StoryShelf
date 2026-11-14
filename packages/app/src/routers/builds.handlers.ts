@@ -40,7 +40,7 @@ export async function createBuildRecord(
       message: "gitSha and gitBranch are required (revision SHA and baseline namespace)",
     });
   }
-  const build = await new BuildModel(db).create(project.id, {
+  const { build, replaced } = await new BuildModel(db).createSuperseding(project.id, {
     gitSha: meta.gitSha,
     gitBranch: meta.gitBranch,
     isDefault: meta.gitBranch === project.gitDefaultBranch,
@@ -50,6 +50,12 @@ export async function createBuildRecord(
     affectedOnly: meta.affectedOnly,
     baselineSha: await resolveBaselineSha(db, project.id, meta.gitBranch, meta.gitSha),
   });
+  // A skipped build of this commit left by a lost response was replaced in the same transaction
+  // (ADR 0044, decision 4); its state is requested again once the new build is committed.
+  for (const skipped of replaced) {
+    // oxlint-disable-next-line no-await-in-loop -- a handful of rows at most
+    await requestBuildState(skipped.id);
+  }
   if (meta.labels && meta.labels.length > 0) {
     await attachLabels(db, project.id, build.id, meta.labels);
   }
@@ -301,6 +307,9 @@ export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver",
 /** Roles permitted to approve or reject snapshots and delete builds. */
 export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 
+/** Labels on a build, validated the same way on normal and skipped creation. */
+export const buildLabelsSchema = z.array(z.object({ key: z.string().min(1), value: z.string() }));
+
 /** JSON input schema for creating a build before streaming its bundle. */
 export const buildCreateJsonSchema = z
   .object({
@@ -310,7 +319,7 @@ export const buildCreateJsonSchema = z
     authorName: z.string().optional(),
     message: z.string().optional(),
     affectedOnly: z.boolean().optional(),
-    labels: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
+    labels: buildLabelsSchema.optional(),
   })
   .openapi("BuildCreate");
 
@@ -340,14 +349,18 @@ async function resolveBaselineSha(
 }
 
 /* oxlint-disable eslint/no-await-in-loop -- label attach is intentionally sequential */
-async function attachLabels(
+export async function attachLabels(
   db: DatabaseAdapter,
   projectId: string,
   buildId: string,
   labels: { key: string; value: string }[],
 ): Promise<void> {
   const models = new LabelModel(db);
+  const attached = new Set(
+    (await models.listForBuild(buildId)).map((label) => `${label.typeKey}\u0000${label.value}`),
+  );
   for (const { key, value } of labels) {
+    if (attached.has(`${key}\u0000${value}`)) continue;
     const existing = await models.getType(projectId, key);
     if (!existing) {
       await models.createType(projectId, { key, name: key });

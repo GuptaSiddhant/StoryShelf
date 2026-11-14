@@ -17,7 +17,7 @@ describe("the skipped-build column on an old MySQL database", () => {
       statements.push(sql);
       const added = /^ALTER TABLE (?<table>\w+) ADD COLUMN (?<column>\w+)/u.exec(sql)?.groups;
       if (added) columns.add(`${added["table"]}.${added["column"]}`);
-      const created = /^CREATE INDEX (?<name>\w+) ON/u.exec(sql)?.groups;
+      const created = /^CREATE (?:UNIQUE )?INDEX (?<name>\w+) ON/u.exec(sql)?.groups;
       if (created) indexes.add(created["name"] ?? "");
       const probe = /table_name = '(?<table>\w+)' AND column_name = '(?<column>\w+)' LIMIT 1/u.exec(
         sql,
@@ -33,15 +33,25 @@ describe("the skipped-build column on an old MySQL database", () => {
       "ALTER TABLE builds ADD COLUMN skipped_from_build_id VARCHAR(26) NULL",
     );
     expect(indexes).toContain("builds_skipped_from_idx");
+    expect(statements).toContain(
+      "ALTER TABLE builds ADD COLUMN superseded_by_build_id VARCHAR(26) NULL",
+    );
+    expect(statements).toContain("ALTER TABLE builds ADD COLUMN idempotency_key VARCHAR(191) NULL");
+    expect(indexes).toContain("builds_project_idempotency_idx");
 
-    const writes = () => statements.filter((sql) => /^(?:ALTER|CREATE)\b.*skipped_from/u.test(sql));
+    const writes = () =>
+      statements.filter((sql) =>
+        /^(?:ALTER|CREATE)\b.*(?:skipped_from|superseded_by|idempotency)/u.test(sql),
+      );
     const before = writes().length;
-    expect(before).toBe(2);
+    expect(before).toBe(5);
     await runMigrations(run);
     expect(writes()).toHaveLength(before);
   });
 
   it("is part of a fresh database's builds table", () => {
     expect(DDL).toContain("skipped_from_build_id VARCHAR(26),");
+    expect(DDL).toContain("superseded_by_build_id VARCHAR(26),");
+    expect(DDL).toContain("idempotency_key VARCHAR(191),");
   });
 });

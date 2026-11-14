@@ -53,9 +53,12 @@ Opt in with `storyshelf upload --skip-unchanged` (`"skipUnchanged": true`, or `S
 
 - there is no earlier build on the branch. The first build on a branch is always a real build: the comparison would be against another branch, and "nothing changed since the merge base" is not a claim Shelf can make truthfully;
 - the earlier build is not `approved` (open for review, rejected, failed, cancelled or still running), because skipping would turn an open or failing check green;
-- the trace needs a full render (shallow clone, global file change, missing stats), any story is affected, or a story file was removed or renamed;
-- `--full` is set, or `--label` is given (a skipped build carries no labels);
+- the trace needs a full render (shallow clone, global file change, missing stats) or any story is affected;
+- a story was added, renamed or removed since that build: the CLI sends the new Storybook's entry ids and the server refuses unless they equal that build's, so every such change uploads;
+- `--full` is set;
 - the server runs without testing, runs Storybook tests for the project, has skipped builds off, refuses the request, or any call fails.
+
+**Labels and retries.** `--label` values (including `persistent`) are attached to the skipped build as they are to a normal one. The CLI sends one idempotency key per run: after a network failure it retries up to three times with the same key, and the server returns the build the first request already created.
 
 **It follows its source.** If the source build's verdict later changes, the skipped build's status follows it.
 

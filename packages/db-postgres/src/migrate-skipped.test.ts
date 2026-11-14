@@ -32,6 +32,7 @@ describe.each(["pre-review.sql", "pre-449.sql"])("skipped builds on the %s datab
       "SELECT indexname FROM pg_indexes WHERE tablename = 'builds'",
     );
     expect(indexes.rows.map((row) => row.indexname)).toContain("builds_skipped_from_idx");
+    expect(indexes.rows.map((row) => row.indexname)).toContain("builds_project_idempotency_idx");
 
     const db = createPgliteDatabase({ client });
     await db.lifecycle?.setup({ config: {}, logger: silent });
@@ -51,6 +52,29 @@ describe.each(["pre-review.sql", "pre-449.sql"])("skipped builds on the %s datab
     });
     expect((await builds.skippedFrom(source.id)).map((build) => build.id)).toEqual([skipped.id]);
     expect((await builds.get(source.id))?.skippedFromBuildId).toBeNull();
+    const keyed = {
+      projectId: "p-custom",
+      gitSha: "ccccccc3333",
+      gitBranch: "main",
+      sourceBuildId: source.id,
+      changedFiles: [],
+      idempotencyKey: "run-1",
+    };
+    const first = await builds.createSkipped(keyed);
+    expect((await builds.findByIdempotencyKey("p-custom", "run-1"))?.id).toBe(first.id);
+    expect(await builds.findByIdempotencyKey("other", "run-1")).toBeNull();
+    await expect(builds.createSkipped(keyed)).rejects.toThrow();
+    const { build: replacement, replaced } = await builds.createSuperseding("p-custom", {
+      gitSha: "ccccccc3333",
+      gitBranch: "main",
+    });
+    expect(replaced.map((build) => build.id)).toEqual([first.id]);
+    expect((await builds.get(first.id))?.supersededByBuildId).toBe(replacement.id);
+    const again = await builds.createSuperseding("p-custom", {
+      gitSha: "ccccccc3333",
+      gitBranch: "main",
+    });
+    expect(again.replaced).toEqual([]);
     await client.close();
   });
 });
