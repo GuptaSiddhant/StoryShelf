@@ -59,14 +59,12 @@
   --sl-color-hairline-shade: #d4d4d8;
 }
 
-/* Header: brand mark + wordmark in the page text colour (the accent is for actions) */
+/* Header: the mark (light/dark variants, no tile) + the wordmark: the UI sans at
+   weight 600 in the page text colour (docs/brand.md; the accent is for actions) */
 .site-title {
   color: var(--sl-color-white);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
-}
-.site-title img {
-  border-radius: 0.4rem;
 }
 
 /* Headings: tighter, heavier, like the app */
