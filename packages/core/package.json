@@ -212,7 +212,6 @@
     "bench": "node --conditions=source bench/run.ts"
   },
   "dependencies": {
-    "@hono/otel": "catalog:",
     "@opentelemetry/api": "catalog:",
     "@storyshelf/affected": "workspace:*",
     "axe-core": "4.13.0",
@@ -234,7 +233,6 @@
     "@types/unzipper": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "^0.6.1",
-    "hono": "catalog:",
     "jsdom": "^30.0.1",
     "nodemailer": "^10.2.1",
     "oxfmt": "catalog:",
@@ -246,7 +244,6 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "hono": "catalog:",
     "nodemailer": "^10.2.1",
     "sharp": ">=0.34.0"
   },
@@ -255,9 +252,6 @@
       "optional": true
     },
     "sharp": {
-      "optional": true
-    },
-    "hono": {
       "optional": true
     }
   },

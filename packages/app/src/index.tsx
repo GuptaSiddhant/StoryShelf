@@ -17,11 +17,7 @@ import type { Logger } from "@storyshelf/core/logger";
  * StoryShelf app: compose database, storage, capture, auth, and notifier
  * adapters into a complete self-hosted visual-testing Hono app.
  */
-import {
-  createHttpMiddleware,
-  createInstrumentedDatabase,
-  createInstrumentedStorage,
-} from "@storyshelf/core/telemetry";
+import { createInstrumentedDatabase, createInstrumentedStorage } from "@storyshelf/core/telemetry";
 import {
   configureOutbound,
   STORYBOOK_READ_PREFIX,
@@ -34,6 +30,7 @@ import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import { createClientIpResolver } from "./middleware/client-ip.ts";
+import { createHttpMiddleware } from "./middleware/http-telemetry.ts";
 import {
   authGate,
   notFoundPage,

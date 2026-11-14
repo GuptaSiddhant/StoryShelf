@@ -3,7 +3,7 @@ import type { Attributes } from "@opentelemetry/api";
 /** Attributes attached to a span or metric measurement. */
 export type SpanAttributes = Attributes;
 
-/** Options for the Hono HTTP middleware (`http-middleware.ts`). */
+/** Options for the Hono HTTP middleware (the app's `http-telemetry.ts`). */
 export interface HttpMiddlewareOptions {
   /** Service name in spans/metrics. Defaults to `OTEL_SERVICE_NAME` resolution. */
   serviceName?: string;

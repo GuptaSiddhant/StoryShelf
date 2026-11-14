@@ -59,14 +59,15 @@
     "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/jobs.integration.test.ts src/capture-status-fanout.test.ts src/routers/design.integration.test.ts src/routers/published-compression.test.ts"
   },
   "dependencies": {
+    "@hono/otel": "catalog:",
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.1.5",
+    "@opentelemetry/api": "catalog:",
     "@storyshelf/core": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@opentelemetry/api": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
