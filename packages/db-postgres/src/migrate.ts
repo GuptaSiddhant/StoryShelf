@@ -104,6 +104,11 @@ const BUILD_MANIFEST_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS ma
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
+/** On for every existing project (#910): a default-branch claim needs a git channel's confirmation. */
+const REQUIRE_VERIFIED_DEFAULT_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS require_verified_default BOOLEAN NOT NULL DEFAULT true";
+const BUILD_BRANCH_VERIFIED_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS branch_verified TEXT";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
 const SWITCH_STORIES_ALTER =
@@ -247,6 +252,8 @@ async function migrateProjectSwitches(run: MigrationRunner): Promise<void> {
 async function migrateRecentColumns(run: MigrationRunner): Promise<void> {
   await migrateDesignColumns(run);
   await migrateUnstableColumns(run);
+  await run(REQUIRE_VERIFIED_DEFAULT_ALTER);
+  await run(BUILD_BRANCH_VERIFIED_ALTER);
 }
 
 async function migrateUnstableColumns(run: MigrationRunner): Promise<void> {

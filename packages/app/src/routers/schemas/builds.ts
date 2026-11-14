@@ -9,7 +9,13 @@ export const buildSchema = z
     projectId: z.string(),
     gitSha: z.string(),
     gitBranch: z.string(),
+    /** The build counts as a default-branch build (after the git host confirmed the claim). */
     isDefault: z.boolean(),
+    /** The git host's answer to a default-branch claim; null when the build claims none or was not checked yet. */
+    branchVerified: z
+      .enum(["verified", "unverified", "refused", "unreachable"])
+      .nullable()
+      .optional(),
     authorEmail: z.string().nullable(),
     authorName: z.string().nullable(),
     message: z.string().nullable(),

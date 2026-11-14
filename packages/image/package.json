@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/image",
   "version": "0.11.0",
-  "description": "StoryShelf image engine: pixel diffing, overlay rendering and thumbnails on a worker-thread pool, with pngjs (default) or sharp codecs.",
+  "description": "Deprecated: the StoryShelf image engine now lives in @storyshelf/core/diff. This package re-exports it.",
   "keywords": [
     "diff",
     "image",
@@ -50,34 +50,21 @@
     "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "prepublishOnly": "nub run build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "bench": "node --conditions=source bench/run.ts",
-    "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/pool.test.ts"
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests"
   },
   "dependencies": {
-    "pixelmatch": "^7.1.0",
-    "pngjs": "^7.0.0"
+    "@storyshelf/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/pngjs": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
-    "sharp": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "peerDependencies": {
-    "sharp": ">=0.34.0"
-  },
-  "peerDependenciesMeta": {
-    "sharp": {
-      "optional": true
-    }
   },
   "engines": {
     "node": ">=24"

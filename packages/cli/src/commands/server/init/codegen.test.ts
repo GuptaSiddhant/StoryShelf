@@ -50,26 +50,23 @@ describe("generateServer", () => {
     expect(code.match(/from "@storyshelf\/app"/gu)).toHaveLength(1);
   });
 
-  it("wires the git notifiers from @storyshelf/notify-git, never gitHosts", () => {
-    const code = server({ git: "git" });
-    expect(code).toContain('import { gitNotifiers } from "@storyshelf/notify-git";');
-    expect(code).toContain("notifications: { notifiers: [...gitNotifiers] },");
-    expect(code).not.toContain("gitHosts");
+  it("generates no integration import: git, chat and Figma are built in", () => {
+    const code = server({ git: "git", design: true, notifications: true });
+    expect(code).not.toContain("notify-");
+    expect(code).not.toContain("design-figma");
+    expect(code).not.toContain("gitNotifiers");
+    expect(code).not.toContain("createFigmaDesign");
   });
 
-  it("puts chat, email and git notifiers in one list", () => {
-    expect(server({ git: "git", notifications: true })).toContain(
-      "notifications: { notifiers: [...chatNotifiers, ...emailNotifiers, ...gitNotifiers] },",
-    );
-  });
-
-  it("leaves git out when not chosen", () => {
-    expect(server({ git: "none" })).not.toContain("notify-git");
+  it("swaps the built-in email notifier for SMTP, keeping the other built-ins", () => {
+    const code = server({ notifications: true });
+    expect(code).toContain('from "@storyshelf/core/integrations"');
+    expect(code).toContain("notifiers: (builtIn) =>");
+    expect(code).toContain('provider.metadata.kind === "email"');
   });
 
   it("wires notifications and the auth hook when enabled", () => {
     const code = server({ auth: "password", notifications: true });
-    expect(code).toContain("chatNotifiers");
     expect(code).toContain("smtpPresetFromEnv");
     expect(code).toContain("onAuthSystemEvent: createAuthSystemHook()");
   });
@@ -82,7 +79,7 @@ describe("generateServer", () => {
 
   it("omits notifications when disabled", () => {
     const code = server({ auth: "password", notifications: false });
-    expect(code).not.toContain("chatNotifiers");
+    expect(code).not.toContain("notifiers:");
     expect(code).not.toContain("smtpPresetFromEnv");
   });
 
@@ -90,14 +87,6 @@ describe("generateServer", () => {
     const code = server({ observability: true });
     expect(code).toContain("initObservabilityFromEnv");
     expect(code).toContain("logger: shelfLogger,");
-  });
-
-  it("wires the Figma design provider when asked, and not by default", () => {
-    const code = server({ design: true });
-    expect(code).toContain(
-      'import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";',
-    );
-    expect(code).toContain("design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],");
   });
 
   it("provisions the env-driven admin for password auth", () => {

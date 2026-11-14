@@ -162,15 +162,6 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../../packages/db-sqlite
-      '@storyshelf/design-figma':
-        specifier: workspace:*
-        version: link:../../packages/design-figma
-      '@storyshelf/notify-chat':
-        specifier: workspace:*
-        version: link:../../packages/notify-chat
-      '@storyshelf/notify-email':
-        specifier: workspace:*
-        version: link:../../packages/notify-email
       '@storyshelf/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -189,7 +180,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -204,7 +195,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   apps/fly-app:
     dependencies:
@@ -229,18 +220,6 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../../packages/db-sqlite
-      '@storyshelf/design-figma':
-        specifier: workspace:*
-        version: link:../../packages/design-figma
-      '@storyshelf/notify-chat':
-        specifier: workspace:*
-        version: link:../../packages/notify-chat
-      '@storyshelf/notify-email':
-        specifier: workspace:*
-        version: link:../../packages/notify-email
-      '@storyshelf/notify-git':
-        specifier: workspace:*
-        version: link:../../packages/notify-git
       '@storyshelf/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -265,7 +244,7 @@ importers:
         version: 26.6.5
       playwright-core:
         specifier: 1.63.0
-        version: 1.63.0
+        version: 1.63.0(zod@4.6.7)
       rolldown:
         specifier: '*'
         version: 1.2.15
@@ -274,7 +253,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   apps/server-image:
     dependencies:
@@ -299,12 +278,6 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../../packages/db-sqlite
-      '@storyshelf/notify-chat':
-        specifier: workspace:*
-        version: link:../../packages/notify-chat
-      '@storyshelf/notify-email':
-        specifier: workspace:*
-        version: link:../../packages/notify-email
       '@storyshelf/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -332,7 +305,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   apps/website:
     dependencies:
@@ -414,7 +387,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -432,7 +405,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/ai:
     dependencies:
@@ -463,7 +436,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -481,25 +454,28 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
       zod:
         specifier: 'catalog:'
         version: 4.6.7
 
   packages/app:
     dependencies:
+      '@hono/otel':
+        specifier: 'catalog:'
+        version: 1.3.0(hono@4.13.14)
       '@hono/swagger-ui':
         specifier: ^0.6.1
         version: 0.6.1(hono@4.13.14)
       '@hono/zod-openapi':
         specifier: ^1.1.5
         version: 1.6.3(hono@4.13.14)(zod@4.6.7)
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.10.0
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      '@storyshelf/observability':
-        specifier: workspace:*
-        version: link:../observability
       hono:
         specifier: 'catalog:'
         version: 4.13.14
@@ -507,9 +483,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@opentelemetry/api':
-        specifier: 'catalog:'
-        version: 1.10.0
       '@opentelemetry/context-async-hooks':
         specifier: 'catalog:'
         version: 2.11.0(@opentelemetry/api@1.10.0)
@@ -521,22 +494,19 @@ importers:
         version: 2.11.0(@opentelemetry/api@1.10.0)
       '@storybook/html-vite':
         specifier: 10.6.5
-        version: 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)(storybook@10.6.5)(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(storybook@10.6.5(react@19.3.1))(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))
       '@storyshelf/auth':
         specifier: workspace:*
         version: link:../auth
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
-      '@storyshelf/design-figma':
-        specifier: workspace:*
-        version: link:../design-figma
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       adm-zip:
         specifier: 'catalog:'
         version: 0.6.1
@@ -566,22 +536,22 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/auth:
     dependencies:
       '@better-auth/passkey':
         specifier: 1.7.6
-        version: 1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.7))(nanostores@1.5.5)
+        version: 1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.7))(nanostores@1.5.5)
       '@better-auth/sso':
         specifier: 1.7.6
-        version: 1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.7))
+        version: 1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.7))
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
       better-auth:
         specifier: 1.7.14
-        version: 1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -597,7 +567,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -615,7 +585,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/cli:
     dependencies:
@@ -649,7 +619,7 @@ importers:
         version: 2.4.9
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       adm-zip:
         specifier: 'catalog:'
         version: 0.6.1
@@ -670,7 +640,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/core:
     dependencies:
@@ -680,9 +650,6 @@ importers:
       '@storyshelf/affected':
         specifier: workspace:*
         version: link:../affected
-      '@storyshelf/image':
-        specifier: workspace:*
-        version: link:../image
       axe-core:
         specifier: 4.13.0
         version: 4.13.0
@@ -692,6 +659,12 @@ importers:
       pino:
         specifier: 'catalog:'
         version: 10.4.0
+      pixelmatch:
+        specifier: ^7.1.0
+        version: 7.2.0
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
       unzipper:
         specifier: 0.12.5
         version: 0.12.5
@@ -699,12 +672,24 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@opentelemetry/context-async-hooks':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/core':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-trace-base':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
       '@types/jsdom':
         specifier: ^30.0.0
         version: 30.0.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
+      '@types/nodemailer':
+        specifier: ^8.0.2
+        version: 8.0.2
       '@types/pngjs':
         specifier: 'catalog:'
         version: 6.0.5
@@ -713,13 +698,16 @@ importers:
         version: 0.10.11
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       adm-zip:
         specifier: ^0.6.1
         version: 0.6.1
       jsdom:
         specifier: ^30.0.1
         version: 30.1.3
+      nodemailer:
+        specifier: ^10.2.1
+        version: 10.2.1
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -729,9 +717,9 @@ importers:
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2005
-      pngjs:
-        specifier: ^7.0.0
-        version: 7.0.0
+      sharp:
+        specifier: 'catalog:'
+        version: 0.35.5(@types/node@26.6.5)
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(typescript@7.0.2)
@@ -740,7 +728,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/db-mysql:
     dependencies:
@@ -765,7 +753,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -783,7 +771,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/db-postgres:
     dependencies:
@@ -811,7 +799,7 @@ importers:
         version: 0.10.0
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -832,7 +820,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/db-sqlite:
     dependencies:
@@ -851,7 +839,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       better-sqlite3:
         specifier: ^12.0.0
         version: 12.11.1
@@ -872,7 +860,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/design-figma:
     dependencies:
@@ -885,7 +873,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -903,26 +891,20 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/image:
     dependencies:
-      pixelmatch:
-        specifier: ^7.1.0
-        version: 7.2.0
-      pngjs:
-        specifier: ^7.0.0
-        version: 7.0.0
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
-      '@types/pngjs':
-        specifier: 'catalog:'
-        version: 6.0.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -932,9 +914,6 @@ importers:
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2005
-      sharp:
-        specifier: 'catalog:'
-        version: 0.35.5(@types/node@26.6.5)
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(typescript@7.0.2)
@@ -943,7 +922,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/mcp:
     dependencies:
@@ -962,7 +941,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -980,7 +959,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/notify-chat:
     dependencies:
@@ -996,7 +975,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1014,29 +993,20 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/notify-email:
     dependencies:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
-      '@types/nodemailer':
-        specifier: ^8.0.2
-        version: 8.0.2
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
-      nodemailer:
-        specifier: ^10.2.1
-        version: 10.2.1
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1054,23 +1024,20 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/notify-git:
     dependencies:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1088,7 +1055,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/observability:
     dependencies:
@@ -1113,9 +1080,6 @@ importers:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
       hono:
         specifier: 'catalog:'
         version: 4.13.14
@@ -1140,7 +1104,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1158,7 +1122,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/runner-playwright:
     dependencies:
@@ -1189,7 +1153,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       adm-zip:
         specifier: 'catalog:'
         version: 0.6.1
@@ -1210,7 +1174,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/runner-puppeteer:
     dependencies:
@@ -1235,7 +1199,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       adm-zip:
         specifier: 'catalog:'
         version: 0.6.1
@@ -1256,7 +1220,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/storage-azure:
     dependencies:
@@ -1272,7 +1236,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1290,7 +1254,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/storage-gcs:
     dependencies:
@@ -1306,7 +1270,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1324,7 +1288,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/storage-local:
     dependencies:
@@ -1337,7 +1301,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1355,7 +1319,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/storage-s3:
     dependencies:
@@ -1374,7 +1338,7 @@ importers:
         version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+        version: 4.1.12(vitest@5.0.5)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1392,7 +1356,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/storybook-addon:
     devDependencies:
@@ -1416,7 +1380,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
 packages:
 
@@ -9036,14 +9000,14 @@ snapshots:
       '@better-auth/core': 1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-auth/utils': 0.5.1
 
-  '@better-auth/passkey@1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.7))(nanostores@1.5.5)':
+  '@better-auth/passkey@1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.7))(nanostores@1.5.5)':
     dependencies:
       '@better-auth/core': 1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-auth/utils': 0.4.2
       '@better-fetch/fetch': 1.3.2
       '@simplewebauthn/browser': 13.3.0
       '@simplewebauthn/server': 13.3.3
-      better-auth: 1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+      better-auth: 1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
       better-call: 1.4.0(zod@4.6.7)
       nanostores: 1.5.5
       zod: 4.6.7
@@ -9053,13 +9017,13 @@ snapshots:
       '@better-auth/core': 1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-auth/utils': 0.5.1
 
-  '@better-auth/sso@1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.7))':
+  '@better-auth/sso@1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.0(zod@4.6.7))':
     dependencies:
       '@better-auth/core': 1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-auth/utils': 0.4.2
       '@better-fetch/fetch': 1.3.2
       '@xmldom/xmldom': 0.9.12
-      better-auth: 1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
+      better-auth: 1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
       better-call: 1.4.0(zod@4.6.7)
       fast-xml-parser: 5.11.2
       jose: 6.2.13
@@ -10779,7 +10743,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@storybook/builder-vite@10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)(storybook@10.6.5)(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))':
+  '@storybook/builder-vite@10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(storybook@10.6.5(react@19.3.1))(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))':
     dependencies:
       storybook: 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)
       ts-dedent: 2.3.0
@@ -10787,14 +10751,14 @@ snapshots:
 
   '@storybook/global@5.0.0': {}
 
-  '@storybook/html-vite@10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)(storybook@10.6.5)(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))':
+  '@storybook/html-vite@10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(storybook@10.6.5(react@19.3.1))(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))':
     dependencies:
-      '@storybook/builder-vite': 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)(storybook@10.6.5)(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))
-      '@storybook/html': 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)(storybook@10.6.5)
+      '@storybook/builder-vite': 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(storybook@10.6.5(react@19.3.1))(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1))
+      '@storybook/html': 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(storybook@10.6.5(react@19.3.1))
       storybook: 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)
       vite: 8.3.5(@types/node@26.6.5)(yaml@2.9.1)
 
-  '@storybook/html@10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)(storybook@10.6.5)':
+  '@storybook/html@10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(storybook@10.6.5(react@19.3.1))':
     dependencies:
       '@storybook/global': 5.0.0
       storybook: 10.6.5(@oxc-parser/binding-wasm32-wasi@0.127.0)(react@19.3.1)
@@ -11176,7 +11140,7 @@ snapshots:
       - node-gyp
       - utf-8-validate
 
-  '@vitest/coverage-v8@4.1.12(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))':
+  '@vitest/coverage-v8@4.1.12(vitest@5.0.5)':
     dependencies:
       '@bcoe/v8-coverage': 1.0.2
       '@vitest/utils': 4.1.12
@@ -11188,7 +11152,7 @@ snapshots:
       obug: 2.2.1
       std-env: 4.3.0
       tinyrainbow: 3.2.0
-      vitest: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+      vitest: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -11637,7 +11601,7 @@ snapshots:
       is-alphanumerical: 2.0.1
       is-decimal: 2.0.1
 
-  better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))):
+  better-auth@1.7.14(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))):
     dependencies:
       '@better-auth/core': 1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-auth/drizzle-adapter': 1.7.14(@better-auth/core@1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.5.1)
@@ -11655,7 +11619,7 @@ snapshots:
       jose: 6.2.13
       kysely: 0.29.7
       nanostores: 1.5.5
-      vitest: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+      vitest: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
       zod: 4.6.7
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -14274,7 +14238,7 @@ snapshots:
   playwright-core@1.63.0: {}
 
   playwright-core@1.63.0(zod@4.6.7):
-    dependencies:
+    optionalDependencies:
       zod: 4.6.7
 
   pngjs@7.0.0: {}
@@ -14645,6 +14609,7 @@ snapshots:
       mdast-util-from-markdown: 2.1.0
       micromark-util-types: 2.0.3
       unified: 11.0.5
+    optionalDependencies:
       vfile: 6.0.3
     transitivePeerDependencies:
       - supports-color
@@ -14675,6 +14640,7 @@ snapshots:
       '@types/mdast': 4.0.4
       mdast-util-to-markdown: 2.2.1
       unified: 11.0.5
+    optionalDependencies:
       vfile: 6.0.3
 
   require-directory@2.1.1: {}
@@ -14923,7 +14889,6 @@ snapshots:
   sharp@0.35.5(@types/node@26.6.5):
     dependencies:
       '@img/colour': 1.1.0
-      '@types/node': 26.6.5
       detect-libc: 2.1.2
       semver: 7.8.5
     optionalDependencies:
@@ -14952,6 +14917,7 @@ snapshots:
       '@img/sharp-win32-arm64': 0.35.5
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
+      '@types/node': 26.6.5
 
   shebang-command@2.0.0:
     dependencies:
@@ -15129,6 +15095,8 @@ snapshots:
       semver: 7.8.5
       use-sync-external-store: 1.7.0(react@19.3.1)
       ws: 8.22.0
+    optionalDependencies:
+      react: 19.3.1
     transitivePeerDependencies:
       - '@jest/globals'
       - '@oxc-resolver/binding-win32-ia32-msvc'
@@ -15628,7 +15596,7 @@ snapshots:
     dependencies:
       vite: 8.3.5(@types/node@26.6.5)(yaml@2.9.1)
 
-  vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)):
+  vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)):
     dependencies:
       '@opentelemetry/api': 1.10.0
       '@types/chai': 5.2.3
@@ -15647,10 +15615,12 @@ snapshots:
       tinyglobby: 0.2.17
       vite: 6.4.5(@types/node@26.6.5)(yaml@2.9.1)
       why-is-node-running: 3.2.1
+    optionalDependencies:
+      '@vitest/coverage-v8': 4.1.12(vitest@5.0.5)
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1)):
+  vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@8.3.5(@types/node@26.6.5)(yaml@2.9.1)):
     dependencies:
       '@opentelemetry/api': 1.10.0
       '@types/chai': 5.2.3
@@ -15669,6 +15639,8 @@ snapshots:
       tinyglobby: 0.2.17
       vite: 8.3.5(@types/node@26.6.5)(yaml@2.9.1)
       why-is-node-running: 3.2.1
+    optionalDependencies:
+      '@vitest/coverage-v8': 4.1.12(vitest@5.0.5)
     transitivePeerDependencies:
       - msw
 
@@ -15718,7 +15690,7 @@ snapshots:
   ws@8.22.0: {}
 
   ws@8.22.0(bufferutil@4.1.0):
-    dependencies:
+    optionalDependencies:
       bufferutil: 4.1.0
 
   wsl-utils@0.1.0:

@@ -147,7 +147,17 @@ describe("detectInstalledAdapters", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("detects the git notification provider package", () => {
+  it("detects git from the built-in app, with no notify-git dependency", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/app": "0.3.2" } }),
+    );
+    expect(detectInstalledAdapters(dir).git).toBe("git");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("still detects the legacy git notification package", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),

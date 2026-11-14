@@ -8,7 +8,7 @@ import {
   type CaptureConsumerOptions,
   type ConsumerMetrics,
 } from "@storyshelf/core/capture";
-import { captureMetrics } from "@storyshelf/observability";
+import { captureMetrics } from "@storyshelf/core/telemetry";
 
 /** One consumer from options that are only worked out on the first `start()`. */
 export function lazyConsumer(

@@ -9,6 +9,7 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
   storybookHostingSchema,
   validateStorybookHosting,
@@ -551,8 +552,17 @@ export interface ShelfTestingOptions {
 
 /** Notification options: who can deliver, over which transport, with what branding. */
 export interface ShelfNotificationsOptions {
-  /** Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these. */
-  notifiers?: NotifierProvider[];
+  /**
+   * Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these.
+   * An array lists exactly these; a function `(builtIn) => list` adds, replaces or filters the
+   * built-in notifiers; `false` wires none (ADR 0049).
+   */
+  notifiers?: IntegrationOption<NotifierProvider>;
+  /**
+   * Email transports, chosen like `notifiers`: an array, a function of the built-ins, or `false`
+   * (ADR 0049). Resolved and checked at startup; the app does not use the list yet.
+   */
+  email?: IntegrationOption<EmailSender>;
   /** Email transport. Listed here so its setup/teardown/validation hooks run with the app's. */
   emailSender?: EmailSender;
   /** Site-wide brand and sender settings for outgoing notifications. */
@@ -600,8 +610,11 @@ export interface ShelfOptions {
   auth?: Auth;
   /** AI insights surface (ADR 0016). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
-  /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
-  design?: DesignProvider[];
+  /**
+   * Design-tool providers (Figma, …) that resolve links, metadata and previews: an array (exactly
+   * these), a function `(builtIn) => list`, or `false` for none (ADR 0049).
+   */
+  design?: IntegrationOption<DesignProvider>;
   /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
   logger?: Logger;
@@ -613,6 +626,25 @@ export interface ShelfOptions {
    * observability package. Flushed on `app.lifecycle.teardown()`.
    */
   observability?: ObservabilityHandle;
+}
+
+/** Notification options after {@link resolveShelfOptions}: every integration group is a list. */
+export interface ResolvedNotificationsOptions extends Omit<
+  ShelfNotificationsOptions,
+  "notifiers" | "email"
+> {
+  notifiers?: NotifierProvider[];
+  email?: EmailSender[];
+}
+
+/**
+ * `ShelfOptions` after {@link resolveShelfOptions}: the integration groups are resolved, once, into
+ * the lists the app registers. `resolveShelfOptions` always sets them; they stay optional so a
+ * hand-built options object (tests, embedders) reads as "none".
+ */
+export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  design?: DesignProvider[];
+  notifications?: ResolvedNotificationsOptions;
 }
 
 /**

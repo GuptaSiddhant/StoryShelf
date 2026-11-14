@@ -1,31 +1,33 @@
 /**
- * StoryShelf observability: runtime-agnostic OTEL instrumentation.
+ * StoryShelf observability: OTEL SDK lifecycle plus the runtime-agnostic helpers.
  *
- * This entrypoint is runtime-agnostic (`@opentelemetry/api` only; the Node SDK
- * supplies the provider). The Node SDK lifecycle
- * (`initObservabilityFromEnv`) lives under `@storyshelf/observability/node`
+ * The helpers (`createInstrumentedDatabase`, `createInstrumentedStorage`,
+ * `withSpan`, the propagation helpers and the memoized instruments) live in
+ * `@storyshelf/core/telemetry` and are re-exported here; `createHttpMiddleware` (Hono) stays here, so this entrypoint's API is unchanged. The
+ * Node SDK lifecycle (`initObservabilityFromEnv`) lives under `@storyshelf/observability/node`
  * and must never be imported here.
  */
-import { createInstrumentedDatabase } from "./instrument-db.ts";
-import { createInstrumentedStorage } from "./instrument-storage.ts";
-import { createHttpMiddleware } from "./middleware.ts";
-
-/** Wrap a database adapter with `db.*` spans and metrics. */
-export { createInstrumentedDatabase };
-/** Wrap a storage adapter with `storage.*` spans and metrics. */
-export { createInstrumentedStorage };
-/** Hono middleware emitting one `http.server` span per request. */
-export { createHttpMiddleware };
-export { captureMetrics, dbMetrics, storageMetrics } from "./metrics.ts";
-export type { CaptureInstruments, DbInstruments, StorageInstruments } from "./metrics.ts";
-export { otelLogMixin } from "./logs.ts";
 export {
-  TRACEPARENT_HEADER,
+  captureMetrics,
+  createInstrumentedDatabase,
+  createInstrumentedStorage,
   currentTraceparent,
+  dbMetrics,
   injectTraceContext,
   parentContext,
-} from "./propagate.ts";
+  storageMetrics,
+  TRACEPARENT_HEADER,
+  withSpan,
+} from "@storyshelf/core/telemetry";
+export type {
+  CaptureInstruments,
+  DbInstruments,
+  HttpMiddlewareOptions,
+  SpanAttributes,
+  StorageInstruments,
+} from "@storyshelf/core/telemetry";
+export { createHttpMiddleware } from "./middleware.ts";
+export { otelLogMixin } from "./logs.ts";
 export { resolveObservabilityConfig } from "./config.ts";
 export type { ObservabilityConfig } from "./config.ts";
-export { withSpan } from "./tracing.ts";
-export type { HttpMiddlewareOptions, ObservabilityHandle, SpanAttributes } from "./types.ts";
+export type { ObservabilityHandle } from "./types.ts";

@@ -1,12 +1,27 @@
 import type { BuildStatus } from "../types.ts";
 
+/**
+ * How the project's git host answered a build's claim to be on the default branch (ADR 0009,
+ * amendment 2026-11-13): `verified` (the commit is on the branch), `refused` (the host says it is
+ * not), `unreachable` (the host could not answer; fails closed like `refused`) or `unverified` (no
+ * git channel can check it).
+ */
+export type BranchVerification = "verified" | "unverified" | "refused" | "unreachable";
+
 /** A build row. */
 export interface Build {
   id: string;
   projectId: string;
   gitSha: string;
   gitBranch: string;
+  /**
+   * The build counts as a default-branch build: it auto-approves, moves the default-branch
+   * baselines and drops orphans. Set at upload from the branch the uploader names, then replaced
+   * by the capture job with `defaultBranchStanding`'s answer before anything reads it.
+   */
   isDefault: boolean;
+  /** The git host's answer to a default-branch claim; null when the build claims no default branch or was not checked yet. */
+  branchVerified?: BranchVerification | null;
   authorEmail: string | null;
   authorName: string | null;
   message: string | null;
