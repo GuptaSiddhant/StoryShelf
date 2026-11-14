@@ -38,7 +38,7 @@ async function buildPage(results: TestResult[] | null): Promise<string> {
     storage,
     logger: createShelfLogger({ level: "silent" }),
   });
-  return await (await app.request(`/projects/${project.slug}/builds/${build.id}`)).text();
+  return await (await app.request(`/projects/${project.slug}/builds/${build.id}/diff`)).text();
 }
 
 describe("build page: Storybook tests", () => {

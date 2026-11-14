@@ -133,6 +133,25 @@ describe("baseStyle", () => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it("never aliases the info status to the accent", () => {
+    const css = baseStyle(LIGHT_THEME, DARK_THEME);
+    expect(css).not.toMatch(/--status-info:\s*var\(--accent\)/u);
+    expect(css).toContain("--status-info: #1d5fcf");
+    expect(css).toContain("--status-info: #4f8fff");
+    expect(LIGHT_THEME.status.info).not.toBe(LIGHT_THEME.accent);
+    expect(DARK_THEME.status.info).not.toBe(DARK_THEME.accent);
+  });
+
+  it("keeps the accent, its button text and the focus ring readable (WCAG AA) in both themes", () => {
+    for (const theme of [LIGHT_THEME, DARK_THEME]) {
+      expect(contrast(theme.accentContrast ?? "", theme.accent)).toBeGreaterThanOrEqual(4.5);
+      for (const surface of [theme.surface.base, theme.surface.card]) {
+        expect(contrast(theme.accent, surface)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(theme.ring ?? "", surface)).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
   it("keeps default accent text readable (WCAG AA) on cards in both themes", () => {
     for (const theme of [LIGHT_THEME, DARK_THEME]) {
       const fg = mix(theme.accent, 0.88, theme.text.primary);

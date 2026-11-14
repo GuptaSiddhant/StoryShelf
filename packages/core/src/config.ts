@@ -43,7 +43,7 @@ export interface BrandTheme {
   text: { primary: string; secondary: string; muted?: string };
   border: string;
   borderSubtle?: string;
-  status: { approved: string; new: string; rejected: string };
+  status: { approved: string; new: string; rejected: string; info?: string };
   sidebarBg?: string;
   topbarBg?: string;
   radius?: string;
@@ -261,7 +261,12 @@ const brandThemeSchema: z.ZodType<BrandTheme> = z.object({
   text: z.object({ primary: z.string(), secondary: z.string(), muted: z.string().optional() }),
   border: z.string(),
   borderSubtle: z.string().optional(),
-  status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
+  status: z.object({
+    approved: z.string(),
+    new: z.string(),
+    rejected: z.string(),
+    info: z.string().optional(),
+  }),
   sidebarBg: z.string().optional(),
   topbarBg: z.string().optional(),
   radius: z.string().optional(),

@@ -1,6 +1,7 @@
 import { PackageUsageModel, ProjectModel } from "@storyshelf/core/models";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
@@ -8,9 +9,6 @@ import { asString, findProject, renderSettingsPage } from "./settings.handlers.t
 
 /** Package-link settings (link a consumed package to its upstream project, or unlink it). */
 export function registerLinkSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings/links", async (c) =>
-    c.html(await renderSettingsPage(c, "links")),
-  );
   app.post("/projects/:slug/settings/links", handleAddLink);
   app.post("/projects/:slug/settings/links/delete", handleRemoveLink);
 }
@@ -55,7 +53,7 @@ async function handleAddLink(c: Context): Promise<Response> {
   }
   await saveLink(project, packageName, upstream.id);
   flash(c, "Package linked");
-  return hxRedirect(c, `/projects/${project.slug}/settings/links`);
+  return hxRedirect(c, settingsHref(project.slug, "links"));
 }
 
 async function handleRemoveLink(c: Context): Promise<Response> {
@@ -70,5 +68,5 @@ async function handleRemoveLink(c: Context): Promise<Response> {
     kept.map((link) => ({ upstreamId: link.upstreamId, packageName: link.packageName })),
   );
   flash(c, "Link removed");
-  return hxRedirect(c, `/projects/${project.slug}/settings/links`);
+  return hxRedirect(c, settingsHref(project.slug, "links"));
 }

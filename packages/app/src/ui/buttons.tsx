@@ -2,7 +2,7 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
 import type { IconName } from "./icons/paths.ts";
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "outline";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-secondary" | "outline";
 type ButtonSize = "md" | "sm";
 
 const btnBase = css`
@@ -138,12 +138,33 @@ const btnDangerSm = css`
   min-height: 32px;
 `;
 
+/** A destructive action that is not the main one: secondary weight, danger text (e.g. Reject). */
+const btnDangerSecondary = css`
+  /* btn-danger-secondary */
+  ${btnSecondary}
+  color: var(--status-rejected-fg);
+  &:hover {
+    background: var(--status-rejected-bg);
+    border-color: var(--status-rejected-border);
+    text-decoration: none;
+  }
+`;
+
+const btnDangerSecondarySm = css`
+  /* btn-danger-secondary-sm */
+  ${btnDangerSecondary}
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  min-height: 32px;
+`;
+
 const btnClasses: Record<ButtonVariant, Record<ButtonSize, Promise<string>>> = {
   primary: { md: btnPrimary, sm: btnPrimarySm },
   secondary: { md: btnSecondary, sm: btnSecondarySm },
   outline: { md: btnOutline, sm: btnOutlineSm },
   ghost: { md: btnGhost, sm: btnGhostSm },
   danger: { md: btnDanger, sm: btnDangerSm },
+  "danger-secondary": { md: btnDangerSecondary, sm: btnDangerSecondarySm },
 };
 
 const tabsNav = css`

@@ -8,6 +8,7 @@ import {
 import type { Baseline, Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { getStore } from "../store.ts";
 import { readComparisonImage, validFrozenReference } from "./comparison-image.ts";
+import { pngSizeOf, readPngSize, type PngSize } from "./png-size.ts";
 
 /** Reference information is only reliable while the recorded baseline version still exists. */
 export type BaselineReference =
@@ -20,6 +21,8 @@ export type BaselineReference =
       updatedAt: string;
       build: Build | null;
       imageAvailable: boolean;
+      /** The baseline image's natural size, so the stage can show both images at one scale. */
+      imageSize?: PngSize | null;
     };
 
 export async function loadBaselineReference(
@@ -57,12 +60,14 @@ async function legacyReference(
     snapshot: async (id) => await snapshots.get(id),
     build: async (id) => await builds.get(id),
   });
+  const imageAvailable = await imageExists(baseline.screenshotPath);
   return {
     kind: "known",
     branch: baseline.branch,
     defaultBranch: baseline.branch === project.gitDefaultBranch,
     updatedAt: baseline.updatedAt,
-    imageAvailable: await imageExists(baseline.screenshotPath),
+    imageAvailable,
+    imageSize: imageAvailable ? await readPngSize(baseline.screenshotPath) : null,
     build: reference,
   };
 }
@@ -78,12 +83,14 @@ async function frozenReference(
   const reference = metadata.sourceBuildId
     ? await new BuildModel(getStore().db).get(metadata.sourceBuildId)
     : null;
+  const image = await readComparisonImage(path, metadata.imageSha256);
   return {
     kind: "known",
     branch: metadata.branch,
     defaultBranch: metadata.defaultBranch,
     updatedAt: metadata.baselineVersion,
-    imageAvailable: Boolean(await readComparisonImage(path, metadata.imageSha256)),
+    imageAvailable: Boolean(image),
+    imageSize: image ? pngSizeOf(image) : null,
     build: reference?.projectId === project.id ? reference : null,
   };
 }

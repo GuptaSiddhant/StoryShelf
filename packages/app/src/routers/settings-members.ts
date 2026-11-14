@@ -4,9 +4,11 @@ import {
   ProjectGroupMappingModel,
   ProjectModel,
   serializeOwnerRules,
+  UserModel,
 } from "@storyshelf/core/models";
 import { isProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -14,36 +16,44 @@ import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Project member settings (assign roles, remove members). */
 export function registerMemberSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings/members", async (c) =>
-    c.html(await renderSettingsPage(c, "members")),
-  );
-
   app.post("/projects/:slug/settings/members", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
     const form = await c.req.formData();
-    const userId = asString(form.get("userId"));
     const role = asString(form.get("role"));
-    if (!userId || !isProjectRole(role)) {
+    const userId = await resolveMemberUser(form);
+    if (!userId.id || !isProjectRole(role)) {
       return c.html(
-        (await renderSettingsPage(c, "members", { globalError: "User and role are required" })) ??
-          "",
+        (await renderSettingsPage(c, "members", { globalError: userId.error })) ?? "",
         400,
       );
     }
-    await new MemberModel(getStore().db).set(project.id, userId, role);
+    await new MemberModel(getStore().db).set(project.id, userId.id, role);
     flash(c, "Member saved");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "members"));
   });
 
   app.post("/projects/:slug/settings/members/:userId/remove", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
     await new MemberModel(getStore().db).remove(project.id, c.req.param("userId") ?? "");
     flash(c, "Member removed");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "members"));
   });
 
   registerOwnerSettings(app);
   registerGroupMappingSettings(app);
+}
+
+/** The user an add-member form names: an email (the form) or a raw id (API-style posts). */
+async function resolveMemberUser(form: FormData): Promise<{ id?: string; error: string }> {
+  const email = asString(form.get("email"));
+  const rawId = asString(form.get("userId"));
+  if (!email && !rawId) return { error: "Enter the member's email and a role" };
+  if (!email) return { id: rawId, error: "User and role are required" };
+  const user = await new UserModel(getStore().db).getByEmail(email);
+  if (!user) {
+    return { error: `No account has the email ${email}. They need to sign in once first.` };
+  }
+  return { id: user.id, error: "User and role are required" };
 }
 
 /**
@@ -60,13 +70,13 @@ function registerOwnerSettings(app: ShelfRouter): void {
     const { rules, problems } = parseOwnerRules(text, new Set(members.map((m) => m.userId)));
     if (problems.length > 0) {
       const state = { ownerText: text, ownerProblems: problems };
-      return c.html((await renderSettingsPage(c, "members", state)) ?? "", 400);
+      return c.html((await renderSettingsPage(c, "owners", state)) ?? "", 400);
     }
     await new ProjectModel(getStore().db).update(project.id, {
       componentOwners: serializeOwnerRules(rules),
     });
     flash(c, "Component owners saved");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "owners"));
   });
 }
 
@@ -87,7 +97,7 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
     }
     await new ProjectGroupMappingModel(getStore().db).create(project.id, groupName, role);
     flash(c, "Group mapping added");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "members"));
   });
 
   app.post("/projects/:slug/settings/members/groups/:mappingId/remove", async (c) => {
@@ -97,6 +107,6 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
       c.req.param("mappingId") ?? "",
     );
     flash(c, "Group mapping removed");
-    return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+    return hxRedirect(c, settingsHref(project.slug, "members"));
   });
 }

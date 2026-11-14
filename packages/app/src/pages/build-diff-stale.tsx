@@ -39,17 +39,37 @@ export function StaleBaselineNotice(
                 Re-diff against current baselines
               </Button>
             </form>
-            <form method="post" action={`${base}/retry`} hx-post={`${base}/retry`} hx-target="body">
-              <Button variant="secondary" size="sm" type="submit">
-                Retry capture
-              </Button>
-            </form>
           </HStack>
         ) : null}
         <Meta>
-          Re-diff reuses the stored screenshots and is quick. Retry capture re-renders every story.
+          Re-diff reuses the stored screenshots and is quick. To re-render every story, use Retry
+          capture in the ⋯ menu.
         </Meta>
       </VStack>
+    </Alert>
+  );
+}
+
+/** The header's one-line version: the same warning with the Re-diff action, no explanation. */
+export function StaleBaselineLine(
+  props: StaleBaselineNoticeProps,
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, staleCount, canReview } = props;
+  const url = `/api/v1/projects/${project.slug}/builds/${build.id}/rediff`;
+  return (
+    <Alert tone="warning">
+      <HStack justify="between">
+        <span>
+          Baseline changed: {staleCount} {staleCount === 1 ? "diff is" : "diffs are"} out of date.
+        </span>
+        {canReview ? (
+          <form method="post" action={url} hx-post={url} hx-target="body">
+            <Button variant="primary" size="sm" type="submit">
+              Re-diff
+            </Button>
+          </form>
+        ) : null}
+      </HStack>
     </Alert>
   );
 }

@@ -126,7 +126,9 @@ async function observed(response: Response): Promise<Record<string, unknown>> {
       .replaceAll(privateBuildId, ":id")
       .replaceAll(UNKNOWN_BUILD_ID, ":id")
       // Every page carries a fresh CSRF token, whatever the request.
-      .replaceAll(/name="csrf-token" content="[^"]*"/gu, 'name="csrf-token" content=":token"'),
+      .replaceAll(/name="csrf-token" content="[^"]*"/gu, 'name="csrf-token" content=":token"')
+      // ...and so does the sign-out form in the chrome a signed-in visitor's not-found page keeps.
+      .replaceAll(/name="csrf_token" value="[^"]*"/gu, 'name="csrf_token" value=":token"'),
     cacheControl: response.headers.get("cache-control"),
     contentType: response.headers.get("content-type"),
     location: response.headers
@@ -195,6 +197,18 @@ describe("a project the caller cannot see", () => {
       "GET /projects/:slug/storybook",
     ]) {
       expect(statuses.get(key), key).toBe(404);
+    }
+  });
+
+  it("hides the Insights tab and its queue fragment of a private project from an outsider", async () => {
+    const app = await boot();
+    for (const path of ["/settings/insights", "/jobs?partial=queue"]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one view at a time keeps failures readable
+      const hidden = await getAs(app, `/projects/hidden${path}`, "storyshelf_session=outsider");
+      // oxlint-disable-next-line eslint/no-await-in-loop -- same
+      const unknown = await getAs(app, `/projects/ghost${path}`, "storyshelf_session=outsider");
+      expect(hidden, path).toEqual(unknown);
+      expect(hidden["status"], path).toBe(404);
     }
   });
 

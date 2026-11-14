@@ -309,7 +309,7 @@ describe("component page with testing", () => {
     const html = await page(app, "src/Button.stories.tsx");
     expect(html).toContain("Design/Button");
     expect(html).toContain('id="button--primary"');
-    expect(html).toContain("changed");
+    expect(html).toContain("Changed");
     const stories = await page(app, "src/Button.stories.tsx?tab=stories");
     expect(stories).toContain(">Tertiary<");
     const history = await page(app, "src/Button.stories.tsx?tab=history");

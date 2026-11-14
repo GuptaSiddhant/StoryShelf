@@ -297,7 +297,7 @@ describe.each(CHANNELS)("the publish guard through the %s", (channel) => {
     const refused = await give(booted, channel, id, { user: "alice" });
     expect(refused.status).toBe(409);
     expect(refused.text).toContain("failed");
-    expect(await page(booted, "alice", `/builds/${id}`)).not.toContain("Approve build");
+    expect(await page(booted, "alice", `/builds/${id}/diff`)).not.toContain("Approve build");
   });
 });
 
@@ -305,11 +305,11 @@ describe("the verdict form while publishing", () => {
   it("is rendered disabled with an explanation, and enabled once published", async () => {
     const booted = await boot();
     const id = await createBuild(booted, false);
-    const waiting = await page(booted, "alice", `/builds/${id}`);
+    const waiting = await page(booted, "alice", `/builds/${id}/diff`);
     expect(waiting).toContain("Waiting for the Storybook to publish");
     expect(waiting).toMatch(/<button[^>]*disabled[^>]*value="approved"/u);
     await booted.storage.write(`${storybookDir("p1", id)}/manifest.json`, Buffer.from("{}"));
-    const ready = await page(booted, "alice", `/builds/${id}`);
+    const ready = await page(booted, "alice", `/builds/${id}/diff`);
     expect(ready).not.toContain("Waiting for the Storybook to publish");
     expect(ready).not.toMatch(/<button[^>]*disabled[^>]*value="approved"/u);
   });
@@ -435,7 +435,7 @@ describe.each(CHANNELS)("sign-offs through the %s (testing on)", (channel) => {
     expect(given.status).toBeLessThan(400);
     expect(await statusOf(booted, id)).toBe("capturing");
     expect(await booted.db.list(booted.db.tables.baselines)).toEqual(baselines);
-    expect(await page(booted, "alice", `/builds/${id}`)).toContain("sign-off");
+    expect(await page(booted, "alice", `/builds/${id}/diff`)).toContain("sign-off");
   });
 
   it.each(["failed", "cancelled"] as const)("keeps a %s build non-reviewable", async (status) => {
@@ -446,7 +446,7 @@ describe.each(CHANNELS)("sign-offs through the %s (testing on)", (channel) => {
     expect(await statusOf(booted, id)).toBe(status);
     expect(await booted.db.list(booted.db.tables.buildReviews)).toHaveLength(0);
     // The build page says there is nothing to review, in words.
-    const html = await page(booted, "alice", `/builds/${id}`);
+    const html = await page(booted, "alice", `/builds/${id}/diff`);
     expect(html).toContain(
       `Nothing to review: this build ${status === "failed" ? "failed" : "was cancelled"}.`,
     );

@@ -24,6 +24,7 @@ import {
   Tabs,
   Thumbnail,
   VStack,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
 import {
@@ -191,9 +192,10 @@ function HeaderMeta(props: { data: ComponentPageData }): Rendered {
   return (
     <>
       <Badge tone={statusTone(status)} icon>
-        {status}
+        {statusLabel(status)}
       </Badge>{" "}
-      {counts} · {modes} {modes === 1 ? "mode" : "modes"}
+      on {captured.shownBuild.gitBranch} · {captured.shownBuild.gitSha.slice(0, 7)} · {counts} ·{" "}
+      {modes} {modes === 1 ? "mode" : "modes"}
     </>
   );
 }
@@ -259,7 +261,9 @@ function StatesTab(props: { data: ComponentPageData }): Rendered {
             <div class={snapshotCardHead}>
               <strong>{group.primary.storyName}</strong>
               <span class={snapshotCardMeta}>
-                <Badge tone={statusTone(group.primary.status)}>{group.primary.status}</Badge>{" "}
+                <Badge tone={statusTone(group.primary.status)}>
+                  {statusLabel(group.primary.status)}
+                </Badge>{" "}
                 {snapshotVariant(group.primary)}
               </span>
             </div>
@@ -337,7 +341,7 @@ function CapturedRow(props: { row: ComponentHistoryRow; data: ComponentPageData 
         {row.changedStates} / {row.states}
       </td>
       <td>
-        <Badge tone={statusTone(row.status)}>{row.status}</Badge>
+        <Badge tone={statusTone(row.status)}>{statusLabel(row.status)}</Badge>
       </td>
       <td>
         <HStack>

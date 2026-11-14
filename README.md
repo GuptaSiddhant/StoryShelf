@@ -6,9 +6,9 @@
 [![CI](https://github.com/GuptaSiddhant/StoryShelf/actions/workflows/ci.yml/badge.svg)](https://github.com/GuptaSiddhant/StoryShelf/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/GuptaSiddhant/StoryShelf)](LICENSE)
 
-Self-hosted visual testing platform for Storybook. Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship.
+**Self-hosted visual testing and review for Storybook.**
 
-**Self-hosted Chromatic alternative. Storybook-native. Unlimited snapshots.**
+An open-source, self-hosted alternative to Chromatic. Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship. Storybook-native, with unlimited snapshots.
 
 [**Live demo**](https://storyshelf.fly.dev) · [**Documentation**](https://storyshelf.js.org) · [Getting started](https://storyshelf.js.org/guides/getting-started/)
 

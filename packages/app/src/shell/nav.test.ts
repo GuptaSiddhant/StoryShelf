@@ -5,8 +5,6 @@ const urls: NavUrls = {
   projects: () => "/projects",
   library: (slug) => `/p/${slug}/library`,
   buildsList: (slug) => `/p/${slug}/builds`,
-  jobs: (slug) => `/p/${slug}/jobs`,
-  labels: (slug) => `/p/${slug}/labels`,
   settings: (slug) => `/p/${slug}/settings`,
 };
 
@@ -49,7 +47,11 @@ describe("breadcrumbs (ancestors of the current page only)", () => {
 
   it("never returns a crumb without a link", () => {
     const crumbs = breadcrumbs(
-      { active: "labels", projectSlug: "docs", trail: [{ label: "pr: 12" }] },
+      {
+        active: "settings",
+        projectSlug: "docs",
+        trail: [{ label: "Labels" }, { label: "pr: 12" }],
+      },
       urls,
     );
     expect(crumbs.every((crumb) => crumb.href !== undefined)).toBe(true);

@@ -154,7 +154,7 @@ async function makeRequest(booted: Booted, id: string, extra: Record<string, str
 }
 
 async function buildPage(booted: Booted, user: string, id: string): Promise<string> {
-  const response = await booted.app.request(`/projects/gate/builds/${id}`, {
+  const response = await booted.app.request(`/projects/gate/builds/${id}/diff`, {
     headers: { cookie: `storyshelf_session=${user}`, "sec-fetch-site": "same-origin" },
   });
   expect(response.status).toBe(200);

@@ -11,7 +11,7 @@ import {
   providerNameFor,
 } from "../routers/design.handlers.ts";
 import { getStore } from "../store.ts";
-import { Badge, Button, HStack, SectionTitle, statusTone } from "../ui/components.tsx";
+import { Badge, Button, HStack, SectionTitle, statusLabel, statusTone } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import {
   diffPaneImg,
@@ -122,8 +122,8 @@ function SnapshotCardItem(props: {
       <div class={snapshotCardHead}>
         <strong>{snap.storyName}</strong>
         <span class={snapshotCardMeta}>
-          <Badge tone={statusTone(snap.status)}>{snap.status}</Badge> {snap.viewportWidth}×
-          {snap.viewportHeight}
+          <Badge tone={statusTone(snap.status)}>{statusLabel(snap.status)}</Badge>{" "}
+          {snap.viewportWidth}×{snap.viewportHeight}
         </span>
       </div>
       <div class={snapshotCardBody}>

@@ -10,11 +10,12 @@
  * an organizational detail.
  */
 export { Button, Tabs } from "./buttons.tsx";
-export { Alert, Badge, EmptyState, Meta, Stat, statusTone } from "./feedback.tsx";
+export { Alert, Badge, EmptyState, Meta, Stat, statusLabel, statusTone } from "./feedback.tsx";
 export { CheckField, Field, FormActions, SelectField, TextareaField } from "./forms.tsx";
 export { Card, CardSection, PageHeader, SectionTitle } from "./layout.tsx";
 export { HStack, VStack } from "./stacks.tsx";
 export { Avatar, AvatarGroup } from "./avatar.tsx";
+export { DefinitionList, Disclosure } from "./disclosure.tsx";
 export { Dropdown, DropdownDivider, DropdownItem } from "./dropdown.tsx";
 export { Icon } from "./icons/icon.tsx";
 export type { IconName } from "./icons/paths.ts";
@@ -23,7 +24,13 @@ export { Option, OptionList } from "./option-list.tsx";
 export { Segmented, type SegmentedItem } from "./segmented.tsx";
 export { Table } from "./table.tsx";
 export { Thumbnail } from "./thumbnail.tsx";
-export { CompareStage, type CompareStageProps } from "./compare-stage.tsx";
+export {
+  CompareStage,
+  formatSize,
+  sizesDiffer,
+  type CompareStageProps,
+  type ImageSize,
+} from "./compare-stage.tsx";
 export { Progress } from "./progress.tsx";
 export { PreviewEmbed, PREVIEW_SANDBOX } from "./preview-embed.tsx";
 export { DesignPreview, DesignReference } from "./design-reference.tsx";

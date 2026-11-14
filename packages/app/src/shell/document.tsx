@@ -72,7 +72,8 @@ const DocumentHead: FC<{
   name: string;
   csrfToken: string;
   styles: string;
-}> = ({ title, name, csrfToken, styles }) => (
+  sidebarDefault?: "rail" | undefined;
+}> = ({ title, name, csrfToken, styles, sidebarDefault }) => (
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -86,7 +87,7 @@ const DocumentHead: FC<{
     </title>
     <style dangerouslySetInnerHTML={{ __html: styles }} />
     <Style />
-    <script dangerouslySetInnerHTML={{ __html: bootScript() }} />
+    <script dangerouslySetInnerHTML={{ __html: bootScript(sidebarDefault) }} />
   </head>
 );
 
@@ -101,7 +102,7 @@ const AppChrome: FC<{
   <>
     <div class={shellRoot}>
       <Sidebar nav={nav} name={name} logo={logo} />
-      <div>
+      <div data-shell-main>
         <TopBar nav={nav} />
         <main
           id="main-content"
@@ -141,6 +142,7 @@ export const DocumentLayout: FC<{
           name={name}
           csrfToken={getCsrfToken(config.secret, sessionId)}
           styles={baseStyle(light, dark)}
+          sidebarDefault={nav?.sidebarDefault}
         />
         <body>
           <a class="skip-link" href="#main-content">
