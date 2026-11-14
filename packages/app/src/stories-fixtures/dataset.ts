@@ -27,7 +27,7 @@ export const BUILD_FAILED = id("BLD003");
 export const BUILD_CAPTURING = id("BLD004");
 export const BUILD_REJECTED = id("BLD005");
 /** An older build of the capturing build's branch, cancelled when that newer commit arrived (ADR 0045). */
-export const BUILD_SUPERSEDED = id("BLD007");
+export const BUILD_SUPERSEDED = id("BLD013");
 export const BUILD_CANCELLED = id("BLD006");
 /** An approved build whose Storybook retention already removed. */
 export const BUILD_PURGED = id("BLD012");
