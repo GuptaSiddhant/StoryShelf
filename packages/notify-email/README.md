@@ -33,10 +33,18 @@ const app = createShelfApp({
 
 | Preset          | Use for                                                                                                          |
 | --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `smtpPreset`    | A corporate relay, Postfix, or SES over SMTP. `smtpPresetFromEnv` reads the settings from environment variables. |
+| `smtpPreset`    | A corporate relay or Postfix. `smtpPresetFromEnv` reads the settings from environment variables.                |
+| `sesPreset`     | Amazon SES over SMTP (`email-smtp.<region>.amazonaws.com`, port 587, STARTTLS). `sesPresetFromEnv` reads the env. |
+
 | `mailpitPreset` | Local development against Mailpit (`localhost:1025`).                                                            |
 | `httpPreset`    | A Resend- or Postmark-style JSON HTTP endpoint.                                                                  |
 | `logPreset`     | Tests and unconfigured setups — messages are written to the log.                                                 |
+
+### Amazon SES
+
+`sesPreset({ region, user, pass, from })` is SMTP configuration only: no AWS SDK, and it needs the same optional `nodemailer` peer as `smtpPreset`. `user` and `pass` are **SES SMTP credentials** (created in the SES console and derived from an IAM user; an IAM access key does not work). `sesPresetFromEnv` reads `SES_REGION` (or `AWS_REGION`), `SES_SMTP_USER`, `SES_SMTP_PASS` and `SES_FROM`, and returns `undefined` unless all four resolve.
+
+Before it can send, SES needs a **verified sending identity** for `from` (an address or its domain) in that region. A new SES account is in the sandbox, which also limits recipients to verified identities until you request production access.
 
 See [Notifications](https://storyshelf.js.org/guides/notifications/) for how email channels, subscriptions, and auth mail fit together.
 
