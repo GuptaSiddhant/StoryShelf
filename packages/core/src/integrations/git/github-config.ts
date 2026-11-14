@@ -11,6 +11,8 @@ export const githubConfigSchema = z
   .object({
     owner: z.string().min(1),
     repo: z.string().min(1),
+    /** GitHub Enterprise Server API base, e.g. `https://ghes.example.com/api/v3`. */
+    apiUrl: z.url().optional(),
     prefix: statusPrefixSchema.optional(),
     mode: z.enum(["statuses", "checks"]).optional(),
     appId: z.string().regex(/^\d+$/u, "Use the numeric App ID").optional(),

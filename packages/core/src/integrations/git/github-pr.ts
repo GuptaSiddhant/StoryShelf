@@ -10,11 +10,12 @@ export async function findPrNumber(opts: {
   token: string;
   owner: string;
   repo: string;
+  apiUrl?: string | undefined;
   sha: string;
 }): Promise<number | undefined> {
   try {
     const pulls = await httpJson<AssociatedPull[]>(
-      repoPath(opts.owner, opts.repo, `/commits/${encodeURIComponent(opts.sha)}/pulls`),
+      repoPath(opts, `/commits/${encodeURIComponent(opts.sha)}/pulls`),
       { headers: githubHeaders(opts.token) },
     );
     const [pr] = pulls;

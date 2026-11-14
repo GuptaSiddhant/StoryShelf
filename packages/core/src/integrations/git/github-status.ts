@@ -9,6 +9,8 @@ export interface GitHubRepo {
   token: string;
   owner: string;
   repo: string;
+  /** GitHub Enterprise Server API base; absent means github.com. */
+  apiUrl?: string | undefined;
   logger?: Logger | undefined;
 }
 
@@ -31,7 +33,7 @@ export async function postCommitStatus(
   const state = mapState(input.state);
   repo.logger?.debug({ context: input.context, sha: input.sha, state }, "posting commit status");
   try {
-    await httpJson(repoPath(repo.owner, repo.repo, `/statuses/${encodeURIComponent(input.sha)}`), {
+    await httpJson(repoPath(repo, `/statuses/${encodeURIComponent(input.sha)}`), {
       method: "POST",
       headers: githubHeaders(repo.token),
       json: {

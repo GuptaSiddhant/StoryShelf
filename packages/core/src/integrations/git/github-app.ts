@@ -10,6 +10,8 @@ import { apiBase, githubHeaders } from "./github-api.ts";
 export interface AppCredentials {
   appId: string;
   installationId: string;
+  /** GitHub Enterprise Server API base; absent means github.com. */
+  apiUrl?: string | undefined;
   /** The App's private key (PEM); a one-line key with literal `\n` is accepted. */
   privateKey: string;
 }
@@ -50,7 +52,7 @@ export function clearInstallationTokens(): void {
 async function exchange(creds: AppCredentials, key: string): Promise<string> {
   const jwt = signAppJwt(creds, Date.now());
   const response = await httpJson<{ token?: unknown; expires_at?: unknown }>(
-    `${apiBase()}/app/installations/${encodeURIComponent(creds.installationId)}/access_tokens`,
+    `${apiBase(creds.apiUrl)}/app/installations/${encodeURIComponent(creds.installationId)}/access_tokens`,
     { method: "POST", headers: githubHeaders(jwt) },
   );
   if (typeof response.token !== "string" || typeof response.expires_at !== "string") {
@@ -63,7 +65,7 @@ async function exchange(creds: AppCredentials, key: string): Promise<string> {
 /** The cache key never holds the private key itself, only its digest. */
 function cacheKey(creds: AppCredentials): string {
   const digest = createHash("sha256").update(creds.privateKey).digest("hex").slice(0, 16);
-  return `${creds.appId}:${creds.installationId}:${digest}`;
+  return `${creds.apiUrl ?? ""}|${creds.appId}:${creds.installationId}:${digest}`;
 }
 
 /** An App JWT (RS256), valid for nine minutes; `now` is in milliseconds. */

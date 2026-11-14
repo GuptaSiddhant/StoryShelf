@@ -21,6 +21,8 @@ export interface CheckRepo {
   repo: string;
   /** The GitHub App the runs belong to: only its runs are found, updated and mirrored. */
   appId?: string | undefined;
+  /** GitHub Enterprise Server API base; absent means github.com. */
+  apiUrl?: string | undefined;
   logger?: Logger | undefined;
 }
 
@@ -152,8 +154,7 @@ async function listRuns(
 ): Promise<ExistingRun[]> {
   const app = repo.appId === undefined ? "" : `&app_id=${encodeURIComponent(repo.appId)}`;
   const url = repoPath(
-    repo.owner,
-    repo.repo,
+    repo,
     `/commits/${encodeURIComponent(input.sha)}/check-runs?filter=all&per_page=${String(RUNS_PAGE)}&page=${String(at.page)}&check_name=${encodeURIComponent(input.context)}${app}`,
   );
   const listed = await httpJson<{ check_runs?: ExistingRun[] }>(url, {
@@ -167,7 +168,7 @@ async function listRuns(
 }
 
 async function createRun(repo: CheckRepo, body: unknown): Promise<number> {
-  const created = await httpJson<{ id: number }>(repoPath(repo.owner, repo.repo, "/check-runs"), {
+  const created = await httpJson<{ id: number }>(repoPath(repo, "/check-runs"), {
     method: "POST",
     headers: githubHeaders(repo.token),
     json: body,
@@ -177,7 +178,7 @@ async function createRun(repo: CheckRepo, body: unknown): Promise<number> {
 }
 
 async function updateRun(repo: CheckRepo, id: number, body: unknown): Promise<number> {
-  await httpJson(repoPath(repo.owner, repo.repo, `/check-runs/${String(id)}`), {
+  await httpJson(repoPath(repo, `/check-runs/${String(id)}`), {
     method: "PATCH",
     headers: githubHeaders(repo.token),
     json: body,

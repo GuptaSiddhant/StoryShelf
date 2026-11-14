@@ -18,9 +18,10 @@ export async function commitOnBranch(
   input: { sha: string; branch: string },
 ): Promise<boolean> {
   const range = `${encodeURIComponent(input.branch)}...${encodeURIComponent(input.sha)}`;
-  const answer = await httpJson<CompareAnswer>(
-    repoPath(repo.owner, repo.repo, `/compare/${range}?per_page=1`),
-    { method: "GET", headers: githubHeaders(repo.token), logger: repo.logger },
-  );
+  const answer = await httpJson<CompareAnswer>(repoPath(repo, `/compare/${range}?per_page=1`), {
+    method: "GET",
+    headers: githubHeaders(repo.token),
+    logger: repo.logger,
+  });
   return answer.status === "identical" || answer.status === "behind";
 }

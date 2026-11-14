@@ -1,11 +1,17 @@
-/** GitHub REST API helpers (base URL + auth headers). */
-export function apiBase(): string {
-  return "https://api.github.com";
+/**
+ * GitHub REST API helpers (base URL + auth headers). `apiUrl` is a GitHub Enterprise Server API
+ * base such as `https://ghes.example.com/api/v3`; every request still goes through the outbound guard.
+ */
+export function apiBase(apiUrl?: string): string {
+  return apiUrl ? apiUrl.replace(/\/+$/u, "") : "https://api.github.com";
 }
 
 /** Join a `/repos/{owner}/{repo}` path with a suffix. */
-export function repoPath(owner: string, repo: string, suffix = ""): string {
-  return `${apiBase()}/repos/${owner}/${repo}${suffix}`;
+export function repoPath(
+  target: { owner: string; repo: string; apiUrl?: string | undefined },
+  suffix = "",
+): string {
+  return `${apiBase(target.apiUrl)}/repos/${target.owner}/${target.repo}${suffix}`;
 }
 
 /** Headers for GitHub REST API requests. */
