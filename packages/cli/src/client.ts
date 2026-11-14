@@ -146,6 +146,7 @@ interface Client {
     };
     admin: {
       purge: (json: { ttlDays?: number }) => Promise<unknown>;
+      checkStorage: (json: { sample?: number }) => Promise<unknown>;
     };
   };
 }
@@ -337,6 +338,12 @@ function createAdminApi(
   requestHeaders: (contentType?: string) => Record<string, string>,
 ): Client["projects"]["admin"] {
   return {
+    checkStorage: async (json: { sample?: number }) =>
+      await fetchJson(`${baseUrl}/api/v1/admin/check-storage`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
+      }),
     purge: async (json: { ttlDays?: number }) =>
       await fetchJson(`${baseUrl}/api/v1/admin/purge`, {
         method: "POST",
