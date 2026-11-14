@@ -105,8 +105,6 @@ const BUILD_SKIPPED_FROM_INDEX =
 const BUILD_SUPERSEDED_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS superseded_by_build_id TEXT";
 const BUILD_IDEMPOTENCY_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS idempotency_key TEXT";
-const BUILD_IDEMPOTENCY_INDEX =
-  "CREATE UNIQUE INDEX IF NOT EXISTS builds_project_idempotency_idx ON builds (project_id, idempotency_key)";
 const BUILD_MANIFEST_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS manifest_sha256 TEXT";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
@@ -187,6 +185,8 @@ const IDENTITY_STATEMENTS = [
   "DROP INDEX IF EXISTS baselines_project_story_viewport_branch_idx",
   "CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser)",
   "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
+  // One build per (project, idempotency key); the column is new in this release, so no row repeats a key (ADR 0044).
+  "CREATE UNIQUE INDEX IF NOT EXISTS builds_project_idempotency_idx ON builds (project_id, idempotency_key)",
 ];
 
 async function migrateSnapshotColumns(run: MigrationRunner, logger?: Logger): Promise<void> {
@@ -294,7 +294,6 @@ async function migrateBuildSkippedFrom(run: MigrationRunner): Promise<void> {
   await run(BUILD_SKIPPED_FROM_INDEX);
   await run(BUILD_SUPERSEDED_ALTER);
   await run(BUILD_IDEMPOTENCY_ALTER);
-  await run(BUILD_IDEMPOTENCY_INDEX);
 }
 
 /** Runs `use` with one dedicated connection's row-query runner, then releases the connection. */

@@ -137,24 +137,33 @@ export function registerBuildSkip(app: ShelfRouter): void {
       ...DEVELOPER_ROLES,
     );
     assertSkippable(project);
-    const input = c.req.valid("json");
+    const { build, created } = await recordSkipped(project, c.req.valid("json"));
     const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
-    const existing = await new BuildModel(getStore().db).findByIdempotencyKey(
-      project.id,
-      input.idempotencyKey,
-    );
-    if (existing) {
-      return c.json({ build: existing, buildUrl: urls.build(project.slug, existing.id) }, 200);
-    }
-    await assertSameCatalog(project, input);
-    const build = await createChecked(project, input);
-    if (input.labels && input.labels.length > 0) {
-      await attachLabels(getStore().db, project.id, build.id, input.labels);
-    }
-    await announceBuildStatus(build.id, "skipped");
-    await requestBuildState(build.id);
-    return c.json({ build, buildUrl: urls.build(project.slug, build.id) }, 201);
+    return c.json({ build, buildUrl: urls.build(project.slug, build.id) }, created ? 201 : 200);
   });
+}
+
+/**
+ * The skipped build for this request: the one a repeated `idempotencyKey` already created
+ * (`created: false`), or a new one after the catalog check, with its labels and announcements.
+ */
+async function recordSkipped(
+  project: Project,
+  input: z.infer<typeof skippedBuildSchema>,
+): Promise<{ build: Build; created: boolean }> {
+  const existing = await new BuildModel(getStore().db).findByIdempotencyKey(
+    project.id,
+    input.idempotencyKey,
+  );
+  if (existing) return { build: existing, created: false };
+  await assertSameCatalog(project, input);
+  const build = await createChecked(project, input);
+  if (input.labels && input.labels.length > 0) {
+    await attachLabels(getStore().db, project.id, build.id, input.labels);
+  }
+  await announceBuildStatus(build.id, "skipped");
+  await requestBuildState(build.id);
+  return { build, created: true };
 }
 
 /**

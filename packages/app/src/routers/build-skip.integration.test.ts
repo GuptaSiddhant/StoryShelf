@@ -246,7 +246,8 @@ describe("POST /builds/skipped", () => {
     ];
     const created = (await (await post(source.id, { labels })).json()) as { build: { id: string } };
     const attached = await new LabelModel(db).listForBuild(created.build.id);
-    expect(attached.map((label) => [label.typeKey, label.value]).toSorted()).toEqual([
+    const pairs = attached.map((label) => `${label.typeKey}=${label.value}`).toSorted();
+    expect(pairs.map((pair) => pair.split("="))).toEqual([
       ["persistent", "true"],
       ["team", "web"],
     ]);
