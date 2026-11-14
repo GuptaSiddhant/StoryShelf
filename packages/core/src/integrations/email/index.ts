@@ -12,7 +12,7 @@ export type { EmailNotifierDefaults } from "./email.ts";
 export { httpPreset } from "./http.ts";
 export { logPreset } from "./log.ts";
 export { mailpitPreset } from "./mailpit.ts";
-export { sesPreset, sesPresetFromEnv, sesSmtpHost } from "./ses.ts";
+export { sesPreset, sesPresetFromEnv } from "./ses.ts";
 export { NODEMAILER_RANGE, smtpPreset, smtpPresetFromEnv } from "./smtp.ts";
 export { emailChannelConfigSchema } from "./types.ts";
 export type {

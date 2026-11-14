@@ -111,7 +111,6 @@ export {
   NODEMAILER_RANGE,
   sesPreset,
   sesPresetFromEnv,
-  sesSmtpHost,
   smtpPreset,
   smtpPresetFromEnv,
   type EmailChannelConfig,

@@ -30,6 +30,7 @@ describe("sesPreset", () => {
       host: "email-smtp.eu-west-1.amazonaws.com",
       port: 587,
       secure: false,
+      requireTLS: true,
       auth: { user: "u", pass: "p" },
     });
   });

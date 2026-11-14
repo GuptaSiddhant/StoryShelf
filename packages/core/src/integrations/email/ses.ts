@@ -26,6 +26,7 @@ export async function sesPreset(
     host: sesSmtpHost(options.region),
     port: 587,
     secure: false,
+    requireTLS: true,
     user: options.user,
     pass: options.pass,
     from: options.from,

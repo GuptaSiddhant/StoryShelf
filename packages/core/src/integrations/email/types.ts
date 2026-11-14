@@ -20,6 +20,8 @@ export interface SmtpPresetOptions {
   host: string;
   port: number;
   secure?: boolean;
+  /** Fail instead of sending in plaintext when the server does not offer STARTTLS. */
+  requireTLS?: boolean;
   user?: string;
   pass?: string;
   from: string;
