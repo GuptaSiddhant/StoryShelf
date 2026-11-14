@@ -279,6 +279,20 @@ jobs:
       - name: Build the packages the adapter imports
         run: nubx turbo run build --filter='@storyshelf/db-postgres^...'
 
+      # Samples what the server runs for long, so a stall (#1067) names its statement in the dump below.
+      - name: Sample slow statements in the background
+        run: |
+          cat > "$RUNNER_TEMP/sample.sh" <<'SAMPLER'
+          export PGPASSWORD=test-password
+          psql_() { psql -h 127.0.0.1 -U postgres -d storyshelf_test -At -F ' | ' "$@"; }
+          while true; do
+            psql_ -c "SELECT now()::time(0), pid, state, wait_event_type, wait_event, now() - query_start, left(regexp_replace(query, '\s+', ' ', 'g'), 160) FROM pg_stat_activity WHERE datname = 'storyshelf_test' AND state <> 'idle' AND pid <> pg_backend_pid() AND now() - query_start > interval '3 seconds'"
+            psql_ -c "SELECT now()::time(0), n_live_tup, last_autoanalyze FROM pg_stat_user_tables WHERE relname = 'content_uses'"
+            sleep 5
+          done
+          SAMPLER
+          nohup setsid bash "$RUNNER_TEMP/sample.sh" >> "$RUNNER_TEMP/slow-statements.log" 2>&1 &
+
       - name: Run the build-reference contract against real Postgres
         working-directory: packages/db-postgres
         env:
@@ -305,6 +319,9 @@ jobs:
             docker logs --tail 80 "$id" 2>&1 || true
             echo "::endgroup::"
           done
+          echo "::group::statements active for more than 3 s, every 5 s"
+          tail -120 "$RUNNER_TEMP/slow-statements.log" || true
+          echo "::endgroup::"
           echo "::group::pg_stat_activity"
           PGPASSWORD=test-password psql -h 127.0.0.1 -U postgres -d storyshelf_test -c \
             "SELECT pid, state, wait_event_type, wait_event, now() - query_start AS running, left(query, 80) AS query FROM pg_stat_activity WHERE datname = 'storyshelf_test'" || true
