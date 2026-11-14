@@ -16,6 +16,7 @@ import { createSpinner, printLine, spinnerFrames } from "../output.ts";
 import { isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
+import { findSupersedes } from "./supersede.ts";
 
 /**
  * Upload a built Storybook and create a build record.
@@ -287,15 +288,13 @@ async function buildAndPost(
     return;
   }
   const client = createClient(collected.url, collected.token);
-  const created: BuildCreated = await client.projects.builds.createJson(collected.slug, {
-    gitSha: collected.sha,
-    gitBranch: collected.branch,
-    message: collected.message,
-    authorEmail: collected.authorEmail,
-    authorName: collected.authorName,
-    affectedOnly: collected.affectedOnly,
-    labels: parseLabels(collected.label),
+  const supersedes = await findSupersedes(client, {
+    slug: collected.slug,
+    cwd,
+    branch: collected.branch,
+    headSha: collected.sha,
   });
+  const created = await createBuild(client, collected, supersedes);
   const hostingOnly = created.testing === false;
   if (!hostingOnly) {
     await reportAffectedCapture(client, created, cwd, collected);
@@ -306,6 +305,24 @@ async function buildAndPost(
   if (hostingOnly) {
     printLine(HOSTING_ONLY_NOTICE);
   }
+}
+
+/** Create the build record, naming the builds it supersedes (ADR 0045). */
+async function createBuild(
+  client: ReturnType<typeof createClient>,
+  collected: ResolvedUploadOptions,
+  supersedes: string[] | undefined,
+): Promise<BuildCreated> {
+  return await client.projects.builds.createJson(collected.slug, {
+    gitSha: collected.sha,
+    gitBranch: collected.branch,
+    message: collected.message,
+    authorEmail: collected.authorEmail,
+    authorName: collected.authorName,
+    affectedOnly: collected.affectedOnly,
+    labels: parseLabels(collected.label),
+    ...(supersedes && { supersedes }),
+  });
 }
 
 /** Printed when the server reports `testing: false` (ADR 0006, decision 1). */

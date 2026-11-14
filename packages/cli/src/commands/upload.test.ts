@@ -99,6 +99,9 @@ describe("runUpload success", () => {
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         await Promise.resolve();
+        if (url.includes("/builds/in-flight")) {
+          return okJson([]);
+        }
         const headers = new Headers(init?.headers);
         calls.push({
           method: init?.method ?? "GET",
@@ -140,6 +143,9 @@ describe("runUpload success", () => {
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {
           await Promise.resolve();
+          if (url.includes("/builds/in-flight")) {
+            return okJson([]);
+          }
           urls.push(url);
           if ((init?.method ?? "") === "PUT") {
             await collectBody(init?.body);
@@ -317,6 +323,9 @@ describe("runUpload affected capture", () => {
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         await Promise.resolve();
+        if (url.includes("/builds/in-flight")) {
+          return okJson([]);
+        }
         const method = init?.method ?? "GET";
         calls.push({ method, url });
         if (method === "POST" && typeof init?.body === "string") {
