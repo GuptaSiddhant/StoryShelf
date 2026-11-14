@@ -4,8 +4,6 @@ import { SCAFFOLD_DEV_DEPENDENCIES, SERVER_ENTRY } from "../../shared/scaffold.t
 import {
   needsCompose,
   resolveDeployTarget,
-  wantsDesign,
-  wantsGit,
   wantsNotifications,
   wantsObservability,
   type Answers,
@@ -24,7 +22,7 @@ const PGLITE_SDK = "^0.5.8";
 const MYSQL2_SDK = "^3.9.0";
 const PLANETSCALE_SDK = "^1.19.0";
 const TIDBCLOUD_SDK = "^0.1.0";
-/** Email peer SDK pin (keep in line with the optional `nodemailer` peer of @storyshelf/core). */
+/** Email peer SDK pin, installed only for SMTP (the optional `nodemailer` peer of @storyshelf/core). */
 const NODEMAILER_SDK = "^10.0.12";
 
 const DB_PACKAGE: Record<DatabaseChoice, string> = {
@@ -77,24 +75,24 @@ function ownPackages(names: readonly string[]): Record<string, string> {
   return Object.fromEntries(names.map((name) => [name, version]));
 }
 
-/** The app, the database package and, with observability, the packages it adds. */
+/** The app, the database package and, with observability or SMTP, the packages those add. */
 function coreNames(answers: Answers): string[] {
   const names = ["@storyshelf/app", DB_PACKAGE[answers.database]];
-  return wantsObservability(answers)
-    ? [...names, "@storyshelf/core", "@storyshelf/observability"]
-    : names;
+  const withCore = wantsObservability(answers) || wantsNotifications(answers);
+  return [
+    ...names,
+    ...(withCore ? ["@storyshelf/core"] : []),
+    ...(wantsObservability(answers) ? ["@storyshelf/observability"] : []),
+  ];
 }
 
-/** The storage, runner, auth, git, design and notification packages the answers ask for. */
+/** The storage, runner and auth packages the answers ask for (integrations are built in). */
 function featureNames(answers: Answers): string[] {
   const auth = AUTH_PACKAGE[answers.auth];
   return [
     ...(answers.storage === "local" ? [] : [STORAGE_PACKAGE[answers.storage]]),
     "@storyshelf/runner-playwright",
     ...(auth === null ? [] : [auth]),
-    ...(wantsGit(answers) ? ["@storyshelf/notify-git"] : []),
-    ...(wantsDesign(answers) ? ["@storyshelf/design-figma"] : []),
-    ...(wantsNotifications(answers) ? ["@storyshelf/notify-chat", "@storyshelf/notify-email"] : []),
   ];
 }
 

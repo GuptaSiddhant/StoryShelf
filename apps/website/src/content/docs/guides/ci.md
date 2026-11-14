@@ -70,7 +70,7 @@ Changes in the package and in sibling workspace packages it imports both trigger
 
 StoryShelf posts commit statuses per project. To enable them:
 
-1. Register the git providers on the server: `notifications: { notifiers: gitNotifiers }` (see [@storyshelf/notify-git](/packages/notify-git/)).
+1. Nothing to register: the git providers are built in and stay idle until a project adds a git channel (see [Notifications](/guides/notifications/#git-channels-commit-statuses-and-check-runs)).
 2. In the project's **Settings → Notifications**, add a git channel: pick the provider, enter the repository, a status prefix and a token.
 3. Mark StoryShelf's status check (`storyshelf/testing` by default) as a required check in your branch protection so PRs can't merge until visual review is approved.
 
