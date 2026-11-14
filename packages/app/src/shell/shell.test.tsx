@@ -105,16 +105,16 @@ describe("sidebar groups", () => {
 });
 
 describe("brand mark", () => {
-  it("links the bundled mark as the favicon", async () => {
+  it("links the bundled bare mark as the favicon", async () => {
     const html = await page("/projects");
     expect(html).toContain(
-      `<link rel="icon" type="image/svg+xml" href="${assetManifest.mark.href}"/>`,
+      `<link rel="icon" type="image/svg+xml" href="${assetManifest.favicon.href}"/>`,
     );
   });
 
   it("keeps the enforced favicon even when ui.favicon is supplied", async () => {
     const html = await page("/projects", undefined, { favicon: "https://acme.test/brand.ico" });
-    expect(html).toContain(`href="${assetManifest.mark.href}"`);
+    expect(html).toContain(`href="${assetManifest.favicon.href}"`);
     expect(html).not.toContain("brand.ico");
   });
 
@@ -127,6 +127,13 @@ describe("brand mark", () => {
     const html = await page("/projects", undefined, { logo: "https://acme.test/logo.svg" });
     expect(html).toContain('src="https://acme.test/logo.svg"');
     expect(html).not.toContain(`<img class="sidebar__logo" src="${assetManifest.mark.href}"`);
+  });
+
+  it("keeps the enforced favicon when ui.logo is overridden", async () => {
+    const html = await page("/projects", undefined, { logo: "https://acme.test/logo.svg" });
+    expect(html).toContain(
+      `<link rel="icon" type="image/svg+xml" href="${assetManifest.favicon.href}"/>`,
+    );
   });
 });
 

@@ -41,7 +41,11 @@ export default defineConfig({
     starlight({
       title: "StoryShelf",
       description: "An open-source, self-hosted alternative to Chromatic.",
-      logo: { src: "./src/assets/logo.svg", alt: "" },
+      logo: {
+        light: "./src/assets/brand/mark-light.svg",
+        dark: "./src/assets/brand/mark-dark.svg",
+        alt: "",
+      },
       components: {
         Hero: "./src/components/overrides/Hero.astro",
         SocialIcons: "./src/components/overrides/SocialIcons.astro",

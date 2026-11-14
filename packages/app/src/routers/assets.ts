@@ -34,9 +34,9 @@ function serveHashed(c: Context, asset: Asset, requestedHash: string): Response 
   });
 }
 
-/** Register the static-asset routes (HTMX bundle, shell script, icon sprite and mark). */
+/** Register the static-asset routes (HTMX bundle, shell script, icon sprite, mark and favicon). */
 export function registerAssets(app: ShelfRouter): void {
-  const { client, htmx, icons, mark } = assetManifest;
+  const { client, favicon, htmx, icons, mark } = assetManifest;
   app.get(String.raw`/assets/:file{htmx-[a-f0-9]+\.js}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^htmx-|\.js$/gu, "");
     return serveHashed(c, { ...htmx, contentType: "application/javascript" }, hash);
@@ -52,6 +52,10 @@ export function registerAssets(app: ShelfRouter): void {
   app.get(String.raw`/assets/:file{mark-[a-f0-9]+\.svg}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^mark-|\.svg$/gu, "");
     return serveHashed(c, { ...mark, contentType: "image/svg+xml" }, hash);
+  });
+  app.get(String.raw`/assets/:file{favicon-[a-f0-9]+\.svg}`, (c) => {
+    const hash = (c.req.param("file") ?? "").replaceAll(/^favicon-|\.svg$/gu, "");
+    return serveHashed(c, { ...favicon, contentType: "image/svg+xml" }, hash);
   });
   // Legacy unversioned URL: kept for old pages and external embeds, but
   // revalidated (never immutable) because its content can change.
