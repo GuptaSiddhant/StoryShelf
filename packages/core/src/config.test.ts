@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTrustProxy, validateConfig } from "./config.ts";
+import { maxOfflineDaysOf, parseTrustProxy, validateConfig } from "./config.ts";
 
 describe("validateConfig", () => {
   it("accepts the serverTiming opt-in", () => {
@@ -30,6 +30,17 @@ describe("validateConfig", () => {
       );
     }
     expect(() => validateConfig({ captureAssets: { headers: {} } })).toThrow("Invalid ShelfConfig");
+  });
+
+  it("validates offline.maxOfflineDays: a positive whole number of days, default 30", () => {
+    expect(maxOfflineDaysOf(validateConfig({}))).toBe(30);
+    expect(maxOfflineDaysOf(validateConfig({ offline: { maxOfflineDays: 7 } }))).toBe(7);
+    for (const bad of [0, -1, 1.5, 366, "7"]) {
+      expect(() => validateConfig({ offline: { maxOfflineDays: bad } })).toThrow(
+        "Invalid ShelfConfig",
+      );
+    }
+    expect(() => validateConfig({ offline: { cache: true } })).toThrow("Invalid ShelfConfig");
   });
 
   it("rejects non-boolean serverTiming", () => {
