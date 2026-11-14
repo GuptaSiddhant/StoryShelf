@@ -68,6 +68,7 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "GET /.well-known/openid-configuration": "hosting",
   "GET /.well-known/change-password": "hosting",
   "GET /profile": "hosting",
+  "GET /profile/offline": "hosting",
   "POST /profile": "hosting",
   "POST /profile/password": "hosting",
   "POST /profile/sessions/revoke": "hosting",
