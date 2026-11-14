@@ -59,9 +59,6 @@ function sandboxOf(shared: Shared, listeners: Map<string, Listener>): Record<str
     Uint8Array,
     indexedDB: fakeIndexedDb(shared.idb),
     caches: fakeCaches(shared.caches),
-    navigator: {
-      storage: { persist: () => Promise.resolve(true), persisted: () => Promise.resolve(false) },
-    },
   };
 }
 

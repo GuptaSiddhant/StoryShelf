@@ -2,7 +2,9 @@
  * The worker's sync and message API (ADR 0048, decision 3), as a script fragment. It asks
  * `GET /api/v1/offline` about the kept projects, downloads only the content hashes the device lacks,
  * refuses what would pass the cap, drops projects the answer leaves out and deletes hashes no kept
- * project refers to. Nothing is ever evicted silently.
+ * project refers to. Nothing is ever evicted silently. A refused update leaves the kept copy and its
+ * sync time alone. `navigator.storage.persist()` is Window-only, so the page asks for persistence
+ * before it sends `keep`.
  */
 export const SYNC_SCRIPT = `
 var chain=Promise.resolve();
@@ -56,11 +58,18 @@ function downloadAll(project,files,missing){
   var firstPath={};
   Object.keys(files).forEach(function(path){ if(!firstPath[files[path]]){ firstPath[files[path]]=path; } });
   var queue=missing.slice();
+  var failed=false;
+  var reason=null;
   function lane(){
-    var hash=queue.pop();
-    return hash===undefined?Promise.resolve():download(project,firstPath[hash],hash).then(lane);
+    var hash=failed?undefined:queue.pop();
+    if(hash===undefined){ return Promise.resolve(); }
+    return download(project,firstPath[hash],hash).then(lane,function(error){
+      if(!failed){ failed=true; reason=error; }
+    });
   }
-  return Promise.all([lane(),lane(),lane(),lane(),lane(),lane()]);
+  return Promise.all([lane(),lane(),lane(),lane(),lane(),lane()]).then(function(){
+    if(failed){ throw reason; }
+  });
 }
 function applyProject(state,project){
   var old=state.projects[project.slug];
@@ -72,7 +81,6 @@ function applyProject(state,project){
   return missingHashes(sizes).then(function(missing){
     var adds=missing.length>0||!old||old.buildId!==project.buildId;
     if(adds&&projected>state.capBytes){
-      if(old){ old.syncedAt=new Date().toISOString(); old.maxOfflineDays=project.maxOfflineDays; }
       return {ok:false,error:'cap',size:projected-unionBytes(others),capBytes:state.capBytes};
     }
     return downloadAll(project,files,missing).then(function(){
@@ -115,30 +123,22 @@ function settle(state,ask,projects,extra){
 function usage(){
   return loadState().then(function(state){
     var now=Date.now();
-    var persisted=navigator.storage&&navigator.storage.persisted?navigator.storage.persisted():false;
-    return Promise.resolve(persisted).catch(function(){ return false; }).then(function(kept){
-      return {
-        usedBytes:usedBytes(state),capBytes:state.capBytes,persisted:kept===true,
-        projects:Object.keys(state.projects).sort().map(function(slug){
-          var project=state.projects[slug];
-          return {
-            slug:slug,name:project.name,commit:project.commit,buildId:project.buildId,
-            size:unionBytes([project.sizes]),syncedAt:project.syncedAt,
-            expired:isExpired(project,now)
-          };
-        })
-      };
-    });
+    return {
+      usedBytes:usedBytes(state),capBytes:state.capBytes,
+      projects:Object.keys(state.projects).sort().map(function(slug){
+        var project=state.projects[slug];
+        return {
+          slug:slug,name:project.name,commit:project.commit,buildId:project.buildId,
+          size:unionBytes([project.sizes]),syncedAt:project.syncedAt,
+          expired:isExpired(project,now)
+        };
+      })
+    };
   });
-}
-function askPersist(){
-  try{ if(navigator.storage&&navigator.storage.persist){ navigator.storage.persist().catch(function(){}); } }
-  catch(error){}
 }
 function keepProject(slug){
   return loadState().then(function(state){
     if(!state.projects[slug]&&Object.keys(state.projects).length>=MAX_KEPT){ return {ok:false,error:'limit'}; }
-    askPersist();
     return exclusive(function(){ return runSync(slug); }).then(function(sync){
       if(!sync.ok){ return sync; }
       return sync.results[slug]||{ok:false,error:'unavailable'};

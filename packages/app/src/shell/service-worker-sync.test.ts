@@ -135,8 +135,25 @@ describe("cap", () => {
     await worker.send({ type: "set-cap", bytes: 30 });
     await worker.send({ type: "keep", slug: "a" });
     worker.server.builds.set("a", build({ buildId: "b2", files: { "big.js": "y".repeat(100) } }));
+    const before = (await worker.send({ type: "usage" }))?.usage.projects[0];
     await worker.send({ type: "sync" });
     expect(await (await worker.fetch("/offline/a/")).text()).toContain("one");
+    expect((await worker.send({ type: "usage" }))?.usage.projects[0]).toEqual(before);
+  });
+
+  it("waits for every download lane and stops scheduling after a failure", async () => {
+    const worker = loadWorker();
+    const files = Object.fromEntries(
+      Array.from({ length: 30 }, (_, i) => [`f${i}.js`, `file ${i}`]),
+    );
+    worker.server.builds.set("a", build({ files }));
+    worker.server.corrupt = true;
+    expect(await worker.send({ type: "keep", slug: "a" })).toMatchObject({ error: "download" });
+    expect(worker.server.downloads.length).toBeLessThanOrEqual(6);
+    const settled = worker.server.downloads.length;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(worker.server.downloads).toHaveLength(settled);
+    expect(worker.caches.get("storyshelf-offline-content-v1")?.size ?? 0).toBe(0);
   });
 
   it("rejects an invalid cap and unknown messages", async () => {
