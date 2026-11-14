@@ -1,3 +1,4 @@
+import type { BuildStateSource } from "../../adapters/notifier/build-state.ts";
 /**
  * Delivering a build's state to git channels: read the build now, compute what each channel shows
  * ({@link statusesForBuild}), write it. Reading at delivery time is what makes a retried, delayed
@@ -71,6 +72,7 @@ export async function writeTo(
     urls: createUrlBuilder(origin, contentHostSuffix(deps.config)),
     flags: deps.flags(project),
     publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
+    source: (await skipSourceOf(deps, build)) ?? undefined,
     approvals: await approvalsOf(deps, build, project),
     changes: await changesOf(deps, build, project),
     supersededBy: await supersededByOf(deps, build),
@@ -93,6 +95,23 @@ export async function writeTo(
 export type ChannelDeps = Pick<BuildStateDeps, "db" | "notifiers" | "secret"> & {
   logger?: BuildStateDeps["logger"] | undefined;
 };
+
+/**
+ * For a `skipped` build, the build it repeats as it is now, with whether its Storybook is available
+ * (ADR 0044, decision 5); null for any other build, and for a skipped one whose source is gone.
+ */
+async function skipSourceOf(deps: BuildStateDeps, build: Build): Promise<BuildStateSource | null> {
+  const source =
+    build.status === "skipped" ? await new BuildModel(deps.db).skipSourceOf(build) : null;
+  if (source === null) return null;
+  const publishing = await publishingOfBuild({ db: deps.db, storage: deps.storage }, source);
+  return {
+    id: source.id,
+    gitSha: source.gitSha,
+    status: source.status,
+    available: publishing === "success",
+  };
+}
 
 /** The project's enabled channels with a wired `state` provider; unreadable secrets are logged and skipped. */
 export async function stateTargets(deps: ChannelDeps, projectId: string): Promise<StateTarget[]> {

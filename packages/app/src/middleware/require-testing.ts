@@ -27,28 +27,20 @@ export function requireTesting(enabled: boolean) {
   };
 }
 
-/** How many segments of a route pattern are a parameter or a wildcard: fewer is more specific. */
-function openSegments(path: string): number {
-  return path.split("/").filter((segment) => segment.startsWith(":") || segment.startsWith("*"))
-    .length;
-}
-
 /**
- * The class of the most specific classified route Hono matched (middleware matches carry no
- * class): the fewest parameter and wildcard segments, the later registration on a tie. A literal
- * route (`/builds/in-flight`) therefore wins over the parameter route (`/builds/:buildId`) that
- * also matches its path.
+ * The first matched handler that the table classifies (middleware matches carry no class, so they
+ * are skipped). Hono answers with the first registered handler that matches, so when a static route
+ * and a parameter route overlap (`builds/skip-source` and `builds/:buildId`) the first one is the
+ * route that runs, and its class is the one that counts.
  */
 export function matchedRouteClass(c: Context): RouteClass | undefined {
-  let best: { routeClass: RouteClass; open: number } | undefined;
   for (const route of matchedRoutes(c)) {
     const routeClass = classOfRoute(route.method, route.path);
-    const open = openSegments(route.path);
-    if (routeClass !== undefined && (best === undefined || open <= best.open)) {
-      best = { routeClass, open };
+    if (routeClass !== undefined) {
+      return routeClass;
     }
   }
-  return best?.routeClass;
+  return undefined;
 }
 
 function isTestingRoute(c: Context): boolean {

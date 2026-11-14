@@ -24,6 +24,8 @@ export interface StoreScopeDeps {
   logger: Logger;
   authEnabled: boolean;
   testing: boolean;
+  /** `options.skippedBuilds` is on (ADR 0044). */
+  skippedBuilds?: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
   /** This instance runs the capture jobs itself (the retry and compute-jobs UI applies). */
@@ -57,6 +59,7 @@ export function storeScope(deps: StoreScopeDeps) {
         user,
         authEnabled: deps.authEnabled,
         testing: deps.testing,
+        skippedBuilds: deps.skippedBuilds === true,
         sessionId: sessionIdFrom(c),
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,

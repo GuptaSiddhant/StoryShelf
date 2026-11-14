@@ -291,6 +291,10 @@ export function statusLabel(status: string): string {
 
 /** Map a build or snapshot status string to its badge tone: settled states are quiet. */
 export function statusTone(status: string): BadgeTone {
+  // A skipped build is routine, neither good news nor a problem (ADR 0044).
+  if (status === "skipped") {
+    return "neutral";
+  }
   if (isSuccessStatus(status)) {
     return "quiet";
   }
@@ -300,10 +304,7 @@ export function statusTone(status: string): BadgeTone {
   if (isWarningStatus(status)) {
     return "warning";
   }
-  if (isInfoStatus(status)) {
-    return "info";
-  }
-  return "neutral";
+  return isInfoStatus(status) ? "info" : "neutral";
 }
 
 function isSuccessStatus(status: string): boolean {
