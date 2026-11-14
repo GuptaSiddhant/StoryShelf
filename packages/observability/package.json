@@ -59,12 +59,14 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hono/otel": "catalog:",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-node": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
-    "@storyshelf/core": "workspace:*"
+    "@storyshelf/core": "workspace:*",
+    "hono": "catalog:"
   },
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "catalog:",

@@ -1,8 +1,40 @@
+import { context, propagation, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import {
+  BasicTracerProvider,
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import { Hono } from "hono";
 import { requestId } from "hono/request-id";
 import { afterEach, describe, expect, it } from "vitest";
-import { createHttpMiddleware } from "./http-middleware.ts";
-import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
+import { createHttpMiddleware } from "./http-telemetry.ts";
+
+interface TestTelemetry {
+  exporter: InMemorySpanExporter;
+  cleanup(): Promise<void>;
+}
+
+/** Register an in-memory tracer provider and ALS context manager globally. */
+function installTestTelemetry(): TestTelemetry {
+  const exporter = new InMemorySpanExporter();
+  const provider = new BasicTracerProvider({
+    spanProcessors: [new SimpleSpanProcessor(exporter)],
+  });
+  trace.setGlobalTracerProvider(provider);
+  propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+  return {
+    exporter,
+    cleanup: async (): Promise<void> => {
+      await provider.shutdown();
+      context.disable();
+      propagation.disable();
+      trace.disable();
+    },
+  };
+}
 
 describe("createHttpMiddleware", () => {
   let telemetry: TestTelemetry | undefined;
