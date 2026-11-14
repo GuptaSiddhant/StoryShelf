@@ -11,6 +11,8 @@
  * - `LIVE_GH_TOKEN` — PAT with `repo:status` on the test repo
  * - `LIVE_GH_OWNER` / `LIVE_GH_REPO` — test repo coordinates
  * - `LIVE_GH_SHA` — commit SHA on the test repo to status.
+ * - `LIVE_GH_BRANCH` (optional) — a branch that contains `LIVE_GH_SHA`; the default-branch check
+ *   (#910) runs only when it is set.
  */
 import { describe, expect, it } from "vitest";
 import { gitHubNotifier } from "./index.ts";
@@ -86,4 +88,17 @@ describe.skipIf(!LIVE)("github live (real api.github.com, gated on LIVE_CLOUD=1)
 
     expect(adapter.metadata.kind).toBe("github");
   }, 60000);
+
+  it.skipIf(process.env["LIVE_GH_BRANCH"] === undefined)(
+    "confirms the test SHA is on LIVE_GH_BRANCH",
+    async () => {
+      const adapter = gitHubNotifier.create({
+        config: { owner: liveOwner(), repo: liveRepo() },
+        secret: liveToken(),
+      });
+      const branch = process.env["LIVE_GH_BRANCH"] ?? "";
+      expect(await adapter.commitOnBranch?.({ sha: liveSha(), branch })).toBe(true);
+    },
+    60000,
+  );
 });

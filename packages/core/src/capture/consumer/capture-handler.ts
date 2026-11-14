@@ -192,6 +192,7 @@ export function captureDispatchDeps(
     logger: options.logger,
     secret: options.secret,
     design: options.design,
+    notifiers: options.notifiers,
     publicOrigin,
     shardSize: options.shardSize,
     enqueue: options.enqueue,
