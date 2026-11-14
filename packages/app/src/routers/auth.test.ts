@@ -239,6 +239,7 @@ describe("engine auth routes", () => {
       },
     });
     expect(logout.status).not.toBe(500);
+    expect(logout.headers.get("clear-site-data")).toBe('"cache", "storage"');
 
     const profile = await app.request("/profile", { headers: { cookie } });
     expect(profile.status).toBe(302);

@@ -1,6 +1,8 @@
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { assetManifest } from "../asset-manifest.ts";
+import { registerManifest } from "./manifest.ts";
+import { registerServiceWorker } from "./service-worker.ts";
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
@@ -34,9 +36,11 @@ function serveHashed(c: Context, asset: Asset, requestedHash: string): Response 
   });
 }
 
-/** Register the static-asset routes (HTMX bundle, shell script, icon sprite and mark). */
+/** Register the static-asset routes and the web app manifest (HTMX bundle, shell script, icon sprite and mark). */
 export function registerAssets(app: ShelfRouter): void {
-  const { client, htmx, icons, mark } = assetManifest;
+  registerManifest(app);
+  registerServiceWorker(app);
+  const { client, htmx, icons, mark, maskable } = assetManifest;
   app.get(String.raw`/assets/:file{htmx-[a-f0-9]+\.js}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^htmx-|\.js$/gu, "");
     return serveHashed(c, { ...htmx, contentType: "application/javascript" }, hash);
@@ -48,6 +52,10 @@ export function registerAssets(app: ShelfRouter): void {
   app.get(String.raw`/assets/:file{icons-[a-f0-9]+\.svg}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^icons-|\.svg$/gu, "");
     return serveHashed(c, { ...icons, contentType: "image/svg+xml" }, hash);
+  });
+  app.get(String.raw`/assets/:file{mark-maskable-[a-f0-9]+\.svg}`, (c) => {
+    const hash = (c.req.param("file") ?? "").replaceAll(/^mark-maskable-|\.svg$/gu, "");
+    return serveHashed(c, { ...maskable, contentType: "image/svg+xml" }, hash);
   });
   app.get(String.raw`/assets/:file{mark-[a-f0-9]+\.svg}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^mark-|\.svg$/gu, "");

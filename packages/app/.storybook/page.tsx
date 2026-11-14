@@ -1,5 +1,6 @@
 import type { StoryObj } from "@storybook/html-vite";
 import { markSource } from "../src/assets/mark.ts";
+import { SERVICE_WORKER_REGISTRATION } from "../src/shell/boot-script.ts";
 import { clientScript } from "../src/shell/client-script.ts";
 import type { Store } from "../src/store.ts";
 import type { StoryDataset } from "../src/stories-fixtures/database.ts";
@@ -42,6 +43,7 @@ const markDataUri = `data:image/svg+xml,${encodeURIComponent(markSource)}`;
 export function standalonePage(html: string, theme: string): string {
   return html
     .replaceAll(/<script\b[^>]*\bsrc=[^>]*><\/script>/gu, "")
+    .replaceAll(SERVICE_WORKER_REGISTRATION, "")
     .replaceAll(/<link\b[^>]*\brel="icon"[^>]*>/gu, "")
     .replaceAll("/assets/mark-storybook.svg", markDataUri)
     .replaceAll(

@@ -2,7 +2,9 @@ import type { Auth } from "@storyshelf/core/auth";
 import type { AuthUser } from "@storyshelf/core/types";
 import { STORYBOOK_READ_PREFIX, STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
+import { MANIFEST_PATH } from "../routers/manifest.ts";
 import { safeReturnPath } from "../routers/oauth-state.ts";
+import { SERVICE_WORKER_PATH } from "../routers/service-worker.ts";
 import { getStore } from "../store.ts";
 
 /** Resolve the request user from the auth adapter (null when auth is off or a token is used). */
@@ -59,6 +61,8 @@ export function authGate() {
       path.startsWith("/api/") ||
       path.startsWith("/auth/") ||
       path.startsWith("/assets/") ||
+      path === MANIFEST_PATH ||
+      path === SERVICE_WORKER_PATH ||
       path.startsWith(STORYBOOK_TOKEN_PREFIX) ||
       path.startsWith(STORYBOOK_READ_PREFIX) ||
       path.startsWith("/.well-known/") ||

@@ -117,6 +117,23 @@ export interface NotificationsConfig {
 /** Longest browser-private freshness a signed capture asset may be given, in seconds (1 hour). */
 export const MAX_CAPTURE_ASSET_CACHE_SECONDS = 3600;
 
+/** Default days a device may serve an offline Storybook after its last successful sync (ADR 0048). */
+export const DEFAULT_MAX_OFFLINE_DAYS = 30;
+
+/** Offline Storybooks (ADR 0048, decision 3). */
+export interface OfflineConfig {
+  /**
+   * Days a device keeps serving a kept Storybook after its last successful sync; the sync answer
+   * tells the worker. Default {@link DEFAULT_MAX_OFFLINE_DAYS}.
+   */
+  maxOfflineDays?: number;
+}
+
+/** The configured `offline.maxOfflineDays`, or the default. */
+export function maxOfflineDaysOf(config: { offline?: OfflineConfig }): number {
+  return config.offline?.maxOfflineDays ?? DEFAULT_MAX_OFFLINE_DAYS;
+}
+
 /** Signed Storybook asset serving for remote capture browsers (ADR 0007, decision 5). */
 export interface CaptureAssetsConfig {
   /**
@@ -224,6 +241,8 @@ export interface ShelfConfig {
   publishedCompression?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;
+  /** Offline Storybooks on installed devices (ADR 0048); see {@link OfflineConfig}. */
+  offline?: OfflineConfig;
   /**
    * Largest zip (bytes) extracted inline in the upload request; a larger zip is published by a
    * `publish` job (or refused with 413 on a host that runs no consumer). The count is taken
@@ -384,6 +403,10 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
       .object({
         cacheMaxAgeSeconds: z.number().int().min(0).max(MAX_CAPTURE_ASSET_CACHE_SECONDS).optional(),
       })
+      .strict()
+      .optional(),
+    offline: z
+      .object({ maxOfflineDays: z.number().int().positive().max(365).optional() })
       .strict()
       .optional(),
     maxInlineUnzipSize: z.number().int().min(0).optional(),

@@ -720,6 +720,57 @@
         },
         "required": ["build", "stories"]
       },
+      "OfflineSync": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "buildId": {
+                  "type": "string"
+                },
+                "commit": {
+                  "type": "string"
+                },
+                "entries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string",
+                        "description": "Content hash of the file"
+                      },
+                      "size": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Bytes"
+                      }
+                    },
+                    "required": ["path", "hash", "size"]
+                  }
+                },
+                "maxOfflineDays": {
+                  "type": "integer"
+                }
+              },
+              "required": ["slug", "name", "buildId", "commit", "entries", "maxOfflineDays"]
+            }
+          }
+        },
+        "required": ["projects"]
+      },
       "Comment": {
         "type": "object",
         "properties": {
@@ -3327,6 +3378,38 @@
           }
         },
         "x-storyshelf-class": "testing"
+      }
+    },
+    "/api/v1/offline": {
+      "get": {
+        "tags": ["Builds"],
+        "summary": "Offline sync of default-branch Storybooks",
+        "description": "For each requested project the caller may read, the latest published build on its default branch with its file manifest (ADR 0048). A project that is unknown, hidden or has no such build is left out. Answers `Cache-Control: private, no-store`. At most 100 slugs.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated project slugs"
+            },
+            "required": true,
+            "description": "Comma-separated project slugs",
+            "name": "projects",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The projects that can be kept offline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfflineSync"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "hosting"
       }
     },
     "/api/v1/projects/{slug}/builds/{buildId}/comments": {
