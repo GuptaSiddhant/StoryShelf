@@ -1,14 +1,14 @@
 import { SpanStatusCode } from "@opentelemetry/api";
+import type { SQL, Table } from "drizzle-orm";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   BuildReferenceLifecycle,
   DatabaseAdapter,
   Tables,
   TxStore,
-} from "@storyshelf/core/adapter/database";
-import type { Logger } from "@storyshelf/core/logger";
-import type { SQL, Table } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+} from "../adapters/database.ts";
+import type { Logger } from "../logger.ts";
 import { createInstrumentedDatabase } from "./instrument-db.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 

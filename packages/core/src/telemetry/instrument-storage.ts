@@ -1,3 +1,5 @@
+import type { Buffer } from "node:buffer";
+import type { Readable } from "node:stream";
 /**
  * Storage adapter wrapper: one span + duration metric per operation.
  *
@@ -6,13 +8,11 @@
  * out of metric attributes). Identity, lifecycle, and logger delegate
  * straight through.
  */
-import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import type { Logger } from "@storyshelf/core/logger";
-import { addTiming } from "@storyshelf/core/utils";
-import type { Buffer } from "node:buffer";
-import type { Readable } from "node:stream";
+import type { StorageAdapter } from "../adapters/storage.ts";
+import type { Logger } from "../logger.ts";
+import { addTiming } from "../utils/index.ts";
 import { storageMetrics } from "./metrics.ts";
-import { withSpan } from "./tracing.ts";
+import { withSpan } from "./span.ts";
 
 /**
  * Wrap a storage adapter with per-operation spans and metrics.

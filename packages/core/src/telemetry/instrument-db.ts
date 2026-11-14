@@ -1,3 +1,4 @@
+import { getTableName, type SQL, type Table } from "drizzle-orm";
 /**
  * Database adapter wrapper: one span + duration metric per operation.
  *
@@ -6,17 +7,11 @@
  * host-bound logger delegate straight through, so health/setup behave
  * identically with or without observability.
  */
-import type {
-  DatabaseAdapter,
-  ListOptions,
-  Tables,
-  TxStore,
-} from "@storyshelf/core/adapter/database";
-import type { Logger } from "@storyshelf/core/logger";
-import { addTiming } from "@storyshelf/core/utils";
-import { getTableName, type SQL, type Table } from "drizzle-orm";
+import type { DatabaseAdapter, ListOptions, Tables, TxStore } from "../adapters/database.ts";
+import type { Logger } from "../logger.ts";
+import { addTiming } from "../utils/index.ts";
 import { dbMetrics } from "./metrics.ts";
-import { withSpan } from "./tracing.ts";
+import { withSpan } from "./span.ts";
 
 /**
  * Wrap a database adapter with per-operation spans and metrics.

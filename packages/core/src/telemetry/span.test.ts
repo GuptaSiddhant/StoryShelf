@@ -1,8 +1,8 @@
 import { SpanStatusCode } from "@opentelemetry/api";
-import { HttpError } from "@storyshelf/core/utils";
 import { afterEach, describe, expect, it } from "vitest";
+import { HttpError } from "../utils/index.ts";
+import { withSpan } from "./span.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
-import { withSpan } from "./tracing.ts";
 
 describe("withSpan", () => {
   let telemetry: TestTelemetry | undefined;

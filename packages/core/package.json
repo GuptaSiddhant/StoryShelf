@@ -138,6 +138,10 @@
       "source": "./src/schema/index.ts",
       "default": "./dist/schema.mjs"
     },
+    "./telemetry": {
+      "source": "./src/telemetry/index.ts",
+      "default": "./dist/telemetry.mjs"
+    },
     "./test-helpers": {
       "source": "./src/test-helpers/index.ts",
       "default": "./dist/test-helpers.mjs"
@@ -185,6 +189,7 @@
       "./paths": "./dist/paths.mjs",
       "./retention": "./dist/retention.mjs",
       "./schema": "./dist/schema.mjs",
+      "./telemetry": "./dist/telemetry.mjs",
       "./test-helpers": "./dist/test-helpers.mjs",
       "./types": "./dist/types.mjs",
       "./urls": "./dist/urls.mjs",
@@ -207,6 +212,7 @@
     "bench": "node --conditions=source bench/run.ts"
   },
   "dependencies": {
+    "@hono/otel": "catalog:",
     "@opentelemetry/api": "catalog:",
     "@storyshelf/affected": "workspace:*",
     "axe-core": "4.13.0",
@@ -218,6 +224,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
     "@types/jsdom": "^30.0.0",
     "@types/node": "catalog:",
     "@types/nodemailer": "^8.0.2",
@@ -225,6 +234,7 @@
     "@types/unzipper": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "^0.6.1",
+    "hono": "catalog:",
     "jsdom": "^30.0.1",
     "nodemailer": "^10.2.1",
     "oxfmt": "catalog:",
@@ -236,6 +246,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
+    "hono": "catalog:",
     "nodemailer": "^10.2.1",
     "sharp": ">=0.34.0"
   },
@@ -244,6 +255,9 @@
       "optional": true
     },
     "sharp": {
+      "optional": true
+    },
+    "hono": {
       "optional": true
     }
   },
