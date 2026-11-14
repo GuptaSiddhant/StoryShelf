@@ -26,16 +26,16 @@ versions together and reading the release notes. A runnable example is in `examp
 
 ## What it creates
 
-| Part     | Resources                                                                      |
-| -------- | ------------------------------------------------------------------------------ |
-| Network  | VPC with 2 public and 2 private subnets (or your own `vpc_id`), no NAT gateway |
-| Compute  | ECS cluster, one Fargate service of identical copies, ALB, CPU autoscaling     |
-| Database | RDS Postgres in private subnets, IAM authentication on (or your own URL)       |
-| Storage  | S3 bucket: private, versioned, encrypted                                       |
-| Identity | Cognito user pool, app client, optional SAML federation                        |
-| Secrets  | Secrets Manager: `SECRET`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                 |
-| DNS      | With `domain_name`: Route 53 zone, ACM certificate, HTTPS listener             |
-| Logs     | CloudWatch log group                                                           |
+| Part     | Resources                                                                       |
+| -------- | ------------------------------------------------------------------------------- |
+| Network  | VPC with 2 public and 2 private subnets (or your own `vpc_id`), no NAT gateway  |
+| Compute  | ECS cluster, one Fargate service of identical copies, ALB, CPU autoscaling      |
+| Database | RDS Postgres in private subnets, IAM authentication on (or your own URL)        |
+| Storage  | S3 bucket: private, versioned, encrypted                                        |
+| Identity | Cognito user pool, app client, optional SAML federation                         |
+| Secrets  | Secrets Manager: `SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET` |
+| DNS      | With `domain_name`: Route 53 zone, ACM certificate, HTTPS listener              |
+| Logs     | CloudWatch log group                                                            |
 
 Tasks run in the public subnets with a public IP (to pull the image and reach AWS APIs) and their
 security group admits only the ALB. The database is reachable from the task security group only.
@@ -69,9 +69,9 @@ security group admits only the ALB. The database is reachable from the task secu
 ## Outputs
 
 `url`, `alb_dns_name`, `s3_bucket`, `db_endpoint`, `db_master_secret_arn`, `db_iam_user`,
-`user_pool_id`, `app_client_id`, `cluster_name`, `service_name`, `task_role_arn`,
-`task_role_policy_json` and `execution_role_policy_json`. Secret outputs are ARNs (references),
-never values.
+`user_pool_id`, `app_client_id`, `cluster_name`, `service_name`, `admin_token_secret_arn`,
+`auth_password_secret_arn`, `oidc_client_secret_arn`, `task_role_arn`, `task_role_policy_json` and
+`execution_role_policy_json`. Secret outputs are ARNs (references), never values.
 
 ## Secrets
 
@@ -108,9 +108,13 @@ secret (`db_master_secret_arn`) from inside the VPC and run:
 GRANT rds_iam TO shelf;
 ```
 
-`shelf` is the master user the module creates (`db_iam_user`); with `rds_iam` granted it logs in
-with a token (the master password keeps working for you). Prefer a separate application user? Create
-it, grant `rds_iam` and the schema rights it needs, and change `local.database_user`.
+`shelf` is both the master user and the app user (`db_iam_user`). **Once `rds_iam` is granted, `shelf`
+can log in only with an IAM token: its password, including the master secret, stops working.** That
+locks you out of password login as well, so run the grant last, and to administer the database
+afterwards connect with a token too
+(`aws rds generate-db-auth-token`, from inside the VPC). Prefer a separate application user, so the
+master password stays usable? Create it, grant `rds_iam` and the schema rights it needs, and change
+`local.database_user`.
 
 With `existing_database_url_secret_arn` the module creates no database, adds no `rds-db:connect`
 permission and passes the URL as `DATABASE_URL`. The network path to that database is yours.
@@ -163,10 +167,12 @@ only (`execution_role_policy_json`).
   and `REMOTE_BROWSER_TOKEN`. The module builds no browser service.
 - **Scaling** is more identical copies between `min_instances` and `max_instances`, tracked on CPU.
   Per-copy limits (remote-browser connections, rate limits, the AI budget) are in the scaling docs.
-- **Shutdown.** On a deploy ECS sends SIGTERM and the app drains running captures for
-  `shutdown_grace_seconds` (`SHUTDOWN_GRACE_SECONDS`), then hands the rest back to the queue. The
-  ALB deregistration delay equals the grace and the ECS `stopTimeout` is the grace plus 10 seconds
-  (Fargate allows at most 120), so the task is never killed mid-drain.
+- **Shutdown.** On a deploy ECS sends SIGTERM and the app drains running captures, then hands the
+  rest back to the queue. The module sets `SHUTDOWN_GRACE_SECONDS`, the ALB deregistration delay
+  (equal to the grace) and the ECS `stopTimeout` (the grace plus 10 seconds; Fargate allows at most
+  120). **The product image does not read `SHUTDOWN_GRACE_SECONDS` yet** and drains for its own
+  built-in grace, so changing `shutdown_grace_seconds` moves the ALB and ECS timings but not the
+  app's drain time.
 
 ## Domain and TLS
 
@@ -189,13 +195,13 @@ database subnet group).
 
 ## Image contract
 
-The module passes these to the image. Every variable below is read by the image except the two
+The module passes these to the image. Every variable below is read by the image except those
 marked _not read_, which the image does not use yet.
 
 | Variable                                                     | Source                             | Status   |
 | ------------------------------------------------------------ | ---------------------------------- | -------- |
 | `AWS_BUCKET`, `AWS_REGION`, `PUBLIC_BASE_URL`, `TRUST_PROXY` | module                             | read     |
-| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | read     |
+| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | not read |
 | `SECRET`, `ADMIN_TOKEN`, `AUTH_PASSWORD`                     | Secrets Manager                    | read     |
 | `DATABASE_URL`                                               | `existing_database_url_secret_arn` | read     |
 | `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`             | the created RDS instance           | read     |
