@@ -11,7 +11,7 @@ import { typeDocGroups, typeDocPlugins } from "./typedoc-packages.mjs";
 const SITE = "https://storyshelf.js.org";
 const REPO = "https://github.com/GuptaSiddhant/StoryShelf";
 const OG_IMAGE = `${SITE}/og-image.png`;
-const OG_ALT = "StoryShelf: visual testing for Storybook, with the build review workspace";
+const OG_ALT = "StoryShelf: self-hosted visual testing and review for Storybook, shown with the build review workspace";
 
 /** A package's page, with its generated TypeScript API nested under it when it has one. */
 const packageItem = (slug) => {
