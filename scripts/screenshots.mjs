@@ -37,7 +37,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const websiteDir = join(root, "apps/website");
 const shotsDir = join(websiteDir, "src/assets/screenshots");
 const ogPath = join(websiteDir, "public/og-image.png");
-const logoPath = join(websiteDir, "src/assets/brand/tile.svg");
+const logoPath = join(websiteDir, "src/assets/brand/storyshelf-logo-white-purple-rounded.svg");
 mkdirSync(shotsDir, { recursive: true });
 
 // Mock "component screenshots" so the docs show a believable review, not blank images.
