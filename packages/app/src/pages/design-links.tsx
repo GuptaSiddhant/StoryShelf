@@ -59,7 +59,7 @@ export function DesignButtons(props: {
   /** Display name of the provider that owns a link. */
   providerName: (url: string) => string;
   previews?: ReadonlyMap<string, DesignPreviewInfo>;
-  /** Component page of the story, offered in the popover as `View component →`. */
+  /** Component page of the story, offered in the popover as `View in Library →`. */
   componentHref?: string;
   size?: "sm" | "md";
 }): Rendered {
@@ -77,7 +77,7 @@ export function DesignButtons(props: {
               Open in {name}
             </DropdownItem>
             {componentHref ? (
-              <DropdownItem href={componentHref}>View component →</DropdownItem>
+              <DropdownItem href={componentHref}>View in Library →</DropdownItem>
             ) : null}
           </Dropdown>
         ) : (

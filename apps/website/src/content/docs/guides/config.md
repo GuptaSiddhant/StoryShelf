@@ -121,9 +121,9 @@ createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, 
 
 ### Outbound URLs set by projects
 
-`config.outbound` controls the URLs project admins configure (webhooks, Slack and Teams, GitLab hosts). By default they must be `https` and resolve only to public addresses.
+`config.outbound` controls the URLs project admins configure (webhooks, Slack and Teams, GitLab hosts and the GitHub Enterprise Server API base). By default they must be `https` and resolve only to public addresses.
 
-- `allowHosts` (array of exact hostnames, no wildcards) lets those hosts resolve to private addresses and use plain `http`, for example `["gitlab.internal.example"]`.
+- `allowHosts` (array of exact hostnames, no wildcards) lets those hosts resolve to private addresses and use plain `http`, for example `["gitlab.internal.example", "ghes.internal.example"]`. This is the setting to change when a project admin sees "URL refused" for a self-hosted git host on a private network.
 - `allowHttp` (boolean, default `false`) allows plain `http` for any host. Use it for local development only; it does not lift the address check.
 
 See [Security](/guides/security/#urls-that-projects-set).

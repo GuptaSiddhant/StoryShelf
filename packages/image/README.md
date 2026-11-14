@@ -1,5 +1,9 @@
 # @storyshelf/image
 
+> **Deprecated.** The image engine is part of `@storyshelf/core` and is imported from
+> `@storyshelf/core/diff`. This package is a thin re-export for one minor release and is then no
+> longer published (ADR 0049). `sharp` is now an optional peer of `@storyshelf/core`.
+
 StoryShelf's image engine: pixel diffing (pixelmatch), diff overlay rendering and thumbnails, run on a
 worker-thread pool.
 
@@ -36,7 +40,7 @@ import {
   type DiffOptions,
   type DiffResult,
   type ImageEngine,
-} from "@storyshelf/image";
+} from "@storyshelf/core/diff";
 ```
 
 `configureImages` is process-wide. The option beats `STORYSHELF_IMAGE_ENGINE`, and an unknown engine name throws.

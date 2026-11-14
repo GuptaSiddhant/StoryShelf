@@ -1,6 +1,6 @@
+import { createFigmaDesign } from "@storyshelf/core/integrations";
 import { CommentModel, PackageUsageModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -195,12 +195,12 @@ describe("component page", () => {
     const library = await (await get(app, "/projects/app/library")).text();
     expect(library).toContain('href="/projects/app/components/src/Button.stories.tsx"');
     const review = await (await get(app, "/projects/app/builds/b2/diff?snapshot=s5")).text();
-    expect(review).toContain("View component");
+    expect(review).toContain("View in Library");
     // Links from a build or review page carry that build's id.
     expect(review).toContain(
       "/projects/app/components/src/Button.stories.tsx?build=b2#button--primary",
     );
-    const card = await (await get(app, "/projects/app/builds/b2")).text();
+    const card = await (await get(app, "/projects/app/builds/b2/diff")).text();
     expect(card).toContain(
       "/projects/app/components/src/Button.stories.tsx?build=b2#button--primary",
     );

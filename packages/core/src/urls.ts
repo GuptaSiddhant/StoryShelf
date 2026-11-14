@@ -35,6 +35,7 @@ export interface UrlBuilder {
   project(slug: string): string;
   projectsNew(): string;
   buildsList(slug: string): string;
+  /** The one build page (overview and review). `GET /projects/:slug/builds/:id` still redirects to it for old links. */
   build(slug: string, buildId: string): string;
   buildDiff(slug: string, buildId: string): string;
   /** Review page of one snapshot: the build's diff page with that snapshot selected. */
@@ -50,7 +51,10 @@ export interface UrlBuilder {
   storybook(slug: string): string;
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
+  /** The project settings page on its first tab (General). */
   settings(slug: string): string;
+  /** One tab of the project settings: `general`, `capture`, `review`, `access` or `insights`. */
+  settingsTab(slug: string, tab: string): string;
   short(id: string): string;
 }
 
@@ -78,7 +82,7 @@ export function createUrlBuilder(baseUrl: string, contentHosts?: string): UrlBui
     project: (slug) => `${root}/projects/${slug}`,
     projectsNew: () => `${root}/projects/new`,
     buildsList: (slug) => `${root}/projects/${slug}/builds`,
-    build: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}`,
+    build: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff`,
     buildDiff: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff`,
     snapshot: (slug, buildId, snapshotId) =>
       `${root}/projects/${slug}/builds/${buildId}/diff?snapshot=${encodeURIComponent(snapshotId)}`,
@@ -109,7 +113,8 @@ export function createUrlBuilder(baseUrl: string, contentHosts?: string): UrlBui
       contentHosts
         ? `${scheme}${contentHostLabel(buildId)}.${contentHosts}`
         : `${root}/projects/${slug}/storybook/build/${buildId}`,
-    settings: (slug) => `${root}/projects/${slug}/settings`,
+    settings: (slug) => `${root}/projects/${slug}/settings/general`,
+    settingsTab: (slug, tab) => `${root}/projects/${slug}/settings/${tab}`,
     short: (id) => `${root}/_/${id}/`,
   };
 }

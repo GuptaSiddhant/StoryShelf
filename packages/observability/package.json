@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/observability",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "StoryShelf observability: OpenTelemetry tracing, metrics, and log correlation over @storyshelf/core adapters.",
   "keywords": [
     "metrics",
@@ -66,7 +66,6 @@
     "@opentelemetry/sdk-node": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
     "@storyshelf/core": "workspace:*",
-    "drizzle-orm": "catalog:",
     "hono": "catalog:"
   },
   "devDependencies": {

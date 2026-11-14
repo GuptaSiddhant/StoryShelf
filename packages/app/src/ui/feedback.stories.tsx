@@ -10,13 +10,14 @@ import {
   Meta as MetaText,
   Stat,
   VStack,
+  statusLabel,
   statusTone,
 } from "./components.tsx";
 
 const meta: Meta = { title: "UI/Feedback" };
 export default meta;
 
-const tones = ["neutral", "success", "warning", "danger", "info"] as const;
+const tones = ["neutral", "success", "warning", "danger", "info", "quiet"] as const;
 
 export const Badges = jsxStory(() => (
   <VStack>
@@ -42,6 +43,7 @@ export const BuildStatusBadges = jsxStory(() => (
     {[
       "approved",
       "unchanged",
+      "reviewing",
       "new",
       "changed",
       "rejected",
@@ -51,7 +53,7 @@ export const BuildStatusBadges = jsxStory(() => (
       "skipped",
     ].map((status) => (
       <Badge key={status} tone={statusTone(status)} icon>
-        {status}
+        {statusLabel(status)}
       </Badge>
     ))}
   </HStack>
@@ -59,11 +61,13 @@ export const BuildStatusBadges = jsxStory(() => (
 
 export const Alerts = jsxStory(() => (
   <VStack>
-    {tones.map((tone) => (
-      <Alert key={tone} tone={tone} title={`${tone[0]?.toUpperCase()}${tone.slice(1)} alert`}>
-        A short explanation of what happened and what to do next.
-      </Alert>
-    ))}
+    {tones
+      .filter((tone) => tone !== "quiet")
+      .map((tone) => (
+        <Alert key={tone} tone={tone} title={`${tone[0]?.toUpperCase()}${tone.slice(1)} alert`}>
+          A short explanation of what happened and what to do next.
+        </Alert>
+      ))}
   </VStack>
 ));
 

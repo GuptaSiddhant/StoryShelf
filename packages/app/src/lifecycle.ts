@@ -11,7 +11,7 @@ import {
 } from "@storyshelf/core/adapter/setup";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { CaptureConsumer } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { shutdownDiffPool, verifyImageEngine } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 import { purgeAiData } from "@storyshelf/core/retention";
@@ -89,7 +89,7 @@ function trackSettlement(cell: LifecycleCell, promise: Promise<AdapterSetupResul
 
 /** First failing boot check (assembly, auth, AI), or null when all pass. */
 async function firstBootFailure(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   logger: Logger,
 ): Promise<AdapterSetupResult | null> {
   const invalid = validateBootAssembly(adapterSourcesOf(options));
@@ -114,7 +114,7 @@ async function firstBootFailure(
 
 /** Kick the eager background setup run (resolves; never rejects). */
 function kickSetup(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   ctx: AdapterSetupContext,
   logger: Logger,
   cell: LifecycleCell,
@@ -131,7 +131,7 @@ function kickSetup(
 }
 
 /** Login method count, or null when the engine throws during introspection. */
-function loginMethodCount(auth: NonNullable<ShelfOptions["auth"]>): number | null {
+function loginMethodCount(auth: NonNullable<ResolvedShelfOptions["auth"]>): number | null {
   try {
     return auth.loginMethods().length;
   } catch {
@@ -140,7 +140,7 @@ function loginMethodCount(auth: NonNullable<ShelfOptions["auth"]>): number | nul
 }
 
 /** Log which auth mode the server boots with (open servers stay visible). */
-function logAuthMode(options: ShelfOptions, logger: Logger): void {
+function logAuthMode(options: ResolvedShelfOptions, logger: Logger): void {
   if (!options.auth) {
     logger.info("auth disabled (local default; every route is open)");
     return;
@@ -156,7 +156,7 @@ function logAuthMode(options: ShelfOptions, logger: Logger): void {
 /** Kick eager setup and attach the `app.lifecycle` namespace (single run). */
 export function attachLifecycle(
   app: ShelfRouter,
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   cell: LifecycleCell,
 ): void {
@@ -176,7 +176,7 @@ export function attachLifecycle(
 }
 
 function startBranchGcInterval(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   cell: LifecycleCell,
 ): { stop(): void } | null {
@@ -192,7 +192,7 @@ function startBranchGcInterval(
 }
 
 /** Run auth boot validation, returning a failure result instead of throwing. */
-async function runAuthSetup(options: ShelfOptions): Promise<AdapterSetupResult | null> {
+async function runAuthSetup(options: ResolvedShelfOptions): Promise<AdapterSetupResult | null> {
   try {
     await options.auth?.setup?.();
     return null;
@@ -207,7 +207,7 @@ async function runAuthSetup(options: ShelfOptions): Promise<AdapterSetupResult |
   }
 }
 /** Run AI boot checks and the stale-run sweep; failure fails readiness like auth. */
-async function runAiSetup(options: ShelfOptions): Promise<AdapterSetupResult | null> {
+async function runAiSetup(options: ResolvedShelfOptions): Promise<AdapterSetupResult | null> {
   if (!options.ai) {
     return null;
   }
@@ -246,7 +246,10 @@ async function runImagesSetup(): Promise<AdapterSetupResult | null> {
   }
 }
 /** Validation failure settled on the cell — null when the assembly is sound. */
-function invalidSources(options: ShelfOptions, cell: LifecycleCell): AdapterSetupResult | null {
+function invalidSources(
+  options: ResolvedShelfOptions,
+  cell: LifecycleCell,
+): AdapterSetupResult | null {
   const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length === 0) {
     return null;
@@ -262,7 +265,7 @@ function invalidSources(options: ShelfOptions, cell: LifecycleCell): AdapterSetu
  * still preparing the adapters.
  */
 async function rerunSetup(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   ctx: AdapterSetupContext,
   logger: Logger,
   cell: LifecycleCell,
@@ -276,7 +279,7 @@ async function rerunSetup(
 
 /** Build the `app.lifecycle` namespace closing over one settlement cell. */
 function createLifecycle(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   ctx: AdapterSetupContext,
   logger: Logger,
   cell: LifecycleCell,

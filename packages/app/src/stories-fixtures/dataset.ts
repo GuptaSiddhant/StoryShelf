@@ -3,6 +3,8 @@ import type {
   Baseline,
   Build,
   BuildComponent,
+  CaptureAttempt,
+  CaptureLog,
   Comment,
   Project,
   Snapshot,
@@ -24,8 +26,9 @@ export const BUILD_REVIEW = id("BLD002");
 export const BUILD_FAILED = id("BLD003");
 export const BUILD_CAPTURING = id("BLD004");
 export const BUILD_REJECTED = id("BLD005");
+export const BUILD_CANCELLED = id("BLD006");
 /** An approved build whose Storybook retention already removed. */
-export const BUILD_PURGED = id("BLD006");
+export const BUILD_PURGED = id("BLD012");
 /** Skipped builds (ADR 0044), one per state of the source they repeat. */
 export const BUILD_SKIPPED = id("BLD007");
 export const BUILD_SKIPPED_REJECTED_SOURCE = id("BLD008");
@@ -214,6 +217,17 @@ export const builds: Build[] = [
     updatedAt: hoursAgo(47),
   }),
   build({
+    id: BUILD_CANCELLED,
+    gitSha: "2d1c0b9",
+    gitBranch: "feature/tooltip-arrow",
+    status: "cancelled",
+    authorName: "Alan Turing",
+    authorEmail: "alan@example.com",
+    message: "feat(tooltip): arrow placement",
+    createdAt: hoursAgo(30),
+    updatedAt: hoursAgo(29.9),
+  }),
+  build({
     id: BUILD_REJECTED,
     gitSha: "3b2a1c0",
     gitBranch: "feature/card-shadow",
@@ -393,3 +407,37 @@ export const buildComponents: BuildComponent[] = [BUILD_MAIN, BUILD_REVIEW].flat
     };
   }),
 );
+
+/** The failed build's one capture attempt, and the error that ended it. */
+export const captureAttempts: CaptureAttempt[] = [
+  {
+    id: id("ATT001"),
+    projectId: PROJECT_ID,
+    buildId: BUILD_FAILED,
+    attemptNo: 1,
+    status: "failed",
+    error: "page.goto: 404 for iframe.html\n    at capture (runner.ts:42)",
+    reqId: null,
+    storyCount: 0,
+    failedCount: 0,
+    queuedAt: hoursAgo(20),
+    startedAt: hoursAgo(19.9),
+    finishedAt: hoursAgo(19.8),
+    createdAt: hoursAgo(20),
+    updatedAt: hoursAgo(19.8),
+  },
+];
+
+export const captureLogs: CaptureLog[] = [
+  {
+    id: id("LOG001"),
+    projectId: PROJECT_ID,
+    buildId: BUILD_FAILED,
+    attemptId: id("ATT001"),
+    seq: 1,
+    level: "error",
+    message: "page.goto: 404 for iframe.html",
+    fields: null,
+    createdAt: hoursAgo(19.8),
+  },
+];

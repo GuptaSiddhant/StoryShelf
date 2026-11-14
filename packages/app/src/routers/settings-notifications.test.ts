@@ -114,7 +114,7 @@ function postForm(
 describe("notifications settings tab", () => {
   it("renders channels, providers, and my preferences", async () => {
     const app = testApp(await seed(), false);
-    const page = await app.request("/projects/notify-project/settings/notifications");
+    const page = await app.request("/projects/notify-project/settings/review");
     expect(page.status).toBe(200);
     const html = await page.text();
     expect(html).toContain("My notifications for this project");
@@ -128,11 +128,11 @@ describe("notifications settings tab", () => {
     const paused = "Notifications are paused until a public URL is set";
     const without = testApp(await seed(), false);
     expect(
-      await (await without.request("/projects/notify-project/settings/notifications")).text(),
+      await (await without.request("/projects/notify-project/settings/review")).text(),
     ).toContain(paused);
     const withOrigin = testApp(await seed(), false, "https://shelf.example.com");
     expect(
-      await (await withOrigin.request("/projects/notify-project/settings/notifications")).text(),
+      await (await withOrigin.request("/projects/notify-project/settings/review")).text(),
     ).not.toContain(paused);
   });
 
@@ -205,7 +205,7 @@ describe("notifications settings tab", () => {
       app,
     );
     expect(saved.status).not.toBe(401);
-    const page = await app.request("/projects/notify-project/settings/notifications", {
+    const page = await app.request("/projects/notify-project/settings/review", {
       headers: { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" },
     });
     expect(await page.text()).toContain('value="build:approved" checked');
@@ -295,7 +295,7 @@ describe("notifications settings tab", () => {
     ]);
     expect(row).toMatchObject({ enabled: false, reviewRequests: true });
     const html = await (
-      await app.request(path, {
+      await app.request("/projects/notify-project/settings/review", {
         headers: { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" },
       })
     ).text();
@@ -322,7 +322,7 @@ describe("notifications settings tab", () => {
   it("lists every subscribable topic, review ones included, and the review switch", async () => {
     const seeded = await seed();
     const app = testApp(seeded, true);
-    const page = await app.request("/projects/notify-project/settings/notifications", {
+    const page = await app.request("/projects/notify-project/settings/review", {
       headers: { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" },
     });
     const html = await page.text();
@@ -340,7 +340,7 @@ describe("notifications settings tab", () => {
   it("explains the switch when email is off, and shows it off for a list that leaves it out", async () => {
     const seeded = await seed();
     const app = testApp(seeded, true);
-    const path = "/projects/notify-project/settings/notifications";
+    const path = "/projects/notify-project/settings/review";
     const page = async () =>
       await (
         await app.request(path, {
@@ -384,7 +384,7 @@ describe("notifications settings tab", () => {
     expect(row?.events).toBeNull();
     expect(row?.secretEncrypted).not.toContain("ghp_secret");
     expect(model.decryptSecret(row!)).toBe("ghp_secret");
-    const page = await app.request("/projects/notify-project/settings/notifications");
+    const page = await app.request("/projects/notify-project/settings/review");
     const html = await page.text();
     expect(html).toContain("acme/widgets (storyshelf-web)");
     expect(html).toContain("build state");
@@ -420,9 +420,7 @@ describe("notifications settings tab", () => {
     });
     expect(row?.secretEncrypted).not.toContain("PRIVATE KEY");
     expect(model.decryptSecret(row!)).toBe(key);
-    const page = await (
-      await app.request("/projects/notify-project/settings/notifications")
-    ).text();
+    const page = await (await app.request("/projects/notify-project/settings/review")).text();
     expect(page).not.toContain("BEGIN PRIVATE KEY");
   });
 
@@ -448,9 +446,7 @@ describe("notifications settings tab", () => {
     const model = new NotificationChannelModel(seeded.db, undefined, secret);
     const [row] = await model.list("p1");
     await model.recordOutcome(row!.id, "HTTP 401: Bad credentials");
-    const html = await (
-      await app.request("/projects/notify-project/settings/notifications")
-    ).text();
+    const html = await (await app.request("/projects/notify-project/settings/review")).text();
     expect(html).toContain("failing");
     expect(html).toContain("HTTP 401: Bad credentials");
     // The failure time and the error are separate lines, so the time never wraps mid-phrase, and

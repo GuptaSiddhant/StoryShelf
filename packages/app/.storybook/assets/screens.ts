@@ -33,3 +33,17 @@ export const diffShot = uri(`
   <rect width="${WIDTH}" height="${HEIGHT}" fill="#ffffff" opacity="0.35"/>
   <rect x="24" y="212" width="132" height="44" rx="22" fill="#e11d74" opacity="0.8"/>
   <rect x="172" y="212" width="132" height="44" rx="22" fill="#e11d74" opacity="0.8"/>`);
+
+/**
+ * A plain card at an exact pixel size, for the one-scale stories: a 100×100 baseline beside a
+ * 120×100 current must keep the 100:120 ratio on the stage and never be drawn wider than itself.
+ */
+export function sizedShot(width: number, height: number, fill: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#ffffff"/><rect x="10" y="10" width="${width - 20}" height="${height - 20}" rx="8" fill="${fill}"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/** 100×100: the baseline of the size-change stories. */
+export const squareShot = sizedShot(100, 100, "#1d5fcf");
+/** 120×100: the same card, 20 px wider. */
+export const wideShot = sizedShot(120, 100, "#1d5fcf");

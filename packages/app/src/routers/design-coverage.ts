@@ -1,5 +1,6 @@
 import { BuildModel, SnapshotModel } from "@storyshelf/core/models";
-import type { Build, Project } from "@storyshelf/core/schema";
+import type { BuildSummary } from "@storyshelf/core/models";
+import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderDesignCoveragePage, type DesignCoverageData } from "../pages/design-coverage.tsx";
@@ -43,7 +44,7 @@ export async function loadDesignCoverage(
   const build = await latestAcceptedBuild(project);
   if (!build) return { ...NO_COVERAGE, project };
   const snapshots = testingEnabled()
-    ? await new SnapshotModel(getStore().db).listByBuild(build.id)
+    ? await new SnapshotModel(getStore().db).listByBuildSummary(build.id)
     : [];
   const catalog = await catalogOf().load(project.id, build.id);
   const entries = catalog?.entries ?? entriesFromSnapshots(snapshots);
@@ -57,12 +58,12 @@ async function mayView(c: Context, project: Project): Promise<boolean> {
 }
 
 /** Newest approved build on the default branch, else the newest approved on any branch. */
-async function latestAcceptedBuild(project: Project): Promise<Build | undefined> {
+async function latestAcceptedBuild(project: Project): Promise<BuildSummary | undefined> {
   const builds = new BuildModel(getStore().db);
   const approved = { status: "approved", limit: 1 } as const;
-  const [onDefault] = await builds.list(project.id, {
+  const [onDefault] = await builds.listSummary(project.id, {
     ...approved,
     branch: project.gitDefaultBranch,
   });
-  return onDefault ?? (await builds.list(project.id, approved))[0];
+  return onDefault ?? (await builds.listSummary(project.id, approved))[0];
 }

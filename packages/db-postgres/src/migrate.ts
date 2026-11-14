@@ -48,6 +48,9 @@ const SNAPSHOT_BASELINE_ID_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_id TEXT";
 const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
+// Expand step (ADR 0053): nullable, so the previous release keeps working against it.
+const CONTENT_USE_SIZE_ALTER =
+  "ALTER TABLE content_uses ADD COLUMN IF NOT EXISTS size_bytes BIGINT";
 const SNAPSHOT_COMPARISON_IMAGE_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS comparison_image_path TEXT";
 const SNAPSHOT_COMPARISON_METADATA_ALTER =
@@ -109,8 +112,15 @@ const BUILD_MANIFEST_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS ma
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
+/** On for every existing project (#910): a default-branch claim needs a git channel's confirmation. */
+const REQUIRE_VERIFIED_DEFAULT_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS require_verified_default BOOLEAN NOT NULL DEFAULT true";
+const BUILD_BRANCH_VERIFIED_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS branch_verified TEXT";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
+const SWITCH_STORIES_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS switch_stories BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
@@ -238,19 +248,28 @@ async function migrateProjectExtras(run: MigrationRunner, logger?: Logger): Prom
   await migrateSnapshotColumns(run, logger);
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
-  await run(RUN_TESTS_ALTER);
+  await migrateProjectSwitches(run);
   await migrateRecentColumns(run);
+}
+
+/** Per-project capture switches added after `run_a11y`; each is an idempotent `ADD COLUMN`. */
+async function migrateProjectSwitches(run: MigrationRunner): Promise<void> {
+  await run(RUN_TESTS_ALTER);
+  await run(SWITCH_STORIES_ALTER);
 }
 
 /** Columns added after the first adapter release; each is an idempotent `ADD COLUMN IF NOT EXISTS`. */
 async function migrateRecentColumns(run: MigrationRunner): Promise<void> {
   await migrateDesignColumns(run);
   await migrateUnstableColumns(run);
+  await run(REQUIRE_VERIFIED_DEFAULT_ALTER);
+  await run(BUILD_BRANCH_VERIFIED_ALTER);
 }
 
 async function migrateUnstableColumns(run: MigrationRunner): Promise<void> {
   await run(SNAPSHOT_UNSTABLE_ALTER);
   await run(DETECT_UNSTABLE_ALTER);
+  await run(CONTENT_USE_SIZE_ALTER);
 }
 
 async function migrateDesignColumns(run: MigrationRunner): Promise<void> {

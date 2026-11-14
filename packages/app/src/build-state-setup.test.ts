@@ -1,5 +1,5 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { NotificationChannelModel, ProjectModel } from "@storyshelf/core/models";
 import {
@@ -52,7 +52,7 @@ async function world(options: { testing?: boolean; review?: boolean; noOrigin?: 
     },
     testing: options.testing === false ? undefined : { runner: {} },
     notifications: { notifiers: [git.provider, recordingMessageProvider(sent)] },
-  } as unknown as ShelfOptions;
+  } as unknown as ResolvedShelfOptions;
   const runtime = resolveRuntime(shelf);
   const project = await createTestProject(db, db.tables);
   await new ProjectModel(db).update(project.id, { reviewEnabled: options.review ?? true });
@@ -81,7 +81,7 @@ describe("setupBuildState", () => {
     await wiring.publisher.request(w.build.id);
     expect(w.git.calls.map((call) => call.target.kind)).toEqual(["status", "status", "comment"]);
     expect(w.git.calls[0]?.url).toBe(
-      `https://shelf.example.com/projects/${w.project.slug}/builds/${w.build.id}`,
+      `https://shelf.example.com/projects/${w.project.slug}/builds/${w.build.id}/diff`,
     );
   });
 

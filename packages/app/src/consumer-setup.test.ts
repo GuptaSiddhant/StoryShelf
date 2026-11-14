@@ -1,5 +1,5 @@
 import type { CaptureConsumer } from "@storyshelf/core/capture";
-import { captureMetrics } from "@storyshelf/observability";
+import { captureMetrics } from "@storyshelf/core/telemetry";
 import { describe, expect, it, vi } from "vitest";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
 

@@ -1,10 +1,9 @@
 /**
  * Internal span and propagation helpers over `@opentelemetry/api`.
  *
- * Not exported from the package surface (see `package.json` exports): other
- * packages use `@storyshelf/observability`. Without a configured provider
- * every helper is a cheap noop, so call sites need no enabled-checks and
- * the hermetic vitest suite stays network-free.
+ * Internal to core; the public surface is `@storyshelf/core/telemetry`, which re-exports the
+ * propagation helpers. Without a configured provider every helper is a cheap noop, so call sites
+ * need no enabled-checks and the hermetic vitest suite stays network-free.
  */
 import {
   SpanKind,
@@ -22,7 +21,7 @@ import { redactSecrets } from "./utils/redact.ts";
 const SCOPE = "storyshelf.core";
 
 /** W3C traceparent header name. */
-const TRACEPARENT_HEADER = "traceparent";
+export const TRACEPARENT_HEADER = "traceparent";
 
 /** What a span records of an error instead of its message, set by the code that knows the error. */
 const spanMessages = new WeakMap<object, string>();

@@ -158,6 +158,26 @@ describe("NotificationChannelModel", () => {
     }
   });
 
+  it("refuses a private GitHub Enterprise API base and names the operator setting", async () => {
+    const kinds = [
+      { metadata: { kind: "github", schema: z.object({ apiUrl: z.string().optional() }) } },
+    ] as unknown as NotifierProvider[];
+    const restore = overrideOutboundResolver(async () => [{ address: "10.0.0.5", family: 4 }]);
+    try {
+      const result = await NotificationChannelModel.validateInput(kinds, "github", {
+        apiUrl: "https://ghes.internal/api/v3",
+      });
+      expect(result).toMatchObject({ ok: false, field: "config", issues: [{ path: "apiUrl" }] });
+      expect(JSON.stringify(result)).toContain("outbound.allowHosts");
+      expect(JSON.stringify(result)).not.toContain("10.0.0.5");
+      expect(await NotificationChannelModel.validateInput(kinds, "github", {})).toEqual({
+        ok: true,
+      });
+    } finally {
+      restore();
+    }
+  });
+
   it("records the last delivery error with its time and clears it on success", async () => {
     const { db } = makeDatabase();
     const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });

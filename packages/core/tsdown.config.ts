@@ -4,6 +4,7 @@ const config = libConfig({
   index: "./src/index.tsx",
   ai: "./src/ai.ts",
   insights: "./src/insights/index.ts",
+  integrations: "./src/integrations/index.ts",
   auth: "./src/auth.ts",
   "adapter/metadata": "./src/adapters/metadata.ts",
   "adapter/setup": "./src/adapters/setup.ts",
@@ -20,6 +21,7 @@ const config = libConfig({
   capture: "./src/capture/index.ts",
   config: "./src/config.ts",
   diff: "./src/diff/index.ts",
+  "diff/worker": "./src/diff/worker.ts",
   models: "./src/models/index.ts",
   retention: "./src/retention/purge.ts",
   orm: "./src/orm/index.ts",
@@ -28,9 +30,12 @@ const config = libConfig({
   paths: "./src/utils/paths.ts",
   urls: "./src/urls.ts",
   schema: "./src/schema/index.ts",
+  telemetry: "./src/telemetry/index.ts",
   types: "./src/types.ts",
   utils: "./src/utils/index.ts",
   "test-helpers": "./src/test-helpers/index.ts",
 });
 
-export default config;
+// `diff/worker` is built only so the diff pool can spawn it via `new URL("worker.mjs", import.meta.url)`;
+// it stays out of the public `exports` map.
+export default { ...config, exports: { devExports: "source", exclude: ["diff/worker"] } };

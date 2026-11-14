@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/index.ts";
-import { storybookDir } from "../utils/paths.ts";
+import { publishedBrotliPath, publishedGzipPath, storybookDir } from "../utils/paths.ts";
 import { collectUnreferencedContent } from "./content-gc.ts";
 
 const GOOD = "a".repeat(64);
@@ -36,12 +36,16 @@ describe("collectUnreferencedContent with a malformed hash", () => {
     const page = `${storybookDir("p1", "b1")}/index.html`;
     w.objects.set(page, Buffer.from("published"));
     w.objects.set(`content/${GOOD}`, Buffer.from("x"));
+    w.objects.set(publishedGzipPath(GOOD), Buffer.from("gz"));
+    w.objects.set(publishedBrotliPath(GOOD), Buffer.from("br"));
 
     const removed = await collectUnreferencedContent(w.deps);
 
     expect(removed).toBe(1);
     expect(w.objects.has(page)).toBe(true);
     expect(w.objects.has(`content/${GOOD}`)).toBe(false);
+    expect(w.objects.has(publishedGzipPath(GOOD))).toBe(false);
+    expect(w.objects.has(publishedBrotliPath(GOOD))).toBe(false);
     expect(w.deleteSpy.mock.calls.map(([key]) => key)).not.toContain(EVIL);
     expect(w.lifecycle.abandonContentClaim).toHaveBeenCalledWith(EVIL, expect.any(String));
     expect(w.lifecycle.finishContentCollection).toHaveBeenCalledTimes(1);

@@ -23,7 +23,7 @@ fly deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile
 fly status -a storyshelf
 ```
 
-`.github/workflows/fly.yml` deploys on every push to `main`. Demo data is seeded by the `seed` job after each deploy (`seed.sh`: builds the fixture, uploads it through the API, and re-seeds only when the fixture changed). It needs the `STORYSHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
+`.github/workflows/fly.yml` deploys a stable release, never a push to `main`: `release.yml` calls it after the tag and the image exist, and `workflow_dispatch` takes a `version`. It runs `ghcr.io/guptasiddhant/storyshelf:<version>` when that image exists (from v0.12.0) and otherwise builds from the release tag. Demo data is seeded by the `seed` job after each deploy (`seed.sh`: builds the fixture, uploads it through the API, and re-seeds only when the fixture changed). It needs the `STORYSHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
 
 ## Notes
 

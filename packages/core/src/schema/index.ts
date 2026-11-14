@@ -10,7 +10,7 @@
 /** Baseline row as stored in the `baselines` table. */
 export type { Baseline } from "./baseline.ts";
 /** Build row as stored in the `builds` table. */
-export type { Build } from "./build.ts";
+export type { BranchVerification, Build } from "./build.ts";
 /** A capture attempt and its log lines for a single build run. */
 export type { CaptureAttempt, CaptureLog, CaptureLogLevel } from "./capture-attempt.ts";
 export type { CaptureShard, CaptureShardKind, CaptureShardStatus } from "./capture-shard.ts";

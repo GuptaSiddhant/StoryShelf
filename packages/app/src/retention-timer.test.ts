@@ -1,5 +1,5 @@
 import type { Auth } from "@storyshelf/core/auth";
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { Retention } from "@storyshelf/core/retention";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -87,7 +87,7 @@ describe("background retention", () => {
         database: db,
         storage,
         ...(testing ? { testing: {} } : {}),
-      } as ShelfOptions;
+      } as ResolvedShelfOptions;
       const runtime = {
         config: { branchGcIntervalMs: 120_000 },
         logger: createShelfLogger({ level: "silent" }),
@@ -211,6 +211,30 @@ describe("background retention", () => {
       expect(objects.has("p/builds/b1/storybook/a.js")).toBe(false);
       expect(objects.has("p/builds/b1/storybook/manifest.json")).toBe(true);
       expect(objects.has(`content/${hash}`)).toBe(true);
+    });
+
+    it("then deletes the upload zip of a build that holds a manifest", async () => {
+      const hash = "a".repeat(64);
+      const { db, objects, run } = await arm({ capability: false, config: {} });
+      await db.insert(db.tables.builds, {
+        id: "b1",
+        projectId: "p",
+        gitSha: "x",
+        gitBranch: "main",
+        status: "approved",
+        retentionState: "available",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      objects.set(
+        "p/builds/b1/storybook/manifest.json",
+        Buffer.from(JSON.stringify({ "a.js": hash })),
+      );
+      objects.set("p/builds/b1/storybook.zip", Buffer.from("zip"));
+      objects.set(`content/${hash}`, Buffer.from("a"));
+      await run();
+      expect(objects.has("p/builds/b1/storybook.zip")).toBe(false);
+      expect(objects.has("p/builds/b1/storybook/manifest.json")).toBe(true);
     });
 
     it("stops the copy reclaim when the timer is stopped", async () => {

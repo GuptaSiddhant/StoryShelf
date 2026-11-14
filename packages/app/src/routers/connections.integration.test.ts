@@ -1,6 +1,6 @@
+import { createFigmaDesign } from "@storyshelf/core/integrations";
 import { ConnectionModel, DesignCredentialModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -189,7 +189,9 @@ describe("connect flow", () => {
     const anonymous = await seed({ user: null });
     const res = await anonymous.app.request("/connections/figma/start");
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/auth/login");
+    expect(res.headers.get("location")).toBe(
+      `/auth/login?return_to=${encodeURIComponent("/connections/figma/start")}`,
+    );
   });
 
   it("disconnects only with a CSRF token", async () => {

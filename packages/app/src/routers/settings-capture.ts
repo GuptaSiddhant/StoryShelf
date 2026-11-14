@@ -6,19 +6,19 @@ import { storybookUrlTtlOverrideError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { toProjectPatch } from "./capture-config.ts";
 import { flash } from "./flash.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 
 /** Capture settings: browsers (primary + extras), the mode allowlist and the signed URL lifetime. */
 export function registerCaptureSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings/capture", async (c) =>
-    c.html(await renderSettingsPage(c, "capture")),
-  );
   app.post("/projects/:slug/settings/capture", handleCaptureUpdate);
+  app.post("/projects/:slug/settings/thresholds", handleThresholdsUpdate);
 }
 
 const EXTRA_PREFIX = "extra_";
@@ -92,5 +92,31 @@ async function handleCaptureUpdate(c: Context): Promise<Response> {
     throw error;
   }
   flash(c, "Capture settings saved");
-  return hxRedirect(c, `/projects/${project.slug}/settings/capture`);
+  return hxRedirect(c, settingsHref(project.slug, "capture"));
+}
+
+/** A fraction from 0 to 1, or undefined when the field is blank or not in range. */
+function fractionOf(raw: string | undefined): number | undefined | null {
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
+}
+
+/** Diff thresholds: how different two captures may be before a snapshot counts as changed. */
+async function handleThresholdsUpdate(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  const form = await c.req.formData();
+  const pixelThreshold = fractionOf(asString(form.get("pixelThreshold")));
+  const maxDiffRatio = fractionOf(asString(form.get("maxDiffRatio")));
+  if (typeof pixelThreshold !== "number" || typeof maxDiffRatio !== "number") {
+    return c.html(
+      (await renderSettingsPage(c, "thresholds", {
+        globalError: "Both thresholds are required, as numbers from 0 to 1",
+      })) ?? "",
+      400,
+    );
+  }
+  await new ProjectModel(getStore().db).update(project.id, { pixelThreshold, maxDiffRatio });
+  flash(c, "Thresholds saved");
+  return hxRedirect(c, settingsHref(project.slug, "thresholds"));
 }

@@ -41,6 +41,12 @@ export {
   type ContentBackfillResult,
 } from "./content-backfill.ts";
 export {
+  RECLAIM_ZIPS_KEY,
+  reclaimUploadZips,
+  type ReclaimZipsDeps,
+  type ReclaimZipsResult,
+} from "./reclaim-upload-zips.ts";
+export {
   RECLAIM_COPIES_KEY,
   RECLAIM_COPIES_PAGE,
   reclaimBuildCopies,

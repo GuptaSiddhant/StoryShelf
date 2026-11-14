@@ -170,6 +170,7 @@ function buildUploadCommand(): Command {
         "npm script to build Storybook (default build-storybook)",
       )
       .option("--force-build", "force rebuild even if buildDir exists")
+      .option("--zip", "upload one zip instead of only the changed files (older servers)")
       .option("--dry-run", "validate and build without sending any requests")
       .option("--skip <glob>", "skip upload for matching branch (glob)")
       .option("--message <message>", "build message")

@@ -11,6 +11,7 @@ import {
   Meta,
   RelativeTime,
   Table,
+  statusLabel,
   statusTone,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
@@ -69,7 +70,7 @@ function SkippedSummary({
   build: Build;
   source: SkipSource | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const sha = skipSourceSha(build, source);
   if (!source?.build || !sha) {
     return <>{noStoryChangedText(sha)}</>;
@@ -124,9 +125,7 @@ function BuildActions({
       <Button
         variant={needsReview ? "primary" : "secondary"}
         size="sm"
-        href={
-          needsReview ? urls.buildDiff(project.slug, build.id) : urls.build(project.slug, build.id)
-        }
+        href={urls.buildDiff(project.slug, build.id)}
       >
         {needsReview ? "Review" : "View"}
       </Button>
@@ -160,7 +159,7 @@ function BuildRow({
       </td>
       <td>
         <Badge tone={statusTone(build.status)} icon>
-          {build.status}
+          {statusLabel(build.status)}
         </Badge>
       </td>
       <td>

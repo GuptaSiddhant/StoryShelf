@@ -27,6 +27,7 @@ import {
   claimContent,
   finishContentCollection,
   holdsContentClaim,
+  contentUsage,
   recordContentUses,
 } from "./content-uses.ts";
 import {
@@ -62,8 +63,9 @@ export function createBuildReferenceLifecycle(database: unknown): BuildReference
       await markStorageDeleted(db, projectId, buildId),
     completeDeletion: async (projectId, buildId, removeRows) =>
       await completeDeletion(db, projectId, buildId, removeRows),
-    recordContentUses: async (projectId, buildId, hashes, staleBefore) =>
-      await recordContentUses(db, projectId, buildId, hashes, staleBefore),
+    recordContentUses: async (projectId, buildId, hashes, staleBefore, sizes) =>
+      await recordContentUses(db, projectId, buildId, hashes, staleBefore, sizes),
+    contentUsage: async (projectId) => await contentUsage(db, projectId),
     claimContent: async (token, idleBefore, staleBefore) =>
       await claimContent(db, token, idleBefore, staleBefore),
     holdsContentClaim: async (hash, token) => await holdsContentClaim(db, hash, token),

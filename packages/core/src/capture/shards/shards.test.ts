@@ -184,7 +184,10 @@ async function world(options: {
 }) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await new ProjectModel(db, tables(db)).create({ name: "Sharded" });
+  const project = await new ProjectModel(db, tables(db)).create({
+    name: "Sharded",
+    requireVerifiedDefault: false,
+  });
   const build = await new BuildModel(db, tables(db)).create(project.id, {
     gitSha: "sha-1",
     gitBranch: "main",

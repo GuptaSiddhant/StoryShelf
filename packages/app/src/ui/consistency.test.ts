@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
  * - No direct family imports in `pages/` (facade + document shell +
  *   shared review styles + page-local `ui/css.ts` only).
  * - No inline `style="..."` in `pages/` or `src/ui/` at all (zero ceiling).
+ * - No card inside a card in `pages/` (a nested `<Card>` is a section, not a second box).
  * - `src/ui/` stays presentational: no store, routers, middleware, pages, core models or
  *   test-helpers (the app-coupled chrome lives in `src/shell/`).
  */
@@ -84,6 +85,22 @@ const INLINE_STYLE = /\bstyle\s*=\s*["'{`]/gu;
 
 function countMatches(source: string, pattern: RegExp): number {
   return source.match(pattern)?.length ?? 0;
+}
+
+/** Whether a `<Card>` opens before the enclosing one closes (`CardSection` and self-closing cards are fine). */
+function hasNestedCard(source: string): boolean {
+  let depth = 0;
+  for (const [token] of source.matchAll(/<Card(?=[\s>/])[^>]*?(\/?)>|<\/Card>/gu)) {
+    if (token === "</Card>") {
+      depth -= 1;
+    } else if (!token.endsWith("/>")) {
+      depth += 1;
+      if (depth > 1) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 describe("ui-building-blocks contract", () => {
@@ -201,5 +218,18 @@ describe("ui-building-blocks contract", () => {
       .map(({ file, source }) => ({ file, count: countMatches(source, INLINE_STYLE) }))
       .filter(({ count }) => count > 0);
     expect(over).toEqual([]);
+  });
+
+  it("has no card inside a card in pages/", async () => {
+    const nested = (await pageSources())
+      .filter(({ source }) => hasNestedCard(source))
+      .map(({ file }) => file);
+    expect(nested).toEqual([]);
+  });
+
+  it("recognises a card nested in a card", () => {
+    expect(hasNestedCard("<Card><Card>x</Card></Card>")).toBe(true);
+    expect(hasNestedCard('<Card id="a"><p>x</p><Card padded={false} /></Card>')).toBe(false);
+    expect(hasNestedCard("<Card><CardSection>x</CardSection></Card><Card>y</Card>")).toBe(false);
   });
 });

@@ -24,6 +24,11 @@ import {
   rejectGroupOf,
   rejectOne,
 } from "./snapshots.handlers.ts";
+/** An HTMX request from the review page is answered with HTML to swap in, not JSON. */
+const reviewSwapContent = { "text/html": { schema: z.string() } };
+const REVIEW_SWAP_NOTE =
+  "An HTMX request (`HX-Request: true`) from the review page gets the next open snapshot as HTML to swap in, with `HX-Push-Url`.";
+
 const listSnapshotsRoute = createRoute({
   method: "get",
   tags: ["Review"],
@@ -51,8 +56,8 @@ const approveSnapshotRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: okSchema } },
-      description: "Snapshot approved",
+      content: { "application/json": { schema: okSchema }, ...reviewSwapContent },
+      description: `Snapshot approved. ${REVIEW_SWAP_NOTE}`,
     },
     409: {
       content: { "application/json": { schema: baselineChangedSchema } },
@@ -71,8 +76,8 @@ const rejectSnapshotRoute = createRoute({
   request: { params: z.object({ slug: z.string(), buildId: z.string(), snapshotId: z.string() }) },
   responses: {
     200: {
-      content: { "application/json": { schema: okSchema } },
-      description: "Snapshot rejected",
+      content: { "application/json": { schema: okSchema }, ...reviewSwapContent },
+      description: `Snapshot rejected. ${REVIEW_SWAP_NOTE}`,
     },
     ...notFound,
   },
@@ -114,9 +119,8 @@ const approveGroupRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: groupDecisionResultSchema } },
-      description:
-        "Every open snapshot of the story and mode approved and each engine's baseline promoted",
+      content: { "application/json": { schema: groupDecisionResultSchema }, ...reviewSwapContent },
+      description: `Every open snapshot of the story and mode approved and each engine's baseline promoted. ${REVIEW_SWAP_NOTE}`,
     },
     409: {
       content: { "application/json": { schema: baselineChangedSchema } },
@@ -135,8 +139,8 @@ const rejectGroupRoute = createRoute({
   request: { params: groupParams },
   responses: {
     200: {
-      content: { "application/json": { schema: groupDecisionResultSchema } },
-      description: "Every open snapshot of the story and mode rejected",
+      content: { "application/json": { schema: groupDecisionResultSchema }, ...reviewSwapContent },
+      description: `Every open snapshot of the story and mode rejected. ${REVIEW_SWAP_NOTE}`,
     },
     ...notFound,
   },
@@ -192,13 +196,14 @@ export function registerSnapshots(app: ShelfRouter): void {
   });
 
   app.openapi(approveSnapshotRoute, async (c) => {
-    await approveOne(c, c.req.valid("param"), c.req.valid("query").force === "true");
-    return c.json({ ok: true }, 200);
+    const force = c.req.valid("query").force === "true";
+    const swap = await approveOne(c, c.req.valid("param"), force);
+    return swap ?? c.json({ ok: true }, 200);
   });
 
   app.openapi(rejectSnapshotRoute, async (c) => {
-    await rejectOne(c, c.req.valid("param"));
-    return c.json({ ok: true });
+    const swap = await rejectOne(c, c.req.valid("param"));
+    return swap ?? c.json({ ok: true }, 200);
   });
 
   app.openapi(approveAllRoute, async (c) => {
@@ -209,13 +214,13 @@ export function registerSnapshots(app: ShelfRouter): void {
 
   app.openapi(approveGroupRoute, async (c) => {
     const force = c.req.valid("query").force === "true";
-    const snapshotIds = await approveGroupOf(c, c.req.valid("param"), force);
-    return c.json({ ok: true, snapshotIds }, 200);
+    const { snapshotIds, swap } = await approveGroupOf(c, c.req.valid("param"), force);
+    return swap ?? c.json({ ok: true, snapshotIds }, 200);
   });
 
   app.openapi(rejectGroupRoute, async (c) => {
-    const snapshotIds = await rejectGroupOf(c, c.req.valid("param"));
-    return c.json({ ok: true, snapshotIds }, 200);
+    const { snapshotIds, swap } = await rejectGroupOf(c, c.req.valid("param"));
+    return swap ?? c.json({ ok: true, snapshotIds }, 200);
   });
 
   app.openapi(rediffRoute, async (c) => {

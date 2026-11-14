@@ -17,12 +17,15 @@ export interface FakeStateNotifier {
 /**
  * Build a fake `state` provider of the given kind. `failWith` makes every write
  * reject with that message, like a host rejecting the token; `schema` is the
- * channel config schema (any object by default).
+ * channel config schema (any object by default). `onBranch` is the host's answer to a
+ * default-branch claim (`commitOnBranch`): it confirms by default, so a default-branch build counts
+ * as before; `false` says the commit is not on the branch and a function can throw (host down).
  */
 export function makeFakeStateNotifier(
   kind = "fake-git",
   failWith?: string,
   schema: z.ZodType = z.object({}).loose(),
+  onBranch: boolean | (() => Promise<boolean>) = true,
 ): FakeStateNotifier {
   const calls: SetStateInput[] = [];
   const secrets: (string | undefined)[] = [];
@@ -47,6 +50,8 @@ export function makeFakeStateNotifier(
             throw new Error(failWith);
           }
         },
+        commitOnBranch: async () =>
+          typeof onBranch === "boolean" ? await Promise.resolve(onBranch) : await onBranch(),
       };
     },
   };

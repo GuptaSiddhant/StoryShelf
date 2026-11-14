@@ -107,7 +107,7 @@ function hasSchemaParse(provider: unknown): boolean {
 }
 
 /** Reasons a notifier provider lacks its descriptor shape. */
-function notifierReasons(provider: unknown): string[] {
+export function notifierReasons(provider: unknown): string[] {
   const record = asRecord(provider);
   if (!record) {
     return ["notifier provider must be an object"];
@@ -123,7 +123,7 @@ function notifierReasons(provider: unknown): string[] {
 }
 
 /** Reasons an email sender lacks its transport shape. */
-function emailSenderReasons(sender: unknown): string[] {
+export function emailSenderReasons(sender: unknown): string[] {
   const record = asRecord(sender);
   if (!record) {
     return ["email sender must be an object"];
@@ -136,7 +136,7 @@ function emailSenderReasons(sender: unknown): string[] {
 }
 
 /** Reasons a design provider lacks its descriptor shape. */
-function designReasons(provider: unknown): string[] {
+export function designReasons(provider: unknown): string[] {
   const record = asRecord(provider);
   if (!record) {
     return ["design provider must be an object"];

@@ -4,9 +4,8 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { chatNotifiers } from "@storyshelf/notify-chat";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -44,7 +43,8 @@ const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 shelfLogger.info({ ...databaseLog, ...storageLog }, "adapters");
 
-const emailSender = smtpPresetFromEnv(env, shelfLogger);
+// Every built-in integration is registered (ADR 0049); with SMTP_* set the `email` notifier sends through it.
+const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
@@ -54,10 +54,14 @@ const app = createShelfApp({
   storage,
   ...(testing ? { testing } : {}),
   notifications: {
-    notifiers: [
-      ...chatNotifiers,
-      ...(emailSender ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })] : []),
-    ],
+    notifiers: (builtIn) =>
+      emailSender
+        ? builtIn.map((provider) =>
+            provider.metadata.kind === "email"
+              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+              : provider,
+          )
+        : builtIn,
   },
   auth:
     authPassword && secret

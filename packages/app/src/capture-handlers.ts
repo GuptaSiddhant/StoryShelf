@@ -12,7 +12,7 @@ import {
   type ConsumerJob,
   type KindHandler,
 } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { createForkedHandler, shouldForkCapture } from "./capture-process.ts";
 import type { JobQueue } from "./job-queue.ts";
@@ -50,7 +50,7 @@ export function registerCrashHooks(
 
 /** The capture handler: in this process, or forked into a worker (which falls back to this process). */
 export function handlerFor(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   handlerOptions: CaptureHandlerOptions,
   parts: {
     retries: number;
@@ -65,7 +65,7 @@ export function handlerFor(
 }
 
 function forkedHandler(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   parts: {
     fallback: KindHandler;
     retries: number;

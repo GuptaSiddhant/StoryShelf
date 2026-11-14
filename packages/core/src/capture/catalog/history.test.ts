@@ -60,6 +60,15 @@ describe("catalogPresence", () => {
     expect(catalogPresence(history, "src/A.tsx", [row("b9", "h")])).toEqual({ kind: "present" });
   });
 
+  it("ignores a leading ./ on either side", () => {
+    expect(
+      catalogPresence(history, "src/A.tsx", [row("b9", "h", { importPath: "./src/A.tsx" })]),
+    ).toEqual({
+      kind: "present",
+    });
+    expect(catalogPresence(history, "./src/A.tsx", [row("b9", "h")])).toEqual({ kind: "present" });
+  });
+
   it("finds a moved file by its title", () => {
     expect(
       catalogPresence(history, "src/A.tsx", [row("b9", "h", { importPath: "src/ui/A.tsx" })]),

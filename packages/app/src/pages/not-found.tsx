@@ -19,10 +19,11 @@ export interface NotFoundPageState {
  */
 export function renderNotFoundPage(state: NotFoundPageState): RenderedContent {
   return (
-    <DocumentLayout title="Not found" layout="bare">
+    <DocumentLayout title="Not found" layout={state.signInHref ? "bare" : "default"}>
       <Card>
         <EmptyState
           title="Not found"
+          headingLevel={1}
           description={state.message}
           action={
             <HStack gap="sm" justify="center" wrap>

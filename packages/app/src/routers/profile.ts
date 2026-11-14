@@ -6,7 +6,7 @@ import type { Project } from "@storyshelf/core/schema";
 import { readSessionCookie, type AuthUser } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
-import { notificationsPaused } from "../notifications-pause.ts";
+import { pausedBannerShown } from "../notifications-pause.ts";
 import { renderProfilePage } from "../pages/profile.tsx";
 import { getStore } from "../store.ts";
 import { forwardToEngine } from "./auth.ts";
@@ -137,7 +137,7 @@ async function profileView(
     isLocal: extra?.local ?? security.hasPassword,
     security,
     error: extra?.error,
-    notificationsPaused: getStore().notifiers.length > 0 && (await notificationsPaused()),
+    notificationsPaused: await pausedBannerShown(getStore()),
   });
   if (extra?.success) {
     flash(c, extra.success);

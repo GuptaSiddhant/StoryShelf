@@ -464,7 +464,7 @@ describe("an accepted build whose Storybook content is gone", () => {
       expect(refused.status).toBe(409);
       expect(await refused.text()).toContain("Storybook content unavailable, see build page");
 
-      const page = await booted.app.request(`/projects/gate/builds/${build.id}`, {
+      const page = await booted.app.request(`/projects/gate/builds/${build.id}/diff`, {
         headers: { cookie: "storyshelf_session=alice", "sec-fetch-site": "same-origin" },
       });
       const html = await page.text();

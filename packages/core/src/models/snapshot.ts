@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { columnsExcept } from "../adapters/database.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import type { SnapshotStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
@@ -14,6 +15,9 @@ export interface SnapshotTables {
 }
 
 /** Data operations for snapshot records. */
+/** A snapshot row without its axe findings, as {@link SnapshotModel.listByBuildSummary} returns it. */
+export type SnapshotSummary = Omit<Snapshot, "a11yViolations">;
+
 export class SnapshotModel {
   private readonly tables: SnapshotTables;
   private readonly db: DatabaseAdapter;
@@ -116,7 +120,7 @@ export class SnapshotModel {
    */
   async durationsByStory(buildId: string): Promise<Map<string, number>> {
     const totals = new Map<string, number>();
-    for (const row of await this.listByBuild(buildId)) {
+    for (const row of await this.listByBuildSummary(buildId)) {
       if (typeof row.durationMs === "number") {
         totals.set(row.storyId, (totals.get(row.storyId) ?? 0) + row.durationMs);
       }
@@ -129,6 +133,17 @@ export class SnapshotModel {
     return (await this.db.list(this.tables.snapshots, {
       where: eq(col(this.tables.snapshots, "buildId"), buildId),
     })) as unknown as Snapshot[];
+  }
+
+  /**
+   * Snapshots of a build without the axe findings (`a11yViolations`), for a caller that never reads
+   * them. Prefer it over {@link listByBuild} on list paths: the column is a large JSON text.
+   */
+  async listByBuildSummary(buildId: string): Promise<SnapshotSummary[]> {
+    return (await this.db.list(this.tables.snapshots, {
+      where: eq(col(this.tables.snapshots, "buildId"), buildId),
+      columns: columnsExcept(this.tables.snapshots, "a11yViolations"),
+    })) as unknown as SnapshotSummary[];
   }
 
   /**

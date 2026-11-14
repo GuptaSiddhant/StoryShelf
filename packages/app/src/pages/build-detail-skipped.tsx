@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
@@ -64,7 +65,7 @@ function SourceAlert({
   project: Project;
   source: SkipSource;
 }): ReturnType<typeof Alert> | null {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   if (!source.build) {
     return <Alert tone="warning">The build this one repeats is no longer available.</Alert>;
   }
@@ -87,7 +88,7 @@ function SourceTerms({
   project: Project;
   source: SkipSource;
 }): ReturnType<typeof Meta> {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const from = source.build;
   return (
     <dl class={termList}>
@@ -188,7 +189,7 @@ export async function renderSkippedBuildPage(
   project: Project,
   build: Build,
 ): Promise<RenderedContent> {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const source = await loadSkipSource(build);
   const sha = build.gitSha.slice(0, 7);
   return (

@@ -77,7 +77,7 @@ const optedOut: SettingsMySubscription = {
   reviewRequests: true,
 };
 
-/** The project settings page on its Notifications tab: only the notification data differs per story. */
+/** The project settings page on its Review & notifications tab: only the notification data differs per story. */
 const settingsPage = (
   data: Pick<
     ProjectSettingsData,
@@ -90,7 +90,7 @@ const settingsPage = (
 ): RenderedContent =>
   renderProjectSettingsPage({
     project,
-    activeTab: "notifications",
+    activeTab: "review",
     labelTypes: [],
     links: [],
     linkCandidates: [],

@@ -22,6 +22,7 @@ export const builds = mysqlTable(
     gitSha: text("git_sha").notNull(),
     gitBranch: text("git_branch").notNull(),
     isDefault: boolean("is_default").notNull().default(false),
+    branchVerified: varchar("branch_verified", { length: 16 }),
     authorEmail: text("author_email"),
     authorName: text("author_name"),
     message: text("message"),
@@ -65,6 +66,7 @@ export interface Build {
   gitSha: string;
   gitBranch: string;
   isDefault: boolean;
+  branchVerified: string | null;
   authorEmail: string | null;
   authorName: string | null;
   message: string | null;

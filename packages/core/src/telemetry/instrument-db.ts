@@ -1,0 +1,139 @@
+import { getTableName, type SQL, type Table } from "drizzle-orm";
+/**
+ * Database adapter wrapper: one span + duration metric per operation.
+ *
+ * Span names are `db.<operation>` with the table as an attribute (never in
+ * the name). Adapter identity (`metadata`, `lifecycle`, `tables`) and the
+ * host-bound logger delegate straight through, so health/setup behave
+ * identically with or without observability.
+ */
+import type { DatabaseAdapter, ListOptions, Tables, TxStore } from "../adapters/database.ts";
+import type { Logger } from "../logger.ts";
+import { addTiming } from "../utils/index.ts";
+import { dbMetrics } from "./metrics.ts";
+import { withSpan } from "./span.ts";
+
+/**
+ * Wrap a database adapter with per-operation spans and metrics.
+ *
+ * @param db - The adapter to wrap (never mutated).
+ * @returns A transparent adapter emitting `db.*` telemetry.
+ */
+export function createInstrumentedDatabase(db: DatabaseAdapter): DatabaseAdapter {
+  return new InstrumentedDatabase(db);
+}
+
+class InstrumentedDatabase implements DatabaseAdapter {
+  private readonly inner: DatabaseAdapter;
+  readonly transact: DatabaseAdapter["transact"];
+
+  constructor(inner: DatabaseAdapter) {
+    this.inner = inner;
+    const transact = inner.transact?.bind(inner);
+    this.transact = transact
+      ? async <Result>(fn: (tx: TxStore) => Promise<Result>): Promise<Result> =>
+          await trackQuery("db.transact", async () => await transact(fn))
+      : undefined;
+  }
+
+  get metadata(): DatabaseAdapter["metadata"] {
+    return this.inner.metadata;
+  }
+
+  get lifecycle(): DatabaseAdapter["lifecycle"] {
+    return this.inner.lifecycle;
+  }
+
+  get buildReferenceLifecycle(): DatabaseAdapter["buildReferenceLifecycle"] {
+    return this.inner.buildReferenceLifecycle;
+  }
+
+  get retentionPause(): DatabaseAdapter["retentionPause"] {
+    return this.inner.retentionPause;
+  }
+
+  get tables(): Tables {
+    return this.inner.tables;
+  }
+
+  setLogger(logger: Logger): void {
+    this.inner.setLogger?.(logger);
+  }
+
+  async insert<T extends Table>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]> {
+    return await track("db.insert", table, async () => await this.inner.insert(table, values));
+  }
+
+  async update<T extends Table>(
+    table: T,
+    id: string,
+    values: Partial<T["$inferInsert"]>,
+  ): Promise<T["$inferSelect"]> {
+    return await track("db.update", table, async () => await this.inner.update(table, id, values));
+  }
+
+  async updateWhere<T extends Table>(
+    table: T,
+    id: string,
+    values: Partial<T["$inferInsert"]>,
+    where: SQL,
+  ): Promise<T["$inferSelect"] | null> {
+    return await track(
+      "db.updateWhere",
+      table,
+      async () => await this.inner.updateWhere(table, id, values, where),
+    );
+  }
+
+  async get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null> {
+    return await track("db.get", table, async () => await this.inner.get(table, id));
+  }
+
+  async remove(table: Table, id: string): Promise<void> {
+    await track("db.remove", table, async () => {
+      await this.inner.remove(table, id);
+    });
+  }
+
+  async list<T extends Table>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]> {
+    return await track("db.list", table, async () => await this.inner.list(table, opts));
+  }
+
+  async count(table: Table, where?: SQL): Promise<number> {
+    return await track("db.count", table, async () => await this.inner.count(table, where));
+  }
+
+  async all<T>(query: SQL): Promise<T[]> {
+    return await trackQuery("db.all", async () => await this.inner.all<T>(query));
+  }
+}
+
+/** Run a table operation inside a span with a duration measurement. */
+async function track<T>(operation: string, table: Table, fn: () => Promise<T>): Promise<T> {
+  const tableName = getTableName(table);
+  const start = performance.now();
+  try {
+    return await withSpan(operation, fn, { "db.table": tableName });
+  } finally {
+    const durationMs = performance.now() - start;
+    addTiming("db", durationMs);
+    dbMetrics().operationDuration.record(durationMs, {
+      "db.operation": operation,
+      "db.table": tableName,
+    });
+  }
+}
+
+/** Run a table-less query inside a span with a duration measurement. */
+async function trackQuery<T>(operation: string, fn: () => Promise<T>): Promise<T> {
+  const start = performance.now();
+  try {
+    return await withSpan(operation, fn);
+  } finally {
+    const durationMs = performance.now() - start;
+    addTiming("db", durationMs);
+    dbMetrics().operationDuration.record(durationMs, {
+      "db.operation": operation,
+    });
+  }
+}

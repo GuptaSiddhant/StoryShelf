@@ -11,7 +11,7 @@ import {
   type DatabaseCaptureQueue,
   type DatabaseJob,
 } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { CaptureJobKind } from "@storyshelf/core/schema";
 
 /** What a kind does when a job of it failed because its last attempt lost its lease. */
@@ -43,7 +43,7 @@ export interface JobQueue {
  * of `testing.leaseSeconds` and the clock of `testing.queueClock` (production: real time).
  */
 export function createJobQueue(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   kinds: readonly CaptureJobKind[],
   retries: number,
 ): JobQueue {

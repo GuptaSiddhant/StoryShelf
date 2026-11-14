@@ -123,7 +123,10 @@ async function world(
 ): Promise<World> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await new ProjectModel(db, tables(db)).create({ name: "Stability" });
+  const project = await new ProjectModel(db, tables(db)).create({
+    name: "Stability",
+    requireVerifiedDefault: false,
+  });
   await db.update(db.tables.projects, project.id, projectPatch);
   const builds = new Map<string, string>();
   const capture: World["capture"] = async (branch, script) => {
@@ -333,7 +336,10 @@ describe("unstable render detection across shards", () => {
   it("judges each shard's own changed snapshots, once", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Sharded stability" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Sharded stability",
+      requireVerifiedDefault: false,
+    });
     const builds = new BuildModel(db, tables(db));
     const main = await builds.create(project.id, {
       gitSha: "sha-main",

@@ -174,7 +174,7 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
 const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
   return (
     <Card>
-      <PageHeader title="Devices" description="Where you are signed in" />
+      <PageHeader level={2} title="Devices" description="Where you are signed in" />
       <Table dense label="Devices">
         <table>
           <thead>
@@ -210,7 +210,11 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
 const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
   return (
     <Card>
-      <PageHeader title="Passkeys" description="Sign in without a password using your device" />
+      <PageHeader
+        level={2}
+        title="Passkeys"
+        description="Sign in without a password using your device"
+      />
       {security.passkeys.length < 2 ? (
         <Alert title="Add a backup key">
           Register a 2nd key so a lost device doesn&apos;t lock you out.
@@ -279,6 +283,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
 
       <Card>
         <PageHeader
+          level={2}
           title="Display name"
           description="Shown in comments and the header. Survives SSO refresh."
         />
@@ -292,7 +297,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
 
       {isLocal ? (
         <Card>
-          <PageHeader title="Change password" description="For local accounts only" />
+          <PageHeader level={2} title="Change password" description="For local accounts only" />
           <form method="post" action="/profile/password" novalidate>
             <Field
               label="Current password"
@@ -327,7 +332,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
       {security?.passkeysEnabled ? <PasskeysSection security={security} /> : null}
 
       <Card>
-        <PageHeader title="Project memberships" description="Your role on each project" />{" "}
+        <PageHeader level={2} title="Project memberships" description="Your role on each project" />{" "}
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
         ) : (
@@ -363,6 +368,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
 
       <Card>
         <PageHeader
+          level={2}
           title="Notifications"
           description="Email alerts per project. Fine-tune topics in each project's settings."
         />

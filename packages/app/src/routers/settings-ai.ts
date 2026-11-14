@@ -2,6 +2,7 @@ import type { Ai } from "@storyshelf/core/ai";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { requireSiteAdmin } from "./helpers.ts";
@@ -10,7 +11,6 @@ import { asString, findProject, renderSettingsPage } from "./settings.handlers.t
 
 /** Register the project AI settings tab (site admins set the profile gate). */
 export function registerAiSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings/ai", async (c) => c.html(await renderSettingsPage(c, "ai")));
   app.post("/projects/:slug/settings/ai", handleAiUpdate);
 }
 
@@ -35,5 +35,5 @@ async function handleAiUpdate(c: Context): Promise<Response> {
   }
   await new ProjectModel(db).update(project.id, { aiProfile: requested === "" ? null : requested });
   flash(c, requested === "" ? "AI turned off for this project" : "AI profile saved");
-  return hxRedirect(c, `/projects/${project.slug}/settings/ai`);
+  return hxRedirect(c, settingsHref(project.slug, "ai"));
 }

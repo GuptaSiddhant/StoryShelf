@@ -25,9 +25,9 @@ import type { Context } from "hono";
 import { credentialKeys } from "../credential-keys.ts";
 import { notificationsPaused } from "../notifications-pause.ts";
 import {
+  insightsShown,
   renderProjectSettingsPage,
   type SettingsFormState,
-  type SettingsTab,
 } from "../pages/project-settings.tsx";
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
 import type { DesignCredentialState } from "../pages/settings-design-credential.tsx";
@@ -39,11 +39,18 @@ import type {
   SettingsNotificationChannel,
   SettingsNotifyProvider,
 } from "../pages/settings-notifications.tsx";
+import {
+  isSettingsTab,
+  SECTION_TAB,
+  type SettingsSection,
+  type SettingsTab,
+} from "../pages/settings-tabs.ts";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
 import { getStore } from "../store.ts";
 import { runnerTargets } from "../targets.ts";
 import { notFound } from "./helpers.ts";
 import { isSiteAdmin } from "./insights.handlers.ts";
+import { loadSettingsInsights } from "./settings-insights.ts";
 /** Aggregated data for rendering a settings tab. */
 export interface SettingsData {
   project: Project;
@@ -318,10 +325,13 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   return { project, ...inventory, ...notifications, ...linksSection, design, isAdmin };
 }
 
-/** Render the project settings page for the given tab, optionally with form state. */
+/**
+ * Render the project settings page for a tab, or for the tab that holds a section (a refused form
+ * names its section, and only that section shows the form state).
+ */
 export async function renderSettingsPage(
   c: Context,
-  tab: SettingsTab,
+  target: SettingsSection | SettingsTab,
   formState?: SettingsFormState,
 ): Promise<string> {
   const slug = c.req.param("slug") ?? "";
@@ -329,10 +339,17 @@ export async function renderSettingsPage(
   if (!data) {
     notFound("Project not found");
   }
+  const tab = isSettingsTab(target) ? target : SECTION_TAB[target];
+  const insights = await loadSettingsInsights(data.project, tab === "insights");
+  if (tab === "insights" && !insightsShown(insights)) {
+    notFound("Nothing to show: capture is off and the project has no AI health digest");
+  }
   return await renderProjectSettingsPage(
     {
       project: data.project,
       activeTab: tab,
+      formSection: target === "access" ? undefined : target,
+      insights,
       labelTypes: data.labelTypes,
       links: data.links,
       linkCandidates: data.linkCandidates,

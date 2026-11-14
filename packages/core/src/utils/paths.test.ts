@@ -5,6 +5,7 @@ import {
   diffPath,
   isContentHash,
   modeSegment,
+  publishedBrotliPath,
   publishedGzipPath,
   screenshotPath,
 } from "./paths.ts";
@@ -63,6 +64,8 @@ describe("contentKey", () => {
     expect(isContentHash(hash)).toBe(true);
     expect(contentKey(hash)).toBe(`content/${hash}`);
     expect(publishedGzipPath(hash)).toBe(`derived/published-gzip/${hash}.gz`);
+    expect(publishedBrotliPath(hash)).toBe(`derived/published-br/${hash}.br`);
+    expect(() => publishedBrotliPath("../x")).toThrow("Invalid published content hash");
   });
 
   it.each([

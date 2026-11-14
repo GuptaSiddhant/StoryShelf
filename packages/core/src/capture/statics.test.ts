@@ -143,4 +143,34 @@ describe("persistStorybookStatics", () => {
     await persistStorybookStatics(storage, dir, "p1", "b1", db, new AbortController().signal);
     expect([...files.keys()].some((key) => key.endsWith("manifest.json"))).toBe(true);
   });
+
+  it("records the byte size of each distinct blob with its use", async () => {
+    await writeFile(join(dir, "index.html"), "<html></html>");
+    await writeFile(join(dir, "a.js"), "same");
+    await writeFile(join(dir, "b.js"), "same");
+    const { storage } = memoryStorage();
+    const recorded: (ReadonlyMap<string, number> | undefined)[] = [];
+    const db = {
+      buildReferenceLifecycle: {
+        recordContentUses: async (
+          _project: string,
+          _build: string,
+          _hashes: readonly string[],
+          _staleBefore?: string,
+          sizes?: ReadonlyMap<string, number>,
+        ): Promise<string[]> => {
+          recorded.push(sizes);
+          return await Promise.resolve([]);
+        },
+      },
+    } as unknown as DatabaseAdapter;
+
+    await persistStorybookStatics(storage, dir, "p1", "b1", db);
+
+    expect(recorded).toHaveLength(1);
+    expect(Object.fromEntries(recorded[0] ?? [])).toEqual({
+      [sha("<html></html>")]: 13,
+      [sha("same")]: 4,
+    });
+  });
 });

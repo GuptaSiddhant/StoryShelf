@@ -39,8 +39,19 @@ async function setup() {
       browsers?: string | null;
       modesAllowlist?: string | null;
       storybookUrlTtlSeconds?: number | null;
+      pixelThreshold?: number;
+      maxDiffRatio?: number;
     };
-  return { app, save, project };
+  const saveThresholds = async (fields: Record<string, string>) =>
+    await app.request("/projects/capture-project/settings/thresholds", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-csrf-token": getCsrfToken(),
+      },
+      body: new URLSearchParams(fields).toString(),
+    });
+  return { app, save, saveThresholds, project };
 }
 
 describe("capture settings tab", () => {
@@ -52,7 +63,7 @@ describe("capture settings tab", () => {
     expect(html).toContain("Primary browser");
     expect(html).toContain('name="extra_firefox"');
     expect(html).toContain('name="modesAllowlist"');
-    expect(html).toContain(">Capture<");
+    expect(html).toContain("Capture &amp; tests");
   });
 
   it("saves a primary engine plus extras and the mode allowlist", async () => {
@@ -125,5 +136,36 @@ describe("capture settings tab", () => {
     const bodies = await Promise.all(responses.map(async (response) => await response.text()));
     expect(bodies.every((body) => body.includes("1050"))).toBe(true);
     expect((await project()).storybookUrlTtlSeconds ?? null).toBeNull();
+  });
+});
+
+describe("diff thresholds", () => {
+  it("shows the thresholds on the capture tab and saves them", async () => {
+    const { app, saveThresholds, project } = await setup();
+    const html = await (await app.request("/projects/capture-project/settings/capture")).text();
+    expect(html).toContain('name="pixelThreshold"');
+    const saved = await saveThresholds({ pixelThreshold: "0.2", maxDiffRatio: "0.01" });
+    expect([200, 204, 302]).toContain(saved.status);
+    expect(saved.headers.get("HX-Redirect") ?? saved.headers.get("location") ?? "").toContain(
+      "/projects/capture-project/settings/capture#thresholds",
+    );
+    expect(await project()).toMatchObject({ pixelThreshold: 0.2, maxDiffRatio: 0.01 });
+  });
+
+  it("refuses a blank threshold and saves nothing", async () => {
+    const { saveThresholds, project } = await setup();
+    const before = await project();
+    const refused = await saveThresholds({ pixelThreshold: "", maxDiffRatio: "0.01" });
+    expect(refused.status).toBe(400);
+    expect(await project()).toEqual(before);
+  });
+
+  it("refuses a value outside 0 to 1 and saves nothing", async () => {
+    const { saveThresholds, project } = await setup();
+    const before = await project();
+    const refused = await saveThresholds({ pixelThreshold: "2", maxDiffRatio: "0.01" });
+    expect(refused.status).toBe(400);
+    expect(await refused.text()).toContain("from 0 to 1");
+    expect(await project()).toEqual(before);
   });
 });

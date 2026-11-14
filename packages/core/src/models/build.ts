@@ -2,9 +2,10 @@
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter, TxStore } from "../adapters/database.ts";
+import { columnsExcept } from "../adapters/database.ts";
 import { allowedFrom, enteringFrom, isEntryOnly } from "../lifecycle/build-lifecycle.ts";
 import type { Logger } from "../logger.ts";
-import type { Build } from "../schema/build.ts";
+import type { BranchVerification, Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
@@ -52,6 +53,9 @@ export interface BuildTables {
 }
 
 /** Data operations for build records. */
+/** A build row without its stored Storybook test results, as {@link BuildModel.listSummary} returns it. */
+export type BuildSummary = Omit<Build, "testResults">;
+
 export class BuildModel {
   private readonly tables: BuildTables;
   private readonly db: DatabaseAdapter;
@@ -278,6 +282,14 @@ export class BuildModel {
   }
 
   async list(projectId: string, filter: BuildListFilter = {}): Promise<Build[]> {
+    return await this.listColumns(projectId, filter);
+  }
+
+  private async listColumns(
+    projectId: string,
+    filter: BuildListFilter,
+    columns?: readonly string[],
+  ): Promise<Build[]> {
     const conditions = this.listConditions(projectId, filter);
     if (filter.labelKey && filter.labelValue) {
       const ids = await this.buildIdsWithLabel(projectId, filter.labelKey, filter.labelValue);
@@ -290,7 +302,17 @@ export class BuildModel {
       where: and(...conditions),
       orderBy: desc(col(this.tables.builds, "createdAt")),
       ...(filter.limit === undefined ? {} : { limit: filter.limit }),
+      ...(columns === undefined ? {} : { columns }),
     })) as unknown as Build[];
+  }
+
+  /**
+   * {@link list} without `testResults` (a large JSON text), for a caller that only reads the
+   * build's own fields, such as a library or component page choosing the newest build.
+   */
+  async listSummary(projectId: string, filter: BuildListFilter = {}): Promise<BuildSummary[]> {
+    const columns = columnsExcept(this.tables.builds, "testResults");
+    return await this.listColumns(projectId, filter, columns);
   }
 
   /** The status and branch conditions of a listing, after the project's own. */
@@ -756,6 +778,22 @@ export class BuildModel {
    * Store the results of the build's `.test()` entries (`TestResult[]`, as JSON), or clear them
    * with null. Written once per capture run, by the run that ran the tests.
    */
+  /**
+   * Record whether the build counts as a default-branch build and the git host's answer that
+   * decided it (`defaultBranchStanding`). The capture job writes it before anything reads
+   * `isDefault`, so every later reader (shards, review, re-diff) sees the standing, not the claim.
+   */
+  async setBranchStanding(
+    id: string,
+    standing: { isDefault: boolean; verification: BranchVerification | null },
+  ): Promise<Build> {
+    return (await this.db.update(this.tables.builds, id, {
+      isDefault: standing.isDefault,
+      branchVerified: standing.verification,
+      updatedAt: new Date().toISOString(),
+    })) as unknown as Build;
+  }
+
   async setTestResults(id: string, results: readonly unknown[] | null): Promise<Build> {
     return (await this.db.update(this.tables.builds, id, {
       testResults: results === null ? null : JSON.stringify(results),

@@ -71,20 +71,11 @@ describe("VerdictCard on a build that cannot be reviewed", () => {
   });
 
   it.each(["failed", "cancelled"])(
-    "offers a retry on a %s build where capture is on and the viewer may retry",
+    "leaves the retry to the build page's menu on a %s build",
     async (status) => {
-      const html = await render(status, { testing: true });
-      expect(html).toContain("Retry capture");
-      expect(html).toContain(`/api/v1/projects/${project.slug}/builds/${build.id}/retry`);
+      expect(await render(status, { testing: true })).not.toContain("Retry capture");
     },
   );
-
-  it("offers no retry without capture, or to a viewer who may not retry", async () => {
-    expect(await render("failed")).not.toContain("Retry capture");
-    expect(await render("failed", { testing: true, canComment: false })).not.toContain(
-      "Retry capture",
-    );
-  });
 
   it("offers no retry while the build can still be reviewed", async () => {
     expect(await render("reviewing", { testing: true })).not.toContain("Retry capture");

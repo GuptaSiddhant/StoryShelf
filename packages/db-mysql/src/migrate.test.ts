@@ -422,3 +422,15 @@ describe("runMigrations: a unique index over rows that already repeat its key", 
     ).rejects.toThrow("Duplicate entry");
   });
 });
+
+describe("runMigrations: default-branch verification (#910)", () => {
+  it("adds the project switch on for existing projects, and the build's answer column", async () => {
+    const { queries, run } = recordingRunner();
+    await runMigrations(run);
+
+    expect(queries).toContain(
+      "ALTER TABLE projects ADD COLUMN require_verified_default TINYINT(1) NOT NULL DEFAULT 1",
+    );
+    expect(queries).toContain("ALTER TABLE builds ADD COLUMN branch_verified VARCHAR(16) NULL");
+  });
+});

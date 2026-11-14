@@ -35,7 +35,7 @@ The gating status is named **`<prefix>/testing`**, where `<prefix>` is the git c
 
 Do this once per project. See the [CI guide](/guides/ci/#merge-gate) for the short version.
 
-1. Register the git providers on the server, next to any chat or email notifiers: `notifications: { notifiers: [...gitNotifiers] }` from [`@storyshelf/notify-git`](/packages/notify-git/).
+1. Nothing to register on the server: the git providers are built in and stay idle until a project adds a channel. Only an operator who passed an explicit `notifications.notifiers` array needs to include them (see [Notifications](/guides/notifications/#choosing-the-providers)).
 2. Open **Project → Settings → Notifications**, find **Add a git channel**, pick the provider, enter `owner` and `repo` (plus `host` for self-hosted GitLab), optionally a status prefix, paste a token, and save.
    - GitHub: a token with `repo:status` scope.
    - GitLab: a token with `api` scope.

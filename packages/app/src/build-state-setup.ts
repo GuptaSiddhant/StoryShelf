@@ -14,7 +14,7 @@ import {
   type KindHandler,
   type NotifyFailure,
 } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { ProjectModel } from "@storyshelf/core/models";
 import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";
@@ -32,7 +32,7 @@ export interface BuildStateWiring {
 
 /** Wire build-state delivery for `options`; `jobs` is the `notify` queue, null on a host with no consumer. */
 export function setupBuildState(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   jobs: JobQueue | null,
 ): BuildStateWiring {
@@ -73,7 +73,7 @@ export function setupBuildState(
  * alert can never raise another one.
  */
 async function alertAdmins(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   failure: NotifyFailure,
 ): Promise<void> {

@@ -156,7 +156,9 @@ describe("the auth gate and the query form", () => {
   ])("sends an anonymous visitor to login for %s, whatever the path tail says", async (link) => {
     const response = await (await gated()).request(link);
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/auth/login");
+    expect(response.headers.get("location")).toBe(
+      `/auth/login?return_to=${encodeURIComponent(link)}`,
+    );
   });
 
   it("still lets an anonymous visitor reach the published Storybook routes", async () => {

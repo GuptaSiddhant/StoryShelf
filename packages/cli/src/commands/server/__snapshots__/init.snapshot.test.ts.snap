@@ -46,8 +46,8 @@ exports[`server init output > is unchanged for aws full 1`] = `
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 985 a9583794222ce9f4542e35a419e539dec769b3096fbf8fe8866c17a005d95806",
-    "src/index.ts 1851 a7f56a0f92d08deecfbdbd9684a54827e002f46b2aadef455370dce4ce99c31c",
+    "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
+    "src/index.ts 1745 3766956929e3cade526d40b4341424e6b62b181a2ad16db0257436403941d3c0",
     "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
     "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
     "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
@@ -493,8 +493,8 @@ Next steps:
 exports[`server init output > is unchanged for design 1`] = `
 {
   "files": [
-    "package.json 610 a2db65ba1b652643946217c58a9e0f24c8825469db6be0b063e99f05f38c91b9",
-    "src/index.ts 1320 1351e66c9f9b2e862facc5f79fee389f74ffb242b554befab9c63204baf306fe",
+    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -584,8 +584,8 @@ Next steps:
 exports[`server init output > is unchanged for everything on 1`] = `
 {
   "files": [
-    "package.json 909 00f42216f93ad938bfb3c56dfa19c2fd48166cddf1308e0d47c188deafa2cc10",
-    "src/index.ts 2861 c0d98c02409d8cf9b2a27a35e0aebb7463c0cd881a96aac5fac929f54f1c56ed",
+    "package.json 748 f227703cd9e56ea6bb1b8a6f62e08d3242343f49ad727d08260d39fb2f24f0d5",
+    "src/index.ts 2802 4e15bac4f50c3172312a15e39b03e6bca9f5e24c761f1dd5603ae1c3e755ef64",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -690,8 +690,8 @@ Next steps:
 exports[`server init output > is unchanged for git on 1`] = `
 {
   "files": [
-    "package.json 608 220b2b4c145390136fd5adbc2ed6011cdbc8723169107ee9b58a94cad1ed8e51",
-    "src/index.ts 1282 74711a8d95884143d974b64b6d9de1f72de5c69a9a510352ee865090733b3d3e",
+    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -753,8 +753,8 @@ Next steps:
 exports[`server init output > is unchanged for notifications 1`] = `
 {
   "files": [
-    "package.json 680 cb64dcb83e4790b745d6c4f4656e1add5c540b0f4268a9f3eb520f6ab9ca97c1",
-    "src/index.ts 1624 c1713691ee89ebc72e7ce137955ad566facc2b58eb335f077a9323477857cfac",
+    "package.json 632 6b615b4d431c63f16df500c2c7e6bf60ef1aa00a86371d825a6ec2aea054fea7",
+    "src/index.ts 1781 b9e2945dfe974fdf2bde23e4900d7f64402c9ba55ccef1bf7b24c5d72db7a9f0",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -773,8 +773,8 @@ Next steps:
 exports[`server init output > is unchanged for notifications with oauth 1`] = `
 {
   "files": [
-    "package.json 713 49ef71244cb225b2b59102868bfc215084ef35c6304d35b71e8f941858dc85d8",
-    "src/index.ts 2130 b52361279e86cf56bdf925f2279256e0bb9b5e00cefbea1cbecbf022d0377ccd",
+    "package.json 665 5cbc9e474910ad7cf3d396729c279e68f1bddab02d04b586c45633a0b5e2e79a",
+    "src/index.ts 2287 7a7326c90ff824e4971cc0c30e433802b26e4bf8a090c5bbd176925be698d730",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -793,8 +793,8 @@ Next steps:
 exports[`server init output > is unchanged for notifications with password auth 1`] = `
 {
   "files": [
-    "package.json 713 49ef71244cb225b2b59102868bfc215084ef35c6304d35b71e8f941858dc85d8",
-    "src/index.ts 2170 0e1f4b2a5786e4bce50f1b26f111183a78fb5a02e9898fc43715ac9c241e8d43",
+    "package.json 665 5cbc9e474910ad7cf3d396729c279e68f1bddab02d04b586c45633a0b5e2e79a",
+    "src/index.ts 2327 d339d8aa0200e2b3dbf2c15ce439dfc13956d4da95914569b5befec3487c1b94",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts

@@ -66,7 +66,7 @@ describe("statusesForBuild: the testing status", () => {
       context: "storyshelf/testing",
       state,
       description,
-      url: "https://shelf.example.com/projects/web/builds/b1",
+      url: "https://shelf.example.com/projects/web/builds/b1/diff",
     });
   });
 
@@ -135,7 +135,7 @@ describe("statusesForBuild: which statuses exist", () => {
     expect(gate(set)).toMatchObject({
       state: "success",
       description: "Review is off",
-      url: "https://shelf.example.com/projects/web/builds/b1",
+      url: "https://shelf.example.com/projects/web/builds/b1/diff",
     });
     expect(set.comment?.state).toBe("success");
   });
@@ -174,7 +174,7 @@ describe("statusesForBuild: storybook", () => {
   it("is pending while publishing and failed when it failed, linking the build", () => {
     expect(run({ publishing: "pending" }).statuses.at(-1)).toMatchObject({
       state: "pending",
-      url: "https://shelf.example.com/projects/web/builds/b1",
+      url: "https://shelf.example.com/projects/web/builds/b1/diff",
     });
     expect(run({ publishing: "failure" }).statuses.at(-1)).toMatchObject({
       state: "failure",
@@ -217,7 +217,7 @@ describe("statusesForBuild: no status waits forever (every build status x publis
         state: "failure",
         informational: true,
         description: "Storybook content unavailable, see build page",
-        url: "https://shelf.example.com/projects/web/builds/b1",
+        url: "https://shelf.example.com/projects/web/builds/b1/diff",
       });
     }
   });
@@ -266,11 +266,11 @@ describe("statusesForBuild: the comment", () => {
   it("is keyed by the build page and carries state, summary and Storybook link", () => {
     const { comment } = run({ build: { status: "reviewing" } });
     expect(comment).toMatchObject({
-      url: "https://shelf.example.com/projects/web/builds/b1",
+      url: "https://shelf.example.com/projects/web/builds/b1/diff",
       state: "pending",
     });
     expect(comment?.markdown).toContain(
-      "[View build](https://shelf.example.com/projects/web/builds/b1)",
+      "[View build](https://shelf.example.com/projects/web/builds/b1/diff)",
     );
     expect(comment?.markdown).toContain("Visual tests: Review open: 3 changes to review");
     expect(comment?.markdown).toContain("Snapshots: 10 total, 4 changed, 1 approved, 0 rejected");
@@ -353,7 +353,7 @@ describe("statusesForBuild: progress and annotations", () => {
       build: { status: "reviewing" },
       changes: [change(1)],
     });
-    expect(gate(set)?.url).toBe("https://shelf.example.com/shelf/projects/web/builds/b1");
+    expect(gate(set)?.url).toBe("https://shelf.example.com/shelf/projects/web/builds/b1/diff");
     expect(gate(set)?.annotations?.[0]?.url).toBe(
       "https://shelf.example.com/shelf/projects/web/builds/b1/diff?snapshot=S1",
     );
@@ -371,6 +371,48 @@ describe("statusesForBuild: progress and annotations", () => {
     expect(withTesting.statuses.find((s) => s.name === "storybook")?.annotations).toBeUndefined();
     const review = run({ flags: { testing: false, review: true }, changes: [change(1)] });
     expect(gate(review)?.annotations).toBeUndefined();
+  });
+});
+
+/** A reviewing build that named `main`, with the host's answer and its standing. */
+const claim = (branchVerified: string | null, isDefault = false) => ({
+  status: "reviewing",
+  gitBranch: "main",
+  isDefault,
+  branchVerified,
+});
+
+describe("statusesForBuild: a default-branch claim that did not count (#910)", () => {
+  it.each([
+    ["refused", "Commit is not on main: 3 changes to review"],
+    ["unreachable", "Git host could not confirm main: 3 changes to review"],
+    ["unverified", "Default branch not verified: 3 changes to review"],
+  ])("says why a %s claim waits for review, and never passes", (verification, description) => {
+    const status = gate(run({ build: claim(verification) }));
+    expect(status).toMatchObject({ state: "pending", description });
+  });
+
+  it("reads like any review for a verified or unclaimed build", () => {
+    expect(gate(run({ build: claim("verified", true) }))?.description).toBe(
+      "Review open: 3 changes to review",
+    );
+    expect(gate(run({ build: claim(null) }))?.description).toBe("Review open: 3 changes to review");
+  });
+
+  it("says nothing more for an unverified claim the project counts", () => {
+    expect(gate(run({ build: claim("unverified", true) }))?.description).toBe(
+      "Review open: 3 changes to review",
+    );
+  });
+
+  it("passes only after an approver accepted the changes", () => {
+    const status = gate(
+      run({ build: { ...claim("refused"), status: "approved", approvedCount: 4 } }),
+    );
+    expect(status).toMatchObject({
+      state: "success",
+      description: "Review closed: 4 changes approved",
+    });
   });
 });
 
@@ -394,7 +436,7 @@ describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
       name: "testing",
       state: "success",
       description: "No story changed since 1234567",
-      url: "https://shelf.example.com/projects/web/builds/sk1",
+      url: "https://shelf.example.com/projects/web/builds/sk1/diff",
     });
   });
 
@@ -442,13 +484,15 @@ describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
   it("writes one comment line that links both builds and carries the gate state", () => {
     const set = skippedRun({ source: skippedSource() });
     expect(set.comment).toMatchObject({
-      url: "https://shelf.example.com/projects/web/builds/sk1",
+      url: "https://shelf.example.com/projects/web/builds/sk1/diff",
       state: "success",
     });
     const markdown = set.comment?.markdown ?? "";
     expect(markdown.split("\n")).toHaveLength(1);
-    expect(markdown).toContain("(https://shelf.example.com/projects/web/builds/sk1)");
-    expect(markdown).toContain("[1234567](https://shelf.example.com/projects/web/builds/src1)");
+    expect(markdown).toContain("(https://shelf.example.com/projects/web/builds/sk1/diff)");
+    expect(markdown).toContain(
+      "[1234567](https://shelf.example.com/projects/web/builds/src1/diff)",
+    );
   });
 
   it("says so in the comment when the source is gone", () => {

@@ -8,7 +8,12 @@
 import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
-import { contentKey, isContentHash, publishedGzipPath } from "../utils/paths.ts";
+import {
+  contentKey,
+  isContentHash,
+  publishedBrotliPath,
+  publishedGzipPath,
+} from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
 import { dropLiveHashes } from "./manifest-scan.ts";
 
@@ -111,6 +116,7 @@ async function removeBlob(deps: ContentGcDeps, hash: string, token: string): Pro
     await deps.storage.delete(contentKey(hash));
     // Variants are disposable; never let their deletion affect authoritative data.
     await deps.storage.delete(publishedGzipPath(hash)).catch(() => {});
+    await deps.storage.delete(publishedBrotliPath(hash)).catch(() => {});
     await deps.lifecycle.finishContentCollection(hash, token);
     return true;
   } catch (error) {

@@ -13,7 +13,7 @@ export function groupKey(snapshot: Pick<Snapshot, "storyId" | "viewportName">): 
 
 /** Open snapshots of one story/mode; 404 when the group has nothing left to decide. */
 async function openMembers(build: Build, storyId: string, modeKey: string): Promise<Snapshot[]> {
-  const all = await new SnapshotModel(getStore().db).listByBuild(build.id);
+  const all = await new SnapshotModel(getStore().db).listByBuildSummary(build.id);
   const members = all.filter(
     (snapshot) =>
       snapshot.storyId === storyId && snapshot.viewportName === modeKey && isOpenSnapshot(snapshot),

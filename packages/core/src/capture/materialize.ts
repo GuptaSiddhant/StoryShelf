@@ -232,9 +232,24 @@ async function fill(storage: StorageAdapter, partial: string, plan: Install): Pr
   });
 }
 
+/** A blob the manifest names is gone, and the upload zip that could rebuild it was deleted (#850). */
+export class MissingContentError extends Error {
+  override readonly name = "MissingContentError";
+  readonly hash: string;
+
+  constructor(hash: string) {
+    super(`Storybook content ${hash} is missing from storage; the build cannot be captured`);
+    this.hash = hash;
+  }
+}
+
 async function readBlob(storage: StorageAdapter, hash: string): Promise<Buffer> {
-  // A storage failure (including a missing blob) is not wrapped: the job retries it.
-  const data = await storage.read(contentKeyOrInvalid(hash));
+  const key = contentKeyOrInvalid(hash);
+  // Any other storage failure is not wrapped: the job retries it.
+  const data = await storage.read(key).catch(async (error: unknown) => {
+    if (await storage.exists(key)) throw error;
+    throw new MissingContentError(hash);
+  });
   if (createHash("sha256").update(data).digest("hex") !== hash) {
     throw new ZipInvalidError("Storybook content blob does not match its hash");
   }

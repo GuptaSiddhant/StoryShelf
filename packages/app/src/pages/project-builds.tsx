@@ -2,9 +2,8 @@ import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
-import { loadHealthPanel } from "../insights/health-panel.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { getStore, testingEnabled } from "../store.ts";
+import { getStore } from "../store.ts";
 import {
   Badge,
   Button,
@@ -16,8 +15,7 @@ import {
   SelectField,
   VStack,
 } from "../ui/components.tsx";
-import { HealthSlot } from "./health-panel.tsx";
-import { InheritedRatioCard } from "./inherited-ratio-card.tsx";
+import { GetStarted } from "./get-started.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 import { loadSkipSources } from "./skipped-source.ts";
 
@@ -148,37 +146,34 @@ function BuildsToolbar(props: {
   );
 }
 
-/** The build table, or an empty state that explains whether a filter or skipping hides builds. */
-function BuildsList(props: {
+/** The empty state for a project whose every build was skipped (hidden by default). */
+function AllSkipped(props: {
   project: Project;
-  all: Build[];
-  builds: Build[];
-  sources: Awaited<ReturnType<typeof loadSkipSources>>;
   query: BuildFilters;
-}): ReturnType<typeof EmptyState> | ReturnType<typeof BuildsTable> {
-  const { project, all, builds, sources, query } = props;
+  total: number;
+}): ReturnType<typeof EmptyState> {
+  const { project, query, total } = props;
   const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
-  if (builds.length > 0) {
-    return <BuildsTable project={project} builds={builds} sources={sources} />;
-  }
-  const skippedTotal = all.filter((build) => build.status === "skipped").length;
-  if (skippedTotal > 0 && skippedTotal === all.length && !showsSkipped(query)) {
-    return (
-      <EmptyState
-        title="Every build here was skipped"
-        description={`No story changed in any of the ${skippedTotal} builds, so none was captured. Show skipped to see them.`}
-        action={
-          <Button
-            variant="secondary"
-            href={listHref(urls.buildsList(project.slug), { ...query, skipped: "1" })}
-          >
-            Show skipped
-          </Button>
-        }
-      />
-    );
-  }
-  const filtered = Boolean(query.status ?? query.branch);
+  return (
+    <EmptyState
+      title="Every build here was skipped"
+      description={`No story changed in any of the ${total} builds, so none was captured. Show skipped to see them.`}
+      action={
+        <Button
+          variant="secondary"
+          href={listHref(urls.buildsList(project.slug), { ...query, skipped: "1" })}
+        >
+          Show skipped
+        </Button>
+      }
+    />
+  );
+}
+
+/** The empty state of a filtered or brand-new list. */
+function NoBuilds(props: { project: Project; filtered: boolean }): ReturnType<typeof EmptyState> {
+  const { project, filtered } = props;
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <EmptyState
       title="No builds"
@@ -198,26 +193,27 @@ function BuildsList(props: {
   );
 }
 
-/** The page title, the repository and default branch, and the settings link. */
-function BuildsHeader(props: { project: Project }): ReturnType<typeof PageHeader> {
-  const { project } = props;
-  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
-  return (
-    <PageHeader
-      title="Builds"
-      description={
-        <>
-          {project.gitRepository ?? project.slug} · default branch{" "}
-          <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
-        </>
-      }
-      actions={
-        <Button variant="secondary" icon="settings" href={urls.settings(project.slug)}>
-          Settings
-        </Button>
-      }
-    />
-  );
+/** The build table, or an empty state that explains whether a filter or skipping hides builds. */
+function BuildsList(props: {
+  project: Project;
+  all: Build[];
+  builds: Build[];
+  sources: Awaited<ReturnType<typeof loadSkipSources>>;
+  query: BuildFilters;
+  origin: string | undefined;
+}): ReturnType<typeof EmptyState> | ReturnType<typeof BuildsTable> {
+  const { project, all, builds, sources, query } = props;
+  if (builds.length > 0) {
+    return <BuildsTable project={project} builds={builds} sources={sources} />;
+  }
+  if (all.length === 0) {
+    return <GetStarted project={project} origin={props.origin} />;
+  }
+  const skippedTotal = all.filter((build) => build.status === "skipped").length;
+  if (skippedTotal > 0 && skippedTotal === all.length && !showsSkipped(query)) {
+    return <AllSkipped project={project} query={query} total={skippedTotal} />;
+  }
+  return <NoBuilds project={project} filtered={Boolean(query.status ?? query.branch)} />;
 }
 
 /** Hiding skipped builds also drops a `status=skipped` filter, which would match nothing. */
@@ -239,21 +235,31 @@ export async function renderProjectBuildsPage(
   const all = await new BuildModel(getStore().db).list(project.id);
   const builds = all.filter((build) => matches(build, query));
   const sources = await loadSkipSources(builds);
-  const health = await loadHealthPanel(project);
 
   return (
     <DocumentLayout
-      title={project.name}
+      title={`Builds · ${project.name}`}
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
     >
-      <BuildsHeader project={project} />
+      <PageHeader
+        title="Builds"
+        description={
+          <>
+            {project.gitRepository ? `${project.gitRepository} · ` : ""}default branch{" "}
+            <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
+          </>
+        }
+      />
       <VStack>
-        <HealthSlot project={project} data={health} />
-        {testingEnabled() ? (
-          <InheritedRatioCard builds={all.filter((build) => build.status !== "skipped")} />
-        ) : null}
         <BuildsToolbar project={project} all={all} filters={query} />
-        <BuildsList project={project} all={all} builds={builds} sources={sources} query={query} />
+        <BuildsList
+          project={project}
+          all={all}
+          builds={builds}
+          sources={sources}
+          query={query}
+          origin={await getStore().publicOrigin?.url()}
+        />
       </VStack>
     </DocumentLayout>
   );

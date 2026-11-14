@@ -57,7 +57,9 @@ describe("project detectUnstable setting", () => {
     const { app, json } = boot();
     const created = (await (await json("POST", "/projects", { name: "Form" })).json()) as Row;
     const tab = `/projects/${created.slug}/settings/tests`;
-    expect(await (await app.request(tab)).text()).toMatch(/name="detectUnstable"[^>]*checked/u);
+    expect(
+      await (await app.request(tab.replace("/settings/tests", "/settings/capture"))).text(),
+    ).toMatch(/name="detectUnstable"[^>]*checked/u);
 
     const save = async (fields: Record<string, string>) =>
       await app.request(tab, {
@@ -71,7 +73,9 @@ describe("project detectUnstable setting", () => {
     expect([200, 204, 302]).toContain((await save({})).status);
     const off = (await (await json("GET", `/projects/${created.slug}`)).json()) as Row;
     expect(off.detectUnstable).toBe(false);
-    expect(await (await app.request(tab)).text()).toMatch(/name="detectUnstable"(?![^>]*checked)/u);
+    expect(
+      await (await app.request(tab.replace("/settings/tests", "/settings/capture"))).text(),
+    ).toMatch(/name="detectUnstable"(?![^>]*checked)/u);
 
     expect([200, 204, 302]).toContain((await save({ detectUnstable: "true" })).status);
     const on = (await (await json("GET", `/projects/${created.slug}`)).json()) as Row;

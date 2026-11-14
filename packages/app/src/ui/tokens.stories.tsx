@@ -100,6 +100,12 @@ const swatch_status_rejected = css`
   background: var(--status-rejected);
 `;
 
+const swatch_status_info = css`
+  /* swatch-status-info */
+  ${swatchFrame}
+  background: var(--status-info);
+`;
+
 const swatches = [
   ["--accent", swatch_accent],
   ["--accent-contrast", swatch_accent_contrast],
@@ -115,6 +121,7 @@ const swatches = [
   ["--status-approved", swatch_status_approved],
   ["--status-new", swatch_status_new],
   ["--status-rejected", swatch_status_rejected],
+  ["--status-info", swatch_status_info],
 ] as const;
 
 /** The brand colour tokens of the active theme: switch Light/Dark in the toolbar to compare. */
