@@ -84,7 +84,7 @@ function httpClient(skipped: Answer): { client: Client; skippedCalls: string[] }
       if (url.includes("/builds/skip-source")) {
         return Response.json({ sourceBuildId: "b0", sha: "basesha1234567" });
       }
-      skippedCalls.push(String(init?.body));
+      skippedCalls.push(typeof init?.body === "string" ? init.body : "");
       return await skipped();
     }),
   );
