@@ -1,4 +1,4 @@
-import type { DesignProvider } from "@storyshelf/core/adapter/design";
+import type { DesignProvider } from "../../../adapters/design.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 

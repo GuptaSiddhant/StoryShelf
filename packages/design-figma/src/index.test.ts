@@ -1,7 +1,11 @@
-import { designContractSuite } from "@storyshelf/core/test-helpers";
-import { createFigmaDesign } from "./index.ts";
+import * as core from "@storyshelf/core/integrations";
+import { describe, expect, it } from "vitest";
+import * as shim from "./index.ts";
 
-designContractSuite("figma", createFigmaDesign, {
-  valid: { url: "https://www.figma.com/design/AbC123/Kit?node-id=1-2", fileKey: "AbC123" },
-  invalid: "https://example.com/design/AbC123/Kit",
+describe("@storyshelf/design-figma shim", () => {
+  it("re-exports the core integration", () => {
+    expect(shim.createFigmaDesign).toBe(core.createFigmaDesign);
+    expect(shim.figmaOAuthFromEnv).toBe(core.figmaOAuthFromEnv);
+    expect(shim.parseFigmaUrl).toBe(core.parseFigmaUrl);
+  });
 });

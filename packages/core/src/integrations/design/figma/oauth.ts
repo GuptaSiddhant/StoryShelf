@@ -1,6 +1,6 @@
 /** Figma OAuth 2 (authorization-code grant): consent URL, code exchange and refresh. */
-import type { OAuthClient, OAuthTokens } from "@storyshelf/core/adapter/oauth";
-import { httpJson } from "@storyshelf/core/utils";
+import type { OAuthClient, OAuthTokens } from "../../../adapters/oauth.ts";
+import { httpJson } from "../../../utils/index.ts";
 
 /** Operator-registered Figma OAuth app (Figma → Settings → OAuth apps). */
 export interface FigmaOAuthOptions {

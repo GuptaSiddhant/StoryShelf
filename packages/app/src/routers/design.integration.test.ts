@@ -575,6 +575,7 @@ async function bare() {
     storage,
     logger: pino({ level: "silent" }),
     config: { secret: SECRET },
+    design: false,
   });
   return { app, design: new DesignModel(db, []) };
 }

@@ -31,7 +31,7 @@ const builtIn: BuiltInIntegrations = {
 };
 
 describe("BUILT_IN_INTEGRATIONS", () => {
-  it("holds the git, email and chat notifiers and is frozen; each move task adds its own", () => {
+  it("holds the git, email and chat notifiers and Figma, frozen; each move task adds its own", () => {
     expect(BUILT_IN_INTEGRATIONS.notifiers.map((entry) => entry.metadata.kind)).toEqual([
       "github",
       "gitlab",
@@ -42,7 +42,7 @@ describe("BUILT_IN_INTEGRATIONS", () => {
       "log",
     ]);
     expect(BUILT_IN_INTEGRATIONS.email).toEqual([]);
-    expect(BUILT_IN_INTEGRATIONS.design).toEqual([]);
+    expect(BUILT_IN_INTEGRATIONS.design.map((p) => p.metadata.kind)).toEqual(["figma"]);
     expect(Object.isFrozen(BUILT_IN_INTEGRATIONS)).toBe(true);
     expect(Object.isFrozen(BUILT_IN_INTEGRATIONS.notifiers)).toBe(true);
   });
@@ -62,7 +62,7 @@ describe("resolveShelfIntegrations", () => {
     expect(resolveShelfIntegrations({})).toEqual({
       notifiers: [...BUILT_IN_INTEGRATIONS.notifiers],
       email: [],
-      design: [],
+      design: [...BUILT_IN_INTEGRATIONS.design],
     });
   });
 

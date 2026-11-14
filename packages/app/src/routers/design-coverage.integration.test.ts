@@ -183,7 +183,7 @@ async function seed(options: Options = {}) {
     storage,
     logger: pino({ level: "silent" }),
     config: { secret: SECRET, ...(auth ? { adminToken: ADMIN_TOKEN } : {}) },
-    ...(providers ? { design: [figma] } : {}),
+    design: providers ? [figma] : false,
     ...(auth ? { auth: stub } : {}),
   });
   return { app, db };
