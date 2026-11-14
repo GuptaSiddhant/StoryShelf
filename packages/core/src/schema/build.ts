@@ -63,6 +63,18 @@ export interface Build {
    */
   captureGeneration?: number;
   /**
+   * For a `skipped` build, the real build whose outcome it repeats (ADR 0044); null on every other
+   * build. Never another skipped build: creation resolves a chain to its source.
+   */
+  skippedFromBuildId?: string | null;
+  /**
+   * For a `skipped` build, the normal build of the same project, branch and commit that replaced
+   * it (ADR 0044 decision 4, ADR 0045); null otherwise.
+   */
+  supersededByBuildId?: string | null;
+  /** The CLI's per-run key: a repeated key returns the build it created. Unique per project. */
+  idempotencyKey?: string | null;
+  /**
    * Hash of the manifest the file-by-file upload accepted (write-once publish, ADR 0051). Null
    * until a manifest claims it, and again after a failed publish releases it.
    */
