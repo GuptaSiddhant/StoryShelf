@@ -25,6 +25,16 @@ describe("childEnvOf", () => {
     );
   });
 
+  it("hands down the operator's veto of story switching (ADR 0052)", () => {
+    expect(childEnvOf({ retries: 1, switchStoriesVetoed: true })).toEqual({
+      STORYSHELF_CAPTURE_RETRIES: "1",
+      STORYSHELF_SWITCH_STORIES_VETO: "1",
+    });
+    expect(childEnvOf({ retries: 1, switchStoriesVetoed: false })).toEqual({
+      STORYSHELF_CAPTURE_RETRIES: "1",
+    });
+  });
+
   it("always hands down the retries, and nothing for options that were not given", () => {
     expect(childEnvOf({ retries: 0 })).toEqual({ STORYSHELF_CAPTURE_RETRIES: "0" });
   });

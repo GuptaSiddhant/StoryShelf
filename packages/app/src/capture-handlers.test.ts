@@ -203,6 +203,7 @@ describe("handlerFor", () => {
         shardSize: 4,
         images: { engine: "sharp" },
         compare: { threads: 2 },
+        switchStories: false,
       },
     } as unknown as ShelfOptions;
 
@@ -214,6 +215,7 @@ describe("handlerFor", () => {
       shardSize: 4,
       imageEngine: "sharp",
       diffThreads: 2,
+      switchStoriesVetoed: true,
       fallback: inProcess,
       ...parts,
     });

@@ -15,7 +15,14 @@ export {
   refusalFor,
   resolveBrowsers,
 } from "./browsers.ts";
-export { switchStoriesEnabled, switchStoriesVetoed } from "./switch-stories.ts";
+export { switchStoriesEnabled, switchStoriesFor, switchStoriesVetoed } from "./switch-stories.ts";
+export {
+  MAX_SESSION_STORIES,
+  planSwitchSessions,
+  type SessionJob,
+  type SessionPlanOptions,
+  type SwitchSession,
+} from "./switch-sessions.ts";
 export {
   NO_ORIGIN_REASON,
   NO_SECRET_REASON,
@@ -198,6 +205,7 @@ export {
   canForkCaptureChild,
   CAPTURE_RETRIES_ENV,
   CAPTURE_SHARD_SIZE_ENV,
+  CAPTURE_SWITCH_STORIES_VETO_ENV,
   CAPTURE_WORKER_ROLE,
   forkCaptureChild,
   type ForkOptions,

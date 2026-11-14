@@ -106,6 +106,9 @@ function runnerMetadata(offers: ReturnType<typeof createTargetOffers>): CaptureR
     description: "Puppeteer capture runner (chrome-headless-shell)",
     kind: "puppeteer",
     category: "capture-runner",
+    // ADR 0052, decision 2: not offered until this runner passes the measurement gate (decision 9).
+    // Correctness passed on fixtures 8-10; the bench's full-capture row did not get 15% faster.
+    switchStories: false,
     get targets() {
       return offers.current();
     },

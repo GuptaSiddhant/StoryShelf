@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
 import { TargetLaunchError } from "../adapters/capture-target.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { contentPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import {
   captureAcrossBrowsers,
@@ -275,6 +277,67 @@ describe("captureAcrossBrowsers", () => {
       )?.level;
     expect(levelOf("flaky")).toBe("warn");
     expect(levelOf("solid")).toBe("error");
+  });
+});
+
+/** Where a screenshot of these bytes is stored: content-addressed, as `storeScreenshot` does. */
+function pathOf(bytes: Buffer): string {
+  return contentPath("p1", createHash("sha256").update(bytes).digest("hex"));
+}
+
+/** A baseline whose image is at `path`. */
+async function seedAt(db: ReturnType<typeof makeDatabase>["db"], storyId: string, path: string) {
+  await seedBaseline(db, storyId);
+  await db.update(db.tables.baselines, `bl-${storyId}`, { screenshotPath: path });
+}
+
+describe("story switching (ADR 0052, decision 5)", () => {
+  it("asks the runner to switch only to baselined stories, then confirms on fresh pages", async () => {
+    const same = png();
+    const other = Buffer.concat([png(), Buffer.from([1])]);
+    const { input, calls, db, logged } = setup({
+      browsers: ["chromium"],
+      stories: [story("a"), story("b"), story("c")],
+      switchStories: true,
+    });
+    await seedAt(db, "a", pathOf(same));
+    await seedAt(db, "b", pathOf(same));
+    const { runner } = runnerOf(async (request) => {
+      for (const entry of request.stories) {
+        const switched = request.switchStories !== undefined && entry.id !== "c";
+        // oxlint-disable-next-line no-await-in-loop -- one capture at a time
+        await request.onCapture?.({
+          story: entry,
+          viewportName: "desktop",
+          screenshot: entry.id === "b" && switched ? other : same,
+          ...(switched ? { switched: true } : {}),
+        });
+      }
+      calls.push(request);
+      return { captures: [], failures: [] };
+    });
+    const result = await captureAcrossBrowsers({ ...input, runner });
+    expect(calls[0]?.switchStories?.baselined.map((pair) => pair.storyId)).toEqual(["a", "b"]);
+    // b's switched capture differs from its baseline: rendered again, without switching.
+    expect(calls[1]?.switchStories).toBeUndefined();
+    expect(calls[1]?.stories.map((entry) => entry.id)).toEqual(["b"]);
+    const byStory = new Map(result.captures.map((capture) => [capture.story.id, capture]));
+    expect(byStory.get("a")?.switched).toBe(true);
+    expect(byStory.get("b")?.switched).toBeUndefined();
+    expect(byStory.get("b")?.storedPath).toBe(pathOf(same));
+    expect(result.captures).toHaveLength(3);
+    expect(logged.find((line) => line.message.startsWith("story switching"))?.fields).toMatchObject(
+      {
+        switched: 2,
+        renderedAgain: 1,
+      },
+    );
+  });
+
+  it("sends no request when the build does not switch", async () => {
+    const { input, calls } = setup({ browsers: ["chromium"] });
+    await captureAcrossBrowsers(input);
+    expect(calls[0]?.switchStories).toBeUndefined();
   });
 });
 

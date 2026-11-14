@@ -6,6 +6,7 @@ import type {
   RenderedSnapshot,
   StoryEntry,
   StorySourceAdapter,
+  SwitchStoriesRequest,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { StoryParameters } from "@storyshelf/core/capture";
@@ -45,6 +46,11 @@ export interface PlaywrightRenderInput {
   reusePages?: boolean;
   /** Streaming hand-off: receives each capture instead of it being collected in the result. */
   onCapture?: (capture: RenderedSnapshot) => Promise<void>;
+  /**
+   * Switch stories inside one loaded page for these story/viewport pairs (ADR 0052). Ignored for
+   * a remote target and for any story source other than the built-in Storybook one.
+   */
+  switchStories?: SwitchStoriesRequest;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
   adapter?: StorySourceAdapter;
 }

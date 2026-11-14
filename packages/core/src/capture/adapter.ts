@@ -39,6 +39,11 @@ export interface StoryParameters {
   diffThreshold?: number;
   pauseAnimationAtEnd?: boolean;
   flakyTest?: boolean;
+  /**
+   * Render this story on a page of its own even when the project switches stories inside one
+   * loaded page (ADR 0052, decision 4): the page is reloaded before and after it.
+   */
+  isolate?: boolean;
   /** Force auto-crop (true) or full viewport (false) for this story; undefined uses 60% whitespace rule. */
   autoCrop?: boolean;
   /** Whitespace fraction (0..1) above which we crop; default 0.6. */

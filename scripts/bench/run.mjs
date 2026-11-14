@@ -34,8 +34,8 @@ async function step(system, buildDir, sha) {
   return { buildId, capture, storage: storageReport(system.dir) };
 }
 
-export async function runOnce(dir, scratch) {
-  const system = await startApp(dir);
+export async function runOnce(dir, scratch, options = {}) {
+  const system = await startApp(dir, options);
   try {
     const story = firstStory();
     const first = await step(system, FIXTURE, "sha-1");

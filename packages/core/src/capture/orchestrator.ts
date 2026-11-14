@@ -38,6 +38,7 @@ import { detectUnstableRenders } from "./stability.ts";
 import { persistStorybookStatics } from "./statics.ts";
 import { storybookUrlSource } from "./storybook-urls.ts";
 import { StorybookAdapter } from "./storybook.ts";
+import { switchStoriesFor } from "./switch-stories.ts";
 import { loadTarget } from "./target.ts";
 import { offeredTargets } from "./targets.ts";
 import { runProjectTests } from "./tests.ts";
@@ -78,6 +79,11 @@ export interface CaptureJobOptions {
    * build runs in one piece.
    */
   enqueue?: ((job: ShardJob) => Promise<void>) | undefined;
+  /**
+   * The operator's veto of story switching (`testing.switchStories: false`, ADR 0052 decision 2):
+   * a project's `switchStories` setting is then ignored.
+   */
+  switchStoriesVetoed?: boolean | undefined;
 }
 
 /** A shard job: the build and the `capture_shards` row to render. */
@@ -328,6 +334,13 @@ async function runCapturePhases(
       renderTimeoutMs: options.renderTimeoutMs,
       storybookUrl,
       logger,
+      switchStories: switchStoriesFor(project, {
+        vetoed: options.switchStoriesVetoed === true,
+        runner: options.runner,
+        log: (message, fields) => {
+          logger?.info(fields, message);
+        },
+      }),
     };
     const renderStart = performance.now();
     const matrix = await timed(

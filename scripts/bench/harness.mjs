@@ -22,8 +22,11 @@ const run = promisify(execFile);
 const load = async (path) => await import(pathToFileURL(join(root, path)).href);
 const needs = createRequire(join(root, "packages/core/package.json"));
 
-/** Start the app on a free port in `dir`. Returns handles for measuring and `stop()`. */
-export async function startApp(dir) {
+/**
+ * Start the app on a free port in `dir`. Returns handles for measuring and `stop()`.
+ * `options.switchStories` turns the project's story switching on (ADR 0052), which has no API yet.
+ */
+export async function startApp(dir, options = {}) {
   rmSync(dir, { recursive: true, force: true });
   rmSync(`${dir}-scratch`, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
@@ -63,6 +66,11 @@ export async function startApp(dir) {
     body: JSON.stringify({ name: SLUG }),
   });
   if (created.status !== 201) throw new Error(`project create answered ${created.status}`);
+  if (options.switchStories) {
+    const projects = new models.ProjectModel(rawDb, rawDb.tables);
+    const project = await projects.getBySlug(SLUG);
+    await projects.update(project.id, { switchStories: true });
+  }
   const builds = new models.BuildModel(rawDb, rawDb.tables);
   const snapshots = new models.SnapshotModel(rawDb, rawDb.tables);
   return {

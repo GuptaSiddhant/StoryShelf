@@ -6,10 +6,13 @@ import type {
   CaptureTarget,
   RenderFailure,
   RenderedSnapshot,
+  SwitchStoriesRequest,
 } from "../adapters/capture-runner.ts";
 import { TargetLaunchError } from "../adapters/capture-target.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import type { BaselineMap } from "../models/baseline-map.ts";
+import { BaselineModel } from "../models/baseline.ts";
 import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureLogLevel } from "../schema/capture-attempt.ts";
@@ -20,13 +23,20 @@ import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
 import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
 import { primaryTargetOf, resolveBrowsers } from "./browsers.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
-import { renderIsolating, type IsolationNote, type PassOutcome } from "./isolate.ts";
+import {
+  renderIsolating,
+  type IsolatedResult,
+  type IsolationNote,
+  type IsolationOptions,
+  type PassOutcome,
+} from "./isolate.ts";
 import type { PipelineTables } from "./pipeline.ts";
 import type { CaptureProgress } from "./progress.ts";
 import type { RenderRequest } from "./render.ts";
 import type { EngineWork } from "./shard-plan.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
 import { resolveStoryViewports } from "./storybook.ts";
+import { replaceStories, switchRequestOf, unconfirmedStories } from "./switch-confirm.ts";
 import { renderInSlices, SignedUrlLifetimeError } from "./token-chunks.ts";
 
 /** Inputs shared by every engine's pass. */
@@ -58,6 +68,11 @@ export interface MatrixInput {
   shardIndex?: number | undefined;
   /** Mints the signed URL for a `reach: "url"` target at the start of each pass. */
   storybookUrl?: StorybookUrlSource | undefined;
+  /**
+   * Let the runner switch stories inside loaded pages for the stories that have a baseline
+   * (ADR 0052), decided once per build by `switchStoriesFor`. Off for every second render.
+   */
+  switchStories?: boolean | undefined;
 }
 
 /** Everything the passes produced, every row tagged with its engine. */
@@ -159,20 +174,81 @@ async function isolatedPass(
   toRender: StoryEntry[],
   inherited: InheritedStory[],
 ): Promise<MatrixResult> {
-  const pass = await renderIsolating(
+  const options: IsolationOptions = {
+    note: isolationNote(mirror, browser),
+    viewportsOf: (story) =>
+      resolveStoryViewports(story, input.viewports).map((viewport) => viewport.name),
+  };
+  const baselines = input.switchStories ? await baselinesOf(input, browser) : undefined;
+  // Only the first render may switch: narrowing a crash, and every second render, use fresh pages.
+  let request = baselines && switchRequestOf(toRender, input.viewports, baselines, browser);
+  // A first build has nothing to confirm against, so nothing may be switched.
+  if (request?.baselined.length === 0) request = undefined;
+  const first = await renderIsolating(
     toRender,
-    async (slice) => await attemptPass(input, browser, mirror, slice),
-    {
-      note: isolationNote(mirror, browser),
-      viewportsOf: (story) =>
-        resolveStoryViewports(story, input.viewports).map((viewport) => viewport.name),
+    async (slice) => {
+      const once = request;
+      request = undefined;
+      return await attemptPass(input, browser, mirror, slice, once);
     },
+    options,
   );
+  const pass = baselines
+    ? await confirmSwitched(input, browser, mirror, { first, baselines, toRender, options })
+    : first;
   return {
     captures: fillEnvironment(pass.captures),
     failures: pass.failures,
     inherited,
     renderCount: pass.renderCount,
+  };
+}
+
+/** The baselines this engine's captures compare against, as the persist step resolves them. */
+async function baselinesOf(input: MatrixInput, browser: CaptureTarget): Promise<BaselineMap> {
+  return await new BaselineModel(input.db, input.tables).loadFor(
+    input.project.id,
+    input.build.gitBranch,
+    input.project.gitDefaultBranch,
+    [browser],
+  );
+}
+
+/**
+ * Decision 5 of ADR 0052: keep a switched capture only when it is identical to its baseline;
+ * render every other switched story again on fresh pages and take that render instead.
+ */
+async function confirmSwitched(
+  input: MatrixInput,
+  browser: CaptureTarget,
+  mirror: AttemptMirror,
+  pass: {
+    first: IsolatedResult;
+    baselines: BaselineMap;
+    toRender: StoryEntry[];
+    options: IsolationOptions;
+  },
+): Promise<IsolatedResult> {
+  const { first } = pass;
+  const switched = first.captures.filter((capture) => capture.switched === true).length;
+  if (switched === 0) return first;
+  const again = unconfirmedStories(first.captures, pass.baselines, browser);
+  mirror.log("info", "story switching: switched captures confirmed against their baselines", {
+    browser,
+    switched,
+    renderedAgain: again.size,
+  });
+  if (again.size === 0) return first;
+  const fresh = await renderIsolating(
+    pass.toRender.filter((story) => again.has(story.id)),
+    async (slice) => await attemptPass(input, browser, mirror, slice),
+    pass.options,
+  );
+  return {
+    captures: replaceStories(first.captures, fresh.captures, again),
+    failures: replaceStories(first.failures, fresh.failures, again),
+    renderCount: first.renderCount,
+    poisoned: [...first.poisoned, ...fresh.poisoned],
   };
 }
 
@@ -182,10 +258,11 @@ async function attemptPass(
   browser: CaptureTarget,
   mirror: AttemptMirror,
   stories: StoryEntry[],
+  switchStories?: SwitchStoriesRequest,
 ): Promise<PassOutcome> {
   const spooled: RenderedSnapshot[] = [];
   try {
-    const pass = await renderPass(input, browser, mirror, stories, [], spooled);
+    const pass = await renderPass(input, browser, mirror, stories, spooled, switchStories);
     return { captures: pass.captures, failures: pass.failures };
   } catch (error) {
     // The browser never started, or the signed URL lifetime cannot fit the pass: no story is at
@@ -296,15 +373,18 @@ async function renderPass(
   browser: CaptureTarget,
   mirror: AttemptMirror,
   toRender: StoryEntry[],
-  inherited: InheritedStory[],
-  spooled: RenderedSnapshot[] = [],
+  spooled: RenderedSnapshot[],
+  switchStories: SwitchStoriesRequest | undefined,
 ): Promise<MatrixResult> {
   const expected = toRender.flatMap((story) =>
     resolveStoryViewports(story, input.viewports),
   ).length;
   const rendered = await renderInSlices({
     runner: input.runner,
-    request: renderRequest(input, browser, toRender, spooled, { mirror, expected }),
+    request: {
+      ...renderRequest(input, browser, toRender, spooled, { mirror, expected }),
+      ...(switchStories ? { switchStories } : {}),
+    },
     browser,
     storybookUrl: input.storybookUrl,
     captureCount: (story) => resolveStoryViewports(story, input.viewports).length,
@@ -321,7 +401,7 @@ async function renderPass(
   return {
     captures: withEnvironment([...spooled, ...tagged(rendered.captures, browser)], environment),
     failures: tagged(rendered.failures, browser),
-    inherited,
+    inherited: [],
     renderCount: toRender.length,
   };
 }

@@ -11,6 +11,7 @@ import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   captureDispatchDeps,
   DEFAULT_RETRIES,
+  switchStoriesVetoed,
   type BuildStatePublisher,
   type CaptureHandlerOptions,
 } from "@storyshelf/core/capture";
@@ -123,5 +124,6 @@ function captureHandlerOptions(
     enqueue: parts.enqueue,
     maxRetries: options.testing?.retries,
     onShardRepeated: recordShardRepeated,
+    switchStoriesVetoed: switchStoriesVetoed(options.testing),
   };
 }

@@ -9,6 +9,7 @@ import type {
   CaptureTarget,
   RemoteTarget,
   RenderedSnapshot,
+  SwitchStoriesRequest,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
@@ -48,6 +49,12 @@ export interface PuppeteerRenderInput {
   reusePages?: boolean;
   /** Streaming hand-off: receives each capture instead of it being collected in the result. */
   onCapture?: (capture: RenderedSnapshot) => Promise<void>;
+  /**
+   * Switch stories inside one loaded page for these story/viewport pairs (ADR 0052). Ignored for
+   * a remote target, without page reuse, and for any story source other than the built-in
+   * Storybook one.
+   */
+  switchStories?: SwitchStoriesRequest;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
   adapter?: StorySourceAdapter;
 }

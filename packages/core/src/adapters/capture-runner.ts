@@ -122,6 +122,22 @@ export interface RenderedSnapshot {
   storedPath?: string;
   /** Environment of the render pass that produced it; filled in by the orchestrator from {@link RenderResult.environment}. */
   environment?: CaptureEnvironment;
+  /**
+   * Set by a runner when this screenshot was taken after switching stories inside a page that had
+   * already rendered another story (ADR 0052). The orchestrator keeps it only when it is identical
+   * to the baseline, and renders the story again on a fresh page otherwise (decision 5).
+   */
+  switched?: boolean;
+}
+
+/**
+ * Permission to switch stories inside one loaded page (ADR 0052). Only the listed story/viewport
+ * pairs may be switched to: the ones that have a baseline to be confirmed against. Every other
+ * capture loads a fresh page.
+ */
+export interface SwitchStoriesRequest {
+  /** The story/viewport pairs with a baseline on this engine. */
+  baselined: readonly { storyId: string; viewportName: string }[];
 }
 
 /** A story/viewport that a renderer could not capture. */
@@ -174,6 +190,11 @@ export interface CaptureRunner extends Adapter<{
    * render now. A runner that omits it offers any target.
    */
   readonly targets?: readonly RunnerTarget[];
+  /**
+   * True when the runner can switch stories inside one loaded page (ADR 0052, decision 2) and
+   * honours `render`'s `switchStories`. Absent or false, the project setting is ignored.
+   */
+  readonly switchStories?: boolean;
 }> {
   /**
    * Render configured viewports for the given stories of an extracted
@@ -221,6 +242,11 @@ export interface CaptureRunner extends Adapter<{
      * story/viewport. Runners that do not support it return captures as usual.
      */
     onCapture?: (capture: RenderedSnapshot) => Promise<void>;
+    /**
+     * Switch stories inside one loaded page for the listed pairs (ADR 0052). Sent only to a runner
+     * whose metadata offers `switchStories`; absent, every capture loads a fresh page.
+     */
+    switchStories?: SwitchStoriesRequest;
     /**
      * Test/extension seam: override the story source adapter (defaults to
      * `StorybookAdapter`). Only the renderer uses it; discovery stays the

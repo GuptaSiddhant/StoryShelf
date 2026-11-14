@@ -12,43 +12,102 @@ import { acquirePage } from "./pages.ts";
 import { runPlay } from "./play.ts";
 import { runtimeParametersForStory } from "./runtime-params.ts";
 import { awaitPaint, settleTimeoutOf, waitForSettled, type SettleReport } from "./settle.ts";
+import { MASK_MARKER } from "./switch-page.ts";
 import type { CaptureContext, RuntimeParamsPage } from "./types.ts";
+
+/** One capture's screenshot, its accessibility lines and the story with its parameters. */
+export interface CaptureResult {
+  screenshot: Buffer;
+  a11yViolations: string[];
+  story: StoryEntry;
+}
+
+/**
+ * Why a page may not go on to another story by switching (ADR 0052, decision 4): the story failed
+ * or fell back to the fixed wait, ran a play function, asked for isolation, or had its animations
+ * or videos paused by the runner.
+ */
+export type SessionEnd = "failed" | "play" | "isolate" | "paused";
+
+/** A capture plus whether the page it was taken on is still fit to switch from. */
+export interface CaptureOutcome extends CaptureResult {
+  /** Set when the page must be reloaded before another story renders on it. */
+  ends?: SessionEnd | undefined;
+}
 
 /** Capture a screenshot for one story/viewport, returning buffer + a11y violations. */
 export async function captureScreenshot(
   ctx: CaptureContext,
   inputStory: StoryEntry,
   viewport: Viewport,
-): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
+): Promise<CaptureResult> {
   const lease = await acquirePage(ctx, viewport);
   let reusable = false;
   if (ctx.navigationTimeoutMs) lease.page.setDefaultTimeout(ctx.navigationTimeoutMs);
   try {
-    const result = await runCapture(lease.page, ctx, inputStory, viewport);
+    const { screenshot, a11yViolations, story } = await runCapture(
+      lease.page,
+      ctx,
+      inputStory,
+      viewport,
+    );
     reusable = true;
-    return result;
+    return { screenshot, a11yViolations, story };
   } finally {
     await lease.release(reusable);
   }
 }
 
-async function runCapture(
+/**
+ * Load the story on `page` and capture it: the fresh-load path, unchanged by switching. The
+ * outcome says whether the page may be switched from afterwards.
+ */
+export async function runCapture(
   page: Page,
   ctx: CaptureContext,
   inputStory: StoryEntry,
   viewport: Viewport,
-): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
+): Promise<CaptureOutcome> {
   const story = await navigateAndEnrich(ctx, page, inputStory, viewport);
-  await waitUntilReady(ctx, page, story);
+  const report = await waitUntilReady(ctx, page, story);
+  return await finishCapture(ctx, page, story, viewport, report);
+}
+
+/**
+ * Everything after the story is ready: the play function, axe, fonts and videos, the ignore
+ * regions, sizing and the screenshot. Shared by a fresh load and a switch, so the two take the
+ * picture the same way.
+ */
+export async function finishCapture(
+  ctx: CaptureContext,
+  page: Page,
+  story: StoryEntry,
+  viewport: Viewport,
+  report: SettleReport | undefined,
+): Promise<CaptureOutcome> {
   if (ctx.executePlay) await runPlay(page, story.id, ctx.playTimeoutMs ?? 10_000);
   const a11yViolations = await getA11y(ctx, page, story);
-  await settlePage(page, story);
+  const videos = await settlePage(page, story);
   await maskIgnoredRegions(ctx, page, story);
   const plan = await resolvePlan(page, viewport, story);
   if (plan.viewport.width !== viewport.width || plan.viewport.height !== viewport.height)
     await page.setViewport({ width: plan.viewport.width, height: plan.viewport.height });
   const screenshot = await burstShots(page, plan, story);
-  return { screenshot, a11yViolations, story };
+  return { screenshot, a11yViolations, story, ends: sessionEndOf(story, report, videos) };
+}
+
+/** Why the page may not be switched from after this capture, if anything says so. */
+export function sessionEndOf(
+  story: StoryEntry,
+  report: SettleReport | undefined,
+  videosPaused: number,
+): SessionEnd | undefined {
+  const problem = report?.renderError ?? report?.playError ?? report?.unhandled?.[0];
+  if (report?.settled !== true || problem !== undefined) return "failed";
+  if (story.tags?.includes("play-fn") === true) return "play";
+  if (story.parameters?.isolate === true) return "isolate";
+  if (story.parameters?.pauseAnimationAtEnd === true || videosPaused > 0) return "paused";
+  return undefined;
 }
 
 async function navigateAndEnrich(
@@ -72,8 +131,12 @@ async function navigateAndEnrich(
  * that never signals (no channel, or no event before the timeout) gets today's fixed wait instead:
  * `delay ?? 500` ms.
  */
-async function waitUntilReady(ctx: CaptureContext, page: Page, story: StoryEntry): Promise<void> {
-  if (!ctx.adapter.screenshotSelector) return;
+async function waitUntilReady(
+  ctx: CaptureContext,
+  page: Page,
+  story: StoryEntry,
+): Promise<SettleReport | undefined> {
+  if (!ctx.adapter.screenshotSelector) return undefined;
   await page.waitForSelector(ctx.adapter.screenshotSelector, { visible: false });
   const report = await waitForSettled(page, settleTimeoutOf(ctx));
   if (report.settled) {
@@ -83,6 +146,12 @@ async function waitUntilReady(ctx: CaptureContext, page: Page, story: StoryEntry
     await delay(story.parameters?.delay ?? 500);
   }
   logSettle(ctx, story, report);
+  await pauseAtEnd(page, story);
+  return report;
+}
+
+/** `pauseAnimationAtEnd`: freeze every animation where it is, for the screenshot. */
+async function pauseAtEnd(page: Page, story: StoryEntry): Promise<void> {
   if (story.parameters?.pauseAnimationAtEnd) {
     await page.evaluate(() => {
       const doc = globalThis.document as unknown as {
@@ -108,7 +177,8 @@ async function getA11y(ctx: CaptureContext, page: Page, story: StoryEntry): Prom
   // checkA11y reports its own failures as an annotation, so it never throws.
   return ctx.runA11y ? await checkA11y(page, ctx.logger, story.id) : [];
 }
-async function settlePage(page: Page, story: StoryEntry): Promise<void> {
+/** Fonts (when asked) and videos; resolves to how many videos the runner paused. */
+async function settlePage(page: Page, story: StoryEntry): Promise<number> {
   const burst = story.parameters?.burst ?? 1;
   const waitFonts = story.parameters?.waitForFonts ?? burst > 1;
   if (waitFonts) {
@@ -122,15 +192,19 @@ async function settlePage(page: Page, story: StoryEntry): Promise<void> {
     }
   }
   try {
-    await page.evaluate(() => {
-      for (const vid of (globalThis as unknown as { document: Document }).document.querySelectorAll(
+    const paused: unknown = await page.evaluate(() => {
+      const videos = (globalThis as unknown as { document: Document }).document.querySelectorAll(
         "video",
-      ))
+      );
+      for (const vid of videos)
         // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- narrow to HTMLVideoElement
         (vid as unknown as HTMLVideoElement).pause();
+      return videos.length;
     });
+    return typeof paused === "number" ? paused : 0;
   } catch {
     // best-effort
+    return 0;
   }
 }
 /**
@@ -163,8 +237,9 @@ async function maskIgnoredRegions(
         { storyId: story.id, selectors: rejected },
         "skipped invalid ignore selectors",
       );
+    // The marker lets a switch remove the style before the next story renders.
     await page.addStyleTag({
-      content: ignoreStylesheet(declared.filter((selector) => !rejected.includes(selector))),
+      content: `${MASK_MARKER}\n${ignoreStylesheet(declared.filter((selector) => !rejected.includes(selector)))}`,
     });
   } catch (err) {
     ctx.logger?.warn({ storyId: story.id, err }, "could not mask ignore regions");
@@ -237,7 +312,8 @@ async function shotOne(
   return shot as unknown as Buffer;
 }
 
-async function delay(ms: number): Promise<void> {
+/** Wait `ms` milliseconds. */
+export async function delay(ms: number): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(() => {
       resolve();

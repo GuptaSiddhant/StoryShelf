@@ -62,6 +62,33 @@ describe("inPageRecorder (as serialized into the page)", () => {
     expect(report).toMatchObject({ settled: true, hooked: true, phase: "rendering" });
   });
 
+  it("after a switch, counts only the events of the story it waits for (ADR 0052)", async () => {
+    const channel = fakeChannel();
+    scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;
+    record();
+    const state = scope["__STORYSHELF_SETTLE__"] as Record<string, unknown>;
+    state["expect"] = "next--story";
+    channel.emit("storyRenderPhaseChanged", { newPhase: "completed", storyId: "old--story" });
+    channel.emit("storyRendered", "old--story");
+    channel.emit("storyFinished", { storyId: "old--story", status: "error" });
+    channel.emit("storyMissing", "old--story");
+    expect(await wait({ timeoutMs: 0 })).toMatchObject({ settled: false, phase: null });
+    expect(state["renderError"]).toBeUndefined();
+    expect(state["playError"]).toBeUndefined();
+    channel.emit("storyRenderPhaseChanged", { newPhase: "rendering", storyId: "next--story" });
+    channel.emit("storyRendered", "next--story");
+    expect(await wait({ timeoutMs: 500 })).toMatchObject({ settled: true, phase: "rendering" });
+  });
+
+  it("after a switch, an error that names no story still counts", async () => {
+    const channel = fakeChannel();
+    scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;
+    record();
+    (scope["__STORYSHELF_SETTLE__"] as Record<string, unknown>)["expect"] = "next--story";
+    channel.emit("storyErrored", { title: "boom" });
+    expect(await wait({ timeoutMs: 500 })).toMatchObject({ settled: true, renderError: "boom" });
+  });
+
   it("waits for test completion after render and records a late play failure", async () => {
     const channel = fakeChannel();
     scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;

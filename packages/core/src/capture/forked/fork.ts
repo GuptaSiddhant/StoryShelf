@@ -12,6 +12,9 @@ export const CAPTURE_RETRIES_ENV = "STORYSHELF_CAPTURE_RETRIES";
 /** Environment variable carrying the parent's `testing.shardSize` to the child, which plans big builds with it. */
 export const CAPTURE_SHARD_SIZE_ENV = "STORYSHELF_CAPTURE_SHARD_SIZE";
 
+/** Environment variable set to `1` when the parent's operator vetoed story switching (ADR 0052). */
+export const CAPTURE_SWITCH_STORIES_VETO_ENV = "STORYSHELF_SWITCH_STORIES_VETO";
+
 /** Grace between SIGTERM and SIGKILL when the parent stops a child. */
 const KILL_ESCALATION_MS = 30_000;
 

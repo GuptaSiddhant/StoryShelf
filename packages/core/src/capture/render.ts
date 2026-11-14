@@ -5,6 +5,7 @@ import type {
   CaptureRunner,
   RenderResult,
   RenderedSnapshot,
+  SwitchStoriesRequest,
 } from "../adapters/capture-runner.ts";
 import { redactSecrets } from "../utils/redact.ts";
 import { PER_CAPTURE_BUDGET_MS } from "../utils/storybook-token.ts";
@@ -42,6 +43,8 @@ export interface RenderRequest {
   /** The signed URL a `reach: "url"` target opens (never logged); absent for every other target. */
   storybookUrl?: string | undefined;
   onCapture?: (capture: RenderedSnapshot) => Promise<void>;
+  /** The stories the runner may switch to inside a loaded page (ADR 0052); absent, none. */
+  switchStories?: SwitchStoriesRequest | undefined;
 }
 
 /** Cap failure error text so one chatty runner cannot flood rows and logs. */

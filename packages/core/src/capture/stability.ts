@@ -122,6 +122,8 @@ async function judgeBatch(
         ...input,
         // The second render's accessibility results are never read, so skip axe on it.
         project: { ...input.project, runA11y: false },
+        // A stability check compares two fresh pages (ADR 0052: switching is a first render's only).
+        switchStories: false,
         stories: batch.stories,
         viewports: viewports.length > 0 ? viewports : input.viewports,
       },

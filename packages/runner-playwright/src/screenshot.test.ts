@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TransientCaptureError } from "./capture-retry.ts";
 import { inPagePlay } from "./play.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
-import { captureScreenshot } from "./screenshot.ts";
+import { captureScreenshot, sessionEndOf } from "./screenshot.ts";
 import { inPagePaint, inPageWaitSettled, type SettleReport } from "./settle.ts";
 import type { CaptureContext } from "./types.ts";
 
@@ -214,6 +214,8 @@ describe("ignore regions", () => {
     const { ctx, styles } = harness(settled);
     await captureScreenshot(ctx, withIgnore([".clock"]), viewport);
     expect(styles).toHaveLength(1);
+    // Marked, so a switch can remove it before the next story (ADR 0052).
+    expect(styles[0]?.startsWith("/* storyshelf-mask */")).toBe(true);
     expect(styles[0]).toContain(".clock { visibility: hidden !important; opacity: 0 !important; }");
     expect(styles[0]).toContain("[data-storyshelf-ignore]");
   });
@@ -251,5 +253,29 @@ describe("ignore regions", () => {
       expect.objectContaining({ storyId: "a--b" }),
       expect.stringContaining("could not mask"),
     );
+  });
+});
+
+describe("sessionEndOf (ADR 0052, decision 4)", () => {
+  const plain = story();
+
+  it("lets a page that settled cleanly be switched from", () => {
+    expect(sessionEndOf(plain, settled, 0)).toBeUndefined();
+  });
+
+  it("ends the session after a failure, a fixed wait or no report at all", () => {
+    expect(sessionEndOf(plain, { ...settled, renderError: "boom" }, 0)).toBe("failed");
+    expect(sessionEndOf(plain, { ...settled, unhandled: ["late"] }, 0)).toBe("failed");
+    expect(sessionEndOf(plain, { ...settled, settled: false }, 0)).toBe("failed");
+    expect(sessionEndOf(plain, undefined, 0)).toBe("failed");
+  });
+
+  it("ends the session after a play function, `isolate`, or anything the runner paused", () => {
+    expect(sessionEndOf({ ...plain, tags: ["play-fn"] }, settled, 0)).toBe("play");
+    expect(sessionEndOf({ ...plain, parameters: { isolate: true } }, settled, 0)).toBe("isolate");
+    expect(sessionEndOf({ ...plain, parameters: { pauseAnimationAtEnd: true } }, settled, 0)).toBe(
+      "paused",
+    );
+    expect(sessionEndOf(plain, settled, 2)).toBe("paused");
   });
 });

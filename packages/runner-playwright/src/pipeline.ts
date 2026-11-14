@@ -13,7 +13,12 @@ import {
   type StorySourceAdapter,
   type Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
+import {
+  StorybookAdapter,
+  planSwitchSessions,
+  resolveStoryViewports,
+  type SessionJob,
+} from "@storyshelf/core/capture";
 import type { StoryParameters } from "@storyshelf/core/capture";
 import {
   DEFAULT_RECYCLE_BROWSER_EVERY,
@@ -23,18 +28,21 @@ import {
   detectCaptureEnvironment,
   errorText,
   isTimeoutError,
+  recommendedPageConcurrency,
   sessionGateFor,
   storybookBase,
   type SessionGate,
 } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
-import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import { finishing, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { TransientCaptureError } from "./capture-retry.ts";
+import { deliverCapture, pushRenderFailure } from "./deliver.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
 import { RemoteBrowserLostError, browserLost } from "./remote-loss.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
+import { runSession, type SwitchStats } from "./sessions.ts";
 import { createStaticServer } from "./static-server.ts";
 import type {
   ActiveRun,
@@ -353,17 +361,73 @@ async function runBatches(
     relaunch: () => Promise<Browser>;
   },
 ): Promise<void> {
+  const switching = switchesStories(input, ctx);
+  const stats: SwitchStats = { switched: 0, ended: {} };
   for (const [index, batch] of batches.entries()) {
     if (index > 0) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- recycle only between drained batches
       await recycleBrowser(active, ctx, out.relaunch, input.logger);
     }
     // oxlint-disable-next-line eslint/no-await-in-loop -- batches run one after another
-    await pages.each(
-      batch,
-      async (job) => await captureOne(input, active, ctx, job.story, job.viewport, out),
+    await (switching
+      ? runSessions(batch, pages, { input, active, ctx, out, stats })
+      : pages.each(
+          batch,
+          async (job) => await captureOne(input, active, ctx, job.story, job.viewport, out),
+        ));
+  }
+  if (switching) {
+    input.logger?.info(
+      { switched: stats.switched, sessionsEnded: stats.ended },
+      "story switching: captures taken by switching inside a loaded page",
     );
   }
+}
+
+/**
+ * Whether this run switches stories inside loaded pages (ADR 0052): asked for, on a local target
+ * (remote targets stay off until their own suite passes, decision 7) and the built-in Storybook
+ * source (decision 2).
+ */
+function switchesStories(input: RunInput, ctx: CaptureContext): boolean {
+  if (input.switchStories === undefined) return false;
+  const local = input.retryRemoteCapture !== true;
+  const storybook = ctx.adapter instanceof StorybookAdapter;
+  if (!local || !storybook) {
+    input.logger?.info(
+      { remote: !local, customSource: !storybook },
+      "story switching is not available for this target or story source; every story loads a fresh page",
+    );
+  }
+  return local && storybook;
+}
+
+/** One batch as sessions, each sharing a page; a session runs on one page slot of the limiter. */
+async function runSessions(
+  batch: SessionJob[],
+  pages: ReturnType<typeof createPageLimiter>,
+  run: {
+    input: RunInput;
+    active: ActiveRun;
+    ctx: CaptureContext;
+    out: { captures: RenderedSnapshot[]; failures: RenderResult["failures"] };
+    stats: SwitchStats;
+  },
+): Promise<void> {
+  const { input, active, ctx } = run;
+  const lanes =
+    connectionConcurrency(input) ??
+    recommendedPageConcurrency(undefined, engineOf(input.target ?? "chromium"));
+  const sessions = planSwitchSessions(batch, {
+    request: input.switchStories,
+    executePlay: input.executePlay,
+    lanes,
+  });
+  const check = (): void => {
+    if (active.cancelled) throw new Error("Capture cancelled");
+    if (lost(input, active, ctx)) throw new RemoteBrowserLostError();
+  };
+  await pages.each(sessions, async (session) => await runSession({ ...run, check }, session));
 }
 
 /** Swap in a fresh browser; the old one is closed first so two never coexist. */
@@ -421,21 +485,9 @@ async function pushCapture(
   input: RunInput,
   active: ActiveRun,
 ): Promise<void> {
-  const started = performance.now();
+  const startedAt = performance.now();
   const result = await screenshotWithRetry(ctx, story, viewport, input, active);
-  const snapshot: RenderedSnapshot = {
-    story: result.story,
-    viewportName: viewport.name,
-    viewport,
-    screenshot: result.screenshot,
-    durationMs: Math.round(performance.now() - started),
-    ...(result.a11yViolations.length > 0 ? { a11y: result.a11yViolations } : {}),
-  };
-  // Streaming: hand it over and drop the buffer rather than holding every screenshot.
-  if (input.onCapture) await input.onCapture(snapshot);
-  else captures.push(snapshot);
-  if (result.a11yViolations.length > 0)
-    handleA11y(input, failures, story, viewport, result.a11yViolations);
+  await deliverCapture(input, { captures, failures }, viewport, { ...result, startedAt });
 }
 
 /** Retry capture only: delivery and accessibility reporting must never be repeated. */
@@ -489,35 +541,6 @@ async function freshScreenshot(
     throw retryError;
   }
 }
-function handleA11y(
-  input: PlaywrightRenderInput,
-  failures: RenderResult["failures"],
-  story: StoryEntry,
-  viewport: Viewport,
-  violations: string[],
-): void {
-  failures.push({
-    storyId: story.id,
-    viewportName: viewport.name,
-    error: `a11y: ${violations.join("; ")}`,
-  });
-  input.logger?.warn(
-    { storyId: story.id, viewport: viewport.name, violations },
-    "a11y violations found",
-  );
-}
-
-function pushRenderFailure(
-  failures: RenderResult["failures"],
-  input: PlaywrightRenderInput,
-  storyId: string,
-  viewportName: string,
-  error: unknown,
-): void {
-  failures.push({ storyId, viewportName, error: messageOf(error) });
-  input.logger?.error({ storyId, viewport: viewportName, err: error }, "render failed for story");
-}
-
 /** The host's sizing of a capture; a remote target runs elsewhere, so nothing is measured here. */
 function logHostSizing(
   input: { logger?: PlaywrightRenderInput["logger"]; concurrency?: number | undefined },

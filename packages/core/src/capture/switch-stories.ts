@@ -16,3 +16,35 @@ export function switchStoriesEnabled(
 export function switchStoriesVetoed(testing: { switchStories?: boolean } | undefined): boolean {
   return testing?.switchStories === false;
 }
+
+/**
+ * Whether this build's captures may switch stories (ADR 0052, decision 2): the project asks for
+ * it, the operator has not vetoed it, and the runner offers it. A project that asked and is
+ * refused gets one log line per build saying why.
+ */
+export function switchStoriesFor(
+  project: { switchStories?: boolean | undefined },
+  context: {
+    vetoed: boolean;
+    runner: { metadata: { switchStories?: boolean | undefined } };
+    log?: ((message: string, fields: Record<string, unknown>) => void) | undefined;
+  },
+): boolean {
+  if (project.switchStories !== true) return false;
+  if (context.vetoed) {
+    context.log?.("story switching is on for this project but the operator turned it off", {
+      reason: "vetoed",
+    });
+    return false;
+  }
+  if (context.runner.metadata.switchStories !== true) {
+    context.log?.(
+      "story switching is on for this project but the capture runner does not offer it",
+      {
+        reason: "runner",
+      },
+    );
+    return false;
+  }
+  return true;
+}

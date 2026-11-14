@@ -66,6 +66,8 @@ export interface CaptureHandlerOptions {
   maxRetries?: number;
   /** Told when a shard re-captures work an earlier attempt had stored (the consumer's `metrics`). */
   onShardRepeated?: ConsumerMetrics["shardRepeated"];
+  /** The operator's veto of story switching (`testing.switchStories: false`, ADR 0052). */
+  switchStoriesVetoed?: boolean;
 }
 
 /** Whether a polled capture job carries the minimum shape to execute. */
@@ -199,6 +201,7 @@ export function captureDispatchDeps(
     publicOrigin,
     shardSize: options.shardSize,
     enqueue: options.enqueue,
+    switchStoriesVetoed: options.switchStoriesVetoed,
   };
   return {
     db: options.db,

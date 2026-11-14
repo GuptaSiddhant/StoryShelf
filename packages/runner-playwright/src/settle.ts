@@ -83,6 +83,8 @@ export function inPageRecorder(): void {
     finished: boolean;
     phase: string | null;
     unhandled: string[];
+    /** The story a switch is waiting for (ADR 0052); null on a fresh load, where every event counts. */
+    expect: string | null;
     hook: () => boolean;
   };
   const scope = globalThis as unknown as Record<string, unknown>;
@@ -93,8 +95,15 @@ export function inPageRecorder(): void {
     finished: false,
     phase: null,
     unhandled: [],
+    expect: null,
     hook: () => false,
   };
+  // An event that names another story belongs to the one rendered before the switch.
+  const mine = (id: unknown): boolean =>
+    state.expect === null || typeof id !== "string" || id === state.expect;
+  // oxlint-disable-next-line unicorn/consistent-function-scoping -- runs in the page, so it must stay inside
+  const idOf = (payload: unknown): unknown =>
+    typeof payload === "string" ? payload : (payload as { storyId?: unknown } | undefined)?.storyId;
   const text = {
     of(payload: unknown): string {
       if (typeof payload === "string") return payload;
@@ -103,30 +112,33 @@ export function inPageRecorder(): void {
       return typeof found === "string" ? found : "unknown error";
     },
   };
-  const markSettled = (): void => {
-    state.settled = true;
+  const markSettled = (payload: unknown): void => {
+    if (mine(idOf(payload))) state.settled = true;
   };
   const failRender = (payload: unknown): void => {
     state["renderError"] = text.of(payload);
-    markSettled();
+    state.settled = true;
   };
   const handlers: Record<string, (payload: unknown) => void> = {
     storyRenderPhaseChanged: (payload) => {
       const phase = (payload as { newPhase?: unknown } | undefined)?.newPhase;
-      if (typeof phase === "string") state.phase = phase;
+      if (typeof phase === "string" && mine(idOf(payload))) state.phase = phase;
     },
     storyRendered: markSettled,
     storyFinished: (payload) => {
+      if (!mine(idOf(payload))) return;
       const status = (payload as { status?: unknown } | undefined)?.status;
       if (status === "error" && state["playError"] === undefined) {
         state["playError"] = "Storybook reported that the test failed";
       }
       state.finished = true;
-      markSettled();
+      state.settled = true;
     },
     storyThrewException: failRender,
     storyErrored: failRender,
-    storyMissing: failRender,
+    storyMissing: (payload) => {
+      if (mine(idOf(payload))) failRender(payload);
+    },
     playFunctionThrewException: (payload) => {
       state["playError"] = text.of(payload);
     },

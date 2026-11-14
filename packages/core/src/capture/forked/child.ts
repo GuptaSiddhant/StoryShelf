@@ -23,7 +23,11 @@ import {
 import { applyImageSettings, ensureImageEngine } from "../consumer/startup.ts";
 import type { CaptureConsumerOptions, ConsumerJob, KindHandler } from "../consumer/types.ts";
 import { createDatabaseCaptureQueue, DEFAULT_RETRIES } from "../db-queue/index.ts";
-import { CAPTURE_RETRIES_ENV, CAPTURE_SHARD_SIZE_ENV } from "./fork.ts";
+import {
+  CAPTURE_RETRIES_ENV,
+  CAPTURE_SHARD_SIZE_ENV,
+  CAPTURE_SWITCH_STORIES_VETO_ENV,
+} from "./fork.ts";
 import { isParentMessage, type ChildMessage } from "./protocol.ts";
 
 /** Handler options minus the shard hand-out, which the child wires to the database queue. */
@@ -124,6 +128,8 @@ function buildHandler(
     secret: options.secret,
     viewports: options.viewports,
     shardSize: options.shardSize ?? positiveInt(env[CAPTURE_SHARD_SIZE_ENV]),
+    switchStoriesVetoed:
+      options.switchStoriesVetoed ?? env[CAPTURE_SWITCH_STORIES_VETO_ENV] === "1",
     maxRetries,
     enqueue: async (job) => {
       await queue.enqueue(job);

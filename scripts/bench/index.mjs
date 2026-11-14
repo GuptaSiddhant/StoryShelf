@@ -23,6 +23,8 @@ const args = process.argv.slice(2);
 const flag = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
 const runs = Number(flag("--runs", 3));
 const out = flag("--out", undefined);
+// ADR 0052's speed gate: the same bench with the project's story switching on.
+const switchStories = args.includes("--switch-stories");
 
 if (!existsSync(join(FIXTURE, "index.json"))) {
   console.error(
@@ -37,7 +39,7 @@ const samples = [];
 for (let at = 0; at <= runs; at += 1) {
   const label = at === 0 ? "warm-up (dropped)" : `run ${at}/${runs}`;
   console.error(`bench: ${label}`);
-  const result = await runOnce(join(scratch, `data-${at}`), scratch);
+  const result = await runOnce(join(scratch, `data-${at}`), scratch, { switchStories });
   if (at > 0) samples.push(result);
 }
 rmSync(scratch, { recursive: true, force: true });
@@ -46,6 +48,7 @@ const summary = {
   fixture: "fixtures/storybook-9",
   runs,
   concurrency: { pages: 2, jobs: 1 },
+  switchStories,
   node: process.version,
   ...medianOf(samples),
 };

@@ -1,11 +1,19 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
-import { CAPTURE_RETRIES_ENV, CAPTURE_SHARD_SIZE_ENV } from "./fork.ts";
+import {
+  CAPTURE_RETRIES_ENV,
+  CAPTURE_SHARD_SIZE_ENV,
+  CAPTURE_SWITCH_STORIES_VETO_ENV,
+} from "./fork.ts";
 
 const dispatch = vi.hoisted(() => ({
   run: vi.fn(),
-  jobOptions: [] as { shardSize?: number; enqueue?: (job: unknown) => Promise<void> }[],
+  jobOptions: [] as {
+    shardSize?: number;
+    switchStoriesVetoed?: boolean;
+    enqueue?: (job: unknown) => Promise<void>;
+  }[],
   maxRetries: [] as (number | undefined)[],
   repeated: [] as ((event: { repeated: number; attempt?: number; limit?: number }) => void)[],
 }));
@@ -271,6 +279,17 @@ describe("runCaptureChild", () => {
     await running;
   });
 
+  it("keeps the operator's veto of story switching from the parent's environment", async () => {
+    dispatch.jobOptions.length = 0;
+    dispatch.run.mockReset().mockImplementation(async () => {});
+    const vetoed = fakeHost({ [CAPTURE_SWITCH_STORIES_VETO_ENV]: "1" });
+    const running = runCaptureChild(options(), vetoed.host);
+    await sleep(20);
+    expect(dispatch.jobOptions.at(-1)?.switchStoriesVetoed).toBe(true);
+    vetoed.events.emit("SIGTERM");
+    await running;
+  });
+
   it("takes retries and shard size from the options, else from the parent's environment", async () => {
     dispatch.jobOptions.length = 0;
     dispatch.maxRetries.length = 0;
@@ -295,6 +314,7 @@ describe("runCaptureChild", () => {
     const third = runCaptureChild(options(), bare.host);
     await sleep(20);
     expect(dispatch.jobOptions.at(-1)?.shardSize).toBeUndefined();
+    expect(dispatch.jobOptions.at(-1)?.switchStoriesVetoed).toBe(false);
     expect(dispatch.maxRetries.at(-1)).toBe(2);
     bare.events.emit("SIGTERM");
     await third;

@@ -7,6 +7,7 @@ import {
   createCaptureHandler,
   failCrashedCapture,
   isFinalAttempt,
+  switchStoriesVetoed,
   type captureDispatchDeps,
   type CaptureHandlerOptions,
   type ConsumerJob,
@@ -79,6 +80,7 @@ function forkedHandler(
     shardSize: testing?.shardSize,
     imageEngine: testing?.images?.engine,
     diffThreads: testing?.compare?.threads,
+    switchStoriesVetoed: switchStoriesVetoed(testing),
     ...parts,
   });
 }

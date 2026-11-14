@@ -9,6 +9,7 @@ import type { CaptureJobOptions } from "../orchestrator.ts";
 import type { CaptureContext } from "../pipeline.ts";
 import type { CaptureProgress } from "../progress.ts";
 import { storybookUrlSource } from "../storybook-urls.ts";
+import { switchStoriesFor } from "../switch-stories.ts";
 
 /** The build being captured and the adapters to capture it with. */
 export interface ShardTarget {
@@ -83,5 +84,10 @@ export function matrixInputOf(
     progress: parts.progress,
     runId: parts.runId,
     shardIndex: parts.shardIndex,
+    // The plan stage already logged a refusal for this build; a shard decides silently.
+    switchStories: switchStoriesFor(target.project, {
+      vetoed: options.switchStoriesVetoed === true,
+      runner: options.runner,
+    }),
   };
 }

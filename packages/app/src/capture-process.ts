@@ -3,6 +3,7 @@ import {
   canForkCaptureChild,
   CAPTURE_RETRIES_ENV,
   CAPTURE_SHARD_SIZE_ENV,
+  CAPTURE_SWITCH_STORIES_VETO_ENV,
   createForkedCaptureHandler,
   decideCaptureProcess,
   forkCaptureChild,
@@ -62,6 +63,8 @@ export interface ForkedHandlerDeps {
   diffThreads?: number;
   /** `testing.retries`, handed to the child, which stamps it on the shard jobs it queues. */
   retries: number;
+  /** `testing.switchStories: false`, handed to the child so the operator's veto holds there too. */
+  switchStoriesVetoed?: boolean;
   /** Takes over if forking stops being viable. */
   fallback: KindHandler;
   /** A job the child kept killing on its last attempt: write its failure. */
@@ -71,7 +74,10 @@ export interface ForkedHandlerDeps {
 
 /** Settings the parent hands to a forked child through its environment. */
 export function childEnvOf(
-  deps: Pick<ForkedHandlerDeps, "shardSize" | "imageEngine" | "diffThreads" | "retries">,
+  deps: Pick<
+    ForkedHandlerDeps,
+    "shardSize" | "imageEngine" | "diffThreads" | "retries" | "switchStoriesVetoed"
+  >,
 ): Record<string, string> {
   const env: Record<string, string> = { [CAPTURE_RETRIES_ENV]: String(deps.retries) };
   if (deps.shardSize !== undefined) {
@@ -82,6 +88,9 @@ export function childEnvOf(
   }
   if (deps.diffThreads !== undefined) {
     env[DIFF_WORKERS_ENV] = String(deps.diffThreads);
+  }
+  if (deps.switchStoriesVetoed === true) {
+    env[CAPTURE_SWITCH_STORIES_VETO_ENV] = "1";
   }
   return env;
 }

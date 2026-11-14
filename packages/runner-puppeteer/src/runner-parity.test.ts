@@ -40,6 +40,15 @@ const SHARED: Record<string, Difference[]> = {
     },
   ],
   "a11y.ts": [PAGE_TYPE],
+  "switch-page.ts": [
+    PAGE_TYPE,
+    {
+      playwright: "await page.addInitScript(inPageDocumentRecorder);",
+      puppeteer: "await page.evaluateOnNewDocument(inPageDocumentRecorder);",
+      why: "the engines name the run-before-any-page-script hook differently",
+    },
+  ],
+  "network-quiet.ts": [],
   "runtime-params.ts": [
     {
       playwright: `/** Read every story's resolved parameters from a loaded preview page in one call. */
