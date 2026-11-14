@@ -116,4 +116,4 @@ Put a load balancer or ingress in front that terminates TLS and forwards the ori
 
 - [Deployment overview](/guides/deployment/), including the supported targets
 - [Back up and restore](/guides/backup-restore/)
-- [Rotating secrets](./secret-rotation/)
+- [Rotating secrets](/guides/deployment/secret-rotation/)

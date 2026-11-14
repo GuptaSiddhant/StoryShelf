@@ -143,4 +143,4 @@ Put a load balancer in front that terminates TLS, and keep the database off the 
 
 - [Deployment overview](/guides/deployment/), including the supported targets
 - [Back up and restore](/guides/backup-restore/)
-- [Rotating secrets](./secret-rotation/)
+- [Rotating secrets](/guides/deployment/secret-rotation/)
