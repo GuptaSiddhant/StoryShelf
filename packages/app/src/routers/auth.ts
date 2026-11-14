@@ -393,6 +393,8 @@ export function registerEngineAuth(app: ShelfRouter, engine: Auth): void {
         },
       );
     }
+    // Drop this device's caches, storage and worker (offline Storybooks, ADR 0048).
+    c.header("clear-site-data", '"cache", "storage"');
     return hxRedirect(c, "/auth/login");
   });
 }
