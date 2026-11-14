@@ -60,6 +60,8 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
   { table: "projects", column: "switch_stories", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  // Expand step (ADR 0053): nullable, so the previous release keeps working against it.
+  { table: "content_uses", column: "size_bytes", definition: "BIGINT NULL" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
     table: "snapshots",

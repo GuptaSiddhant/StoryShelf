@@ -506,6 +506,7 @@ CREATE TABLE IF NOT EXISTS content_uses (
   content_hash VARCHAR(128) NOT NULL,
   project_id VARCHAR(64) NOT NULL,
   created_at DATETIME(3) NOT NULL,
+  size_bytes BIGINT NULL,
   released_at DATETIME(3) NULL,
   collecting_at DATETIME(3) NULL,
   claim_token VARCHAR(64) NULL,
