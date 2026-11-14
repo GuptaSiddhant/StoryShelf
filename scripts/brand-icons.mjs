@@ -108,7 +108,9 @@ async function checkMaskable(page) {
     // The top board runs to the right edge, the bottom board to the left edge.
     const differsAt = (x, [from, to]) => {
       const i = (Math.round((from + to) / 2) * width + x) * 4;
-      return Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 24;
+      return (
+        Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 24
+      );
     };
     const reachesEdge = differsAt(width - 1, boards[0]) && differsAt(0, boards[1]);
     return { outside, farthest: farthest / width, opaqueCorner: px[3] === 255, reachesEdge };
