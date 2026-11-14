@@ -132,6 +132,7 @@ describe("health endpoints", () => {
       "notifier",
       "notifier",
       "notifier",
+      "notifier",
       "storage",
     ]);
     expect(body.adapters.every((a) => a.state === "ok")).toBe(true);

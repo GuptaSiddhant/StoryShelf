@@ -1,5 +1,6 @@
 import type { StateNotifierProvider } from "../../adapters/notifier/index.ts";
 import type { Logger } from "../../logger.ts";
+import { commitOnBranch } from "./gitlab-branch.ts";
 import { upsertMrNote } from "./gitlab-comment.ts";
 import { gitlabConfigSchema } from "./gitlab-config.ts";
 import { postCommitStatus, type GitLabProject } from "./gitlab-status.ts";
@@ -26,6 +27,7 @@ export const gitLabNotifier: StateNotifierProvider = {
           await postCommitStatus(project, input);
         },
         comment: async (input) => await upsertMrNote(project, { ...input, logger }),
+        commitOnBranch: async (input) => await commitOnBranch(project, input),
       },
       logger,
     );

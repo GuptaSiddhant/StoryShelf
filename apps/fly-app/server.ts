@@ -6,11 +6,11 @@ import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
 import { parseTrustProxy } from "@storyshelf/core/config";
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
 import { chatNotifiers } from "@storyshelf/notify-chat";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -128,7 +128,7 @@ shelfLogger.info(aiLogFields(ai), "ai insights");
 
 // Notifications: SMTP sender from SMTP_* env (undefined keeps invites
 // out-of-band); chat + email providers serve stored channels.
-const emailSender = smtpPresetFromEnv(env, shelfLogger);
+const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 const emailNotifiers = emailSender
   ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
   : [];

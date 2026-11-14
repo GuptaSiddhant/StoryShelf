@@ -98,18 +98,12 @@ async function handleTestsUpdate(c: Context): Promise<Response> {
   const slug = c.req.param("slug") ?? "";
   const project = await findProject(slug);
   const form = await c.req.formData();
-  const { executePlay, runA11y, runTests, detectUnstable, playTimeoutMs } = readTestsFields(form);
+  const { playTimeoutMs, ...switches } = readTestsFields(form);
   const rangeError = playTimeoutError(playTimeoutMs);
   if (rangeError) {
     return c.html((await renderSettingsPage(c, "tests", { globalError: rangeError })) ?? "", 400);
   }
-  return await persistTestsUpdate(
-    c,
-    project,
-    slug,
-    { executePlay, runA11y, runTests, detectUnstable },
-    playTimeoutMs,
-  );
+  return await persistTestsUpdate(c, project, slug, switches, playTimeoutMs);
 }
 
 /** Read the tests-tab form fields. */
@@ -118,6 +112,7 @@ function readTestsFields(form: FormData): {
   runA11y: boolean;
   runTests: boolean;
   detectUnstable: boolean;
+  requireVerifiedDefault: boolean;
   playTimeoutMs: number | undefined;
 } {
   const playTimeoutMsRaw = asString(form.get("playTimeoutMs"));
@@ -126,6 +121,7 @@ function readTestsFields(form: FormData): {
     runA11y: form.get("runA11y") === "true",
     runTests: form.get("runTests") === "true",
     detectUnstable: form.get("detectUnstable") === "true",
+    requireVerifiedDefault: form.get("requireVerifiedDefault") === "true",
     playTimeoutMs: playTimeoutMsRaw ? Number(playTimeoutMsRaw) : undefined,
   };
 }
@@ -150,6 +146,7 @@ async function persistTestsUpdate(
     runA11y: boolean;
     runTests: boolean;
     detectUnstable: boolean;
+    requireVerifiedDefault: boolean;
   },
   playTimeoutMs: number | undefined,
 ): Promise<Response> {
