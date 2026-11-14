@@ -414,7 +414,24 @@ jobs:
             exit 1
           fi
 
+      # The step above stops at ECONNREFUSED, before pg asks for a password, so it never signs a
+      # token and would not notice the signer going missing again. The image carries only the root
+      # node_modules, so the bundle must hold `@aws-sdk/rds-signer` itself: no bare import of any
+      # `@aws-sdk/*` may remain in the built files.
+      - name: Bundle has no bare @aws-sdk import
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          set -e
+          docker run --rm --entrypoint sh storyshelf:ci -c \
+            "grep -rnE '(import\\(|from ) ?[\"'\"'\"']@aws-sdk' dist --include='*.js' --include='*.mjs' || true" > bare.log
+          cat bare.log
+          if [ -s bare.log ]; then
+            echo "::error::dist imports @aws-sdk by bare name; the image has no such module at runtime"
+            exit 1
+          fi
+
   # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
+
   # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child
   # checks, so requiring those by name would wait forever. This passes when every job passed or
   # was skipped.
