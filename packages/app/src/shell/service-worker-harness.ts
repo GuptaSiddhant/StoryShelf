@@ -25,6 +25,7 @@ export interface Reply {
   usage: {
     usedBytes: number;
     capBytes: number;
+    persisted: boolean;
     projects: { slug: string; size: number; expired: boolean; commit: string }[];
   };
 }
@@ -57,6 +58,7 @@ function sandboxOf(shared: Shared, listeners: Map<string, Listener>): Record<str
     crypto: webcrypto,
     setTimeout,
     Uint8Array,
+    navigator: { storage: { persisted: () => Promise.resolve(true) } },
     indexedDB: fakeIndexedDb(shared.idb),
     caches: fakeCaches(shared.caches),
   };

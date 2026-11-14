@@ -25,6 +25,8 @@ export class FakeServer {
   downloads: string[] = [];
   requests: string[] = [];
   corrupt = false;
+  /** Answers as a deployment outside `trusted` hosting mode does. */
+  hostingOff = false;
 
   handle(input: string | { url: string }): Response {
     const url = new URL(typeof input === "string" ? input : input.url, ORIGIN);
@@ -43,6 +45,9 @@ export class FakeServer {
 
   private sync(url: URL): Response {
     if (this.status !== 200) return new Response("", { status: this.status });
+    if (this.hostingOff) {
+      return Response.json({ projects: [], reason: "hosting-mode", hostingMode: "sandboxed" });
+    }
     const slugs = (url.searchParams.get("projects") ?? "").split(",");
     const projects = slugs.flatMap((slug) => {
       const build = this.builds.get(slug);

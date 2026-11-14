@@ -78,7 +78,11 @@ function collect(state){
     });
   });
 }
-function clearAll(){
-  return caches.delete(CACHE_NAME).then(function(){ return saveState(emptyState()); });
+function clearAll(keepCap){
+  return Promise.all([caches.delete(CACHE_NAME),loadState()]).then(function(done){
+    var state=emptyState();
+    if(keepCap){ state.capBytes=done[1].capBytes; }
+    return saveState(state);
+  });
 }
 `;

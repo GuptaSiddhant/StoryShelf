@@ -8,7 +8,11 @@ export const PERIODIC_SYNC_TAG = "storyshelf-offline-sync";
 /**
  * The listeners: everything outside `/offline` passes straight to the network, and a failed
  * navigation answers with the offline home page. `message` is the page's small API (keep, unkeep,
- * sync, usage, set-cap), accepted only from app pages, never from a Storybook's own frames.
+ * sync, usage, set-cap). `fromStorybook` only skips clients whose URL looks like a Storybook; it is
+ * a convenience, not a guard. In `trusted` mode uploaded code runs on the app origin and can reach
+ * Cache Storage and IndexedDB directly, so the cache is not a boundary between projects (ADR 0048,
+ * amendment 2026-11-11). Offline Storybooks are therefore off outside `trusted` mode, and the sync
+ * endpoint says so.
  */
 const LISTENERS_SCRIPT = `
 function fromStorybook(client){

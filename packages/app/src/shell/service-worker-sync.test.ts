@@ -19,6 +19,7 @@ describe("keep and sync diff", () => {
     expect(reply?.ok).toBe(true);
     expect(worker.server.downloads).toHaveLength(2);
     expect(reply?.usage.projects.map((p) => p.slug)).toEqual(["a"]);
+    expect(reply?.usage.persisted).toBe(true);
     expect(reply?.usage.usedBytes).toBe("same".length + "z".length);
   });
 
@@ -54,7 +55,7 @@ describe("keep and sync diff", () => {
     worker.server.builds.delete("a");
     const reply = await worker.send({ type: "sync" });
     expect(reply?.usage.projects).toEqual([]);
-    expect(worker.caches.get("storyshelf-offline-content-v1")?.size).toBe(0);
+    expect(worker.caches.get("storyshelf-offline-content-v1")?.size ?? 0).toBe(0);
   });
 
   it("answers unavailable for a project the server does not offer", async () => {
@@ -108,6 +109,52 @@ describe("keep and sync diff", () => {
   });
 });
 
+describe("signed out and hosting mode", () => {
+  it("clears every copy when the answer is an empty list, and keeps the cap setting", async () => {
+    const worker = loadWorker();
+    worker.server.builds.set("a", build());
+    await worker.send({ type: "set-cap", bytes: 1_000_000 });
+    await worker.send({ type: "keep", slug: "a" });
+    worker.server.builds.delete("a");
+    const reply = await worker.send({ type: "sync" });
+    expect(worker.caches.has("storyshelf-offline-content-v1")).toBe(false);
+    expect(reply?.usage).toMatchObject({ projects: [], usedBytes: 0, capBytes: 1_000_000 });
+  });
+
+  it("clears the cap setting too when the server says the user is signed out", async () => {
+    const worker = loadWorker();
+    worker.server.builds.set("a", build());
+    await worker.send({ type: "set-cap", bytes: 1_000_000 });
+    await worker.send({ type: "keep", slug: "a" });
+    worker.server.status = 403;
+    await worker.send({ type: "sync" });
+    expect(worker.caches.has("storyshelf-offline-content-v1")).toBe(false);
+    expect((await worker.send({ type: "usage" }))?.usage.capBytes).toBe(500 * 1024 * 1024);
+  });
+
+  it("refuses to keep outside trusted hosting mode and downloads nothing", async () => {
+    const worker = loadWorker();
+    worker.server.builds.set("a", build());
+    worker.server.hostingOff = true;
+    expect(await worker.send({ type: "keep", slug: "a" })).toMatchObject({
+      ok: false,
+      error: "hosting-mode",
+    });
+    expect(worker.server.downloads).toEqual([]);
+    expect(worker.caches.get("storyshelf-offline-content-v1")?.size ?? 0).toBe(0);
+  });
+
+  it("removes copies already kept on the next sync once the mode is not trusted", async () => {
+    const worker = loadWorker();
+    worker.server.builds.set("a", build());
+    await worker.send({ type: "keep", slug: "a" });
+    worker.server.hostingOff = true;
+    await worker.send({ type: "sync" });
+    expect(worker.caches.has("storyshelf-offline-content-v1")).toBe(false);
+    expect((await worker.fetch("/offline/a/")).status).toBe(404);
+  });
+});
+
 describe("cap", () => {
   it("refuses a project that would pass the cap, says its size, and stores nothing", async () => {
     const worker = loadWorker();
@@ -135,10 +182,15 @@ describe("cap", () => {
     await worker.send({ type: "set-cap", bytes: 30 });
     await worker.send({ type: "keep", slug: "a" });
     worker.server.builds.set("a", build({ buildId: "b2", files: { "big.js": "y".repeat(100) } }));
-    const before = (await worker.send({ type: "usage" }))?.usage.projects[0];
+    const state = worker.idb.get("state") as {
+      projects: Record<string, { syncedAt: string }>;
+    };
+    state.projects["a"]!.syncedAt = new Date(Date.now() - 86_400_000).toISOString();
+    worker.server.builds.get("a")!.maxOfflineDays = 7;
+    const before = structuredClone(worker.idb.get("state"));
     await worker.send({ type: "sync" });
     expect(await (await worker.fetch("/offline/a/")).text()).toContain("one");
-    expect((await worker.send({ type: "usage" }))?.usage.projects[0]).toEqual(before);
+    expect(worker.idb.get("state")).toEqual(before);
   });
 
   it("waits for every download lane and stops scheduling after a failure", async () => {

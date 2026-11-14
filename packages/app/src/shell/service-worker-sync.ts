@@ -3,8 +3,8 @@
  * `GET /api/v1/offline` about the kept projects, downloads only the content hashes the device lacks,
  * refuses what would pass the cap, drops projects the answer leaves out and deletes hashes no kept
  * project refers to. Nothing is ever evicted silently. A refused update leaves the kept copy and its
- * sync time alone. `navigator.storage.persist()` is Window-only, so the page asks for persistence
- * before it sends `keep`.
+ * sync time alone. `navigator.storage.persist()` is Window-only (`persisted()` is not), so the page
+ * asks for persistence before it sends `keep`.
  */
 export const SYNC_SCRIPT = `
 var chain=Promise.resolve();
@@ -98,7 +98,10 @@ function runSync(extra){
     if(extra&&ask.indexOf(extra)<0){ ask.push(extra); }
     if(ask.length===0){ return {ok:true,results:{}}; }
     return fetchAnswer(ask).then(function(answer){
-      if(answer.signedOut){ return clearAll().then(function(){ return {ok:false,error:'signed-out'}; }); }
+      if(answer.signedOut){ return clearAll(false).then(function(){ return {ok:false,error:'signed-out'}; }); }
+      if(answer.projects.length===0){
+        return clearAll(true).then(function(){ return {ok:true,results:{},reason:answer.reason}; });
+      }
       return settle(state,ask,answer.projects,extra);
     },function(){ return {ok:false,error:'offline'}; });
   });
@@ -123,17 +126,20 @@ function settle(state,ask,projects,extra){
 function usage(){
   return loadState().then(function(state){
     var now=Date.now();
-    return {
-      usedBytes:usedBytes(state),capBytes:state.capBytes,
-      projects:Object.keys(state.projects).sort().map(function(slug){
-        var project=state.projects[slug];
-        return {
-          slug:slug,name:project.name,commit:project.commit,buildId:project.buildId,
-          size:unionBytes([project.sizes]),syncedAt:project.syncedAt,
-          expired:isExpired(project,now)
-        };
-      })
-    };
+    var persisted=navigator.storage&&navigator.storage.persisted?navigator.storage.persisted():false;
+    return Promise.resolve(persisted).catch(function(){ return false; }).then(function(kept){
+      return {
+        usedBytes:usedBytes(state),capBytes:state.capBytes,persisted:kept===true,
+        projects:Object.keys(state.projects).sort().map(function(slug){
+          var project=state.projects[slug];
+          return {
+            slug:slug,name:project.name,commit:project.commit,buildId:project.buildId,
+            size:unionBytes([project.sizes]),syncedAt:project.syncedAt,
+            expired:isExpired(project,now)
+          };
+        })
+      };
+    });
   });
 }
 function keepProject(slug){
@@ -141,6 +147,7 @@ function keepProject(slug){
     if(!state.projects[slug]&&Object.keys(state.projects).length>=MAX_KEPT){ return {ok:false,error:'limit'}; }
     return exclusive(function(){ return runSync(slug); }).then(function(sync){
       if(!sync.ok){ return sync; }
+      if(sync.reason){ return {ok:false,error:sync.reason}; }
       return sync.results[slug]||{ok:false,error:'unavailable'};
     });
   });
