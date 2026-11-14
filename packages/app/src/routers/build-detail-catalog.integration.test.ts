@@ -66,7 +66,7 @@ async function seed(options: { testing?: boolean; status?: string; catalogued?: 
 }
 
 const page = async (app: Awaited<ReturnType<typeof seed>>["app"], id: string) =>
-  await (await app.request(`/projects/app/builds/${id}/diff`)).text();
+  await (await app.request(`/projects/web/builds/${id}/diff`)).text();
 
 describe("build page without testing", () => {
   it("labels an accepted build with no attempts Published and counts components and stories", async () => {
@@ -114,7 +114,7 @@ describe("build page without testing", () => {
     const { app, build } = await seed({ catalogued: false });
     const html = await page(app, build.id);
     expect(html).not.toContain("Components");
-    expect((await app.request("/projects/app/builds/nope/diff")).status).toBe(404);
+    expect((await app.request("/projects/web/builds/nope/diff")).status).toBe(404);
   });
 });
 
@@ -165,18 +165,18 @@ describe("build page with testing", () => {
 describe("the old build overview URL", () => {
   it("redirects to the build page and keeps the query string", async () => {
     const { app, build } = await seed({ testing: true });
-    const plain = await app.request(`/projects/app/builds/${build.id}`);
+    const plain = await app.request(`/projects/web/builds/${build.id}`);
     expect(plain.status).toBe(302);
-    expect(plain.headers.get("location")).toBe(`/projects/app/builds/${build.id}/diff`);
-    const withQuery = await app.request(`/projects/app/builds/${build.id}?snapshot=s1&x=a%20b`);
+    expect(plain.headers.get("location")).toBe(`/projects/web/builds/${build.id}/diff`);
+    const withQuery = await app.request(`/projects/web/builds/${build.id}?snapshot=s1&x=a%20b`);
     expect(withQuery.headers.get("location")).toBe(
-      `/projects/app/builds/${build.id}/diff?snapshot=s1&x=a%20b`,
+      `/projects/web/builds/${build.id}/diff?snapshot=s1&x=a%20b`,
     );
   });
 
   it("redirects without testing too, since the build page is classed both", async () => {
     const { app, build } = await seed();
-    expect((await app.request(`/projects/app/builds/${build.id}`)).status).toBe(302);
+    expect((await app.request(`/projects/web/builds/${build.id}`)).status).toBe(302);
   });
 });
 

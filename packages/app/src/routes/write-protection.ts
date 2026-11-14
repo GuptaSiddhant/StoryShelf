@@ -24,6 +24,7 @@ export const CSRF_PATHS: readonly string[] = [
   "/projects/new",
   "/projects/:slug/delete",
   "/projects/:slug/settings/*",
+  "/projects/:slug/get-started/*",
   "/profile/*",
   "/connections/*",
   "/profile",

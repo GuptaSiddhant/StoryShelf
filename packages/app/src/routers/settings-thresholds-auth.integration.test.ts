@@ -81,6 +81,7 @@ async function boot() {
       headers: {
         ...(id ? { cookie: `storyshelf_session=${id}` } : {}),
         "x-csrf-token": getCsrfToken("s", id ?? undefined),
+        "sec-fetch-site": "same-origin",
         "content-type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams(fields).toString(),

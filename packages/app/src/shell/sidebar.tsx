@@ -369,7 +369,7 @@ export const Sidebar: FC<{ nav?: NavConfig; name: string; logo?: string }> = ({
   name,
   logo,
 }) => {
-  const { user, authEnabled, config, testing } = getStore();
+  const { user, authEnabled, config } = getStore();
   const urls = createUrlBuilder("/", contentHostSuffix(config));
   const showAdmin = !authEnabled || user?.role === "admin";
   const projects: NavItem = {

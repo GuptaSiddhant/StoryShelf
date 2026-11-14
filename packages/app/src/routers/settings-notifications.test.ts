@@ -295,7 +295,7 @@ describe("notifications settings tab", () => {
     ]);
     expect(row).toMatchObject({ enabled: false, reviewRequests: true });
     const html = await (
-      await app.request(path, {
+      await app.request("/projects/notify-project/settings/review", {
         headers: { cookie: "storyshelf_session=ok", "sec-fetch-site": "same-origin" },
       })
     ).text();
