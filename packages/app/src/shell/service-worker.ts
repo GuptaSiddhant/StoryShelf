@@ -1,4 +1,5 @@
 import { DEVICE_SCRIPT } from "./service-worker-device.ts";
+import { PUSH_SCRIPT } from "./service-worker-push.ts";
 import { SERVE_SCRIPT } from "./service-worker-serve.ts";
 import { SYNC_SCRIPT } from "./service-worker-sync.ts";
 
@@ -42,6 +43,10 @@ self.addEventListener('fetch',function(event){
     event.respondWith(serveOffline(url));
     return;
   }
+  if(request.method==='POST'&&url.origin===self.location.origin&&url.pathname==='/auth/logout'){
+    event.respondWith(signOut(request));
+    return;
+  }
   var pass=fetch(request);
   if(request.mode!=='navigate'){ event.respondWith(pass); return; }
   event.respondWith(pass.catch(function(){ return homePage(503); }));
@@ -50,9 +55,9 @@ self.addEventListener('fetch',function(event){
 
 /**
  * The app's one service worker (ADR 0048, decision 2). Three jobs only: serve opted-in Storybooks
- * at `/offline/<slug>/` from Cache Storage, show the offline home page, and (later) show push
- * notifications. App HTML, `/api/v1` answers, session state and CSRF tokens are never cached.
+ * at `/offline/<slug>/` from Cache Storage, show the offline home page, and show push
+ * notifications (`service-worker-push.ts`). App HTML, `/api/v1` answers, session state and CSRF tokens are never cached.
  */
 export function serviceWorkerScript(): string {
-  return `(function(){${DEVICE_SCRIPT}${SYNC_SCRIPT}${SERVE_SCRIPT}${LISTENERS_SCRIPT}})();`;
+  return `(function(){${DEVICE_SCRIPT}${SYNC_SCRIPT}${SERVE_SCRIPT}${PUSH_SCRIPT}${LISTENERS_SCRIPT}})();`;
 }

@@ -11,6 +11,7 @@ import {
   type CatalogLoader,
 } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type { Vapid } from "@storyshelf/core/integrations/push";
 import type { Logger } from "@storyshelf/core/logger";
 import type { PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -49,6 +50,8 @@ export interface Store {
   /** Design providers (Figma, …); empty when none is wired. */
   design: DesignProvider[];
   notifiers: NotifierProvider[];
+  /** The web push identity (ADR 0048); absent ⇒ push is off. */
+  push?: Vapid | undefined;
   /** Brand/sender settings for outgoing notifications (`notifications.config`). */
   notificationsConfig?: NotificationsConfig;
   /** AI insights surface; absent ⇒ AI off site-wide. */

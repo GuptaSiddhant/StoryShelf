@@ -9,6 +9,7 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { VapidConfig } from "./integrations/push/types.ts";
 import {
   storybookHostingSchema,
   validateStorybookHosting,
@@ -576,6 +577,11 @@ export interface ShelfTestingOptions {
 export interface ShelfNotificationsOptions {
   /** Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these. */
   notifiers?: NotifierProvider[];
+  /**
+   * VAPID identity for web push (ADR 0048; `vapidConfigFromEnv` reads `SHELF_VAPID_*`). Set ⇒ push
+   * on, after the key pair checks out at boot; absent ⇒ off (the push routes answer 404).
+   */
+  vapid?: VapidConfig;
   /** Email transport. Listed here so its setup/teardown/validation hooks run with the app's. */
   emailSender?: EmailSender;
   /** Site-wide brand and sender settings for outgoing notifications. */

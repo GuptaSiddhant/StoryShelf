@@ -3,9 +3,14 @@ import type { AdapterMetadata } from "@storyshelf/core/adapter/metadata";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { ShelfConfig, ShelfOptions, UIConfig } from "@storyshelf/core/config";
 import { validateConfig, validateUiConfig } from "@storyshelf/core/config";
+import { createVapid, createPushNotifier, type Vapid } from "@storyshelf/core/integrations/push";
 import type { Logger } from "@storyshelf/core/logger";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { createPublicOriginResolver, type PublicOriginResolver } from "@storyshelf/core/models";
+import {
+  createPublicOriginResolver,
+  PushSubscriptionModel,
+  type PublicOriginResolver,
+} from "@storyshelf/core/models";
 
 /**
  * Resolved server runtime derived from {@link ShelfOptions}.
@@ -21,6 +26,42 @@ export interface ServerRuntime {
   notifiers: NotifierProvider[];
   /** The public origin for links built in the background (ADR 0007, decision 6). */
   publicOrigin: PublicOriginResolver;
+  /** The web push identity (ADR 0048); absent ⇒ push is off and its routes answer 404. */
+  push?: Vapid | undefined;
+}
+
+/**
+ * The web push identity and, with it, the `push` notifier, or neither. The key pair is checked once
+ * here: a garbage or mismatched pair would sign fine and then fail 403 at every push service, so push
+ * stays off with one clear error line instead. A device the push service no longer knows is deleted
+ * (the notifier calls back, then the send ends: there is nothing left to retry).
+ */
+function pushOf(
+  options: ShelfOptions,
+  logger: Logger,
+): { vapid: Vapid; notifier: NotifierProvider } | undefined {
+  const config = options.notifications?.vapid;
+  if (config === undefined) {
+    return undefined;
+  }
+  try {
+    const vapid = createVapid(config);
+    const devices = new PushSubscriptionModel(options.database);
+    const notifier = createPushNotifier(vapid, {
+      logger,
+      onGone: async (device) => {
+        const row = await devices.findByEndpoint(device.endpoint);
+        if (row) {
+          await devices.remove(row.id);
+          logger.info({ deviceId: row.id }, "push device gone, removed");
+        }
+      },
+    });
+    return { vapid, notifier };
+  } catch (error) {
+    logger.error({ err: error }, "web push stays off");
+    return undefined;
+  }
 }
 
 function addOptionalSnapshots(snap: Record<string, AdapterMetadata>, options: ShelfOptions): void {
@@ -52,6 +93,16 @@ export function buildAdapterSnapshot(options: ShelfOptions): Record<string, Adap
   return snap;
 }
 
+/** The wired notifiers plus the push notifier, unless the host supplied its own `push` kind. */
+function withPush(
+  wired: NotifierProvider[],
+  push: NotifierProvider | undefined,
+): NotifierProvider[] {
+  return push === undefined || wired.some((entry) => entry.metadata.kind === "push")
+    ? wired
+    : [...wired, push];
+}
+
 /** Validate config/ui and derive runtime singletons from options. */
 export function resolveRuntime(options: ShelfOptions): ServerRuntime {
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- ShelfConfig lacks index signature
@@ -63,7 +114,8 @@ export function resolveRuntime(options: ShelfOptions): ServerRuntime {
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
   const design = options.design ?? [];
-  const notifiers = options.notifications?.notifiers ?? [];
+  const push = pushOf(options, logger);
+  const notifiers = withPush(options.notifications?.notifiers ?? [], push?.notifier);
   // Adapter introspection — auto-populate config.adapters if not supplied
   const config: ShelfConfig = rawConfig.adapters
     ? rawConfig
@@ -72,5 +124,5 @@ export function resolveRuntime(options: ShelfOptions): ServerRuntime {
         adapters: buildAdapterSnapshot(options),
       };
   const publicOrigin = createPublicOriginResolver({ db: options.database, config });
-  return { config, ui, logger, authEnabled, design, notifiers, publicOrigin };
+  return { config, ui, logger, authEnabled, design, notifiers, publicOrigin, push: push?.vapid };
 }

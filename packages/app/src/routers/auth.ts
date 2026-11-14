@@ -9,12 +9,14 @@ import type { ShelfRouter } from "../app-types.ts";
 import { notifySystem } from "../notify.ts";
 import { renderInviteInvalidPage, renderInvitePage } from "../pages/invite.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
+import { PUSH_ENDPOINT_HEADER } from "../shell/service-worker-push.ts";
 import { getStore } from "../store.ts";
 import { loginFailureOf } from "./auth-login-failure.ts";
 import { syncLoginMemberships } from "./auth-sync.ts";
 import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { safeReturnPath } from "./oauth-state.ts";
+import { forgetPushDevice } from "./push.ts";
 
 /** Provider ids are URL path segments: strict charset, bounded length. */
 function validProviderId(value: string): boolean {
@@ -372,6 +374,8 @@ export function registerEngineAuth(app: ShelfRouter, engine: Auth): void {
   app.post("/auth/invites/:inviteId", async (c) => await handleInviteAccept(c, engine));
 
   app.post("/auth/logout", async (c) => {
+    // The worker already unsubscribed this device and names its endpoint; forget it while the session still says whose it is.
+    await forgetPushDevice(c.req.header(PUSH_ENDPOINT_HEADER));
     const res = await forwardToEngine(c, engine, "/api/auth/sign-out", {});
     copySetCookies(c, res);
     // Mirror the Secure attribute or the clear-cookie misses Secure session
