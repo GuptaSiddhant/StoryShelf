@@ -11,6 +11,7 @@ import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
 import { chatNotifiers } from "@storyshelf/notify-chat";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
+import { gitLogNotifier } from "@storyshelf/notify-git";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -127,7 +128,9 @@ shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
 shelfLogger.info(aiLogFields(ai), "ai insights");
 
 // Notifications: SMTP sender from SMTP_* env (undefined keeps invites
-// out-of-band); chat + email providers serve stored channels.
+// out-of-band); chat + email providers serve stored channels. The `git-log` provider writes git
+// statuses to the server log only (no outbound call); a channel uses it only when someone creates
+// one through the API, so the deployed demo is unchanged. The browser golden-path test (#941) uses it.
 const emailSender = smtpPresetFromEnv(env, shelfLogger);
 const emailNotifiers = emailSender
   ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
@@ -140,7 +143,7 @@ const app = createShelfApp({
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   ai,
   notifications: {
-    notifiers: [...chatNotifiers, ...emailNotifiers],
+    notifiers: [...chatNotifiers, ...emailNotifiers, gitLogNotifier],
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   auth:

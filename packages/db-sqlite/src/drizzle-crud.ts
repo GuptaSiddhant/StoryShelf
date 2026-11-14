@@ -4,8 +4,9 @@
  * handle, as its `tx` store.
  */
 import type { ListOptions, TxStore } from "@storyshelf/core/adapter/database";
+import { listSelection } from "@storyshelf/core/adapter/database";
 import type { SQL, Table } from "drizzle-orm";
-import { and, eq, getTableColumns } from "drizzle-orm";
+import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export async function updateWhereOne<T extends AnySQLiteTable>(
@@ -73,20 +74,26 @@ export async function listMany<T extends Table>(
   table: T,
   opts: ListOptions = {},
 ): Promise<T["$inferSelect"][]> {
-  const query = applyListOptions(drizzle.select().from(table), opts);
+  const query = applyListOptions(
+    drizzle.select(listSelection(table, opts.columns)).from(table),
+    opts,
+    idOf(table),
+  );
   const rows: unknown = await query.all();
   return rows as T["$inferSelect"][];
 }
 
-/** The `where`, `orderBy`, `limit` and `offset` the caller asked for, in that order. */
-function applyListOptions(query: DrizzleSelectChain, opts: ListOptions): DrizzleSelectChain {
+/** The `where`, `orderBy` (with an `id` tie-break), `limit` and `offset`, in that order. */
+function applyListOptions(
+  query: DrizzleSelectChain,
+  opts: ListOptions,
+  id: SQLiteColumn,
+): DrizzleSelectChain {
   let next = query;
   if (opts.where) {
     next = next.where(opts.where);
   }
-  if (opts.orderBy) {
-    next = next.orderBy(opts.orderBy);
-  }
+  next = next.orderBy(opts.orderBy ? sql`${opts.orderBy}, ${id}` : sql`${id}`);
   if (opts.limit !== undefined) {
     next = next.limit(opts.limit);
   }
@@ -135,7 +142,7 @@ export interface DrizzleLike {
   update(table: AnySQLiteTable): {
     set(values: unknown): { where(where: SQL): { returning(): { get(): MaybePromise<unknown> } } };
   };
-  select(): { from(table: AnySQLiteTable): DrizzleSelectChain };
+  select(fields?: Record<string, unknown>): { from(table: AnySQLiteTable): DrizzleSelectChain };
   delete(table: AnySQLiteTable): { where(where: SQL): { run(): MaybePromise<unknown> } };
   $count(table: AnySQLiteTable, where?: SQL): MaybePromise<number>;
   all<T>(query: SQL): MaybePromise<T[]>;

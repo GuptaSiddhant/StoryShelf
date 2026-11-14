@@ -3,6 +3,7 @@ import { and, asc, eq, gte, lt, lte } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { AiUsageRow } from "../schema/insight.ts";
+import { deleteInBatches } from "../utils/batched-delete.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
 
@@ -182,18 +183,14 @@ export class AiUsageModel {
     );
   }
 
-  /** Delete rows older than `cutoffIso`; returns the number removed. */
+  /** Delete rows older than `cutoffIso` in bounded batches; returns the number removed. */
   async purgeBefore(cutoffIso: string): Promise<number> {
-    const rows = (await this.db.list(this.tables.aiUsage, {
-      where: lt(this.col("createdAt"), cutoffIso),
-      limit: 1000,
-    })) as unknown as AiUsageRow[];
-    await Promise.all(
-      rows.map(async (row) => {
-        await this.db.remove(this.tables.aiUsage, row.id);
-      }),
+    return await deleteInBatches(
+      this.db,
+      this.tables.aiUsage,
+      lt(this.col("createdAt"), cutoffIso),
+      asc(this.col("id")),
     );
-    return rows.length;
   }
 
   private col(name: string): SQLWrapper {

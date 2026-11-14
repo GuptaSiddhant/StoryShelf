@@ -2,6 +2,7 @@ import { LabelModel } from "@storyshelf/core/models";
 import { UserFacingError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { publicMessage } from "./helpers.ts";
@@ -9,9 +10,6 @@ import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Label-type settings (create custom types, delete removable ones). */
 export function registerLabelSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings/labels", async (c) =>
-    c.html(await renderSettingsPage(c, "labels", { editKey: c.req.query("edit") })),
-  );
   app.post("/projects/:slug/settings/labels", handleCreateLabelType);
   app.post("/projects/:slug/settings/labels/:key", handleUpdateLabelType);
   app.post("/projects/:slug/settings/labels/:key/delete", handleDeleteLabelType);
@@ -47,7 +45,7 @@ async function persistLabelType(
       linkTemplate,
     });
     flash(c, "Label type added");
-    return hxRedirect(c, `/projects/${projectSlug}/settings/labels`);
+    return hxRedirect(c, settingsHref(projectSlug, "labels"));
   } catch (error) {
     const message = publicMessage(error, "Failed to create label");
     return c.html((await renderSettingsPage(c, "labels", { globalError: message })) ?? "", 400);
@@ -87,7 +85,7 @@ async function persistLabelUpdate(
     return c.html((await renderSettingsPage(c, "labels", { globalError: message })) ?? "", 400);
   }
   flash(c, "Label type saved");
-  return hxRedirect(c, `/projects/${project.slug}/settings/labels`);
+  return hxRedirect(c, settingsHref(project.slug, "labels"));
 }
 
 async function handleDeleteLabelType(c: Context): Promise<Response> {
@@ -102,5 +100,5 @@ async function handleDeleteLabelType(c: Context): Promise<Response> {
     );
   }
   flash(c, "Label type deleted");
-  return hxRedirect(c, `/projects/${project.slug}/settings/labels`);
+  return hxRedirect(c, settingsHref(project.slug, "labels"));
 }

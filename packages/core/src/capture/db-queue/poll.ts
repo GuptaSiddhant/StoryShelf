@@ -71,26 +71,6 @@ export async function nackJob(
   if (current !== null) await settleFailure(rt, current, options);
 }
 
-/**
- * The holder hands the job back (shutdown): the job is queued again at once and the attempt is not
- * spent ({@link CaptureJobModel.release}). Like `nack`, only the current holder acts: a holder whose
- * attempt is no longer `running`, or whose job moved on, ended, or was asked to cancel, writes nothing.
- */
-export async function releaseJob(rt: QueueRuntime, job: PollableJob): Promise<void> {
-  const ref = attemptRef(job);
-  if ((await rt.model.get(ref.receipt))?.status !== "running") {
-    return;
-  }
-  const row = await rt.model.get(ref.jobId);
-  if (!isCurrent(row, ref.attempt) || row.status !== "running" || row.cancelRequestedAt !== null) {
-    return;
-  }
-  if (await rt.model.release(row, ref.attempt, isoAt(rt))) {
-    rt.logger?.info({ jobId: ref.jobId, attempt: ref.attempt }, "job released");
-    rt.wake.notify();
-  }
-}
-
 /** Whether `row` is open and still on `attempt`. */
 function isCurrent(row: CaptureJobRow | null, attempt: number): row is CaptureJobRow {
   return row !== null && !isTerminalJob(row) && row.attempt === attempt;
@@ -134,6 +114,26 @@ async function settleFailure(
   }
   const delayMs = Math.min(Math.max(options.delayMs ?? 0, 0), MAX_NACK_DELAY_MS);
   await rt.model.requeue(row.jobId, isoAt(rt, delayMs), error, now);
+}
+
+/** Longest a job handed back stays out of the queue unless the caller asks otherwise. */
+const DEFAULT_HAND_BACK_DELAY_MS = 30_000;
+
+/**
+ * Give a claimed job back without spending an attempt (see `PollableCaptureQueue.handBack`). Only
+ * the current holder can: a stale holder writes nothing.
+ */
+export async function handBackJob(
+  rt: QueueRuntime,
+  job: PollableJob,
+  options: { delayMs?: number; reason?: string } = {},
+): Promise<void> {
+  const ref = attemptRef(job);
+  const delayMs = Math.min(
+    Math.max(options.delayMs ?? DEFAULT_HAND_BACK_DELAY_MS, 0),
+    MAX_NACK_DELAY_MS,
+  );
+  await rt.model.handBack(ref.jobId, ref.attempt, isoAt(rt, delayMs), isoAt(rt));
 }
 
 /** The attempt a polled job refers to, from its receipt (`<jobId>:<attempt>`). */

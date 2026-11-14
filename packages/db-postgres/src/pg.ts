@@ -80,8 +80,8 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
       category: "database",
     },
     tables: schema,
-    migrate: async ({ logger }) => {
-      await runMigrationsLocked(sessionFor(pool), logger);
+    migrate: async ({ logger, release }) => {
+      await runMigrationsLocked(sessionFor(pool), logger, release);
       if (pooled) {
         await activateRetention(db, retention);
       }

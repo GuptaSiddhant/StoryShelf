@@ -1,4 +1,5 @@
 // oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
@@ -14,10 +15,12 @@ import {
   Meta,
   PageHeader,
   SelectField,
+  statusLabel,
   statusTone,
   Badge,
 } from "../ui/components.tsx";
 import { ProjectDesignLinks } from "./design-links.tsx";
+import { GetStarted } from "./get-started.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 import { LibraryGrid } from "./library-grid.tsx";
 import { entriesFromSnapshots, groupLibrary, type LibraryGroup } from "./library-model.ts";
@@ -37,7 +40,7 @@ export async function renderLibraryPage(
   const project = await new ProjectModel(getStore().db).getBySlug(slug);
   if (!project) return null;
   const build = await getLibraryBuild(project, branch);
-  if (!build) return renderEmptyLibrary(project);
+  if (!build) return await renderEmptyLibrary(project);
   const data = await loadLibraryData(project, build);
   if (data.groups.length === 0) return renderNoStories(project, build);
   return (
@@ -110,7 +113,8 @@ async function distinctBranches(projectId: string): Promise<string[]> {
   return [...new Set(buildsList.map((b) => b.gitBranch))].toSorted((a, b) => a.localeCompare(b));
 }
 
-function renderEmptyLibrary(project: Project): RenderedContent {
+async function renderEmptyLibrary(project: Project): Promise<RenderedContent> {
+  const origin = await getStore().publicOrigin?.url();
   return (
     <DocumentLayout
       title="Library"
@@ -122,14 +126,14 @@ function renderEmptyLibrary(project: Project): RenderedContent {
           <>All stories/components from the latest build on {project.gitDefaultBranch}.</>
         }
       />
-      <EmptyState title="No builds yet" description="Upload a build to populate the library." />
+      <GetStarted project={project} origin={origin} />
     </DocumentLayout>
   );
 }
 
 /** A build with nothing to list: still publishing, failed, or its Storybook is gone. */
 function renderNoStories(project: Project, build: Build): RenderedContent {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const preparing = build.status === "pending";
   return (
     <DocumentLayout
@@ -169,7 +173,7 @@ function LibraryHeader(props: {
   branches: string[];
 }): Rendered {
   const { project, build } = props;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <PageHeader
       title="Library"
@@ -181,7 +185,7 @@ function LibraryHeader(props: {
             {build.gitBranch} · {build.gitSha.slice(0, 7)}
           </a>{" "}
           · {new Date(build.createdAt).toLocaleString()}{" "}
-          <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+          <Badge tone={statusTone(build.status)}>{statusLabel(build.status)}</Badge>
         </>
       }
       actions={

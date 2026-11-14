@@ -17,6 +17,7 @@
  */
 import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
 import { createShelfLogger, type Logger } from "../../logger.ts";
+import type { CaptureJobKind } from "../../schema/capture-job.ts";
 import { recommendedBuildConcurrency } from "../../utils/resources.ts";
 import { startPollLoop, type PollLoop } from "../db-queue/poll-loop.ts";
 import { REAL_TIMERS, type QueueTimers } from "../db-queue/timers.ts";
@@ -46,6 +47,7 @@ export function createCaptureConsumer(options: CaptureConsumerOptions): CaptureC
   const logger = options.logger ?? createShelfLogger();
   options.queue.setLogger?.(logger.child({ component: options.queue.metadata.kind }));
   const rt = buildRuntime(options, logger);
+  claimHandledKinds(options.queue, rt);
   const slots = options.config?.concurrency ?? recommendedBuildConcurrency();
   let active: ActiveSession | null = null;
   return {
@@ -222,6 +224,13 @@ function startLoop(c: Consuming): PollLoop {
     now: rt.now,
     timers: options.timers,
   });
+}
+
+/** Claim only the kinds this consumer can run: an old copy never takes a newer kind (ADR 0053). */
+function claimHandledKinds(queue: PollableCaptureQueue, rt: JobRuntime): void {
+  if (isDatabaseQueue(queue)) {
+    queue.claimOnly([...rt.handlers.keys()] as CaptureJobKind[]);
+  }
 }
 
 function isDatabaseQueue(queue: PollableCaptureQueue): queue is DatabaseCaptureQueue {

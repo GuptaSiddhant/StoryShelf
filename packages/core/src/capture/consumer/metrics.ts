@@ -15,8 +15,8 @@ export type JobOutcome =
   | "failed"
   | "cancelled"
   | "lost"
-  | "released"
   | "dropped"
+  | "handed-back"
   | "unhandled";
 
 /** A job the consumer finished with. */

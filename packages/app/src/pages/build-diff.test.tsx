@@ -5,6 +5,16 @@ import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 
+/** Moves a freshly created (pending) build to `reviewing`, the status the review page expects. */
+async function startReview(
+  db: ReturnType<typeof makeDatabase>["db"],
+  buildId: string,
+): Promise<void> {
+  const builds = new BuildModel(db);
+  await builds.setStatus(buildId, "capturing");
+  await builds.setStatus(buildId, "reviewing");
+}
+
 interface Seeded {
   html: string;
   firstId: string;
@@ -50,6 +60,7 @@ async function reviewPage(
     gitBranch: "feature/x",
     authorName: "Ada Lovelace",
   });
+  await startReview(db, build.id);
   const ids = await seedSnapshots(db, project.id, build.id);
   const app = createShelfApp({
     testing: { runner: stubRunner() },
@@ -115,12 +126,20 @@ describe("review workspace page", () => {
   });
 });
 
+describe("review page snapshot list", () => {
+  it("groups under one component header and labels each status dot", async () => {
+    const { html } = await reviewPage();
+    expect(html.match(/<h3 class="[^"]*film-group-head/gu)).toHaveLength(1);
+    expect(html).toContain('<span class="visually-hidden">changed</span>');
+  });
+});
+
 describe("review page breadcrumb", () => {
-  it("lists Builds and the build (ancestors), not Review itself", async () => {
+  it("lists Builds only: the build is the current page, so its heading names it", async () => {
     const { html } = await reviewPage();
     const topbar = html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
     expect(topbar).toContain(">Builds</a>");
-    expect(topbar).toContain("feature/x · abc1234");
+    expect(topbar).not.toContain("feature/x · abc1234");
     expect(topbar).not.toContain(">Review<");
   });
 
@@ -174,6 +193,7 @@ async function multiBrowserPage(query: (ids: Record<string, string>) => string):
     gitSha: "abc1234def",
     gitBranch: "feature/x",
   });
+  await startReview(db, build.id);
   const ids = await seedMultiBrowser(db, project.id, build.id);
   const app = createShelfApp({
     testing: { runner: stubRunner() },
@@ -329,7 +349,7 @@ describe("review page: capture environment migration", () => {
 const VIOLATION =
   "color-contrast (serious): Elements must meet minimum color contrast [button] 1 node(s)";
 
-async function pageWith(violations: string | null, view: "diff" | "" = "diff"): Promise<string> {
+async function pageWith(violations: string | null): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const project = await new ProjectModel(db).create({ name: "Docs" });
@@ -354,10 +374,7 @@ async function pageWith(violations: string | null, view: "diff" | "" = "diff"): 
     storage,
     logger: createShelfLogger({ level: "silent" }),
   });
-  const url =
-    view === "diff"
-      ? `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`
-      : `/projects/${project.slug}/builds/${build.id}`;
+  const url = `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`;
   return await (await app.request(url)).text();
 }
 
@@ -366,22 +383,23 @@ describe("review page: accessibility violations", () => {
     const html = await pageWith(JSON.stringify([VIOLATION]));
     expect(html).toContain("Accessibility: 1 found on chromium (does not block)");
     expect(html).toContain("color-contrast (serious)");
-    expect(html).toContain("a11y 1 (chromium)");
+    expect(html).toContain("a11y 1");
+    expect(html).not.toContain("(chromium)");
   });
 
   it("sums the findings in the header and offers an a11y filter on the snapshot list", async () => {
     const html = await pageWith(JSON.stringify([VIOLATION, "label (critical): x"]));
-    expect(html).toContain("a11y 2 (does not block)");
+    expect(html).toMatch(/Accessibility findings<\/dt><dd[^>]*>2/u);
     expect(html).toMatch(/data-filter-switch[\s\S]*A11y 1/u);
     expect(html).toContain('data-filter="a11y"');
     expect(html).toContain("data-a11y");
   });
 
   it("shows the build's total on the build page as information only", async () => {
-    const html = await pageWith(JSON.stringify([VIOLATION]), "");
+    const html = await pageWith(JSON.stringify([VIOLATION]));
     expect(html).toContain("Accessibility findings");
     expect(html).toContain("On 1 snapshot. Information only; they never change the status.");
-    expect(await pageWith(null, "")).toContain("No findings recorded. Information only.");
+    expect(await pageWith(null)).toContain("No findings recorded. Information only.");
   });
 
   it("offers no a11y filter and no header count when nothing was found", async () => {
@@ -402,7 +420,7 @@ describe("review page: accessibility violations", () => {
   });
 
   it("reports an `axe unavailable` entry on the build page without calling it a finding", async () => {
-    const page = await pageWith(JSON.stringify(["axe unavailable: page crashed"]), "");
+    const page = await pageWith(JSON.stringify(["axe unavailable: page crashed"]));
     expect(page).toContain("No findings recorded.");
     expect(page).toContain("axe did not run on 1 snapshot.");
   });
@@ -410,5 +428,22 @@ describe("review page: accessibility violations", () => {
   it("shows nothing for a snapshot without findings or with unreadable data", async () => {
     expect(await pageWith(null)).not.toContain("Accessibility:");
     expect(await pageWith("not json")).not.toContain("Accessibility:");
+  });
+});
+
+describe("review page action bar", () => {
+  it("docks the action bar in the comparison card, with the keys inside the buttons", async () => {
+    const { html } = await reviewPage();
+    const card = html.slice(html.indexOf("review-comparison-card"));
+    // The bar is the card's footer: it comes after the stage and before the comment thread.
+    expect(card.indexOf("data-compare")).toBeLessThan(card.indexOf('role="toolbar"'));
+    expect(html.indexOf('role="toolbar"')).toBeLessThan(html.indexOf("Add comment"));
+    expect(html).toMatch(/<button[^>]*data-approve[^>]*aria-keyshortcuts="a"/u);
+    expect(html).toMatch(/<button[^>]*data-reject[^>]*aria-keyshortcuts="r"/u);
+    // Approve is the one filled button; Reject is secondary with danger text.
+    expect(html).toMatch(/class="[^"]*btn-danger-secondary-sm[^"]*"[^>]*data-reject/u);
+    // The hint row ("j k navigate a approve r reject") is gone: only the ? help button stays.
+    expect(html).not.toContain("navigate");
+    expect(html).toContain("data-shortcuts-open");
   });
 });

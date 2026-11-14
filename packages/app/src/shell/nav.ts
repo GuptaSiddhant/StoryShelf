@@ -7,6 +7,15 @@ export interface NavConfig {
   projectName?: string;
   /** Levels below the section, ending with the current page (e.g. a build, then "Review"). */
   trail?: NavCrumb[];
+  /** `rail`: open with the sidebar collapsed unless the viewer expanded it on this kind of page. */
+  sidebarDefault?: "rail";
+}
+
+/** A foldable sidebar group: a heading and its entries. */
+export interface NavGroup {
+  id: string;
+  title: string;
+  items: NavItem[];
 }
 
 /** One breadcrumb level; the last trail item is the current page (it needs no `href`). */
@@ -30,28 +39,33 @@ export interface NavUrls {
   projects(): string;
   library(slug: string): string;
   buildsList(slug: string): string;
-  jobs(slug: string): string;
-  labels(slug: string): string;
   settings(slug: string): string;
 }
 
 /**
- * Entries shown for the current project. Entries for `testing` routes (Jobs) drop out on a
- * hosting-only instance, where those routes answer 404.
+ * The task groups for a project: its Builds (review) and Library (browse), then Settings.
+ * Jobs and Labels are reached from Settings, so each page has exactly one sidebar entry.
  */
-export function projectNavItems(urls: NavUrls, slug: string, testing = true): NavItem[] {
-  const jobs: NavItem = { key: "jobs", label: "Jobs", href: urls.jobs(slug), icon: "activity" };
+export function projectNavGroups(urls: NavUrls, slug: string): NavGroup[] {
   return [
-    { key: "library", label: "Library", href: urls.library(slug), icon: "image" },
-    { key: "builds", label: "Builds", href: urls.buildsList(slug), icon: "layers" },
-    ...(testing ? [jobs] : []),
-    { key: "labels", label: "Labels", href: urls.labels(slug), icon: "tag" },
-    { key: "settings", label: "Settings", href: urls.settings(slug), icon: "settings" },
+    {
+      id: "project",
+      title: "Project",
+      items: [
+        { key: "builds", label: "Builds", href: urls.buildsList(slug), icon: "layers" },
+        { key: "library", label: "Library", href: urls.library(slug), icon: "image" },
+      ],
+    },
+    {
+      id: "settings",
+      title: "Settings",
+      items: [{ key: "settings", label: "Settings", href: urls.settings(slug), icon: "settings" }],
+    },
   ];
 }
 
-/** Developer entries (API reference). */
-export function developerNavItems(): NavItem[] {
+/** Help menu entries (API reference), shown next to the theme toggle. */
+export function helpNavItems(): NavItem[] {
   return [
     { key: "api-docs", label: "API docs", href: "/api/v1/docs", icon: "book" },
     {
@@ -87,8 +101,6 @@ function sectionCrumb(nav: NavConfig | undefined, urls: NavUrls): NavCrumb | nul
   const table: Record<string, NavCrumb | undefined> = {
     library: slug ? { label: "Library", href: urls.library(slug) } : undefined,
     builds: slug ? { label: "Builds", href: urls.buildsList(slug) } : undefined,
-    jobs: slug ? { label: "Jobs", href: urls.jobs(slug) } : undefined,
-    labels: slug ? { label: "Labels", href: urls.labels(slug) } : undefined,
     settings: slug ? { label: "Settings", href: urls.settings(slug) } : undefined,
     admin: { label: "System", href: "/admin" },
     profile: { label: "Profile", href: "/profile" },

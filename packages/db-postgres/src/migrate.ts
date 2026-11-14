@@ -7,6 +7,8 @@
  */
 import {
   duplicateGroupsSql,
+  gatedMigration,
+  sqlSchemaLevelStore,
   logSkippedIndex,
   parseUniqueIndex,
 } from "@storyshelf/core/adapter/database";
@@ -46,6 +48,9 @@ const SNAPSHOT_BASELINE_ID_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_id TEXT";
 const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
+// Expand step (ADR 0053): nullable, so the previous release keeps working against it.
+const CONTENT_USE_SIZE_ALTER =
+  "ALTER TABLE content_uses ADD COLUMN IF NOT EXISTS size_bytes BIGINT";
 const SNAPSHOT_COMPARISON_IMAGE_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS comparison_image_path TEXT";
 const SNAPSHOT_COMPARISON_METADATA_ALTER =
@@ -95,11 +100,14 @@ const BUILD_CAPTURE_JOB_BACKFILL =
   "UPDATE builds SET capture_job_id = (SELECT j.job_id FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id LIMIT 1) WHERE capture_job_id IS NULL AND status IN ('pending', 'capturing') AND (SELECT COUNT(*) FROM capture_jobs j WHERE j.entry = 'job' AND j.kind = 'capture' AND j.shard_id IS NULL AND j.cancel_requested_at IS NULL AND j.status IN ('queued', 'running') AND j.build_id = builds.id) = 1";
 const BUILD_CAPTURE_GENERATION_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS capture_generation INTEGER NOT NULL DEFAULT 0";
+const BUILD_MANIFEST_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS manifest_sha256 TEXT";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
+const SWITCH_STORIES_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS switch_stories BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
@@ -151,6 +159,13 @@ const NOTIFICATION_LAST_DELIVERED_ALTER =
 const BUILDS_GITSHA_DEDUP = "DROP INDEX IF EXISTS builds_project_gitsha_idx";
 const BUILDS_GITSHA_INDEX =
   "CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha)";
+
+/** Build lists read `(project_id [, git_branch]) ORDER BY created_at DESC`; these serve it without a sort. */
+const BUILDS_LIST_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS builds_project_created_idx ON builds (project_id, created_at)",
+  "CREATE INDEX IF NOT EXISTS builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
+  "DROP INDEX IF EXISTS builds_git_branch_idx",
+];
 
 const PROJECT_BROWSERS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browsers TEXT";
 const PROJECT_MODES_ALLOWLIST_ALTER =
@@ -218,8 +233,14 @@ async function migrateProjectExtras(run: MigrationRunner, logger?: Logger): Prom
   await migrateSnapshotColumns(run, logger);
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
-  await run(RUN_TESTS_ALTER);
+  await migrateProjectSwitches(run);
   await migrateRecentColumns(run);
+}
+
+/** Per-project capture switches added after `run_a11y`; each is an idempotent `ADD COLUMN`. */
+async function migrateProjectSwitches(run: MigrationRunner): Promise<void> {
+  await run(RUN_TESTS_ALTER);
+  await run(SWITCH_STORIES_ALTER);
 }
 
 /** Columns added after the first adapter release; each is an idempotent `ADD COLUMN IF NOT EXISTS`. */
@@ -231,6 +252,7 @@ async function migrateRecentColumns(run: MigrationRunner): Promise<void> {
 async function migrateUnstableColumns(run: MigrationRunner): Promise<void> {
   await run(SNAPSHOT_UNSTABLE_ALTER);
   await run(DETECT_UNSTABLE_ALTER);
+  await run(CONTENT_USE_SIZE_ALTER);
 }
 
 async function migrateDesignColumns(run: MigrationRunner): Promise<void> {
@@ -258,8 +280,13 @@ async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_TEST_RESULTS_ALTER);
   await run(BUILD_REVIEW_CYCLE_ALTER);
   await run(BUILD_REVIEW_REQUESTED_CYCLE_ALTER);
+  await migrateBuildRunColumns(run);
+}
+
+async function migrateBuildRunColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_CAPTURE_JOB_ALTER);
   await run(BUILD_CAPTURE_GENERATION_ALTER);
+  await run(BUILD_MANIFEST_SHA_ALTER);
 }
 
 /** Runs `use` with one dedicated connection's row-query runner, then releases the connection. */
@@ -278,11 +305,12 @@ const MIGRATION_LOCK_KEY = 5_370_011_001;
 export async function runMigrationsLocked(
   session: MigrationSession,
   logger?: Logger,
+  release?: string,
 ): Promise<void> {
   await session(async (run) => {
     await run(`SELECT pg_advisory_lock(${MIGRATION_LOCK_KEY})`);
     try {
-      await runMigrations(run, logger);
+      await runMigrations(run, logger, release);
     } finally {
       await run(`SELECT pg_advisory_unlock(${MIGRATION_LOCK_KEY})`);
     }
@@ -290,7 +318,22 @@ export async function runMigrationsLocked(
 }
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+export async function runMigrations(
+  run: MigrationRunner,
+  logger?: Logger,
+  release?: string,
+): Promise<void> {
+  await gatedMigration({
+    release,
+    logger,
+    store: sqlSchemaLevelStore(run, "postgres"),
+    migrate: async () => {
+      await migrateEverything(run, logger);
+    },
+  });
+}
+
+async function migrateEverything(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await run(DDL);
   await migrateCoreColumns(run);
@@ -328,6 +371,15 @@ async function migrateRunA11yDefault(run: MigrationRunner): Promise<void> {
   await run(RUN_A11Y_DEFAULT_ALTER);
 }
 
+async function migrateBuildsListIndexes(run: MigrationRunner): Promise<void> {
+  await run(BUILDS_GITSHA_DEDUP);
+  await run(BUILDS_GITSHA_INDEX);
+  for (const statement of BUILDS_LIST_INDEXES) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered DDL
+    await run(statement);
+  }
+}
+
 async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await run(STORYBOOK_META_ALTER);
   await migrateRunA11yDefault(run);
@@ -337,8 +389,7 @@ async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await run(WEBHOOK_SECRET_DROP);
   await run(TOKEN_USER_ALTER);
   await run(MEMBER_SOURCE_ALTER);
-  await run(BUILDS_GITSHA_DEDUP);
-  await run(BUILDS_GITSHA_INDEX);
+  await migrateBuildsListIndexes(run);
 }
 
 async function applyIdentityStatements(run: MigrationRunner, logger?: Logger): Promise<void> {

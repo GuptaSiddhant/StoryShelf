@@ -1,7 +1,7 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import { DiffViewer } from "./build-diff-viewer.tsx";
+import { DiffViewer, type DiffViewerProps } from "./build-diff-viewer.tsx";
 import type { DesignItem } from "./design-links.tsx";
 
 const project = { slug: "demo" } as Project;
@@ -33,7 +33,11 @@ const design = (extra: Partial<DesignItem> = {}): DesignItem => ({
   ...extra,
 });
 
-async function render(items?: DesignItem[], snapshot: Snapshot = selected): Promise<string> {
+async function render(
+  items?: DesignItem[],
+  snapshot: Snapshot = selected,
+  extra: Partial<DiffViewerProps> = {},
+): Promise<string> {
   const app = new Hono().get("/", (c): Response | Promise<Response> =>
     c.html(
       <DiffViewer
@@ -42,11 +46,57 @@ async function render(items?: DesignItem[], snapshot: Snapshot = selected): Prom
         selected={snapshot}
         hasBaseline={{ s1: true }}
         design={items}
+        {...extra}
       />,
     ),
   );
   return await (await app.request("/")).text();
 }
+
+const known = (imageSize: { width: number; height: number }): DiffViewerProps["reference"] => ({
+  kind: "known",
+  branch: "main",
+  defaultBranch: true,
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  imageAvailable: true,
+  imageSize,
+  build: { id: "ref", gitSha: "aaaaaaa123" } as Build,
+});
+
+describe("review stage: size change", () => {
+  it("says the sizes differ instead of a 100% diff, and the diff mode says why it is empty", async () => {
+    const html = await render(
+      undefined,
+      { ...selected, diffPath: null, diffPixels: 0, diffRatio: 1 },
+      { reference: known({ width: 100, height: 100 }), currentSize: { width: 120, height: 100 } },
+    );
+    expect(html).toContain("100×100 → 120×100");
+    expect(html).toContain("sizes differ");
+    expect(html).not.toContain(">0 px<");
+    expect(html).not.toContain(">100.0%<");
+    expect(html).not.toContain("No diff yet");
+    expect(html).toContain("No pixel diff: the images are different sizes");
+    // Both images at one scale: the same 120-wide box.
+    expect(html.match(/viewBox="0 0 120 100"/gu)).toHaveLength(2);
+  });
+
+  it("keeps the pixel figures when the sizes match", async () => {
+    const html = await render(undefined, selected, {
+      reference: known({ width: 800, height: 600 }),
+      currentSize: { width: 800, height: 600 },
+    });
+    expect(html).toContain("12 px");
+    expect(html).not.toContain("sizes differ");
+  });
+
+  it("names the baseline in one quiet line, not an alert", async () => {
+    const html = await render(undefined, selected, { reference: known({ width: 1, height: 1 }) });
+    expect(html).toContain("vs main ·");
+    expect(html).toContain(">aaaaaaa</a>");
+    expect(html).not.toContain('role="alert"');
+    expect(html).not.toContain(">ref<");
+  });
+});
 
 describe("review stage: unstable render", () => {
   it("flags a snapshot whose second render differed, and nothing else", async () => {

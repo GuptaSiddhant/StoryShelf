@@ -98,7 +98,11 @@ const CHANNELS: Channel[] = ["api", "form"];
 async function createBuild(booted: Booted): Promise<string> {
   const created = await booted.app.request("/api/v1/projects/gate/builds", {
     method: "POST",
-    headers: { cookie: "storyshelf_session=admin", "content-type": "application/json" },
+    headers: {
+      cookie: "storyshelf_session=admin",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/json",
+    },
     body: JSON.stringify({
       gitSha: "a".repeat(40),
       gitBranch: "feature/x",
@@ -127,6 +131,7 @@ async function call(
       method: "POST",
       headers: {
         cookie: `storyshelf_session=${user}`,
+        "sec-fetch-site": "same-origin",
         "x-csrf-token": getCsrfToken("s", user),
         "content-type": form ? "application/x-www-form-urlencoded" : "application/json",
       },
@@ -149,8 +154,8 @@ async function makeRequest(booted: Booted, id: string, extra: Record<string, str
 }
 
 async function buildPage(booted: Booted, user: string, id: string): Promise<string> {
-  const response = await booted.app.request(`/projects/gate/builds/${id}`, {
-    headers: { cookie: `storyshelf_session=${user}` },
+  const response = await booted.app.request(`/projects/gate/builds/${id}/diff`, {
+    headers: { cookie: `storyshelf_session=${user}`, "sec-fetch-site": "same-origin" },
   });
   expect(response.status).toBe(200);
   return await response.text();
@@ -372,7 +377,7 @@ describe("open change requests do not gate approval", () => {
     await call(booted, "api", "dev", `/builds/${id}/comments/${commentId}/reopen`);
     expect(await statusOf(booted, id)).toBe(before);
     const reviews = await booted.app.request(`/api/v1/projects/gate/builds/${id}/reviews`, {
-      headers: { cookie: "storyshelf_session=alice" },
+      headers: { cookie: "storyshelf_session=alice", "sec-fetch-site": "same-origin" },
     });
     expect(await reviews.json()).toMatchObject({ approvals: 0 });
   });

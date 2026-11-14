@@ -47,6 +47,13 @@ export interface ShelfAuthOptions {
   sso?: ShelfSSOOptions;
   /** Extra Better Auth plugins (passkey, SSO, ...). Defaults to none. */
   plugins?: BetterAuthPlugin[];
+  /**
+   * Name the session cookie `__Host-storyshelf_session` (ADR 0051, decision 9), which `subdomain`
+   * hosting requires: the prefix forces `Secure`, `Path=/` and no `Domain`, so a content host cannot
+   * set or overwrite it. Needs an https `baseURL` or a `localhost` name. Changing it signs everyone
+   * out once. Defaults to false.
+   */
+  hostSessionCookie?: boolean;
   /** Session lifetime in days. Defaults to 7 (current parity). */
   sessionExpiresInDays?: number;
 }

@@ -108,12 +108,12 @@ export interface PollableCaptureQueue extends CaptureQueue {
     options?: { requeue?: boolean; delayMs?: number; error?: string },
   ): Promise<void>;
   /**
-   * Hand a job back during shutdown: it is visible to the next poll at once and the attempt does
-   * not count against its retries. Not a failure (nothing is recorded as the job's error) and not
-   * a cancel. Optional: queues that cannot do it omit it, and the lease recovers the job. Only the
-   * current holder releases; a superseded holder's call changes nothing.
+   * Give a claimed job back unrun, without spending an attempt: it is claimable again after
+   * `delayMs`, and its attempt count is what it was before the claim. Optional: only the database
+   * queue has it. Used for a payload version this consumer cannot read (ADR 0053) and by a
+   * draining shutdown.
    */
-  release?(job: PollableJob): Promise<void>;
+  handBack?(job: PollableJob, options?: { delayMs?: number; reason?: string }): Promise<void>;
   /**
    * Extend the lease on an in-flight job by another `job.leaseMs`. Optional:
    * queues without a renewable lease (e.g. Redis) omit it. May update

@@ -1,4 +1,5 @@
 // oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
+import { contentHostSuffix } from "@storyshelf/core/config";
 import type { DesignDrift } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
@@ -105,7 +106,7 @@ const widePath = css`
 /** The design coverage page: what lacks a design, what drifted, and how much is in sync. */
 export function renderDesignCoveragePage(data: DesignCoverageData): RenderedContent {
   const { project, build } = data;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <DocumentLayout
       title="Design coverage"
@@ -193,10 +194,10 @@ function CoverageBody(props: { data: DesignCoverageData }): Rendered {
 
 /** Where a component's design links are managed: its Design tab with testing, else the project's design settings. */
 function linkTarget(data: DesignCoverageData, component: CoverageComponent): string {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return data.storyLinksRead
     ? urls.component(data.project.slug, component.importPath, { tab: "design" })
-    : `${urls.settings(data.project.slug)}/design`;
+    : `${urls.settingsTab(data.project.slug, "capture")}#design`;
 }
 
 function ComponentLink(props: {
@@ -204,7 +205,7 @@ function ComponentLink(props: {
   component: CoverageComponent;
 }): Rendered {
   const { data, component } = props;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const href = data.storyLinksRead
     ? urls.component(data.project.slug, component.importPath, { tab: "design" })
     : urls.component(data.project.slug, component.importPath);
@@ -343,13 +344,17 @@ function DriftRows(props: { data: DesignCoverageData; component: CoverageCompone
 /** Says which providers cannot be checked and where to add a token. */
 function DriftAlert(props: { data: DesignCoverageData }): Rendered {
   const { project, withoutToken } = props.data;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <Alert tone="info" title="Drift can't be checked">
       {withoutToken.join(", ")} has no access token for this project, so StoryShelf cannot see which
-      designs changed. Add one in Settings → Design.
+      designs changed. Add one in Settings → Capture & tests.
       <div class="mt-1">
-        <Button variant="secondary" size="sm" href={`${urls.settings(project.slug)}/design`}>
+        <Button
+          variant="secondary"
+          size="sm"
+          href={`${urls.settingsTab(project.slug, "capture")}#design`}
+        >
           Open design settings
         </Button>
       </div>

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS projects (
   play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
   run_a11y INTEGER NOT NULL DEFAULT 1,
   run_tests INTEGER NOT NULL DEFAULT 0,
+  switch_stories INTEGER NOT NULL DEFAULT 0,
   detect_unstable INTEGER NOT NULL DEFAULT 1,
   browser TEXT NOT NULL DEFAULT 'chromium',
   viewports TEXT,
@@ -54,11 +55,13 @@ CREATE TABLE IF NOT EXISTS builds (
   review_cycle INTEGER NOT NULL DEFAULT 0,
   review_requested_cycle INTEGER,
   capture_job_id TEXT,
+  manifest_sha256 TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha);
-CREATE INDEX IF NOT EXISTS builds_git_branch_idx ON builds (git_branch);
+CREATE INDEX IF NOT EXISTS builds_project_created_idx ON builds (project_id, created_at);
+CREATE INDEX IF NOT EXISTS builds_project_branch_created_idx ON builds (project_id, git_branch, created_at);
 CREATE TABLE IF NOT EXISTS build_references (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   owner_type TEXT NOT NULL CHECK (owner_type IN ('baseline', 'investigation')),
@@ -150,6 +153,11 @@ CREATE INDEX IF NOT EXISTS capture_jobs_poll_idx ON capture_jobs (kind, visible_
 CREATE INDEX IF NOT EXISTS capture_jobs_job_id_idx ON capture_jobs (job_id);
 CREATE INDEX IF NOT EXISTS capture_jobs_build_id_idx ON capture_jobs (build_id);
 CREATE INDEX IF NOT EXISTS capture_jobs_entry_created_idx ON capture_jobs (entry, created_at);
+CREATE TABLE IF NOT EXISTS schema_meta (
+  id TEXT PRIMARY KEY,
+  version TEXT NOT NULL,
+  migrated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS site_settings (
   id TEXT PRIMARY KEY,
   value TEXT NOT NULL,
@@ -485,6 +493,7 @@ CREATE TABLE IF NOT EXISTS content_uses (
   content_hash TEXT NOT NULL,
   project_id TEXT NOT NULL,
   created_at TEXT NOT NULL,
+  size_bytes INTEGER,
   released_at TEXT,
   collecting_at TEXT,
   claim_token TEXT,

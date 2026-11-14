@@ -1,4 +1,4 @@
-import { index, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, index, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 /** A build's use of one shared content blob; see the core `ContentUse` row type. */
 export const contentUses = pgTable(
@@ -8,6 +8,7 @@ export const contentUses = pgTable(
     contentHash: text("content_hash").notNull(),
     projectId: text("project_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
     releasedAt: timestamp("released_at", { withTimezone: true, mode: "string" }),
     collectingAt: timestamp("collecting_at", { withTimezone: true, mode: "string" }),
     claimToken: text("claim_token"),
@@ -24,6 +25,7 @@ export interface ContentUse {
   contentHash: string;
   projectId: string;
   createdAt: string;
+  sizeBytes: number | null;
   releasedAt: string | null;
   collectingAt: string | null;
   claimToken: string | null;

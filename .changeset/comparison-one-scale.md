@@ -1,0 +1,7 @@
+---
+"@storyshelf/app": patch
+---
+
+Changed: the review comparison draws both screenshots at one scale, with a docked action bar.
+
+In Fit, the baseline and the current image shrink by the same factor (the server reads each PNG's size from its header) and are never stretched past their natural width, so a 100×100 baseline beside a 120×100 screenshot looks smaller instead of the same. The stage has two columns, baseline and current, on a muted canvas with outlined images; the diff is a mode, not a third column, and when the sizes differ it says why it has no image. A size-only change reads "100×100 → 120×100 · sizes differ" instead of "100.0%", "0 px" and "No diff yet". The baseline alert is one quiet line ("vs main · abc1234 · updated 2 h ago", no live region) with the commit linking to the reference build. The action bar is the docked footer of the comparison card, with the keys inside the buttons; Approve is the one filled button and Reject is secondary with danger text (a new `danger-secondary` button variant).

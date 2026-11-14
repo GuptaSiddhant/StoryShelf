@@ -4,7 +4,7 @@
  * Performance benchmark on `fixtures/storybook-9` (issue #853). Run: `nub run bench`.
  *
  * Starts the real app (SQLite, local storage, Playwright at 2 pages, jobs at concurrency 1), uploads
- * the fixture with the built CLI three times (first, unchanged, one file changed) and reports
+ * the fixture with the built CLI three times (first, unchanged, one file changed; every upload is `--full`, so "unchanged" is a full capture of an unchanged build, the row ADR 0052's gate measures) and reports
  * storage, capture, published serving, database work and app pages. One warm-up run is dropped,
  * then the median of `--runs` (default 3) runs is printed as a table and as one JSON line.
  * Needs the built `dist/` of the app, cli, core, db-sqlite, storage-local and runner-playwright

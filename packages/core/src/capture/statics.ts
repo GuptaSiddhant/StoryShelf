@@ -53,6 +53,7 @@ export async function extractStorybookToScratch(
     ? shardScratchDir(scratchDir, projectId, buildId, shardId)
     : jobScratchDir(scratchDir, projectId, buildId);
   const targetDir = join(base, "storybook");
+  await rm(join(base, "storybook.complete"), { force: true });
   const root = await prepareTargetDir(targetDir);
   const source = await storage.readStream(storybookZipPath(projectId, buildId));
   await extractZipStream(source, root, limits, signal);
@@ -94,6 +95,7 @@ export async function persistStorybookStatics(
   const destinationPrefix = storybookDir(projectId, buildId);
   const files = await walkFiles(root);
   const manifest: Record<string, string> = {};
+  const sizes = new Map<string, number>();
   // Bounded: a large Storybook has thousands of files, and buffering them all
   // at once exhausts memory on small hosts.
   await mapLimit(files, STATICS_CONCURRENCY, async (file) => {
@@ -102,6 +104,7 @@ export async function persistStorybookStatics(
     const buffer = await readFile(file);
     const hash = createHash("sha256").update(buffer).digest("hex");
     manifest[rel] = hash;
+    sizes.set(hash, buffer.length);
     // Only write if not already exists (dedup)
     if (!(await storage.exists(contentKey(hash)))) {
       signal?.throwIfAborted();
@@ -110,7 +113,14 @@ export async function persistStorybookStatics(
   });
   // The uses are recorded once per hash, before the manifest that names them makes the build serve.
   signal?.throwIfAborted();
-  await recordContentUses(db, storage, { projectId, buildId }, Object.values(manifest));
+  await recordContentUses(
+    db,
+    storage,
+    { projectId, buildId },
+    Object.values(manifest),
+    undefined,
+    sizes,
+  );
   signal?.throwIfAborted();
   await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }

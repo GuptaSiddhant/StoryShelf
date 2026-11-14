@@ -63,6 +63,7 @@ const projects = defineTable("projects", {
   playTimeoutMs: "play_timeout_ms",
   runA11y: "run_a11y",
   runTests: "run_tests",
+  switchStories: "switch_stories",
   detectUnstable: "detect_unstable",
   browser: "browser",
   viewports: "viewports",
@@ -155,6 +156,7 @@ const builds = defineTable("builds", {
   reviewCycle: "review_cycle",
   reviewRequestedCycle: "review_requested_cycle",
   captureJobId: "capture_job_id",
+  manifestSha256: "manifest_sha256",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -242,6 +244,12 @@ const siteSettings = defineTable("site_settings", {
   updatedBy: "updated_by",
   createdAt: "created_at",
   updatedAt: "updated_at",
+});
+
+const schemaMeta = defineTable("schema_meta", {
+  id: "id",
+  version: "version",
+  migratedAt: "migrated_at",
 });
 
 const captureLogs = defineTable("capture_logs", {
@@ -515,6 +523,7 @@ export const fakeSchema: Tables = {
   buildComponents,
   buildReviews,
   siteSettings,
+  schemaMeta,
   snapshots,
   baselines,
   comments,

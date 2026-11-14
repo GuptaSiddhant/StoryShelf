@@ -2,8 +2,9 @@ import { BuildModel, LabelModel, PackageUsageModel } from "@storyshelf/core/mode
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { storybookZipPath } from "@storyshelf/core/utils";
+import { contentKey, storybookZipPath } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";
+import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
@@ -203,7 +204,8 @@ describe("streaming build upload (JSON + PUT)", () => {
     const { storage, app } = await setupSeeded();
     const created = await createViaJson(app, defaultPayload);
     const zip = new AdmZip();
-    zip.addFile("iframe.html", Buffer.from("PK-zip-bytes-".repeat(5000)));
+    const file = Buffer.from("PK-zip-bytes-".repeat(5000));
+    zip.addFile("iframe.html", file);
     const payload = zip.toBuffer();
 
     const response = await app.request(created.uploadUrl, {
@@ -213,14 +215,19 @@ describe("streaming build upload (JSON + PUT)", () => {
     });
 
     expect(response.status).toBe(202);
-    expect(await storage.read(storybookZipPath("p1", created.build.id))).toEqual(payload);
+    // The publish stored the file once and dropped the upload zip (#850).
+    expect(await storage.read(contentKey(createHash("sha256").update(file).digest("hex")))).toEqual(
+      file,
+    );
+    expect(await storage.exists(storybookZipPath("p1", created.build.id))).toBe(false);
   });
 
   it("streams a node Readable end to end", async () => {
     const { storage, app } = await setupSeeded();
     const created = await createViaJson(app, defaultPayload);
     const zip = new AdmZip();
-    zip.addFile("iframe.html", Buffer.from("readable-bytes-".repeat(2000)));
+    const file = Buffer.from("readable-bytes-".repeat(2000));
+    zip.addFile("iframe.html", file);
     const payload = zip.toBuffer();
 
     const response = await app.request(created.uploadUrl, {
@@ -231,7 +238,11 @@ describe("streaming build upload (JSON + PUT)", () => {
     } as RequestInit);
 
     expect(response.status).toBe(202);
-    expect(await storage.read(storybookZipPath("p1", created.build.id))).toEqual(payload);
+    // The publish stored the file once and dropped the upload zip (#850).
+    expect(await storage.read(contentKey(createHash("sha256").update(file).digest("hex")))).toEqual(
+      file,
+    );
+    expect(await storage.exists(storybookZipPath("p1", created.build.id))).toBe(false);
   });
 
   it("rejects JSON without sha with 400", async () => {

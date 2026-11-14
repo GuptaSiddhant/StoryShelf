@@ -1,4 +1,5 @@
 /** The snapshot layer of the library: what `testing` adds on top of the catalog (ADR 0006, decision 9). */
+import { contentHostSuffix } from "@storyshelf/core/config";
 import type { Project, Snapshot } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -10,7 +11,7 @@ import {
   providerNameFor,
 } from "../routers/design.handlers.ts";
 import { getStore } from "../store.ts";
-import { Badge, Button, HStack, SectionTitle, statusTone } from "../ui/components.tsx";
+import { Badge, Button, HStack, SectionTitle, statusLabel, statusTone } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import {
   diffPaneImg,
@@ -121,8 +122,8 @@ function SnapshotCardItem(props: {
       <div class={snapshotCardHead}>
         <strong>{snap.storyName}</strong>
         <span class={snapshotCardMeta}>
-          <Badge tone={statusTone(snap.status)}>{snap.status}</Badge> {snap.viewportWidth}×
-          {snap.viewportHeight}
+          <Badge tone={statusTone(snap.status)}>{statusLabel(snap.status)}</Badge>{" "}
+          {snap.viewportWidth}×{snap.viewportHeight}
         </span>
       </div>
       <div class={snapshotCardBody}>
@@ -147,7 +148,7 @@ function SnapshotActions(props: {
   componentHref: string | undefined;
 }): Rendered {
   const { snap, project, buildId, layer } = props;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <HStack>
       <Button

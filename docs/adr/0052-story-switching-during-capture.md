@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-13), for the owner to decide. It answers #876. Nothing here ships until the
+Accepted (2026-11-13, owner). It answers #876. Nothing here ships until the
 measurement gate in decision 9 passes; until then the behaviour in Context is the only one.
 Statements marked `[inferred]` were not read in the code and must be confirmed by the implementation.
 

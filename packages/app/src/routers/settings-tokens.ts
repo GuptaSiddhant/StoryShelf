@@ -1,15 +1,13 @@
 import { TokenModel } from "@storyshelf/core/models";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** CI token settings (create with one-time display, delete). */
 export function registerTokenSettings(app: ShelfRouter): void {
-  app.get("/projects/:slug/settings/tokens", async (c) =>
-    c.html(await renderSettingsPage(c, "tokens")),
-  );
   app.post("/projects/:slug/settings/tokens", handleCreateToken);
   app.post("/projects/:slug/settings/tokens/:tokenId/delete", handleDeleteToken);
 }
@@ -29,12 +27,17 @@ async function handleCreateToken(c: Context): Promise<Response> {
     userId: getStore().user?.id ?? null,
   });
   flash(c, "Token created — copy it now, it is shown once");
-  return c.html((await renderSettingsPage(c, "tokens", { secret: value })) ?? "");
+  return c.html(
+    (await renderSettingsPage(c, "tokens", {
+      secret: value,
+      origin: await getStore().publicOrigin?.url(),
+    })) ?? "",
+  );
 }
 
 async function handleDeleteToken(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   await new TokenModel(getStore().db).remove(c.req.param("tokenId") ?? "");
   flash(c, "Token deleted");
-  return hxRedirect(c, `/projects/${project.slug}/settings/tokens`);
+  return hxRedirect(c, settingsHref(project.slug, "tokens"));
 }

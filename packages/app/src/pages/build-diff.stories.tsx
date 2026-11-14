@@ -1,15 +1,142 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
-import type { Snapshot } from "@storyshelf/core/schema";
+import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { pageStory } from "../../.storybook/page.tsx";
+import type { RenderedContent } from "../shell/document.tsx";
+import {
+  BUILD_CANCELLED,
+  BUILD_CAPTURING,
+  BUILD_FAILED,
+  BUILD_MAIN,
+  BUILD_REJECTED,
+  BUILD_REVIEW,
+  builds,
+  project,
+  snapshots,
+} from "../stories-fixtures/dataset.ts";
 import { NEW_STORY_ID, reviewData } from "../stories-fixtures/review.ts";
-import { renderBuildDiffPage } from "./build-diff.tsx";
+import { loadBuildDetails } from "./build-detail.tsx";
+import { type BuildDiffData, renderBuildDiffPage } from "./build-diff.tsx";
 
-const meta: Meta = { title: "Pages/Builds/Review stage" };
+const meta: Meta = { title: "Pages/Builds/Build page" };
 export default meta;
+
+const fixture = (id: string): Build => {
+  const found = builds.find((item) => item.id === id);
+  if (!found) throw new Error(`fixture missing: ${id}`);
+  return found;
+};
+const capturing = (): Build => fixture(BUILD_CAPTURING);
+const review = (): Build => fixture(BUILD_REVIEW);
+
+/** The build page for one fixture build, with its details panel loaded from the story database. */
+async function buildPage(
+  buildId: string,
+  patch: Partial<BuildDiffData> = {},
+): Promise<RenderedContent> {
+  const build = builds.find((item) => item.id === buildId);
+  if (!build) throw new Error(`fixture missing: ${buildId}`);
+  const owner = patch.project ?? project;
+  return renderBuildDiffPage({
+    ...reviewData(),
+    build,
+    snapshots: snapshots.filter((snapshot) => snapshot.buildId === buildId),
+    comments: [],
+    selectedId: undefined,
+    details: await loadBuildDetails(owner, build),
+    ...patch,
+  });
+}
+
+/** Undecided changes: the stage, the Approve all / Reject all header and the collapsed details. */
+export const Reviewing = pageStory(() => buildPage(BUILD_REVIEW));
+
+/** Every change decided: nothing left to approve in the header. */
+export const Approved = pageStory(() => buildPage(BUILD_MAIN));
+
+/** Capture failed: the reason and Retry capture sit in the strip and the stage, no menu to open. */
+export const Failed = pageStory(() => buildPage(BUILD_FAILED));
+
+/** A cancelled build is terminal: nothing to review, and Retry is one click away. */
+export const Cancelled = pageStory(() => buildPage(BUILD_CANCELLED));
+
+/** Capturing: "Capturing… n of m" in the strip, and a stage that says snapshots are on their way. */
+export const Capturing = pageStory(() => buildPage(BUILD_CAPTURING));
+
+/** Queued: waiting for a capture worker. */
+export const Queued = pageStory(() =>
+  buildPage(BUILD_CAPTURING, { build: { ...capturing(), status: "pending" } }),
+);
+
+/** Rejected: a terminal verdict, nothing left to approve. */
+export const Rejected = pageStory(() => buildPage(BUILD_REJECTED));
+
+/** A finished build whose Storybook has no stories: a real "No stories" state. */
+export const NoStories = pageStory(() =>
+  buildPage(BUILD_REVIEW, { snapshots: [], build: { ...review(), status: "approved" } }),
+);
+
+/** The baseline moved after the diffs were computed: a one-line warning with Re-diff. */
+export const StaleBaseline = pageStory(() =>
+  buildPage(BUILD_REVIEW, {
+    drifted: Object.fromEntries(
+      reviewData().snapshots.map((snapshot) => [snapshot.id, "stale" as const]),
+    ),
+  }),
+);
+
+/** Capture off: review only. No stage; the verdict and the discussion stay in view. */
+export const TestingOff = pageStory(() => buildPage(BUILD_MAIN), { store: { testing: false } });
+
+/** Review off: capture and the stage stay, without Approve all or any verdict controls. */
+export const ReviewOff = pageStory(() =>
+  buildPage(BUILD_REVIEW, { project: { ...project, reviewEnabled: false } }),
+);
 
 /** A changed snapshot against its baseline: side by side, with the diff and the thread. */
 export const ChangedAgainstBaseline = pageStory(() => renderBuildDiffPage(reviewData()));
+
+/** A reference build for the baseline line ("vs main · abc1234 · updated …"). */
+const referenceBuild = builds.find((item) => item.id === BUILD_MAIN) ?? null;
+
+/** The baseline line under the heading: what this snapshot was compared with, in one quiet line. */
+export const ComparedWithMain = pageStory(() =>
+  renderBuildDiffPage(
+    reviewData({
+      reference: {
+        kind: "known",
+        branch: "main",
+        defaultBranch: true,
+        updatedAt: referenceBuild?.updatedAt ?? "2026-01-14T12:00:00.000Z",
+        imageAvailable: true,
+        imageSize: { width: 640, height: 400 },
+        build: referenceBuild,
+      },
+      currentSize: { width: 640, height: 400 },
+    }),
+  ),
+);
+
+/**
+ * The current screenshot is a different size from its baseline: "560×350 → 640×400" and a "sizes
+ * differ" badge instead of a 100% diff, and both images drawn at one scale.
+ */
+export const SizesDiffer = pageStory(() =>
+  renderBuildDiffPage(
+    reviewData({
+      reference: {
+        kind: "known",
+        branch: "main",
+        defaultBranch: true,
+        updatedAt: referenceBuild?.updatedAt ?? "2026-01-14T12:00:00.000Z",
+        imageAvailable: true,
+        imageSize: { width: 560, height: 350 },
+        build: referenceBuild,
+      },
+      currentSize: { width: 640, height: 400 },
+    }),
+  ),
+);
 
 /** A story with no baseline yet: nothing to compare, the current render is the proposal. */
 export const NewStory = pageStory(() =>
@@ -122,3 +249,15 @@ export const ParametersNotApplied = pageStory(() =>
     }),
   ),
 );
+
+/** A snapshot as the reviewer left it: an open change approved, anything else as it was. */
+function decided(snapshot: Snapshot): Snapshot {
+  const open = snapshot.status === "new" || snapshot.status === "changed";
+  return open ? Object.assign(structuredClone(snapshot), { status: "approved" }) : snapshot;
+}
+
+/** Every change decided: the stage says the review is complete (what the last approve swaps in). */
+export const ReviewComplete = pageStory(() => {
+  const all = reviewData().snapshots.map((snapshot) => decided(snapshot));
+  return renderBuildDiffPage(reviewData({ snapshots: all }));
+});

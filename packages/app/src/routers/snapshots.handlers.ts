@@ -58,14 +58,35 @@ function redirectOnDrift(c: Context, error: unknown, location: string): void {
   c.header("HX-Redirect", location);
 }
 
-async function advanceToFirst(c: Context, p: BuildParams, snapshotIds: string[]): Promise<void> {
-  const first = snapshotIds[0];
-  if (first) await hxAdvance(c, { slug: p.slug, buildId: p.buildId, snapshotId: first });
+/**
+ * What a group decision answers: the snapshots it decided, and the review page swapped in place
+ * when HTMX asked from it (null otherwise: the route answers JSON).
+ */
+export interface GroupDecision {
+  snapshotIds: string[];
+  swap: Response | null;
 }
 
-/** Approve one snapshot; on a changed baseline from the UI, redirect to the diff page instead. */
-export async function approveOne(c: Context, p: SnapshotParams, force: boolean): Promise<void> {
-  const { build } = await authorizeApprover(c, p);
+async function advanceToFirst(
+  c: Context,
+  decided: { project: Project; build: Build },
+  snapshotIds: string[],
+): Promise<GroupDecision> {
+  const first = snapshotIds[0];
+  const swap = first ? await hxAdvance(c, { ...decided, snapshotId: first }) : null;
+  return { snapshotIds, swap };
+}
+
+/**
+ * Approve one snapshot. HTMX on the review page gets the next snapshot swapped in (a Response);
+ * on a changed baseline it is redirected to the diff page instead. Otherwise null.
+ */
+export async function approveOne(
+  c: Context,
+  p: SnapshotParams,
+  force: boolean,
+): Promise<Response | null> {
+  const { project, build } = await authorizeApprover(c, p);
   await snapshotForBuild(build, p.snapshotId);
   try {
     await approveSnapshot(p.snapshotId, reviewer(), { force });
@@ -75,18 +96,18 @@ export async function approveOne(c: Context, p: SnapshotParams, force: boolean):
       error,
       `/projects/${p.slug}/builds/${p.buildId}/diff?snapshot=${p.snapshotId}`,
     );
-    return;
+    return null;
   }
-  await hxAdvance(c, p);
+  return await hxAdvance(c, { project, build, snapshotId: p.snapshotId });
 }
 
-/** Reject one snapshot. */
-export async function rejectOne(c: Context, p: SnapshotParams): Promise<void> {
-  const { build } = await authorizeApprover(c, p);
+/** Reject one snapshot; HTMX on the review page gets the next snapshot swapped in, else null. */
+export async function rejectOne(c: Context, p: SnapshotParams): Promise<Response | null> {
+  const { project, build } = await authorizeApprover(c, p);
   const snapshot = await snapshotForBuild(build, p.snapshotId);
   await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", reviewer());
   await refreshBuild(build.id);
-  await hxAdvance(c, p);
+  return await hxAdvance(c, { project, build, snapshotId: p.snapshotId });
 }
 
 /** Approve every open snapshot; returns the ids skipped because their baseline drifted. */
@@ -110,30 +131,28 @@ export async function approveAll(c: Context, p: BuildParams, force: boolean): Pr
   return skipped.map((snapshot) => snapshot.id);
 }
 
-/** Approve a story/mode across browsers; returns the approved ids (none on a UI-handled drift). */
+/** Approve a story/mode across browsers: the approved ids (none on a UI-handled drift). */
 export async function approveGroupOf(
   c: Context,
   p: GroupParams,
   force: boolean,
-): Promise<string[]> {
+): Promise<GroupDecision> {
   const { project, build } = await authorizeApprover(c, p);
   let snapshotIds: string[];
   try {
     snapshotIds = await approveGroup(project, build, p, reviewer(), { force });
   } catch (error) {
     redirectOnDrift(c, error, `/projects/${p.slug}/builds/${p.buildId}/diff`);
-    return [];
+    return { snapshotIds: [], swap: null };
   }
-  await advanceToFirst(c, p, snapshotIds);
-  return snapshotIds;
+  return await advanceToFirst(c, { project, build }, snapshotIds);
 }
 
-/** Reject a story/mode across browsers; returns the rejected ids. */
-export async function rejectGroupOf(c: Context, p: GroupParams): Promise<string[]> {
-  const { build } = await authorizeApprover(c, p);
+/** Reject a story/mode across browsers: the rejected ids. */
+export async function rejectGroupOf(c: Context, p: GroupParams): Promise<GroupDecision> {
+  const { project, build } = await authorizeApprover(c, p);
   const snapshotIds = await rejectGroup(build, p, reviewer());
-  await advanceToFirst(c, p, snapshotIds);
-  return snapshotIds;
+  return await advanceToFirst(c, { project, build }, snapshotIds);
 }
 
 function assertRediffable(build: Build): void {

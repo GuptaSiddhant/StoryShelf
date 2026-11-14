@@ -47,17 +47,19 @@ const form = (body: Record<string, string>) =>
   }) as const;
 
 describe("AI settings tab", () => {
-  it("hides the tab and explains when AI is not configured", async () => {
+  it("hides the AI section when AI is not configured", async () => {
     const { db, storage } = await seed();
-    const html = await (await app(db, storage, false).request("/projects/p/settings/ai")).text();
-    expect(html).toContain("AI is not configured");
-    expect(html).not.toContain('/projects/p/settings/ai"');
+    const html = await (
+      await app(db, storage, false).request("/projects/p/settings/capture")
+    ).text();
+    expect(html).not.toContain('name="aiProfile"');
+    expect(html).not.toContain('id="ai"');
   });
 
   it("lets a site admin choose a profile, rejects unknown ones and can turn AI off", async () => {
     const { db, storage } = await seed(null);
     const shelf = app(db, storage);
-    expect(await (await shelf.request("/projects/p/settings/ai")).text()).toContain(
+    expect(await (await shelf.request("/projects/p/settings/capture")).text()).toContain(
       'name="aiProfile"',
     );
     const bad = await shelf.request("/projects/p/settings/ai", form({ aiProfile: "ghost" }));
@@ -180,7 +182,7 @@ describe("project health UI", () => {
 
   it("shows the panel on the builds page", async () => {
     const { db, storage } = await seed();
-    const html = await (await app(db, storage).request("/projects/p/builds")).text();
+    const html = await (await app(db, storage).request("/projects/p/settings/insights")).text();
     expect(html).toContain("Project health");
     expect(html).toContain("Generate health");
   });

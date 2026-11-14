@@ -368,30 +368,25 @@ export class CaptureJobModel {
   }
 
   /**
-   * Hand a running attempt back without spending it: the job row is queued again, claimable at
-   * once, and its `maxAttempts` grows by one so the attempt number just used does not count
-   * (numbers stay unique and increasing, so a holder's receipt is never reused). Applies only while
-   * the job row is `running` on `attempt` with no cancel asked, as read in `job`; the job write
-   * comes first and is conditional, so a lost race (a cancel, a takeover) writes nothing. Resolves
-   * true when applied; the attempt row then ends `released` (a crash before that leaves it to its
-   * lease, which the next claim retires).
+   * Give attempt `attempt` of a job back unrun: the job row is queued again, claimable from
+   * `visibleAt`, with the attempt count it had before the claim, and the attempt row is removed so
+   * the next claim can use its number. Nothing happens unless that attempt is the job's running one
+   * (a lease already lost to another instance is left alone, and so is a job asked to cancel: that ends it). The job row is written first, so a
+   * crash between the two writes leaves an attempt whose lease runs out like any other.
    */
-  async release(job: CaptureJobRow, attempt: number, now: string): Promise<boolean> {
-    const row = (await this.#db.updateWhere(
-      this.#table,
-      job.jobId,
-      { status: "queued", maxAttempts: job.maxAttempts + 1, visibleAt: now, updatedAt: now },
-      allOf(
-        eq(this.#c.status, "running"),
-        eq(this.#c.attempt, attempt),
-        eq(this.#c.maxAttempts, job.maxAttempts),
-        isNull(this.#c.cancelRequestedAt),
-      ),
-    )) as unknown as CaptureJobRow | null;
-    if (row?.status !== "queued" || row.maxAttempts !== job.maxAttempts + 1) {
+  async handBack(jobId: string, attempt: number, visibleAt: string, now: string): Promise<boolean> {
+    const row = await this.get(jobId);
+    if (row?.status !== "running" || row.attempt !== attempt || row.cancelRequestedAt !== null) {
       return false;
     }
-    await this.finishAttempt(attemptRowId(job.jobId, attempt), "released", now);
+    await this.#db.update(this.#table, jobId, {
+      status: "queued",
+      attempt: attempt - 1,
+      visibleAt,
+      startedAt: null,
+      updatedAt: now,
+    });
+    await this.#db.remove(this.#table, attemptRowId(jobId, attempt));
     return true;
   }
 
@@ -535,8 +530,6 @@ interface JobColumns {
   rerunRequestedAt: Column;
   status: Column;
   attempt: Column;
-  maxAttempts: Column;
-  cancelRequestedAt: Column;
   visibleAt: Column;
   createdAt: Column;
 }
@@ -552,8 +545,6 @@ function jobColumns(table: Table): JobColumns {
     rerunRequestedAt: col(table, "rerunRequestedAt"),
     status: col(table, "status"),
     attempt: col(table, "attempt"),
-    maxAttempts: col(table, "maxAttempts"),
-    cancelRequestedAt: col(table, "cancelRequestedAt"),
     visibleAt: col(table, "visibleAt"),
     createdAt: col(table, "createdAt"),
   };

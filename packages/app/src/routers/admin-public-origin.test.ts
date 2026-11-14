@@ -278,7 +278,7 @@ async function openBuildApp(logger: typeof silent = silent) {
     secret: "token",
   });
   const token = await csrfFrom(app);
-  const urlOf = (origin: string) => `${origin}/projects/${project.slug}/builds/${build.id}`;
+  const urlOf = (origin: string) => `${origin}/projects/${project.slug}/builds/${build.id}/diff`;
   return { app, git, token, urlOf };
 }
 
