@@ -2,13 +2,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RequestError, type createClient } from "../client.ts";
+import { RequestError, createClient } from "../client.ts";
 import { trySkipUnchanged, type SkipContext } from "./upload-skip.ts";
 
 const computeAffected = vi.hoisted(() => vi.fn());
 vi.mock("@storyshelf/affected", () => ({ computeAffected, gitRepoRoot: (cwd: string) => cwd }));
 
 type Client = ReturnType<typeof createClient>;
+
+type Answer = () => Response | Promise<Response>;
 
 let dir: string;
 let lines: string[];
@@ -34,6 +36,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -70,6 +73,22 @@ function fakeClient(overrides: {
   );
   const client = { projects: { builds: { skipSource, createSkipped } } } as unknown as Client;
   return { client, skipSource, createSkipped };
+}
+
+/** The real client over a fake transport: the hint answers, `skipped` answers each creation call. */
+function httpClient(skipped: Answer): { client: Client; skippedCalls: string[] } {
+  const skippedCalls: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/builds/skip-source")) {
+        return Response.json({ sourceBuildId: "b0", sha: "basesha1234567" });
+      }
+      skippedCalls.push(String(init?.body));
+      return await skipped();
+    }),
+  );
+  return { client: createClient("http://shelf.test", "token"), skippedCalls };
 }
 
 function affected(paths: string[] | null, changed: string[] = [], reason: string | null = null) {
@@ -161,48 +180,30 @@ describe("trySkipUnchanged", () => {
   it("retries a network failure with the same key, and stops at the third attempt", async () => {
     affected([], []);
     let calls = 0;
-    const { client, createSkipped } = fakeClient({
-      createSkipped: async () => {
-        calls += 1;
-        if (calls < 3) throw new TypeError("fetch failed");
-        return { build: { id: "b9" }, buildUrl: "/x" };
-      },
+    const flaky = httpClient(() => {
+      calls += 1;
+      if (calls < 3) throw new TypeError("fetch failed");
+      return Response.json({ build: { id: "b9" }, buildUrl: "/x" }, { status: 201 });
     });
-    await expect(trySkipUnchanged(client, ctx())).resolves.toBe(true);
-    const keys = createSkipped.mock.calls.map(
-      (call) => (call[1] as { idempotencyKey: string }).idempotencyKey,
+    await expect(trySkipUnchanged(flaky.client, ctx())).resolves.toBe(true);
+    const keys = flaky.skippedCalls.map(
+      (body) => (JSON.parse(body) as { idempotencyKey: string }).idempotencyKey,
     );
     expect(keys).toHaveLength(3);
     expect(new Set(keys).size).toBe(1);
 
-    const failing = fakeClient({
-      createSkipped: async () => {
-        throw new TypeError("fetch failed");
-      },
+    const failing = httpClient(() => {
+      throw new TypeError("fetch failed");
     });
     await expect(trySkipUnchanged(failing.client, ctx())).resolves.toBe(false);
-    expect(failing.createSkipped).toHaveBeenCalledTimes(3);
+    expect(failing.skippedCalls).toHaveLength(3);
   });
 
-  it("does not retry a refusal", async () => {
+  it("does not retry a refusal, and uploads normally", async () => {
     affected([], []);
-    const { client, createSkipped } = fakeClient({
-      createSkipped: async () => {
-        throw new RequestError(409, "stories differ");
-      },
-    });
-    await expect(trySkipUnchanged(client, ctx())).resolves.toBe(false);
-    expect(createSkipped).toHaveBeenCalledTimes(1);
-  });
-
-  it("uploads normally when the server refuses with 409", async () => {
-    affected([], []);
-    const { client } = fakeClient({
-      createSkipped: async () => {
-        throw new RequestError(409, "source moved");
-      },
-    });
-    await expect(trySkipUnchanged(client, ctx())).resolves.toBe(false);
+    const refused = httpClient(() => Response.json({ error: "source moved" }, { status: 409 }));
+    await expect(trySkipUnchanged(refused.client, ctx())).resolves.toBe(false);
+    expect(refused.skippedCalls).toHaveLength(1);
     expect(lines[0]).toContain("409");
   });
 

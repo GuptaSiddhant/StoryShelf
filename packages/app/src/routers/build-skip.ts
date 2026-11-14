@@ -226,15 +226,16 @@ async function createChecked(
     });
     return { build, raced: false };
   } catch (error) {
-    if (error instanceof SkipSourceRefused) {
-      throw new HTTPException(409, { message: error.message });
-    }
-    // A concurrent request with the same key won the unique index: it is the build to return.
+    // A concurrent request with the same key may have won first (its commit can also be what
+    // makes this one refused): the recorded build is the answer, ahead of any refusal.
     const raced = await new BuildModel(getStore().db).findByIdempotencyKey(
       project.id,
       input.idempotencyKey,
     );
     if (raced) return { build: raced, raced: true };
+    if (error instanceof SkipSourceRefused) {
+      throw new HTTPException(409, { message: error.message });
+    }
     throw error;
   }
 }
