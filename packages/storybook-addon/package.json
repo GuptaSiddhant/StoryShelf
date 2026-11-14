@@ -1,0 +1,80 @@
+{
+  "name": "@storyshelf/storybook-addon",
+  "version": "0.11.0",
+  "description": "Read-only Storybook addon: a review badge beside each story in a Storybook published by StoryShelf, linking to the review.",
+  "keywords": [
+    "addon",
+    "review",
+    "storybook",
+    "storybook-addon",
+    "visual-testing"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/storybook-addon"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./preset": {
+      "source": "./src/preset.ts",
+      "default": "./dist/preset.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./preset": "./dist/preset.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "prepublishOnly": "nub run build",
+    "test": "vitest run",
+    "test:integration": "RUN_INTEGRATION=1 vitest run src/fixtures.integration.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "storybook": "^8.6.0 || ^9.0.0 || ^10.0.0"
+  },
+  "peerDependenciesMeta": {
+    "storybook": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -79,6 +79,7 @@ import { registerProjects } from "./routers/projects.ts";
 import { registerReadGrants } from "./routers/read-grants.ts";
 import { registerReviewForms } from "./routers/review-forms.ts";
 import { registerSignedStorybook } from "./routers/signed-storybook.ts";
+import { STORY_STATUS_PATH, storyStatusNoStore } from "./routers/story-status.ts";
 import { registerStorybook } from "./routers/storybook.ts";
 import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
@@ -202,12 +203,20 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   // With Hono's Web `Request`/`Response` model.
   app.use("*", requestLogging(logger));
   app.use("*", setupGate(getReady));
-  // Routes classified `testing` answer 404 without `options.testing` (ADR 0006, decision 8).
-  app.use("*", requireTesting(wiring.options.testing !== undefined));
+  mountTestingGate(app, wiring.options.testing !== undefined);
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
   mountPortalBoundary(app, config);
   mountAccessGates(app);
+}
+
+/**
+ * Routes classified `testing` answer 404 without `options.testing` (ADR 0006, decision 8). The
+ * story-status route keeps `private, no-store` on that 404 too, so its no-store layer comes first.
+ */
+function mountTestingGate(app: ShelfRouter, testing: boolean): void {
+  app.use(STORY_STATUS_PATH, storyStatusNoStore);
+  app.use("*", requireTesting(testing));
 }
 
 /**
