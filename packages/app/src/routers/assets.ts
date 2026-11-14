@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { assetManifest } from "../asset-manifest.ts";
+import { registerServiceWorker } from "./service-worker.ts";
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
@@ -37,6 +38,7 @@ function serveHashed(c: Context, asset: Asset, requestedHash: string): Response 
 /** Register the static-asset routes (HTMX bundle, shell script, icon sprite and mark). */
 export function registerAssets(app: ShelfRouter): void {
   const { client, htmx, icons, mark } = assetManifest;
+  registerServiceWorker(app);
   app.get(String.raw`/assets/:file{htmx-[a-f0-9]+\.js}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^htmx-|\.js$/gu, "");
     return serveHashed(c, { ...htmx, contentType: "application/javascript" }, hash);

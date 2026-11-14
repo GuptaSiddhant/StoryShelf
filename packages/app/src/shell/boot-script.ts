@@ -31,6 +31,11 @@ export function bootScript(sidebarDefault?: "rail"): string {
     if(theme){ applyTheme(theme); }
     var savedSidebar=readCookie(sidebarCookie);
     applySidebar(savedSidebar===null&&${buildPage} ? 'rail' : savedSidebar);
+    if('serviceWorker' in navigator){
+      window.addEventListener('load',function(){
+        navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(){});
+      });
+    }
     window.__storyshelfShell={
       readCookie:readCookie,writeCookie:writeCookie,applyTheme:applyTheme,applySidebar:applySidebar,
       themeCookie:themeCookie,sidebarCookie:sidebarCookie
