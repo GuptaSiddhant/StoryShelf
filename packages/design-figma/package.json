@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/design-figma",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Deprecated: the Figma integration is built into @storyshelf/core. Figma design-link provider for StoryShelf: link validation, file metadata and rendered previews.",
   "keywords": [
     "design",
