@@ -43,6 +43,22 @@ Git reports changed files relative to the repository root, while the bundler's m
 | `STORYSHELF_FULL=1`                                     | Same, via env (useful for release pipelines)                   |
 | `"affectedOnly": false` in `.storybook/storyshelf.json` | Disable for the project (see [Configuration](/guides/config/)) |
 
+## Skipping unchanged commits
+
+Opt in with `storyshelf upload --skip-unchanged` (`"skipUnchanged": true`, or `STORYSHELF_SKIP_UNCHANGED=1`). When a commit reaches **no** story, the CLI records a `skipped` build instead of uploading the Storybook: no upload, no capture, no snapshots. The commit still gets a status, because a pull request that requires the check would otherwise wait forever.
+
+**What is compared.** The CLI asks the server for the newest earlier build on the same branch, then traces `git diff <that build's commit>..HEAD` as above. Only an empty affected set skips, and the skipped build repeats the outcome of that build.
+
+**When it won't skip.** The CLI uploads normally, and prints why, when:
+
+- there is no earlier build on the branch. The first build on a branch is always a real build: the comparison would be against another branch, and "nothing changed since the merge base" is not a claim Shelf can make truthfully;
+- the earlier build is not `approved` (open for review, rejected, failed, cancelled or still running), because skipping would turn an open or failing check green;
+- the trace needs a full render (shallow clone, global file change, missing stats), any story is affected, or a story file was removed or renamed;
+- `--full` is set, or `--label` is given (a skipped build carries no labels);
+- the server runs without testing, runs Storybook tests for the project, has skipped builds off, refuses the request, or any call fails.
+
+**It follows its source.** If the source build's verdict later changes, the skipped build's status follows it.
+
 ## Build identity: sha and branch without git
 
 `upload` resolves each field independently — **flags > env > local git > synthesized** (`local-<random>` sha on the `local` branch). A project with no git at all uploads with zero identity flags; those builds always render everything (`not-a-git-repo` below). The full story — synthetic identity, environments as branches, checkout-less pipelines — lives in [Uploading without git](/guides/without-git/).
