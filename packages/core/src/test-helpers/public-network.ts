@@ -12,7 +12,11 @@ export function publicNetworkForTests(): () => void {
   ]);
   const restoreTransport = overrideGuardedNetwork({
     transport: async (target, init) =>
-      await fetch(target, { method: init.method, headers: init.headers, body: init.body }),
+      await fetch(target, {
+        method: init.method,
+        headers: init.headers,
+        body: init.body as BodyInit | undefined,
+      }),
   });
   return () => {
     restoreTransport();

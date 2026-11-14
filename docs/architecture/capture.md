@@ -23,6 +23,8 @@ CI machine / local dev                  StoryShelf server
 
 Every adapter extends the shared `Adapter<Extra>` base (`core/adapter/metadata`): mandatory `metadata: { name, version, description?, kind, category }` plus an optional `lifecycle` sub-object. `lifecycle` is all or nothing — an adapter either omits it or implements all three hooks (`setup`, `teardown`, `health`). `category` (`database | storage | capture-runner | capture-queue | design | notifier`) names the concern so metadata reads standalone; `kind` stays an open string (`sqlite`, `local`, `s3`, …) for third-party implementations. All hooks must be idempotent.
 
+**Notifier kinds.** `git` and chat providers live in their packages; `email` too. `push` (web push, ADR 0048) is a built-in integration in `core/src/integrations/push/` (`@storyshelf/core/integrations/push`): a `message` provider with `audience: "person"`, one adapter per device (`endpoint`, `p256dh`, `auth` from a `push_subscriptions` row). It signs with VAPID (RFC 8292, `SHELF_VAPID_*`; the private key is never logged, thrown or stored) and encrypts with `aes128gcm` (RFC 8291). A 404 or 410 answer throws `PushGoneError` (the caller deletes the row); any other failure throws a message without key, endpoint or body, so the queue retries.
+
 `createShelfApp` kicks every `lifecycle.setup` eagerly via `Promise.allSettled` and exposes `app.lifecycle { ready, setup(), teardown() }`: `await app.lifecycle.setup()` before serving for fail-fast startup (database migrations run here — there is no top-level `migrate()`), otherwise the first request gates on settlement (503 with per-adapter failures); `await app.lifecycle.teardown()` on `SIGTERM`/`SIGINT`.
 
 ### Health
