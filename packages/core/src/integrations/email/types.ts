@@ -20,8 +20,18 @@ export interface SmtpPresetOptions {
   host: string;
   port: number;
   secure?: boolean;
+  /** Fail instead of sending in plaintext when the server does not offer STARTTLS. */
+  requireTLS?: boolean;
   user?: string;
   pass?: string;
+  from: string;
+}
+
+/** Amazon SES SMTP options for {@link sesPreset}; `user`/`pass` are SES SMTP credentials. */
+export interface SesPresetOptions {
+  region: string;
+  user: string;
+  pass: string;
   from: string;
 }
 
