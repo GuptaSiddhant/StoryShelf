@@ -30,10 +30,7 @@ variable "image_version" {
 provider "azurerm" {
   features {
     resource_group {
-      # A throwaway stack that anyone can reach; a real stack lists its office or VPN ranges.
-  allowed_cidr_blocks = ["0.0.0.0/0"]
-
-  # A throwaway stack: let destroy remove the group with everything in it.
+      # A throwaway stack: let destroy remove the group with everything in it.
       prevent_deletion_if_contains_resources = false
     }
     key_vault {
@@ -50,6 +47,9 @@ module "storyshelf" {
   name          = var.name
   location      = var.location
   image_version = var.image_version
+
+  # A throwaway stack that anyone can reach; a real stack lists its office or VPN ranges.
+  allowed_cidr_blocks = ["0.0.0.0/0"]
 
   # A throwaway stack: no delete lock and no Key Vault purge protection.
   deletion_protection = false
