@@ -226,6 +226,39 @@ export function buildReferenceContractSuite(
         ]);
       });
     });
+    it("sums each live blob once, counts blobs without a size, and drops a blob when its uses are released", async () => {
+      await withFixture(async ({ first, owner, buildIds }) => {
+        const project = owner.projectId;
+        const shared = "b".repeat(64);
+        const own = "c".repeat(64);
+        const legacy = "d".repeat(64);
+        const sizes = new Map([
+          [shared, 1000],
+          [own, 24],
+        ]);
+        expect(await first.contentUsage(project)).toEqual({ bytes: 0, blobs: 0, unsized: 0 });
+        await first.recordContentUses(
+          project,
+          buildIds[0],
+          [shared, own, legacy],
+          undefined,
+          sizes,
+        );
+        // The second build uses the shared blob too: it is still one blob of 1000 bytes.
+        await first.recordContentUses(project, buildIds[1], [shared], undefined, sizes);
+        expect(await first.contentUsage(project)).toEqual({ bytes: 1024, blobs: 2, unsized: 1 });
+        // Another project's blobs are not counted.
+        expect(await first.contentUsage("another-project")).toEqual({
+          bytes: 0,
+          blobs: 0,
+          unsized: 0,
+        });
+        await first.claimDeletion(project, buildIds[0]);
+        await first.releaseBuildContent(project, buildIds[0], [shared, own, legacy]);
+        // Only the blob a live build still uses remains.
+        expect(await first.contentUsage(project)).toEqual({ bytes: 1000, blobs: 1, unsized: 0 });
+      });
+    });
     it("records one use per build and hash, releases them once, and claims a blob only when all are released", async () => {
       await withFixture(async ({ first, second, owner, buildIds }) => {
         const project = owner.projectId;

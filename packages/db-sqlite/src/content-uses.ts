@@ -1,3 +1,4 @@
+import type { ContentUsage } from "@storyshelf/core/adapter/database";
 /** Build uses of shared content and its claim for collection (ADR 0039), in SQLite's write lock. */
 import type { DatabaseSync } from "node:sqlite";
 import { inTransaction } from "./lifecycle-transaction.ts";
@@ -17,6 +18,7 @@ export async function recordContentUses(
   buildId: string,
   hashes: readonly string[],
   staleBefore?: string,
+  sizes?: ReadonlyMap<string, number>,
 ): Promise<string[]> {
   return await inTransaction(path, async (db) => {
     const distinct = [...new Set(hashes)];
@@ -28,11 +30,12 @@ export async function recordContentUses(
     if (refused.length > 0) return await Promise.resolve(refused);
     clearAbandonedClaims(db, distinct, staleBefore);
     const insert = db.prepare(
-      `INSERT OR IGNORE INTO content_uses (build_id, content_hash, project_id, created_at)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
+       VALUES (?, ?, ?, ?, ?)`,
     );
     const now = new Date().toISOString();
-    for (const hash of distinct) insert.run(buildId, hash, projectId, now);
+    for (const hash of distinct)
+      insert.run(buildId, hash, projectId, now, sizes?.get(hash) ?? null);
     return await Promise.resolve([]);
   });
 }
@@ -141,5 +144,25 @@ export async function finishContentCollection(
       token,
     );
     await Promise.resolve();
+  });
+}
+
+/**
+ * What the project's live content weighs (see the capability): one row per distinct hash with an
+ * unreleased use, its size the largest recorded for it (the same blob has one size; a null never
+ * wins over a recorded one).
+ */
+export async function contentUsage(path: string, projectId: string): Promise<ContentUsage> {
+  return await inTransaction(path, async (db) => {
+    const row = db
+      .prepare(
+        `SELECT COALESCE(SUM(size), 0), COUNT(size), COUNT(*) - COUNT(size) FROM (
+           SELECT content_hash, MAX(size_bytes) AS size FROM content_uses
+           WHERE project_id = ? AND released_at IS NULL GROUP BY content_hash
+         )`,
+      )
+      .get(projectId) as unknown as [number, number, number];
+    const [bytes, blobs, unsized] = row;
+    return await Promise.resolve({ bytes, blobs, unsized });
   });
 }

@@ -48,6 +48,9 @@ const SNAPSHOT_BASELINE_ID_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_id TEXT";
 const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
+// Expand step (ADR 0053): nullable, so the previous release keeps working against it.
+const CONTENT_USE_SIZE_ALTER =
+  "ALTER TABLE content_uses ADD COLUMN IF NOT EXISTS size_bytes BIGINT";
 const SNAPSHOT_COMPARISON_IMAGE_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS comparison_image_path TEXT";
 const SNAPSHOT_COMPARISON_METADATA_ALTER =
@@ -249,6 +252,7 @@ async function migrateRecentColumns(run: MigrationRunner): Promise<void> {
 async function migrateUnstableColumns(run: MigrationRunner): Promise<void> {
   await run(SNAPSHOT_UNSTABLE_ALTER);
   await run(DETECT_UNSTABLE_ALTER);
+  await run(CONTENT_USE_SIZE_ALTER);
 }
 
 async function migrateDesignColumns(run: MigrationRunner): Promise<void> {
