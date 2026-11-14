@@ -50,6 +50,7 @@ const populated: SettingsInsightsData = {
     : null,
   queue,
   canRetry: true,
+  storage: { bytes: 4_820_000, blobs: 63, unsized: 0 },
 };
 
 const empty: SettingsInsightsData = {
@@ -59,6 +60,7 @@ const empty: SettingsInsightsData = {
   latest: null,
   queue: [],
   canRetry: true,
+  storage: { bytes: 0, blobs: 0, unsized: 0 },
 };
 
 /** The Insights tab of the project settings with the given data. */
@@ -92,3 +94,8 @@ export const CannotRetry = pageStory(() => insightsPage({ ...populated, canRetry
 
 /** The tab on a 375px phone: the stat rows wrap and each table scrolls in its own region. */
 export const OnAPhone = onAPhone(pageStory(() => insightsPage(populated)));
+
+/** A project with years of builds: the figure is in gigabytes, and some files predate recorded sizes so they are named, not summed. */
+export const LargeStorage = pageStory(() =>
+  insightsPage({ ...populated, storage: { bytes: 1_240_000_000, blobs: 18_450, unsized: 340 } }),
+);

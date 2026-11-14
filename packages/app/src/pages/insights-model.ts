@@ -66,3 +66,29 @@ export function queueViewOf(
       error: entry.error,
     }));
 }
+
+/** What the project's live published content weighs; `unsized` blobs were recorded before sizes were kept. */
+export interface StorageUsageView {
+  bytes: number;
+  /** Distinct blobs with a recorded size. */
+  blobs: number;
+  /** Distinct blobs with no recorded size: counted, but not in `bytes`. */
+  unsized: number;
+}
+
+const BYTE_UNITS = ["KB", "MB", "GB", "TB"] as const;
+
+/** A size for people in decimal units: `0 B`, `812 B`, `4.2 KB`, `1.2 GB`. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1000) {
+    return `${Math.max(0, Math.round(bytes))} B`;
+  }
+  let value = bytes;
+  let unit = "B";
+  for (const next of BYTE_UNITS) {
+    if (value < 1000) break;
+    value /= 1000;
+    unit = next;
+  }
+  return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${unit}`;
+}
