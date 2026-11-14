@@ -25,6 +25,14 @@ export interface SmtpPresetOptions {
   from: string;
 }
 
+/** Amazon SES SMTP options for {@link sesPreset}; `user`/`pass` are SES SMTP credentials. */
+export interface SesPresetOptions {
+  region: string;
+  user: string;
+  pass: string;
+  from: string;
+}
+
 /** HTTP email-API options for {@link httpPreset} (Resend-style). */
 export interface HttpPresetOptions {
   url: string;

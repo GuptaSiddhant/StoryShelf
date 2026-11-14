@@ -109,11 +109,15 @@ export {
   logPreset,
   mailpitPreset,
   NODEMAILER_RANGE,
+  sesPreset,
+  sesPresetFromEnv,
+  sesSmtpHost,
   smtpPreset,
   smtpPresetFromEnv,
   type EmailChannelConfig,
   type EmailNotifierDefaults,
   type HttpPresetOptions,
+  type SesPresetOptions,
   type SmtpPresetOptions,
 } from "./email/index.ts";
 
