@@ -8,6 +8,10 @@ The simplest self-hosted deploy: one container, no cloud dependencies. Every sta
 attestation. The same image is mirrored to Docker Hub as `docker.io/guptasiddhant/storyshelf`, from
 the first release that has the mirror configured. The examples below use the GHCR name.
 
+:::caution
+The container image is published from v0.12.0. Until that release, build it from the repository's [Dockerfile](https://github.com/GuptaSiddhant/StoryShelf/blob/main/apps/server-image/Dockerfile).
+:::
+
 ## Quick start
 
 ```sh

@@ -81,6 +81,7 @@ export function setupPublishing(
   });
   const completer = createPublishCompleter({
     db: options.database,
+    storage: options.storage,
     captureWillRun,
     afterPublish,
     logger,

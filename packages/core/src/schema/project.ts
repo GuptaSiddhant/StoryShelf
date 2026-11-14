@@ -18,6 +18,11 @@ export interface Project {
    * decision 11); off by default because it changes what a build contains.
    */
   runTests?: boolean;
+  /**
+   * Render a session's stories in one loaded page (ADR 0052, decision 2); off by default and
+   * subject to the operator veto (`switchStoriesAllowed`).
+   */
+  switchStories?: boolean;
   /** Re-render a changed snapshot once and flag it when the two renders differ; on by default. */
   detectUnstable?: boolean;
   browser?: string;

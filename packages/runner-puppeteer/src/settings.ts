@@ -23,7 +23,7 @@ export function resolveSettings(options: {
     recycleBrowserEvery:
       options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0),
     reusePages:
-      options.reusePages ?? ["1", "true"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? ""),
+      options.reusePages ?? !["0", "false"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? ""),
   };
 }
 

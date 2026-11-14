@@ -9,6 +9,7 @@ import {
   Retention,
   purgeAiData,
   reclaimBuildCopies,
+  reclaimUploadZips,
   type AiRetention,
 } from "@storyshelf/core/retention";
 
@@ -149,7 +150,8 @@ async function sweep(context: SweepContext): Promise<void> {
 }
 
 /**
- * Reclaim the per-build Storybook copies kept before published files were stored once (#850): a
+ * Reclaim the per-build Storybook copies kept before published files were stored once, then the
+ * upload zips of builds that hold a manifest (#850): a
  * bounded number of pages per sweep, resumed from a saved cursor, idempotent, never at boot. It is
  * not a job kind, so it adds no new queue row type (ADR 0053).
  */
@@ -158,6 +160,12 @@ async function sweepBuildCopies(context: SweepContext): Promise<void> {
   for (let page = 0; page < RECLAIM_PAGES_PER_SWEEP && !signal.aborted; page += 1) {
     // oxlint-disable-next-line no-await-in-loop -- one page at a time; the cursor is saved per build
     const result = await reclaimBuildCopies({ db, storage, logger, signal });
+    if (result.done) break;
+  }
+  // The second pass: upload zips of builds whose statics are stored once (#850), own cursor.
+  for (let page = 0; page < RECLAIM_PAGES_PER_SWEEP && !signal.aborted; page += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- one page at a time; the cursor is saved per build
+    const result = await reclaimUploadZips({ db, storage, logger, signal });
     if (result.done) return;
   }
 }

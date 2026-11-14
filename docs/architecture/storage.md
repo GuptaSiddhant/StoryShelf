@@ -15,7 +15,7 @@ data/                                        # --data-dir flag (default: ./data)
       {sha256}.png                           # screenshots, stored by content; shared by snapshots and baselines; swept when unreferenced
     builds/
       {buildId}/
-        storybook.zip                        # the uploaded Storybook archive, read when its statics are extracted
+        storybook.zip                        # the upload; deleted once the build has a committed manifest (#850)
         storybook/
           manifest.json                      # path -> sha256 of the published Storybook; the files are read from content/{sha256}
         catalog.json                         # compact catalog of the build's index.json (entries: id, title, name, import path, type, tags)
