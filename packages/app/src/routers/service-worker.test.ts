@@ -2,11 +2,13 @@ import { stubTables } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 const fail = async (): Promise<never> => await Promise.reject(new Error("not used"));
 
-function makeApp(): ReturnType<typeof createShelfApp> {
+function makeApp(signedOut = false): ReturnType<typeof createShelfApp> {
   return createShelfApp({
+    ...(signedOut ? { auth: stubAuth(null) } : {}),
     database: {
       metadata: { name: "Stub DB", version: "0.0.0", kind: "stub", category: "database" },
       tables: stubTables(),
@@ -41,6 +43,12 @@ describe("GET /sw.js", () => {
     expect(res.headers.get("cache-control")).toBe("no-cache");
     expect(res.headers.has("service-worker-allowed")).toBe(false);
     expect(await res.text()).toContain("addEventListener('fetch'");
+  });
+
+  it("needs no session, so the sign-in page can register it", async () => {
+    const res = await makeApp(true).request("/sw.js");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/javascript");
   });
 
   it("never sends Service-Worker-Allowed from published-file routes", async () => {
