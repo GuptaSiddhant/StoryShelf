@@ -1,5 +1,5 @@
 import { hostingModeOf } from "@storyshelf/core/config";
-import { ProjectModel } from "@storyshelf/core/models";
+import { ProjectModel, PushSubscriptionModel } from "@storyshelf/core/models";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderOfflineDevicePage } from "../pages/offline-device.tsx";
 import { getStore } from "../store.ts";
@@ -11,9 +11,24 @@ import { getStore } from "../store.ts";
  */
 export function registerOfflineDevicePage(app: ShelfRouter): void {
   app.get("/profile/offline", async (c) => {
-    const { db, config } = getStore();
+    const { db, config, push, user } = getStore();
     const projects = (await new ProjectModel(db).list()).map(({ slug, name }) => ({ slug, name }));
+    const devices =
+      push && user ? await new PushSubscriptionModel(db).listForUser(user.id) : undefined;
     c.header("Cache-Control", "no-store");
-    return c.html(await renderOfflineDevicePage({ projects, hostingMode: hostingModeOf(config) }));
+    return c.html(
+      await renderOfflineDevicePage({
+        projects,
+        hostingMode: hostingModeOf(config),
+        push: devices && {
+          devices: devices.map(({ id, label, createdAt, lastSuccessAt }) => ({
+            id,
+            label,
+            createdAt,
+            lastSuccessAt,
+          })),
+        },
+      }),
+    );
   });
 }

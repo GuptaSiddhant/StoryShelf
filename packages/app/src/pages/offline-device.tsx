@@ -22,6 +22,7 @@ import {
   type OfflineUsage,
 } from "./offline-device-model.ts";
 import { offlineDeviceScript } from "./offline-device-script.ts";
+import { type PushClientState, PushDevicesCard, type PushDeviceView } from "./push-devices.tsx";
 
 export interface OfflineDevicePageState {
   /** Projects the viewer may keep: the page lists these. */
@@ -29,6 +30,8 @@ export interface OfflineDevicePageState {
   hostingMode: StorybookHostingMode;
   /** Device state, filled by the page script from the worker; stories pass a fixed one. */
   usage?: OfflineUsage | undefined;
+  /** The viewer's push devices; absent when push is off (no VAPID keys) or nobody is signed in. */
+  push?: { devices: PushDeviceView[]; clientState?: PushClientState | undefined } | undefined;
 }
 
 const note = css`
@@ -185,24 +188,29 @@ export function renderOfflineDevicePage(state: OfflineDevicePageState): Rendered
         title="This device"
         description="Keep default-branch Storybooks to read without a network"
       />
-      {trusted ? (
-        <VStack gap="lg">
-          <div data-offline-unsupported hidden>
-            <Alert tone="warning" title="Offline storage is not available" role="status">
-              This browser cannot run the offline worker. Open StoryShelf over HTTPS in a current
-              browser.
-            </Alert>
-          </div>
-          <p class={note} data-offline-status-line aria-live="polite">
-            {""}
-          </p>
-          <StorageCard usage={state.usage} />
-          <ProjectsCard projects={state.projects} usage={state.usage} />
-          <script dangerouslySetInnerHTML={{ __html: offlineDeviceScript() }} />
-        </VStack>
-      ) : (
-        <UnavailableNotice hostingMode={state.hostingMode} />
-      )}
+      <VStack gap="lg">
+        {state.push ? (
+          <PushDevicesCard devices={state.push.devices} clientState={state.push.clientState} />
+        ) : null}
+        {trusted ? (
+          <VStack gap="lg">
+            <div data-offline-unsupported hidden>
+              <Alert tone="warning" title="Offline storage is not available" role="status">
+                This browser cannot run the offline worker. Open StoryShelf over HTTPS in a current
+                browser.
+              </Alert>
+            </div>
+            <p class={note} data-offline-status-line aria-live="polite">
+              {""}
+            </p>
+            <StorageCard usage={state.usage} />
+            <ProjectsCard projects={state.projects} usage={state.usage} />
+            <script dangerouslySetInnerHTML={{ __html: offlineDeviceScript() }} />
+          </VStack>
+        ) : (
+          <UnavailableNotice hostingMode={state.hostingMode} />
+        )}
+      </VStack>
     </DocumentLayout>
   );
 }
