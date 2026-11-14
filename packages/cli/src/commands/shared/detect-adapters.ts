@@ -166,7 +166,8 @@ function detectStorage(deps: Set<string>): Pick<DetectedAdapters, "storage"> {
 }
 
 function detectGit(deps: Set<string>): Pick<DetectedAdapters, "git"> {
-  return deps.has("@storyshelf/notify-git") ? { git: "git" } : {};
+  // Git hosts are built into the app (ADR 0049); the legacy package still counts for older projects.
+  return deps.has("@storyshelf/app") || deps.has("@storyshelf/notify-git") ? { git: "git" } : {};
 }
 
 function readGeneratedSources(dir: string): string {
