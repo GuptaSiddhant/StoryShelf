@@ -7,6 +7,7 @@ import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
 import type { BuildStatePublisher } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type { Vapid } from "@storyshelf/core/integrations/push";
 import type { Logger } from "@storyshelf/core/logger";
 import type { PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -36,6 +37,7 @@ export interface StoreScopeDeps {
   publicOrigin?: PublicOriginResolver | undefined;
   design: DesignProvider[];
   notifiers: NotifierProvider[];
+  push?: Vapid | undefined;
   notificationsConfig?: NotificationsConfig;
   ai?: Ai;
   resolveUser: (c: Context) => Promise<AuthUser | null>;
@@ -69,6 +71,7 @@ export function storeScope(deps: StoreScopeDeps) {
         publicOrigin: deps.publicOrigin,
         design: deps.design,
         notifiers: deps.notifiers,
+        push: deps.push,
         notificationsConfig: deps.notificationsConfig,
         ai: deps.ai,
       },

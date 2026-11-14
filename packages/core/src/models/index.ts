@@ -152,6 +152,11 @@ export {
   type NotificationSubscriptionInput,
   type NotificationSubscriptionTables,
 } from "./notification-subscription.ts";
+export {
+  PushSubscriptionModel,
+  type PushSubscriptionInput,
+  type PushSubscriptionTables,
+} from "./push-subscription.ts";
 export { ProjectModel, type ProjectCreateInput } from "./project.ts";
 export { ProjectGroupMappingModel } from "./project-group-mapping.ts";
 export { SnapshotModel, type SnapshotCreateInput, type SnapshotSummary } from "./snapshot.ts";

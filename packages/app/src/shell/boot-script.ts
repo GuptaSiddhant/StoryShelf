@@ -1,7 +1,16 @@
+import { PERIODIC_SYNC_TAG } from "./service-worker.ts";
+
 /** Registers the app's service worker (ADR 0048) once the page has loaded. */
 export const SERVICE_WORKER_REGISTRATION = `if('serviceWorker' in navigator){
       window.addEventListener('load',function(){
-        navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(){});
+        navigator.serviceWorker.register('/sw.js',{scope:'/'}).then(function(){
+          return navigator.serviceWorker.ready;
+        }).then(function(reg){
+          if(navigator.onLine&&reg.active){ reg.active.postMessage({type:'sync'}); }
+          if(reg.periodicSync){
+            reg.periodicSync.register('${PERIODIC_SYNC_TAG}',{minInterval:43200000}).catch(function(){});
+          }
+        }).catch(function(){});
       });
     }`;
 

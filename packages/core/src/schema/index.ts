@@ -52,6 +52,8 @@ export type {
 } from "./insight.ts";
 /** Notification channel and per-user subscription rows. */
 export type { NotificationChannelRow, NotificationSubscriptionRow } from "./notification.ts";
+/** A device registered for web push. */
+export type { PushSubscriptionRow } from "./push.ts";
 /** Project row and its embedded Storybook metadata. */
 export type { Project, StorybookMeta } from "./project.ts";
 /** Snapshot row capturing a single story at one viewport. */

@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { assetManifest } from "../asset-manifest.ts";
 import { registerManifest } from "./manifest.ts";
+import { registerOfflineDevicePage } from "./offline-device.ts";
 import { registerServiceWorker } from "./service-worker.ts";
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
@@ -40,6 +41,7 @@ function serveHashed(c: Context, asset: Asset, requestedHash: string): Response 
 export function registerAssets(app: ShelfRouter): void {
   registerManifest(app);
   registerServiceWorker(app);
+  registerOfflineDevicePage(app);
   const { client, htmx, icons, mark, maskable } = assetManifest;
   app.get(String.raw`/assets/:file{htmx-[a-f0-9]+\.js}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^htmx-|\.js$/gu, "");

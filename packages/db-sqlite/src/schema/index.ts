@@ -39,6 +39,7 @@ import {
 } from "./notification.ts";
 import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
 import { projects as projectsTable } from "./project.ts";
+import { pushSubscriptions as pushSubscriptionsTable } from "./push.ts";
 import { schemaMeta as schemaMetaTable } from "./schema-meta.ts";
 import { siteSettings as siteSettingsTable } from "./site-setting.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
@@ -68,6 +69,7 @@ export { userConnections } from "./connection.ts";
 export { designCredentials, designLinks, designNodes } from "./design.ts";
 export { aiBudgetAlerts, aiUsage, insights } from "./insight.ts";
 export { notificationChannels, notificationSubscriptions } from "./notification.ts";
+export { pushSubscriptions } from "./push.ts";
 export { projectGroupMappings } from "./project-group-mapping.ts";
 export { projects } from "./project.ts";
 export { snapshots } from "./snapshot.ts";
@@ -112,6 +114,8 @@ export type { Webhook } from "./webhook.ts";
 export type { AiBudgetAlert, AiUsage, Insight } from "./insight.ts";
 /** Notification channel and subscription rows. */
 export type { NotificationChannel, NotificationSubscription } from "./notification.ts";
+/** Web push device rows. */
+export type { PushSubscription } from "./push.ts";
 /** Content ref row for deduplicated assets. */
 export type { ContentUse } from "./content-uses.ts";
 
@@ -145,6 +149,7 @@ export const schema: {
   aiBudgetAlerts: AnySQLiteTable;
   notificationChannels: AnySQLiteTable;
   notificationSubscriptions: AnySQLiteTable;
+  pushSubscriptions: AnySQLiteTable;
   users: AnySQLiteTable;
   userInviteTokens: AnySQLiteTable;
   projectMembers: AnySQLiteTable;
@@ -179,6 +184,7 @@ export const schema: {
   aiBudgetAlerts: aiBudgetAlertsTable,
   notificationChannels: notificationChannelsTable,
   notificationSubscriptions: notificationSubscriptionsTable,
+  pushSubscriptions: pushSubscriptionsTable,
   users: usersTable,
   userInviteTokens: userInviteTokensTable,
   projectMembers: projectMembersTable,

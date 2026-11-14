@@ -261,6 +261,13 @@ export const FOREIGN_KEYS: ForeignKeyMigration[] = [
     parentColumn: "id",
   },
   {
+    table: "push_subscriptions",
+    name: "fk_push_subscriptions_user_id",
+    column: "user_id",
+    parent: "users",
+    parentColumn: "id",
+  },
+  {
     table: "insights",
     name: "fk_insights_project_id",
     column: "project_id",
