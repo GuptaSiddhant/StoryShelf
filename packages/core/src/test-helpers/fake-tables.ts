@@ -246,6 +246,12 @@ const siteSettings = defineTable("site_settings", {
   updatedAt: "updated_at",
 });
 
+const schemaMeta = defineTable("schema_meta", {
+  id: "id",
+  version: "version",
+  migratedAt: "migrated_at",
+});
+
 const captureLogs = defineTable("capture_logs", {
   id: "id",
   projectId: "project_id",
@@ -517,6 +523,7 @@ export const fakeSchema: Tables = {
   buildComponents,
   buildReviews,
   siteSettings,
+  schemaMeta,
   snapshots,
   baselines,
   comments,

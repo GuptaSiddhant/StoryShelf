@@ -1,5 +1,6 @@
 import type { Client } from "@libsql/client";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { gatedMigration, sqlSchemaLevelStore } from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
 import * as drizzleLibsqlCore from "drizzle-orm/libsql/driver-core";
 /**
@@ -71,11 +72,18 @@ export function createTursoDatabase(options: TursoDatabaseOptions): DatabaseAdap
       category: "database",
     },
     tables: schema,
-    migrate: async ({ logger }) => {
-      await assertReviewSchema(async (table) =>
-        parseTableInfo((await client.execute(`PRAGMA table_info(${table})`)).rows),
-      );
-      await runMigrations(client, logger);
+    migrate: async ({ logger, release }) => {
+      await gatedMigration({
+        release,
+        logger,
+        store: sqlSchemaLevelStore(async (sql) => (await client.execute(sql)).rows, "sqlite"),
+        migrate: async () => {
+          await assertReviewSchema(async (table) =>
+            parseTableInfo((await client.execute(`PRAGMA table_info(${table})`)).rows),
+          );
+          await runMigrations(client, logger);
+        },
+      });
     },
     close: () => {
       if (owned) {

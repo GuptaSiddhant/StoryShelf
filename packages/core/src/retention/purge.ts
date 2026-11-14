@@ -26,7 +26,7 @@ export {
   type SweepTables,
 } from "./screenshot-sweep.ts";
 import { col } from "../models/columns.ts";
-export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
+export { purgeAiData, STALE_RUN_MS, type AiPurgeResult, type AiRetention } from "./ai.ts";
 export {
   deleteClaimedBuild,
   type BuildDeletionDeps,
@@ -40,6 +40,19 @@ export {
   type ContentBackfillDeps,
   type ContentBackfillResult,
 } from "./content-backfill.ts";
+export {
+  RECLAIM_COPIES_KEY,
+  RECLAIM_COPIES_PAGE,
+  reclaimBuildCopies,
+  type ReclaimCopiesDeps,
+  type ReclaimCopiesResult,
+} from "./reclaim-build-copies.ts";
+export {
+  checkStorage,
+  type StorageCheckDeps,
+  type StorageCheckOptions,
+  type StorageCheckResult,
+} from "./storage-check.ts";
 export { CONTENT_GRACE_MS, collectUnreferencedContent, type ContentGcDeps } from "./content-gc.ts";
 export {
   purgeClaimedBuilds,
@@ -163,17 +176,46 @@ export class Retention {
       this.db,
       this.tables as unknown as LabelTables,
     ).persistentBuildIds(project.id);
+    const kept = (id: string): boolean => keep.has(id) || persistent.has(id);
     const terminal = candidates
       .map((build) => (build as { id: string }).id)
-      .filter((buildId) => !keep.has(buildId));
+      .filter((id) => !kept(id));
     // Pending builds leave on their own clock; "the latest on a branch" does not shield them.
     const pending = (await pendingCandidates(this.db, project.id, cutoff)).map(
       (candidate) => candidate.buildId,
     );
+    const pinned = await this.pinnedSources(project.id, new Set([...terminal, ...pending]));
     return {
-      buildIds: [...terminal, ...pending].filter((buildId) => !persistent.has(buildId)),
+      buildIds: [...terminal, ...pending].filter(
+        (buildId) => !persistent.has(buildId) && !pinned.has(buildId),
+      ),
       pending: pending.length,
     };
+  }
+
+  /**
+   * The sources of the skipped builds this pass keeps (ADR 0044 decision 8). Deleting a source
+   * deletes the builds skipped from it, so a source stays while any build skipped from it is not
+   * itself a candidate: the latest on a branch, a persistent label, or still inside the window.
+   */
+  private async pinnedSources(
+    projectId: string,
+    candidates: ReadonlySet<string>,
+  ): Promise<Set<string>> {
+    const builds = this.tables.builds;
+    const skipped = (await this.db.list(builds, {
+      where: and(eq(col(builds, "projectId"), projectId), eq(col(builds, "status"), "skipped")),
+    })) as unknown as { id: string; skippedFromBuildId: string | null }[];
+    const persistent = await new LabelModel(
+      this.db,
+      this.tables as unknown as LabelTables,
+    ).persistentBuildIds(projectId);
+    const pinned = new Set<string>();
+    for (const build of skipped) {
+      const kept = !candidates.has(build.id) || persistent.has(build.id);
+      if (kept && build.skippedFromBuildId) pinned.add(build.skippedFromBuildId);
+    }
+    return pinned;
   }
 
   /** Reclaim screenshots no snapshot or baseline references any more; never blocks the purge. */

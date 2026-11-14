@@ -4,7 +4,12 @@ import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
 import { SESSION_COOKIE, type AuthUser } from "@storyshelf/core/types";
 import { hasPasswordCredential, listUserPasskeys } from "../passkeys.ts";
-import { deleteSessionByToken, deleteUserSessions, listUserSessions } from "../sessions.ts";
+import {
+  deleteSessionByToken,
+  deleteUserSessions,
+  listUserSessions,
+  purgeExpiredAuthRows,
+} from "../sessions.ts";
 import { describeLoginMethods } from "./login-methods.ts";
 import { buildInviteMethods } from "./mail.ts";
 import { ENGINE_PROVIDER_ID, type ShelfAuthInstance, type ShelfAuthOptions } from "./types.ts";
@@ -163,5 +168,6 @@ export function buildAdapter(
     destroySession: async (sessionToken: string): Promise<void> => {
       await revokeSession(db, shelf, sessionToken);
     },
+    purgeExpired: async (cutoffIso) => await purgeExpiredAuthRows(db, cutoffIso),
   };
 }

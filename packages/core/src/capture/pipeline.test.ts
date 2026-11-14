@@ -126,6 +126,27 @@ async function seedBaseline(ctx: CaptureContext): Promise<void> {
   await ctx.storage.write(path, png(4, 4, [255, 0, 0]));
 }
 
+async function writesOf(options: { same: boolean; isDefault: boolean; seed: boolean }) {
+  const color: [number, number, number] = options.same ? [255, 0, 0] : [0, 255, 0];
+  const { ctx } = await makeContext({
+    captures: [captureFor(storyOf("a"), png(4, 4, color))],
+    isDefault: options.isDefault,
+  });
+  if (options.seed) {
+    await seedBaseline(ctx);
+  }
+  const insert = vi.spyOn(ctx.db, "insert");
+  const update = vi.spyOn(ctx.db, "update");
+  await persistRendered(ctx);
+  const table = ctx.db.tables.snapshots;
+  return {
+    ctx,
+    inserts: insert.mock.calls.filter(([t]) => t === table).length,
+    updates: update.mock.calls.filter(([t]) => t === table).length,
+    row: (await ctx.db.list(table))[0],
+  };
+}
+
 describe("persistCapture", () => {
   describe("multiple browsers", () => {
     const RED = png(4, 4, [255, 0, 0]);
@@ -528,6 +549,41 @@ describe("persistCapture", () => {
     expect(parseComparisonReference(row?.comparisonMetadata as string)).toMatchObject({
       baselineId: "bl1",
       baselineVersion: "2026-01-01T00:00:00.000Z",
+    });
+  });
+
+  describe("one snapshot write per screenshot", () => {
+    it("inserts a passing diff once, with no overlay", async () => {
+      const result = await writesOf({ same: true, isDefault: false, seed: true });
+      expect([result.inserts, result.updates]).toEqual([1, 0]);
+      expect(result.row).toMatchObject({ status: "unchanged", diffPassed: true, diffPath: null });
+      const overlay = diffPath(
+        result.ctx.project.id,
+        result.ctx.build.id,
+        "a",
+        DEFAULT_VIEWPORT.name,
+      );
+      await expect(result.ctx.storage.exists(overlay)).resolves.toBe(false);
+    });
+
+    it("inserts a failing diff once, keeping its overlay", async () => {
+      const result = await writesOf({ same: false, isDefault: false, seed: true });
+      expect([result.inserts, result.updates]).toEqual([1, 0]);
+      expect(result.row).toMatchObject({ status: "changed", diffPassed: false });
+      expect(result.row?.diffPath).toBeTruthy();
+      await expect(result.ctx.storage.exists(String(result.row?.diffPath))).resolves.toBe(true);
+    });
+
+    it("inserts a story without a baseline once", async () => {
+      const result = await writesOf({ same: true, isDefault: false, seed: false });
+      expect([result.inserts, result.updates]).toEqual([1, 0]);
+      expect(result.row?.status).toBe("new");
+    });
+
+    it("inserts a default-branch story without a baseline once, already approved", async () => {
+      const result = await writesOf({ same: true, isDefault: true, seed: false });
+      expect(result.inserts).toBe(1);
+      expect(result.row?.status).toBe("approved");
     });
   });
 

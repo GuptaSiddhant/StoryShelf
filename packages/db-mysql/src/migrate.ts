@@ -7,6 +7,8 @@
  * duplicate-index error from a repeated DDL statement is ignored.
  */
 import {
+  gatedMigration,
+  sqlSchemaLevelStore,
   duplicateGroupsSql,
   logSkippedIndex,
   parseUniqueIndex,
@@ -168,7 +170,22 @@ const IDENTITY_INDEXES = [
 ];
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+export async function runMigrations(
+  run: MigrationRunner,
+  logger?: Logger,
+  release?: string,
+): Promise<void> {
+  await gatedMigration({
+    release,
+    logger,
+    store: sqlSchemaLevelStore(run, "mysql"),
+    migrate: async () => {
+      await migrateEverything(run, logger);
+    },
+  });
+}
+
+async function migrateEverything(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);
