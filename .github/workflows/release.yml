@@ -160,8 +160,9 @@ jobs:
   # a `next` build never reaches here. amd64 and arm64, with SBOM and provenance attestations. It
   # authenticates with GITHUB_TOKEN (`packages: write`). The same build is also pushed to Docker Hub
   # (#1027) under the same tags, as one manifest per tag, so both registries share one digest. Docker
-  # Hub is fail soft: with `DOCKERHUB_TOKEN` or `DOCKERHUB_USERNAME` unset it is skipped with a notice
-  # and the release goes on. Re-pushing a version overwrites its tags, so a re-run is safe.
+  # Hub is fail soft: with `DOCKERHUB_TOKEN` unset it is skipped with a notice and the release goes
+  # on. `DOCKERHUB_USERNAME` is optional and defaults to `guptasiddhant`, the repository's owner.
+  # Re-pushing a version overwrites its tags, so a re-run is safe.
   publish-image:
     name: publish container image
     needs: [detect, validate]
@@ -173,7 +174,7 @@ jobs:
       attestations: write
     env:
       VERSION: ${{ needs.validate.outputs.version }}
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || 'guptasiddhant' }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     strategy:
       fail-fast: false
@@ -213,13 +214,13 @@ jobs:
         run: |
           tags="ghcr.io/guptasiddhant/storyshelf:${VERSION}${SUFFIX}
           ghcr.io/guptasiddhant/storyshelf:latest${SUFFIX}"
-          if [ -n "$DOCKERHUB_TOKEN" ] && [ -n "$DOCKERHUB_USERNAME" ]; then
+          if [ -n "$DOCKERHUB_TOKEN" ]; then
             echo "dockerhub=true" >> "$GITHUB_OUTPUT"
             tags="$tags
           docker.io/guptasiddhant/storyshelf:${VERSION}${SUFFIX}
           docker.io/guptasiddhant/storyshelf:latest${SUFFIX}"
           else
-            echo "::notice::Docker Hub secrets not set; publishing to ghcr.io only."
+            echo "::notice::DOCKERHUB_TOKEN not set; publishing to ghcr.io only."
             echo "dockerhub=false" >> "$GITHUB_OUTPUT"
           fi
           {
