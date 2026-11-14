@@ -5,6 +5,7 @@ import type { RouteClass } from "./classification.ts";
 export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   // hosting
   "GET /": "hosting",
+  "GET /manifest.webmanifest": "hosting",
   "GET /projects": "hosting",
   "GET /projects/new": "hosting",
   "POST /projects/new": "hosting",

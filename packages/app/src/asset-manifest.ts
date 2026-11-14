@@ -1,4 +1,5 @@
 import { htmxSource } from "./assets/htmx.ts";
+import { maskableMarkSource } from "./assets/mark-maskable.ts";
 import { markSource } from "./assets/mark.ts";
 import { clientScript } from "./shell/client-script.ts";
 import { contentHash, iconSprite, iconSpriteHash, iconSpriteHref } from "./ui/icons/sprite.ts";
@@ -17,6 +18,9 @@ const htmxHash = contentHash(htmxSource);
  */
 const markHash = contentHash(markSource);
 
+/** The same mark with a full-bleed background and safe-zone padding: the maskable app icon. */
+const maskableHash = contentHash(maskableMarkSource);
+
 /** The shell's interactive behaviour; static, so it is served as a cacheable file. */
 const clientSource = clientScript();
 const clientHash = contentHash(clientSource);
@@ -25,5 +29,10 @@ export const assetManifest = {
   client: { source: clientSource, hash: clientHash, href: `/assets/client-${clientHash}.js` },
   htmx: { source: htmxSource, hash: htmxHash, href: `/assets/htmx-${htmxHash}.js` },
   icons: { source: iconSprite, hash: iconSpriteHash, href: iconSpriteHref },
+  maskable: {
+    source: maskableMarkSource,
+    hash: maskableHash,
+    href: `/assets/mark-maskable-${maskableHash}.svg`,
+  },
   mark: { source: markSource, hash: markHash, href: `/assets/mark-${markHash}.svg` },
 } as const;
