@@ -18,6 +18,7 @@ const VIEWS: Record<Build["status"], StatusView> = {
   rejected: { label: "Rejected", tone: "danger", icon: "x-circle" },
   failed: { label: "Capture failed", tone: "danger", icon: "x-circle" },
   cancelled: { label: "Cancelled", tone: "neutral", icon: "x-circle" },
+  skipped: { label: "Skipped", tone: "neutral", icon: "check" },
 };
 
 /** The status strip's heading, tone and icon for a build ("Published" for an upload without capture). */

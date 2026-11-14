@@ -49,6 +49,10 @@
       "description": "Append --stats-json to the build script when affected capture is on (default true). Set false for a script that rejects the flag.",
       "type": "boolean"
     },
+    "skipUnchanged": {
+      "description": "Record a commit that changed no story as a skipped build instead of uploading the Storybook (default false). Needs affected capture and a server with testing on; --full disables it.",
+      "type": "boolean"
+    },
     "untraced": {
       "description": "Glob patterns excluded from affected tracing (union with --untraced).",
       "type": "array",

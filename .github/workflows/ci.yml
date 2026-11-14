@@ -364,9 +364,19 @@ jobs:
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
 
+      - name: Set up QEMU
+        if: steps.filter.outputs.run == 'true'
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Buildx
         if: steps.filter.outputs.run == 'true'
         uses: docker/setup-buildx-action@v3
+
+      # release.yml pushes amd64 and arm64. Native install scripts can differ per platform, so build
+      # the arm64 builder stage too (install + bundle; nothing is loaded or pushed).
+      - name: Build the arm64 builder stage
+        if: steps.filter.outputs.run == 'true'
+        run: docker buildx build -f apps/server-image/Dockerfile --platform linux/arm64 --target builder .
 
       - name: Build both variants (not pushed)
         if: steps.filter.outputs.run == 'true'

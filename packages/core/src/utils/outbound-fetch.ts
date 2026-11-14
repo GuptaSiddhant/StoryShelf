@@ -81,7 +81,33 @@ async function visit(
     return { response };
   }
   await discard(response);
-  return { target: new URL(location, target).href, init: redirected(init, response.status) };
+  const next = new URL(location, target);
+  const moved = redirected(init, response.status);
+  return {
+    target: next.href,
+    init: next.origin === new URL(target).origin ? moved : withoutCredentials(moved),
+  };
+}
+
+/** Headers that carry no credential; a cross-origin redirect keeps only these. */
+const CROSS_ORIGIN_HEADERS = new Set([
+  "accept",
+  "accept-language",
+  "content-type",
+  "content-length",
+  "user-agent",
+]);
+
+/**
+ * A redirect to another origin (scheme, host or port) must not carry a secret the caller set for
+ * the first host: `Authorization`, `Cookie`, `PRIVATE-TOKEN`, a signature. Allowlist rather than
+ * denylist, because callers choose custom credential header names.
+ */
+function withoutCredentials(init: GuardedInit): GuardedInit {
+  const headers = Object.fromEntries(
+    Object.entries(init.headers).filter(([name]) => CROSS_ORIGIN_HEADERS.has(name.toLowerCase())),
+  );
+  return { ...init, headers };
 }
 
 async function discard(response: Response): Promise<void> {
