@@ -166,12 +166,35 @@ export class BuildModel {
             : "The source build is no longer the newest approved build on the branch",
         );
       }
-      return (await store.insert(
+      const inserted = (await store.insert(
         this.tables.builds,
         skippedRow(input, source),
       )) as unknown as Build;
+      return await this.replacedByExisting(inserted, store);
     };
     return this.db.transact ? await this.db.transact(run) : await run(this.db);
+  }
+
+  /**
+   * A skipped build that arrives after a normal build of its own commit was replaced from the
+   * start: normal creation only supersedes the skipped builds that exist when it runs, so the
+   * other order is reconciled here (ADR 0044, decision 4).
+   */
+  private async replacedByExisting(skipped: Build, store: TxStore): Promise<Build> {
+    const builds = this.tables.builds;
+    const [normal] = (await store.list(builds, {
+      where: and(
+        eq(col(builds, "projectId"), skipped.projectId),
+        eq(col(builds, "gitBranch"), skipped.gitBranch),
+        eq(col(builds, "gitSha"), skipped.gitSha),
+        ne(col(builds, "status"), "skipped"),
+      ),
+      orderBy: desc(col(builds, "createdAt")),
+      limit: 1,
+    })) as unknown as Build[];
+    if (!normal) return skipped;
+    const row = await store.update(builds, skipped.id, { supersededByBuildId: normal.id });
+    return row as unknown as Build;
   }
 
   /** The build `projectId` created under `idempotencyKey`, or null (ADR 0044, decision 4). */
@@ -208,12 +231,15 @@ export class BuildModel {
     })) as unknown as Build[];
     const replaced: Build[] = [];
     for (const build of skipped) {
+      // Compare-and-set on the column: a concurrent caller that got there first keeps its row.
       // oxlint-disable-next-line no-await-in-loop -- a handful of rows at most (one per lost response)
-      const row = await this.db.update(this.tables.builds, build.id, {
-        supersededByBuildId: replacementId,
-        updatedAt: new Date().toISOString(),
-      });
-      replaced.push(row as unknown as Build);
+      const row = (await this.db.updateWhere(
+        this.tables.builds,
+        build.id,
+        { supersededByBuildId: replacementId, updatedAt: new Date().toISOString() },
+        isNull(col(this.tables.builds, "supersededByBuildId")),
+      )) as unknown as Build | null;
+      if (row?.supersededByBuildId === replacementId) replaced.push(row);
     }
     return replaced;
   }

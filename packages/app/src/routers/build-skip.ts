@@ -157,7 +157,9 @@ async function recordSkipped(
   );
   if (existing) return { build: existing, created: false };
   await assertSameCatalog(project, input);
-  const build = await createChecked(project, input);
+  const { build, raced } = await createChecked(project, input);
+  // The request that lost a race for the key returns the winner's build and repeats nothing.
+  if (raced) return { build, created: false };
   if (input.labels && input.labels.length > 0) {
     await attachLabels(getStore().db, project.id, build.id, input.labels);
   }
@@ -196,9 +198,9 @@ async function assertSameCatalog(
 async function createChecked(
   project: Project,
   input: z.infer<typeof skippedBuildSchema>,
-): Promise<Build> {
+): Promise<{ build: Build; raced: boolean }> {
   try {
-    return await new BuildModel(getStore().db).createSkippedIfEligible({
+    const build = await new BuildModel(getStore().db).createSkippedIfEligible({
       projectId: project.id,
       gitSha: input.gitSha,
       gitBranch: input.gitBranch,
@@ -209,6 +211,7 @@ async function createChecked(
       ...(input.message === undefined ? {} : { message: input.message }),
       ...(input.author === undefined ? {} : { author: input.author }),
     });
+    return { build, raced: false };
   } catch (error) {
     if (error instanceof SkipSourceRefused) {
       throw new HTTPException(409, { message: error.message });
@@ -218,7 +221,7 @@ async function createChecked(
       project.id,
       input.idempotencyKey,
     );
-    if (raced) return raced;
+    if (raced) return { build: raced, raced: true };
     throw error;
   }
 }

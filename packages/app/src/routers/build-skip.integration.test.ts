@@ -278,6 +278,30 @@ describe("POST /builds/skipped", () => {
     expect((await models.get(other.id))?.supersededByBuildId ?? null).toBeNull();
   });
 
+  it("is already replaced when its commit's normal build exists first", async () => {
+    const { build, post, db, project } = await seed();
+    const source = await build("base", "approved");
+    const normal = await createTestBuild(db, db.tables, project.id, {
+      gitSha: "head",
+      gitBranch: "main",
+    });
+    const created = (await (await post(source.id)).json()) as { build: { id: string } };
+    const row = await new BuildModel(db).get(created.build.id);
+    expect(row?.supersededByBuildId).toBe(normal.id);
+  });
+
+  it("keeps the replacement the first normal build assigned", async () => {
+    const { build, post, db, project } = await seed();
+    const source = await build("base", "approved");
+    const created = (await (await post(source.id)).json()) as { build: { id: string } };
+    const models = new BuildModel(db);
+    const first = await models.supersedeSkipped(project.id, "main", "head", "first");
+    const second = await models.supersedeSkipped(project.id, "main", "head", "second");
+    expect(first.map((row) => row.id)).toEqual([created.build.id]);
+    expect(second).toEqual([]);
+    expect((await models.get(created.build.id))?.supersededByBuildId).toBe("first");
+  });
+
   it("answers 409 for a project that runs Storybook tests", async () => {
     const { build, post } = await seed({ runTests: true });
     const source = await build("base", "approved");
