@@ -191,6 +191,21 @@ jobs:
           ref: ${{ needs.detect.outputs.sha }}
           persist-credentials: false
 
+      # The Dockerfile comes from the commit this workflow runs on; everything it builds (packages,
+      # lockfile, apps/server-image sources) from the release commit. On a push they are the same
+      # commit; on a manual stable re-run a fixed Dockerfile can build the version already on npm
+      # from the same tree.
+      - name: Use this run's Dockerfile
+        env:
+          RUN_SHA: ${{ github.sha }}
+          RELEASE_SHA: ${{ needs.detect.outputs.sha }}
+        run: |
+          if [ "$RUN_SHA" != "$RELEASE_SHA" ]; then
+            git fetch --no-tags --depth=1 origin "$RUN_SHA"
+            git checkout "$RUN_SHA" -- apps/server-image/Dockerfile
+            echo "::notice::Dockerfile from ${RUN_SHA}, sources from ${RELEASE_SHA}"
+          fi
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
