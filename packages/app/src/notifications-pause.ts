@@ -6,7 +6,11 @@ import type { ShelfConfig } from "@storyshelf/core/config";
  * and the notification settings say what to set.
  */
 import type { Logger } from "@storyshelf/core/logger";
-import type { PublicOriginResolver } from "@storyshelf/core/models";
+import {
+  NotificationChannelModel,
+  ProjectModel,
+  type PublicOriginResolver,
+} from "@storyshelf/core/models";
 import { getStore, type Store } from "./store.ts";
 
 /** What the System page and the notification settings tell the viewer. */
@@ -30,6 +34,22 @@ export async function notificationOrigin(deps: OriginDeps): Promise<string | und
 /** Whether the current instance sends no notifications for want of a public origin. */
 export async function notificationsPaused(store: Store = getStore()): Promise<boolean> {
   return (await notificationOrigin(store)) === undefined;
+}
+
+/** Whether any notification channel (site-wide or on a project) is enabled (#1018). */
+export async function anyChannelEnabled(store: Store = getStore()): Promise<boolean> {
+  const channels = new NotificationChannelModel(store.db);
+  const projects = await new ProjectModel(store.db).list();
+  const lists = await Promise.all([
+    channels.listSystem(),
+    ...projects.map(async (project) => await channels.list(project.id)),
+  ]);
+  return lists.some((rows) => rows.some((row) => row.enabled));
+}
+
+/** Whether the "paused" banner shows: a channel is enabled, and no public origin is confirmed. */
+export async function pausedBannerShown(store: Store = getStore()): Promise<boolean> {
+  return (await anyChannelEnabled(store)) && (await notificationsPaused(store));
 }
 
 /** Loggers that already said so; cleared when an origin resolves, so a later pause logs again. */

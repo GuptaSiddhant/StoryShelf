@@ -71,11 +71,11 @@ Local accounts work with no identity provider: an admin invites each person with
 
 ## Get alerts in Slack, Teams or email
 
-Add a channel on the project (**Settings → Notifications**) and pick which events it receives. Chat channels use an incoming-webhook URL; email needs an SMTP or HTTP mail transport. Notifications need a confirmed public URL. See [Notifications](/guides/notifications/), [@storyshelf/notify-chat](/packages/notify-chat/) and [@storyshelf/notify-email](/packages/notify-email/).
+Add a channel on the project (**Settings → Notifications**) and pick which events it receives. Slack, Teams, git and email providers are built in; chat channels use an incoming-webhook URL and email needs an SMTP or HTTP mail transport. Notifications need a confirmed public URL. See [Notifications](/guides/notifications/).
 
 ## Link stories to their Figma designs
 
-Register the Figma provider on the server and stories can link to their Figma designs, with previews and a warning when a design changes after the story. See [Design links](/guides/design-links/) and [@storyshelf/design-figma](/packages/design-figma/).
+Figma is built in, so stories can link to their Figma designs, with previews and a warning when a design changes after the story. See [Design links](/guides/design-links/).
 
 ## Back up or move baselines
 

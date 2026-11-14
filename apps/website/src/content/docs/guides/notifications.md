@@ -24,7 +24,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
   -d '{ "provider": "slack-webhook", "events": ["build:reviewing"], "config": { "style": "compact" }, "secret": "https://hooks.slack.com/..." }'
 ```
 
-- `provider` — `slack-webhook` | `teams-workflow` | `email`, or a git provider (see below); it must be wired in `ShelfOptions.notifications.notifiers`, and unknown kinds are a 400.
+- `provider` — `slack-webhook` | `teams-workflow` | `email`, or a git provider (see below); it must be registered (every built-in is, unless `ShelfOptions.notifications.notifiers` says otherwise), and unknown kinds are a 400.
 - `events` — allowlist or empty for all; `enabled` toggles delivery without deleting.
 - Secrets (webhook URLs, SMTP passwords) are stored AES-256-GCM encrypted with server `SECRET` and decrypted only in memory at send time.
 - **A public URL is required.** Every message links to the build or review page, so while the server resolves no [public origin](/guides/config/#public-origin) (`PUBLIC_BASE_URL`, the platform's address, or the origin an admin confirmed on **System**; a detected origin counts only once confirmed) no notification is sent at all, git statuses included. Channels are not marked as failing; **System**, the project's notification settings and your profile show "Notifications are paused until a public URL is set", and the server logs it at start-up. Webhooks carry ids and no links, so they are unaffected. Events that happen while notifications are paused are not delivered later: chat, email and system messages for them are lost, and only the current state of open builds is sent again to git channels once a public URL resolves.
@@ -32,7 +32,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
 
 ## Git channels (commit statuses and check runs)
 
-A git channel (`github`, `gitlab` from [`@storyshelf/notify-git`](/packages/notify-git/)) belongs to a project and shows the build's state on your repository: commit statuses named `<prefix>/testing` (or `<prefix>/review` without `testing`) and `<prefix>/storybook`, and one pull-request comment per build. It takes the repository as config and the token as its secret:
+A git channel (the built-in `github` and `gitlab` providers) belongs to a project and shows the build's state on your repository: commit statuses named `<prefix>/testing` (or `<prefix>/review` without `testing`) and `<prefix>/storybook`, and one pull-request comment per build. It takes the repository as config and the token as its secret:
 
 ```sh
 curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
@@ -42,6 +42,8 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
 ```
 
 A GitHub channel can post **check runs** as a GitHub App instead of commit statuses (`"mode": "checks"`, `appId`, `installationId` in `config`, the App's private key as `secret`); see [GitHub check runs](/packages/notify-git/#github-check-runs). GitLab always uses statuses. A site-wide git channel, or one without a token (or key), is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
+
+**Self-hosted git hosts.** For GitHub Enterprise Server, set `apiUrl` in `config` to its REST API base, for example `"apiUrl": "https://ghes.example.com/api/v3"` (leave it out for github.com); statuses, check runs, the App token exchange and pull-request comments all use it. For self-managed GitLab, set `host`. Both URLs go through the same outbound guard as webhooks: `https` only, and a host that resolves to a private address is refused. The settings page then says why (not https, or a private address) and that the operator must add the exact hostname to `config.outbound.allowHosts`; it never shows the address the host resolved to. See [Outbound URLs set by projects](/guides/config/#outbound-urls-set-by-projects).
 
 Git delivery is **durable**, unlike messages: each state change is a `notify` job on the database queue that reads the build when it runs and is retried with backoff (five attempts), or delivered inline without durability on a host with no job queue. See [Delivery](/packages/notify-git/#delivery).
 
@@ -64,7 +66,7 @@ Site admins manage project-less channels (`POST /api/v1/admin/notification-chann
 
 ## Email transport
 
-One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and `notifications.notifiers`. Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
+One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and swap it into the built-in `email` notifier (see [Choosing the providers](#choosing-the-providers)). Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
 
 | Env                       | Purpose                             | Default  |
 | ------------------------- | ----------------------------------- | -------- |
@@ -81,3 +83,40 @@ Password recovery is both: users can request a reset email when a sender is conf
 - [Webhooks](/guides/webhooks/) — signed machine events for custom receivers
 - [Project settings](/guides/project-settings/) — where channels are managed
 - [REST API](/guides/api/) — endpoint walkthrough
+
+## Choosing the providers
+
+Git, chat (Slack, Teams) and email providers are built in and registered by default. Registering sends nothing: a provider acts only once a project adds a channel. Email also needs a transport (`SMTP_HOST` and `SMTP_FROM`, or a sender you pass); without one, an email channel reports that it has none. `nodemailer` is needed only for SMTP: `npm install nodemailer`.
+
+`notifications.notifiers`, `notifications.email` and `design` each take:
+
+- **nothing:** every built-in;
+- **an array:** exactly these, with no built-ins;
+- **a function `(builtIn) => list`:** add a provider, replace a built-in of the same `kind`, or filter some out. It runs once, at startup;
+- **`false`:** none of that group.
+
+Add a custom notifier next to the built-ins, and swap the built-in email notifier for your own transport:
+
+```ts
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+
+const emailSender = await smtpPresetFromEnv(process.env);
+
+createShelfApp({
+  // ...
+  notifications: {
+    notifiers: (builtIn) => [
+      ...builtIn.map((provider) =>
+        provider.metadata.kind === "email" && emailSender
+          ? createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })
+          : provider,
+      ),
+      myPagerNotifier, // a NotifierProvider of your own, with a unique `kind`
+    ],
+  },
+});
+```
+
+A provider kind must be unique within its group; a repeated kind stops startup and names the kind.
+
+Migrating from `@storyshelf/notify-git`, `@storyshelf/notify-chat`, `@storyshelf/notify-email` or `@storyshelf/design-figma`: remove the dependency and its import, and delete `notifiers: [...chatNotifiers, ...gitNotifiers]` and `design: [createFigmaDesign()]`. Those lists replaced the built-ins; leaving them in keeps working but pins the old behaviour.

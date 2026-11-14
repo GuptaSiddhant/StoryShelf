@@ -1,6 +1,10 @@
 # @storyshelf/notify-email
 
-Email notification transport for StoryShelf: one SMTP/HTTP transport serves notification channels and (optionally) auth mail. Owns `nodemailer`; no other package imports it directly.
+> **Deprecated.** The email integration is now part of `@storyshelf/core` (ADR 0049). This package re-exports it for one minor release and is then retired. Import from `@storyshelf/core/integrations` instead.
+>
+> `smtpPreset`, `smtpPresetFromEnv` and `mailpitPreset` are now **async** (they load the optional `nodemailer` peer of core): `await` them. Install `nodemailer@^10.2.1` yourself for SMTP.
+
+Email notification transport for StoryShelf: one SMTP/HTTP transport serves notification channels and (optionally) auth mail. 
 
 ## Install
 
@@ -13,9 +17,9 @@ nub add @storyshelf/notify-email
 ```ts
 import { createShelfApp } from "@storyshelf/app";
 import { createShelfAuth } from "@storyshelf/auth";
-import { createEmailNotifier, smtpPreset } from "@storyshelf/notify-email";
+import { createEmailNotifier, smtpPreset } from "@storyshelf/core/integrations";
 
-const sender = smtpPreset({ host: "mail.example.com", port: 587, from: "shelf@example.com" });
+const sender = await smtpPreset({ host: "mail.example.com", port: 587, from: "shelf@example.com" });
 const app = createShelfApp({
   database,
   storage,

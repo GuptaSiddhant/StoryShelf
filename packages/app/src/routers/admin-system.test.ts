@@ -216,3 +216,30 @@ describe("admin system page", () => {
     expect(await page.text()).toContain(">Email<");
   });
 });
+
+describe("admin system page: default-branch verification (#910)", () => {
+  it("lists the projects that turned verification off", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      testing: { runner: inProcessRunner() },
+    });
+    await app.lifecycle.setup();
+    const create = async (body: Record<string, unknown>) =>
+      await app.request("/api/v1/projects", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    await create({ name: "Verified" });
+    expect(await (await app.request("/admin")).text()).not.toContain("counted unverified");
+    await create({ name: "Trusting", requireVerifiedDefault: false });
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain("Default-branch builds counted unverified");
+    expect(html).toContain('href="/projects/trusting/settings/tests"');
+    expect(html).not.toContain('href="/projects/verified/settings/tests"');
+  });
+});

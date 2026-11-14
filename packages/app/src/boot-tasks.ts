@@ -3,7 +3,7 @@ import {
   sweepOrphanedScratch,
   type BuildStatePublisher,
 } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { backfillContentUses } from "@storyshelf/core/retention";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
@@ -20,7 +20,7 @@ import type { ServerRuntime } from "./runtime.ts";
  */
 export function runBootTasks(
   cell: LifecycleCell,
-  scoped: ShelfOptions,
+  scoped: ResolvedShelfOptions,
   runtime: ServerRuntime,
   buildState?: BuildStatePublisher,
 ): void {
@@ -43,7 +43,7 @@ export function runBootTasks(
  */
 function replayGitStateAfterSetup(
   cell: LifecycleCell,
-  scoped: ShelfOptions,
+  scoped: ResolvedShelfOptions,
   runtime: ServerRuntime,
   buildState: BuildStatePublisher,
 ): void {
@@ -76,7 +76,7 @@ function replayGitStateAfterSetup(
  */
 function backfillContentUsesAfterSetup(
   cell: LifecycleCell,
-  scoped: ShelfOptions,
+  scoped: ResolvedShelfOptions,
   logger: Logger,
 ): void {
   trackBackground(
@@ -118,7 +118,11 @@ function logPausedAfterSetup(cell: LifecycleCell, runtime: ServerRuntime): void 
 }
 
 /** Without `testing`, once adapters are ready, log the mode and any snapshots it hides. */
-function logHostingOnlyAfterSetup(cell: LifecycleCell, scoped: ShelfOptions, logger: Logger): void {
+function logHostingOnlyAfterSetup(
+  cell: LifecycleCell,
+  scoped: ResolvedShelfOptions,
+  logger: Logger,
+): void {
   if (scoped.testing !== undefined) {
     return;
   }

@@ -6,12 +6,9 @@ import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
 import { parseShutdownGraceMs, parseTrustProxy } from "@storyshelf/core/config";
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
-import { chatNotifiers } from "@storyshelf/notify-chat";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
-import { gitLogNotifier } from "@storyshelf/notify-git";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -127,23 +124,25 @@ shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
 // Only the model in use (null while AI is off): the Anthropic key never reaches a log.
 shelfLogger.info(aiLogFields(ai), "ai insights");
 
-// Notifications: SMTP sender from SMTP_* env (undefined keeps invites
-// out-of-band); chat + email providers serve stored channels. The `git-log` provider writes git
-// statuses to the server log only (no outbound call); a channel uses it only when someone creates
-// one through the API, so the deployed demo is unchanged. The browser golden-path test (#941) uses it.
-const emailSender = smtpPresetFromEnv(env, shelfLogger);
-const emailNotifiers = emailSender
-  ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
-  : [];
+// Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
+// SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
+// (undefined keeps invites out-of-band).
+const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
-  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   ai,
   notifications: {
-    notifiers: [...chatNotifiers, ...emailNotifiers, gitLogNotifier],
+    notifiers: (builtIn) =>
+      emailSender
+        ? builtIn.map((provider) =>
+            provider.metadata.kind === "email"
+              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+              : provider,
+          )
+        : builtIn,
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   auth:

@@ -126,6 +126,9 @@
           "reviewApprovals": {
             "type": "number"
           },
+          "requireVerifiedDefault": {
+            "type": "boolean"
+          },
           "storybookUrlTtlSeconds": {
             "type": "number",
             "nullable": true
@@ -211,6 +214,9 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 20
+          },
+          "requireVerifiedDefault": {
+            "type": "boolean"
           }
         },
         "required": ["name"]
@@ -297,6 +303,9 @@
             "minimum": 1,
             "maximum": 20
           },
+          "requireVerifiedDefault": {
+            "type": "boolean"
+          },
           "storybookUrlTtlSeconds": {
             "type": "integer",
             "nullable": true
@@ -320,6 +329,11 @@
           },
           "isDefault": {
             "type": "boolean"
+          },
+          "branchVerified": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["verified", "unverified", "refused", "unreachable", null]
           },
           "authorEmail": {
             "type": "string",
