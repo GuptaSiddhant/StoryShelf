@@ -208,3 +208,19 @@ Adoption needs both parts. Either failing means the code does not merge.
   do not depend on it, and it would mark every snapshot as an environment change.
 - **Do nothing.** Still the outcome if the gate fails. Affected capture and the #853 to #857 work
   may already cover most of the gain.
+
+## Gate result (2026-11-14)
+
+The gate in decision 9 was run for #990. **Correctness passed; speed failed.** Per decision 9 the
+code did not merge (architect decision on #990). It is kept on the branch `feat/990-switch-stories`
+(PR #1041, closed), with the gate suite and the bench's `--switch-stories` flag.
+
+- **Correctness.** Both runners, `fixtures/storybook-8`, `-9` and `-10`, the leaking stories
+  included, two viewports: every snapshot with the switch on was byte-identical to the fresh one
+  over three runs, reverse order, three pages and one page.
+- **Speed.** `nub run bench`, same machine, median of three. Full capture of an unchanged build:
+  6588 ms off, 6603 ms on, **+0.2%** against the required −15%. Page reuse (#857) already makes a
+  fresh load of a small, cached Storybook cheap, and decision 3's 500 ms quiet window dominates each
+  switch. Only 12 of 26 captures could switch on that fixture.
+- **Next.** #1050 (deferred) re-runs the gate on a large, realistic fixture before decision 3's
+  window is revisited. Until then the behaviour in Context is the only one.
