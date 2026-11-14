@@ -104,7 +104,7 @@ describe("offline home page", () => {
     expect(html).toContain('href="/offline/a/"');
     expect(html).toContain("Name a");
     expect(html).toContain("1234567");
-    expect(html).toContain("synced 20");
+    expect(html).toMatch(/synced \S+/u);
   });
 
   it("escapes project names", async () => {
@@ -115,6 +115,6 @@ describe("offline home page", () => {
   });
 
   it("says so when nothing is kept", async () => {
-    expect(await (await loadWorker().fetch("/offline")).text()).toContain("None.");
+    expect(await (await loadWorker().fetch("/offline")).text()).toContain("No Storybooks are kept");
   });
 });

@@ -1,5 +1,5 @@
 // oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
-import { contentHostSuffix } from "@storyshelf/core/config";
+import { contentHostSuffix, hostingModeOf } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
@@ -25,6 +25,7 @@ import { HealthSlot } from "./health-panel.tsx";
 import { LibraryGrid } from "./library-grid.tsx";
 import { entriesFromSnapshots, groupLibrary, type LibraryGroup } from "./library-model.ts";
 import { loadSnapshotLayer, type SnapshotLayer } from "./library-snapshots.tsx";
+import { offlineDeviceScript } from "./offline-device-script.ts";
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
@@ -194,6 +195,7 @@ function LibraryHeader(props: {
           <Button variant="ghost" size="sm" icon="external-link" href={urls.short(build.id)}>
             View Storybook
           </Button>
+          <KeepOfflineButton slug={project.slug} />
           {getStore().design.length > 0 ? (
             <Button variant="ghost" size="sm" href={urls.designCoverage(project.slug)}>
               Design coverage
@@ -203,6 +205,28 @@ function LibraryHeader(props: {
         </HStack>
       }
     />
+  );
+}
+
+/** One click from the Storybook link: keep this project on the device (trusted hosting only). */
+function KeepOfflineButton(props: { slug: string }): Rendered | null {
+  if (hostingModeOf(getStore().config) !== "trusted") return null;
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon="download"
+        type="button"
+        data-offline-keep={props.slug}
+        data-offline-state="idle"
+        data-idle-label="Keep offline"
+        data-kept-label="Kept offline"
+      >
+        Keep offline
+      </Button>
+      <script dangerouslySetInnerHTML={{ __html: offlineDeviceScript() }} />
+    </>
   );
 }
 
