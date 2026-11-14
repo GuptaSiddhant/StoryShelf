@@ -25,7 +25,7 @@ vi.mock("pg", () => ({
 }));
 
 const { createRdsIamDatabase } = await import("./rds-iam.ts");
-const { RDS_CA_BUNDLE } = await import("./rds-ca-bundle.ts");
+const { RDS_CA_BUNDLE, RDS_GOV_CA_BUNDLE } = await import("./rds-ca-bundle.ts");
 
 const base = {
   host: "db.example.rds.amazonaws.com",
@@ -88,6 +88,11 @@ describe("createRdsIamDatabase", () => {
   it("verifies the server certificate against the bundled RDS roots by default", () => {
     createRdsIamDatabase({ ...base, signer: fakeSigner() });
     expect(poolConfigs[0]?.["ssl"]).toEqual({ ca: RDS_CA_BUNDLE, rejectUnauthorized: true });
+  });
+
+  it("trusts the GovCloud roots for a us-gov region", () => {
+    createRdsIamDatabase({ ...base, region: "us-gov-west-1", signer: fakeSigner() });
+    expect(poolConfigs[0]?.["ssl"]).toEqual({ ca: RDS_GOV_CA_BUNDLE, rejectUnauthorized: true });
   });
 
   it("verifies against the `ca` given instead of the bundle", () => {

@@ -71,7 +71,7 @@ const database = createRdsIamDatabase({
 ```
 
 - **A fresh token for every new connection.** Tokens live 15 minutes; the pool asks for one each time it opens a connection, so it never reuses a stale one. An open connection stays valid after its token expires.
-- **The server certificate is verified by default.** The IAM token is a credential, so the preset checks the database's certificate against the Amazon RDS root certificates it bundles (AWS's global bundle, every region). Pass `ca` (PEM, or an array) to trust your own instead, for a proxy or a custom domain. Opting out is explicit: `verifyServerCertificate: false` encrypts without verifying and logs a warning, because anyone who can intercept the connection can then take the token. A `ca` always verifies.
+- **The server certificate is verified by default.** The IAM token is a credential, so the preset checks the database's certificate against the Amazon RDS root certificates it bundles (AWS's global bundle, every region, and the GovCloud bundle for `us-gov-*`). Pass `ca` (PEM, or an array) to trust your own instead, for a proxy or a custom domain. Opting out is explicit: `verifyServerCertificate: false` encrypts without verifying and logs a warning, because anyone who can intercept the connection can then take the token. A `ca` always verifies.
 - **Tokens stay out of logs and errors.** A signer failure is reported without the token, and `redactSecrets` removes presigned `X-Amz-*` values.
 - **A missing `@aws-sdk/rds-signer` fails at startup** with an install hint.
 - The database user needs the `rds_iam` role and the task role needs `rds-db:connect` on the database user.

@@ -6,7 +6,7 @@
  * one (tokens live 15 minutes). Credentials come from the standard AWS chain (ECS task role,
  * instance role, web identity). Requires the optional `pg` and `@aws-sdk/rds-signer` peers.
  *
- * The server certificate is always verified, against the bundled Amazon RDS root certificates or the
+ * The server certificate is always verified, against the bundled Amazon RDS root certificates (GovCloud's for `us-gov-*`) or the
  * `ca` you give. The IAM token is a credential, so the preset never connects encrypted but
  * unverified unless `verifyServerCertificate: false` asks for it, and that logs a warning.
  */
@@ -14,7 +14,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
 import { redactSecrets } from "@storyshelf/core/utils";
 import { createPgDatabase } from "./pg.ts";
-import { RDS_CA_BUNDLE } from "./rds-ca-bundle.ts";
+import { caBundleFor } from "./rds-ca-bundle.ts";
 
 /** Anything that mints an RDS IAM token; `@aws-sdk/rds-signer`'s `Signer` fits, so does a fake. */
 export interface RdsTokenSigner {
@@ -84,7 +84,7 @@ function sslOf(options: RdsIamDatabaseOptions): {
   if (skipsVerification(options)) {
     return { rejectUnauthorized: false };
   }
-  return { ca: options.ca ?? RDS_CA_BUNDLE, rejectUnauthorized: true };
+  return { ca: options.ca ?? caBundleFor(options.region), rejectUnauthorized: true };
 }
 
 const UNVERIFIED_WARNING =
