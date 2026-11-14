@@ -16,6 +16,8 @@ export interface StorybookConfig {
   affectedOnly?: boolean;
   /** Append `--stats-json` to the build script when affected capture is on (default true). */
   buildStats?: boolean;
+  /** Record a commit that changed no story as a skipped build instead of uploading (default false). */
+  skipUnchanged?: boolean;
   /** Glob patterns excluded from affected tracing (union with `--untraced`). */
   untraced?: string[];
 }
@@ -85,7 +87,7 @@ const OPTIONAL_CONFIG_KEYS = [
 ] as const;
 
 /** Optional config keys with boolean values. */
-const BOOLEAN_CONFIG_KEYS = ["affectedOnly", "buildStats"] as const;
+const BOOLEAN_CONFIG_KEYS = ["affectedOnly", "buildStats", "skipUnchanged"] as const;
 
 /** Optional config keys with string-array values. */
 const STRING_ARRAY_CONFIG_KEYS = ["untraced"] as const;
@@ -185,8 +187,7 @@ function checkCrossFieldRules(
     return { ok: false, error: "buildCommand and buildScriptName are mutually exclusive" };
   }
   const { buildDir, buildCommand, buildScriptName, skip } = parts.values;
-  const affectedOnly = parts.flags["affectedOnly"];
-  const buildStats = parts.flags["buildStats"];
+  const { affectedOnly, buildStats, skipUnchanged } = parts.flags;
   const untraced = parts.lists["untraced"];
   return {
     ok: true,
@@ -199,6 +200,7 @@ function checkCrossFieldRules(
       ...(skip === undefined ? {} : { skip }),
       ...(affectedOnly === undefined ? {} : { affectedOnly }),
       ...(buildStats === undefined ? {} : { buildStats }),
+      ...(skipUnchanged === undefined ? {} : { skipUnchanged }),
       ...(untraced === undefined ? {} : { untraced }),
     },
   };
