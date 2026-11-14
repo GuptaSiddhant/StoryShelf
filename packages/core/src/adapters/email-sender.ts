@@ -11,7 +11,7 @@ export interface EmailMessage {
 }
 
 /**
- * Minimal email transport: implemented once in `@storyshelf/notify-email`,
+ * Minimal email transport: implemented once in `integrations/email` (the presets),
  * consumed by notification fan-out and (optionally) the auth engine for
  * invites and password resets. Best-effort delivery; throws on failure so
  * callers can log and continue.

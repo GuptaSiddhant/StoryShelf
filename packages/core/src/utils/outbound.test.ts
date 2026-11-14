@@ -106,6 +106,7 @@ describe("assertOutboundUrl", () => {
     expect((error as Error).message).not.toContain("10.1.2.3");
     expect((error as Error).message).not.toContain("secret-path");
     expect(outboundReasonText("address-not-public")).not.toMatch(/\d+\.\d+/u);
+    expect(outboundReasonText("address-not-public")).toContain("outbound.allowHosts");
   });
 
   it("lets an allowlisted exact host reach a private address, over http", async () => {

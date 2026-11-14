@@ -1,6 +1,6 @@
 /**
- * Optional observation hooks of the consumer. Core owns no metrics library (the single OTEL owner is
- * `@storyshelf/observability`); the app adapts these two callbacks to its instruments.
+ * Optional observation hooks of the consumer. Core owns no metrics SDK (instruments come from
+ * `@storyshelf/core/telemetry`); the app adapts these two callbacks to its instruments.
  */
 import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
 import type { Logger } from "../../logger.ts";

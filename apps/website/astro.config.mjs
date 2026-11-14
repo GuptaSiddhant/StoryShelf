@@ -176,6 +176,7 @@ export default defineConfig({
             { label: "Azure", slug: "guides/deployment/azure" },
             { label: "GCP", slug: "guides/deployment/gcp" },
             { label: "Cloud assembly", slug: "guides/deployment/cloud" },
+            { label: "Migrate a Terraform stack", slug: "guides/deployment/migrate-terraform" },
             { label: "Server configuration", slug: "guides/config" },
             { label: "Secret rotation", slug: "guides/deployment/secret-rotation" },
             { label: "Observability", slug: "guides/observability" },

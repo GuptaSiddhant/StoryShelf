@@ -25,7 +25,10 @@ const config: StorybookConfig = {
         replacement: here("./shims/sprite.ts"),
       },
       { find: /^(?:\.{1,2}\/)+store\.ts$/u, replacement: here("./shims/store.ts") },
-      { find: /^(?:sharp|unzipper|pngjs|graceful-fs)$/u, replacement: here("./shims/inert.ts") },
+      {
+        find: /^(?:sharp|unzipper|pngjs|graceful-fs|nodemailer)$/u,
+        replacement: here("./shims/inert.ts"),
+      },
       {
         find: /^node:(?:[a-z_]+(?:\/[a-z]+)?)$/u,
         replacement: here("./shims/node-builtins.ts"),

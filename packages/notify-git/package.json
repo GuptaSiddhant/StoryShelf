@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/notify-git",
   "version": "0.11.0",
-  "description": "Git notification providers for StoryShelf: commit statuses and pull-request comments on GitHub and GitLab.",
+  "description": "Deprecated: built into @storyshelf/core. Git notification providers for StoryShelf: commit statuses and pull-request comments on GitHub and GitLab.",
   "keywords": [
     "ci",
     "github",
@@ -54,8 +54,7 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "@storyshelf/core": "workspace:*",
-    "zod": "catalog:"
+    "@storyshelf/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

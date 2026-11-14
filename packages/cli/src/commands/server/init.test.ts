@@ -174,7 +174,11 @@ describe("runServerInit", () => {
   });
 
   it("writes the Terraform module stub with --cloud and rejects an unknown cloud", async () => {
-    vi.mocked(prompts).mockResolvedValueOnce({ name: "shelf", location: "us-east-1" });
+    vi.mocked(prompts).mockResolvedValueOnce({
+      name: "shelf",
+      location: "us-east-1",
+      allowedCidrBlocks: "10.0.0.0/8",
+    });
     await runServerInit({ cloud: "aws", dir: join(tmpRoot, "infra") });
     expect(existsSync(join(tmpRoot, "infra", "main.tf"))).toBe(true);
     await expect(runServerInit({ cloud: "fly" })).rejects.toThrow("Unknown --cloud");

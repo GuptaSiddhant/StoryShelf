@@ -198,5 +198,14 @@ export async function checkOutboundUrl(
 
 /** User-facing text for a refusal reason, safe to show in a form. */
 export function outboundReasonText(reason: OutboundReason): string {
-  return `URL refused: ${MESSAGES[reason]}`;
+  const hint = OPERATOR_HINTS[reason];
+  return `URL refused: ${MESSAGES[reason]}${hint ? `. ${hint}` : ""}`;
 }
+
+/** What the operator can change; shown beside the refusal so a project admin knows who to ask. */
+const OPERATOR_HINTS: Partial<Record<OutboundReason, string>> = {
+  "scheme-not-https":
+    "Use an https URL, or ask the operator to allow this host in the outbound.allowHosts setting",
+  "address-not-public":
+    "A private host is refused unless the operator adds its exact hostname to the outbound.allowHosts setting",
+};

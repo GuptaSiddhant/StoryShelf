@@ -89,3 +89,61 @@ jobs:
       - name: Run S3 suites (hermetic + live)
         # --force: live results must never come from the turbo cache.
         run: nubx turbo test --filter='@storyshelf/storage-s3' --force
+
+  # The customer path (#891, ADR 0050): apply the AWS module's `examples/minimal` with the current
+  # release image, smoke-test the running stack, destroy it. Real AWS, billed: it runs only when the
+  # repository variable LIVE_AWS_MODULE_APPLY is "1", which stays off until the image reads the
+  # rds-iam variables the module sets (see the module README, "Image contract"). Uses the same AWS
+  # secrets as live-s3. Destroy runs even when the apply or the smoke test fails.
+  module-apply:
+    runs-on: ubuntu-latest
+    if: ${{ vars.LIVE_AWS_MODULE_APPLY == '1' }}
+    timeout-minutes: 60
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      # Unique per run (the module caps a name at 20 characters), so runs never collide.
+      TF_VAR_name: shelf-ci-${{ github.run_id }}
+      TF_VAR_region: ${{ secrets.AWS_REGION }}
+    defaults:
+      run:
+        working-directory: deploy/terraform/aws/examples/minimal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+          terraform_wrapper: false
+
+      - name: Resolve the current release image
+        run: |
+          set -e
+          tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)
+          echo "TF_VAR_image_version=${tag#v}" >> "$GITHUB_ENV"
+          echo "applying the module with image ${tag#v}"
+
+      - name: Apply
+        run: |
+          set -e
+          terraform init -input=false
+          terraform apply -input=false -auto-approve
+
+      - name: Smoke test the stack
+        run: |
+          set -e
+          url=$(terraform output -raw url)
+          for _ in $(seq 1 60); do
+            if curl -fsS "$url/api/v1/health" >/dev/null; then break; fi
+            sleep 15
+          done
+          SMOKE_BASE_URL="$url" bash "$GITHUB_WORKSPACE/scripts/smoke.sh"
+
+      - name: Destroy
+        if: ${{ always() }}
+        run: terraform destroy -input=false -auto-approve

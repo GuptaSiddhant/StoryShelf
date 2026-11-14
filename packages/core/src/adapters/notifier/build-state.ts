@@ -41,6 +41,12 @@ export interface BuildStateBuild {
   changedCount: number;
   approvedCount: number;
   rejectedCount: number;
+  /** The branch the uploader named; with {@link BuildStateBuild.branchVerified} it explains a refused claim. */
+  gitBranch?: string | undefined;
+  /** Whether the build counts as a default-branch build (`defaultBranchStanding`). */
+  isDefault?: boolean | undefined;
+  /** The git host's answer to a default-branch claim; null or absent when nothing was claimed. */
+  branchVerified?: string | null | undefined;
 }
 
 /** The part of a snapshot row the annotations read. */
@@ -247,9 +253,10 @@ const CANCELLED: Outcome = { state: "cancelled", description: "Cancelled" };
 function testingOutcome(build: BuildStateBuild): Outcome {
   switch (build.status) {
     case "reviewing": {
+      const why = unconfirmedClaim(build);
       return {
         state: "pending",
-        description: `Review open: ${plural(openCount(build), "change")} to review`,
+        description: `${why ?? "Review open"}: ${plural(openCount(build), "change")} to review`,
       };
     }
     case "approved": {
@@ -269,6 +276,32 @@ function testingOutcome(build: BuildStateBuild): Outcome {
     }
     default: {
       return { state: "pending", description: "Capturing and comparing screenshots" };
+    }
+  }
+}
+
+/**
+ * Why a build that names the default branch is reviewed like a feature branch (ADR 0009, amendment
+ * 2026-11-13): the git host said the commit is not on it, could not answer, or no channel could
+ * check. Null when the build claims nothing or the claim counts.
+ */
+function unconfirmedClaim(build: BuildStateBuild): string | null {
+  if (build.isDefault !== false || (build.branchVerified ?? null) === null) {
+    return null;
+  }
+  const branch = build.gitBranch ?? "the default branch";
+  switch (build.branchVerified) {
+    case "refused": {
+      return `Commit is not on ${branch}`;
+    }
+    case "unreachable": {
+      return `Git host could not confirm ${branch}`;
+    }
+    case "unverified": {
+      return "Default branch not verified";
+    }
+    default: {
+      return null;
     }
   }
 }

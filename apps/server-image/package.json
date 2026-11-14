@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/rds-signer": "^3.0.0",
     "@hono/node-server": "catalog:",
     "@storyshelf/app": "workspace:*",
     "@storyshelf/auth": "workspace:*",
@@ -17,12 +18,11 @@
     "@storyshelf/db-mysql": "workspace:*",
     "@storyshelf/db-postgres": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
-    "@storyshelf/notify-chat": "workspace:*",
-    "@storyshelf/notify-email": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
     "@storyshelf/storage-s3": "workspace:*",
+    "pg": "^8.0.0",
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {

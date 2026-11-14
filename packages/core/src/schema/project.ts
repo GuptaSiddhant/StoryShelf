@@ -39,6 +39,12 @@ export interface Project {
   /** Approvals a build needs when `testing` is off (ADR 0013, decision 3); default 1. */
   reviewApprovals?: number;
   /**
+   * A build claiming the default branch counts as one only once a git channel confirmed the commit
+   * is on it (ADR 0009, amendment 2026-11-13); the column defaults to true. Off, a claim no channel
+   * can check counts as before and is shown as unverified.
+   */
+  requireVerifiedDefault?: boolean;
+  /**
    * Lifetime in seconds of the signed Storybook URLs of this project's renders (ADR 0007,
    * decision 5); null derives it from the build's stories.
    */

@@ -1,4 +1,4 @@
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel, SiteSettingsModel } from "@storyshelf/core/models";
 import { CONTENT_BACKFILL_KEY } from "@storyshelf/core/retention";
@@ -49,7 +49,7 @@ function boot(
   } as unknown as ServerRuntime;
   runBootTasks(
     cell,
-    { database: db } as unknown as ShelfOptions,
+    { database: db } as unknown as ResolvedShelfOptions,
     runtime,
     extra.buildState as never,
   );
@@ -121,7 +121,7 @@ async function replay(extra: Parameters<typeof boot>[1], ok = true) {
   };
   runBootTasks(
     cell,
-    { database: db } as unknown as ShelfOptions,
+    { database: db } as unknown as ResolvedShelfOptions,
     {
       config: {},
       logger,
@@ -183,7 +183,7 @@ describe("runBootTasks: content uses backfill", () => {
       notifiers: [],
       publicOrigin: { url: async () => await Promise.resolve("") },
     } as unknown as ServerRuntime;
-    runBootTasks(cell, { database: db, storage } as unknown as ShelfOptions, runtime);
+    runBootTasks(cell, { database: db, storage } as unknown as ResolvedShelfOptions, runtime);
     await Promise.all(cell.background ?? []);
     return { record, list, db };
   }

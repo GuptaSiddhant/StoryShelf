@@ -1,7 +1,7 @@
+import { createFigmaDesign } from "@storyshelf/core/integrations";
 import { DesignCredentialModel, DesignModel, MemberModel } from "@storyshelf/core/models";
 import type { DesignNode } from "@storyshelf/core/schema";
 import { createLatch, makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -579,6 +579,7 @@ async function bare() {
     storage,
     logger: pino({ level: "silent" }),
     config: { secret: SECRET },
+    design: false,
   });
   return { app, design: new DesignModel(db, []) };
 }

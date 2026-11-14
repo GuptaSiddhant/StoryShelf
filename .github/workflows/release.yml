@@ -313,6 +313,16 @@ jobs:
           fi
           cat release-body.md
 
+      - name: Package the Terraform modules (#891)
+        # The same files the git source `deploy/terraform/<cloud>?ref=<tag>` serves, for installs
+        # that cannot reach GitHub from Terraform. `.terraform` and state never ship.
+        run: |
+          set -e
+          version="${RELEASE_TAG#v}"
+          tar --exclude='.terraform' --exclude='*.tfstate*' --exclude='.terraform.lock.hcl' \
+            -czf "storyshelf-terraform-${version}.tar.gz" deploy/terraform
+          tar -tzf "storyshelf-terraform-${version}.tar.gz" | head -20
+
       - name: Create GitHub Release
         # Updates the release when a re-run finds it.
         uses: softprops/action-gh-release@v2
@@ -320,6 +330,7 @@ jobs:
           tag_name: ${{ needs.detect.outputs.tag }}
           body_path: release-body.md
           generate_release_notes: false
+          files: storyshelf-terraform-*.tar.gz
 
   # The website and the Fly demo follow stable releases only (ADR 0043, amendments 2026-11-10 and
   # 2026-11-11). They run after the tag exists and the image is pushed, so the site builds from the

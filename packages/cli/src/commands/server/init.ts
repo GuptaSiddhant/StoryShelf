@@ -29,7 +29,8 @@ export interface ServerInitOptions {
  */
 export async function runServerInit(options: ServerInitOptions): Promise<void> {
   if (options.cloud !== undefined) {
-    return await initCloud(options.cloud, options.dir);
+    await initCloud(options.cloud, options.dir);
+    return;
   }
   const answers = await collectAnswers();
   if (answers === null) {

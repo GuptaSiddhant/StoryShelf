@@ -50,6 +50,9 @@ export class ProjectModel {
       ...(input.playTimeoutMs === undefined ? {} : { playTimeoutMs: input.playTimeoutMs }),
       ...(input.reviewEnabled === undefined ? {} : { reviewEnabled: input.reviewEnabled }),
       ...(input.reviewApprovals === undefined ? {} : { reviewApprovals: input.reviewApprovals }),
+      ...(input.requireVerifiedDefault === undefined
+        ? {}
+        : { requireVerifiedDefault: input.requireVerifiedDefault }),
       createdAt: now,
       updatedAt: now,
     })) as unknown as Project;
@@ -148,4 +151,6 @@ export interface ProjectCreateInput {
   reviewEnabled?: boolean;
   /** Approvals a build needs with `testing` off (column default 1 when omitted). */
   reviewApprovals?: number;
+  /** A default-branch claim needs a git channel's confirmation (column default true when omitted). */
+  requireVerifiedDefault?: boolean;
 }

@@ -53,8 +53,11 @@ describe("generateTfvars", () => {
   it("writes the answers, and the project only for GCP", () => {
     const answers = { dir: ".", name: "shelf", location: "eu-west-1", projectId: "p" };
     expect(generateTfvars("aws", answers)).toBe(
-      'name = "shelf"\nregion = "eu-west-1"\ndomain_name = ""\n',
+      'name = "shelf"\nregion = "eu-west-1"\ndomain_name = ""\nallowed_cidr_blocks = []\n',
     );
+    expect(
+      generateTfvars("aws", { ...answers, allowedCidrBlocks: "10.0.0.0/8, 1.2.3.0/24" }),
+    ).toContain('allowed_cidr_blocks = ["10.0.0.0/8","1.2.3.0/24"]');
     expect(generateTfvars("gcp", answers)).toContain('project_id = "p"');
     expect(generateTfvars("azure", answers)).toContain('location = "eu-west-1"');
   });
@@ -62,7 +65,11 @@ describe("generateTfvars", () => {
 
 describe("runCloudInit", () => {
   it("writes main.tf and terraform.tfvars", async () => {
-    vi.mocked(prompts).mockResolvedValueOnce({ name: "shelf", location: "us-east-1" });
+    vi.mocked(prompts).mockResolvedValueOnce({
+      name: "shelf",
+      location: "us-east-1",
+      allowedCidrBlocks: "10.0.0.0/8, 192.168.0.0/16",
+    });
     const dir = join(root, "infra");
     await runCloudInit("aws", dir);
     expect(readFileSync(join(dir, "main.tf"), "utf8")).toContain("?ref=v0.12.0");
@@ -75,12 +82,19 @@ describe("runCloudInit", () => {
     await runCloudInit("aws", join(root, "a"));
     vi.mocked(prompts).mockResolvedValueOnce({ name: "shelf", location: "us-central1" });
     await runCloudInit("gcp", join(root, "b"));
+    vi.mocked(prompts).mockResolvedValueOnce({ name: "shelf", location: "us-east-1" });
+    await runCloudInit("aws", join(root, "c"));
+    expect(existsSync(join(root, "c"))).toBe(false);
     expect(existsSync(join(root, "a"))).toBe(false);
     expect(existsSync(join(root, "b"))).toBe(false);
   });
 
   it("does not overwrite an existing main.tf", async () => {
-    vi.mocked(prompts).mockResolvedValue({ name: "shelf", location: "us-east-1" });
+    vi.mocked(prompts).mockResolvedValue({
+      name: "shelf",
+      location: "us-east-1",
+      allowedCidrBlocks: "10.0.0.0/8, 192.168.0.0/16",
+    });
     const dir = join(root, "infra");
     await runCloudInit("aws", dir);
     await runCloudInit("aws", dir);

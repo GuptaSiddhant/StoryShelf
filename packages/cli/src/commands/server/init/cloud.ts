@@ -24,6 +24,8 @@ export interface CloudAnswers {
   projectId?: string;
   /** The public domain; empty leaves the stack on the cloud's default hostname. */
   domainName?: string;
+  /** The IPv4 CIDR ranges allowed to reach the AWS load balancer, comma-separated; AWS only. */
+  allowedCidrBlocks?: string;
 }
 
 const REPOSITORY = "git::https://github.com/GuptaSiddhant/StoryShelf.git";
@@ -37,7 +39,8 @@ const LOCATION: Record<Cloud, { variable: string; message: string; initial: stri
 /** The `main.tf` that pins the module at the CLI's own release tag. */
 export function generateMainTf(cloud: Cloud, version: string): string {
   const { variable } = LOCATION[cloud];
-  const inputs = ["name", variable, ...(cloud === "gcp" ? ["project_id"] : []), "domain_name"];
+  const extra = cloud === "gcp" ? ["project_id"] : cloud === "aws" ? ["allowed_cidr_blocks"] : [];
+  const inputs = ["name", variable, ...extra, "domain_name"];
   const lines = [
     `module "storyshelf" {`,
     `  source        = "${REPOSITORY}//deploy/terraform/${cloud}?ref=v${version}"`,
@@ -48,7 +51,8 @@ export function generateMainTf(cloud: Cloud, version: string): string {
   ];
   for (const input of inputs) {
     const optional = input === "domain_name" ? ['  default     = ""'] : [];
-    lines.push(`variable "${input}" {`, `  type = string`, ...optional, `}`, ``);
+    const type = input === "allowed_cidr_blocks" ? "list(string)" : "string";
+    lines.push(`variable "${input}" {`, `  type = ${type}`, ...optional, `}`, ``);
   }
   lines.push(`output "url" {`, `  value = module.storyshelf.url`, `}`, ``);
   return lines.join("\n");
@@ -62,10 +66,19 @@ export function generateTfvars(cloud: Cloud, answers: CloudAnswers): string {
     ["project_id", cloud === "gcp" ? answers.projectId : undefined],
     ["domain_name", answers.domainName ?? ""],
   ];
+  const cidrs = cloud === "aws" ? splitList(answers.allowedCidrBlocks) : undefined;
   return `${lines
     .filter((line): line is [string, string] => line[1] !== undefined)
     .map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
+    .concat(cidrs ? [`allowed_cidr_blocks = ${JSON.stringify(cidrs)}`] : [])
     .join("\n")}\n`;
+}
+
+function splitList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 async function collect(cloud: Cloud, dir: string | undefined): Promise<CloudAnswers | null> {
@@ -76,9 +89,23 @@ async function collect(cloud: Cloud, dir: string | undefined): Promise<CloudAnsw
     ...(cloud === "gcp"
       ? [{ type: "text" as const, name: "projectId", message: "GCP project ID?" }]
       : []),
+    ...(cloud === "aws"
+      ? [
+          {
+            type: "text" as const,
+            name: "allowedCidrBlocks",
+            message: "CIDR ranges allowed to reach the load balancer? (comma-separated)",
+          },
+        ]
+      : []),
     { type: "text", name: "domainName", message: "Public domain? (empty skips DNS)", initial: "" },
   ])) as Partial<CloudAnswers>;
-  if (!answers.name || !answers.location || (cloud === "gcp" && !answers.projectId)) {
+  if (
+    !answers.name ||
+    !answers.location ||
+    (cloud === "gcp" && !answers.projectId) ||
+    (cloud === "aws" && splitList(answers.allowedCidrBlocks).length === 0)
+  ) {
     printError("Cancelled.");
     return null;
   }

@@ -1,4 +1,4 @@
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
@@ -27,7 +27,7 @@ describe("attachLifecycle", () => {
       database: fakeAdapter("postgres", setLoggerDb),
       storage: fakeAdapter("local"),
       captureRunner: fakeAdapter("sqs", setLoggerQueue),
-    } as unknown as ShelfOptions;
+    } as unknown as ResolvedShelfOptions;
     const runtime = {
       config: { branchTtlDays: null },
       logger: silentLogger,
@@ -55,7 +55,7 @@ describe("attachLifecycle", () => {
     const options = {
       database: db,
       storage: broken,
-    } as unknown as ShelfOptions;
+    } as unknown as ResolvedShelfOptions;
     const runtime = {
       config: { branchTtlDays: null },
       logger: silentLogger,
@@ -95,7 +95,7 @@ describe("attachLifecycle", () => {
         createSession: async () => "",
         destroySession: async () => {},
       },
-    } as unknown as ShelfOptions;
+    } as unknown as ResolvedShelfOptions;
     const runtime = {
       config: { branchTtlDays: null },
       logger: silentLogger,
@@ -125,7 +125,7 @@ function boot(torn: string[]) {
   const options = {
     database: closing("db"),
     storage: closing("storage"),
-  } as unknown as ShelfOptions;
+  } as unknown as ResolvedShelfOptions;
   const runtime = {
     config: { branchTtlDays: null },
     logger: silentLogger,
@@ -194,7 +194,7 @@ function fakeConsumer() {
 function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage } as unknown as ShelfOptions;
+  const options = { database: db, storage } as unknown as ResolvedShelfOptions;
   const runtime = {
     config: { branchTtlDays: null },
     logger: silentLogger,
@@ -228,7 +228,7 @@ describe("setup rerun", () => {
         if (calls > 1) await hold.promise;
       },
     };
-    const options = { database: db, storage } as unknown as ShelfOptions;
+    const options = { database: db, storage } as unknown as ResolvedShelfOptions;
     const runtime = {
       config: { branchTtlDays: null },
       logger: silentLogger,

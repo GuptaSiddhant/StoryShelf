@@ -1,5 +1,3 @@
-/** The browser loop: one partition + render pass per engine, sequentially. */
-import { currentImageEngine } from "@storyshelf/image";
 import type { Logger } from "pino";
 import type {
   CaptureRunner,
@@ -10,6 +8,8 @@ import type {
 import { TargetLaunchError } from "../adapters/capture-target.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+/** The browser loop: one partition + render pass per engine, sequentially. */
+import { currentImageEngine } from "../diff/index.ts";
 import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureLogLevel } from "../schema/capture-attempt.ts";

@@ -4,16 +4,17 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { chatNotifiers } from "@storyshelf/notify-chat";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 /**
  * The StoryShelf product image's server (`docker run ghcr.io/guptasiddhant/storyshelf`).
  *
- * Everything comes from the environment: `DATABASE_URL` (SQLite on `/data` when unset), `AWS_BUCKET`
+ * Everything comes from the environment: `DATABASE_URL`, or `DATABASE_IAM_HOST` + `DATABASE_IAM_USER` +
+ * `DATABASE_IAM_NAME` + `DATABASE_IAM_REGION` for RDS IAM login (SQLite on `/data` when neither is set),
+ * `DATABASE_POOL_MAX`, `AWS_BUCKET`
  * (local storage on `/data` when unset), `SECRET`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`,
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
  * unless set) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Bundled by
@@ -44,7 +45,8 @@ const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 shelfLogger.info({ ...databaseLog, ...storageLog }, "adapters");
 
-const emailSender = smtpPresetFromEnv(env, shelfLogger);
+// Every built-in integration is registered (ADR 0049); with SMTP_* set the `email` notifier sends through it.
+const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
@@ -54,10 +56,14 @@ const app = createShelfApp({
   storage,
   ...(testing ? { testing } : {}),
   notifications: {
-    notifiers: [
-      ...chatNotifiers,
-      ...(emailSender ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })] : []),
-    ],
+    notifiers: (builtIn) =>
+      emailSender
+        ? builtIn.map((provider) =>
+            provider.metadata.kind === "email"
+              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+              : provider,
+          )
+        : builtIn,
   },
   auth:
     authPassword && secret

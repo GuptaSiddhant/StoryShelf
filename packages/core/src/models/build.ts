@@ -5,7 +5,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import { columnsExcept } from "../adapters/database.ts";
 import { allowedFrom, enteringFrom } from "../lifecycle/build-lifecycle.ts";
 import type { Logger } from "../logger.ts";
-import type { Build } from "../schema/build.ts";
+import type { BranchVerification, Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
@@ -585,6 +585,22 @@ export class BuildModel {
    * Store the results of the build's `.test()` entries (`TestResult[]`, as JSON), or clear them
    * with null. Written once per capture run, by the run that ran the tests.
    */
+  /**
+   * Record whether the build counts as a default-branch build and the git host's answer that
+   * decided it (`defaultBranchStanding`). The capture job writes it before anything reads
+   * `isDefault`, so every later reader (shards, review, re-diff) sees the standing, not the claim.
+   */
+  async setBranchStanding(
+    id: string,
+    standing: { isDefault: boolean; verification: BranchVerification | null },
+  ): Promise<Build> {
+    return (await this.db.update(this.tables.builds, id, {
+      isDefault: standing.isDefault,
+      branchVerified: standing.verification,
+      updatedAt: new Date().toISOString(),
+    })) as unknown as Build;
+  }
+
   async setTestResults(id: string, results: readonly unknown[] | null): Promise<Build> {
     return (await this.db.update(this.tables.builds, id, {
       testResults: results === null ? null : JSON.stringify(results),

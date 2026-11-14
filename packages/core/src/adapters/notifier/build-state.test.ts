@@ -370,3 +370,45 @@ describe("statusesForBuild: progress and annotations", () => {
     expect(gate(review)?.annotations).toBeUndefined();
   });
 });
+
+/** A reviewing build that named `main`, with the host's answer and its standing. */
+const claim = (branchVerified: string | null, isDefault = false) => ({
+  status: "reviewing",
+  gitBranch: "main",
+  isDefault,
+  branchVerified,
+});
+
+describe("statusesForBuild: a default-branch claim that did not count (#910)", () => {
+  it.each([
+    ["refused", "Commit is not on main: 3 changes to review"],
+    ["unreachable", "Git host could not confirm main: 3 changes to review"],
+    ["unverified", "Default branch not verified: 3 changes to review"],
+  ])("says why a %s claim waits for review, and never passes", (verification, description) => {
+    const status = gate(run({ build: claim(verification) }));
+    expect(status).toMatchObject({ state: "pending", description });
+  });
+
+  it("reads like any review for a verified or unclaimed build", () => {
+    expect(gate(run({ build: claim("verified", true) }))?.description).toBe(
+      "Review open: 3 changes to review",
+    );
+    expect(gate(run({ build: claim(null) }))?.description).toBe("Review open: 3 changes to review");
+  });
+
+  it("says nothing more for an unverified claim the project counts", () => {
+    expect(gate(run({ build: claim("unverified", true) }))?.description).toBe(
+      "Review open: 3 changes to review",
+    );
+  });
+
+  it("passes only after an approver accepted the changes", () => {
+    const status = gate(
+      run({ build: { ...claim("refused"), status: "approved", approvedCount: 4 } }),
+    );
+    expect(status).toMatchObject({
+      state: "success",
+      description: "Review closed: 4 changes approved",
+    });
+  });
+});

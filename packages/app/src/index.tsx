@@ -10,24 +10,20 @@ import {
   resolveShelfOptions,
   sequentialTransactionsWarning,
 } from "@storyshelf/core/config";
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions, ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
+/**
+ * StoryShelf app: compose database, storage, capture, auth, and notifier
+ * adapters into a complete self-hosted visual-testing Hono app.
+ */
+import { createInstrumentedDatabase, createInstrumentedStorage } from "@storyshelf/core/telemetry";
 import {
   configureOutbound,
   STORYBOOK_EXCHANGE_PREFIX,
   STORYBOOK_READ_PREFIX,
   STORYBOOK_TOKEN_PREFIX,
 } from "@storyshelf/core/utils";
-/**
- * StoryShelf app: compose database, storage, capture, auth, and notifier
- * adapters into a complete self-hosted visual-testing Hono app.
- */
-import {
-  createHttpMiddleware,
-  createInstrumentedDatabase,
-  createInstrumentedStorage,
-} from "@storyshelf/observability";
 import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
@@ -36,6 +32,7 @@ import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import { createClientIpResolver } from "./middleware/client-ip.ts";
 import { compression } from "./middleware/compression.ts";
+import { createHttpMiddleware } from "./middleware/http-telemetry.ts";
 import {
   authGate,
   notFoundPage,
@@ -93,7 +90,7 @@ import { resolveRuntime, type ServerRuntime } from "./runtime.ts";
  * Fail fast on third-party adapters that cannot satisfy their slot.
  * Throws before any route or lifecycle hook runs.
  */
-function throwOnInvalidAdapters(options: ShelfOptions): void {
+function throwOnInvalidAdapters(options: ResolvedShelfOptions): void {
   const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length > 0) {
     throw new AdapterLifecycleError("setup", invalid, true);
@@ -101,7 +98,7 @@ function throwOnInvalidAdapters(options: ShelfOptions): void {
 }
 
 /** Request/capture-path adapters with OTEL wrappers (lifecycle keeps raw ones). */
-function instrumentedOptions(options: ShelfOptions): ShelfOptions {
+function instrumentedOptions(options: ResolvedShelfOptions): ResolvedShelfOptions {
   return {
     ...options,
     database: createInstrumentedDatabase(options.database),
@@ -110,7 +107,11 @@ function instrumentedOptions(options: ShelfOptions): ShelfOptions {
 }
 
 /** Wire the job queue, its handlers and its consumer, and run the boot tasks that need them. */
-function wireQueues(scoped: ShelfOptions, runtime: ServerRuntime, cell: LifecycleCell): JobsWiring {
+function wireQueues(
+  scoped: ResolvedShelfOptions,
+  runtime: ServerRuntime,
+  cell: LifecycleCell,
+): JobsWiring {
   const jobs = setupJobs(scoped, runtime);
   cell.consumer = jobs.consumer;
   runBootTasks(cell, scoped, runtime, jobs.buildState);
@@ -121,7 +122,7 @@ function wireQueues(scoped: ShelfOptions, runtime: ServerRuntime, cell: Lifecycl
  * Serverless check (ADR 0006, decision 3): throws on AWS Lambda, warns on Vercel and Netlify. Only
  * an instance with `testing` needs a process that outlives the request.
  */
-function warnOnServerless(options: ShelfOptions, logger: Logger): void {
+function warnOnServerless(options: ResolvedShelfOptions, logger: Logger): void {
   const warning = assertServerless(options.testing?.runner !== undefined);
   if (warning) {
     logger.warn(warning);
@@ -138,7 +139,11 @@ function warnOnServerless(options: ShelfOptions, logger: Logger): void {
 }
 
 /** Attach lifecycle, queue, middleware, routes, and docs to the app. */
-function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions): void {
+function assembleApp(
+  app: ShelfApp,
+  options: ResolvedShelfOptions,
+  scoped: ResolvedShelfOptions,
+): void {
   const runtime = resolveRuntime(options);
   warnOnServerless(options, runtime.logger);
   const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
@@ -294,7 +299,7 @@ const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] 
 const DEFAULT_STORYBOOK_URL_RATE_LIMIT = 6000;
 
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
-function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOptions): void {
+function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ResolvedShelfOptions): void {
   // One resolver for every bucket: a forwarded header counts only from a trusted proxy (#911).
   const clientIp = createClientIpResolver(config.trustProxy);
   const rateLimit = createRateLimiter(clientIp);
@@ -398,7 +403,7 @@ function registerNotificationRoutes(app: ShelfRouter): void {
 }
 
 /** Register the auth flow: engine mount, relying-party documents, profile. */
-function registerAuthFlow(app: ShelfRouter, options: ShelfOptions): void {
+function registerAuthFlow(app: ShelfRouter, options: ResolvedShelfOptions): void {
   // Auth-gated pages mount only with auth: authEnabled=false mounts zero
   // auth routes. Static imports stay — true lazy loading would need an async
   // createShelfApp, which the sync Hono assembly cannot do.
@@ -418,7 +423,11 @@ function registerTokenStorybook(app: ShelfRouter): void {
 }
 
 /** Register HTML pages, assets, and the optional auth flow. */
-function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
+function registerPageRoutes(
+  app: ShelfRouter,
+  options: ResolvedShelfOptions,
+  health: HealthDeps,
+): void {
   registerAuthFlow(app, options);
   registerAssets(app);
   registerStorybook(app);
@@ -434,7 +443,7 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
 /** Register every API router and page set, then the error answers that cover them. */
 function registerAllRoutes(
   app: ShelfRouter,
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   health: HealthDeps,
   logger: Logger,
 ): void {
@@ -517,6 +526,7 @@ function registerDocs(app: ShelfRouter): void {
 export { createAuthSystemHook } from "./notify.ts";
 export type {
   ShelfOptions,
+  ResolvedShelfOptions,
   ShelfTestingOptions,
   ShelfCompareOptions,
   ShelfNotificationsOptions,
