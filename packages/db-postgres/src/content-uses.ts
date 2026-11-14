@@ -66,7 +66,9 @@ export async function recordContentUses(
     const now = new Date().toISOString();
     const uses = JSON.stringify(distinct.map((hash) => ({ hash, size: sizes?.get(hash) ?? null })));
     await tx.query(sql`INSERT INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
-      SELECT ${buildId}, use->>'hash', ${projectId}, ${instant(now)}, (use->>'size')::bigint
+      SELECT ${buildId}, use->>'hash', ${projectId}, ${instant(now)},
+        COALESCE((use->>'size')::bigint,
+          (SELECT MAX(size_bytes) FROM content_uses WHERE content_hash = use->>'hash'))
       FROM jsonb_array_elements(${uses}::jsonb) AS use
       ON CONFLICT DO NOTHING`);
     return [];

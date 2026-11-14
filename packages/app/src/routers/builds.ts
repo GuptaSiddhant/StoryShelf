@@ -82,6 +82,7 @@ async function recordUses(
   projectId: string,
   buildId: string,
   files: readonly { hash: string }[],
+  sizes?: ReadonlyMap<string, number>,
 ): Promise<void> {
   try {
     await recordContentUses(
@@ -89,6 +90,8 @@ async function recordUses(
       getStore().storage,
       { projectId, buildId },
       files.map((file) => file.hash),
+      undefined,
+      sizes,
     );
   } catch (error) {
     if (!(error instanceof ContentCollectingError)) throw error;
@@ -219,6 +222,12 @@ export function registerBuilds(app: ShelfRouter): void {
         // oxlint-disable-next-line no-await-in-loop -- one write at a time keeps the order stable
         await getStore().storage.write(contentKey(hash), buffer);
       }
+      await recordUses(
+        project.id,
+        buildId,
+        files,
+        new Map(files.map(({ hash, buffer }) => [hash, buffer.length])),
+      );
     } else {
       // Single content upload via PUT with hash header
       const hash = c.req.header("x-content-hash") ?? "";
@@ -226,6 +235,7 @@ export function registerBuilds(app: ShelfRouter): void {
       const buffer = Buffer.from(await c.req.arrayBuffer());
       refuseMismatch(hash, buffer);
       await getStore().storage.write(contentKey(hash), buffer);
+      await recordUses(project.id, buildId, [{ hash }], new Map([[hash, buffer.length]]));
     }
     return c.json({ ok: true });
   });

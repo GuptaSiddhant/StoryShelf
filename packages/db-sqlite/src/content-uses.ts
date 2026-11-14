@@ -30,12 +30,13 @@ export async function recordContentUses(
     if (refused.length > 0) return await Promise.resolve(refused);
     clearAbandonedClaims(db, distinct, staleBefore);
     const insert = db.prepare(
+      // No size given: take the one another use of the same blob already recorded (never a blob read).
       `INSERT OR IGNORE INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
-       VALUES (?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, COALESCE(?, (SELECT MAX(size_bytes) FROM content_uses WHERE content_hash = ?)))`,
     );
     const now = new Date().toISOString();
     for (const hash of distinct)
-      insert.run(buildId, hash, projectId, now, sizes?.get(hash) ?? null);
+      insert.run(buildId, hash, projectId, now, sizes?.get(hash) ?? null, hash);
     return await Promise.resolve([]);
   });
 }
