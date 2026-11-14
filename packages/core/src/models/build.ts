@@ -80,7 +80,9 @@ export class BuildModel {
    * every skipped build of its project, branch and commit that is not yet replaced by setting its
    * `supersededByBuildId` (ADR 0044, decision 4). A failure while replacing rolls the insert back,
    * so no normal build is left behind. Returns the new build and the skipped builds it replaced;
-   * the caller announces after the commit.
+   * the caller announces after the commit. On an adapter without a real rollback (Neon HTTP, or
+   * one with no `transact`) a failed supersede can leave the inserted build, as the create path
+   * already does; the architect accepted that limit.
    */
   async createSuperseding(
     projectId: string,
