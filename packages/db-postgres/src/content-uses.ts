@@ -65,11 +65,20 @@ export async function recordContentUses(
     await clearAbandonedClaims(tx, distinct, staleBefore);
     const now = new Date().toISOString();
     const uses = JSON.stringify(distinct.map((hash) => ({ hash, size: sizes?.get(hash) ?? null })));
-    await tx.query(sql`INSERT INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
-      SELECT ${buildId}, use->>'hash', ${projectId}, ${instant(now)},
-        COALESCE((use->>'size')::bigint,
-          (SELECT MAX(size_bytes) FROM content_uses WHERE content_hash = use->>'hash'))
-      FROM jsonb_array_elements(${uses}::jsonb) AS use
+    // A blob of unknown size takes the size another use of it recorded. That is one aggregate joined
+    // once, never a subquery per row: a per-row subquery is planned from the table's statistics, and
+    // when an analyze saw only a few rows (a hash shared by several builds) it scans the whole table
+    // for each of tens of thousands of hashes, which ran for minutes in `postgres-lifecycle` (#1067).
+    await tx.query(sql`WITH incoming AS MATERIALIZED (
+        SELECT use->>'hash' AS hash, (use->>'size')::bigint AS size
+        FROM jsonb_array_elements(${uses}::jsonb) AS use),
+      known AS (
+        SELECT content_hash, MAX(size_bytes) AS size FROM content_uses
+        WHERE size_bytes IS NOT NULL AND content_hash IN (SELECT hash FROM incoming)
+        GROUP BY content_hash)
+      INSERT INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
+      SELECT ${buildId}, incoming.hash, ${projectId}, ${instant(now)}, COALESCE(incoming.size, known.size)
+      FROM incoming LEFT JOIN known ON known.content_hash = incoming.hash
       ON CONFLICT DO NOTHING`);
     return [];
   });
