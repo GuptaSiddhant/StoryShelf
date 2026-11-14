@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS builds (
   review_requested_cycle INT,
   capture_job_id VARCHAR(26),
   skipped_from_build_id VARCHAR(26),
+  superseded_by_build_id VARCHAR(26),
+  idempotency_key VARCHAR(191),
   manifest_sha256 VARCHAR(64),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,

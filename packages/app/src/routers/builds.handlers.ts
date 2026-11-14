@@ -53,6 +53,8 @@ export async function createBuildRecord(
   if (meta.labels && meta.labels.length > 0) {
     await attachLabels(db, project.id, build.id, meta.labels);
   }
+  // A skipped build of this commit left by a lost response is replaced (ADR 0044, decision 4).
+  await new BuildModel(db).supersedeSkipped(project.id, meta.gitBranch, meta.gitSha, build.id);
   await emitWebhookEvent(
     db,
     { webhooks: getStore().db.tables.webhooks },
@@ -301,6 +303,9 @@ export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver",
 /** Roles permitted to approve or reject snapshots and delete builds. */
 export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 
+/** Labels on a build, validated the same way on normal and skipped creation. */
+export const buildLabelsSchema = z.array(z.object({ key: z.string().min(1), value: z.string() }));
+
 /** JSON input schema for creating a build before streaming its bundle. */
 export const buildCreateJsonSchema = z
   .object({
@@ -310,7 +315,7 @@ export const buildCreateJsonSchema = z
     authorName: z.string().optional(),
     message: z.string().optional(),
     affectedOnly: z.boolean().optional(),
-    labels: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
+    labels: buildLabelsSchema.optional(),
   })
   .openapi("BuildCreate");
 
@@ -340,7 +345,7 @@ async function resolveBaselineSha(
 }
 
 /* oxlint-disable eslint/no-await-in-loop -- label attach is intentionally sequential */
-async function attachLabels(
+export async function attachLabels(
   db: DatabaseAdapter,
   projectId: string,
   buildId: string,

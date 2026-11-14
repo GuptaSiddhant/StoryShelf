@@ -75,7 +75,14 @@ describe("skip calls", () => {
       .mockResolvedValueOnce(new Response("no", { status: 409 }));
     vi.stubGlobal("fetch", fetchMock);
     const { builds } = createClient("https://shelf.test", "tok").projects;
-    const input = { gitSha: "s", gitBranch: "main", sourceBuildId: "b1", changedFiles: ["a"] };
+    const input = {
+      gitSha: "s",
+      gitBranch: "main",
+      sourceBuildId: "b1",
+      changedFiles: ["a"],
+      entryIds: ["a--b"],
+      idempotencyKey: "k1",
+    };
     await expect(builds.createSkipped("demo", input)).resolves.toMatchObject({
       build: { id: "b2" },
     });

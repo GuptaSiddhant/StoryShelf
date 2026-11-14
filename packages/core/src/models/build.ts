@@ -174,6 +174,50 @@ export class BuildModel {
     return this.db.transact ? await this.db.transact(run) : await run(this.db);
   }
 
+  /** The build `projectId` created under `idempotencyKey`, or null (ADR 0044, decision 4). */
+  async findByIdempotencyKey(projectId: string, idempotencyKey: string): Promise<Build | null> {
+    const [found] = (await this.db.list(this.tables.builds, {
+      where: and(
+        eq(col(this.tables.builds, "projectId"), projectId),
+        eq(col(this.tables.builds, "idempotencyKey"), idempotencyKey),
+      ),
+      limit: 1,
+    })) as unknown as Build[];
+    return found ?? null;
+  }
+
+  /**
+   * Normal build creation replaces any skipped build of the same project, branch and commit
+   * (ADR 0044, decision 4): each one that is not yet replaced gets `supersededByBuildId`. Returns
+   * the replaced builds. A build never replaces itself.
+   */
+  async supersedeSkipped(
+    projectId: string,
+    gitBranch: string,
+    gitSha: string,
+    replacementId: string,
+  ): Promise<Build[]> {
+    const skipped = (await this.db.list(this.tables.builds, {
+      where: and(
+        eq(col(this.tables.builds, "projectId"), projectId),
+        eq(col(this.tables.builds, "gitBranch"), gitBranch),
+        eq(col(this.tables.builds, "gitSha"), gitSha),
+        eq(col(this.tables.builds, "status"), "skipped"),
+        isNull(col(this.tables.builds, "supersededByBuildId")),
+      ),
+    })) as unknown as Build[];
+    const replaced: Build[] = [];
+    for (const build of skipped) {
+      // oxlint-disable-next-line no-await-in-loop -- a handful of rows at most (one per lost response)
+      const row = await this.db.update(this.tables.builds, build.id, {
+        supersededByBuildId: replacementId,
+        updatedAt: new Date().toISOString(),
+      });
+      replaced.push(row as unknown as Build);
+    }
+    return replaced;
+  }
+
   /** The real source for `sourceBuildId` in `projectId`, or a thrown error. */
   private async skipSourceFor(projectId: string, sourceBuildId: string): Promise<Build> {
     const found = await this.get(sourceBuildId);
@@ -763,6 +807,8 @@ export interface SkippedBuildInput {
   isDefault?: boolean;
   message?: string;
   author?: { email?: string; name?: string };
+  /** The CLI's key for this run; a repeated key returns the build it created (unique per project). */
+  idempotencyKey?: string;
 }
 
 /** Links followed at most when resolving a skip chain; chains are one hop, this bounds a cycle. */
@@ -869,6 +915,7 @@ function skippedRow(input: SkippedBuildInput, source: Build): Record<string, unk
     affectedImportPaths: serializePaths([]),
     status: "skipped",
     skippedFromBuildId: source.id,
+    idempotencyKey: input.idempotencyKey ?? null,
     captureGeneration: 0,
     createdAt: now,
     updatedAt: now,

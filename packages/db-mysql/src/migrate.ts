@@ -106,6 +106,8 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
   { table: "builds", column: "capture_generation", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "skipped_from_build_id", definition: "VARCHAR(26) NULL" },
+  { table: "builds", column: "superseded_by_build_id", definition: "VARCHAR(26) NULL" },
+  { table: "builds", column: "idempotency_key", definition: "VARCHAR(191) NULL" },
   { table: "builds", column: "manifest_sha256", definition: "VARCHAR(64) NULL" },
   {
     table: "notification_subscriptions",
@@ -151,6 +153,11 @@ const IDENTITY_INDEXES = [
     table: "builds",
     name: "builds_skipped_from_idx",
     sql: "CREATE INDEX builds_skipped_from_idx ON builds (skipped_from_build_id)",
+  },
+  {
+    table: "builds",
+    name: "builds_project_idempotency_idx",
+    sql: "CREATE UNIQUE INDEX builds_project_idempotency_idx ON builds (project_id, idempotency_key)",
   },
   {
     table: "snapshots",

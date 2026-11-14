@@ -102,6 +102,11 @@ const BUILD_SKIPPED_FROM_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS skipped_from_build_id TEXT";
 const BUILD_SKIPPED_FROM_INDEX =
   "CREATE INDEX IF NOT EXISTS builds_skipped_from_idx ON builds (skipped_from_build_id)";
+const BUILD_SUPERSEDED_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS superseded_by_build_id TEXT";
+const BUILD_IDEMPOTENCY_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS idempotency_key TEXT";
+const BUILD_IDEMPOTENCY_INDEX =
+  "CREATE UNIQUE INDEX IF NOT EXISTS builds_project_idempotency_idx ON builds (project_id, idempotency_key)";
 const BUILD_MANIFEST_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS manifest_sha256 TEXT";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
@@ -287,6 +292,9 @@ async function migrateBuildRunColumns(run: MigrationRunner): Promise<void> {
 async function migrateBuildSkippedFrom(run: MigrationRunner): Promise<void> {
   await run(BUILD_SKIPPED_FROM_ALTER);
   await run(BUILD_SKIPPED_FROM_INDEX);
+  await run(BUILD_SUPERSEDED_ALTER);
+  await run(BUILD_IDEMPOTENCY_ALTER);
+  await run(BUILD_IDEMPOTENCY_INDEX);
 }
 
 /** Runs `use` with one dedicated connection's row-query runner, then releases the connection. */

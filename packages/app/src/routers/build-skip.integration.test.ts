@@ -1,4 +1,5 @@
-import { BuildModel } from "@storyshelf/core/models";
+import { catalogueBuild } from "@storyshelf/core/capture";
+import { BuildModel, LabelModel } from "@storyshelf/core/models";
 import {
   createTestBuild,
   createTestProject,
@@ -6,6 +7,7 @@ import {
   makeStorage,
 } from "@storyshelf/core/test-helpers";
 import type { BuildStatus } from "@storyshelf/core/types";
+import { storybookDir } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -14,11 +16,26 @@ import { stubRunner } from "../test-runner.ts";
 const SKIP_SOURCE = "/api/v1/projects/web/builds/skip-source";
 const SKIPPED = "/api/v1/projects/web/builds/skipped";
 
+/** The stories every seeded source build has, and so what `post` sends as `entryIds` by default. */
+const STORIES = ["button--primary", "button--secondary"];
+
+function indexOf(ids: string[]): unknown {
+  return {
+    v: 5,
+    entries: Object.fromEntries(
+      ids.map((id) => [
+        id,
+        { id, title: "Button", name: id, importPath: "./src/Button.stories.tsx", type: "story" },
+      ]),
+    ),
+  };
+}
+
 type Setup = { testing?: boolean; skippedBuilds?: boolean; runTests?: boolean };
 
 async function seed({ testing = true, skippedBuilds = true, runTests = false }: Setup = {}) {
   const { db } = makeDatabase();
-  const { storage } = makeStorage();
+  const { storage, objects } = makeStorage();
   const project = await createTestProject(db, db.tables, { name: "web", runTests });
   const app = createShelfApp({
     database: db,
@@ -38,8 +55,14 @@ async function seed({ testing = true, skippedBuilds = true, runTests = false }: 
     });
     const at = new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
     await db.update(db.tables.builds, created.id, { status, createdAt: at, updatedAt: at });
+    objects.set(
+      `${storybookDir(project.id, created.id)}/index.json`,
+      Buffer.from(JSON.stringify(indexOf(STORIES))),
+    );
+    await catalogueBuild({ db, storage }, project.id, created.id);
     return created;
   };
+  let key = 0;
   const hint = async (sha = "head", branch = "main") =>
     await (await app.request(`${SKIP_SOURCE}?branch=${branch}&sha=${sha}`)).json();
   const post = async (sourceBuildId: string, extra: Record<string, unknown> = {}) =>
@@ -51,6 +74,8 @@ async function seed({ testing = true, skippedBuilds = true, runTests = false }: 
         gitBranch: "main",
         sourceBuildId,
         changedFiles: ["README.md"],
+        entryIds: STORIES,
+        idempotencyKey: `key-${(key += 1)}`,
         ...extra,
       }),
     });
@@ -60,7 +85,7 @@ async function seed({ testing = true, skippedBuilds = true, runTests = false }: 
       headers: { "content-type": "application/json" },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-  return { app, db, project, build, hint, post, act };
+  return { app, db, project, build, hint, post, act, storage };
 }
 
 describe("GET /builds/skip-source: which candidate may be skipped from", () => {
@@ -170,6 +195,86 @@ describe("POST /builds/skipped", () => {
     expect((await post("missing")).status).toBe(409);
     await build("newer", "pending");
     expect((await post(source.id)).status).toBe(409);
+  });
+
+  it("answers 409 when a story was added, removed or renamed since the source", async () => {
+    const { build, post, db } = await seed();
+    const source = await build("base", "approved");
+    for (const entryIds of [
+      [...STORIES, "button--added"],
+      [STORIES[0]],
+      [STORIES[0], "button--renamed"],
+      [],
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- one request at a time
+      expect((await post(source.id, { entryIds })).status).toBe(409);
+    }
+    expect(await new BuildModel(db).list(source.projectId, { status: "skipped" })).toEqual([]);
+  });
+
+  it("accepts the entry ids in any order, and answers 409 for a source with no catalog", async () => {
+    const { build, post, db, project } = await seed();
+    const source = await build("base", "approved");
+    expect((await post(source.id, { entryIds: [...STORIES].toReversed() })).status).toBe(201);
+    const bare = await createTestBuild(db, db.tables, project.id, {
+      gitSha: "bare",
+      gitBranch: "other",
+    });
+    await db.update(db.tables.builds, bare.id, { status: "approved" });
+    expect((await post(bare.id, { gitBranch: "other" })).status).toBe(409);
+  });
+
+  it("returns the build a repeated idempotencyKey already created", async () => {
+    const { build, post, db } = await seed();
+    const source = await build("base", "approved");
+    const first = await post(source.id, { idempotencyKey: "run-1" });
+    expect(first.status).toBe(201);
+    const created = (await first.json()) as { build: { id: string } };
+    const again = await post(source.id, { idempotencyKey: "run-1" });
+    expect(again.status).toBe(200);
+    expect(((await again.json()) as { build: { id: string } }).build.id).toBe(created.build.id);
+    expect(await new BuildModel(db).list(source.projectId, { status: "skipped" })).toHaveLength(1);
+    expect((await post(source.id, { idempotencyKey: "run-2" })).status).toBe(201);
+  });
+
+  it("attaches labels, including persistent", async () => {
+    const { build, post, db } = await seed();
+    const source = await build("base", "approved");
+    const labels = [
+      { key: "persistent", value: "true" },
+      { key: "team", value: "web" },
+    ];
+    const created = (await (await post(source.id, { labels })).json()) as { build: { id: string } };
+    const attached = await new LabelModel(db).listForBuild(created.build.id);
+    expect(attached.map((label) => [label.typeKey, label.value]).toSorted()).toEqual([
+      ["persistent", "true"],
+      ["team", "web"],
+    ]);
+    expect((await post(source.id, { labels: [{ key: "", value: "x" }] })).status).toBe(400);
+  });
+
+  it("is replaced by a normal build of the same commit", async () => {
+    const { app, build, post, db, project } = await seed();
+    const source = await build("base", "approved");
+    const skipped = (await (await post(source.id)).json()) as { build: { id: string } };
+    const other = await new BuildModel(db).createSkipped({
+      projectId: project.id,
+      gitSha: "elsewhere",
+      gitBranch: "main",
+      sourceBuildId: source.id,
+      changedFiles: [],
+    });
+    const response = await app.request("/api/v1/projects/web/builds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gitSha: "head", gitBranch: "main" }),
+    });
+    const replacement = (await response.json()) as { id?: string; build?: { id: string } };
+    const replacementId = replacement.id ?? replacement.build?.id;
+    expect(replacementId).toBeTruthy();
+    const models = new BuildModel(db);
+    expect((await models.get(skipped.build.id))?.supersededByBuildId).toBe(replacementId);
+    expect((await models.get(other.id))?.supersededByBuildId ?? null).toBeNull();
   });
 
   it("answers 409 for a project that runs Storybook tests", async () => {

@@ -82,6 +82,11 @@ export interface SkippedBuildInput {
   gitBranch: string;
   sourceBuildId: string;
   changedFiles: string[];
+  /** Every entry id of the new Storybook index; the server answers 409 unless they equal the source's. */
+  entryIds: string[];
+  /** Generated once per run; a retry with the same key returns the build the first call created. */
+  idempotencyKey: string;
+  labels?: { key: string; value: string }[];
   message?: string;
   author?: { email?: string; name?: string };
 }
