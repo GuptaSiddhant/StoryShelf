@@ -10,12 +10,29 @@ import { stubRunner } from "../test-runner.ts";
 /** What a driver says when a write fails: internal text no client should ever read. */
 const INTERNAL = "SQLITE_CONSTRAINT: UNIQUE constraint failed: projects.slug (/var/data/shelf.db)";
 
+/** Variables a hosting platform sets to publish its address; with one set, the origin resolves before any database read. */
+const PLATFORM_ORIGIN_VARIABLES = [
+  "HEROKU_APP_DEFAULT_DOMAIN_NAME",
+  "RAILWAY_PUBLIC_DOMAIN",
+  "VERCEL",
+  "NETLIFY",
+  "RENDER_EXTERNAL_URL",
+  "RENDER_EXTERNAL_HOSTNAME",
+  "WEBSITE_HOSTNAME",
+  "DIGITALOCEAN_APP_ID",
+  "FLY_APP_NAME",
+  "CONTAINER_APP_NAME",
+];
+
 interface LogLine {
   msg: string;
   err?: { message?: string };
 }
 
 function boot() {
+  for (const name of PLATFORM_ORIGIN_VARIABLES) {
+    vi.stubEnv(name, "");
+  }
   const logged: LogLine[] = [];
   const logger = pino(
     { level: "info" },
@@ -58,6 +75,7 @@ function expectLogged(logged: LogLine[]): void {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("a failure inside a handler never sends its text to the client", () => {
