@@ -430,6 +430,62 @@ jobs:
             exit 1
           fi
 
+  # Terraform modules under deploy/ (#891, ADR 0050): fmt, validate and tflint for every module.
+  # Runs only for a change that can alter them; the filter lives in this job so `changes` stays untouched.
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Did a module change?
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          run=true
+          if [ "$EVENT" = "pull_request" ]; then
+            git diff --name-only HEAD^1 HEAD > changed.txt || echo "diff failed; checking" >&2
+            if [ -s changed.txt ] && ! grep -qE '^(deploy/|\.tflint\.hcl|\.github/workflows/ci\.yml)' changed.txt; then
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Terraform
+        if: steps.filter.outputs.run == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+          terraform_wrapper: false
+
+      - name: Setup tflint
+        if: steps.filter.outputs.run == 'true'
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.53.0
+
+      - name: fmt, validate and tflint every module
+        if: steps.filter.outputs.run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          tflint --init --config="$PWD/.tflint.hcl"
+          terraform fmt -check -recursive deploy/
+          # Every module and every example: a directory with a versions.tf, or an example's main.tf.
+          for dir in $(find deploy/terraform -name '*.tf' -printf '%h\n' | sort -u); do
+            echo "::group::$dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+            tflint --chdir="$dir" --config="$PWD/.tflint.hcl"
+            echo "::endgroup::"
+          done
+
   # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
 
   # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child
@@ -438,7 +494,8 @@ jobs:
   ci:
     name: ci
     if: ${{ always() }}
-    needs: [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly, image]
+    needs:
+      [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly, image, deploy]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
