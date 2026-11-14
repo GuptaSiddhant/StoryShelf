@@ -81,6 +81,14 @@ export function renderSettingsTests(
             disabled={!isAdmin}
             hint="On by default. A snapshot that differs from its baseline is rendered once more; if the two renders differ, it is flagged as a likely flaky story. It stays a change to review and never changes the build status. Costs one extra render per changed snapshot."
           />
+          <CheckField
+            label="Verify default-branch builds with the git host"
+            name="requireVerifiedDefault"
+            value="true"
+            checked={project.requireVerifiedDefault === false ? undefined : true}
+            disabled={!isAdmin}
+            hint={`On by default. A build that names ${project.gitDefaultBranch} auto-approves and moves the default-branch baselines only after a git channel confirms the commit is on ${project.gitDefaultBranch}. Turn it off only for a project with no git host: its default-branch builds then count unverified, and anyone with an upload token can move the baselines.`}
+          />
           <Field
             label="Play timeout (ms)"
             name="playTimeoutMs"

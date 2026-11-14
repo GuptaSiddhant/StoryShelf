@@ -81,7 +81,7 @@ esac
 # Create the project with fixed metadata. Uploads use the admin token itself: a project token
 # minted through it has no owner, which makes it a viewer that cannot upload.
 curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
-  -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main"}'
+  -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main","requireVerifiedDefault":false}'
 # Before the first upload, so the first build already renders on the chosen target.
 set_demo_browser
 set_demo_ai_profile

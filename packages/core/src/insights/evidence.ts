@@ -1,6 +1,6 @@
-/** Pure evidence builders: already-loaded inputs in, delimited text + images out. */
-import { downscalePng } from "@storyshelf/image";
 import type { AiEvidence } from "../ai.ts";
+/** Pure evidence builders: already-loaded inputs in, delimited text + images out. */
+import { downscalePng } from "../diff/index.ts";
 import { type EvidenceLimits, resolveLimits } from "./limits.ts";
 import { capBytes, field, headTail } from "./text.ts";
 

@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/notify-email",
   "version": "0.11.0",
-  "description": "Email notification transport for StoryShelf (SMTP, Mailpit, log, HTTP APIs).",
+  "description": "Deprecated: the email integration moved into @storyshelf/core (ADR 0049); this package re-exports it.",
   "keywords": [
     "email",
     "notifications",
@@ -77,28 +77,17 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "@storyshelf/core": "workspace:*",
-    "zod": "catalog:"
+    "@storyshelf/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/nodemailer": "^8.0.2",
     "@vitest/coverage-v8": "catalog:",
-    "nodemailer": "^10.2.1",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "peerDependencies": {
-    "nodemailer": "^10.2.1"
-  },
-  "peerDependenciesMeta": {
-    "nodemailer": {
-      "optional": true
-    }
   },
   "engines": {
     "node": ">=24"

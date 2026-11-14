@@ -1,7 +1,7 @@
+import { createFigmaDesign } from "@storyshelf/core/integrations";
 import { DesignCredentialModel, DesignModel, MemberModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
-import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -183,7 +183,7 @@ async function seed(options: Options = {}) {
     storage,
     logger: pino({ level: "silent" }),
     config: { secret: SECRET, ...(auth ? { adminToken: ADMIN_TOKEN } : {}) },
-    ...(providers ? { design: [figma] } : {}),
+    design: providers ? [figma] : false,
     ...(auth ? { auth: stub } : {}),
   });
   return { app, db };

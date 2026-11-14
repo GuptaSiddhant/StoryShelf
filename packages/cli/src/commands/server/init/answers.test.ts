@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   needsCompose,
   resolveDeployTarget,
-  wantsDesign,
-  wantsGit,
   wantsNotifications,
   wantsObservability,
   type Answers,
@@ -38,17 +36,13 @@ describe("opt-in predicates", () => {
   it("are off when the answer is absent", () => {
     const bare = answers();
     expect(wantsNotifications(bare)).toBe(false);
-    expect(wantsDesign(bare)).toBe(false);
     expect(wantsObservability(bare)).toBe(false);
-    expect(wantsGit(bare)).toBe(false);
   });
 
   it("follow the answer", () => {
-    const all = answers({ notifications: true, design: true, observability: true, git: "git" });
+    const all = answers({ notifications: true, observability: true });
     expect(wantsNotifications(all)).toBe(true);
-    expect(wantsDesign(all)).toBe(true);
     expect(wantsObservability(all)).toBe(true);
-    expect(wantsGit(all)).toBe(true);
     expect(wantsNotifications(answers({ notifications: false }))).toBe(false);
   });
 });

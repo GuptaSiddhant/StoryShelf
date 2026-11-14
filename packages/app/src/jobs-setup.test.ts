@@ -1,6 +1,6 @@
 import type { StateNotifierProvider } from "@storyshelf/core/adapter/notifier";
 import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import {
@@ -41,10 +41,10 @@ function blockingStateProvider(gate: Promise<void>, entered: () => void): StateN
   };
 }
 
-function wire(testing?: ShelfOptions["testing"], env: NodeJS.ProcessEnv = {}) {
+function wire(testing?: ResolvedShelfOptions["testing"], env: NodeJS.ProcessEnv = {}) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage, logger, testing } as unknown as ShelfOptions;
+  const options = { database: db, storage, logger, testing } as unknown as ResolvedShelfOptions;
   return { db, wiring: setupJobs(options, resolveRuntime(options), env) };
 }
 
@@ -138,7 +138,7 @@ describe("setupJobs", () => {
       config: { secret: SECRET, publicBaseUrl: "https://shelf.example.com" },
       testing: { runner: stubRunner(), queueClock: { now: clock.now, timers } },
       notifications: { notifiers: [provider] },
-    } as unknown as ShelfOptions;
+    } as unknown as ResolvedShelfOptions;
     const project = await createTestProject(db, db.tables);
     const build = await createTestBuild(db, db.tables, project.id);
     await new NotificationChannelModel(db, undefined, SECRET).create({

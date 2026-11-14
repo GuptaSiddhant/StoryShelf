@@ -62,8 +62,15 @@ const GitChannelFields: FC<{ errors?: Record<string, string> }> = ({ errors }) =
       label="Host"
       name="host"
       placeholder="https://gitlab.example.com"
-      hint="GitLab only: a self-managed host. Leave blank for gitlab.com."
+      hint="GitLab only: a self-managed host. Leave blank for gitlab.com. A private host must be allowed by the operator (outbound.allowHosts)."
       error={errors?.["host"]}
+    />
+    <Field
+      label="API base URL"
+      name="apiUrl"
+      placeholder="https://ghes.example.com/api/v3"
+      hint="GitHub Enterprise Server only: its REST API base. Leave blank for github.com. A private host must be allowed by the operator (outbound.allowHosts)."
+      error={errors?.["apiUrl"]}
     />
     <Field
       label="Status prefix"

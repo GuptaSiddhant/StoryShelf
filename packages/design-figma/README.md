@@ -1,5 +1,7 @@
 # @storyshelf/design-figma
 
+> **Deprecated.** The Figma integration is built into `@storyshelf/core` and registered by default (ADR 0049). This package re-exports it from `@storyshelf/core/integrations` for one minor release and is then no longer published. Set `FIGMA_CLIENT_ID` and `FIGMA_CLIENT_SECRET` to enable "Connect Figma"; personal tokens work without them.
+
 Figma design provider for StoryShelf: validates Figma links, reads file/node metadata (name, version, last modified) and downloads rendered previews through the Figma REST API with a personal access token.
 
 ## Install

@@ -81,6 +81,13 @@ export interface SetStateInput {
  */
 export interface StateNotifierAdapter extends Adapter<StateNotifierMetadata> {
   setState(input: SetStateInput): Promise<void>;
+  /**
+   * Whether the host says commit `sha` is on `branch` (ADR 0009, amendment 2026-11-13): the check
+   * that lets a build claiming the default branch count as one. Resolves `false` when the host says
+   * no and throws when it cannot answer. Optional: a provider without it cannot confirm a claim, so
+   * its channel leaves the claim unverified.
+   */
+  commitOnBranch?(input: { sha: string; branch: string }): Promise<boolean>;
 }
 
 /** Runtime — bound to one channel config + decrypted secret. */
