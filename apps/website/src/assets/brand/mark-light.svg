@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="StoryShelf">
+  <!-- StoryShelf mark: a shelf with three books; the last one leans on its neighbour (the changed one). Hand-written; see docs/brand.md. -->
+  <rect x="2" y="6" width="3" height="7" rx="0.4" fill="#09090b"/>
+  <rect x="6" y="3" width="3" height="10" rx="0.4" fill="#09090b"/>
+  <rect x="11.63" y="4" width="2.5" height="9" rx="0.4" transform="rotate(-17 11.63 13)" fill="#5b3fd6"/>
+  <rect x="1" y="13" width="14" height="2" rx="0.4" fill="#09090b"/>
+</svg>
