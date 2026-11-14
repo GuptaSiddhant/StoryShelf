@@ -45,15 +45,15 @@ module "storyshelf" {
 
 output "url" {
   description = "Public base URL."
-  value = module.storyshelf.url
+  value       = module.storyshelf.url
 }
 
 output "cluster_name" {
   description = "ECS cluster name."
-  value = module.storyshelf.cluster_name
+  value       = module.storyshelf.cluster_name
 }
 
 output "service_name" {
   description = "ECS service name."
-  value = module.storyshelf.service_name
+  value       = module.storyshelf.service_name
 }
