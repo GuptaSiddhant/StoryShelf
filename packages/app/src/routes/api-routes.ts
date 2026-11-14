@@ -54,6 +54,7 @@ export const API_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "POST /api/v1/admin/credentials/reencrypt": "hosting",
   "POST /api/v1/admin/check-storage": "hosting",
   "POST /api/v1/admin/purge": "hosting",
+  "GET /api/v1/offline": "hosting",
   "GET /api/v1/openapi.json": "hosting",
   "GET /api/v1/docs": "hosting",
   // testing
