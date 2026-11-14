@@ -58,6 +58,7 @@ function card(
     canTriage: true,
     testing: false,
     publishing: "success",
+    supersededBy: null,
     canComment: true,
     canVerdict: true,
     ...overrides,
@@ -110,3 +111,26 @@ export const FailedBuild = jsxStory(() => (
 
 /** A failed build on an instance that only hosts Storybooks (no capture): the line, no retry to offer. */
 export const FailedBuildHostingOnly = jsxStory(() => <VerdictCard data={card([], [], "failed")} />);
+
+const superseded = { supersededByBuildId: "bld_newer" } as const;
+
+/** A build a newer commit replaced: the line names the newer build and links to it, with no retry. */
+export const SupersededBuild = jsxStory(() => (
+  <VerdictCard
+    data={card([], [], "cancelled", {
+      testing: true,
+      build: { ...build, status: "cancelled", ...superseded },
+      supersededBy: { id: "bld_newer", gitSha: "5c4d3e2f1a0b" },
+    })}
+  />
+));
+
+/** The newer build was purged by retention: the same line without a link that would 404. */
+export const SupersededBuildNewerGone = jsxStory(() => (
+  <VerdictCard
+    data={card([], [], "cancelled", {
+      testing: true,
+      build: { ...build, status: "cancelled", ...superseded },
+    })}
+  />
+));

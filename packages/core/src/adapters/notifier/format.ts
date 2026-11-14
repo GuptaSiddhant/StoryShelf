@@ -11,6 +11,11 @@ function esc(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
+/** Escape a value for a double-quoted HTML attribute. */
+function escAttribute(value: string): string {
+  return esc(value).replaceAll('"', "&quot;");
+}
+
 /** Read a string field from event data without throwing on shapes. */
 function str(data: Record<string, unknown>, key: string): string {
   const value = data[key];
@@ -96,13 +101,24 @@ function envelope(
   const text = lines.join("\n");
   const footer = brand?.footerText ?? `Sent by ${name}`;
   const htmlBody = lines.map((line) => esc(line)).join("<br/>");
-  const logo = brand?.logo ? `<img src="${esc(brand.logo)}" alt="" width="24"/>` : "";
   return {
     subject,
     text: `${text}\n\n${footer}`,
     markdown: `${text}\n\n_${esc(footer)}_`,
-    html: `${logo}<p>${htmlBody}</p><p><small>${esc(footer)}</small></p>`,
+    html: `${emailHeader(name, brand?.logo)}<p>${htmlBody}</p><p><small>${esc(footer)}</small></p>`,
   };
+}
+
+/**
+ * The email header: the wordmark (the brand name, weight 600, neutral text colour; see
+ * docs/brand.md), after the brand's logo when one is set. Plain HTML, no image by default,
+ * because many mail clients block images and do not render SVG.
+ */
+function emailHeader(name: string, logo?: string): string {
+  const image = logo
+    ? `<img src="${escAttribute(logo)}" alt="" width="24" height="24" style="vertical-align:middle;margin-right:8px"/>`
+    : "";
+  return `<p style="margin:0 0 16px;font-weight:600;font-size:16px;color:#09090b">${image}${esc(name)}</p>`;
 }
 
 /**

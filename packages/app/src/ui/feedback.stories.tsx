@@ -50,6 +50,7 @@ export const BuildStatusBadges = jsxStory(() => (
       "failed",
       "pending",
       "cancelled",
+      "skipped",
     ].map((status) => (
       <Badge key={status} tone={statusTone(status)} icon>
         {statusLabel(status)}

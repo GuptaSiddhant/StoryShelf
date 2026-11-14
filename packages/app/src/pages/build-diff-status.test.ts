@@ -44,6 +44,10 @@ describe("build state helpers", () => {
     expect(isRetryable(build("cancelled"))).toBe(true);
     expect(isRetryable(build("reviewing"))).toBe(false);
   });
+
+  it("offers no retry for a build a newer commit superseded (ADR 0045)", () => {
+    expect(isRetryable({ ...build("cancelled"), supersededByBuildId: "bld_newer" })).toBe(false);
+  });
 });
 
 describe("failureReason", () => {

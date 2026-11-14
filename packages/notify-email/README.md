@@ -4,7 +4,7 @@
 >
 > `smtpPreset`, `smtpPresetFromEnv` and `mailpitPreset` are now **async** (they load the optional `nodemailer` peer of core): `await` them. Install `nodemailer@^10.2.1` yourself for SMTP.
 
-Email notification transport for StoryShelf: one SMTP/HTTP transport serves notification channels and (optionally) auth mail. 
+Email notification transport for StoryShelf: one SMTP/HTTP transport serves notification channels and (optionally) auth mail.
 
 ## Install
 

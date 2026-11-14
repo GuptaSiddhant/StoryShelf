@@ -223,6 +223,13 @@ export interface ShelfConfig {
   serverTiming?: boolean;
   /** Persist gzip and brotli copies of published Storybook files, made when publishing ends (default off). */
   publishedCompression?: boolean;
+  /**
+   * Act on `supersedes` when a build is created (ADR 0045, decision 3): cancel the older in-flight
+   * builds the CLI names, for projects with `cancelSuperseded` on. Default off, so a rolling upgrade
+   * never has a copy cancel builds that a previous copy cannot read as superseded (ADR 0053,
+   * decision 5: readers first); turn it on one minor release after the readers shipped.
+   */
+  supersedeOnCreate?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;
   /**
@@ -381,6 +388,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
     publishedCompression: z.boolean().optional(),
+    supersedeOnCreate: z.boolean().optional(),
     captureAssets: z
       .object({
         cacheMaxAgeSeconds: z.number().int().min(0).max(MAX_CAPTURE_ASSET_CACHE_SECONDS).optional(),
@@ -598,6 +606,14 @@ export interface ShelfOptions {
    * no queue, and the tuning below is unreachable rather than silently ignored.
    */
   testing?: ShelfTestingOptions;
+  /**
+   * Accept skipped builds (ADR 0044): `GET …/builds/skip-source` and `POST …/builds/skipped`. Off by
+   * default, and then both answer 404 as if they did not exist, so a release can ship the readers of
+   * the `skipped` status before any server writes it (ADR 0053, decision 5). The release after the
+   * readers turns the default on and removes the option. Needs `testing`; without it the routes
+   * answer 404 either way.
+   */
+  skippedBuilds?: boolean;
   /**
    * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`,
    * and to the read-grant route, `/_r/<token>/*`, which share one bucket (ADR 0007, decision 5;

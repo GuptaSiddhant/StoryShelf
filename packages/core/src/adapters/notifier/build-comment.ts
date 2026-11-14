@@ -8,6 +8,8 @@ export interface BuildCommentInput {
   storybookUrl?: string | undefined;
   /** The gating statuses (`testing` or `review`), in display order. */
   gates: readonly DesiredStatus[];
+  /** Present on a build a newer one superseded (ADR 0045): the newer build's page and short commit. */
+  supersededBy?: { url: string; sha: string } | undefined;
   /** Present when `testing` or review is on: the snapshot totals to summarize. */
   counts?:
     | {
@@ -31,14 +33,24 @@ export function buildCommentMarkdown(input: BuildCommentInput): string {
   for (const gate of input.gates) {
     lines.push(`- ${LABEL[gate.name]}: ${gate.description}`);
   }
+  lines.push(...detailLines(input));
+  return lines.join("\n");
+}
+
+/** The summary, superseded and Storybook lines that follow the gates. */
+function detailLines(input: BuildCommentInput): string[] {
+  const lines: string[] = [];
   if (input.counts !== undefined && input.counts.snapshotCount > 0) {
     const { snapshotCount, changedCount, approvedCount, rejectedCount } = input.counts;
     lines.push(
       `- Snapshots: ${String(snapshotCount)} total, ${String(changedCount)} changed, ${String(approvedCount)} approved, ${String(rejectedCount)} rejected`,
     );
   }
+  if (input.supersededBy !== undefined) {
+    lines.push(`- Superseded by [${input.supersededBy.sha}](${input.supersededBy.url})`);
+  }
   if (input.storybookUrl !== undefined) {
     lines.push(`- Storybook: [Open the published Storybook](${input.storybookUrl})`);
   }
-  return lines.join("\n");
+  return lines;
 }

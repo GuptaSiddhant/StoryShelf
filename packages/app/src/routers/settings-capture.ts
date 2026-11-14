@@ -18,6 +18,7 @@ import { asString, findProject, renderSettingsPage } from "./settings.handlers.t
 /** Capture settings: browsers (primary + extras), the mode allowlist and the signed URL lifetime. */
 export function registerCaptureSettings(app: ShelfRouter): void {
   app.post("/projects/:slug/settings/capture", handleCaptureUpdate);
+  app.post("/projects/:slug/settings/capture/superseded", handleSupersededUpdate);
   app.post("/projects/:slug/settings/thresholds", handleThresholdsUpdate);
 }
 
@@ -119,4 +120,15 @@ async function handleThresholdsUpdate(c: Context): Promise<Response> {
   await new ProjectModel(getStore().db).update(project.id, { pixelThreshold, maxDiffRatio });
   flash(c, "Thresholds saved");
   return hxRedirect(c, settingsHref(project.slug, "thresholds"));
+}
+
+/** The cancel-superseded switch (ADR 0045); admins only. An unticked box sends no field. */
+async function handleSupersededUpdate(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  const form = await c.req.formData();
+  await new ProjectModel(getStore().db).update(project.id, {
+    cancelSuperseded: form.get("cancelSuperseded") === "true",
+  });
+  flash(c, "Superseded-build setting saved");
+  return hxRedirect(c, `/projects/${project.slug}/settings/capture`);
 }
