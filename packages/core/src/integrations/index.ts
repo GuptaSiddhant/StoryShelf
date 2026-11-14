@@ -10,6 +10,7 @@ import type { EmailSender } from "../adapters/email-sender.ts";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import { designReasons, emailSenderReasons, notifierReasons } from "../adapters/validate.ts";
 import { chatNotifiers } from "./chat/index.ts";
+import { builtInEmailNotifier } from "./email/index.ts";
 import { gitNotifiers } from "./git/index.ts";
 import {
   resolveIntegrationGroup,
@@ -26,7 +27,7 @@ export interface BuiltInIntegrations {
 
 /** Every built-in integration, by group. */
 export const BUILT_IN_INTEGRATIONS: BuiltInIntegrations = Object.freeze({
-  notifiers: Object.freeze([...gitNotifiers, ...chatNotifiers]),
+  notifiers: Object.freeze([...gitNotifiers, builtInEmailNotifier(), ...chatNotifiers]),
   email: Object.freeze([]),
   design: Object.freeze([]),
 });
@@ -86,6 +87,22 @@ export {
   type IntegrationGroup,
   type IntegrationOption,
 } from "./resolve.ts";
+
+export {
+  builtInEmailNotifier,
+  createEmailNotifier,
+  emailChannelConfigSchema,
+  httpPreset,
+  logPreset,
+  mailpitPreset,
+  NODEMAILER_RANGE,
+  smtpPreset,
+  smtpPresetFromEnv,
+  type EmailChannelConfig,
+  type EmailNotifierDefaults,
+  type HttpPresetOptions,
+  type SmtpPresetOptions,
+} from "./email/index.ts";
 
 export {
   chatNotifiers,

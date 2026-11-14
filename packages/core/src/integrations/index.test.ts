@@ -31,11 +31,12 @@ const builtIn: BuiltInIntegrations = {
 };
 
 describe("BUILT_IN_INTEGRATIONS", () => {
-  it("holds the git and chat notifiers and is frozen; each move task adds its own", () => {
+  it("holds the git, email and chat notifiers and is frozen; each move task adds its own", () => {
     expect(BUILT_IN_INTEGRATIONS.notifiers.map((entry) => entry.metadata.kind)).toEqual([
       "github",
       "gitlab",
       "git-log",
+      "email",
       "slack-webhook",
       "teams-workflow",
       "log",

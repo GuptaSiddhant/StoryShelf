@@ -129,7 +129,7 @@ describe("health endpoints", () => {
     expect(body.status).toBe("ok");
     expect(body.adapters.map((a) => a.category).toSorted()).toEqual([
       "database",
-      ...Array.from({ length: 6 }, () => "notifier"),
+      ...Array.from({ length: 7 }, () => "notifier"),
       "storage",
     ]);
     expect(body.adapters.every((a) => a.state === "ok")).toBe(true);
