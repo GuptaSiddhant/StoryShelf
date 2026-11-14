@@ -34,6 +34,8 @@ Open <http://localhost:3000>. SQLite and local storage live on the `/data` volum
 image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64`
 (`:<version>`, `:latest`, and `-hosting` variants without a browser); see the
 [Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose.
+For AWS, GCP and Azure, and the list of supported targets, see the
+[deployment guide](https://storyshelf.js.org/guides/deployment/#supported-targets).
 
 ## StoryShelf vs Chromatic
 
