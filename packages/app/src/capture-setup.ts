@@ -17,7 +17,7 @@ import {
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
-import { currentTraceparent } from "@storyshelf/observability";
+import { currentTraceparent } from "@storyshelf/core/telemetry";
 import { notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
 import {
   alerting,

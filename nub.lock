@@ -262,7 +262,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   apps/website:
     dependencies:
@@ -427,9 +427,6 @@ importers:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      '@storyshelf/observability':
-        specifier: workspace:*
-        version: link:../observability
       hono:
         specifier: 'catalog:'
         version: 4.13.14
@@ -604,6 +601,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@hono/otel':
+        specifier: 'catalog:'
+        version: 1.3.0(hono@4.13.14)
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.10.0
@@ -632,6 +632,15 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@opentelemetry/context-async-hooks':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/core':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-trace-base':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
       '@types/jsdom':
         specifier: ^30.0.0
         version: 30.0.0
@@ -653,6 +662,9 @@ importers:
       adm-zip:
         specifier: ^0.6.1
         version: 0.6.1
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.14
       jsdom:
         specifier: ^30.0.1
         version: 30.1.3
@@ -1010,9 +1022,6 @@ importers:
 
   packages/observability:
     dependencies:
-      '@hono/otel':
-        specifier: 'catalog:'
-        version: 1.3.0(hono@4.13.14)
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.10.0
@@ -1031,12 +1040,6 @@ importers:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
-      hono:
-        specifier: 'catalog:'
-        version: 4.13.14
     devDependencies:
       '@opentelemetry/context-async-hooks':
         specifier: 'catalog:'
@@ -15571,28 +15574,6 @@ snapshots:
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@vitest/coverage-v8': 4.1.12(vitest@5.0.5)
-    transitivePeerDependencies:
-      - msw
-
-  vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)):
-    dependencies:
-      '@opentelemetry/api': 1.10.0
-      '@types/chai': 5.2.3
-      '@types/node': 26.6.5
-      '@vitest/mocker': 5.0.5(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
-      chai: 6.3.0
-      es-module-lexer: 2.3.2
-      expect-type: 1.4.0
-      jsdom: 30.1.3
-      magic-string: 1.4.5
-      obug: 3.0.0
-      picomatch: 4.0.7
-      std-env: 4.3.0
-      tinybench: 6.2.2
-      tinyexec: 1.3.1
-      tinyglobby: 0.2.17
-      vite: 6.4.5(@types/node@26.6.5)(yaml@2.9.1)
-      why-is-node-running: 3.2.1
     transitivePeerDependencies:
       - msw
 

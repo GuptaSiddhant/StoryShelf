@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requestId } from "hono/request-id";
 import { afterEach, describe, expect, it } from "vitest";
-import { createHttpMiddleware } from "./middleware.ts";
+import { createHttpMiddleware } from "./http-middleware.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 
 describe("createHttpMiddleware", () => {

@@ -13,11 +13,6 @@ import {
 import type { ResolvedShelfOptions, ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
-import {
-  configureOutbound,
-  STORYBOOK_READ_PREFIX,
-  STORYBOOK_TOKEN_PREFIX,
-} from "@storyshelf/core/utils";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and notifier
  * adapters into a complete self-hosted visual-testing Hono app.
@@ -26,7 +21,12 @@ import {
   createHttpMiddleware,
   createInstrumentedDatabase,
   createInstrumentedStorage,
-} from "@storyshelf/observability";
+} from "@storyshelf/core/telemetry";
+import {
+  configureOutbound,
+  STORYBOOK_READ_PREFIX,
+  STORYBOOK_TOKEN_PREFIX,
+} from "@storyshelf/core/utils";
 import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";

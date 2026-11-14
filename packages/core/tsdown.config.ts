@@ -30,6 +30,7 @@ const config = libConfig({
   paths: "./src/utils/paths.ts",
   urls: "./src/urls.ts",
   schema: "./src/schema/index.ts",
+  telemetry: "./src/telemetry/index.ts",
   types: "./src/types.ts",
   utils: "./src/utils/index.ts",
   "test-helpers": "./src/test-helpers/index.ts",
