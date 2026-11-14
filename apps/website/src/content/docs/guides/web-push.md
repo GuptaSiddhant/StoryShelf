@@ -1,54 +1,65 @@
 ---
 title: Web push notifications
-description: Enable browser push for review requests and other events, generate VAPID keys, set the server variables and handle the iOS install requirement.
+description: Enable browser push for review requests, mentions and failures, generate VAPID keys, set the server variables and handle the iOS install requirement.
 ---
 
 Web push delivers a personal notification to a browser or installed app, next to email. The design is [ADR 0048](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0048-installable-app-offline-push.md), section 4.
 
 :::note[Status]
-**Planned.** Nothing on this page has landed yet. The `push_subscriptions` table is #843, the push notifier is #844, delivery, the API and the worker handlers are #845, and the settings page is #846. Everything below is written from the ADR; check each marker when its task merges, in particular the exact variable names.
+The server side has landed: the keys, the notifier, the three routes and the worker's handlers (#843–#845). **Planned (#846):** a settings page to enable push on a device. Until it lands, a device is registered through the API, as described below.
 :::
 
 ## What you get
 
-Push is a personal delivery kind, like **Email me**. It is off until you enable it on a device, and it follows the event preferences you already have (review requested, mentions, change requests, build failed, and so on). A push carries only a title, a one-line body and a link to a page on this server. It never carries tokens or more than one line of a comment.
+Push is a personal delivery kind, like **Email me**: `push` is a `via` kind of a [personal notification subscription](/guides/notifications/). It stays off until you register a device and list `push` in a subscription's `via`. It then follows that subscription's event preferences. Review requests, mentions and build failures are delivered. A push carries a title, a one-line body and a path on this server. It never carries tokens or an absolute URL, and nothing is sent while the server has no [confirmed public URL](/guides/config/#public-origin).
 
-Nothing is sent while the server has no [confirmed public URL](/guides/config/#public-origin), the same as every other notification.
+## Operator setup
 
-## Operator setup (planned: #844, #845)
+Push needs a VAPID key pair (RFC 8292) and a contact address. Without both keys push is off: its routes answer 404 and nothing is sent.
 
-Push needs a VAPID key pair (RFC 8292) and a contact address. Without keys push is off, its routes answer 404 and the settings page hides it.
-
-1. **Generate a key pair once.** Use any VAPID generator you trust, or Node:
+1. **Generate a key pair once.** Any VAPID generator works, or Node:
 
    ```sh
    node -e "
    const { generateKeyPairSync } = require('node:crypto');
    const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
    const pub = publicKey.export({ format: 'jwk' });
-   const prv = privateKey.export({ format: 'jwk' });
    const raw = Buffer.concat([Buffer.from([4]), Buffer.from(pub.x, 'base64url'), Buffer.from(pub.y, 'base64url')]);
-   console.log('public :', raw.toString('base64url'));
-   console.log('private:', prv.d);
+   console.log('SHELF_VAPID_PUBLIC_KEY=' + raw.toString('base64url'));
+   console.log('SHELF_VAPID_PRIVATE_KEY=' + privateKey.export({ format: 'jwk' }).d);
    "
    ```
 
-2. **Set the variables** from the environment: the public key, the private key and a contact `subject` (a `mailto:` or `https:` address the push services can reach). The names are fixed by #845 and are **not yet confirmed** here; this page will show them once that task merges.
-3. **Keep the private key secret.** Store it with your other secrets, as you do `SECRET`. StoryShelf never writes it to logs, errors, API output or the database. Only the public key is exposed, at `GET /api/v1/push/public-key`.
-4. **Do not rotate casually.** A device's subscription is tied to the public key that created it. Changing the key pair means each device must enable push again.
+   The public key is an uncompressed P-256 point and the private key is its 32-byte scalar, both base64url.
+
+2. **Set three variables:**
+
+   | Variable                  | Value                                                                                         |
+   | ------------------------- | --------------------------------------------------------------------------------------------- |
+   | `SHELF_VAPID_PUBLIC_KEY`  | the public key (safe to expose)                                                               |
+   | `SHELF_VAPID_PRIVATE_KEY` | the private key (a secret)                                                                    |
+   | `SHELF_VAPID_SUBJECT`     | a contact the push services can reach, `mailto:ops@example.com` or `https://…`; always needed |
+
+   With both keys set and no subject the server refuses to start. A pair that does not match is detected at boot: push stays off and one error line says why.
+
+3. **Keep the private key secret.** Store it with your other secrets. StoryShelf never writes it to logs, errors, API output or the database. Only the public key is served, at `GET /api/v1/push/public-key`.
+4. **Do not rotate casually.** A device's subscription is tied to the public key that created it, so a new pair means each device must register again.
 
 Never commit a real key, and never paste one into an issue or a chat.
 
-## Enable it on a device (planned: #846)
+## Register a device
 
-Open your profile's notification settings and enable push on this device. The browser asks for permission, the device registers (`POST /api/v1/me/push-subscriptions`) and you can remove it later (`DELETE /api/v1/me/push-subscriptions/:id`). A device whose push service answers 404 or 410 is removed automatically. Signing out unsubscribes the device first.
+A browser subscribes with the public key from `GET /api/v1/push/public-key`, then registers itself as the signed-in user:
 
-Clicking a notification opens a page on this server only.
+- `POST /api/v1/me/push-subscriptions` with the browser's `PushSubscription` JSON (`endpoint`, `keys.p256dh`, `keys.auth`) and an optional `label`. The endpoint must be `https:` and at most 512 characters. Registering the same endpoint again replaces its keys, owner and label.
+- `DELETE /api/v1/me/push-subscriptions/:id` removes a device.
+
+A device whose push service answers 404 or 410 is removed automatically, and signing out unsubscribes the device and forgets its row. Clicking a notification opens a page on this server only. The settings page that does all this for you is planned (#846).
 
 ## iOS
 
-On iPhone and iPad, web push works only for an app **installed to the Home Screen**, on iOS 16.4 or later. Open StoryShelf in Safari, choose **Share → Add to Home Screen**, then open it from the Home Screen icon and enable push there. See [Install the app](/guides/installable-app/).
+On iPhone and iPad, web push works only for an app **installed to the Home Screen**, on iOS 16.4 or later. Open StoryShelf in Safari, choose **Share → Add to Home Screen**, then open it from the Home Screen icon. See [Install the app](/guides/installable-app/).
 
 ## Privacy
 
-Push services (Apple, Google, Mozilla) see that a message was sent and to which endpoint, but not its contents: the payload is encrypted end to end to the device (RFC 8291).
+Push services (Apple, Google, Mozilla) see that a message was sent and to which endpoint, but not its contents: the payload is encrypted to the device (RFC 8291).

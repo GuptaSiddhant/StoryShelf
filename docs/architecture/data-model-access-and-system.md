@@ -24,6 +24,19 @@ webhooks (
   updated_at          text NOT NULL
 );
 
+-- Web push devices (ADR 0048): one row per browser endpoint
+push_subscriptions (
+  id                  text PRIMARY KEY,
+  user_id             text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint            text NOT NULL UNIQUE,    -- https push-service URL; never logged
+  p256dh              text NOT NULL,           -- device public key, base64url
+  auth                text NOT NULL,           -- device auth secret, base64url
+  label               text,                    -- "Work laptop"
+  created_at          text NOT NULL,
+  last_success_at     text,
+  failure_count       integer NOT NULL DEFAULT 0
+);
+
 -- Users (created by auth engine on login, optional if no auth configured)
 users (
   id                  text PRIMARY KEY,        -- engine ULID (shared with Better Auth user.id)

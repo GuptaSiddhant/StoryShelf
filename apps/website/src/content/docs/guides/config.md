@@ -22,17 +22,17 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 }
 ```
 
-| Field             | CLI flag                     | Env fallback                  | Description                                                                                                                        |
-| ----------------- | ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `slug`            | `--slug`                     | `STORYSHELF_SLUG`             | Project slug (required)                                                                                                            |
-| `url`             | `--url`                      | `STORYSHELF_URL`              | Server URL                                                                                                                         |
-| `buildDir`        | `--build-dir` / `-d`         | —                             | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                   |
-| `buildCommand`    | `--build-command`            | —                             | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                |
-| `buildScriptName` | `--build-script-name` / `-b` | —                             | package script to run (default `build-storybook`)                                                                                  |
-| `skip`            | `--skip`                     | —                             | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
-| `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                                 |
-| `buildStats`      | `--no-build-stats` (opt-out)  | —                             | Append `--stats-json` to the build script when affected capture is on (default `true`). Set `false` for a script that rejects the flag |
-| `untraced`        | `--untraced` (union)         | —                             | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/)                            |
+| Field             | CLI flag                     | Env fallback                  | Description                                                                                                                            |
+| ----------------- | ---------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`            | `--slug`                     | `STORYSHELF_SLUG`             | Project slug (required)                                                                                                                |
+| `url`             | `--url`                      | `STORYSHELF_URL`              | Server URL                                                                                                                             |
+| `buildDir`        | `--build-dir` / `-d`         | —                             | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                       |
+| `buildCommand`    | `--build-command`            | —                             | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                    |
+| `buildScriptName` | `--build-script-name` / `-b` | —                             | package script to run (default `build-storybook`)                                                                                      |
+| `skip`            | `--skip`                     | —                             | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST`     |
+| `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                                     |
+| `buildStats`      | `--no-build-stats` (opt-out) | —                             | Append `--stats-json` to the build script when affected capture is on (default `true`). Set `false` for a script that rejects the flag |
+| `untraced`        | `--untraced` (union)         | —                             | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/)                                |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
 
@@ -120,6 +120,7 @@ createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, 
 - `config.captureAssets.cacheMaxAgeSeconds` (`0` to `3600`, default `0`) lets a remote browser's own cache keep a render's signed Storybook assets for that many seconds at most, never past the token's lifetime. It is off by default and trades faster long runs for the fact that revoked access cannot reclaim bytes already cached. See [Browser caching of capture assets](/guides/remote-browsers/#browser-caching-of-capture-assets-opt-in).
 
 - `config.offline.maxOfflineDays` (`1` to `365`, default `30`) is how many days a device may keep serving an offline Storybook after its last successful sync; the offline sync answer hands it to the device. See [Install the app and keep Storybooks offline](/guides/installable-app/#private-projects-sign-out-and-maxofflinedays).
+- `SHELF_VAPID_PUBLIC_KEY`, `SHELF_VAPID_PRIVATE_KEY` and `SHELF_VAPID_SUBJECT` (environment) turn on [web push](/guides/web-push/#operator-setup). The private key is a secret.
 
 ### Outbound URLs set by projects
 

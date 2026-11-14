@@ -73,7 +73,10 @@ POST   /api/v1/projects/:slug/builds/:buildId/unpublish
 GET    /manifest.webmanifest                        # web app manifest (hosting, no session)
 GET    /sw.js                                       # the one service worker, scope / (hosting, no session)
 GET    /api/v1/offline?projects=<slug,...>          # default-branch build + file manifest per readable project (hosting)
-# planned: GET /api/v1/push/public-key (#845), POST /api/v1/me/push-subscriptions and DELETE .../:id (#845)
+GET    /api/v1/push/public-key                      # VAPID public key; 404 without keys (hosting)
+POST   /api/v1/me/push-subscriptions                # register this browser for push (hosting, signed-in user)
+DELETE /api/v1/me/push-subscriptions/:id            # remove a device (hosting)
+GET    /profile/offline                             # "This device": keep Storybooks offline, cap, sync
 
 # Admin
 POST   /api/v1/admin/purge                          # manual retention purge
