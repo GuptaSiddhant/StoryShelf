@@ -109,15 +109,6 @@ function buildDeps(answers: Answers): Record<string, string> {
   };
 }
 
-/** The Terraform npm scripts of the AWS, Azure and GCP targets. */
-const INFRA_SCRIPTS: Record<string, string> = {
-  "infra:init": "terraform -chdir=terraform init",
-  "infra:plan": "terraform -chdir=terraform plan -out=tfplan",
-  "infra:apply": "terraform -chdir=terraform apply tfplan",
-  "infra:destroy": "terraform -chdir=terraform destroy",
-  "infra:outputs": "terraform -chdir=terraform output -json",
-};
-
 /** `docker:*` npm scripts: compose when several services, plain `docker` for one container. */
 function dockerScripts(answers: Answers): Record<string, string> {
   if (needsCompose(answers)) {
@@ -134,7 +125,7 @@ function dockerScripts(answers: Answers): Record<string, string> {
   };
 }
 
-/** The npm scripts: start, dev and typecheck, plus the Docker or Terraform ones of the deploy target. */
+/** The npm scripts: start, dev and typecheck, plus the Docker ones of the deploy target. */
 function scriptsFor(answers: Answers): Record<string, string> {
   const target = resolveDeployTarget(answers);
   return {
@@ -142,7 +133,6 @@ function scriptsFor(answers: Answers): Record<string, string> {
     dev: `node --watch ${SERVER_ENTRY}`,
     typecheck: "tsc",
     ...(target === "docker" ? dockerScripts(answers) : {}),
-    ...(target === "aws" || target === "azure" || target === "gcp" ? INFRA_SCRIPTS : {}),
   };
 }
 

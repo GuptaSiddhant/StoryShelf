@@ -58,19 +58,4 @@ describe("printNextSteps", () => {
     expect(printed).toContain("npm run docker:down");
     expect(printed).not.toContain("docker:run");
   });
-
-  it.each([
-    ["aws", "  S3_BUCKET / AWS_REGION", undefined],
-    ["azure", "  AZURE_STORAGE_CONNECTION", "az login"],
-    ["gcp", "  GCS_BUCKET + GOOGLE_CLOUD_PROJECT", "gcloud auth login"],
-  ] as const)("walks the %s terraform steps", (deployTarget, outputs, login) => {
-    printNextSteps(answers({ deployTarget }), "npm");
-    expect(printed).toContain("terraform -chdir=terraform init");
-    expect(printed).toContain("terraform -chdir=terraform apply tfplan");
-    expect(printed).toContain(outputs.trim());
-    if (login !== undefined) {
-      expect(printed).toContain(login);
-    }
-    expect(printed.endsWith("  npm install\n  npm start\n")).toBe(true);
-  });
 });

@@ -97,6 +97,7 @@ function buildServerCommand(): Command {
     .command("init")
     .description("Scaffold a new StoryShelf server project")
     .option("--dir <dir>", "output directory")
+    .option("--cloud <cloud>", "write a Terraform module stub for aws, gcp or azure")
     .action(
       run<ServerInitOptions>(async () => (await import("./commands/server/init.ts")).runServerInit),
     );
