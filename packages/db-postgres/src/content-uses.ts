@@ -8,6 +8,7 @@ import { sql, type SQL } from "drizzle-orm";
 import {
   inTransaction,
   instant,
+  textArray,
   textRows,
   type LifecycleDatabase,
   type LifecycleTx,
@@ -74,7 +75,7 @@ export async function recordContentUses(
         FROM jsonb_array_elements(${uses}::jsonb) AS use),
       known AS (
         SELECT content_hash, MAX(size_bytes) AS size FROM content_uses
-        WHERE size_bytes IS NOT NULL AND content_hash IN (SELECT hash FROM incoming)
+        WHERE size_bytes IS NOT NULL AND content_hash = ANY(ARRAY(SELECT hash FROM incoming))
         GROUP BY content_hash)
       INSERT INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
       SELECT ${buildId}, incoming.hash, ${projectId}, ${instant(now)}, COALESCE(incoming.size, known.size)
@@ -93,7 +94,7 @@ async function claimedHashes(
   const live: SQL =
     staleBefore === undefined ? sql`true` : sql`collecting_at >= ${instant(staleBefore)}`;
   const rows = await tx.query(sql`SELECT DISTINCT content_hash FROM content_uses
-    WHERE content_hash IN (SELECT * FROM ${textRows(hashes)}) AND collecting_at IS NOT NULL AND ${live}`);
+    WHERE content_hash = ANY(${textArray(hashes)}) AND collecting_at IS NOT NULL AND ${live}`);
   return new Set(rows.map((row) => String(row["content_hash"])));
 }
 
@@ -105,7 +106,7 @@ async function clearAbandonedClaims(
 ): Promise<void> {
   if (staleBefore === undefined) return;
   await tx.query(sql`UPDATE content_uses SET collecting_at = NULL, claim_token = NULL
-    WHERE content_hash IN (SELECT * FROM ${textRows(hashes)}) AND collecting_at IS NOT NULL
+    WHERE content_hash = ANY(${textArray(hashes)}) AND collecting_at IS NOT NULL
       AND collecting_at < ${instant(staleBefore)}`);
 }
 
@@ -134,13 +135,13 @@ export async function claimContent(
     if (hashes.length === 0) return [];
     await lockHashes(tx, hashes);
     const decided = await tx.query(sql`SELECT content_hash FROM content_uses
-      WHERE content_hash IN (SELECT * FROM ${textRows(hashes)})
+      WHERE content_hash = ANY(${textArray(hashes)})
       GROUP BY content_hash HAVING ${claimable(idleBefore, staleBefore)}`);
     const claimed = decided.map((row) => String(row["content_hash"]));
     if (claimed.length === 0) return [];
     const stamped = await tx.query(sql`UPDATE content_uses
       SET collecting_at = ${instant(new Date().toISOString())}, claim_token = ${token}
-      WHERE content_hash IN (SELECT * FROM ${textRows(claimed)})
+      WHERE content_hash = ANY(${textArray(claimed)})
       RETURNING content_hash`);
     return [...new Set(stamped.map((row) => String(row["content_hash"])))].toSorted();
   });

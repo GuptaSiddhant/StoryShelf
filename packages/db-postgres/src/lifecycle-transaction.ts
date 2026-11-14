@@ -55,6 +55,16 @@ export function textRows(values: readonly string[]): SQL {
   return sql`jsonb_array_elements_text(${JSON.stringify(values)}::jsonb)`;
 }
 
+/**
+ * The strings as one `text[]`, for `column = ANY(...)`. The array is an init plan, built once per
+ * statement, so the planner cannot re-expand it per row. `IN (SELECT * FROM jsonb_array_elements_text(...))`
+ * can fall back to a nested loop that parses the whole parameter again for every row of the table:
+ * quadratic, and minutes for tens of thousands of hashes (#1067). Still one bound parameter.
+ */
+export function textArray(values: readonly string[]): SQL {
+  return sql`ARRAY(SELECT ${textRows(values)})`;
+}
+
 /** An ISO instant as a bound `timestamptz`. */
 export function instant(iso: string): SQL {
   return sql`${iso}::timestamptz`;
