@@ -66,6 +66,10 @@ When Storybook lives in a package of the repository (`packages/app`, a workspace
 
 Changes in the package and in sibling workspace packages it imports both trigger the stories that depend on them. See [Affected capture](/concepts/affected-capture/#storybook-in-a-monorepo-package).
 
+## Superseded builds
+
+`storyshelf upload` names older in-flight builds of the branch that the new commit replaces, and the project setting `cancel_superseded` lets the server cancel them. Git history decides, so keep `fetch-depth: 0` (or enough depth to reach the previous commits). In a shallow clone a missing commit is kept unless the checked-out commit is the branch's tip on `origin`. See [Builds](/concepts/builds/#superseded-builds).
+
 ## Skip commits that change no story
 
 Add `--skip-unchanged` to `storyshelf upload` (or set `STORYSHELF_SKIP_UNCHANGED=1`) and a commit that reaches no story records a skipped build instead of uploading the Storybook, with a status for the commit. It needs the full history (`fetch-depth: 0`) and the build's stats file, like affected capture, and never fails the job: any doubt uploads normally. See [Skipping unchanged commits](/concepts/affected-capture/#skipping-unchanged-commits).

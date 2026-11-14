@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS projects (
   require_verified_default TINYINT(1) NOT NULL DEFAULT true,
   storybook_url_ttl_seconds INT,
   component_owners TEXT,
+  cancel_superseded TINYINT(1) NOT NULL DEFAULT true,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 );

@@ -68,8 +68,10 @@ export interface Build {
    */
   skippedFromBuildId?: string | null;
   /**
-   * For a `skipped` build, the normal build of the same project, branch and commit that replaced
-   * it (ADR 0044 decision 4, ADR 0045); null otherwise.
+   * The build that replaced this one (ADR 0044 decision 4, ADR 0045): for a `skipped` build, the
+   * normal build of the same project, branch and commit; for a build cancelled as superseded, the
+   * newer build that cancelled it (set in the write that cancels, the build stays `cancelled`).
+   * Null otherwise.
    */
   supersededByBuildId?: string | null;
   /** The CLI's per-run key: a repeated key returns the build it created. Unique per project. */

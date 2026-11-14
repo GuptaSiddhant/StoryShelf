@@ -109,6 +109,8 @@ const BUILD_SUPERSEDED_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS superseded_by_build_id TEXT";
 const BUILD_IDEMPOTENCY_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS idempotency_key TEXT";
 const BUILD_MANIFEST_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS manifest_sha256 TEXT";
+const PROJECT_CANCEL_SUPERSEDED_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS cancel_superseded BOOLEAN NOT NULL DEFAULT true";
 const SNAPSHOT_UNSTABLE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS unstable BOOLEAN";
 const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
@@ -305,6 +307,7 @@ async function migrateBuildRunColumns(run: MigrationRunner): Promise<void> {
   await run(BUILD_CAPTURE_JOB_ALTER);
   await run(BUILD_CAPTURE_GENERATION_ALTER);
   await run(BUILD_MANIFEST_SHA_ALTER);
+  await run(PROJECT_CANCEL_SUPERSEDED_ALTER);
 }
 
 /** The column first, then the index on it: the DDL cannot index a column an old table lacks. */

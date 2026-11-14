@@ -76,6 +76,7 @@ const projects = defineTable("projects", {
   requireVerifiedDefault: "require_verified_default",
   storybookUrlTtlSeconds: "storybook_url_ttl_seconds",
   componentOwners: "component_owners",
+  cancelSuperseded: "cancel_superseded",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

@@ -17,6 +17,7 @@ import { HashRoutesMissingError, isOverInlineLimit, uploadFileByFile } from "./f
 import { parseLabels } from "./labels.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
+import { findSupersedes } from "./supersede.ts";
 import { trySkipUnchanged } from "./upload-skip.ts";
 
 /**
@@ -301,15 +302,13 @@ async function buildAndPost(
   if (collected.skipUnchanged && (await trySkipUnchanged(client, { ...collected, cwd }))) {
     return;
   }
-  const created: BuildCreated = await client.projects.builds.createJson(collected.slug, {
-    gitSha: collected.sha,
-    gitBranch: collected.branch,
-    message: collected.message,
-    authorEmail: collected.authorEmail,
-    authorName: collected.authorName,
-    affectedOnly: collected.affectedOnly,
-    labels: parseLabels(collected.label),
+  const supersedes = await findSupersedes(client, {
+    slug: collected.slug,
+    cwd,
+    branch: collected.branch,
+    headSha: collected.sha,
   });
+  const created = await createBuild(client, collected, supersedes);
   const hostingOnly = created.testing === false;
   if (!hostingOnly) {
     await reportAffectedCapture(client, created, cwd, collected);
@@ -320,6 +319,24 @@ async function buildAndPost(
   if (hostingOnly) {
     printLine(HOSTING_ONLY_NOTICE);
   }
+}
+
+/** Create the build record, naming the builds it supersedes (ADR 0045). */
+async function createBuild(
+  client: ReturnType<typeof createClient>,
+  collected: ResolvedUploadOptions,
+  supersedes: string[] | undefined,
+): Promise<BuildCreated> {
+  return await client.projects.builds.createJson(collected.slug, {
+    gitSha: collected.sha,
+    gitBranch: collected.branch,
+    message: collected.message,
+    authorEmail: collected.authorEmail,
+    authorName: collected.authorName,
+    affectedOnly: collected.affectedOnly,
+    labels: parseLabels(collected.label),
+    ...(supersedes && { supersedes }),
+  });
 }
 
 /** Printed when the server reports `testing: false` (ADR 0006, decision 1). */

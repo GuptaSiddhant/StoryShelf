@@ -33,9 +33,9 @@ export function isCapturing(build: Build): boolean {
   return build.status === "pending" || build.status === "capturing" || build.status === "comparing";
 }
 
-/** Whether a retry makes sense: the build ended without snapshots to review. */
+/** Whether a retry makes sense: the build ended without snapshots to review, and no newer commit replaced it (ADR 0045). */
 export function isRetryable(build: Build): boolean {
-  return build.status === "failed" || build.status === "cancelled";
+  return (build.status === "failed" || build.status === "cancelled") && !build.supersededByBuildId;
 }
 
 function firstLine(text: string | null | undefined): string | null {

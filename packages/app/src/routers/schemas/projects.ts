@@ -61,6 +61,8 @@ export const projectSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs when `testing` is off. */
     reviewApprovals: z.number().optional(),
+    /** Cancel older in-flight builds a newer commit supersedes (ADR 0045; default on). */
+    cancelSuperseded: z.boolean().optional(),
     /** A build naming the default branch counts as one only once a git channel confirmed the commit is on it (default on). */
     requireVerifiedDefault: z.boolean().optional(),
     /** Seconds the signed Storybook URLs of a render stay valid; null derives it from the stories. */
@@ -122,6 +124,8 @@ export const projectUpdateSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs before it is accepted when `testing` is off. */
     reviewApprovals: reviewApprovalsSchema.optional(),
+    /** Cancel older in-flight builds a newer commit supersedes (admins; ADR 0045). */
+    cancelSuperseded: z.boolean().optional(),
     /** Turn default-branch verification on or off (admins); off lets an unverified claim count. */
     requireVerifiedDefault: z.boolean().optional(),
     /** Seconds (at least one minimum slice plus grace, 1050, to 86400) the signed Storybook URLs of a render stay valid; null derives it from the stories. */

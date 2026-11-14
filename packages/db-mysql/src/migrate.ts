@@ -118,6 +118,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "superseded_by_build_id", definition: "VARCHAR(26) NULL" },
   { table: "builds", column: "idempotency_key", definition: "VARCHAR(191) NULL" },
   { table: "builds", column: "manifest_sha256", definition: "VARCHAR(64) NULL" },
+  { table: "projects", column: "cancel_superseded", definition: "TINYINT(1) NOT NULL DEFAULT 1" },
   {
     table: "notification_subscriptions",
     column: "review_requests",

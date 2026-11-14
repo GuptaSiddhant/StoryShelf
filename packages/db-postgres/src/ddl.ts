@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS projects (
   require_verified_default BOOLEAN NOT NULL DEFAULT true,
   storybook_url_ttl_seconds INTEGER,
   component_owners TEXT,
+  cancel_superseded BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
