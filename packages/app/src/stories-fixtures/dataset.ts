@@ -24,6 +24,8 @@ export const BUILD_REVIEW = id("BLD002");
 export const BUILD_FAILED = id("BLD003");
 export const BUILD_CAPTURING = id("BLD004");
 export const BUILD_REJECTED = id("BLD005");
+/** An older build of the capturing build's branch, cancelled when that newer commit arrived (ADR 0045). */
+export const BUILD_SUPERSEDED = id("BLD006");
 
 export const project: Project = {
   id: PROJECT_ID,
@@ -138,6 +140,18 @@ export const builds: Build[] = [
     rejectedCount: 2,
     createdAt: hoursAgo(96),
     updatedAt: hoursAgo(94),
+  }),
+  build({
+    id: BUILD_SUPERSEDED,
+    gitSha: "e4f5a6b",
+    gitBranch: "feature/dark-tabs",
+    status: "cancelled",
+    supersededByBuildId: BUILD_CAPTURING,
+    authorName: "Grace Hopper",
+    authorEmail: "grace@example.com",
+    message: "wip(tabs): dark mode tab bar",
+    createdAt: hoursAgo(0.5),
+    updatedAt: hoursAgo(0.1),
   }),
 ];
 

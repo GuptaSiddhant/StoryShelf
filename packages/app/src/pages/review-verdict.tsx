@@ -140,12 +140,32 @@ function takesNoVerdict(status: string): boolean {
 }
 
 /** The one line a build that cannot be reviewed shows in place of the approval counter; null when it can be. */
-function nothingToReview(data: ReviewSectionData): string | null {
+function nothingToReview(data: ReviewSectionData): Rendered | string | null {
   const { status } = data.build;
   if (!takesNoVerdict(status)) {
     return null;
   }
+  if (data.build.supersededByBuildId) {
+    return supersededLine(data);
+  }
   return `Nothing to review: this build ${status === "failed" ? "failed" : "was cancelled"}.`;
+}
+
+/** A superseded build (ADR 0045) says what replaced it; the link is dropped once that build is purged. */
+function supersededLine(data: ReviewSectionData): Rendered {
+  const { supersededBy, project } = data;
+  if (!supersededBy) {
+    return <>Nothing to review: this build was superseded.</>;
+  }
+  return (
+    <>
+      Nothing to review: this build was superseded by{" "}
+      <a href={`/projects/${project.slug}/builds/${supersededBy.id}`}>
+        {supersededBy.gitSha.slice(0, 7)}
+      </a>
+      .
+    </>
+  );
 }
 
 /**
@@ -155,7 +175,7 @@ function nothingToReview(data: ReviewSectionData): string | null {
  */
 function RetryBuild(props: { data: ReviewSectionData }): Rendered | null {
   const { data } = props;
-  if (!data.testing || !data.canComment) {
+  if (!data.testing || !data.canComment || data.build.supersededByBuildId) {
     return null;
   }
   const url = `/api/v1/projects/${data.project.slug}/builds/${data.build.id}/retry`;

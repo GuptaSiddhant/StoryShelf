@@ -7,6 +7,7 @@ import {
   BUILD_MAIN,
   BUILD_REJECTED,
   BUILD_REVIEW,
+  BUILD_SUPERSEDED,
 } from "../stories-fixtures/dataset.ts";
 import { renderBuildDetailPage } from "./build-detail.tsx";
 
@@ -22,6 +23,9 @@ export const Capturing = pageStory(() => renderBuildDetailPage(BUILD_CAPTURING))
 export const Failed = pageStory(() => renderBuildDetailPage(BUILD_FAILED));
 
 export const Rejected = pageStory(() => renderBuildDetailPage(BUILD_REJECTED));
+
+/** Cancelled because a newer commit of the branch replaced it: the review card names that build. */
+export const Superseded = pageStory(() => renderBuildDetailPage(BUILD_SUPERSEDED));
 
 export const TestingOff = pageStory(() => renderBuildDetailPage(BUILD_MAIN), {
   store: { testing: false },

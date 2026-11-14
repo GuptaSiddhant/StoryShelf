@@ -10,6 +10,7 @@ import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { toProjectPatch } from "./capture-config.ts";
 import { flash } from "./flash.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 
@@ -19,6 +20,7 @@ export function registerCaptureSettings(app: ShelfRouter): void {
     c.html(await renderSettingsPage(c, "capture")),
   );
   app.post("/projects/:slug/settings/capture", handleCaptureUpdate);
+  app.post("/projects/:slug/settings/capture/superseded", handleSupersededUpdate);
 }
 
 const EXTRA_PREFIX = "extra_";
@@ -92,5 +94,16 @@ async function handleCaptureUpdate(c: Context): Promise<Response> {
     throw error;
   }
   flash(c, "Capture settings saved");
+  return hxRedirect(c, `/projects/${project.slug}/settings/capture`);
+}
+
+/** The cancel-superseded switch (ADR 0045); admins only. An unticked box sends no field. */
+async function handleSupersededUpdate(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  const form = await c.req.formData();
+  await new ProjectModel(getStore().db).update(project.id, {
+    cancelSuperseded: form.get("cancelSuperseded") === "true",
+  });
+  flash(c, "Superseded-build setting saved");
   return hxRedirect(c, `/projects/${project.slug}/settings/capture`);
 }
