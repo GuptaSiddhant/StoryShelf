@@ -62,6 +62,16 @@ export function storageContractSuite(label: string, make: StorageFactory): void 
       expect(await adapter.exists(path)).toBe(false);
     });
 
+    it("deletes a missing object without error, so a repeated delete is idempotent", async () => {
+      const adapter = await make();
+      const path = `${prefix}/twice.txt`;
+      await adapter.write(path, Buffer.from("x"));
+      await adapter.delete(path);
+      await expect(adapter.delete(path)).resolves.toBeUndefined();
+      await expect(adapter.delete(`${prefix}/never-written.txt`)).resolves.toBeUndefined();
+      expect(await adapter.exists(path)).toBe(false);
+    });
+
     it("lists recursively and empty for missing prefixes", async () => {
       const adapter = await make();
       await adapter.write(`${prefix}/list/a.txt`, Buffer.from("a"));

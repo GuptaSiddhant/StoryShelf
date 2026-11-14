@@ -204,6 +204,12 @@ export interface ShelfConfig {
    * retention (ADR 0039).
    */
   purgeTtlDays?: number;
+  /** Insight rows (all kinds) older than this many days are deleted daily; null keeps them (default 180). */
+  insightsTtlDays?: number | null;
+  /** AI usage rows older than this many days are deleted daily; null keeps them (default 400, covers every budget window). */
+  aiUsageTtlDays?: number | null;
+  /** Expired session and verification rows are deleted this many days after expiry; null keeps them (default 7). */
+  expiredAuthTtlDays?: number | null;
   /** Branch baseline TTL, days; null disables branch GC (default 30). */
   branchTtlDays?: number | null;
   /** Branch GC interval, ms; daily sweep via interval clock (default 86_400_000). */
@@ -214,7 +220,7 @@ export interface ShelfConfig {
    * Opt-in, off by default — some deployments prefer no timing headers.
    */
   serverTiming?: boolean;
-  /** Persist gzip variants for published Storybook files (default off). */
+  /** Persist gzip and brotli copies of published Storybook files, made when publishing ends (default off). */
   publishedCompression?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;
@@ -362,6 +368,9 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     branchTtlDays: z.number().int().positive().nullable().optional(),
+    insightsTtlDays: z.number().int().positive().nullable().optional(),
+    aiUsageTtlDays: z.number().int().positive().nullable().optional(),
+    expiredAuthTtlDays: z.number().int().positive().nullable().optional(),
     branchGcIntervalMs: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
@@ -511,6 +520,12 @@ export interface ShelfTestingOptions {
    * boot if it cannot.
    */
   mode?: "auto" | "in-process" | "fork";
+  /**
+   * Operator veto of story switching (ADR 0052, decision 2). `false` forbids a project's
+   * `switchStories` setting for the whole server; unset or `true` leaves the choice to each
+   * project (the setting itself defaults to off).
+   */
+  switchStories?: boolean;
   /** Screenshot comparison, shared by capture and the re-diff endpoint. */
   compare?: ShelfCompareOptions;
   /** Image library selection; see {@link ShelfImagesOptions}. */

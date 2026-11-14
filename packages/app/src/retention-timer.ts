@@ -1,13 +1,24 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import type { Auth } from "@storyshelf/core/auth";
 import type { ShelfConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 /* oxlint-disable typescript/promise-function-async -- interval helpers return promise factories */
 import { ProjectModel } from "@storyshelf/core/models";
-import { Retention, purgeAiData } from "@storyshelf/core/retention";
+import {
+  Retention,
+  purgeAiData,
+  reclaimBuildCopies,
+  reclaimUploadZips,
+  type AiRetention,
+} from "@storyshelf/core/retention";
 
 const DEFAULT_BRANCH_TTL_DAYS = 30;
+const DEFAULT_EXPIRED_AUTH_TTL_DAYS = 7;
 const DEFAULT_BRANCH_GC_INTERVAL_MS = 86_400_000;
+
+/** Pages of 50 builds the per-build copy reclaim visits in one sweep; the next sweep resumes from its cursor. */
+const RECLAIM_PAGES_PER_SWEEP = 20;
 
 /** Handle for the background branch-GC interval; call `stop()` on server shutdown. */
 export interface BranchGcTimer {
@@ -24,10 +35,18 @@ interface SweepContext {
   /** Build purge TTL; undefined: scheduled build purge is off (the default). */
   purgeTtlDays: number | undefined;
   testing: boolean;
+  /** AI table retention windows from config (days; null keeps rows). */
+  retention: AiRetention;
+  /** Days after expiry that session and verification rows are deleted; null keeps them. */
+  expiredAuthTtlDays: number | null;
+  /** Auth singleton whose expired rows are swept, when auth is on. */
+  auth: Auth | undefined;
   /** Resolves with the adapter setup result; a sweep waits for it and runs only when it succeeded. */
   ready: () => Promise<{ ok: boolean }>;
   /** Set by `stop()`: a sweep that was waiting for setup must not start after shutdown began. */
   stopped: boolean;
+  /** Aborted by `stop()`: a running batched stage stops between builds. */
+  signal: AbortSignal;
   warned: boolean;
 }
 
@@ -55,13 +74,16 @@ export function startBranchGcTimer(
   logger: Logger,
   testing = false,
   ready: () => Promise<{ ok: boolean }> = async () => await Promise.resolve({ ok: true }),
+  auth?: Auth,
 ): BranchGcTimer | null {
   const branchTtlDays =
     config.branchTtlDays === undefined ? DEFAULT_BRANCH_TTL_DAYS : config.branchTtlDays;
   const intervalMs = config.branchGcIntervalMs ?? DEFAULT_BRANCH_GC_INTERVAL_MS;
-  if ((branchTtlDays === null && config.purgeTtlDays === undefined) || intervalMs <= 0) {
+  // The AI-data and expired-auth sweeps always run, so only a non-positive interval turns it off.
+  if (intervalMs <= 0) {
     return null;
   }
+  const stop = new AbortController();
   const context: SweepContext = {
     db,
     storage,
@@ -69,12 +91,20 @@ export function startBranchGcTimer(
     branchTtlDays,
     purgeTtlDays: config.purgeTtlDays,
     testing,
+    retention: { insightDays: config.insightsTtlDays, usageDays: config.aiUsageTtlDays },
+    expiredAuthTtlDays:
+      config.expiredAuthTtlDays === undefined
+        ? DEFAULT_EXPIRED_AUTH_TTL_DAYS
+        : config.expiredAuthTtlDays,
+    auth,
     ready,
     stopped: false,
+    signal: stop.signal,
     warned: false,
   };
   return scheduleBranchGc(createSweepRunner(context), intervalMs, () => {
     context.stopped = true;
+    stop.abort();
   });
 }
 
@@ -108,9 +138,47 @@ async function sweep(context: SweepContext): Promise<void> {
       await sweepBuilds(context, purgeTtlDays);
     });
   }
-  await stage(context, "AI data cleanup", async () => {
-    await purgeAiData(db, new Date(), context.logger);
+  await stage(context, "build copy reclaim", async () => {
+    await sweepBuildCopies(context);
   });
+  await stage(context, "AI data cleanup", async () => {
+    await purgeAiData(db, new Date(), context.logger, context.retention);
+  });
+  await stage(context, "expired auth rows", async () => {
+    await sweepExpiredAuth(context);
+  });
+}
+
+/**
+ * Reclaim the per-build Storybook copies kept before published files were stored once, then the
+ * upload zips of builds that hold a manifest (#850): a
+ * bounded number of pages per sweep, resumed from a saved cursor, idempotent, never at boot. It is
+ * not a job kind, so it adds no new queue row type (ADR 0053).
+ */
+async function sweepBuildCopies(context: SweepContext): Promise<void> {
+  const { db, storage, logger, signal } = context;
+  for (let page = 0; page < RECLAIM_PAGES_PER_SWEEP && !signal.aborted; page += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- one page at a time; the cursor is saved per build
+    const result = await reclaimBuildCopies({ db, storage, logger, signal });
+    if (result.done) break;
+  }
+  // The second pass: upload zips of builds whose statics are stored once (#850), own cursor.
+  for (let page = 0; page < RECLAIM_PAGES_PER_SWEEP && !signal.aborted; page += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- one page at a time; the cursor is saved per build
+    const result = await reclaimUploadZips({ db, storage, logger, signal });
+    if (result.done) return;
+  }
+}
+
+/** Delete session and verification rows that expired `expiredAuthTtlDays` ago (batched by the auth engine). */
+async function sweepExpiredAuth(context: SweepContext): Promise<void> {
+  const { auth, expiredAuthTtlDays } = context;
+  if (!auth?.purgeExpired || expiredAuthTtlDays === null) return;
+  const cutoff = new Date(Date.now() - expiredAuthTtlDays * 86_400_000).toISOString();
+  const removed = await auth.purgeExpired(cutoff);
+  if (removed.sessions > 0 || removed.verifications > 0) {
+    context.logger.info(removed, "expired auth rows removed");
+  }
 }
 
 /** Run one stage of the sweep; a failure is logged and leaves the next stage to run. */

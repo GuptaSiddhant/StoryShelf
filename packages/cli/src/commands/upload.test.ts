@@ -17,6 +17,7 @@ function baseOptions(): {
   sha: string;
   branch: string;
   cwd: string;
+  zip: boolean;
 } {
   return {
     url: "https://shelf.example.com",
@@ -24,6 +25,7 @@ function baseOptions(): {
     token: "ci-token",
     sha: "abc123",
     branch: "main",
+    zip: true,
     cwd: dir,
   };
 }
@@ -148,7 +150,7 @@ describe("runUpload success", () => {
           return okJson({ build: { id: "b1" }, uploadUrl: "/api/v1/projects/demo/builds/b1/zip" });
         }),
       );
-      const options: Record<string, string | undefined> = {
+      const options: Record<string, string | boolean | undefined> = {
         ...baseOptions(),
         buildDir: "storybook-static",
         url: source === "flag" ? "https://shelf.example.com//" : undefined,
@@ -487,6 +489,7 @@ describe("runUpload affected capture", () => {
       buildDir: "storybook-static",
       untraced: ["src/b.tsx"],
       cwd: dir,
+      zip: true,
     });
 
     const affected = calls.find((call) => call.url.endsWith("/affected"));

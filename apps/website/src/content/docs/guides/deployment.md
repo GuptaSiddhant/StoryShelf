@@ -50,7 +50,7 @@ createShelfApp({
 });
 ```
 
-Set `publishedCompression: false` or omit it to disable generation and serving of variants. Authorized public, signed-in and signed URL requests keep their existing access rules; signed URLs still answer `private, no-store`. The first eligible request receives the original while gzip is generated in the background. Later requests that accept gzip can receive the stored variant. Missing, invalid or unavailable variants always fall back to the original. Legacy files without a content hash remain uncompressed.
+Set `publishedCompression: false` or omit it to disable generation and serving of variants. Authorized public, signed-in and signed URL requests keep their existing access rules; signed URLs still answer `private, no-store`. When a build finishes publishing, the server makes a brotli and a gzip copy of each of its text-like files of 1 KB or more (JavaScript, CSS, HTML, JSON, SVG, ...) in the background, so the first request is already compressed. A client that accepts `br` gets brotli, otherwise gzip if it accepts that; each encoding has its own `ETag` and every answer sends `Vary: Accept-Encoding`. The copies are stored once per content hash, next to the content (`derived/published-br/` and `derived/published-gzip/`), and are deleted with it. A file published before this, or one the background pass skipped, gets its copy on its first request, which is answered uncompressed. Missing, invalid or unavailable copies always fall back to the original. Legacy files without a content hash remain uncompressed.
 
 Only compressible files up to 8 MiB are eligible. At most two generation jobs and four variant checks run per storage adapter in each process; work above those limits is skipped and can be attempted on a later request. A variant check that takes longer than 250 ms falls back to the original. Variant storage is additional to the original, shared by content hash, and useful for warm transfer size and latency at the cost of CPU, memory and persistent storage. Savings depend on the files and the workload; the first response is uncompressed.
 
@@ -109,6 +109,61 @@ const storage = createS3Storage({
 
 Credentials come from the SDK's default chain, so `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` stay Fly secrets and are never passed in code. See `apps/fly-app` in the repository for the demo's wiring, including how it falls back to the volume when no bucket is set and a one-time copy of existing objects.
 
+## CDN in front of published builds
+
+Published Storybook files can sit behind a CDN. What a CDN may keep is decided by the `Cache-Control` each answer carries, which the server sets per request. A CDN must obey it: do not add a default TTL, do not override `private`, and do not cache by URL when the response is `private`.
+
+| Route | Who gets it | `Cache-Control` | A shared cache (CDN) may store it |
+| --- | --- | --- | --- |
+| `/_/<buildId>/*` (a ULID short link) | a public build, or any build on an instance without sign-in | `public, max-age=31536000, immutable` | yes, indefinitely |
+| `/projects/:slug/storybook/build/<buildId>/*` | the same | `public, max-age=31536000, immutable` | yes, indefinitely |
+| `/_/<slug>/` (the project's latest build) | the same | `public, max-age=60` | yes, for a minute |
+| `/_/<slug>/*` (a slug, not the root) | the same | `public, max-age=3600` | yes, for an hour |
+| `/projects/:slug/storybook/build/<buildId>/` (the landing page, not a file) | the same | `public, no-cache` | revalidate only |
+| a private build, signed-in viewer with a role | `session` | `private, no-cache` | no |
+| `/_s/:token/*` (a signed URL) | the token holder | `private, no-store`; a capture grant may get `private, max-age=N` when `captureAssets.cacheMaxAgeSeconds` is set | no |
+| `/_r/:token/*` (a read grant) | the token holder | `private, no-store` | no |
+
+Rules for the CDN:
+
+- **Public builds** are safe to cache for good: the build's URL names its content, so an entry never goes stale.
+- **Private projects** must bypass the cache. Their answers are `private`, and a CDN that stores them would serve one viewer's private build to anyone who asks for the same URL.
+- **`/_s/` and `/_r/` must bypass the cache.** They are signed, carry the token in the URL, and are `no-store` (a successful capture-grant answer may use `private`, never `public`).
+- **Compression.** When `publishedCompression` is on, the answer varies by `Accept-Encoding`; the server sends `Vary: Accept-Encoding`, and the CDN must key its cache on it.
+- **Never** add `public` or `s-maxage` to an answer the origin marked `private`. Authorization is decided at the origin, so a CDN that keeps a private answer serves it without the check.
+
+A 404 for a private build is the same for every caller and carries no `Cache-Control`; configure the CDN not to cache 404s on these paths, so that a build published later appears at once.
+
+## Running several instances
+
+Several instances can share one database and one storage adapter. Some state is shared between them and some is per process; this decides what a configured limit means.
+
+**Shared** (one copy, seen by every instance):
+
+- the database, including the capture and publish job queue (`capture_jobs`): any instance may take a job, and a lease recovers work from an instance that stops;
+- published files and manifests in the storage adapter;
+- the AI token budget: usage is counted from the database, so the daily limit holds across instances;
+- sessions and signed URLs, provided every instance has the same `SECRET`. Set it once and share it.
+
+**Per process** (each instance has its own copy):
+
+- the manifest cache (a bounded cache per storage adapter) and the catalog cache (`catalog.json` by build id): a cold instance reads storage once; the entries are immutable, so this never causes a stale answer;
+- the rate-limit buckets: a client's count lives in the instance it reaches;
+- the remote-browser connection limiter (`maxConnections`), and the page limit of each capture run (it is set per run and the adaptive controller is per run, so every instance renders its own runs' pages);
+- the capture consumer: each instance runs its own, so `CAPTURE_CONCURRENCY` applies per instance.
+
+What this means for configured limits with N instances:
+
+| Limit | Total across N instances |
+| --- | --- |
+| `/api/v1/*`, sign-in and signed-URL rate limits | up to N × the configured count for one client, when a load balancer spreads that client over instances |
+| `CAPTURE_CONCURRENCY` | N × the value captures run at once; each capture drives a browser |
+| remote-browser `maxConnections` | N × the value connections to a remote service; divide a provider's session limit by N |
+| pages rendered at once by capture runs | N × the page count of one run: each instance runs its own jobs |
+| AI token budget | not multiplied: it is counted from the database |
+
+Choose each per-instance value as the total limit divided by N. For rate limits, a load balancer that keeps one client on one instance (sticky sessions) keeps the count exact for that client.
+
 ## Remote browsers
 
 Rendering scales on the browser side, not by adding processes: every instance runs the same `testing` configuration, so every instance offers the same targets. To take browsers off the app host, list remote services in the runner's `browsers` (a self-hosted Playwright server, Azure Playwright Workspaces, a CDP service) and the host needs no installed browsers. `sessions` per service is the page cap per instance; divide a provider's parallel-session limit among instances. See [Remote browsers](/guides/remote-browsers/).
@@ -123,7 +178,7 @@ Capture drives Chromium, which dominates memory use. Each open page costs roughl
 | `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY`           | auto (see below)                                              | Pages rendering at once within one build                         |
 | `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU               | Per-page navigation and action timeout                           |
 
-| `createPlaywrightCaptureRunner({ reusePages })` / `STORYSHELF_REUSE_PAGES` | off | Reuse a pool of reset pages instead of opening one per capture |
+| `createPlaywrightCaptureRunner({ reusePages })` / `STORYSHELF_REUSE_PAGES` | on | Reuse a pool of reset pages instead of opening one per capture; `false` or `0` opens a fresh page each time |
 | `createPlaywrightCaptureRunner({ recycleBrowserEvery })` / `STORYSHELF_BROWSER_RECYCLE_EVERY` | `150` (`0` disables) | Captures between browser restarts |
 
 The defaults are sized from the CPU and memory the process can actually use, including container limits (cgroup CPU quota and memory limit), so a 0.5 vCPU / 1 GB container on a big host is treated as 0.5 / 1 GB. Pages at once is the smaller of the CPU count (rounded up), `(memory − 512 MB) / 300 MB`, and 4, with a minimum of 1. In practice:
@@ -139,7 +194,7 @@ More pages than CPUs does not make capture faster: the pages compete for the sam
 
 Screenshots are written to storage as each one is captured instead of being held until the whole build has rendered, so memory use no longer grows with the number of stories.
 
-By default every capture opens a fresh page. Set `reusePages: true` (or `STORYSHELF_REUSE_PAGES=1`) to reuse a small pool of pages instead. Each page runs in its own browser context and is reset between captures (cookies, local and session storage and IndexedDB cleared, blank document), and a page that failed a capture is thrown away rather than reused. It is off by default because a story that leaks state outside those resets could affect the next one; on the bundled fixtures, screenshots were byte-identical with reuse on and off. Reuse mostly saves page startup time, which matters most on slower hosts.
+Captures reuse a small pool of pages by default. Each page runs in its own browser context and is reset between captures (cookies, local and session storage and IndexedDB cleared, blank document), a page is resized when the viewport changes, and a page that failed a capture is thrown away rather than reused. Set `reusePages: false` (or `STORYSHELF_REUSE_PAGES=0`) to open a fresh page per capture, for example if a story leaks state outside those resets and affects the next one. Reuse mostly saves page startup time, which matters most on slower hosts.
 
 Chromium grows slowly over a long run, so a local browser is closed and relaunched every 150 captures. A connected remote target is instead disconnected and reconnected, never sent `Browser.close`, so sibling clients and the provider machine survive. The restart happens between batches, after in-flight pages finish, so no capture is interrupted. At the start of every render the runner logs a `capture sizing` line with the detected `cpus` and `memoryMb` and the resulting `pages`, `navigationTimeoutMs` and `recycleBrowserEvery`; check it first if a host behaves differently from the table.
 

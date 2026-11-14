@@ -30,3 +30,4 @@ export {
 export { publishStoredZip, PUBLISH_SCRATCH_ID, type PublishZipOptions } from "./run.ts";
 
 export { ZipInvalidError } from "./invalid-zip.ts";
+export { dropUploadZip, type DropZipDeps, type DropZipResult } from "./drop-zip.ts";

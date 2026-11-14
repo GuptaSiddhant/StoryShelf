@@ -35,10 +35,10 @@ import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import { createClientIpResolver } from "./middleware/client-ip.ts";
+import { compression } from "./middleware/compression.ts";
 import {
   authGate,
   notFoundPage,
-  csrf,
   createRateLimiter,
   hostDispatch,
   requireProjectVisible,
@@ -52,6 +52,7 @@ import {
 } from "./middleware/index.ts";
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
+import { packageVersion } from "./package-version.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerPublicOriginRoutes } from "./routers/admin-public-origin.ts";
 import { registerAdmin } from "./routers/admin.ts";
@@ -85,6 +86,7 @@ import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
 import { registerWellKnown } from "./routers/well-known.ts";
 import { markRouteClasses } from "./routes/openapi-classes.ts";
+import { mountCsrf } from "./routes/write-protection.ts";
 import { resolveRuntime, type ServerRuntime } from "./runtime.ts";
 
 /**
@@ -141,9 +143,6 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
   warnOnServerless(options, runtime.logger);
   const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
   attachLifecycle(app, options, runtime, cell);
-  if (runtime.config.serverTiming === true) {
-    app.use("*", serverTiming(true));
-  }
   const queues = wireQueues(scoped, runtime, cell);
   wireMiddleware(app, {
     ...runtime,
@@ -188,24 +187,6 @@ export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
   return app;
 }
 
-/** Cookie-authenticated write paths guarded by CSRF tokens. */
-const CSRF_PATHS = [
-  "/auth/logout",
-  "/auth/invites/*",
-  "/projects/:slug/settings/*",
-  "/profile/*",
-  "/connections/*",
-  "/profile",
-  "/admin/credentials/*",
-  "/admin/public-origin",
-  "/admin/public-origin/*",
-  "/projects/:slug/builds/:buildId/insights/generate",
-  "/projects/:slug/builds/:buildId/comments",
-  "/projects/:slug/builds/:buildId/comments/*",
-  "/projects/:slug/builds/:buildId/reviews",
-  "/projects/:slug/insights/health/generate",
-] as const;
-
 /** Attach global middleware: ids, logging, init gate, limits, store scope, auth gate. */
 function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   const { config, logger, getReady } = wiring;
@@ -245,6 +226,13 @@ function mountTestingGate(app: ShelfRouter, testing: boolean): void {
  */
 function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
   app.use("*", hostDispatch());
+  // Gzip portal HTML pages and JSON (#868). After hostDispatch, so content and alias hosts, which
+  // serve published files with their own handling, never reach it.
+  // Server-Timing (#872), opt-in, outside compression so the header lands on the final answer.
+  if (config.serverTiming === true) {
+    app.use("*", serverTiming(true));
+  }
+  app.use("*", compression());
   app.use("*", sameSiteWrites(config));
 }
 
@@ -330,9 +318,8 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOption
       app.use(path, rateLimit({ windowMs: MINUTE, max, keyGenerator }));
     }
   }
-  for (const path of CSRF_PATHS) {
-    app.use(path, csrf(config.secret));
-  }
+  // CSRF tokens on page writes; the same-origin rule (`sameSiteWrites`) covers every write (#786).
+  mountCsrf(app, config.secret);
 }
 
 /** Mount the request-scoped store (db/storage/config/user/adapters). */
@@ -516,17 +503,6 @@ function registerDocs(app: ShelfRouter): void {
     ),
   );
   app.get("/api/v1/docs", swaggerUI({ url: "/api/v1/openapi.json" }));
-}
-
-declare const __PKG_VERSION__: string | undefined;
-
-/**
- * Package version injected at build via the `__PKG_VERSION__` define. Read as a bare identifier:
- * bundler defines replace identifiers, not `globalThis` property reads. Undefined when running
- * from source (dev server, tests).
- */
-function packageVersion(): string {
-  return typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0";
 }
 
 /**

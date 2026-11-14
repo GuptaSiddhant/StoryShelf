@@ -7,6 +7,8 @@
  */
 import {
   duplicateGroupsSql,
+  gatedMigration,
+  sqlSchemaLevelStore,
   logSkippedIndex,
   parseUniqueIndex,
 } from "@storyshelf/core/adapter/database";
@@ -101,6 +103,8 @@ const DETECT_UNSTABLE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS detect_unstable BOOLEAN NOT NULL DEFAULT true";
 const RUN_TESTS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
+const SWITCH_STORIES_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS switch_stories BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
@@ -226,8 +230,14 @@ async function migrateProjectExtras(run: MigrationRunner, logger?: Logger): Prom
   await migrateSnapshotColumns(run, logger);
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
-  await run(RUN_TESTS_ALTER);
+  await migrateProjectSwitches(run);
   await migrateRecentColumns(run);
+}
+
+/** Per-project capture switches added after `run_a11y`; each is an idempotent `ADD COLUMN`. */
+async function migrateProjectSwitches(run: MigrationRunner): Promise<void> {
+  await run(RUN_TESTS_ALTER);
+  await run(SWITCH_STORIES_ALTER);
 }
 
 /** Columns added after the first adapter release; each is an idempotent `ADD COLUMN IF NOT EXISTS`. */
@@ -291,11 +301,12 @@ const MIGRATION_LOCK_KEY = 5_370_011_001;
 export async function runMigrationsLocked(
   session: MigrationSession,
   logger?: Logger,
+  release?: string,
 ): Promise<void> {
   await session(async (run) => {
     await run(`SELECT pg_advisory_lock(${MIGRATION_LOCK_KEY})`);
     try {
-      await runMigrations(run, logger);
+      await runMigrations(run, logger, release);
     } finally {
       await run(`SELECT pg_advisory_unlock(${MIGRATION_LOCK_KEY})`);
     }
@@ -303,7 +314,22 @@ export async function runMigrationsLocked(
 }
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+export async function runMigrations(
+  run: MigrationRunner,
+  logger?: Logger,
+  release?: string,
+): Promise<void> {
+  await gatedMigration({
+    release,
+    logger,
+    store: sqlSchemaLevelStore(run, "postgres"),
+    migrate: async () => {
+      await migrateEverything(run, logger);
+    },
+  });
+}
+
+async function migrateEverything(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await run(DDL);
   await migrateCoreColumns(run);

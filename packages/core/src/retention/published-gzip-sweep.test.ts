@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeStorage } from "../test-helpers/fake-storage.ts";
-import { publishedGzipPath } from "../utils/paths.ts";
+import { publishedBrotliPath, publishedGzipPath } from "../utils/paths.ts";
 import { sweepPublishedGzip } from "./published-gzip-sweep.ts";
 
 describe("published gzip cleanup", () => {
@@ -32,5 +32,24 @@ describe("published gzip cleanup", () => {
     expect(objects.has(publishedGzipPath(last))).toBe(true);
     await sweepPublishedGzip(storage);
     expect(objects.has(publishedGzipPath(last))).toBe(false);
+  });
+});
+
+describe("published brotli cleanup", () => {
+  it("removes orphan brotli copies in the same pass and keeps live ones", async () => {
+    const { storage, objects } = makeStorage();
+    const live = "c".repeat(64);
+    const dead = "d".repeat(64);
+    objects.set(`content/${live}`, Buffer.from("original"));
+    objects.set(publishedBrotliPath(live), Buffer.from("live"));
+    objects.set(publishedBrotliPath(dead), Buffer.from("dead"));
+    objects.set(publishedGzipPath(dead), Buffer.from("dead gzip"));
+    objects.set("derived/published-br/unrelated", Buffer.from("other"));
+    await sweepPublishedGzip(storage);
+    expect(objects.has(publishedBrotliPath(dead))).toBe(false);
+    expect(objects.has(publishedGzipPath(dead))).toBe(false);
+    expect(objects.has(publishedBrotliPath(live))).toBe(true);
+    expect(objects.has("derived/published-br/unrelated")).toBe(true);
+    expect(objects.get(`content/${live}`)?.toString()).toBe("original");
   });
 });

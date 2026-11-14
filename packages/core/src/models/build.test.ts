@@ -46,6 +46,17 @@ describe("BuildModel", () => {
     expect(fetched?.gitSha).toBe("sha-1");
   });
 
+  it("lists summaries without the stored test results", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
+    await model.setTestResults(build.id, [{ id: "t", status: "passed" }]);
+    const [summary] = await model.listSummary("p1", { branch: "main", limit: 1 });
+    expect(summary?.id).toBe(build.id);
+    expect(summary).not.toHaveProperty("testResults");
+    expect((await model.list("p1"))[0]?.testResults).toContain("passed");
+  });
+
   it("updates build status", async () => {
     const { db } = makeDatabase();
     const model = new BuildModel(db, buildTables(db));
