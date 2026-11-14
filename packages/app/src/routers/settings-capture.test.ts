@@ -127,3 +127,42 @@ describe("capture settings tab", () => {
     expect((await project()).storybookUrlTtlSeconds ?? null).toBeNull();
   });
 });
+
+async function post(app: App, fields: Record<string, string>) {
+  return await app.request("/projects/capture-project/settings/capture/superseded", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      "x-csrf-token": getCsrfToken(),
+    },
+    body: new URLSearchParams(fields).toString(),
+  });
+}
+const flag = async (app: App) =>
+  (
+    (await (await app.request("/api/v1/projects/capture-project")).json()) as {
+      cancelSuperseded?: boolean;
+    }
+  ).cancelSuperseded;
+
+type App = Awaited<ReturnType<typeof setup>>["app"];
+
+describe("cancel-superseded setting (ADR 0045)", () => {
+  it("renders the toggle ticked by default", async () => {
+    const { app } = await setup();
+    const html = await (await app.request("/projects/capture-project/settings/capture")).text();
+    expect(html).toContain("Cancel superseded builds");
+    expect(html).toMatch(
+      /name="cancelSuperseded"[^>]*checked|checked[^>]*name="cancelSuperseded"/u,
+    );
+    expect(html).toContain("Save superseded-build setting");
+  });
+
+  it("turns it off with an unticked box and on again", async () => {
+    const { app } = await setup();
+    expect((await post(app, {})).status).toBeLessThan(400);
+    expect(await flag(app)).toBe(false);
+    await post(app, { cancelSuperseded: "true" });
+    expect(await flag(app)).toBe(true);
+  });
+});
