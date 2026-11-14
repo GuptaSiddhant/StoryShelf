@@ -1,6 +1,6 @@
 ---
 "@storyshelf/app": minor
-"@storyshelf/cli": minor
+"storyshelf": minor
 ---
 
 Breaking: notification and Figma integrations are built in; the separate packages are deprecated
