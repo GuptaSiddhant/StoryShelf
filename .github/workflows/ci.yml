@@ -257,8 +257,10 @@ jobs:
           --health-timeout=5s
           --health-retries=12
       # Neon's WebSocket proxy in front of the same server, so `./neon` runs both suites for real.
+      # Pinned by digest (the `latest` of 2026-11-14) so a new upstream build cannot change this job
+      # unseen. #1067 first blamed `latest`, but passing and failing runs pulled this same digest.
       wsproxy:
-        image: ghcr.io/neondatabase/wsproxy:latest
+        image: ghcr.io/neondatabase/wsproxy@sha256:7f2e2149aa6a57ba382a140102fba44f5053f3e44389ccc18adcecf896054efb
         env:
           APPEND_PORT: postgres:5432
           ALLOW_ADDR_REGEX: ".*"
@@ -277,6 +279,20 @@ jobs:
       - name: Build the packages the adapter imports
         run: nubx turbo run build --filter='@storyshelf/db-postgres^...'
 
+      # Samples what the server runs for long, so a stall (#1067) names its statement in the dump below.
+      - name: Sample slow statements in the background
+        run: |
+          cat > "$RUNNER_TEMP/sample.sh" <<'SAMPLER'
+          export PGPASSWORD=test-password
+          psql_() { psql -h 127.0.0.1 -U postgres -d storyshelf_test -At -F ' | ' "$@"; }
+          while true; do
+            psql_ -c "SELECT now()::time(0), pid, state, wait_event_type, wait_event, now() - query_start, left(regexp_replace(query, '\s+', ' ', 'g'), 160) FROM pg_stat_activity WHERE datname = 'storyshelf_test' AND state <> 'idle' AND pid <> pg_backend_pid() AND now() - query_start > interval '3 seconds'"
+            psql_ -c "SELECT now()::time(0), n_live_tup, last_autoanalyze FROM pg_stat_user_tables WHERE relname = 'content_uses'"
+            sleep 5
+          done
+          SAMPLER
+          nohup setsid bash "$RUNNER_TEMP/sample.sh" >> "$RUNNER_TEMP/slow-statements.log" 2>&1 &
+
       - name: Run the build-reference contract against real Postgres
         working-directory: packages/db-postgres
         env:
@@ -292,6 +308,24 @@ jobs:
           nubx vitest run src/build-reference-lifecycle.test.ts
           nubx vitest run src/retention-activation.test.ts
           nubx vitest run src/retention-pool-presets.test.ts
+
+      # A stalled WebSocket leaves nothing in the test output (#1067): show what the server and the
+      # proxy saw, and whether the server was still running the statement.
+      - name: Show the service containers and live sessions after a failure
+        if: ${{ failure() }}
+        run: |
+          for id in $(docker ps -a --format '{{.ID}}'); do
+            echo "::group::docker logs $(docker inspect --format '{{.Config.Image}}' "$id")"
+            docker logs --tail 80 "$id" 2>&1 || true
+            echo "::endgroup::"
+          done
+          echo "::group::statements active for more than 3 s, every 5 s"
+          tail -120 "$RUNNER_TEMP/slow-statements.log" || true
+          echo "::endgroup::"
+          echo "::group::pg_stat_activity"
+          PGPASSWORD=test-password psql -h 127.0.0.1 -U postgres -d storyshelf_test -c \
+            "SELECT pid, state, wait_event_type, wait_event, now() - query_start AS running, left(query, 80) AS query FROM pg_stat_activity WHERE datname = 'storyshelf_test'" || true
+          echo "::endgroup::"
 
   website:
     name: website
