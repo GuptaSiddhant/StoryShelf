@@ -119,6 +119,8 @@ createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, 
 
 - `config.captureAssets.cacheMaxAgeSeconds` (`0` to `3600`, default `0`) lets a remote browser's own cache keep a render's signed Storybook assets for that many seconds at most, never past the token's lifetime. It is off by default and trades faster long runs for the fact that revoked access cannot reclaim bytes already cached. See [Browser caching of capture assets](/guides/remote-browsers/#browser-caching-of-capture-assets-opt-in).
 
+- `config.offline.maxOfflineDays` (`1` to `365`, default `30`) is how many days a device may keep serving an offline Storybook after its last successful sync; the offline sync answer hands it to the device. See [Install the app and keep Storybooks offline](/guides/installable-app/#private-projects-sign-out-and-maxofflinedays).
+
 ### Outbound URLs set by projects
 
 `config.outbound` controls the URLs project admins configure (webhooks, Slack and Teams, GitLab hosts). By default they must be `https` and resolve only to public addresses.
