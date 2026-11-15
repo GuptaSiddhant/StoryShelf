@@ -7,11 +7,18 @@ import {
   hasTrustedPublisher,
 } from "./check-npm-packages.mjs";
 
-const registry = (known) => async (url) => {
+const registry = (known) => (url) => Promise.resolve(lookup(known, url));
+
+const lookup = (known, url) => {
   const name = decodeURIComponent(url.slice("https://registry.npmjs.org/".length));
   if (name === "boom") return { ok: false, status: 500 };
   return known.includes(name) ? { ok: true, status: 200 } : { ok: false, status: 404 };
 };
+
+const trustFn = (name) =>
+  name === "a"
+    ? '{"repository":"GuptaSiddhant/StoryShelf","file":"release.yml"}'
+    : '{"repository":"someone/else","file":"release.yml"}';
 
 describe("check-npm-packages", () => {
   it("reads a 404 as a package that is not on npm, and fails on other errors", async () => {
@@ -21,10 +28,6 @@ describe("check-npm-packages", () => {
   });
 
   it("lists the missing packages and the untrusted ones", async () => {
-    const trustFn = (name) =>
-      name === "a"
-        ? '{"repository":"GuptaSiddhant/StoryShelf","file":"release.yml"}'
-        : '{"repository":"someone/else","file":"release.yml"}';
     const result = await checkPackages(["a", "b", "c"], {
       trust: true,
       fetchFn: registry(["a", "b"]),
