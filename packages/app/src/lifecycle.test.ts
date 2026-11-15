@@ -1,12 +1,16 @@
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 const silentLogger = pino({ level: "silent" });
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 async function throwingSetup(): Promise<void> {
   throw new Error("bad secret");
@@ -111,6 +115,21 @@ describe("attachLifecycle", () => {
   });
 });
 
+/** Record the delay of every `setTimeout` (the real timer still runs), then restore on cleanup. */
+function recordTimeouts(): number[] {
+  const delays: number[] = [];
+  const real = globalThis.setTimeout;
+  vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+    handler: TimerHandler,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    delays.push(delay ?? 0);
+    return real(handler as () => void, delay, ...args);
+  }) as unknown as typeof setTimeout);
+  return delays;
+}
+
 function boot(torn: string[]) {
   const closing = (name: string) => ({
     ...fakeAdapter(name),
@@ -175,15 +194,17 @@ describe("teardown and background boot tasks", () => {
     expect(order).toContain("db");
   });
 
-  it("counts the shutdown grace once: a spent grace leaves no wait for boot tasks", async () => {
+  it("bounds the boot-task wait by the shutdown grace", async () => {
+    const delays = recordTimeouts();
     const order: string[] = [];
     const { cell, lifecycle } = boot(order);
     cell.drainMs = 60_000;
     trackBackground(cell, new Promise(() => {}));
-    const startedAt = Date.now();
     await lifecycle.teardown({ graceMs: 30 });
-    expect(Date.now() - startedAt).toBeLessThan(5000);
     expect(order).toContain("db");
+    // Without a grace the wait is the cell's 60 s limit; with one it can never pass the grace.
+    expect(delays.some((delay) => delay === 60_000)).toBe(false);
+    expect(delays.some((delay) => delay > 0 && delay <= 30)).toBe(true);
   });
 });
 
@@ -289,30 +310,23 @@ describe("job consumer lifecycle", () => {
   });
 
   it("gives a hung boot task only what the consumer drain left of the grace", async () => {
-    vi.useFakeTimers();
-    try {
-      const consumer = fakeConsumer();
-      consumer.stop.mockImplementation(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 60));
-      });
-      const { cell, lifecycle } = bootWithConsumer(consumer);
-      cell.drainMs = 60_000;
-      trackBackground(cell, new Promise(() => {}));
-      await lifecycle.setup();
-      let done = false;
-      const tornDown = lifecycle.teardown({ graceMs: 80 }).then(() => {
-        done = true;
-      });
-      expect(consumer.stop).toHaveBeenCalledWith({ graceMs: 80 });
-      // The consumer drain spends 60 of the 80 ms: the boot task gets the remaining 20, not 80.
-      await vi.advanceTimersByTimeAsync(60 + 19);
-      expect(done).toBe(false);
-      await vi.advanceTimersByTimeAsync(1);
-      await tornDown;
-      expect(done).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
+    const delays = recordTimeouts();
+    let now = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const consumer = fakeConsumer();
+    consumer.stop.mockImplementation(async () => {
+      now += 60; // the job drain spends 60 of the 80 ms grace
+    });
+    const { cell, lifecycle } = bootWithConsumer(consumer);
+    cell.drainMs = 60_000;
+    trackBackground(cell, new Promise(() => {}));
+    await lifecycle.setup();
+    await lifecycle.teardown({ graceMs: 80 });
+    expect(consumer.stop).toHaveBeenCalledWith({ graceMs: 80 });
+    // The boot-task wait is armed for the 20 ms left, not 80 and not the 60 s limit.
+    expect(delays).toContain(20);
+    expect(delays).not.toContain(60_000);
+    expect(delays).not.toContain(80);
   });
 
   it("drains unbounded without a grace, and passes a grace on to the consumer", async () => {
