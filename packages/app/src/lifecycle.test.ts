@@ -136,7 +136,9 @@ function boot(torn: string[]) {
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
-  const lifecycle = (app as unknown as { lifecycle: { teardown(): Promise<void> } }).lifecycle;
+  const lifecycle = (
+    app as unknown as { lifecycle: { teardown(options?: { graceMs?: number }): Promise<void> } }
+  ).lifecycle;
   return { cell, lifecycle };
 }
 
@@ -170,6 +172,17 @@ describe("teardown and background boot tasks", () => {
     cell.drainMs = 20;
     trackBackground(cell, new Promise(() => {}));
     await lifecycle.teardown();
+    expect(order).toContain("db");
+  });
+
+  it("counts the shutdown grace once: a spent grace leaves no wait for boot tasks", async () => {
+    const order: string[] = [];
+    const { cell, lifecycle } = boot(order);
+    cell.drainMs = 60_000;
+    trackBackground(cell, new Promise(() => {}));
+    const startedAt = Date.now();
+    await lifecycle.teardown({ graceMs: 30 });
+    expect(Date.now() - startedAt).toBeLessThan(5000);
     expect(order).toContain("db");
   });
 });

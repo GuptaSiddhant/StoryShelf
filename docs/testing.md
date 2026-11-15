@@ -236,10 +236,13 @@ in CI).
 <aws|azure|gcp>` (or `deploy/terraform/<cloud>/examples/minimal`), then in that directory:
    ```sh
    terraform init
-   terraform plan -var "project=shelf-manual-<name>" -out=tfplan  # review!
+   terraform plan -var "name=shelf-manual-<name>" -out=tfplan  # review!
    terraform apply tfplan
    terraform output -json
    ```
+   The stub and `examples/minimal` output only `url` (and `service_name`). For the storage name in
+   the table below, add a root output that forwards the module's, such as
+   `output "gcs_bucket" { value = module.storyshelf.gcs_bucket }` (GCP) or `s3_bucket` (AWS).
    Use a personal `shelf-manual-<name>` prefix so parallel runs never share
    resources. Prefer serverless/cheap engines (AWS DSQL, Cloud SQL `f1-micro`).
 2. **Map outputs to env** using the table above, plus credentials
@@ -254,7 +257,7 @@ in CI).
 4. **Teardown:** suites delete their own keys/messages (unique
    `live/<run-id>/<uuid>` prefixes, per-run build ids), but the
    infrastructure is yours — `terraform destroy -var
-"project=shelf-manual-<name>" -auto-approve` when done.
+"name=shelf-manual-<name>" -auto-approve` when done.
 5. **Costs:** live suites are a handful of API calls; the spend is idle
    infrastructure (RDS, Cloud SQL, Postgres Flexible Server). Destroy promptly.
 
