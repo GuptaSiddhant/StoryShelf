@@ -149,12 +149,31 @@ function consumedBy(root, ref) {
   return out.split("\n").map((line) => line.replace(/^\.changeset\//u, ""));
 }
 
-/** Pending changeset files on `main` that the open release branch did not consume. */
+/** A changeset file's content at a git revision. */
+function changesetAt(root, rev, file) {
+  return execFileSync("git", ["show", `${rev}:.changeset/${file}`], {
+    cwd: root,
+    encoding: "utf8",
+  });
+}
+
+/**
+ * Pending changeset files on `main` that the open release branch did not consume: new files, and
+ * consumed ones `main` has edited since the branch was prepared (a bump can change).
+ */
 function unconsumedCount(root, ref) {
   execFileSync("git", ["fetch", "origin", ref], { cwd: root, stdio: "inherit" });
   const consumed = new Set(consumedBy(root, ref));
+  const base = execFileSync("git", ["merge-base", "origin/main", `origin/${ref}`], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
   const pending = listPending(join(root, ".changeset")).map((changeset) => changeset.file);
-  return pending.filter((file) => !consumed.has(file)).length;
+  return pending.filter(
+    (file) =>
+      !consumed.has(file) ||
+      changesetAt(root, base, file) !== changesetAt(root, "origin/main", file),
+  ).length;
 }
 
 function main() {

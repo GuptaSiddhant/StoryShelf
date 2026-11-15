@@ -121,11 +121,12 @@ jobs:
         env:
           OLD_NUMBER: ${{ steps.due.outputs.open_number }}
           OLD_REF: ${{ steps.due.outputs.open_ref }}
+          OLD_SHA: ${{ steps.due.outputs.open_sha }}
           VERSION: ${{ steps.prepare.outputs.version }}
         run: |
           set -e
           gh pr close "$OLD_NUMBER" --comment "Superseded: the changesets now call for v${VERSION}, so a new release pull request replaces this one."
-          # Only this workflow pushes release/*; the old branch has no other owner.
+          # Only this workflow pushes release/*; delete only the sha this run planned against.
           case "$OLD_REF" in
-            release/v*) git push origin --delete "$OLD_REF" ;;
+            release/v*) git push --force-with-lease="${OLD_REF}:${OLD_SHA}" origin --delete "$OLD_REF" ;;
           esac
