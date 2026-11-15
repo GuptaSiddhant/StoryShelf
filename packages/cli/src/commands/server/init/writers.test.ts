@@ -72,21 +72,6 @@ describe("writeFiles", () => {
     expect(printed).toContain("Created Dockerfile, .dockerignore, compose.yaml\n");
   });
 
-  it.each([
-    ["aws", "aws_db_instance", { awsRegion: "eu-west-1" }],
-    ["azure", "azurerm", { azureLocation: "westeurope" }],
-    ["gcp", "google", { gcpProjectId: "proj", gcpLocation: "europe-west1" }],
-  ] as const)("writes the %s terraform stack", async (deployTarget, marker, extra) => {
-    await writeFiles(
-      out,
-      answers({ deployTarget, docker: true, database: "postgres", auth: "oauth", ...extra }),
-    );
-    const tf = readFileSync(join(out, "terraform", "database.tf"), "utf8");
-    expect(tf).toContain(marker);
-    expect(printed).toMatch(/Created terraform\/ \(\d+ files\)\n/u);
-    expect(existsSync(join(out, "Dockerfile"))).toBe(true);
-  });
-
   it("writes no terraform for local and docker targets", async () => {
     await writeFiles(out, answers({ deployTarget: "docker", docker: true }));
     expect(existsSync(join(out, "terraform"))).toBe(false);

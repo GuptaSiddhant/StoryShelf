@@ -49,15 +49,6 @@ export const DEPLOY_TARGET_PROMPT: SelectPrompt = {
   choices: [
     { title: "Local (bare node)", value: "local" },
     { title: "Docker (compose)", value: "docker" },
-    { title: "AWS (ECS + S3 + Postgres + Cognito)", value: "aws" },
-    {
-      title: "Azure (Container Apps + Blob + Postgres + Entra)",
-      value: "azure",
-    },
-    {
-      title: "Google Cloud (Cloud Run + GCS + Postgres + Identity Platform)",
-      value: "gcp",
-    },
   ],
 };
 
@@ -252,75 +243,3 @@ export function localInfraPrompts(advanced: boolean): Prompt[] {
     OBSERVABILITY_CONFIRM,
   ];
 }
-
-/** Follow-up prompts for the GCP deploy target (single prompts call). */
-export const GCP_INFRA_PROMPTS: Prompt[] = [
-  {
-    type: "text",
-    name: "gcpProjectId",
-    message: "GCP project ID?",
-    initial: "",
-  },
-  {
-    type: "text",
-    name: "gcpLocation",
-    message: "GCP region?",
-    initial: "us-central1",
-  },
-  {
-    type: "text",
-    name: "domainName",
-    message: "Public domain for the app? (empty skips DNS)",
-    initial: "",
-  },
-  {
-    type: "text",
-    name: "identityTenant",
-    message: "Identity Platform tenant display name? (empty skips it)",
-    initial: "",
-  },
-];
-
-/** Follow-up prompts for the Azure deploy target (single prompts call). */
-export const AZURE_INFRA_PROMPTS: Prompt[] = [
-  {
-    type: "text",
-    name: "azureLocation",
-    message: "Azure region?",
-    initial: "eastus",
-  },
-  {
-    type: "text",
-    name: "domainName",
-    message: "Public domain for the app? (empty skips DNS)",
-    initial: "",
-  },
-  {
-    type: "text",
-    name: "entraTenantId",
-    message: "Entra tenant ID for the app registration? (empty skips it)",
-    initial: "",
-  },
-];
-
-/** Follow-up prompts for the AWS deploy target (single prompts call). */
-export const AWS_INFRA_PROMPTS: Prompt[] = [
-  {
-    type: "text",
-    name: "awsRegion",
-    message: "AWS region?",
-    initial: "us-east-1",
-  },
-  {
-    type: "text",
-    name: "domainName",
-    message: "Public domain for the ALB? (empty leaves it HTTP-only)",
-    initial: "",
-  },
-  {
-    type: "text",
-    name: "samlMetadataUrl",
-    message: "SAML metadata URL for Cognito federation? (empty skips it)",
-    initial: "",
-  },
-];

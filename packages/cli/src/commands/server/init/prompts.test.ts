@@ -115,39 +115,6 @@ describe("collectAnswers", () => {
     expect(typeof database?.initial).toBe("number");
   });
 
-  it.each([
-    ["aws", { database: "postgres", storage: "s3", docker: true }, "awsRegion"],
-    ["azure", { database: "postgres", storage: "azure", docker: true }, "azureLocation"],
-    ["gcp", { database: "postgres", storage: "gcs", docker: true }, "gcpLocation"],
-  ] as const)(
-    "pins the %s reference stack and asks its follow-ups",
-    async (target, pinned, field) => {
-      vi.mocked(prompts)
-        .mockResolvedValueOnce({ ...PROJECT, deployTarget: target, ...ADAPTERS })
-        .mockResolvedValueOnce({});
-      const answers = await collectAnswers();
-      expect(answers).toMatchObject(pinned);
-      expect(asked(1)).toContain(field);
-      // No adapter menu on a cloud target: two calls in all.
-      expect(vi.mocked(prompts)).toHaveBeenCalledTimes(2);
-    },
-  );
-
-  it("defaults the cloud follow-ups when they are left blank", async () => {
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({ ...PROJECT, deployTarget: "aws" })
-      .mockResolvedValueOnce({});
-    expect(await collectAnswers()).toMatchObject({ awsRegion: "us-east-1" });
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({ ...PROJECT, deployTarget: "azure" })
-      .mockResolvedValueOnce({});
-    expect(await collectAnswers()).toMatchObject({ azureLocation: "eastus" });
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({ ...PROJECT, deployTarget: "gcp" })
-      .mockResolvedValueOnce({});
-    expect(await collectAnswers()).toMatchObject({ gcpLocation: "us-central1" });
-  });
-
   it("asks no queue or worker question", async () => {
     vi.mocked(prompts)
       .mockResolvedValueOnce({ ...PROJECT, deployTarget: "docker" })

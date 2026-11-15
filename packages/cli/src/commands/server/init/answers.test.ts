@@ -22,7 +22,7 @@ function answers(overrides: Partial<Answers> = {}): Answers {
 
 describe("resolveDeployTarget", () => {
   it("keeps an explicit target", () => {
-    expect(resolveDeployTarget(answers({ deployTarget: "aws", docker: false }))).toBe("aws");
+    expect(resolveDeployTarget(answers({ deployTarget: "docker", docker: false }))).toBe("docker");
     expect(resolveDeployTarget(answers({ deployTarget: "local", docker: true }))).toBe("local");
   });
 

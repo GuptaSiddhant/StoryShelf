@@ -66,7 +66,7 @@ Site admins manage project-less channels (`POST /api/v1/admin/notification-chann
 
 ## Email transport
 
-One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and swap it into the built-in `email` notifier (see [Choosing the providers](#choosing-the-providers)). Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
+One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and swap it into the built-in `email` notifier (see [Choosing the providers](#choosing-the-providers)). Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `ses` (Amazon SES over SMTP), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
 
 | Env                       | Purpose                             | Default  |
 | ------------------------- | ----------------------------------- | -------- |
@@ -75,6 +75,16 @@ One SMTP configuration serves notification channels and (optionally) auth mail: 
 | `SMTP_SECURE`             | `1`/`true` for implicit TLS (465)   | STARTTLS |
 | `SMTP_USER` / `SMTP_PASS` | Relay credentials                   | —        |
 | `SMTP_FROM`               | Sender address (`fromEmail`)        | —        |
+
+**Amazon SES.** `sesPresetFromEnv` (or `sesPreset({ region, user, pass, from })`) points the same SMTP transport at `email-smtp.<region>.amazonaws.com:587` with STARTTLS; there is no AWS SDK.
+
+| Env                                  | Purpose                                                       |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `SES_REGION` (or `AWS_REGION`)       | SES region, such as `eu-west-1`                               |
+| `SES_SMTP_USER` / `SES_SMTP_PASS`    | SES SMTP credentials (not an IAM access key)                  |
+| `SES_FROM`                           | Sender address; its address or domain must be a verified SES identity in that region |
+
+Verify the sending identity in the SES console first; a new account is in the SES sandbox and can only send to verified recipients until you request production access.
 
 Password recovery is both: users can request a reset email when a sender is configured; admins can always re-invite (which also resets access). Failed local logins emit `sys:auth-failed` to admin channels (SSO failures excluded in v1).
 

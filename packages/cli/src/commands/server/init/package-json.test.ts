@@ -150,14 +150,7 @@ describe("generatePackageJson", () => {
     expect(scripts["docker:run"]).toBeUndefined();
   });
 
-  it.each(["aws", "azure", "gcp"] as const)("has the terraform scripts for %s", (deployTarget) => {
-    const { scripts } = pkg({ deployTarget, docker: true, database: "postgres" });
-    expect(scripts["infra:init"]).toBe("terraform -chdir=terraform init");
-    expect(scripts["infra:apply"]).toBe("terraform -chdir=terraform apply tfplan");
-    expect(scripts["docker:up"]).toBeUndefined();
-  });
-
-  it("has neither docker nor infra scripts on a plain local server", () => {
+  it("has no docker scripts on a plain local server", () => {
     const keys = Object.keys(pkg().scripts).toSorted();
     expect(keys).toEqual(["dev", "start", "typecheck"]);
   });

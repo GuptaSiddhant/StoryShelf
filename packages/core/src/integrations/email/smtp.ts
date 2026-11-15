@@ -31,6 +31,7 @@ export async function smtpPreset(
     host: options.host,
     port: options.port,
     secure: options.secure ?? options.port === 465,
+    requireTLS: options.requireTLS,
     auth: options.user ? { user: options.user, pass: options.pass } : undefined,
   });
   const from = options.from;
