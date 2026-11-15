@@ -105,13 +105,6 @@ describe("generateServer", () => {
     expect(code).not.toContain("cognitoPreset");
   });
 
-  it("emits the Cognito preset for oauth on AWS", () => {
-    const code = server({ auth: "oauth", deployTarget: "aws" });
-    expect(code).toContain("cognitoPreset");
-    expect(code).toContain("COGNITO_USER_POOL_ID");
-    expect(code).not.toContain("keycloakPreset");
-  });
-
   it("puts the D1 binding stub before the database", () => {
     const code = server({ database: "d1" });
     expect(code.indexOf("function getD1Binding()")).toBeGreaterThan(-1);

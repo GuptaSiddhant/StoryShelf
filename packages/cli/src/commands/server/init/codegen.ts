@@ -1,10 +1,5 @@
 import { DB_IMPORT, DB_INIT, dbPrelude, STORAGE_IMPORT, STORAGE_INIT } from "./adapter-snippets.ts";
-import {
-  resolveDeployTarget,
-  wantsNotifications,
-  wantsObservability,
-  type Answers,
-} from "./answers.ts";
+import { wantsNotifications, wantsObservability, type Answers } from "./answers.ts";
 
 const NAMED_IMPORT_RE = /^import \{ (?<names>[^}]+) \} from "(?<from>[^"]+)";$/u;
 
@@ -41,16 +36,15 @@ const OBSERVABILITY_IMPORTS = [
   `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
 ];
 
-/** The auth imports: the password admin, or the OAuth preset of the deploy target (Cognito on AWS). */
+/** The auth imports: the password admin, or the Keycloak OAuth preset. */
 function authImports(answers: Answers): string[] {
   if (answers.auth === "password") {
     return [`import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";`];
   }
   if (answers.auth === "oauth") {
-    const preset = resolveDeployTarget(answers) === "aws" ? "cognitoPreset" : "keycloakPreset";
     return [
       `import { createShelfAuth } from "@storyshelf/auth";`,
-      `import { ${preset} } from "@storyshelf/auth";`,
+      `import { keycloakPreset } from "@storyshelf/auth";`,
     ];
   }
   return [];
@@ -136,18 +130,6 @@ const PASSWORD_ADMIN_LINES = [
   `});`,
 ];
 
-const COGNITO_SOCIAL_LINES = [
-  `    social: [`,
-  `      cognitoPreset({`,
-  `        domain: process.env.COGNITO_DOMAIN!,`,
-  `        region: process.env.COGNITO_REGION!,`,
-  `        userPoolId: process.env.COGNITO_USER_POOL_ID!,`,
-  `        clientId: process.env.OIDC_CLIENT_ID!,`,
-  `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
-  `      }),`,
-  `    ],`,
-];
-
 const KEYCLOAK_OAUTH_LINES = [
   `    oauth: [`,
   `      keycloakPreset(process.env.OIDC_ISSUER!, {`,
@@ -162,12 +144,7 @@ function authLines(answers: Answers): string[] {
   if (answers.auth === "none") {
     return [];
   }
-  const provider =
-    answers.auth === "password"
-      ? []
-      : resolveDeployTarget(answers) === "aws"
-        ? COGNITO_SOCIAL_LINES
-        : KEYCLOAK_OAUTH_LINES;
+  const provider = answers.auth === "password" ? [] : KEYCLOAK_OAUTH_LINES;
   return [
     `  auth: createShelfAuth({`,
     `    db: database,`,
