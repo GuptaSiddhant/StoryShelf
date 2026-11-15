@@ -233,16 +233,17 @@ in CI).
 ### Manual runbook (follow these steps later)
 
 1. **Provision** (per target, one-time): `storyshelf server init --cloud
-<aws|azure|gcp>` (or `deploy/terraform/<cloud>/examples/minimal`), then in that directory:
+<aws|azure|gcp>` (or `deploy/terraform/<cloud>/examples/minimal`). The stub and `examples/minimal`
+   output only `url` (and `service_name`). For the storage name in the table below, first add a
+   root output that forwards the module's, such as
+   `output "gcs_bucket" { value = module.storyshelf.gcs_bucket }` (GCP) or `s3_bucket` (AWS), so it
+   is in the state the apply writes. Then, in that directory:
    ```sh
    terraform init
    terraform plan -var "name=shelf-manual-<name>" -out=tfplan  # review!
    terraform apply tfplan
    terraform output -json
    ```
-   The stub and `examples/minimal` output only `url` (and `service_name`). For the storage name in
-   the table below, add a root output that forwards the module's, such as
-   `output "gcs_bucket" { value = module.storyshelf.gcs_bucket }` (GCP) or `s3_bucket` (AWS).
    Use a personal `shelf-manual-<name>` prefix so parallel runs never share
    resources. Prefer serverless/cheap engines (AWS DSQL, Cloud SQL `f1-micro`).
 2. **Map outputs to env** using the table above, plus credentials
