@@ -1,8 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="StoryShelf">
-  <!-- StoryShelf mark: a shelf with three books; the last one leans on its neighbour (the changed one). Hand-written; see docs/brand.md. -->
-  <style>.ink{fill:#09090b}.lean{fill:#5b3fd6}@media (prefers-color-scheme:dark){.ink{fill:#fafafa}.lean{fill:#9d8cff}}</style>
-  <rect class="ink" x="2" y="6" width="3" height="7" rx="0.4"/>
-  <rect class="ink" x="6" y="3" width="3" height="10" rx="0.4"/>
-  <rect class="lean" x="11.63" y="4" width="2.5" height="9" rx="0.4" transform="rotate(-17 11.63 13)"/>
-  <rect class="ink" x="1" y="13" width="14" height="2" rx="0.4"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="StoryShelf">
+  <title>StoryShelf</title>
+  <!-- The 16 px drawing (favicon-16.png and the 16 px frame of favicon.ico): the S with heavier boards and one enlarged solid story; the three outlined stories are left out because they blur below 32 px. -->
+  <clipPath id="tile-purple-white-small"><rect width="64" height="64" rx="14"/></clipPath>
+  <rect width="64" height="64" rx="14" fill="#5b3fd6"/>
+  <g clip-path="url(#tile-purple-white-small)">
+    <path d="M64 12.5 H22.5 a8 8 0 0 0 -8 8 V32 H49.5 V43.5 a8 8 0 0 1 -8 8 H0" fill="none" stroke="#ffffff" stroke-width="8"/>
+    <rect x="30" y="20" width="14" height="16" rx="3.5" fill="#ffffff"/>
+  </g>
 </svg>

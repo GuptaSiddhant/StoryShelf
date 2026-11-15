@@ -42,8 +42,8 @@ export default defineConfig({
       title: "StoryShelf",
       description: "An open-source, self-hosted alternative to Chromatic.",
       logo: {
-        light: "./src/assets/brand/mark-light.svg",
-        dark: "./src/assets/brand/mark-dark.svg",
+        light: "./src/assets/brand/storyshelf-logo-purple-white-rounded.svg",
+        dark: "./src/assets/brand/storyshelf-logo-white-purple-rounded.svg",
         alt: "",
       },
       components: {

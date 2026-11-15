@@ -1,7 +1,7 @@
 // oxlint-disable-next-line unicorn/no-abusive-eslint-disable
 /* oxlint-disable */
 /**
- * Renders the StoryShelf raster icons from the hand-written SVG sources in
+ * Renders the StoryShelf raster icons from the hand-written SVG sources (storyshelf-logo-*.svg) in
  * apps/website/src/assets/brand/ (docs/brand.md), and checks the maskable
  * icon's safe zone.
  *
@@ -22,21 +22,19 @@ const brandDir = join(root, "apps/website/src/assets/brand");
 const publicDir = join(root, "apps/website/public");
 const source = (name) => readFileSync(join(brandDir, name), "utf8");
 
-/**
- * A PNG favicon cannot follow the tab's colour scheme the way favicon.svg
- * does, so the 16 px fallback paints the glyph in mid-tone colours that read
- * on light and dark tabs alike.
- */
-const fallbackGlyph = () =>
-  source("mark-light.svg").replaceAll("#09090b", "#71717a").replaceAll("#5b3fd6", "#7c66f0");
+const logo = (name) => () => source(`storyshelf-logo-${name}.svg`);
 
+/**
+ * 16 and 32 px use the small drawing (the S plus one enlarged solid story): the
+ * three outlined stories blur below about 48 px (docs/brand.md).
+ */
 const targets = [
-  { file: "favicon-16.png", size: 16, svg: fallbackGlyph },
-  { file: "favicon-32.png", size: 32, svg: () => source("tile.svg") },
-  { file: "apple-touch-icon.png", size: 180, svg: () => source("tile-square.svg") },
-  { file: "icon-192.png", size: 192, svg: () => source("tile.svg") },
-  { file: "icon-512.png", size: 512, svg: () => source("tile.svg") },
-  { file: "icon-maskable-512.png", size: 512, svg: () => source("maskable.svg") },
+  { file: "favicon-16.png", size: 16, svg: logo("purple-white-small") },
+  { file: "favicon-32.png", size: 32, svg: logo("purple-white-small") },
+  { file: "apple-touch-icon.png", size: 180, svg: logo("purple-white-square") },
+  { file: "icon-192.png", size: 192, svg: logo("purple-white-rounded") },
+  { file: "icon-512.png", size: 512, svg: logo("purple-white-rounded") },
+  { file: "icon-maskable-512.png", size: 512, svg: logo("purple-white-maskable") },
 ];
 
 async function render(page, svg, size) {
@@ -72,6 +70,9 @@ function ico(images) {
 /**
  * Maskable safe zone (W3C manifest spec): everything that is not the plain
  * background must sit inside a circle of radius 40% of the icon, centred.
+ * The one exception is the two boards of the S, which run to the edge of the
+ * tile on purpose (docs/brand.md): outside the circle,
+ * only pixels in the board rows (scaled 0.8 about the centre) may differ.
  */
 async function checkMaskable(page) {
   const png = readFileSync(join(publicDir, "icon-maskable-512.png")).toString("base64");
@@ -85,6 +86,12 @@ async function checkMaskable(page) {
     const { data: px, width, height } = context.getImageData(0, 0, image.width, image.height);
     const bg = [px[0], px[1], px[2]];
     const radius = 0.4 * width;
+    const row = (y64) => ((y64 * 0.8 + 6.4) / 64) * height;
+    const boards = [
+      [row(11), row(16)],
+      [row(48), row(53)],
+    ];
+    const onBoard = (y) => boards.some(([from, to]) => y >= from - 1 && y <= to + 1);
     let outside = 0;
     let farthest = 0;
     for (let y = 0; y < height; y++) {
@@ -95,14 +102,22 @@ async function checkMaskable(page) {
         if (!differs) continue;
         const distance = Math.hypot(x + 0.5 - width / 2, y + 0.5 - height / 2);
         farthest = Math.max(farthest, distance);
-        if (distance > radius) outside++;
+        if (distance > radius && !onBoard(y)) outside++;
       }
     }
-    return { outside, farthest: farthest / width, opaqueCorner: px[3] === 255 };
+    // The top board runs to the right edge, the bottom board to the left edge.
+    const differsAt = (x, [from, to]) => {
+      const i = (Math.round((from + to) / 2) * width + x) * 4;
+      return (
+        Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 24
+      );
+    };
+    const reachesEdge = differsAt(width - 1, boards[0]) && differsAt(0, boards[1]);
+    return { outside, farthest: farthest / width, opaqueCorner: px[3] === 255, reachesEdge };
   }, png);
-  const ok = result.outside === 0 && result.opaqueCorner;
+  const ok = result.outside === 0 && result.opaqueCorner && result.reachesEdge;
   console.log(
-    `${ok ? "✓" : "✗"} maskable safe zone: content reaches ${(result.farthest * 100).toFixed(1)}% of the width from the centre (limit 40%), full-bleed background ${result.opaqueCorner ? "yes" : "no"}`,
+    `${ok ? "✓" : "✗"} maskable safe zone: content reaches ${(result.farthest * 100).toFixed(1)}% of the width from the centre (limit 40%, boards excepted), full-bleed background ${result.opaqueCorner ? "yes" : "no"}, boards reach the edge ${result.reachesEdge ? "yes" : "no"}`,
   );
   return ok;
 }

@@ -19,9 +19,12 @@ describe("embedded assets", () => {
     }
   });
 
-  it("keeps the favicon bare and legible in dark tabs", () => {
-    expect(faviconSource).not.toContain("rx='14'");
-    expect(faviconSource).toContain("@media (prefers-color-scheme:dark)");
+  it("draws the mark and the favicon in the base and foreground colours only", () => {
+    for (const source of [markSource, faviconSource]) {
+      const colours = new Set(source.match(/#[0-9a-f]{6}/giu));
+      expect([...colours].toSorted()).toEqual(["#5b3fd6", "#ffffff"]);
+    }
+    expect(markSource).toContain("rx='14'");
   });
 
   it("serves exactly the embedded sources, each under its own content hash", () => {

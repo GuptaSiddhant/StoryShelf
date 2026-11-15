@@ -1,48 +1,53 @@
 # Brand and voice
 
-How StoryShelf looks and sounds. Issue #947 set the mark; #946 set the violet accent.
+How StoryShelf looks and sounds. Issue #1092 set the mark; #946 set the violet accent.
 
 ## The mark
 
-One shelf with three books of different heights; the last book leans on its neighbour. The leaning
-book is the changed one, so the mark says "diff", not only "library". It is original: no letterform,
-no container at small sizes, nothing borrowed from another product.
+An S-shaped shelf whose top and bottom boards run to the edge of the tile, holding four stories:
+three outlined (unchanged) and one solid, top right (the changed one). So the mark says "diff", not
+only "library". It is original: no borrowed letterform or container. Issue #1092 replaced the
+earlier three-books mark.
 
-- **Colour.** Only the leaning book carries the accent. Everything else is the neutral text colour
-  (`#09090b` light, `#fafafa` dark), or white on the accent tile, where the leaning book is a pale
-  accent (`#cbc2ff`) so it still reads as the changed one.
-- **Accent.** `#5b3fd6` on light, `#9d8cff` on dark: the app's `accent` tokens
-  (`packages/core/src/brand-packs.ts`).
-- **16 px.** The bare mark on a 16-unit grid with whole-pixel books, no tile. `favicon.svg` follows
-  the browser's colour scheme. The PNG fallbacks cannot, so `favicon-16.png` uses mid-tones
-  (`#71717a`, `#7c66f0`) that read on light and dark tabs.
-- **32 px and up** may use the rounded accent tile. Installable icons use it; the maskable icon is
-  full-bleed with the mark inside the 40 % safe circle.
+- **Two colours only.** A base and a foreground, no accent, in the app too. The default is
+  `purple-white`: base `#5b3fd6`, foreground `#ffffff`. The violet matches the app's `accent`
+  token (`packages/core/src/brand-packs.ts`), which still colours the interface; the mark itself
+  never takes a third colour.
+- **Pairs.** `purple-white`, `black-white`, `white-black` and `white-purple` (base, then
+  foreground), each in `rounded` (radius 14 on the 64 grid) and `square` corners: eight files.
+- **White-base pairs** (`white-black`, `white-purple`) have no visible edge on a white page, so
+  use them on dark or coloured surfaces only (the website header in dark mode, the social card).
+  Light surfaces use `purple-white` or `black-white`.
+- **16 px.** The four stories blur, so a small drawing replaces the mark: the S with heavier
+  boards and one enlarged solid story (`storyshelf-logo-purple-white-small.svg`). It is used at
+  16 px and at 32 px (the outlined stories still blur there), and for `favicon.svg`, so every
+  favicon, `favicon.ico` included, is the small drawing. Icons from 180 px up use the full mark.
+- **Maskable.** `storyshelf-logo-purple-white-maskable.svg` scales the mark to 80 % on a
+  full-bleed square tile, and draws the boards past the tile so they still reach the edge under
+  any mask. `nub scripts/brand-icons.mjs` checks that all but the boards sits inside the 40 %
+  safe circle; it was also checked by eye against circle and squircle masks.
 - **Wordmark.** "StoryShelf" in the UI sans (`ui-sans-serif, system-ui, …`) at weight 600, in the
-  neutral text colour, after the mark. Never in the accent, never with a gradient.
+  neutral text colour (`#09090b` light, `#fafafa` dark), after the tile. Never in the accent,
+  never with a gradient.
 - **Format.** Hand-written SVG: no embedded fonts, no raster, no editor metadata.
-
-The favicon at 16 px in a light and a dark tab, with the raster fallbacks and the wordmark:
-
-![Favicon in a light tab](brand/favicon-tab-light.png)
-![Favicon in a dark tab](brand/favicon-tab-dark.png)
 
 ### Files
 
 The sources live in `apps/website/src/assets/brand/`:
 
-| File                                      | Use                                                |
-| ----------------------------------------- | -------------------------------------------------- |
-| `mark-light.svg`, `mark-dark.svg`         | Bare mark per theme (website header)               |
-| `tile.svg` (also `../logo.svg`)           | Mark on the rounded accent tile                    |
-| `tile-square.svg`, `maskable.svg`         | Full-bleed tiles (Apple touch icon, maskable icon) |
-| `wordmark-light.svg`, `wordmark-dark.svg` | Mark plus wordmark                                 |
+| File                                                 | Use                                                          |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| `storyshelf-logo-<pair>-<corner>.svg` (8)            | The mark; `purple-white-rounded` is the default (README, app) |
+| `storyshelf-logo-purple-white-small.svg`             | 16 and 32 px favicons                                        |
+| `storyshelf-logo-purple-white-maskable.svg`          | Maskable icon                                                |
+| `wordmark-light.svg`, `wordmark-dark.svg`            | Tile plus wordmark per theme                                 |
 
-`apps/website/public/favicon.svg` is the theme-aware favicon. `nub scripts/brand-icons.mjs` renders
-the PNGs and `favicon.ico` from these files and checks the maskable safe zone (`--check` only
-checks). `nub scripts/screenshots.mjs og` renders `og-image.png` from the tile, the wordmark and the
-tagline. The app embeds the tile (default sidebar logo) and the favicon in
-`packages/app/src/assets/mark.ts`; keep them in step with the sources.
+The website header uses `purple-white-rounded` in light mode and `white-purple-rounded` in dark
+mode. `apps/website/public/favicon.svg` is a copy of the small drawing. `nub
+scripts/brand-icons.mjs` renders the PNGs and `favicon.ico` from these files and checks the maskable
+safe zone (`--check` only checks). `nub scripts/screenshots.mjs og` renders `og-image.png` from the
+`white-purple-rounded` tile, the wordmark text and the tagline. The app embeds the default mark and
+the small drawing in `packages/app/src/assets/mark.ts`; keep them in step with the sources.
 
 Operators still override the name and logo (`ui.name`, `ui.logo`, `SHELF_BRAND_NAME`,
 `SHELF_LOGO_URL`) and the colours (brand packs). The favicon is not brandable, so a StoryShelf tab

@@ -1,4 +1,4 @@
-<img src="apps/website/src/assets/logo.svg" alt="" width="72" height="72" />
+<img src="apps/website/src/assets/brand/storyshelf-logo-purple-white-rounded.svg" alt="" width="72" height="72" />
 
 # StoryShelf
 
