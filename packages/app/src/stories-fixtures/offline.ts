@@ -76,3 +76,14 @@ export const USAGE_AT_CAP: OfflineUsage = {
   usedBytes: 250 * MB,
   capBytes: 250 * MB,
 };
+
+/** Two push devices of the signed-in person: one that delivered recently, one that never has. */
+export const PUSH_DEVICES = [
+  {
+    id: "01JD0000000000000000000PU1",
+    label: "Work laptop",
+    createdAt: hoursAgo(24 * 9),
+    lastSuccessAt: hoursAgo(2),
+  },
+  { id: "01JD0000000000000000000PU2", label: null, createdAt: hoursAgo(5), lastSuccessAt: null },
+];
