@@ -19,7 +19,7 @@ output "db_endpoint" {
 }
 
 output "db_master_secret_arn" {
-  description = "ARN of the RDS-managed master secret an operator uses once to create the IAM database user (null with an existing database URL). A reference, not a value."
+  description = "ARN of the RDS-managed secret of the master user (password login, for operators; null with an existing database URL). A reference, not a value."
   value       = local.create_database ? aws_db_instance.main[0].master_user_secret[0].secret_arn : null
 }
 
@@ -29,13 +29,13 @@ output "db_iam_user" {
 }
 
 output "user_pool_id" {
-  description = "Cognito user pool id."
-  value       = aws_cognito_user_pool.main.id
+  description = "Cognito user pool id (null unless enable_cognito)."
+  value       = var.enable_cognito ? aws_cognito_user_pool.main[0].id : null
 }
 
 output "app_client_id" {
-  description = "Cognito app client id."
-  value       = aws_cognito_user_pool_client.shelf.id
+  description = "Cognito app client id (null unless enable_cognito)."
+  value       = var.enable_cognito ? aws_cognito_user_pool_client.shelf[0].id : null
 }
 
 output "cluster_name" {
@@ -59,8 +59,8 @@ output "auth_password_secret_arn" {
 }
 
 output "oidc_client_secret_arn" {
-  description = "Secrets Manager ARN to put the real OIDC client secret into."
-  value       = aws_secretsmanager_secret.oidc_client_secret.arn
+  description = "Secrets Manager ARN to put the real OIDC client secret into (null unless enable_cognito)."
+  value       = var.enable_cognito ? aws_secretsmanager_secret.oidc_client_secret[0].arn : null
 }
 
 output "task_role_arn" {

@@ -53,3 +53,31 @@ resource "aws_s3_bucket_lifecycle_configuration" "storybook" {
 
   depends_on = [aws_s3_bucket_versioning.storybook]
 }
+
+# Refuse plain-HTTP access to the bucket and its objects.
+data "aws_iam_policy_document" "bucket_tls" {
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.storybook.arn, "${aws_s3_bucket.storybook.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "storybook" {
+  bucket = aws_s3_bucket.storybook.id
+  policy = data.aws_iam_policy_document.bucket_tls.json
+
+  depends_on = [aws_s3_bucket_public_access_block.storybook]
+}
