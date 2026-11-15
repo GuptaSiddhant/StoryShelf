@@ -205,6 +205,10 @@ function fakeConsumer() {
 }
 
 function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
+  return bootWithConsumer(consumer).lifecycle;
+}
+
+function bootWithConsumer(consumer: ReturnType<typeof fakeConsumer> | null) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const options = { database: db, storage } as unknown as ResolvedShelfOptions;
@@ -219,7 +223,7 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
-  return (
+  const lifecycle = (
     app as unknown as {
       lifecycle: {
         setup(): Promise<void>;
@@ -227,6 +231,7 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
       };
     }
   ).lifecycle;
+  return { cell, lifecycle };
 }
 
 describe("setup rerun", () => {
@@ -281,6 +286,21 @@ describe("job consumer lifecycle", () => {
     await lifecycle.teardown();
     expect(consumer.stop).toHaveBeenCalledOnce();
     expect(consumer.isRunning()).toBe(false);
+  });
+
+  it("gives a hung boot task only what the consumer drain left of the grace", async () => {
+    const consumer = fakeConsumer();
+    consumer.stop.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    });
+    const { cell, lifecycle } = bootWithConsumer(consumer);
+    cell.drainMs = 60_000;
+    trackBackground(cell, new Promise(() => {}));
+    await lifecycle.setup();
+    const startedAt = Date.now();
+    await lifecycle.teardown({ graceMs: 80 });
+    expect(consumer.stop).toHaveBeenCalledWith({ graceMs: 80 });
+    expect(Date.now() - startedAt).toBeLessThan(5000);
   });
 
   it("drains unbounded without a grace, and passes a grace on to the consumer", async () => {
