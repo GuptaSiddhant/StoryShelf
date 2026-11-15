@@ -289,18 +289,30 @@ describe("job consumer lifecycle", () => {
   });
 
   it("gives a hung boot task only what the consumer drain left of the grace", async () => {
-    const consumer = fakeConsumer();
-    consumer.stop.mockImplementation(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 60));
-    });
-    const { cell, lifecycle } = bootWithConsumer(consumer);
-    cell.drainMs = 60_000;
-    trackBackground(cell, new Promise(() => {}));
-    await lifecycle.setup();
-    const startedAt = Date.now();
-    await lifecycle.teardown({ graceMs: 80 });
-    expect(consumer.stop).toHaveBeenCalledWith({ graceMs: 80 });
-    expect(Date.now() - startedAt).toBeLessThan(5000);
+    vi.useFakeTimers();
+    try {
+      const consumer = fakeConsumer();
+      consumer.stop.mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60));
+      });
+      const { cell, lifecycle } = bootWithConsumer(consumer);
+      cell.drainMs = 60_000;
+      trackBackground(cell, new Promise(() => {}));
+      await lifecycle.setup();
+      let done = false;
+      const tornDown = lifecycle.teardown({ graceMs: 80 }).then(() => {
+        done = true;
+      });
+      expect(consumer.stop).toHaveBeenCalledWith({ graceMs: 80 });
+      // The consumer drain spends 60 of the 80 ms: the boot task gets the remaining 20, not 80.
+      await vi.advanceTimersByTimeAsync(60 + 19);
+      expect(done).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await tornDown;
+      expect(done).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("drains unbounded without a grace, and passes a grace on to the consumer", async () => {
