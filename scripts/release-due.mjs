@@ -159,7 +159,8 @@ function changesetAt(root, rev, file) {
 
 /**
  * Pending changeset files on `main` that the open release branch did not consume: new files, and
- * consumed ones `main` has edited since the branch was prepared (a bump can change).
+ * consumed ones `main` has edited since the branch was prepared (a bump can change). A new
+ * version on `main` (a release merged meanwhile) counts as one more, so the branch is redone.
  */
 function unconsumedCount(root, ref) {
   execFileSync("git", ["fetch", "origin", ref], { cwd: root, stdio: "inherit" });
@@ -169,11 +170,22 @@ function unconsumedCount(root, ref) {
     encoding: "utf8",
   }).trim();
   const pending = listPending(join(root, ".changeset")).map((changeset) => changeset.file);
-  return pending.filter(
+  const stale = pending.filter(
     (file) =>
       !consumed.has(file) ||
       changesetAt(root, base, file) !== changesetAt(root, "origin/main", file),
   ).length;
+  // A release merged into `main` meanwhile moved the version: the branch must be prepared again.
+  return stale + (coreVersionAt(root, base) === coreVersionAt(root, "origin/main") ? 0 : 1);
+}
+
+/** The shared package version at a git revision. */
+function coreVersionAt(root, rev) {
+  const manifest = execFileSync("git", ["show", `${rev}:packages/core/package.json`], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return JSON.parse(manifest).version;
 }
 
 function main() {
