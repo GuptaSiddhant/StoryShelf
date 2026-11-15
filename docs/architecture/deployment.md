@@ -119,6 +119,10 @@ What this means for configured limits with N instances:
 
 Choose each per-instance value as the total limit divided by N. For rate limits, a load balancer that keeps one client on one instance (sticky sessions) keeps the count exact for that client.
 
+### AWS (Terraform module)
+
+The module in `deploy/terraform/aws` runs the published image on ECS Fargate; each task's `db-init` container creates the app database user and grants it `rds_iam` before the app starts. The first-boot database step (db-init: app user, rds_iam grant, backups) is checked by `terraform validate` only and has not yet run against a real RDS; tracked in #1096.
+
 ### Development
 
 ```sh

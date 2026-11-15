@@ -112,6 +112,8 @@ creates the app user `shelf` (`db_iam_user`), grants it `rds_iam`, and gives it 
 database and the `public` schema. The app container starts only after `db-init` succeeds
 (`dependsOn: SUCCESS`); its output is in the log group under the `db-init` stream prefix.
 
+> **Unverified.** The first-boot database step (db-init: app user, rds_iam grant, backups) is checked by `terraform validate` only and has not yet run against a real RDS; tracked in #1096.
+
 The master user (`shelf_admin`) is separate and keeps its password, so operators can still log in
 with the secret in `db_master_secret_arn` (from inside the VPC). Only `shelf` is IAM-only.
 
