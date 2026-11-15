@@ -196,15 +196,16 @@ describe("teardown and background boot tasks", () => {
 
   it("bounds the boot-task wait by the shutdown grace", async () => {
     const delays = recordTimeouts();
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000); // no time passes: the whole grace is left
     const order: string[] = [];
     const { cell, lifecycle } = boot(order);
     cell.drainMs = 60_000;
     trackBackground(cell, new Promise(() => {}));
     await lifecycle.teardown({ graceMs: 30 });
     expect(order).toContain("db");
-    // Without a grace the wait is the cell's 60 s limit; with one it can never pass the grace.
-    expect(delays.some((delay) => delay === 60_000)).toBe(false);
-    expect(delays.some((delay) => delay > 0 && delay <= 30)).toBe(true);
+    // Without a grace the wait is the cell's 60 s limit; with one it is the 30 ms grace.
+    expect(delays).toContain(30);
+    expect(delays).not.toContain(60_000);
   });
 });
 
