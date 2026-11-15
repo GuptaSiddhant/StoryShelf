@@ -22,9 +22,11 @@ export interface CloudAnswers {
   location: string;
   /** The GCP project ID; GCP only. */
   projectId?: string;
-  /** The public domain; empty leaves the stack on the cloud's default hostname. */
+  /** The public domain; empty leaves the stack on the cloud's default hostname. AWS only. */
   domainName?: string;
-  /** The IPv4 CIDR ranges allowed to reach the AWS load balancer, comma-separated; AWS only. */
+  /** The public origin (`public_base_url`); empty uses the Cloud Run origin. GCP only. */
+  publicBaseUrl?: string;
+  /** The IPv4 CIDR ranges allowed to reach the app, comma-separated; AWS and Azure. */
   allowedCidrBlocks?: string;
 }
 
@@ -36,11 +38,20 @@ const LOCATION: Record<Cloud, { variable: string; message: string; initial: stri
   azure: { variable: "location", message: "Azure location?", initial: "eastus" },
 };
 
+/** The module inputs beyond `name` and the location, as each module declares them. */
+const EXTRA_INPUTS: Record<Cloud, string[]> = {
+  aws: ["allowed_cidr_blocks", "domain_name"],
+  gcp: ["project_id", "public_base_url"],
+  azure: ["allowed_cidr_blocks"],
+};
+
+/** Inputs that may stay empty: the module has a default for them. */
+const OPTIONAL_INPUTS = new Set(["domain_name", "public_base_url"]);
+
 /** The `main.tf` that pins the module at the CLI's own release tag. */
 export function generateMainTf(cloud: Cloud, version: string): string {
   const { variable } = LOCATION[cloud];
-  const extra = cloud === "gcp" ? ["project_id"] : cloud === "aws" ? ["allowed_cidr_blocks"] : [];
-  const inputs = ["name", variable, ...extra, "domain_name"];
+  const inputs = ["name", variable, ...EXTRA_INPUTS[cloud]];
   const lines = [
     `module "storyshelf" {`,
     `  source        = "${REPOSITORY}//deploy/terraform/${cloud}?ref=v${version}"`,
@@ -50,7 +61,7 @@ export function generateMainTf(cloud: Cloud, version: string): string {
     ``,
   ];
   for (const input of inputs) {
-    const optional = input === "domain_name" ? ['  default     = ""'] : [];
+    const optional = OPTIONAL_INPUTS.has(input) ? ['  default     = ""'] : [];
     const type = input === "allowed_cidr_blocks" ? "list(string)" : "string";
     lines.push(`variable "${input}" {`, `  type = ${type}`, ...optional, `}`, ``);
   }
@@ -64,9 +75,10 @@ export function generateTfvars(cloud: Cloud, answers: CloudAnswers): string {
     ["name", answers.name],
     [LOCATION[cloud].variable, answers.location],
     ["project_id", cloud === "gcp" ? answers.projectId : undefined],
-    ["domain_name", answers.domainName ?? ""],
+    ["domain_name", cloud === "aws" ? (answers.domainName ?? "") : undefined],
+    ["public_base_url", cloud === "gcp" ? (answers.publicBaseUrl ?? "") : undefined],
   ];
-  const cidrs = cloud === "aws" ? splitList(answers.allowedCidrBlocks) : undefined;
+  const cidrs = cloud === "gcp" ? undefined : splitList(answers.allowedCidrBlocks);
   return `${lines
     .filter((line): line is [string, string] => line[1] !== undefined)
     .map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
@@ -89,22 +101,39 @@ async function collect(cloud: Cloud, dir: string | undefined): Promise<CloudAnsw
     ...(cloud === "gcp"
       ? [{ type: "text" as const, name: "projectId", message: "GCP project ID?" }]
       : []),
+    ...(cloud === "gcp"
+      ? [
+          {
+            type: "text" as const,
+            name: "publicBaseUrl",
+            message:
+              "Public origin, e.g. https://shelf.example.com? (empty uses the Cloud Run URL)",
+            initial: "",
+          },
+        ]
+      : [
+          {
+            type: "text" as const,
+            name: "allowedCidrBlocks",
+            message: "CIDR ranges allowed to reach the app? (comma-separated)",
+          },
+        ]),
     ...(cloud === "aws"
       ? [
           {
             type: "text" as const,
-            name: "allowedCidrBlocks",
-            message: "CIDR ranges allowed to reach the load balancer? (comma-separated)",
+            name: "domainName",
+            message: "Public domain? (empty skips DNS)",
+            initial: "",
           },
         ]
       : []),
-    { type: "text", name: "domainName", message: "Public domain? (empty skips DNS)", initial: "" },
   ])) as Partial<CloudAnswers>;
   if (
     !answers.name ||
     !answers.location ||
     (cloud === "gcp" && !answers.projectId) ||
-    (cloud === "aws" && splitList(answers.allowedCidrBlocks).length === 0)
+    (cloud !== "gcp" && splitList(answers.allowedCidrBlocks).length === 0)
   ) {
     printError("Cancelled.");
     return null;

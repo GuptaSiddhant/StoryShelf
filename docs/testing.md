@@ -199,17 +199,17 @@ Strictly real providers — no injected fake clients, no emulators. Hermetic
 and construct adapters inside `beforeAll`, so skipped runs don't even read
 cloud env vars. Live results must never come from the turbo cache — always
 run with `--force`. Manual dispatch only, per provider (the nightly schedules
-are deferred until secrets exist and the AWS scaffold is fixed; see #410):
+are deferred until secrets exist; see #410):
 
 - `.github/workflows/live-cloud-aws.yml` — S3
 - `.github/workflows/live-cloud-azure.yml` — Blob
 - `.github/workflows/live-cloud-gcp.yml` — GCS
 - `.github/workflows/live-cloud-ancillary.yml` — Turso + Postgres + MySQL + OAuth + GitHub + GitLab (matrix `db`/`auth`/`git`; long-lived resources, no scaffold)
 
-Each workflow also validates its terraform scaffold generator (`fmt` +
-`init -backend=false` + `validate`, mirroring the CLI's
-`terraform-*.integration.test.ts`). Scaffold output keys are a frozen
-contract pinned by `terraform-*.test.ts` — renames break CI.
+The Terraform modules under `deploy/terraform/` are checked by the deploy checks in `ci.yml`
+(`fmt`, `validate`, `tflint`). Each workflow's `module-apply` job applies the module's
+`examples/minimal` (see the module README, "Checks"); it stays off until its repository variable
+is `1`.
 
 ### Output → env map
 
@@ -232,13 +232,13 @@ in CI).
 
 ### Manual runbook (follow these steps later)
 
-1. **Provision** (per target, one-time): `storyshelf server init --target
-<aws|azure|gcp>`, then under the generated `terraform/`:
+1. **Provision** (per target, one-time): `storyshelf server init --cloud
+<aws|azure|gcp>` (or `deploy/terraform/<cloud>/examples/minimal`), then in that directory:
    ```sh
    terraform init
    terraform plan -var "project=shelf-manual-<name>" -out=tfplan  # review!
    terraform apply tfplan
-   terraform output -json   # or: npm run infra:outputs
+   terraform output -json
    ```
    Use a personal `shelf-manual-<name>` prefix so parallel runs never share
    resources. Prefer serverless/cheap engines (AWS DSQL, Cloud SQL `f1-micro`).
@@ -260,7 +260,7 @@ in CI).
 
 ### Phase 4 (ancillary: `.github/workflows/live-cloud-ancillary.yml`)
 
-No terraform scaffold covers these — resources are long-lived and shared,
+No terraform module covers these — resources are long-lived and shared,
 isolation is per-run. Matrix legs: `db`, `auth`, `git` (nightly +
 manual dispatch, `--force` so results never come from cache).
 

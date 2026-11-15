@@ -127,7 +127,7 @@ a Cloud Run domain mapping) and pass `public_base_url`.
 | `DATABASE_URL`, `DATABASE_POOL_MAX`               | Secret Manager, `database_pool_size` | read    |
 | `SECRET`, `ADMIN_TOKEN`                           | Secret Manager                       | read    |
 | `GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT`              | the created bucket                   | pending |
-| `SHUTDOWN_GRACE_SECONDS`                          | `shutdown_grace_seconds`             | pending |
+| `SHUTDOWN_GRACE_SECONDS`                          | `shutdown_grace_seconds`             | read    |
 | `REMOTE_BROWSER_ENDPOINT`, `REMOTE_BROWSER_TOKEN` | secret references                    | pending |
 
 _Pending_ variables are set by the module but read by the image only once it wires them: until the

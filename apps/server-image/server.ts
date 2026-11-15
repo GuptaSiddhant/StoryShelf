@@ -3,7 +3,7 @@ import "reflect-metadata";
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import { parseTrustProxy } from "@storyshelf/core/config";
+import { parseShutdownGraceMs, parseTrustProxy } from "@storyshelf/core/config";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -104,7 +104,7 @@ const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     app.lifecycle
-      .teardown()
+      .teardown({ graceMs: parseShutdownGraceMs(env["SHUTDOWN_GRACE_SECONDS"]) })
       .catch(() => {}) // Intentionally empty — teardown errors are already logged
       .finally(() => {
         server.close();

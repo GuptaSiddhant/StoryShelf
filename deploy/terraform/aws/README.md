@@ -168,11 +168,9 @@ only (`execution_role_policy_json`).
 - **Scaling** is more identical copies between `min_instances` and `max_instances`, tracked on CPU.
   Per-copy limits (remote-browser connections, rate limits, the AI budget) are in the scaling docs.
 - **Shutdown.** On a deploy ECS sends SIGTERM and the app drains running captures, then hands the
-  rest back to the queue. The module sets `SHUTDOWN_GRACE_SECONDS`, the ALB deregistration delay
-  (equal to the grace) and the ECS `stopTimeout` (the grace plus 10 seconds; Fargate allows at most
-  120). **The product image does not read `SHUTDOWN_GRACE_SECONDS` yet** and drains for its own
-  built-in grace, so changing `shutdown_grace_seconds` moves the ALB and ECS timings but not the
-  app's drain time.
+  rest back to the queue. The module sets `SHUTDOWN_GRACE_SECONDS` (the image drains for that long),
+  the ALB deregistration delay (equal to the grace) and the ECS `stopTimeout` (the grace plus 10
+  seconds; Fargate allows at most 120).
 
 ## Domain and TLS
 
@@ -201,7 +199,7 @@ marked _not read_, which the image does not use yet.
 | Variable                                                     | Source                             | Status   |
 | ------------------------------------------------------------ | ---------------------------------- | -------- |
 | `AWS_BUCKET`, `AWS_REGION`, `PUBLIC_BASE_URL`, `TRUST_PROXY` | module                             | read     |
-| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | not read |
+| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | read     |
 | `SECRET`, `ADMIN_TOKEN`, `AUTH_PASSWORD`                     | Secrets Manager                    | read     |
 | `DATABASE_URL`                                               | `existing_database_url_secret_arn` | read     |
 | `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`             | the created RDS instance           | read     |

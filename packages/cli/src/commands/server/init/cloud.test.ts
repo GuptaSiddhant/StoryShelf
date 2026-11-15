@@ -38,6 +38,19 @@ describe("isCloud", () => {
   });
 });
 
+/** The variables a module under `deploy/terraform/` declares. */
+function declaredInputs(cloud: string): string[] {
+  const file = join(
+    import.meta.dirname,
+    "../../../../../../deploy/terraform",
+    cloud,
+    "variables.tf",
+  );
+  return [...readFileSync(file, "utf8").matchAll(/^variable "(?<name>\w+)"/gmu)].map(
+    (match) => match.groups?.["name"] ?? "",
+  );
+}
+
 describe("generateMainTf", () => {
   it.each(["aws", "gcp", "azure"] as const)("pins the %s module at the CLI version", (cloud) => {
     const tf = generateMainTf(cloud, "0.12.0");
@@ -46,6 +59,17 @@ describe("generateMainTf", () => {
     );
     expect(tf).toContain('image_version = "0.12.0"');
     expect(tf.includes("project_id")).toBe(cloud === "gcp");
+  });
+
+  it("passes only inputs that the module declares", () => {
+    for (const cloud of ["aws", "gcp", "azure"] as const) {
+      const passed = [
+        ...generateMainTf(cloud, "0.12.0").matchAll(/^ {2}(?<name>\w+)\s+= var\./gmu),
+      ];
+      expect(declaredInputs(cloud)).toEqual(
+        expect.arrayContaining(passed.map((match) => match.groups?.["name"] ?? "")),
+      );
+    }
   });
 });
 
@@ -59,7 +83,11 @@ describe("generateTfvars", () => {
       generateTfvars("aws", { ...answers, allowedCidrBlocks: "10.0.0.0/8, 1.2.3.0/24" }),
     ).toContain('allowed_cidr_blocks = ["10.0.0.0/8","1.2.3.0/24"]');
     expect(generateTfvars("gcp", answers)).toContain('project_id = "p"');
+    expect(generateTfvars("gcp", answers)).toContain('public_base_url = ""');
+    expect(generateTfvars("gcp", answers)).not.toContain("domain_name");
     expect(generateTfvars("azure", answers)).toContain('location = "eu-west-1"');
+    expect(generateTfvars("azure", answers)).toContain("allowed_cidr_blocks = []");
+    expect(generateTfvars("azure", answers)).not.toContain("domain_name");
   });
 });
 
@@ -82,6 +110,9 @@ describe("runCloudInit", () => {
     await runCloudInit("aws", join(root, "a"));
     vi.mocked(prompts).mockResolvedValueOnce({ name: "shelf", location: "us-central1" });
     await runCloudInit("gcp", join(root, "b"));
+    vi.mocked(prompts).mockResolvedValueOnce({ name: "shelf", location: "eastus" });
+    await runCloudInit("azure", join(root, "d"));
+    expect(existsSync(join(root, "d"))).toBe(false);
     vi.mocked(prompts).mockResolvedValueOnce({ name: "shelf", location: "us-east-1" });
     await runCloudInit("aws", join(root, "c"));
     expect(existsSync(join(root, "c"))).toBe(false);
