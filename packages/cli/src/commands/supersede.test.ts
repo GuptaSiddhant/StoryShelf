@@ -82,7 +82,7 @@ describe("decideSuperseded (real git repository)", () => {
     const decision = decideSuperseded([{ id: "x", sha: "f".repeat(40) }], {
       cwd: work,
       branch: "main",
-      headSha: `${head.slice(0, 39)}0`,
+      headSha: `${head.slice(0, 39)}${head.endsWith("0") ? "1" : "0"}`,
     });
     expect(decision).toEqual({ superseded: [], undecided: 1 });
   });
