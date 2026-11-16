@@ -91,7 +91,9 @@ installation's repositories, the GitLab group's projects) appears only when the 
 - A site admin approves or refuses it on the System page, or creates the link already approved
   (assigning a repository to a project up front). Approval records who approved it and when, and
   the host's numeric repository ID, so a repository renamed or deleted and re-created under the
-  same name is not reached by the old approval.
+  same name is not reached by the old approval. Delivery enforces it: a GitHub installation token
+  is requested for that repository ID only (`repository_ids`), and GitLab is addressed by the
+  numeric project ID, so a replacement repository answers 404 and decision 6 applies.
 - Changing an approved link's repository, connection or prefix returns it to `pending`.
 - Approving a link re-requests the state of the project's open builds, as confirming a public
   origin does, so open pull requests get their check without waiting for the next push.
@@ -141,9 +143,11 @@ StoryShelf still receives nothing from git hosts. It learns that an App was unin
 revoked or a repository removed only from a refused write. A refusal can also be about the commit:
 `--sha` is chosen by the uploader, and a commit that is not in the repository is refused too. So a
 401, 403 or 404 alone never breaks a link. On a refusal the handler checks the link itself (the
-installation still covers the repository ID, or the token can still read it). Only when that check
-fails is the link marked `broken` with the reason, and the System page and the project's settings
-show it with a reconnect action. Otherwise the job fails and retries as today. No new job kind and
+installation still covers the repository ID, or the token can still read it). Only a definitive
+negative answer (the host answers that the installation no longer covers the ID, or the token cannot
+read it) marks the link `broken` with the reason, and the System page and the project's settings
+show it with a reconnect action. A timeout, a 5xx or a network error is inconclusive: the job fails
+and retries as today. No new job kind and
 no new build status are added (ADR 0053).
 
 ### 7. Delivery is unchanged
@@ -198,9 +202,13 @@ Rules:
 ### 10. What StoryShelf reads and posts
 
 **Reads are fixed and minimal.** A connection reads which pull request contains a commit, the pull
-request's comments (only to find its own), which installation covers a repository, and the
-repository's numeric ID. It never reads code, diffs or files: captures come from the uploaded
-Storybook (ADR 0004), not the git host. The docs and the System page say so.
+request's comments (only to find its own), which installation covers a repository, the
+repository's numeric ID, and whether a commit is on the default branch (`commitOnBranch`, ADR 0009
+amendment 2026-11-13: GitHub compare, GitLab commit refs). StoryShelf never reads code, diffs or
+files: captures come from the uploaded Storybook (ADR 0004), not the git host. GitHub has no
+narrower permission for compare than **Contents: read**, so the App requests it (read-only, and only
+the compare `status` field is read); GitLab's `api` scope already covers commit refs. The docs and
+the System page say what each permission is used for.
 
 **Posts have two layers of choice.**
 
