@@ -4,8 +4,8 @@ import {
   anyRepositoryLinkAllowed,
   GIT_LINK_ANY_REPOSITORY_KEY,
   GitRepositoryLinkModel,
-  GitRepositoryTakenError,
 } from "./git-repository-link.ts";
+import { GitRepositoryTakenError } from "./git-repository-taken-error.ts";
 import { NotificationChannelModel } from "./notification-channel.ts";
 import { SiteSettingsModel } from "./site-settings.ts";
 

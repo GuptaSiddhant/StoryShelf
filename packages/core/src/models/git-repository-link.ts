@@ -7,6 +7,7 @@ import type { GitRepositoryLinkRow } from "../schema/git-connection.ts";
 import type { NotificationChannelRow } from "../schema/notification.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
+import { GitRepositoryTakenError } from "./git-repository-taken-error.ts";
 import type { SiteSettingsModel } from "./site-settings.ts";
 
 /** `site_settings` key of the operator switch: project admins may link any repository a connection covers. */
@@ -31,17 +32,6 @@ export interface GitRepositoryLinkInput {
   requestedBy?: string;
 }
 
-/** The repository and prefix on a host are already linked, by a link or by a project's git channel. */
-export class GitRepositoryTakenError extends Error {
-  readonly takenBy: "link" | "channel";
-
-  constructor(takenBy: "link" | "channel") {
-    super(`That repository and status prefix are already used by a project's git ${takenBy}`);
-    this.name = "GitRepositoryTakenError";
-    this.takenBy = takenBy;
-  }
-}
-
 /** Whether operators let project admins link any repository a connection covers (default off). */
 export async function anyRepositoryLinkAllowed(settings: SiteSettingsModel): Promise<boolean> {
   return (await settings.get(GIT_LINK_ANY_REPOSITORY_KEY)) === "true";
@@ -64,6 +54,13 @@ function sameText(a: unknown, b: string): boolean {
   return typeof a === "string" && a.toLowerCase() === b;
 }
 
+interface LinkKey {
+  host: string;
+  owner: string;
+  repo: string;
+  prefix: string;
+}
+
 /** Data operations for repository links. */
 export class GitRepositoryLinkModel {
   readonly #db: DatabaseAdapter;
@@ -84,7 +81,7 @@ export class GitRepositoryLinkModel {
    * @throws GitRepositoryTakenError when either already holds it.
    */
   async create(input: GitRepositoryLinkInput): Promise<GitRepositoryLinkRow> {
-    const key = {
+    const key: LinkKey = {
       host: input.host.toLowerCase(),
       owner: input.owner.toLowerCase(),
       repo: input.repo.toLowerCase(),
@@ -96,30 +93,34 @@ export class GitRepositoryLinkModel {
     if ((await this.#linkHolds(key)) !== null) {
       throw new GitRepositoryTakenError("link");
     }
-    const now = new Date().toISOString();
     try {
-      return (await this.#db.insert(this.#tables.gitRepositoryLinks, {
-        id: ulid(),
-        projectId: input.projectId,
-        connectionId: input.connectionId,
-        ...key,
-        hostRepositoryId: null,
-        state: "pending",
-        reason: null,
-        outputs: "{}",
-        installationId: null,
-        requestedBy: input.requestedBy ?? null,
-        approvedBy: null,
-        approvedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      })) as unknown as GitRepositoryLinkRow;
+      return await this.#insert(input, key);
     } catch (error) {
       if ((await this.#linkHolds(key)) === null) {
         throw error;
       }
       throw new GitRepositoryTakenError("link");
     }
+  }
+
+  async #insert(input: GitRepositoryLinkInput, key: LinkKey): Promise<GitRepositoryLinkRow> {
+    const now = new Date().toISOString();
+    return (await this.#db.insert(this.#tables.gitRepositoryLinks, {
+      id: ulid(),
+      projectId: input.projectId,
+      connectionId: input.connectionId,
+      ...key,
+      hostRepositoryId: null,
+      state: "pending",
+      reason: null,
+      outputs: "{}",
+      installationId: null,
+      requestedBy: input.requestedBy ?? null,
+      approvedBy: null,
+      approvedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    })) as unknown as GitRepositoryLinkRow;
   }
 
   /** The links of a project. */
@@ -130,12 +131,7 @@ export class GitRepositoryLinkModel {
     })) as unknown as GitRepositoryLinkRow[];
   }
 
-  async #linkHolds(key: {
-    host: string;
-    owner: string;
-    repo: string;
-    prefix: string;
-  }): Promise<GitRepositoryLinkRow | null> {
+  async #linkHolds(key: LinkKey): Promise<GitRepositoryLinkRow | null> {
     const table = this.#tables.gitRepositoryLinks;
     const rows = (await this.#db.list(table, {
       where: and(
@@ -149,12 +145,7 @@ export class GitRepositoryLinkModel {
     return rows[0] ?? null;
   }
 
-  async #channelHolds(key: {
-    host: string;
-    owner: string;
-    repo: string;
-    prefix: string;
-  }): Promise<boolean> {
+  async #channelHolds(key: LinkKey): Promise<boolean> {
     const rows = (await this.#db.list(
       this.#tables.notificationChannels,
     )) as unknown as NotificationChannelRow[];

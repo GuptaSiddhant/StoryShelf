@@ -171,10 +171,10 @@ export {
   anyRepositoryLinkAllowed,
   GIT_LINK_ANY_REPOSITORY_KEY,
   GitRepositoryLinkModel,
-  GitRepositoryTakenError,
   type GitRepositoryLinkInput,
   type GitRepositoryLinkTables,
 } from "./git-repository-link.ts";
+export { GitRepositoryTakenError } from "./git-repository-taken-error.ts";
 export { SiteSettingsModel, type SiteSettingsTables } from "./site-settings.ts";
 export {
   PUBLIC_ORIGIN_KEY,
