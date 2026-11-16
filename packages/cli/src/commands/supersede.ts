@@ -23,6 +23,12 @@ const runGit: GitRunner = (cwd, args) => {
   return { status: result.status ?? -1, stdout: (result.stdout ?? "").trim() };
 };
 
+/**
+ * Most ids one build creation may name in `supersedes` (the server's schema caps the array at 50).
+ * More superseded builds than this are cancelled by later uploads, a batch at a time.
+ */
+export const MAX_SUPERSEDES = 50;
+
 /** Ids to send as `supersedes`, plus how many builds were kept because of a missing commit. */
 export interface SupersedeDecision {
   superseded: string[];
@@ -96,7 +102,8 @@ export async function findSupersedes(
     const inFlight = await client.projects.builds.inFlight(options.slug, options.branch);
     const decision = decideSuperseded(inFlight, options);
     announce(decision);
-    return decision.superseded.length > 0 ? decision.superseded : undefined;
+    const sent = decision.superseded.slice(0, MAX_SUPERSEDES);
+    return sent.length > 0 ? sent : undefined;
   } catch (error) {
     if (!(error instanceof RequestError && error.status === 404)) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -114,6 +121,9 @@ function announce({ superseded, undecided }: SupersedeDecision): void {
 }
 
 function describeSupersede(superseded: number, undecided: number): string {
+  if (superseded > MAX_SUPERSEDES) {
+    return `Superseding ${MAX_SUPERSEDES} of ${superseded} older in-flight builds on this branch (at most ${MAX_SUPERSEDES} per upload; later uploads cancel the rest)`;
+  }
   if (superseded > 0) {
     return `Superseding ${superseded} older in-flight ${superseded === 1 ? "build" : "builds"} on this branch`;
   }
