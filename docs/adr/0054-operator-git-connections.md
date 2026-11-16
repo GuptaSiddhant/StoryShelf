@@ -194,6 +194,32 @@ Rules:
 - Removing a connection from configuration marks its links `broken` (decision 6) instead of
   deleting them, so restoring it restores them.
 
+### 10. What StoryShelf reads and posts
+
+**Reads are fixed and minimal.** A connection reads which pull request contains a commit, the pull
+request's comments (only to find its own), which installation covers a repository, and the
+repository's numeric ID. It never reads code, diffs or files: captures come from the uploaded
+Storybook (ADR 0004), not the git host. The docs and the System page say so.
+
+**Posts have two layers of choice.**
+
+- **The operator sets the ceiling** through the connection's permissions. Checks write (the merge
+  gate) is required. Pull requests write (the comment) and commit statuses write (plain statuses
+  instead of check runs) are optional checkboxes in the manifest flow. The System page shows what
+  each connection may post. A GitLab token's `api` scope allows everything, so its ceiling is a
+  per-connection setting instead.
+- **Project admins choose within the ceiling, per link:**
+  - the merge gate (`<prefix>/testing` or `<prefix>/review`): always on while the link exists;
+  - the Storybook status (`<prefix>/storybook`): on or off, default on;
+  - the pull-request comment: `always`, `on-changes` or `off`, default `always`;
+  - per-snapshot annotations on the check run: on or off, default on.
+
+  Options above the ceiling show as unavailable, with the reason. The settings sit on the link (its
+  edit dialog, ADR 0012 decision 10) and are stored with it.
+
+The gate cannot be switched off on a linked repository: branch protection that requires a check
+which never arrives blocks every merge. A project that wants no gate removes the link.
+
 ## Consequences
 
 - Setup moves to the person who runs the server, once per git host account; a project owner pastes
