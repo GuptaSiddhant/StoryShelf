@@ -17,7 +17,6 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * `DATABASE_POOL_MAX`, `AWS_BUCKET`
  * (local storage on `/data` when unset), `SECRET`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `AUTH_EMAIL`, `SMTP_*`,
  * `SHUTDOWN_GRACE_SECONDS` (bound of the SIGTERM drain, a few seconds below the platform's stop timeout),
- * `SHUTDOWN_GRACE_SECONDS` (drain bound on SIGTERM),
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
  * unless set) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Bundled by
  * rolldown (`rolldown.config.ts`).

@@ -42,7 +42,8 @@ export interface ShelfLifecycle {
    * Graceful teardown for SIGTERM/SIGINT (`await app.lifecycle.teardown()`). Idempotent. With
    * `graceMs` the job drain is bounded: jobs still running after it are cancelled and handed back
    * to the queue without spending an attempt (hosts pass `shutdownGraceMs()`). Without it the drain
-   * waits for them with no limit.
+   * waits for them with no limit. `graceMs` is one budget for the whole drain: the wait for boot
+   * tasks gets only what the job drain left of it.
    */
   teardown(options?: { graceMs?: number }): Promise<void>;
 }

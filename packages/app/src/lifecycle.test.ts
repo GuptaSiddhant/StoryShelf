@@ -1,12 +1,16 @@
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 const silentLogger = pino({ level: "silent" });
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 async function throwingSetup(): Promise<void> {
   throw new Error("bad secret");
@@ -111,6 +115,21 @@ describe("attachLifecycle", () => {
   });
 });
 
+/** Record the delay of every `setTimeout` (the real timer still runs), then restore on cleanup. */
+function recordTimeouts(): number[] {
+  const delays: number[] = [];
+  const real = globalThis.setTimeout;
+  vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+    handler: TimerHandler,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    delays.push(delay ?? 0);
+    return real(handler as () => void, delay, ...args);
+  }) as unknown as typeof setTimeout);
+  return delays;
+}
+
 function boot(torn: string[]) {
   const closing = (name: string) => ({
     ...fakeAdapter(name),
@@ -136,7 +155,9 @@ function boot(torn: string[]) {
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
-  const lifecycle = (app as unknown as { lifecycle: { teardown(): Promise<void> } }).lifecycle;
+  const lifecycle = (
+    app as unknown as { lifecycle: { teardown(options?: { graceMs?: number }): Promise<void> } }
+  ).lifecycle;
   return { cell, lifecycle };
 }
 
@@ -172,6 +193,20 @@ describe("teardown and background boot tasks", () => {
     await lifecycle.teardown();
     expect(order).toContain("db");
   });
+
+  it("bounds the boot-task wait by the shutdown grace", async () => {
+    const delays = recordTimeouts();
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000); // no time passes: the whole grace is left
+    const order: string[] = [];
+    const { cell, lifecycle } = boot(order);
+    cell.drainMs = 60_000;
+    trackBackground(cell, new Promise(() => {}));
+    await lifecycle.teardown({ graceMs: 30 });
+    expect(order).toContain("db");
+    // Without a grace the wait is the cell's 60 s limit; with one it is the 30 ms grace.
+    expect(delays).toContain(30);
+    expect(delays).not.toContain(60_000);
+  });
 });
 
 function fakeConsumer() {
@@ -192,6 +227,10 @@ function fakeConsumer() {
 }
 
 function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
+  return bootWithConsumer(consumer).lifecycle;
+}
+
+function bootWithConsumer(consumer: ReturnType<typeof fakeConsumer> | null) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const options = { database: db, storage } as unknown as ResolvedShelfOptions;
@@ -206,7 +245,7 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
-  return (
+  const lifecycle = (
     app as unknown as {
       lifecycle: {
         setup(): Promise<void>;
@@ -214,6 +253,7 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
       };
     }
   ).lifecycle;
+  return { cell, lifecycle };
 }
 
 describe("setup rerun", () => {
@@ -268,6 +308,26 @@ describe("job consumer lifecycle", () => {
     await lifecycle.teardown();
     expect(consumer.stop).toHaveBeenCalledOnce();
     expect(consumer.isRunning()).toBe(false);
+  });
+
+  it("gives a hung boot task only what the consumer drain left of the grace", async () => {
+    const delays = recordTimeouts();
+    let now = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const consumer = fakeConsumer();
+    consumer.stop.mockImplementation(async () => {
+      now += 60; // the job drain spends 60 of the 80 ms grace
+    });
+    const { cell, lifecycle } = bootWithConsumer(consumer);
+    cell.drainMs = 60_000;
+    trackBackground(cell, new Promise(() => {}));
+    await lifecycle.setup();
+    await lifecycle.teardown({ graceMs: 80 });
+    expect(consumer.stop).toHaveBeenCalledWith({ graceMs: 80 });
+    // The boot-task wait is armed for the 20 ms left, not 80 and not the 60 s limit.
+    expect(delays).toContain(20);
+    expect(delays).not.toContain(60_000);
+    expect(delays).not.toContain(80);
   });
 
   it("drains unbounded without a grace, and passes a grace on to the consumer", async () => {
