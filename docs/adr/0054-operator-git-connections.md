@@ -2,10 +2,11 @@
 
 ## Status
 
-Proposed. The owner chose the direction on 2026-11-16: git provider setup belongs to the operator
-(site admins), project owners only name or pick a repository, and a link posts nothing until a site
-admin approves it. Amends ADR 0014 decisions 1 and 4. Statements marked `[inferred]` were not read
-in the code and must be confirmed by the implementation.
+Accepted (2026-11-16, owner). The owner chose the direction the same day: git provider setup
+belongs to the operator (site admins), project owners only name a repository, a link posts nothing
+until a site admin approves it, GitHub connects through Apps only, and connections can come from
+configuration. Amends ADR 0014 decisions 1 and 4. Statements marked `[inferred]` were not read in
+the code or the host's documentation and must be confirmed by the implementation.
 
 ## Context
 

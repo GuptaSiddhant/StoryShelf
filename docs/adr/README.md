@@ -55,6 +55,6 @@ Each current ADR below lists the archived ones it supersedes.
 | 0051 | Storybook Hosting Modes and Access Contract                                  | —                                  |
 | 0052 | Switching Stories Inside One Loaded Page During Capture                      | —                                  |
 | 0053 | Migrations Keep the Previous Release Working                                 | —                                  |
-| 0054 | Operator Git Connections and Approved Repository Links (proposed)            | — (amends 0014)                    |
+| 0054 | Operator Git Connections and Approved Repository Links (accepted)            | — (amends 0014)                    |
 
 Implementation work is tracked in GitHub issues; the ordered pickup list is issue #370.
