@@ -168,6 +168,32 @@ secret.
 
 Chat, email and push channels stay per project; this ADR covers git hosts only.
 
+### 9. Connections and links can come from configuration
+
+The UI flow suits a server set up by hand; a server deployed from code (the Terraform modules of
+ADR 0050, identical copies, recovery) needs the same result without clicks. So a connection can also
+be declared:
+
+- In code, as `createShelfApp({ git: { connections, links } })`, with constructors in
+  `@storyshelf/core/integrations` (`githubApp({ id, appId, privateKey, apiUrl? })`,
+  `gitlabGroup({ id, host, token, expiresOn })`).
+- In the server image's environment, through `gitFromEnv(env)` beside `smtpPresetFromEnv`: one
+  GitHub App (`SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_APP_PRIVATE_KEY` or `…_FILE`,
+  `SHELF_GITHUB_API_URL`) and one GitLab connection (`SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN` or
+  `…_FILE`, `SHELF_GITLAB_TOKEN_EXPIRES`); more through `SHELF_GIT_CONFIG_FILE`, a JSON file of the
+  same shape. The Terraform modules pass the key from the cloud's secret manager, never as plain text.
+
+Rules:
+
+- A configured connection has a stable `id`, which links refer to across restarts. Its secret is read
+  at startup and never written to the database; rotation is a secret change and a restart.
+- The System page shows it as **managed by configuration**: state, health and coverage, no Edit or
+  Remove. A database connection with the same `id` is ignored, and the page says so.
+- Links in configuration count as approved, follow decision 3, and show as managed. Other links are
+  requested and approved in the UI as in decision 2.
+- Removing a connection from configuration marks its links `broken` (decision 6) instead of
+  deleting them, so restoring it restores them.
+
 ## Consequences
 
 - Setup moves to the person who runs the server, once per git host account; a project owner pastes
