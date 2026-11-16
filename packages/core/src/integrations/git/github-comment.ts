@@ -3,7 +3,13 @@ import { httpJson } from "../../utils/index.ts";
 import { githubHeaders, repoPath } from "./github-api.ts";
 import { findPrNumber } from "./github-pr.ts";
 import type { GitHubRepo } from "./github-status.ts";
-import { upsertReviewComment, type ReviewThread } from "./review-comment.ts";
+import {
+  listAllPages,
+  PAGE_SIZE,
+  upsertReviewComment,
+  type CommentInput,
+  type ReviewThread,
+} from "./review-comment.ts";
 
 interface IssueComment {
   id: number;
@@ -16,7 +22,9 @@ function createThread(repo: GitHubRepo, prNumber: number): ReviewThread {
   const headers = githubHeaders(repo.token);
   return {
     list: async () => {
-      const comments = await httpJson<IssueComment[]>(`${threadUrl}?per_page=100`, { headers });
+      const comments = await listAllPages((page) =>
+        httpJson<IssueComment[]>(`${threadUrl}?per_page=${PAGE_SIZE}&page=${page}`, { headers }),
+      );
       return comments.map((comment) => ({ id: comment.id, body: comment.body ?? "" }));
     },
     update: async (id, body) => {
@@ -40,10 +48,12 @@ function createThread(repo: GitHubRepo, prNumber: number): ReviewThread {
 /** Create or update the StoryShelf review comment on the pull request of a commit. */
 export async function upsertPrComment(
   repo: GitHubRepo,
-  input: { sha: string; url: string; markdown: string; logger?: Logger },
+  input: CommentInput & { logger?: Logger },
 ): Promise<string> {
   const { token, owner } = repo;
   return await upsertReviewComment({
+    project: input.project,
+    buildId: input.buildId,
     url: input.url,
     markdown: input.markdown,
     sha: input.sha,

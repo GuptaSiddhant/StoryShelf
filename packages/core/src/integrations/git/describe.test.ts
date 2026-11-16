@@ -11,7 +11,7 @@ describe("describeState", () => {
 });
 
 describe("commentMarker", () => {
-  it("keys the comment by the build url", () => {
-    expect(commentMarker("https://x/builds/1")).toBe("<!-- storyshelf:https://x/builds/1 -->");
+  it("keys the comment by the project", () => {
+    expect(commentMarker("web")).toBe("<!-- storyshelf:project=web -->");
   });
 });

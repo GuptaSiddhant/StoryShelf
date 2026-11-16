@@ -80,7 +80,7 @@ describe("gitLabNotifier", () => {
     ).rejects.toThrow("401");
   });
 
-  it("creates the merge-request note with the url marker when none exists", async () => {
+  it("creates the merge-request note with the project marker when none exists", async () => {
     const calls = stubFetch((url) => {
       if (url.endsWith("/merge_requests")) {
         return Response.json([{ iid: 3, state: "opened" }]);
@@ -92,7 +92,13 @@ describe("gitLabNotifier", () => {
     });
     await adapter(REPO).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "Visual tests passed" },
+      target: {
+        kind: "comment",
+        sha: "abc",
+        project: "web",
+        buildId: "01B",
+        markdown: "Visual tests passed",
+      },
       state: "success",
       url: "https://shelf.example/b/1",
     });
@@ -102,7 +108,7 @@ describe("gitLabNotifier", () => {
     );
     expect(create?.init.method).toBe("POST");
     expect(bodyOf(create)["body"]).toBe(
-      "<!-- storyshelf:https://shelf.example/b/1 -->\nVisual tests passed",
+      "<!-- storyshelf:project=web -->\n<!-- storyshelf:build=01B -->\nVisual tests passed",
     );
   });
 

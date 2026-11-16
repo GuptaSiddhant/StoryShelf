@@ -89,6 +89,10 @@ export type NotifierStateTarget =
   | {
       kind: "comment";
       sha: string;
+      /** Project slug: one comment per pull request and project. */
+      project: string;
+      /** The build shown; a comment written for a newer build is left alone. */
+      buildId: string;
       /** Comment body below the idempotency marker. */
       markdown: string;
     };

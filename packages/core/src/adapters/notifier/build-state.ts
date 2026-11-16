@@ -124,8 +124,12 @@ export interface DesiredStatus {
 
 /** The pull-request comment to show. */
 export interface DesiredComment {
-  /** The build page; it keys the comment, one per build. */
+  /** The build page the comment links. */
   url: string;
+  /** Keys the comment: one per pull request and project. */
+  projectSlug: string;
+  /** The build shown; creation order (ULID) decides which build's write stands. */
+  buildId: string;
   markdown: string;
   state: NotifierState;
 }
@@ -189,7 +193,16 @@ function skippedState(input: BuildStateInput, links: Links): BuildStateSet {
     withProgress(status, input.build),
   );
   const markdown = skippedComment(input, links, sourceUrl?.build);
-  return { statuses, comment: { url: links.build, state: gate.state, markdown } };
+  return {
+    statuses,
+    comment: {
+      url: links.build,
+      projectSlug: input.projectSlug,
+      buildId: input.build.id,
+      state: gate.state,
+      markdown,
+    },
+  };
 }
 
 /** The gate of a skipped build, under the same name `gateStatus` gives a normal one. */
@@ -301,6 +314,8 @@ function commentOf(
   const gates = statuses.filter((status) => status.name !== "storybook");
   return {
     url: links.build,
+    projectSlug: input.projectSlug,
+    buildId: input.build.id,
     state: gates[0]?.state ?? "success",
     markdown: buildCommentMarkdown({
       buildUrl: links.build,
