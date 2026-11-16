@@ -5,7 +5,7 @@
 "@storyshelf/db-mysql": patch
 ---
 
-Internal: add the git connection and repository link tables (ADR 0054)
+Internal: add the git connection and repository link tables (epic #1117)
 
 New `git_connections` and `git_repository_links` tables in every dialect, their core row types, a
 `GitRepositoryLinkModel` whose uniqueness also counts the per-project git channels, the

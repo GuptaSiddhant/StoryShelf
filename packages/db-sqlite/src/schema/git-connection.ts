@@ -2,7 +2,7 @@ import type { GitConnectionProvider, GitRepositoryLinkState } from "@storyshelf/
 import { index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { projects } from "./project.ts";
 
-/** Narrow `git_connections` table definition: one credential per git host account (ADR 0054). */
+/** Narrow `git_connections` table definition: one credential per git host account (epic #1117). */
 export const gitConnections = sqliteTable("git_connections", {
   id: text("id").primaryKey(),
   provider: text("provider").$type<GitConnectionProvider>().notNull(),

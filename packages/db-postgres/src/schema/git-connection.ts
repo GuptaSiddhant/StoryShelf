@@ -2,7 +2,7 @@ import type { GitConnectionProvider, GitRepositoryLinkState } from "@storyshelf/
 import { index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { projects } from "./project.ts";
 
-/** Narrow `git_connections` table definition: one credential per git host account (ADR 0054). */
+/** Narrow `git_connections` table definition: one credential per git host account (epic #1117). */
 export const gitConnections = pgTable("git_connections", {
   id: text("id").primaryKey(),
   provider: text("provider").$type<GitConnectionProvider>().notNull(),

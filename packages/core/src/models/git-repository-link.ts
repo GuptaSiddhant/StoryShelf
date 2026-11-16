@@ -1,4 +1,4 @@
-/** Project repository links (`git_repository_links`, ADR 0054) and the operator switch for them. */
+/** Project repository links (`git_repository_links`, epic #1117) and the operator switch for them. */
 import { and, eq } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";

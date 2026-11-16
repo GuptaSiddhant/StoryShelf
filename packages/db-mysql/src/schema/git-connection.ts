@@ -3,7 +3,7 @@ import { index, mysqlTable, text, uniqueIndex } from "drizzle-orm/mysql-core";
 import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
-/** Narrow `git_connections` table definition: one credential per git host account (ADR 0054). */
+/** Narrow `git_connections` table definition: one credential per git host account (epic #1117). */
 export const gitConnections = mysqlTable("git_connections", {
   id: text("id").primaryKey(),
   provider: text("provider").$type<GitConnectionProvider>().notNull(),

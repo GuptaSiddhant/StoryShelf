@@ -1,5 +1,5 @@
 /**
- * Row types of `git_connections` and `git_repository_links` (ADR 0054): one credential per git
+ * Row types of `git_connections` and `git_repository_links` (epic #1117): one credential per git
  * host account, and the repositories a project links through it.
  */
 
