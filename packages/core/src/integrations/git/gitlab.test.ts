@@ -126,7 +126,7 @@ describe("gitLabNotifier", () => {
     });
     await adapter(REPO).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "new" },
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "new" },
       state: "failure",
       url: "https://shelf.example/b/1",
     });

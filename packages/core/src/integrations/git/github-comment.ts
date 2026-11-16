@@ -22,8 +22,11 @@ function createThread(repo: GitHubRepo, prNumber: number): ReviewThread {
   const headers = githubHeaders(repo.token);
   return {
     list: async () => {
-      const comments = await listAllPages((page) =>
-        httpJson<IssueComment[]>(`${threadUrl}?per_page=${PAGE_SIZE}&page=${page}`, { headers }),
+      const comments = await listAllPages(
+        async (page) =>
+          await httpJson<IssueComment[]>(`${threadUrl}?per_page=${PAGE_SIZE}&page=${page}`, {
+            headers,
+          }),
       );
       return comments.map((comment) => ({ id: comment.id, body: comment.body ?? "" }));
     },

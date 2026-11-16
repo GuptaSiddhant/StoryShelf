@@ -53,11 +53,17 @@ describe("createStateAdapter", () => {
     const w = writer();
     await createStateAdapter(getMetadata(), w).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "hello" },
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "hello" },
       state: "failure",
       url: "https://x/b/1",
     });
-    expect(w.comment).toHaveBeenCalledWith({ sha: "abc", url: "https://x/b/1", markdown: "hello" });
+    expect(w.comment).toHaveBeenCalledWith({
+      sha: "abc",
+      project: "web",
+      buildId: "01B",
+      url: "https://x/b/1",
+      markdown: "hello",
+    });
     expect(w.status).not.toHaveBeenCalled();
   });
 });

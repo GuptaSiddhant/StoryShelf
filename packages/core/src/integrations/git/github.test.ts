@@ -124,7 +124,7 @@ describe("gitHubNotifier", () => {
     });
     await adapter(REPO).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "new" },
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "new" },
       state: "failure",
       url: "https://shelf.example/b/1",
     });
@@ -137,7 +137,7 @@ describe("gitHubNotifier", () => {
     const calls = stubFetch(() => Response.json([]));
     await adapter(REPO).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "m" },
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "m" },
       state: "success",
       url: "u",
     });

@@ -27,11 +27,12 @@ function createThread(
   return {
     list: async () => {
       try {
-        const notes = await listAllPages((page) =>
-          httpJson<MergeRequestNote[]>(`${threadUrl}?per_page=${PAGE_SIZE}&page=${page}`, {
-            headers,
-            destination: "project",
-          }),
+        const notes = await listAllPages(
+          async (page) =>
+            await httpJson<MergeRequestNote[]>(`${threadUrl}?per_page=${PAGE_SIZE}&page=${page}`, {
+              headers,
+              destination: "project",
+            }),
         );
         return notes.map((note) => ({ id: note.id, body: note.body ?? "" }));
       } catch {
