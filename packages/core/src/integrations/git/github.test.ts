@@ -83,7 +83,7 @@ describe("gitHubNotifier", () => {
   it("creates the pull-request comment with the url marker when none exists", async () => {
     const calls = stubFetch((url) => {
       if (url.endsWith("/pulls")) {
-        return Response.json([{ number: 7 }]);
+        return Response.json([{ number: 7, state: "open" }]);
       }
       if (url.includes("/comments?")) {
         return Response.json([]);
@@ -107,7 +107,7 @@ describe("gitHubNotifier", () => {
   it("updates the existing comment instead of adding a second one", async () => {
     const calls = stubFetch((url, init) => {
       if (url.endsWith("/pulls")) {
-        return Response.json([{ number: 7 }]);
+        return Response.json([{ number: 7, state: "open" }]);
       }
       if (url.includes("/issues/7/comments?")) {
         return Response.json([
