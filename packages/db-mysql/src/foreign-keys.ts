@@ -205,6 +205,20 @@ export const FOREIGN_KEYS: ForeignKeyMigration[] = [
     parentColumn: "id",
   },
   {
+    table: "git_repository_links",
+    name: "fk_git_repository_links_project_id",
+    column: "project_id",
+    parent: "projects",
+    parentColumn: "id",
+  },
+  {
+    table: "git_repository_links",
+    name: "fk_git_repository_links_connection_id",
+    column: "connection_id",
+    parent: "git_connections",
+    parentColumn: "id",
+  },
+  {
     table: "build_package_usage",
     name: "fk_build_package_usage_project_id",
     column: "project_id",

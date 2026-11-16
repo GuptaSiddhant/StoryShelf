@@ -518,6 +518,39 @@ const contentUses = defineTable("content_uses", {
   claimToken: "claim_token",
 });
 
+const gitConnections = defineTable("git_connections", {
+  id: "id",
+  provider: "provider",
+  name: "name",
+  apiBase: "api_base",
+  config: "config",
+  secretEncrypted: "secret_encrypted",
+  createdBy: "created_by",
+  state: "state",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
+const gitRepositoryLinks = defineTable("git_repository_links", {
+  id: "id",
+  projectId: "project_id",
+  connectionId: "connection_id",
+  host: "host",
+  owner: "owner",
+  repo: "repo",
+  hostRepositoryId: "host_repository_id",
+  prefix: "prefix",
+  state: "state",
+  reason: "reason",
+  outputs: "outputs",
+  installationId: "installation_id",
+  requestedBy: "requested_by",
+  approvedBy: "approved_by",
+  approvedAt: "approved_at",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
 /** Stub schema bundled into the `Tables` map every fake serves. */
 export const fakeSchema: Tables = {
   projects,
@@ -553,4 +586,6 @@ export const fakeSchema: Tables = {
   notificationChannels,
   notificationSubscriptions,
   contentUses,
+  gitConnections,
+  gitRepositoryLinks,
 };
