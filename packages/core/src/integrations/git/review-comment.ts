@@ -17,16 +17,15 @@ export const PAGE_SIZE = 100;
 const MAX_PAGES = 100;
 
 /** Read pages 1, 2, … until one comes back short or empty. */
-export async function listAllPages<T>(fetchPage: (page: number) => Promise<T[]>): Promise<T[]> {
-  const all: T[] = [];
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const items = await fetchPage(page);
-    all.push(...items);
-    if (items.length < PAGE_SIZE) {
-      break;
-    }
+export async function listAllPages<T>(
+  fetchPage: (page: number) => Promise<T[]>,
+  page = 1,
+): Promise<T[]> {
+  const items = await fetchPage(page);
+  if (items.length < PAGE_SIZE || page >= MAX_PAGES) {
+    return items;
   }
-  return all;
+  return [...items, ...(await listAllPages(fetchPage, page + 1))];
 }
 
 /** What identifies the comment to write. */
@@ -81,27 +80,18 @@ async function findOrCreateComment(
   body: string,
   prNumber: number,
 ): Promise<string> {
-  const { logger } = opts;
-  const existing = findComment(
-    await thread.list(),
-    commentMarker(opts.project),
-    legacyCommentPrefix(opts.url),
-  );
-  if (existing) {
-    const written = commentBuildId(existing.body);
-    if (written !== undefined && written > opts.buildId) {
-      logger?.info(
-        { prNumber, buildId: opts.buildId },
-        "review comment kept: a newer build wrote it",
-      );
-      return String(existing.id);
-    }
-    const id = await thread.update(existing.id, body);
-    logger?.info({ prNumber, commentId: id }, "review comment updated");
-    return id;
+  const marker = commentMarker(opts.project);
+  const existing = findComment(await thread.list(), marker, legacyCommentPrefix(opts.url));
+  const written = existing === undefined ? undefined : commentBuildId(existing.body);
+  if (existing && written !== undefined && written > opts.buildId) {
+    opts.logger?.info({ prNumber, buildId: opts.buildId }, "review comment kept: newer build");
+    return String(existing.id);
   }
-  const id = await thread.create(body);
-  logger?.info({ prNumber, commentId: id }, "review comment created");
+  const id = existing ? await thread.update(existing.id, body) : await thread.create(body);
+  opts.logger?.info(
+    { prNumber, commentId: id },
+    existing ? "review comment updated" : "review comment created",
+  );
   return id;
 }
 
