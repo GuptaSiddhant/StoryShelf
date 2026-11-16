@@ -43,15 +43,23 @@ by, state). Only site admins create, rotate or delete one, on the System page's 
 A server may hold several: a personal GitHub App, an organization's App, a GitHub Enterprise Server
 App, a GitLab group.
 
-- **GitHub App, created from a manifest.** **Connect GitHub** posts an App manifest to GitHub (the
-  user's account or a named organization, or a GHES base URL) with the permissions ADR 0014 needs:
-  Checks and Pull requests read and write, Contents read, webhooks inactive, installable only on
-  that account. GitHub returns to StoryShelf with a one-time code, which the server exchanges for
-  the App ID, private key and the other credentials GitHub returns. Nobody copies a key. The site
-  admin then installs the App on the repositories they choose.
+- **GitHub App, created from a manifest.** **Connect GitHub** posts an App manifest to GitHub, for
+  the admin's account or a named organization (`/organizations/<org>/settings/apps/new`), with the
+  permissions ADR 0014 needs: Checks and Pull requests read and write, Contents read, `public:
+  false`. The manifest must name a webhook URL; it points at a path on the server that answers 404,
+  with `hook_attributes.active: false`. GitHub returns to StoryShelf with a one-time code, valid for
+  an hour, which the server exchanges for the App ID and private key. Nobody copies a key. The
+  exchange also returns a webhook secret and client credentials, which are discarded unused. The
+  site admin then installs the App on the repositories they choose. `[inferred]` The same flow on
+  GitHub Enterprise Server under its own base URL; GitHub's manifest documentation does not say.
+- **An existing GitHub App, entered by hand.** A site admin who manages their own App (or rotates
+  a key) enters its App ID and private key once for the server. This is also how today's
+  hand-made per-project Apps move to a connection (decision 8).
 - **Token connections** (a GitHub token, a GitLab group or project access token) stay available.
   The System page opens the host's token form prefilled with the name and the minimum scope
   (`repo:status`, or GitLab `api`), and the admin pastes the token once for the server.
+  `[inferred]` Both hosts accept those prefill parameters in the form's URL; if one does not, the
+  page shows the scope to pick instead.
 
 Every secret a connection holds (private key, client secret, webhook secret, token) is stored
 encrypted with `SECRET`, never returned by the API or shown again, and removed from logs and error
@@ -60,15 +68,25 @@ text through the existing redaction. `git_connections` joins the rotation list i
 
 ### 2. Projects link a repository, and a link is pending until approved
 
-A project admin connects a project to a repository on **Project → Settings → Notifications**,
-either by pasting its URL or by picking it from the repositories a connection can reach (the GitHub
-installation's repository list; the GitLab group's projects). The result is a **repository link**
-(a new table: project, connection, owner/repo, prefix, mode, state, requested by, approved by).
+A project admin connects a project to a repository on **Project → Settings → Notifications** by
+pasting its URL. The result is a **repository link** (a new table: project, connection,
+owner/repo, the host's repository ID, prefix, mode, state, requested by, approved by).
+
+A project admin never sees what a connection can reach. While the operator switch (below) is off,
+the form takes a URL only and gives the same answer whether or not the repository exists or is
+covered, so it cannot be used to list or probe other teams' private repositories. Coverage is
+checked when a site admin approves the link, and shown to the site admin. The picker (the GitHub
+installation's repositories, the GitLab group's projects) appears only when the switch is on.
 
 - A new link is `pending`. A pending link posts no status, no check run and no comment, and the
   project page says it waits for a site admin.
 - A site admin approves or refuses it on the System page, or creates the link already approved
-  (assigning a repository to a project up front). Approval records who approved it and when.
+  (assigning a repository to a project up front). Approval records who approved it and when, and
+  the host's numeric repository ID, so a repository renamed or deleted and re-created under the
+  same name is not reached by the old approval.
+- Changing an approved link's repository, connection or prefix returns it to `pending`.
+- Approving a link re-requests the state of the project's open builds, as confirming a public
+  origin does, so open pull requests get their check without waiting for the next push.
 - **Operator switch:** `site_settings` holds "project admins may link any repository a connection
   covers" (default off). With it on, a link a project admin creates is approved at once: the
   one-click flow for a server whose project admins are all trusted with every repository the
@@ -78,8 +96,9 @@ installation's repository list; the GitLab group's projects). The result is a **
 
 ### 3. One gate per repository and prefix
 
-A repository link is unique per (connection host, owner/repo, prefix). A second project on the same
-repository must use its own prefix (ADR 0014's "several projects in one repo"), so it can never
+A repository link is unique per (connection host, repository, prefix), counting the per-project
+git channels that remain during the move (decision 8). A second project on the same repository
+must use its own prefix (ADR 0014's "several projects in one repo"), so it can never
 overwrite another project's `<prefix>/testing` or `<prefix>/review`. The link form proposes a
 prefix derived from the project slug when the default is taken.
 
@@ -111,10 +130,13 @@ The manifest exchange and the installation return are cross-site `GET`s.
 ### 6. No webhooks
 
 StoryShelf still receives nothing from git hosts. It learns that an App was uninstalled, a token
-revoked or a repository removed only from a refused write. A refusal (401, 403 or 404 from the
-host) marks the link `broken` with the reason. Its pending `notify` jobs end through the normal
-retry limit, and the System page and the project's settings show the broken link with a
-reconnect action. No new job kind and no new build status are added (ADR 0053).
+revoked or a repository removed only from a refused write. A refusal can also be about the commit:
+`--sha` is chosen by the uploader, and a commit that is not in the repository is refused too. So a
+401, 403 or 404 alone never breaks a link. On a refusal the handler checks the link itself (the
+installation still covers the repository ID, or the token can still read it). Only when that check
+fails is the link marked `broken` with the reason, and the System page and the project's settings
+show it with a reconnect action. Otherwise the job fails and retries as today. No new job kind and
+no new build status are added (ADR 0053).
 
 ### 7. Delivery is unchanged
 
@@ -132,7 +154,9 @@ secret.
   remaining ones with a one-click move: the site admin creates or picks a connection, and the
   channel becomes an approved link.
 - **Release N+2 or later:** per-project git credentials are removed (contract), one minor after the
-  last release that read them.
+  last release that read them. A channel nobody moved stops posting then, and a required check
+  that stops posting blocks merges. So from N+1 the System page and the project's settings warn on
+  every remaining channel, with the release in which it stops, and the release notes say so.
 
 Chat, email and push channels stay per project; this ADR covers git hosts only.
 
