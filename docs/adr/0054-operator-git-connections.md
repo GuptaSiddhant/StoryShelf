@@ -1,0 +1,162 @@
+# ADR 0054: Operator Git Connections and Approved Repository Links
+
+## Status
+
+Proposed. The owner chose the direction on 2026-11-16: git provider setup belongs to the operator
+(site admins), project owners only name or pick a repository, and a link posts nothing until a site
+admin approves it. Amends ADR 0014 decisions 1 and 4. Statements marked `[inferred]` were not read
+in the code and must be confirmed by the implementation.
+
+## Context
+
+Today every project sets up its own git channel (ADR 0014, decision 1): a project admin creates a
+GitHub App or a token on the git host, then pastes the App ID, installation ID and private key, or
+the token, into **Project → Settings → Notifications**. Connecting the demo on 2026-11-16 took about
+ten steps on GitHub and three copied values. The work falls on whoever owns the project, once per
+project, although the App and its key could serve the whole server.
+
+Pasting the credential also proves something nobody wrote down: a project admin who can paste a key
+that writes to `acme/widgets` controls `acme/widgets`. A server-wide credential removes that proof.
+`storyshelf upload --sha` lets the uploader name any commit, so once a project is linked to a
+repository, its builds post `storyshelf/testing` on that repository. If any project admin could link
+any repository a server-wide connection reaches, one team could post a green merge gate on another
+team's repository. The link is therefore the security boundary, not the credential.
+
+Facts read in the code on 2026-11-16:
+
+- Channel secrets are stored encrypted with the server `SECRET` in `notification_channels`
+  (`secretEncrypted`). Secret rotation re-encrypts a fixed list of tables
+  (`packages/core/src/models/credentials.ts`); a new credential table must join that list.
+- In `checks` mode the private key is the channel secret and must never appear in config, logs,
+  errors or API output (AGENTS.md, Git state).
+- Session cookies are `SameSite=Lax` (`packages/app/src/middleware/same-site-writes.ts`), so a
+  browser returning from the git host by a top-level `GET` still carries the session.
+- StoryShelf receives no webhooks from git hosts; the App setup turns them off.
+
+## Decision
+
+### 1. Git connections belong to the server, set up by site admins
+
+A **git connection** is a server-wide credential for one git host account, kept in a new table
+`git_connections` (provider, display name, API base, non-secret config, encrypted secret, created
+by, state). Only site admins create, rotate or delete one, on the System page's **Git** section.
+A server may hold several: a personal GitHub App, an organization's App, a GitHub Enterprise Server
+App, a GitLab group.
+
+- **GitHub App, created from a manifest.** **Connect GitHub** posts an App manifest to GitHub (the
+  user's account or a named organization, or a GHES base URL) with the permissions ADR 0014 needs:
+  Checks and Pull requests read and write, Contents read, webhooks inactive, installable only on
+  that account. GitHub returns to StoryShelf with a one-time code, which the server exchanges for
+  the App ID, private key and the other credentials GitHub returns. Nobody copies a key. The site
+  admin then installs the App on the repositories they choose.
+- **Token connections** (a GitHub token, a GitLab group or project access token) stay available.
+  The System page opens the host's token form prefilled with the name and the minimum scope
+  (`repo:status`, or GitLab `api`), and the admin pastes the token once for the server.
+
+Every secret a connection holds (private key, client secret, webhook secret, token) is stored
+encrypted with `SECRET`, never returned by the API or shown again, and removed from logs and error
+text through the existing redaction. `git_connections` joins the rotation list in
+`credentials.ts`, so `SECRET_PREVIOUS` and the re-encrypt action cover it.
+
+### 2. Projects link a repository, and a link is pending until approved
+
+A project admin connects a project to a repository on **Project → Settings → Notifications**,
+either by pasting its URL or by picking it from the repositories a connection can reach (the GitHub
+installation's repository list; the GitLab group's projects). The result is a **repository link**
+(a new table: project, connection, owner/repo, prefix, mode, state, requested by, approved by).
+
+- A new link is `pending`. A pending link posts no status, no check run and no comment, and the
+  project page says it waits for a site admin.
+- A site admin approves or refuses it on the System page, or creates the link already approved
+  (assigning a repository to a project up front). Approval records who approved it and when.
+- **Operator switch:** `site_settings` holds "project admins may link any repository a connection
+  covers" (default off). With it on, a link a project admin creates is approved at once: the
+  one-click flow for a server whose project admins are all trusted with every repository the
+  connection reaches. Turning it off does not revoke existing links.
+- Removing a link, deleting a connection or refusing a link stops delivery for that project; a
+  refused link keeps its record for the audit trail.
+
+### 3. One gate per repository and prefix
+
+A repository link is unique per (connection host, owner/repo, prefix). A second project on the same
+repository must use its own prefix (ADR 0014's "several projects in one repo"), so it can never
+overwrite another project's `<prefix>/testing` or `<prefix>/review`. The link form proposes a
+prefix derived from the project slug when the default is taken.
+
+### 4. The installation is resolved, never taken from a URL
+
+GitHub returns from an installation with `installation_id` in the query string. Anyone can craft
+that URL, so it is never stored. For each linked repository the server asks GitHub, with the App's
+own credentials, which installation covers `owner/repo`, and caches the answer with the link. A
+repository the App is not installed on cannot be approved; the form says so and links the App's
+install page.
+
+### 5. Return pages from the git host
+
+The manifest exchange and the installation return are cross-site `GET`s.
+
+- Each flow starts from a site-admin form post that stores a single-use `state` (random, bound to
+  the session, ten-minute life). The return page checks it and shows a confirm page; the write is a
+  CSRF-protected form post (`CSRF_PATHS`), never the `GET` itself.
+- Redirect and return URLs are built only from the confirmed public origin
+  (`createPublicOriginResolver`). With none confirmed, the flow refuses to start and the page says
+  why.
+- The routes are classified `hosting` (git delivery works with testing off) and sit under the
+  site-admin pages. They hold no token in a URL beyond the one-time `code` and `state`, which are
+  never logged.
+- In `subdomain` mode the return must reach the portal origin, where `__Host-storyshelf_session`
+  lives (ADR 0051). `[inferred]` That cookie is sent on the top-level return navigation; the
+  implementation confirms it in a browser test.
+
+### 6. No webhooks
+
+StoryShelf still receives nothing from git hosts. It learns that an App was uninstalled, a token
+revoked or a repository removed only from a refused write. A refusal (401, 403 or 404 from the
+host) marks the link `broken` with the reason. Its pending `notify` jobs end through the normal
+retry limit, and the System page and the project's settings show the broken link with a
+reconnect action. No new job kind and no new build status are added (ADR 0053).
+
+### 7. Delivery is unchanged
+
+Statuses, check runs and the pull-request comment keep ADR 0014's rules: one mapper, durable
+latest-wins delivery, a confirmed origin before anything is sent. Only where the credential comes
+from changes: the `notify` handler reads the link, then its connection, instead of a channel
+secret.
+
+### 8. Moving off per-project credentials (ADR 0053)
+
+- **Release N:** add `git_connections` and the repository links (expand). Existing per-project git
+  channels keep working unchanged. The project settings offer linking when a connection exists, and
+  per-project credentials only when none does.
+- **Release N+1:** new per-project git channels are no longer accepted. The System page lists the
+  remaining ones with a one-click move: the site admin creates or picks a connection, and the
+  channel becomes an approved link.
+- **Release N+2 or later:** per-project git credentials are removed (contract), one minor after the
+  last release that read them.
+
+Chat, email and push channels stay per project; this ADR covers git hosts only.
+
+## Consequences
+
+- Setup moves to the person who runs the server, once per git host account; a project owner pastes
+  a URL or picks a repository.
+- No project admin can make a merge gate appear on a repository a site admin has not approved for
+  that project, unless the operator switches that check off.
+- A server-wide key reaches every repository its App is installed on. The installation list on the
+  git host and the approved links are the two places to review, and both are visible to site
+  admins.
+- A broken connection now affects every project linked through it. The System page shows each
+  connection's state, and its health appears with the other dependencies (#1090).
+- Proving control automatically, for example with a CI identity token (GitHub Actions or GitLab CI
+  `id_tokens`) that names the repository, could replace the site admin's approval later. It is left
+  out: it adds inbound trust surface, and fork pull requests and self-hosted issuers need their own
+  rules. It would be an amendment to this ADR.
+- Buttons and `/storyshelf` commands in pull requests still need inbound webhooks and are not part
+  of this ADR.
+
+## References
+
+- ADR 0011 (roles), ADR 0014 (git hosts and notifications), ADR 0051 (cookies and origins), ADR 0053
+  (migrations).
+- GitHub: creating an App from a manifest, and the App installation endpoints for a repository.
+- Issues: #1111 (one comment per project), #1112 (the comment's content).
