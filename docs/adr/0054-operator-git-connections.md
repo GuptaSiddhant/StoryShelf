@@ -46,7 +46,7 @@ App, a GitLab group.
 - **GitHub App, created from a manifest.** **Connect GitHub** posts an App manifest to GitHub, for
   the admin's account or a named organization (`/organizations/<org>/settings/apps/new`), with the
   permissions ADR 0014 needs: Checks and Pull requests read and write, Contents read, `public:
-  false`. The manifest must name a webhook URL; it points at a path on the server that answers 404,
+false`. The manifest must name a webhook URL; it points at a path on the server that answers 404,
   with `hook_attributes.active: false`. GitHub returns to StoryShelf with a one-time code, valid for
   an hour, which the server exchanges for the App ID and private key. Nobody copies a key. The
   exchange also returns a webhook secret and client credentials, which are discarded unused. The
