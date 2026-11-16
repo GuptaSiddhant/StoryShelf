@@ -13,7 +13,7 @@ export const DEFAULT_BACKOFF_MS = 1000;
 export const MAX_BACKOFF_MS = 30_000;
 /** Longest a job may run before its lease stops being renewed (`testing.maxJobSeconds`, 2 h). */
 export const DEFAULT_MAX_JOB_SECONDS = 7200;
-/** Long-poll wait handed to queues that block inside `poll` (SQS, Redis, Service Bus, IPC). */
+/** Long-poll wait handed to a queue that blocks inside `poll`. */
 export const DEFAULT_WAIT_TIME_SECONDS = 20;
 
 /** Retry knobs of the consumer. */
