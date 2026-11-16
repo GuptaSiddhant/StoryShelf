@@ -90,7 +90,7 @@ async function navigateAndEnrich(
     "navigation",
     async () =>
       await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id, viewport.globals), {
-        waitUntil: "networkidle",
+        waitUntil: "load",
       }),
   );
   await ctx.adapter.waitForReady?.(page);

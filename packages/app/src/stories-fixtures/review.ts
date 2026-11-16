@@ -95,6 +95,7 @@ export function reviewSection(overrides: Partial<ReviewSectionData> = {}): Revie
     canTriage: true,
     testing: false,
     publishing: "success",
+    supersededBy: null,
     canComment: true,
     canVerdict: true,
     ...overrides,

@@ -82,7 +82,7 @@ export function createMysqlDatabase(options: MysqlDatabaseOptions): DatabaseAdap
     },
     // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- schema is AnyMySqlTable, adapter expects Table
     tables: schema as unknown as DatabaseAdapter["tables"],
-    migrate: async ({ logger }): Promise<void> => {
+    migrate: async ({ logger, release }): Promise<void> => {
       // oxlint-disable-next-line unicorn/consistent-function-scoping -- closes over pool from createMysqlDatabase
       const run = async (sql: string): Promise<unknown[]> => {
         const result: unknown =
@@ -93,7 +93,7 @@ export function createMysqlDatabase(options: MysqlDatabaseOptions): DatabaseAdap
         const rows: unknown = result[0];
         return Array.isArray(rows) ? (rows as unknown[]) : [];
       };
-      await runMigrations(run, logger);
+      await runMigrations(run, logger, release);
     },
     close: async (): Promise<void> => {
       if (owned && pool.end) {

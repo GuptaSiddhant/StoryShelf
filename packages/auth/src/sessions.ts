@@ -7,7 +7,8 @@
  * `/revoke-other-sessions` keeps the caller), never raw deletes.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { eq } from "@storyshelf/core/orm";
+import { asc, eq, lt } from "@storyshelf/core/orm";
+import { deleteInBatches } from "@storyshelf/core/utils";
 import { baseAuthTables } from "./auth-tables.ts";
 import { tableColumn } from "./invites.ts";
 
@@ -76,4 +77,24 @@ export async function listUserSessions(
     .toSorted((a, b) =>
       a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? 1 : -1,
     );
+}
+
+/** Delete session and verification rows that expired before `cutoffIso`, in bounded batches. */
+export async function purgeExpiredAuthRows(
+  db: DatabaseAdapter,
+  cutoffIso: string,
+): Promise<{ sessions: number; verifications: number }> {
+  const sweep = async (
+    table: typeof baseAuthTables.session | typeof baseAuthTables.verification,
+  ): Promise<number> =>
+    await deleteInBatches(
+      db,
+      table,
+      lt(tableColumn(table, "expiresAt"), cutoffIso),
+      asc(tableColumn(table, "id")),
+    );
+  return {
+    sessions: await sweep(baseAuthTables.session),
+    verifications: await sweep(baseAuthTables.verification),
+  };
 }

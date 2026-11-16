@@ -14,6 +14,7 @@ import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { gatedSyncMigration } from "./gated-migration.ts";
 import {
   execUnless,
   isDuplicateColumn,
@@ -21,6 +22,7 @@ import {
   reportSkippedIndex,
   toleratedFor,
 } from "./migration-errors.ts";
+import { applyConnectionPragmas, type SqliteConnectionOptions } from "./pragmas.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
 import { parseTableInfo } from "./table-info.ts";
@@ -36,7 +38,7 @@ type BetterSqlite3Client = InstanceType<typeof Database>;
  * lifecycle of the client (teardown is a no-op). This is the hook for
  * shared connections and hermetic tests.
  */
-export interface BetterSqlite3DatabaseOptions {
+export interface BetterSqlite3DatabaseOptions extends SqliteConnectionOptions {
   path?: string;
   readonly?: boolean;
   client?: BetterSqlite3Client;
@@ -59,8 +61,9 @@ export function createBetterSqlite3Database(
   const owned = !options.client;
   const client = options.client ?? openDatabase(options);
   if (owned) {
-    client.exec("PRAGMA journal_mode = WAL");
-    client.exec("PRAGMA busy_timeout = 5000");
+    applyConnectionPragmas((sql) => {
+      client.exec(sql);
+    }, options);
   }
   const db = drizzle(client, { schema });
 
@@ -73,14 +76,8 @@ export function createBetterSqlite3Database(
       category: "database",
     },
     tables: schema,
-    migrate: async ({ logger }) => {
-      await assertReviewSchema(
-        async (table) =>
-          await Promise.resolve(
-            parseTableInfo(client.prepare(`PRAGMA table_info(${table})`).all()),
-          ),
-      );
-      runMigrations(client, logger);
+    migrate: async ({ logger, release }) => {
+      await migrateGated(client, logger, release);
     },
     close: () => {
       if (owned) {
@@ -170,6 +167,35 @@ function applyIdentityStatements(client: BetterSqlite3Client, logger: Logger | u
       );
     }
   }
+}
+
+/** Migrate, skip or refuse by the release recorded in `schema_meta` (ADR 0053). */
+async function migrateGated(
+  client: BetterSqlite3Client,
+  logger: Logger | undefined,
+  release: string | undefined,
+): Promise<void> {
+  await gatedSyncMigration(
+    {
+      exec: (sql) => {
+        client.exec(sql);
+      },
+      all: (sql) => client.prepare(sql).all(),
+    },
+    {
+      release,
+      logger,
+      migrate: async () => {
+        await assertReviewSchema(
+          async (table) =>
+            await Promise.resolve(
+              parseTableInfo(client.prepare(`PRAGMA table_info(${table})`).all()),
+            ),
+        );
+        runMigrations(client, logger);
+      },
+    },
+  );
 }
 
 function runMigrations(client: BetterSqlite3Client, logger: Logger | undefined): void {

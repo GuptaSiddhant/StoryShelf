@@ -115,7 +115,7 @@ function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
     );
   }
   if (takesNoVerdict(data.build.status)) {
-    return <RetryBuild data={data} />;
+    return null;
   }
   if (!data.canVerdict) {
     return null;
@@ -140,32 +140,31 @@ function takesNoVerdict(status: string): boolean {
 }
 
 /** The one line a build that cannot be reviewed shows in place of the approval counter; null when it can be. */
-function nothingToReview(data: ReviewSectionData): string | null {
+function nothingToReview(data: ReviewSectionData): Rendered | string | null {
   const { status } = data.build;
   if (!takesNoVerdict(status)) {
     return null;
   }
+  if (data.build.supersededByBuildId) {
+    return supersededLine(data);
+  }
   return `Nothing to review: this build ${status === "failed" ? "failed" : "was cancelled"}.`;
 }
 
-/**
- * Retry for a build that failed or was cancelled, for the roles that may retry (developer and above,
- * the same ones that may comment) and only where capture is on, since the retry route is a testing
- * route. It posts like the Retry capture button of the build page.
- */
-function RetryBuild(props: { data: ReviewSectionData }): Rendered | null {
-  const { data } = props;
-  if (!data.testing || !data.canComment) {
-    return null;
+/** A superseded build (ADR 0045) says what replaced it; the link is dropped once that build is purged. */
+function supersededLine(data: ReviewSectionData): Rendered {
+  const { supersededBy, project } = data;
+  if (!supersededBy) {
+    return <>Nothing to review: this build was superseded.</>;
   }
-  const url = `/api/v1/projects/${data.project.slug}/builds/${data.build.id}/retry`;
   return (
-    <form method="post" action={url} hx-post={url} hx-target="body" class="mt-1">
-      {csrfField()}
-      <Button variant="secondary" size="sm" type="submit">
-        Retry capture
-      </Button>
-    </form>
+    <>
+      Nothing to review: this build was superseded by{" "}
+      <a href={`/projects/${project.slug}/builds/${supersededBy.id}`}>
+        {supersededBy.gitSha.slice(0, 7)}
+      </a>
+      .
+    </>
   );
 }
 

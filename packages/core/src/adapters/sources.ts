@@ -1,9 +1,11 @@
-/** Maps `ShelfOptions` to the flat adapter slots lifecycle, validation and health probing work on. */
-import type { ShelfOptions } from "../config.ts";
+/** Maps resolved `ShelfOptions` to the flat adapter slots lifecycle, validation and health probing work on. */
+import type { ResolvedShelfOptions } from "../config.ts";
 import type { AdapterSetupSources } from "./setup.ts";
 
 /** The adapter slots of `options`, with `auth` carried along for boot validation. */
-export function adapterSourcesOf(options: ShelfOptions): AdapterSetupSources & { auth?: unknown } {
+export function adapterSourcesOf(
+  options: ResolvedShelfOptions,
+): AdapterSetupSources & { auth?: unknown } {
   return {
     database: options.database,
     storage: options.storage,

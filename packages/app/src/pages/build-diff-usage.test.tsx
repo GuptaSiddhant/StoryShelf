@@ -22,9 +22,9 @@ describe("upstreamPreviewUrl", () => {
     );
   });
 
-  it("uses the published domain when configured", () => {
+  it("uses the build's content host when configured", () => {
     expect(upstreamPreviewUrl(item, "shelf.example.com")).toBe(
-      "https://BUILD1.design-system.shelf.example.com?storyId=button--primary",
+      "//build1.shelf.example.com?storyId=button--primary",
     );
   });
 

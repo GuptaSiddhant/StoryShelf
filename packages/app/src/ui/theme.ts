@@ -7,7 +7,7 @@ export interface BrandTheme {
   text: { primary: string; secondary: string; muted?: string };
   border: string;
   borderSubtle?: string;
-  status: { approved: string; new: string; rejected: string };
+  status: { approved: string; new: string; rejected: string; info?: string };
   sidebarBg?: string;
   /** @deprecated No longer used: the top bar is neutral. Accepted so existing configs still parse. */
   topbarBg?: string;
@@ -18,14 +18,14 @@ export interface BrandTheme {
 
 /** Default light brand theme (shadcn-like zinc, content-first). */
 export const LIGHT_THEME: BrandTheme = {
-  accent: "#1d5fcf",
+  accent: "#5b3fd6",
   accentContrast: "#ffffff",
-  ring: "#1d5fcf",
+  ring: "#5b3fd6",
   surface: { base: "#fafafa", card: "#ffffff", muted: "#f4f4f5", subtle: "#fafafa" },
   text: { primary: "#09090b", secondary: "#5b5b64", muted: "#6a6a73" },
   border: "#e4e4e7",
   borderSubtle: "#f4f4f5",
-  status: { approved: "#16a34a", new: "#d97706", rejected: "#dc2626" },
+  status: { approved: "#16a34a", new: "#d97706", rejected: "#dc2626", info: "#1d5fcf" },
   sidebarBg: "#ffffff",
   radius: "0.5rem",
   radiusSm: "0.375rem",
@@ -34,14 +34,14 @@ export const LIGHT_THEME: BrandTheme = {
 
 /** Default dark brand theme (shadcn-like zinc). */
 export const DARK_THEME: BrandTheme = {
-  accent: "#4f8fff",
+  accent: "#9d8cff",
   accentContrast: "#09090b",
-  ring: "#4f8fff",
+  ring: "#9d8cff",
   surface: { base: "#09090b", card: "#111113", muted: "#27272a", subtle: "#18181b" },
   text: { primary: "#fafafa", secondary: "#a1a1aa", muted: "#8a8a94" },
   border: "#27272a",
   borderSubtle: "#1e1e22",
-  status: { approved: "#22c55e", new: "#f59e0b", rejected: "#ef4444" },
+  status: { approved: "#22c55e", new: "#f59e0b", rejected: "#ef4444", info: "#4f8fff" },
   sidebarBg: "#111113",
   radius: "0.5rem",
   radiusSm: "0.375rem",

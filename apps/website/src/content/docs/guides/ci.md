@@ -66,14 +66,30 @@ When Storybook lives in a package of the repository (`packages/app`, a workspace
 
 Changes in the package and in sibling workspace packages it imports both trigger the stories that depend on them. See [Affected capture](/concepts/affected-capture/#storybook-in-a-monorepo-package).
 
+## Superseded builds
+
+`storyshelf upload` names older in-flight builds of the branch that the new commit replaces, and the project setting `cancel_superseded` lets the server cancel them. Git history decides, so keep `fetch-depth: 0` (or enough depth to reach the previous commits). In a shallow clone a missing commit is kept unless the checked-out commit is the branch's tip on `origin`. See [Builds](/concepts/builds/#superseded-builds).
+
+## Skip commits that change no story
+
+Add `--skip-unchanged` to `storyshelf upload` (or set `STORYSHELF_SKIP_UNCHANGED=1`) and a commit that reaches no story records a skipped build instead of uploading the Storybook, with a status for the commit. It needs the full history (`fetch-depth: 0`) and the build's stats file, like affected capture, and never fails the job: any doubt uploads normally. See [Skipping unchanged commits](/concepts/affected-capture/#skipping-unchanged-commits).
+
 ## Merge gate
 
 StoryShelf posts commit statuses per project. To enable them:
 
-1. Register the git providers on the server: `notifications: { notifiers: gitNotifiers }` (see [@storyshelf/notify-git](/packages/notify-git/)).
+1. Nothing to register: the git providers are built in and stay idle until a project adds a git channel (see [Notifications](/guides/notifications/#git-channels-commit-statuses-and-check-runs)).
 2. In the project's **Settings → Notifications**, add a git channel: pick the provider, enter the repository, a status prefix and a token.
 3. Mark StoryShelf's status check (`storyshelf/testing` by default) as a required check in your branch protection so PRs can't merge until visual review is approved.
 
 For the full walkthrough (GitHub and GitLab rules, multiple projects, verification), see [Merge gate setup](/guides/merge-gate/).
+
+### Default-branch builds are checked with the git host
+
+Any upload token can name any branch, so a build that names the project's default branch counts as a default-branch build (auto-approved, moving the default-branch baselines) only after a git channel confirms the commit is on that branch: GitHub's compare API or GitLab's commit refs, with the channel's own token. A pull request's CI job that uploads with `--branch main` therefore gets a build that needs review, and `storyshelf/testing` stays `pending` with "Commit is not on main" instead of passing.
+
+- If the host says no, or cannot be reached, the build is reviewed like a feature-branch build. The build page says why and offers **Re-check and capture again**.
+- Without a git channel the claim is **not verified**, and by default the build needs review too. Connect a GitHub or GitLab channel, or, for a project with no git host, a project admin turns off **Settings → Tests → Verify default-branch builds with the git host** (`requireVerifiedDefault: false`). Its default-branch builds then count unverified, and the System page lists the project.
+- **Upgrading:** projects get verification on. A project without a git channel stops auto-approving its default-branch builds until you connect a channel or turn verification off.
 
 `storyshelf/testing` is `pending` while capture runs and review is open, `success` when the build is approved, and `failure` on rejection or capture errors. Without `testing` the gate is `storyshelf/review`: `pending` until an approver approves the build, `success` once approved, `failure` on rejection. `storyshelf/storybook` reports the published Storybook and is informational.

@@ -92,8 +92,8 @@ function appWith(
   });
 }
 
-const adminCookie = { cookie: "storyshelf_session=admin" };
-const memberCookie = { cookie: "storyshelf_session=member" };
+const adminCookie = { cookie: "storyshelf_session=admin", "sec-fetch-site": "same-origin" };
+const memberCookie = { cookie: "storyshelf_session=member", "sec-fetch-site": "same-origin" };
 const mePath = "/api/v1/projects/notify-project/notifications/me";
 
 describe("notification subscriptions", () => {

@@ -141,6 +141,6 @@ Rendering happens on the server against the user's uploaded static build, in a p
 
 1. **Pinned Playwright image** -- same browser version everywhere (`mcr.microsoft.com/playwright:<pinned>`)
 2. **Disable animations** -- CSS injection: `* { animation: none !important; transition: none !important; }`
-3. **Wait for network idle and for Storybook's render-finished event** -- `networkidle` on navigation, then the preview channel's `storyRendered`/`storyFinished` (ADR 0004, decision 9), falling back to `delay ?? 500` ms when the page never signals
+3. **Wait for the page load and for Storybook's render-finished event** -- `load` on navigation (not `networkidle`, #856), then the preview channel's `storyRendered`/`storyFinished` (ADR 0004, decision 9), falling back to `delay ?? 500` ms when the page never signals
 4. **Freeze time** (optional) -- inject a fixed `Date` via `page.addInitScript`
 5. **Embed fonts** (optional) -- ensure same font files in the capture image

@@ -2,6 +2,7 @@ import type { Logger } from "pino";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { parseDesignUrl, type DesignProvider } from "../adapters/design.ts";
+import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import {
@@ -21,10 +22,12 @@ import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory } from "./adapter.ts";
 import type { DiscoverOptions, Viewport } from "./adapter.ts";
 import { affectedPathsFor } from "./affected.ts";
+import { settleBranchStanding } from "./branch-standing.ts";
 import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
 import { logInvalidDesigns } from "./design.ts";
 import { assertModeCaps, enrichStories } from "./enrich.ts";
 import { classifyFailures } from "./failure-sets.ts";
+import { prepareStorybook } from "./materialize.ts";
 import { captureAcrossBrowsers, type MatrixInput } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
@@ -34,7 +37,7 @@ import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
 import { detectUnstableRenders } from "./stability.ts";
-import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
+import { persistStorybookStatics } from "./statics.ts";
 import { storybookUrlSource } from "./storybook-urls.ts";
 import { StorybookAdapter } from "./storybook.ts";
 import { loadTarget } from "./target.ts";
@@ -63,6 +66,11 @@ export interface CaptureJobOptions {
   secret?: SecretInput;
   /** Design providers validating declared design links; none ⇒ links are not extracted. */
   design?: DesignProvider[];
+  /**
+   * Notifier providers: a project's git channels confirm a default-branch claim with the host
+   * (`defaultBranchStanding`). None ⇒ every claim is unverified.
+   */
+  notifiers?: readonly NotifierProvider[] | undefined;
   /** The resolved public origin (ADR 0007, decision 6); targets that need a URL wait for it. */
   publicOrigin?: (() => Promise<string | undefined>) | undefined;
   /** Render budget override (tests use a short fuse). */
@@ -139,7 +147,13 @@ export async function executeCaptureJob(
   options: CaptureJobOptions,
 ): Promise<CaptureSummary> {
   const builds = new BuildModel(options.db, options.tables, options.logger);
-  const { build, project } = await loadTarget(options, input.buildId);
+  const loaded = await loadTarget(options, input.buildId);
+  const { project } = loaded;
+  // Before anything reads `isDefault`: the claim is checked with the git host (ADR 0009).
+  const build =
+    loaded.build.status === "cancelled"
+      ? loaded.build
+      : await settleBranchStanding({ ...options, builds }, loaded);
   return await withSpan(
     "capture.job",
     async () => {
@@ -233,14 +247,9 @@ async function runCapturePhases(
       "capture.extract",
       async () =>
         await withSpan("capture.extract", async () => {
-          return await extractStorybookToScratch(
-            options.storage,
-            options.scratchDir,
-            project.id,
-            build.id,
-            undefined,
-            options.limits,
-          );
+          return await prepareStorybook(options.storage, options.scratchDir, project.id, build.id, {
+            limits: options.limits,
+          });
         }),
     );
     const extractDuration = performance.now() - extractStart;

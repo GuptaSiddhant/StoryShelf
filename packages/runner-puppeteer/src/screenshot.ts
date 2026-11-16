@@ -58,7 +58,7 @@ async function navigateAndEnrich(
   viewport: Viewport,
 ): Promise<StoryEntry> {
   await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id, viewport.globals), {
-    waitUntil: "networkidle0",
+    waitUntil: "load",
   });
   await ctx.adapter.waitForReady?.(page);
   if (story.parameters) return story;

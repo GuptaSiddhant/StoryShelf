@@ -14,6 +14,7 @@ import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
+import { gatedSyncMigration } from "./gated-migration.ts";
 import {
   execUnless,
   isDuplicateColumn,
@@ -21,6 +22,7 @@ import {
   reportSkippedIndex,
   toleratedFor,
 } from "./migration-errors.ts";
+import { applyConnectionPragmas, type SqliteConnectionOptions } from "./pragmas.ts";
 import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
 import { parseTableInfo } from "./table-info.ts";
@@ -34,7 +36,7 @@ declare const __PKG_VERSION__: string | undefined;
  * lifecycle of the client (teardown is a no-op). This is the hook for
  * shared connections and hermetic tests.
  */
-export interface BunSqliteDatabaseOptions {
+export interface BunSqliteDatabaseOptions extends SqliteConnectionOptions {
   path?: string;
   readonly?: boolean;
   create?: boolean;
@@ -57,8 +59,9 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
   const owned = !options.client;
   const client = options.client ?? openDatabase(options);
   if (owned) {
-    client.exec("PRAGMA journal_mode = WAL");
-    client.exec("PRAGMA busy_timeout = 5000");
+    applyConnectionPragmas((sql) => {
+      client.exec(sql);
+    }, options);
   }
   const db = drizzle(client, { schema });
 
@@ -71,12 +74,8 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
       category: "database",
     },
     tables: schema,
-    migrate: async ({ logger }) => {
-      await assertReviewSchema(
-        async (table) =>
-          await Promise.resolve(parseTableInfo(client.query(`PRAGMA table_info(${table})`).all())),
-      );
-      runMigrations(client, logger);
+    migrate: async ({ logger, release }) => {
+      await migrateGated(client, logger, release);
     },
     close: () => {
       if (owned) {
@@ -180,6 +179,35 @@ function applyIdentityStatements(client: Database, logger: Logger | undefined): 
       );
     }
   }
+}
+
+/** Migrate, skip or refuse by the release recorded in `schema_meta` (ADR 0053). */
+async function migrateGated(
+  client: Database,
+  logger: Logger | undefined,
+  release: string | undefined,
+): Promise<void> {
+  await gatedSyncMigration(
+    {
+      exec: (sql) => {
+        client.exec(sql);
+      },
+      all: (sql) => client.query(sql).all(),
+    },
+    {
+      release,
+      logger,
+      migrate: async () => {
+        await assertReviewSchema(
+          async (table) =>
+            await Promise.resolve(
+              parseTableInfo(client.query(`PRAGMA table_info(${table})`).all()),
+            ),
+        );
+        runMigrations(client, logger);
+      },
+    },
+  );
 }
 
 function runMigrations(client: Database, logger: Logger | undefined): void {

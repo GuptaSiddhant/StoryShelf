@@ -1,6 +1,10 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
+import { sql } from "drizzle-orm";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { schema } from "./schema/index.ts";
 
@@ -14,6 +18,13 @@ const silentLogger = createShelfLogger({ level: "silent" });
 /** Run the adapter's setup hook (migrations live there now). */
 async function initDb(db: DatabaseAdapter): Promise<void> {
   await db.lifecycle?.setup({ config: {}, logger: silentLogger });
+}
+
+/** Read a single PRAGMA value; rows are arrays or objects depending on the driver. */
+async function pragmaValue(db: DatabaseAdapter, name: string): Promise<unknown> {
+  const rows = await db.all<unknown>(sql.raw(`PRAGMA ${name}`));
+  const row = rows[0];
+  return Array.isArray(row) ? row[0] : Object.values(row as object)[0];
 }
 
 describe.skipIf(!HAS_BUN)("createBunSqliteDatabase (bun runtime)", () => {
@@ -142,5 +153,23 @@ describe.skipIf(!HAS_BUN)("createBunSqliteDatabase (bun runtime)", () => {
     const db = createBunSqliteDatabase({ client });
     await expect(initDb(db)).rejects.toThrow("table build_reviews has no column build_id");
     client.close();
+  });
+
+  it("runs WAL with synchronous=NORMAL by default and FULL on opt-out", async () => {
+    const { createBunSqliteDatabase } = await import("./bun-sqlite.ts");
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-bun-sqlite-"));
+    try {
+      const normal = createBunSqliteDatabase({ path: join(dir, "normal.db") });
+      await initDb(normal);
+      expect(await pragmaValue(normal, "synchronous")).toBe(1);
+      await normal.lifecycle?.teardown();
+
+      const full = createBunSqliteDatabase({ path: join(dir, "full.db"), synchronous: "full" });
+      await initDb(full);
+      expect(await pragmaValue(full, "synchronous")).toBe(2);
+      await full.lifecycle?.teardown();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -44,7 +44,11 @@ export interface CaptureHandlerOptions {
   /** Links in statuses are absolute from `publicBaseUrl`; published Storybooks use `publishedBaseDomain`. */
   config?: Pick<
     ShelfConfig,
-    "publicBaseUrl" | "publishedBaseDomain" | "maxZipEntries" | "maxUnzippedBytes"
+    | "publicBaseUrl"
+    | "publishedBaseDomain"
+    | "storybookHosting"
+    | "maxZipEntries"
+    | "maxUnzippedBytes"
   >;
   /**
    * The resolved public origin (ADR 0007, decision 6): status links and URL-reaching targets use it.
@@ -192,6 +196,7 @@ export function captureDispatchDeps(
     logger: options.logger,
     secret: options.secret,
     design: options.design,
+    notifiers: options.notifiers,
     publicOrigin,
     shardSize: options.shardSize,
     enqueue: options.enqueue,

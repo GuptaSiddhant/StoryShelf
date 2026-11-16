@@ -45,6 +45,7 @@ export async function recordContentUses(
   target: { projectId: string; buildId: string },
   hashes: Iterable<string>,
   logger?: Logger,
+  sizes?: ReadonlyMap<string, number>,
 ): Promise<number> {
   const lifecycle = db?.buildReferenceLifecycle;
   if (lifecycle === undefined) return 0;
@@ -56,6 +57,7 @@ export async function recordContentUses(
     target.buildId,
     distinct,
     staleBefore,
+    sizes,
   );
   if (refused.length > 0) throw new ContentCollectingError(refused);
   const missing = await missingBlobs(storage, distinct);

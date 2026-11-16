@@ -16,6 +16,7 @@ import {
   SectionTitle,
   VStack,
 } from "../ui/components.tsx";
+import { Style } from "../ui/css.ts";
 import {
   reviewComment,
   reviewCommentActions,
@@ -35,7 +36,12 @@ export interface DiffCommentsProps {
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
   names?: ReadonlyMap<string, string>;
+  /** Answering a posted comment in place: render the box empty and focused for the next one. */
+  refocus?: boolean;
 }
+
+/** The id the snapshot comment form swaps in place: the thread and its (emptied) box. */
+export const SNAPSHOT_COMMENTS_ID = "snapshot-comments";
 
 /** One comment's props: where it sits, and what its head shows beside the author. */
 export interface CommentCardProps {
@@ -202,23 +208,30 @@ interface CommentFormProps {
   project: Project;
   build: Build;
   selectedId: string;
+  refocus?: boolean;
 }
 
 /** Reply form scoped to the selected snapshot. */
 function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selectedId } = props;
+  const { project, build, selectedId, refocus = false } = props;
   return (
     <form
       method="post"
       action={`/projects/${project.slug}/builds/${build.id}/comments`}
       hx-post={`/projects/${project.slug}/builds/${build.id}/comments`}
-      hx-target="body"
+      hx-target={`#${SNAPSHOT_COMMENTS_ID}`}
+      hx-swap="outerHTML"
       class="mt-1"
     >
       {csrfField()}
       <VStack>
         <input type="hidden" name="snapshotId" value={selectedId} />
-        <CommentBodyField slug={project.slug} buildId={build.id} kind="snapshot" />
+        <CommentBodyField
+          slug={project.slug}
+          buildId={build.id}
+          kind="snapshot"
+          value={refocus ? "" : undefined}
+        />
         <RequestChangeField id="snapshot-request-change" />
         <div>
           <Button variant="primary" type="submit">
@@ -230,7 +243,10 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
   );
 }
 
-/** Threaded comments for the selected snapshot plus the reply form. */
+/**
+ * Threaded comments for the selected snapshot plus the reply form. Posting swaps this card in
+ * place (`#snapshot-comments`): the new comment in the list, the box empty again.
+ */
 export function DiffComments(
   props: DiffCommentsProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
@@ -239,7 +255,7 @@ export function DiffComments(
     c.snapshotId ? c.snapshotId === selectedId : !c.storyId || c.storyId === selectedStoryId,
   );
   return (
-    <Card>
+    <Card id={SNAPSHOT_COMMENTS_ID}>
       <SectionTitle level={3}>Comments</SectionTitle>
       <VStack>
         {visible.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
@@ -255,7 +271,27 @@ export function DiffComments(
         {visible.length === 0 ? <Meta>No comments on this snapshot.</Meta> : null}
       </VStack>
 
-      <CommentForm project={project} build={build} selectedId={selectedId} />
+      <CommentForm
+        project={project}
+        build={build}
+        selectedId={selectedId}
+        refocus={props.refocus}
+      />
     </Card>
+  );
+}
+
+/**
+ * The in-place answer to a posted snapshot comment: the card, the comment in it and the box empty
+ * and focused, opening with its stylesheet (merged by the shell, as in `renderReviewSwap`).
+ */
+export function renderCommentSwap(
+  props: Omit<DiffCommentsProps, "refocus">,
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <>
+      <Style />
+      <DiffComments {...props} refocus />
+    </>
   );
 }

@@ -19,7 +19,7 @@ export interface BuildStateDeps {
   /** Server secret that decrypts channel tokens. */
   secret: SecretInput;
   /** The published-Storybook domain for Storybook links. */
-  config: Pick<ShelfConfig, "publishedBaseDomain">;
+  config: Pick<ShelfConfig, "publishedBaseDomain" | "storybookHosting" | "publicBaseUrl">;
   /**
    * The resolved public origin (ADR 0007, decision 6): the origin every link starts with. While it
    * resolves to nothing, no state is requested or delivered (ADR 0014, decision 11).

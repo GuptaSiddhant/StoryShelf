@@ -1,11 +1,10 @@
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
+import { parseTrustProxy } from "@storyshelf/core/config";
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
-import { chatNotifiers } from "@storyshelf/notify-chat";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -42,6 +41,8 @@ const authPassword = env["AUTH_PASSWORD"];
 const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
+// Proxies allowed to name the client for rate limits (#911); unset trusts none.
+const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
 
 // Scheduled build purge is opt-in (ADR 0039): `PURGE_TTL_DAYS` turns it on; unset leaves it off, so
 // an upgrade never starts deleting builds. A value that is not a positive whole number stops the boot.
@@ -105,20 +106,24 @@ const ui = buildUi();
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 
-// Notifications: SMTP sender from SMTP_* env (undefined keeps invites
-// out-of-band); chat + email providers serve stored channels.
-const emailSender = smtpPresetFromEnv(env, shelfLogger);
-const emailNotifiers = emailSender
-  ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
-  : [];
+// Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
+// SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
+// (undefined keeps invites out-of-band).
+const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
-  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifications: {
-    notifiers: [...chatNotifiers, ...emailNotifiers],
+    notifiers: (builtIn) =>
+      emailSender
+        ? builtIn.map((provider) =>
+            provider.metadata.kind === "email"
+              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+              : provider,
+          )
+        : builtIn,
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the
@@ -152,6 +157,7 @@ const app = createShelfApp({
     migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken,
     publicBaseUrl,
+    ...(trustProxy === undefined ? {} : { trustProxy }),
     scratchDir: dataDir,
     ...(purgeTtlDays === undefined ? {} : { purgeTtlDays }),
     serverTiming: true,

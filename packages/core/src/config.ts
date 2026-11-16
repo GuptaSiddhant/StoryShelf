@@ -9,6 +9,7 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
   storybookHostingSchema,
   validateStorybookHosting,
@@ -16,6 +17,23 @@ import {
 } from "./storybook-hosting.ts";
 
 export type { StorybookHostingConfig, StorybookHostingMode } from "./storybook-hosting.ts";
+export {
+  assertPortalOutsideContentHosts,
+  classifyHost,
+  contentHostLabel,
+  contentHostSuffix,
+  contentOriginOf,
+  hostingModeOf,
+  hostingOriginsOf,
+  hostingOriginsOfConfig,
+  isAliasLabel,
+  isReservedLabel,
+  isUlidShape,
+  portalOriginOf,
+  RESERVED_HOST_LABELS,
+  storybookHostingOf,
+} from "./content-hosts.ts";
+export type { HostClass, HostingOrigins } from "./content-hosts.ts";
 
 /** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {
@@ -26,7 +44,7 @@ export interface BrandTheme {
   text: { primary: string; secondary: string; muted?: string };
   border: string;
   borderSubtle?: string;
-  status: { approved: string; new: string; rejected: string };
+  status: { approved: string; new: string; rejected: string; info?: string };
   sidebarBg?: string;
   topbarBg?: string;
   radius?: string;
@@ -121,6 +139,14 @@ export interface OutboundConfig {
   allowHttp?: boolean;
 }
 
+/**
+ * Which reverse proxies in front of this server may name the client (`ShelfConfig.trustProxy`).
+ * A number trusts that many hops counted from this server, whatever their address; a list trusts
+ * peers whose address is one of these IPs or CIDRs; `"fly"` trusts Fly.io's proxy and reads its
+ * `Fly-Client-IP` header. A forwarded header from a peer that is not trusted is never read.
+ */
+export type TrustProxy = number | string[] | "fly";
+
 /** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
 export interface ShelfConfig {
   /** Policy for project-set outbound URLs; see {@link OutboundConfig}. */
@@ -162,6 +188,12 @@ export interface ShelfConfig {
    */
   publicBaseUrl?: string;
   /**
+   * Proxies allowed to report the client's IP, which keys rate limits (see {@link TrustProxy}).
+   * Unset keeps the socket peer, so behind a load balancer every client shares the proxy's
+   * buckets. Hosts map it from `TRUST_PROXY` with {@link parseTrustProxy}.
+   */
+  trustProxy?: TrustProxy;
+  /**
    * Working directory for capture and inline statics extraction. Defaults to
    * `<os.tmpdir()>/storyshelf`; publishing and capture extract there.
    */
@@ -173,6 +205,12 @@ export interface ShelfConfig {
    * retention (ADR 0039).
    */
   purgeTtlDays?: number;
+  /** Insight rows (all kinds) older than this many days are deleted daily; null keeps them (default 180). */
+  insightsTtlDays?: number | null;
+  /** AI usage rows older than this many days are deleted daily; null keeps them (default 400, covers every budget window). */
+  aiUsageTtlDays?: number | null;
+  /** Expired session and verification rows are deleted this many days after expiry; null keeps them (default 7). */
+  expiredAuthTtlDays?: number | null;
   /** Branch baseline TTL, days; null disables branch GC (default 30). */
   branchTtlDays?: number | null;
   /** Branch GC interval, ms; daily sweep via interval clock (default 86_400_000). */
@@ -183,8 +221,15 @@ export interface ShelfConfig {
    * Opt-in, off by default — some deployments prefer no timing headers.
    */
   serverTiming?: boolean;
-  /** Persist gzip variants for published Storybook files (default off). */
+  /** Persist gzip and brotli copies of published Storybook files, made when publishing ends (default off). */
   publishedCompression?: boolean;
+  /**
+   * Act on `supersedes` when a build is created (ADR 0045, decision 3): cancel the older in-flight
+   * builds the CLI names, for projects with `cancelSuperseded` on. Default off, so a rolling upgrade
+   * never has a copy cancel builds that a previous copy cannot read as superseded (ADR 0053,
+   * decision 5: readers first); turn it on one minor release after the readers shipped.
+   */
+  supersedeOnCreate?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;
   /**
@@ -224,7 +269,12 @@ const brandThemeSchema: z.ZodType<BrandTheme> = z.object({
   text: z.object({ primary: z.string(), secondary: z.string(), muted: z.string().optional() }),
   border: z.string(),
   borderSubtle: z.string().optional(),
-  status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
+  status: z.object({
+    approved: z.string(),
+    new: z.string(),
+    rejected: z.string(),
+    info: z.string().optional(),
+  }),
   sidebarBg: z.string().optional(),
   topbarBg: z.string().optional(),
   radius: z.string().optional(),
@@ -267,6 +317,42 @@ export const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.objec
 });
 
 /** Zod schema validating the shelf-level configuration. */
+/** Most trusted hops `trustProxy` may count (a longer proxy chain is a misconfiguration). */
+const MAX_TRUSTED_HOPS = 10;
+
+/** Shape of one `trustProxy` entry: an IPv4/IPv6 address with an optional prefix length. */
+const TRUSTED_PROXY_PATTERN = /^[\da-f:.]+(?:\/\d{1,3})?$/iu;
+
+/**
+ * Map a `TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
+ * or `0` is off; `fly` is Fly.io; digits are a hop count; anything else is a comma-separated list
+ * of IPs or CIDRs (checked by {@link validateConfig}).
+ */
+export function parseTrustProxy(raw?: string): TrustProxy | undefined {
+  const value = raw?.trim() ?? "";
+  if (value === "" || value === "false" || value === "0") {
+    return undefined;
+  }
+  if (value === "fly") {
+    return "fly";
+  }
+  if (/^\d+$/u.test(value)) {
+    return Number(value);
+  }
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+}
+
+const trustedProxyEntry = z.string().regex(TRUSTED_PROXY_PATTERN, "an IP address or CIDR");
+
+const trustProxySchema: z.ZodType<TrustProxy> = z.union([
+  z.number().int().min(1).max(MAX_TRUSTED_HOPS),
+  z.literal("fly"),
+  z.array(trustedProxyEntry).min(1, "at least one IP address or CIDR"),
+]);
+
 export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .object({
     outbound: z
@@ -291,13 +377,18 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     storybookHosting: storybookHostingSchema.optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     publicBaseUrl: z.string().url().optional(),
+    trustProxy: trustProxySchema.optional(),
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     branchTtlDays: z.number().int().positive().nullable().optional(),
+    insightsTtlDays: z.number().int().positive().nullable().optional(),
+    aiUsageTtlDays: z.number().int().positive().nullable().optional(),
+    expiredAuthTtlDays: z.number().int().positive().nullable().optional(),
     branchGcIntervalMs: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
     publishedCompression: z.boolean().optional(),
+    supersedeOnCreate: z.boolean().optional(),
     captureAssets: z
       .object({
         cacheMaxAgeSeconds: z.number().int().min(0).max(MAX_CAPTURE_ASSET_CACHE_SECONDS).optional(),
@@ -443,6 +534,12 @@ export interface ShelfTestingOptions {
    * boot if it cannot.
    */
   mode?: "auto" | "in-process" | "fork";
+  /**
+   * Operator veto of story switching (ADR 0052, decision 2). `false` forbids a project's
+   * `switchStories` setting for the whole server; unset or `true` leaves the choice to each
+   * project (the setting itself defaults to off).
+   */
+  switchStories?: boolean;
   /** Screenshot comparison, shared by capture and the re-diff endpoint. */
   compare?: ShelfCompareOptions;
   /** Image library selection; see {@link ShelfImagesOptions}. */
@@ -463,8 +560,17 @@ export interface ShelfTestingOptions {
 
 /** Notification options: who can deliver, over which transport, with what branding. */
 export interface ShelfNotificationsOptions {
-  /** Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these. */
-  notifiers?: NotifierProvider[];
+  /**
+   * Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these.
+   * An array lists exactly these; a function `(builtIn) => list` adds, replaces or filters the
+   * built-in notifiers; `false` wires none (ADR 0049).
+   */
+  notifiers?: IntegrationOption<NotifierProvider>;
+  /**
+   * Email transports, chosen like `notifiers`: an array, a function of the built-ins, or `false`
+   * (ADR 0049). Resolved and checked at startup; the app does not use the list yet.
+   */
+  email?: IntegrationOption<EmailSender>;
   /** Email transport. Listed here so its setup/teardown/validation hooks run with the app's. */
   emailSender?: EmailSender;
   /** Site-wide brand and sender settings for outgoing notifications. */
@@ -501,6 +607,14 @@ export interface ShelfOptions {
    */
   testing?: ShelfTestingOptions;
   /**
+   * Accept skipped builds (ADR 0044): `GET …/builds/skip-source` and `POST …/builds/skipped`. Off by
+   * default, and then both answer 404 as if they did not exist, so a release can ship the readers of
+   * the `skipped` status before any server writes it (ADR 0053, decision 5). The release after the
+   * readers turns the default on and removes the option. Needs `testing`; without it the routes
+   * answer 404 either way.
+   */
+  skippedBuilds?: boolean;
+  /**
    * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`,
    * and to the read-grant route, `/_r/<token>/*`, which share one bucket (ADR 0007, decision 5;
    * ADR 0051, decision 10). Default 6000, enough for a render fetching thousands of assets from one
@@ -512,8 +626,11 @@ export interface ShelfOptions {
   auth?: Auth;
   /** AI insights surface (ADR 0016). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
-  /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
-  design?: DesignProvider[];
+  /**
+   * Design-tool providers (Figma, …) that resolve links, metadata and previews: an array (exactly
+   * these), a function `(builtIn) => list`, or `false` for none (ADR 0049).
+   */
+  design?: IntegrationOption<DesignProvider>;
   /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
   logger?: Logger;
@@ -525,6 +642,25 @@ export interface ShelfOptions {
    * observability package. Flushed on `app.lifecycle.teardown()`.
    */
   observability?: ObservabilityHandle;
+}
+
+/** Notification options after {@link resolveShelfOptions}: every integration group is a list. */
+export interface ResolvedNotificationsOptions extends Omit<
+  ShelfNotificationsOptions,
+  "notifiers" | "email"
+> {
+  notifiers?: NotifierProvider[];
+  email?: EmailSender[];
+}
+
+/**
+ * `ShelfOptions` after {@link resolveShelfOptions}: the integration groups are resolved, once, into
+ * the lists the app registers. `resolveShelfOptions` always sets them; they stay optional so a
+ * hand-built options object (tests, embedders) reads as "none".
+ */
+export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  design?: DesignProvider[];
+  notifications?: ResolvedNotificationsOptions;
 }
 
 /**

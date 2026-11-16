@@ -1,6 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { formatNotification, formatSystemNotification } from "./format.ts";
 
+const event = { event: "build:reviewing", data: {}, timestamp: "2026-11-14T00:00:00.000Z" };
+
+describe("email header", () => {
+  it("opens the html with the StoryShelf wordmark when no brand is set", () => {
+    const { html } = formatNotification(event);
+    expect(html.startsWith('<p style="margin:0 0 16px;font-weight:600;')).toBe(true);
+    expect(html).toContain(">StoryShelf</p>");
+    expect(html).not.toContain("<img");
+  });
+
+  it("uses the operator's name and logo, escaped", () => {
+    const { html } = formatNotification(event, {
+      name: "Acme <QA>",
+      logo: 'https://acme.test/l.png"',
+    });
+    expect(html).toContain('<img src="https://acme.test/l.png&quot;" alt=""');
+    expect(html).toContain("Acme &lt;QA&gt;</p>");
+    expect(html).not.toContain("StoryShelf");
+  });
+});
+
 describe("formatNotification", () => {
   it("formats a compact build event with prefix and link", () => {
     const formatted = formatNotification(

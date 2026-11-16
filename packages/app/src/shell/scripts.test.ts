@@ -4,6 +4,31 @@ import { describe, expect, it, vi } from "vitest";
 import { bootScript } from "./boot-script.ts";
 import { clientScript } from "./client-script.ts";
 
+/** Run a boot script in a page with `cookie` set; the sidebar state it applied. */
+function sidebarAfterBoot(source: string, cookie: string): string | undefined {
+  const dom = new JSDOM("<body></body>", {
+    runScripts: "outside-only",
+    url: "https://shelf.test/",
+  });
+  // oxlint-disable-next-line unicorn/no-document-cookie -- the boot script reads document.cookie
+  dom.window.document.cookie = cookie;
+  dom.window.eval(source);
+  return dom.window.document.documentElement.dataset["sidebar"];
+}
+
+/** Boot a page, click the collapse control, and return the cookies the script wrote. */
+function collapseAndRead(boot: string): string {
+  const dom = new JSDOM("<body><button data-sidebar-collapse></button></body>", {
+    runScripts: "outside-only",
+    url: "https://shelf.test/",
+  });
+  dom.window.eval(boot);
+  dom.window.eval(clientScript());
+  dom.window.document.querySelector<HTMLElement>("[data-sidebar-collapse]")?.click();
+  // oxlint-disable-next-line unicorn/no-document-cookie -- reading back what the script wrote
+  return dom.window.document.cookie;
+}
+
 function compiles(source: string): boolean {
   // Syntax check only: compiling a vm.Script parses the source without running it.
   return new Script(source) instanceof Script;
@@ -20,6 +45,62 @@ describe("shell scripts", () => {
     expect(source).toContain("storyshelf_theme");
     expect(source).toContain("storyshelf_sidebar");
     expect(source).toContain("data-sidebar");
+  });
+
+  it("boot script opens a build page collapsed until the viewer expands it there", () => {
+    expect(sidebarAfterBoot(bootScript("rail"), "")).toBe("rail");
+    expect(sidebarAfterBoot(bootScript("rail"), "storyshelf_sidebar_build=full")).toBeUndefined();
+    // The other pages' choice neither affects nor is affected by the build page.
+    expect(sidebarAfterBoot(bootScript("rail"), "storyshelf_sidebar=full")).toBe("rail");
+    expect(sidebarAfterBoot(bootScript(), "storyshelf_sidebar_build=rail")).toBeUndefined();
+    expect(sidebarAfterBoot(bootScript(), "storyshelf_sidebar=rail")).toBe("rail");
+  });
+
+  it("the collapse control saves the choice under the page's own cookie", () => {
+    expect(collapseAndRead(bootScript("rail"))).toBe("storyshelf_sidebar_build=full");
+    expect(collapseAndRead(bootScript())).toBe("storyshelf_sidebar=rail");
+  });
+
+  it("folds a sidebar group on its own and remembers it, rendering the same without storage", () => {
+    const page = `<body><button data-nav-fold="project" aria-expanded="true"></button>
+      <div data-nav-group="project"></div></body>`;
+    const run = (storage: "ok" | "throws") => {
+      const dom = new JSDOM(page, { runScripts: "outside-only", url: "https://shelf.test/" });
+      const { window } = dom;
+      if (storage === "throws") {
+        Object.defineProperty(window, "localStorage", {
+          get: () => {
+            throw new Error("blocked");
+          },
+        });
+      }
+      Object.assign(window, {
+        __storyshelfShell: {
+          readCookie: () => null,
+          writeCookie: () => {},
+          applyTheme: () => {},
+          applySidebar: () => {},
+        },
+      });
+      window.eval(clientScript());
+      return window;
+    };
+    const window = run("ok");
+    const head = window.document.querySelector<HTMLElement>("[data-nav-fold]");
+    const group = window.document.querySelector<HTMLElement>("[data-nav-group]");
+    head?.click();
+    expect(group?.dataset["folded"] !== undefined).toBe(true);
+    expect(head?.getAttribute("aria-expanded")).toBe("false");
+    expect(window.localStorage.getItem("storyshelf_nav_folded")).toBe('["project"]');
+    head?.click();
+    expect(group?.dataset["folded"] !== undefined).toBe(false);
+    expect(window.localStorage.getItem("storyshelf_nav_folded")).toBe("[]");
+    const blocked = run("throws");
+    blocked.document.querySelector<HTMLElement>("[data-nav-fold]")?.click();
+    expect(
+      blocked.document.querySelector<HTMLElement>("[data-nav-group]")?.dataset["folded"] !==
+        undefined,
+    ).toBe(true);
   });
 
   it("client script wires every shell behavior", () => {
@@ -395,5 +476,111 @@ describe("signed preview frame", () => {
     await tick();
     expect(page.part("notice")?.hidden).toBe(true);
     expect(page.part("disclosure")?.hidden).toBe(false);
+  });
+});
+
+/** A page with the drawer, its toggle, and a page body behind it, with the client script running. */
+function drawerPage() {
+  const dom = new JSDOM(
+    `<body><button data-sidebar-toggle aria-expanded="false">Menu</button>
+      <aside id="sidebar"><a href="/a">First</a><a href="/b">Second</a></aside>
+      <div data-sidebar-backdrop hidden></div>
+      <div data-shell-main><main><h1 data-focus-heading>Heading</h1></main></div></body>`,
+    { runScripts: "outside-only", url: "https://shelf.test/" },
+  );
+  dom.window.eval(bootScript());
+  dom.window.eval(clientScript());
+  return dom.window;
+}
+
+describe("shell focus handling", () => {
+  it("moves focus into the open drawer, makes the page inert, and gives focus back on close", () => {
+    const { document } = drawerPage();
+    const toggle = document.querySelector<HTMLElement>("[data-sidebar-toggle]");
+    const main = document.querySelector<HTMLElement>("[data-shell-main]");
+    toggle?.click();
+    expect(document.activeElement?.textContent).toBe("First");
+    expect(main?.hasAttribute("inert")).toBe(true);
+    toggle?.click();
+    expect(main?.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("closes the drawer with Escape and returns focus to the toggle", () => {
+    const { document, KeyboardEvent } = drawerPage();
+    const toggle = document.querySelector<HTMLElement>("[data-sidebar-toggle]");
+    toggle?.click();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(document.querySelector("[data-shell-main]")?.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("focuses the main heading after a whole-page swap", () => {
+    const { document, CustomEvent } = drawerPage();
+    expect(document.activeElement).toBe(document.body);
+    document.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { detail: { target: document.body } }),
+    );
+    expect(document.activeElement?.textContent).toBe("Heading");
+  });
+
+  it("after an in-place swap, wires the new canvas and focuses its heading without scrolling", () => {
+    const { document, CustomEvent } = drawerPage();
+    const old = document.createElement("div");
+    old.id = "review-canvas";
+    const fresh = document.createElement("div");
+    fresh.id = "review-canvas";
+    fresh.innerHTML = `<h2 id="snapshot-heading" tabindex="-1" data-focus-heading>Next</h2>
+      <div data-compare data-view="side"></div><textarea autofocus></textarea>`;
+    document.querySelector("main")?.append(fresh);
+    fresh.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { bubbles: true, detail: { target: old } }),
+    );
+    expect(document.activeElement?.textContent).toBe("Next");
+    expect(fresh.querySelector<HTMLElement>("[data-compare]")?.dataset["ready"]).toBe("1");
+  });
+
+  it("merges only the missing rules of an in-place swap's stylesheet and drops the block", () => {
+    const { document, CustomEvent } = drawerPage();
+    const sheet = document.createElement("style");
+    sheet.id = "storyshelf-css";
+    sheet.textContent = ".a{x:1}";
+    document.body.append(sheet);
+    const detail = {
+      target: document.createElement("div"),
+      serverResponse:
+        '<style id="storyshelf-css">.a{x:1}.b{y:2;&:hover{z:3}}</style><div id="c"></div>',
+    };
+    document.body.dispatchEvent(new CustomEvent("htmx:beforeSwap", { bubbles: true, detail }));
+    expect(sheet.textContent).toBe(".a{x:1}.b{y:2;&:hover{z:3}}");
+    expect(detail.serverResponse).toBe('<div id="c"></div>');
+  });
+
+  it("after an in-place comment swap, focuses the emptied box", () => {
+    const { document, CustomEvent } = drawerPage();
+    const old = document.createElement("section");
+    old.id = "snapshot-comments";
+    const fresh = document.createElement("section");
+    fresh.id = "snapshot-comments";
+    fresh.innerHTML = `<button>Mark resolved</button><textarea autofocus></textarea>`;
+    document.querySelector("main")?.append(fresh);
+    fresh.dispatchEvent(
+      new CustomEvent("htmx:afterSwap", { bubbles: true, detail: { target: old } }),
+    );
+    expect(document.activeElement?.tagName).toBe("TEXTAREA");
+  });
+
+  it("keeps aria-expanded of the collapse button in step with the rail", () => {
+    const dom = new JSDOM(
+      `<body><button data-sidebar-collapse aria-expanded="true"></button></body>`,
+      { runScripts: "outside-only", url: "https://shelf.test/" },
+    );
+    dom.window.eval(bootScript());
+    dom.window.eval(clientScript());
+    const button = dom.window.document.querySelector<HTMLElement>("[data-sidebar-collapse]");
+    button?.click();
+    expect(button?.getAttribute("aria-expanded")).toBe("false");
+    button?.click();
+    expect(button?.getAttribute("aria-expanded")).toBe("true");
   });
 });

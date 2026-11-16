@@ -86,8 +86,8 @@ function appWith(db: ReturnType<typeof makeDatabase>["db"], storage: unknown) {
   });
 }
 
-const adminCookie = { cookie: "storyshelf_session=admin" };
-const viewerCookie = { cookie: "storyshelf_session=viewer" };
+const adminCookie = { cookie: "storyshelf_session=admin", "sec-fetch-site": "same-origin" };
+const viewerCookie = { cookie: "storyshelf_session=viewer", "sec-fetch-site": "same-origin" };
 
 describe("notification channels", () => {
   it("creates and lists project channels as admin", async () => {

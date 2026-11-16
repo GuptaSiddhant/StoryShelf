@@ -17,6 +17,7 @@ function baseOptions(): {
   sha: string;
   branch: string;
   cwd: string;
+  zip: boolean;
 } {
   return {
     url: "https://shelf.example.com",
@@ -24,6 +25,7 @@ function baseOptions(): {
     token: "ci-token",
     sha: "abc123",
     branch: "main",
+    zip: true,
     cwd: dir,
   };
 }
@@ -99,6 +101,9 @@ describe("runUpload success", () => {
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         await Promise.resolve();
+        if (url.includes("/builds/in-flight")) {
+          return okJson([]);
+        }
         const headers = new Headers(init?.headers);
         calls.push({
           method: init?.method ?? "GET",
@@ -140,6 +145,9 @@ describe("runUpload success", () => {
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {
           await Promise.resolve();
+          if (url.includes("/builds/in-flight")) {
+            return okJson([]);
+          }
           urls.push(url);
           if ((init?.method ?? "") === "PUT") {
             await collectBody(init?.body);
@@ -148,7 +156,7 @@ describe("runUpload success", () => {
           return okJson({ build: { id: "b1" }, uploadUrl: "/api/v1/projects/demo/builds/b1/zip" });
         }),
       );
-      const options: Record<string, string | undefined> = {
+      const options: Record<string, string | boolean | undefined> = {
         ...baseOptions(),
         buildDir: "storybook-static",
         url: source === "flag" ? "https://shelf.example.com//" : undefined,
@@ -317,6 +325,9 @@ describe("runUpload affected capture", () => {
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         await Promise.resolve();
+        if (url.includes("/builds/in-flight")) {
+          return okJson([]);
+        }
         const method = init?.method ?? "GET";
         calls.push({ method, url });
         if (method === "POST" && typeof init?.body === "string") {
@@ -425,6 +436,66 @@ describe("runUpload affected capture", () => {
     expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
   });
 
+  it("never asks for a skip source with --full, even with --skip-unchanged", async () => {
+    writeBuild(dir);
+    const { calls } = stubFetch({ build: { id: "b1" }, uploadUrl: "/x", baselineSha: "abc123" });
+
+    await runUpload({
+      ...baseOptions(),
+      buildDir: "storybook-static",
+      full: true,
+      skipUnchanged: true,
+    });
+
+    expect(calls.some((call) => call.url.includes("skip-source"))).toBe(false);
+    expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
+  });
+
+  it("uploads normally when the skip hint is null", async () => {
+    writeBuild(dir);
+    const { calls } = stubFetch({ build: { id: "b1" }, uploadUrl: "/x", baselineSha: null });
+    const fetchMock = vi.mocked(fetch);
+    const inner = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url, init) =>
+      typeof url === "string" && url.includes("skip-source")
+        ? await Promise.resolve(okJson(null))
+        : inner(url, init),
+    );
+
+    await runUpload({ ...baseOptions(), buildDir: "storybook-static", skipUnchanged: true });
+
+    expect(calls.map((call) => call.method)).toContain("PUT");
+    expect(calls.some((call) => call.url.endsWith("/builds/skipped"))).toBe(false);
+  });
+
+  it("reads STORYSHELF_SKIP_UNCHANGED and skips without creating a build or uploading a zip", async () => {
+    vi.stubEnv("STORYSHELF_SKIP_UNCHANGED", "1");
+    git(dir, ["-c", "init.defaultBranch=main", "init"]);
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "a.tsx"), "v1");
+    writeBuild(dir);
+    commitAll(dir, "base");
+    const base = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, "README.md"), "docs");
+    commitAll(dir, "docs only");
+    const head = git(dir, ["rev-parse", "HEAD"]);
+    const { calls } = stubFetch({ build: { id: "b9" }, buildUrl: "/b9" });
+    const fetchMock = vi.mocked(fetch);
+    const inner = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url, init) =>
+      typeof url === "string" && url.includes("skip-source")
+        ? await Promise.resolve(okJson({ sourceBuildId: "b0", sha: base }))
+        : inner(url, init),
+    );
+
+    await runUpload({ ...baseOptions(), sha: head, buildDir: "storybook-static" });
+
+    // The hint is answered by the override above; the only other call is the skipped-build POST.
+    expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`)).toEqual([
+      "POST /api/v1/projects/demo/builds/skipped",
+    ]);
+  });
+
   it("prints a notice and skips the affected post when the server reports testing: false", async () => {
     writeBuild(dir);
     const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -487,6 +558,7 @@ describe("runUpload affected capture", () => {
       buildDir: "storybook-static",
       untraced: ["src/b.tsx"],
       cwd: dir,
+      zip: true,
     });
 
     const affected = calls.find((call) => call.url.endsWith("/affected"));

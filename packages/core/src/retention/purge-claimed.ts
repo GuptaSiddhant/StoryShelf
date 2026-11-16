@@ -1,4 +1,5 @@
 /** Purge for a database with the lifecycle capability: claim each candidate, then finish the deletions. */
+import { and, eq, inArray } from "drizzle-orm";
 import type {
   BuildReferenceLifecycle,
   DatabaseAdapter,
@@ -6,6 +7,7 @@ import type {
 } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
+import { col } from "../models/columns.ts";
 import { deleteClaimedBuild, type DeletionStep } from "./build-deletion.ts";
 
 /** What the claimed purge needs; `afterStep` reaches the driver's fault-injection seam. */
@@ -29,7 +31,8 @@ export interface ClaimedPurgeResult {
 
 /**
  * Claim `buildIds` (a protected build is skipped and logged), then finish every `deleting` build of
- * the project, including ones an earlier run left half done. One build's failure is logged and
+ * the project, including ones an earlier run left half done. A build skipped from a `deleting` build
+ * is claimed with it (ADR 0044 decision 8). One build's failure is logged and
  * leaves it `deleting` for the next run; it never stops the others.
  */
 export async function purgeClaimedBuilds(
@@ -41,7 +44,8 @@ export async function purgeClaimedBuilds(
     (await deps.lifecycle.listDeleting(projectId)).map((build) => build.buildId),
   );
   const protectedBuilds = await claimAll(deps, projectId, buildIds);
-  const finished = await finishAll(deps, projectId, earlier);
+  const cascaded = await claimSkippedFrom(deps, projectId);
+  const finished = await finishAll(deps, projectId, earlier, cascaded);
   return { ...finished, protectedBuilds };
 }
 
@@ -50,11 +54,19 @@ async function finishAll(
   deps: ClaimedPurgeDeps,
   projectId: string,
   earlier: ReadonlySet<string>,
+  cascaded: ReadonlySet<string>,
 ): Promise<Omit<ClaimedPurgeResult, "protectedBuilds">> {
   const total = { removedBuilds: 0, removedFiles: 0, resumedBuilds: 0 };
-  for (const build of await deps.lifecycle.listDeleting(projectId)) {
+  // Skipped builds first: a source's rows never go while a build skipped from it is still there.
+  const deleting = (await deps.lifecycle.listDeleting(projectId)).toSorted(
+    (a, b) => Number(cascaded.has(b.buildId)) - Number(cascaded.has(a.buildId)),
+  );
+  for (const build of deleting) {
     // oxlint-disable-next-line no-await-in-loop -- one build at a time: SQLite serializes the writes
-    const result = await finishOne(deps, projectId, build);
+    const result = (await hasSkippedFrom(deps, projectId, build.buildId))
+      ? null
+      : // oxlint-disable-next-line no-await-in-loop -- same
+        await finishOne(deps, projectId, build);
     if (result?.outcome === "deleted") {
       total.removedBuilds += 1;
       if (earlier.has(build.buildId)) total.resumedBuilds += 1;
@@ -110,4 +122,52 @@ async function claimOne(
     deps.logger?.warn({ err: error, projectId, buildId }, "build claim failed");
     return null;
   }
+}
+
+/**
+ * Claim every build skipped from a `deleting` build (ADR 0044 decision 8). The source's tombstone is
+ * durable, so a run that crashed between the two claims finds the source `deleting` here and
+ * finishes the cascade: a skipped build never outlives its source's claim. A skipped build holds
+ * no storage and adds no build reference, so its claim is never `protected`. Returns the ids of
+ * the skipped builds that are now `deleting`; a failure is logged and retried by the next pass.
+ */
+async function claimSkippedFrom(deps: ClaimedPurgeDeps, projectId: string): Promise<Set<string>> {
+  const sources = (await deps.lifecycle.listDeleting(projectId)).map((build) => build.buildId);
+  const claimed = new Set<string>();
+  if (sources.length === 0) return claimed;
+  const builds = deps.db.tables.builds;
+  const rows = (await deps.db.list(builds, {
+    where: and(
+      eq(col(builds, "projectId"), projectId),
+      inArray(col(builds, "skippedFromBuildId"), sources),
+    ),
+  })) as unknown as { id: string }[];
+  for (const { id } of rows) {
+    // oxlint-disable-next-line no-await-in-loop -- each claim is its own short transaction
+    const claim = await claimOne(deps, projectId, id);
+    if (claim === "claimed" || claim === "deleting") claimed.add(id);
+  }
+  return claimed;
+}
+
+/**
+ * Whether a build skipped from `sourceId` still has its row. Such a source stays `deleting` until
+ * those rows are gone, so no skipped build ever outlives the removal of its source's rows.
+ */
+async function hasSkippedFrom(
+  deps: ClaimedPurgeDeps,
+  projectId: string,
+  sourceId: string,
+): Promise<boolean> {
+  const builds = deps.db.tables.builds;
+  const rows = await deps.db.list(builds, {
+    where: and(
+      eq(col(builds, "projectId"), projectId),
+      eq(col(builds, "skippedFromBuildId"), sourceId),
+    ),
+    limit: 1,
+  });
+  if (rows.length === 0) return false;
+  deps.logger?.warn({ projectId, buildId: sourceId }, "build kept deleting: skipped builds remain");
+  return true;
 }

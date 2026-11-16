@@ -34,7 +34,7 @@ describe("recordContentUses", () => {
   it("passes each distinct hash once, and skips the call for none", async () => {
     const { db, record } = withLifecycle([]);
     await recordContentUses(db, storageWith(H1, H2), target, [H1, H2, H1]);
-    expect(record).toHaveBeenCalledWith("p", "b", [H1, H2], expect.any(String));
+    expect(record).toHaveBeenCalledWith("p", "b", [H1, H2], expect.any(String), undefined);
 
     record.mockClear();
     await recordContentUses(db, storageWith(), target, []);
@@ -61,6 +61,13 @@ describe("recordContentUses", () => {
     expect((error as ContentCollectingError).hashes).toEqual([H2]);
   });
 
+  it("hands the recorded sizes to the capability", async () => {
+    const { db, record } = withLifecycle([]);
+    const sizes = new Map([[H1, 12]]);
+    await recordContentUses(db, storageWith(H1), target, [H1], undefined, sizes);
+    expect(record).toHaveBeenCalledWith("p", "b", [H1], expect.any(String), sizes);
+  });
+
   it("never records or looks up a value that is not a content hash, and logs it once without it", async () => {
     const { db, record } = withLifecycle([]);
     const storage = storageWith(H1);
@@ -72,7 +79,7 @@ describe("recordContentUses", () => {
     const skipped = await recordContentUses(db, storage, target, [evil, H1, "", evil], logger);
 
     expect(skipped).toBe(2);
-    expect(record).toHaveBeenCalledWith("p", "b", [H1], expect.any(String));
+    expect(record).toHaveBeenCalledWith("p", "b", [H1], expect.any(String), undefined);
     expect(exists).toHaveBeenCalledTimes(1);
     expect(exists).toHaveBeenCalledWith(contentKey(H1));
     expect(warn).toHaveBeenCalledTimes(1);

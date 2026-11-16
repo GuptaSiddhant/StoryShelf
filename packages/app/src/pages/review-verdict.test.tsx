@@ -25,6 +25,7 @@ function data(status: string, overrides: Partial<ReviewSectionData> = {}): Revie
     canTriage: true,
     testing: false,
     publishing: "success",
+    supersededBy: null,
     canComment: true,
     canVerdict: true,
     ...overrides,
@@ -71,22 +72,32 @@ describe("VerdictCard on a build that cannot be reviewed", () => {
   });
 
   it.each(["failed", "cancelled"])(
-    "offers a retry on a %s build where capture is on and the viewer may retry",
+    "leaves the retry to the build page's menu on a %s build",
     async (status) => {
-      const html = await render(status, { testing: true });
-      expect(html).toContain("Retry capture");
-      expect(html).toContain(`/api/v1/projects/${project.slug}/builds/${build.id}/retry`);
+      expect(await render(status, { testing: true })).not.toContain("Retry capture");
     },
   );
 
-  it("offers no retry without capture, or to a viewer who may not retry", async () => {
-    expect(await render("failed")).not.toContain("Retry capture");
-    expect(await render("failed", { testing: true, canComment: false })).not.toContain(
-      "Retry capture",
-    );
-  });
-
   it("offers no retry while the build can still be reviewed", async () => {
     expect(await render("reviewing", { testing: true })).not.toContain("Retry capture");
+  });
+});
+
+describe("VerdictCard on a superseded build (ADR 0045)", () => {
+  const superseded = { ...build, status: "cancelled" as const, supersededByBuildId: "bld_newer" };
+
+  it("names the newer build and links to it", async () => {
+    const html = await render("cancelled", {
+      build: superseded,
+      supersededBy: { id: "bld_newer", gitSha: "5c4d3e2f1a0b" },
+    });
+    expect(html).toContain("Nothing to review: this build was superseded by");
+    expect(html).toContain(`<a href="/projects/${project.slug}/builds/bld_newer">5c4d3e2</a>`);
+  });
+
+  it("drops the link once the newer build is gone", async () => {
+    const html = await render("cancelled", { build: superseded });
+    expect(html).toContain("Nothing to review: this build was superseded.");
+    expect(html).not.toContain("bld_newer");
   });
 });

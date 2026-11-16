@@ -10,6 +10,16 @@ describe("brand packs", () => {
     expect(brandPack("nope")).toBeUndefined();
   });
 
+  it("sets an info status colour that is not the accent, and no top bar colour", () => {
+    for (const [name, pack] of Object.entries(brandPacks)) {
+      for (const theme of [pack.light, pack.dark]) {
+        expect(theme.status.info, `pack ${name}`).toBeTruthy();
+        expect(theme.status.info, `pack ${name}`).not.toBe(theme.accent);
+        expect(theme.topbarBg, `pack ${name}`).toBeUndefined();
+      }
+    }
+  });
+
   it("validates every pack against the UI config schema", () => {
     for (const [name, pack] of Object.entries(brandPacks)) {
       const result = uiConfigSchema.safeParse({ lightTheme: pack.light, darkTheme: pack.dark });

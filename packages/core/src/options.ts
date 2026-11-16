@@ -1,7 +1,17 @@
-/** Resolves `ShelfOptions` once at boot: validates `testing.compare` and fills the scratch default. */
+/**
+ * Resolves `ShelfOptions` once at boot: validates `testing.compare`, fills the scratch default and
+ * resolves the integration groups.
+ */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { notificationsConfigSchema, type ShelfOptions } from "./config.ts";
+import {
+  notificationsConfigSchema,
+  type ResolvedShelfOptions,
+  type ShelfOptions,
+} from "./config.ts";
+import { assertPortalOutsideContentHosts, storybookHostingOf } from "./content-hosts.ts";
+import { resolveShelfIntegrations } from "./integrations/index.ts";
+import { validateStorybookHosting } from "./storybook-hosting.ts";
 
 /** Where capture scratch lives when `config.scratchDir` is not set. */
 export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
@@ -13,18 +23,31 @@ export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
  * - `notifications.config` must match its schema (it used to live in `ShelfConfig`, which validated it).
  * - `config.scratchDir` defaults to {@link DEFAULT_SCRATCH_DIR}: publishing extracts zips there,
  *   with or without `testing`.
+ * - `design`, `notifications.notifiers` and `notifications.email` resolve to lists against the
+ *   built-in integrations (ADR 0049); a broken provider or a repeated provider kind throws.
  */
-export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
+export function resolveShelfOptions(options: ShelfOptions): ResolvedShelfOptions {
   assertThreads(options.testing?.compare?.threads);
   assertTestingProcess(options.testing);
   assertStorybookUrlRateLimit(options.storybookUrlRateLimit, "storybookUrlRateLimit");
   assertStorybookHosting(options);
   assertTestingBackable(options);
   assertNotificationsConfig(options.notifications?.config);
+  const resolved = withIntegrations(options);
   if (options.config?.scratchDir !== undefined) {
-    return options;
+    return resolved;
   }
-  return { ...options, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };
+  return { ...resolved, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };
+}
+
+/** `options` with its integration groups resolved into lists. */
+function withIntegrations(options: ShelfOptions): ResolvedShelfOptions {
+  const { notifiers, email, design } = resolveShelfIntegrations({
+    notifiers: options.notifications?.notifiers,
+    email: options.notifications?.email,
+    design: options.design,
+  });
+  return { ...options, design, notifications: { ...options.notifications, notifiers, email } };
 }
 
 /**
@@ -167,21 +190,52 @@ function assertNotificationsConfig(config: unknown): void {
 
 /**
  * The boot refusals of ADR 0051, decision 1, that need more than the hosting object: `sandboxed` and
- * `subdomain` mint grants, so with sign-in on they need the server `secret`. A broken value stops
- * boot; it never falls back to `trusted`. The `subdomain` mode (#358) is not wired yet, so it is
- * refused rather than served as `trusted`.
+ * `subdomain` mint grants, so with sign-in on they need the server `secret`; `subdomain` also needs
+ * the configured portal origin (`publicBaseUrl`), served over https (a `localhost` name may use http),
+ * a base domain that does not swallow the portal host, and, with sign-in on, an auth engine that
+ * issues the `__Host-` session cookie (decision 9). A broken value stops boot; it never falls back
+ * to `trusted`.
  */
 function assertStorybookHosting(options: ShelfOptions): void {
-  const mode = options.config?.storybookHosting?.mode;
-  if (mode === undefined || mode === "trusted") {
+  const hosting = storybookHostingOf(options.config);
+  if (hosting === undefined || hosting.mode === "trusted") {
     return;
   }
   if (options.auth !== undefined && !options.config?.secret) {
     throw new Error(
-      `storybookHosting.mode "${mode}" needs config.secret when sign-in is on: read grants are signed with it`,
+      `storybookHosting.mode "${hosting.mode}" needs config.secret when sign-in is on: read grants are signed with it`,
     );
   }
-  if (mode !== "sandboxed") {
-    throw new Error(`storybookHosting.mode "${mode}" is not available in this version`);
+  if (hosting.mode === "subdomain") {
+    // Also checks a deprecated `publishedBaseDomain` read as the alias (decision 6).
+    const { baseDomain = "" } = validateStorybookHosting(hosting);
+    assertSubdomainHosting(options, baseDomain);
+  }
+}
+
+/** Whether a host name is a loopback name a browser treats as a secure context over http. */
+function isLocalhostName(hostname: string): boolean {
+  return hostname === "localhost" || hostname.endsWith(".localhost");
+}
+
+/** The `subdomain` rules of decision 1 and decision 9 that need the portal origin and the auth engine. */
+function assertSubdomainHosting(options: ShelfOptions, baseDomain: string): void {
+  const portal = options.config?.publicBaseUrl;
+  if (!portal) {
+    throw new Error(
+      `storybookHosting.mode "subdomain" needs config.publicBaseUrl: the portal origin content hosts redirect to`,
+    );
+  }
+  const url = new URL(portal);
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalhostName(url.hostname))) {
+    throw new Error(
+      `storybookHosting.mode "subdomain" needs an https config.publicBaseUrl: the portal session cookie is __Host- prefixed, which browsers accept over https only (or on a localhost name)`,
+    );
+  }
+  assertPortalOutsideContentHosts(portal, baseDomain);
+  if (options.auth !== undefined && options.auth.hostSessionCookie !== true) {
+    throw new Error(
+      `storybookHosting.mode "subdomain" needs the auth engine to issue the __Host- session cookie: create it with createShelfAuth({ hostSessionCookie: true })`,
+    );
   }
 }

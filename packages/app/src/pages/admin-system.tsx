@@ -1,5 +1,6 @@
 import type { RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import type { RetentionPause } from "@storyshelf/core/adapter/database";
+import { storybookHostingOf } from "@storyshelf/core/config";
 import type { ShelfConfig } from "@storyshelf/core/config";
 import type { CredentialProbe } from "@storyshelf/core/models";
 import type { CaptureHostSummary } from "@storyshelf/core/utils";
@@ -21,6 +22,7 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
+import { UnverifiedDefaultNotice, type UnverifiedDefaultProject } from "./admin-system-branch.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
@@ -50,6 +52,8 @@ export interface AdminSystemData {
   notificationsPaused?: boolean | undefined;
   /** The database withheld build retention at boot (a baseline's source build cannot be pinned). */
   retentionPause?: RetentionPause | undefined;
+  /** Projects whose default-branch builds count without the git host's confirmation. */
+  unverifiedDefault?: readonly UnverifiedDefaultProject[] | undefined;
 }
 
 /** What the deployment has paused and why: notifications (no public URL) and build retention. */
@@ -226,7 +230,7 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
       {capture ? <CaptureSizing capture={capture} /> : null}
       <Meta>
         Scratch dir {formatOptional(config.scratchDir)} · Published domain{" "}
-        {formatOptional(config.publishedBaseDomain)} · Max upload{" "}
+        {formatOptional(storybookHostingOf(config)?.baseDomain)} · Max upload{" "}
         {formatOptional(config.maxUploadBytes)} bytes
       </Meta>
     </Card>
@@ -300,6 +304,18 @@ function HostingOnlyNotice(props: {
   );
 }
 
+/** Hosting-only mode, or the projects that count default-branch claims unverified (ADR 0009). */
+function TestingNotice(props: {
+  data: AdminSystemData;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { data } = props;
+  return data.testing === false ? (
+    <HostingOnlyNotice hiddenSnapshots={data.hiddenSnapshots ?? 0} />
+  ) : (
+    <UnverifiedDefaultNotice projects={data.unverifiedDefault} />
+  );
+}
+
 /** The public origin and the capture browsers (ADR 0007), when the instance has them. */
 function CaptureCards(props: {
   data: AdminSystemData;
@@ -349,9 +365,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
         }
       />
       <PausedNotices data={data} />
-      {data.testing === false ? (
-        <HostingOnlyNotice hiddenSnapshots={data.hiddenSnapshots ?? 0} />
-      ) : null}
+      <TestingNotice data={data} />
       <ServerFacts data={data} />
       <CaptureCards data={data} />
       {credentials ? (

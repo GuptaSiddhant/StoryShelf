@@ -71,10 +71,13 @@ const app = createShelfApp({
 });
 ```
 
-Every response then carries e.g.
-`Server-Timing: total;dur=42.1, db;dur=12.5, storage;dur=3.2` —
-`total` matches the `http.server` span, `db`/`storage` are roll-ups of the
-adapter calls in that request (per-operation detail stays in traces). No
+App HTML pages and `/api/v1` answers then carry e.g.
+`Server-Timing: db;dur=13, storage;dur=3, render;dur=8, total;dur=42` —
+`db`/`storage` are roll-ups of the adapter calls in that request,
+`render` is the time spent building the HTML, and `total` is the whole
+request (per-operation detail stays in traces). The header holds phase names
+and durations only: never an id, path, query or user value. Published
+Storybook files, signed Storybook URLs (`/_s/`, `/_r/`) and assets never get it. No
 OpenTelemetry SDK is required; with one configured, the names line up with
 the `db.*` / `storage.*` span families on purpose.
 

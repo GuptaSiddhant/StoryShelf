@@ -1,5 +1,5 @@
 import type { BuildStatus } from "@storyshelf/core/types";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { projects } from "./project.ts";
 
 /** Narrow `builds` table definition. */
@@ -13,6 +13,7 @@ export const builds = sqliteTable(
     gitSha: text("git_sha").notNull(),
     gitBranch: text("git_branch").notNull(),
     isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+    branchVerified: text("branch_verified"),
     authorEmail: text("author_email"),
     authorName: text("author_name"),
     message: text("message"),
@@ -34,12 +35,19 @@ export const builds = sqliteTable(
     reviewCycle: integer("review_cycle").notNull().default(0),
     reviewRequestedCycle: integer("review_requested_cycle"),
     captureJobId: text("capture_job_id"),
+    skippedFromBuildId: text("skipped_from_build_id"),
+    supersededByBuildId: text("superseded_by_build_id"),
+    idempotencyKey: text("idempotency_key"),
+    manifestSha256: text("manifest_sha256"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
     index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
-    index("builds_git_branch_idx").on(t.gitBranch),
+    index("builds_skipped_from_idx").on(t.skippedFromBuildId),
+    uniqueIndex("builds_project_idempotency_idx").on(t.projectId, t.idempotencyKey),
+    index("builds_project_created_idx").on(t.projectId, t.createdAt),
+    index("builds_project_branch_created_idx").on(t.projectId, t.gitBranch, t.createdAt),
   ],
 );
 
@@ -50,6 +58,7 @@ export interface Build {
   gitSha: string;
   gitBranch: string;
   isDefault: boolean;
+  branchVerified: string | null;
   authorEmail: string | null;
   authorName: string | null;
   message: string | null;
@@ -70,6 +79,10 @@ export interface Build {
   reviewCycle: number;
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
+  skippedFromBuildId: string | null;
+  supersededByBuildId: string | null;
+  idempotencyKey: string | null;
+  manifestSha256: string | null;
   createdAt: string;
   updatedAt: string;
 }

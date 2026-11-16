@@ -1,7 +1,7 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Alert } from "../ui/components.tsx";
-import { StaleBaselineNotice } from "./build-diff-stale.tsx";
+import { StaleBaselineLine } from "./build-diff-stale.tsx";
 import {
   environmentChangeOf,
   labelOf,
@@ -116,7 +116,7 @@ export function ReviewNotices(props: {
   return (
     <>
       {staleCount > 0 ? (
-        <StaleBaselineNotice
+        <StaleBaselineLine
           project={project}
           build={build}
           staleCount={staleCount}

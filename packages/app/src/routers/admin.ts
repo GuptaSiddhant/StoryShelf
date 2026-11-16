@@ -2,7 +2,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { BuildReferenceLifecycle, RetentionPause } from "@storyshelf/core/adapter/database";
 import { ProjectModel } from "@storyshelf/core/models";
-import { Retention } from "@storyshelf/core/retention";
+import { Retention, checkStorage } from "@storyshelf/core/retention";
 import type { ShelfRouter } from "../app-types.ts";
 import { reencryptWithCurrent } from "../credentials.ts";
 import { errorBody } from "../middleware/api-errors.ts";
@@ -29,6 +29,37 @@ const purgeRoute = createRoute({
     503: {
       content: { "application/json": { schema: errorSchema } },
       description: "Testing retention requires atomic build lifecycle support",
+    },
+    ...forbiddenResponse,
+  },
+});
+
+const checkStorageSchema = z.object({
+  buildsChecked: z.number().int(),
+  baselinesChecked: z.number().int(),
+  builds: z.array(z.object({ buildId: z.string(), missing: z.number().int() })),
+  unreadableManifests: z.array(z.string()),
+  missingBaselineImages: z.number().int(),
+  unreferencedBlobs: z.number().int(),
+  sampled: z.boolean(),
+});
+
+const checkStorageRoute = createRoute({
+  method: "post",
+  tags: ["Admin"],
+  summary: "Check that storage holds what the database references (read-only)",
+  path: "/api/v1/admin/check-storage",
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: z.object({ sample: z.number().int().min(1).optional() }) },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: checkStorageSchema } },
+      description: "Storage consistency report",
     },
     ...forbiddenResponse,
   },
@@ -77,6 +108,8 @@ export function registerAdmin(app: ShelfRouter): void {
     );
   });
 
+  registerCheckStorage(app);
+
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin(c);
     const pass = startPurgePass();
@@ -105,6 +138,16 @@ export function registerAdmin(app: ShelfRouter): void {
       },
       200,
     );
+  });
+}
+
+/** The read-only storage consistency check (class hosting, site admin). */
+function registerCheckStorage(app: ShelfRouter): void {
+  app.openapi(checkStorageRoute, async (c) => {
+    requireSiteAdmin(c);
+    const { db, storage } = getStore();
+    const { sample } = c.req.valid("json");
+    return c.json(await checkStorage({ db, storage }, sample === undefined ? {} : { sample }), 200);
   });
 }
 

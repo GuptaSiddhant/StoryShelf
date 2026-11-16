@@ -4,6 +4,7 @@ import type { CaptureShard } from "../../schema/capture-shard.ts";
 /** The render stage: one shard of a sharded capture, run by whichever worker picked up its job. */
 import { JobAbortedError } from "../../utils/job-aborted.ts";
 import { classifyFailures } from "../failure-sets.ts";
+import { prepareStorybook } from "../materialize.ts";
 import { renderWork } from "../matrix.ts";
 import type { CaptureJobOptions } from "../orchestrator.ts";
 import { persistRendered } from "../pipeline.ts";
@@ -11,7 +12,6 @@ import type { CaptureProgress } from "../progress.ts";
 import { removeShardScratch } from "../scratch.ts";
 import type { ShardPayload, ShardResult } from "../shard-plan.ts";
 import { detectUnstableRenders, stabilityKey } from "../stability.ts";
-import { extractStorybookToScratch } from "../statics.ts";
 import { loadTarget } from "../target.ts";
 import { contextOf, matrixInputOf, type ShardTarget } from "./context.ts";
 import { reduceBuild, type FinalSummary } from "./reduce.ts";
@@ -179,13 +179,12 @@ async function renderShard(
   const { options, build, project } = target;
   const payload = JSON.parse(shard.payload ?? "{}") as ShardPayload;
   const started = performance.now();
-  const storybookDir = await extractStorybookToScratch(
+  const storybookDir = await prepareStorybook(
     options.storage,
     options.scratchDir,
     project.id,
     build.id,
-    shard.id,
-    options.limits,
+    { shardId: shard.id, limits: options.limits },
   );
   run.progress?.();
   try {

@@ -215,4 +215,16 @@ describe("SnapshotModel.listByImportPath", () => {
     expect(await model.removeForBuild("b1")).toBe(3);
     expect(await model.listByBuild("b1")).toEqual([]);
   });
+
+  it("lists a build's snapshots without their axe findings", async () => {
+    const { db } = makeDatabase();
+    const model = new SnapshotModel(db, { snapshots: db.tables.snapshots });
+    const row = await model.create("p1", "b1", timedRow("a", "desktop", 5));
+    await model.update(row.id, { a11yViolations: JSON.stringify(["rule (serious): help"]) });
+    const [summary] = await model.listByBuildSummary("b1");
+    expect(summary?.id).toBe(row.id);
+    expect(summary?.storyId).toBe("a");
+    expect(summary).not.toHaveProperty("a11yViolations");
+    expect((await model.listByBuild("b1"))[0]?.a11yViolations).toContain("serious");
+  });
 });

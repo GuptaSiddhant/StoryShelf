@@ -75,34 +75,22 @@ describe("aiFromEnv", () => {
     await expect(ai?.health()).resolves.toEqual({ ok: true });
   });
 
-  it("takes the model from SHELF_AI_MODEL, and an empty one means the default", () => {
-    const named = aiFromEnv({ ...withKey, SHELF_AI_MODEL: "claude-sonnet-5-5" });
-    const empty = aiFromEnv({ ...withKey, SHELF_AI_MODEL: "" });
+  it("ignores SHELF_AI_MODEL and SHELF_AI_DAILY_TOKENS: the demo's model and budget are fixed", () => {
+    const ai = aiFromEnv({
+      ...withKey,
+      SHELF_AI_MODEL: "claude-sonnet-5-5",
+      SHELF_AI_DAILY_TOKENS: "250000",
+    });
 
-    expect(named?.modelId("default", "triage")).toBe(idOf("claude-sonnet-5-5"));
-    expect(named?.modelId("default", "health")).toBe(idOf("claude-sonnet-5-5"));
-    expect(empty?.modelId("default", "triage")).toBe(idOf(DEFAULT_AI_MODEL));
+    expect(ai?.modelId("default", "triage")).toBe(idOf(DEFAULT_AI_MODEL));
+    expect(ai?.modelId("default", "health")).toBe(idOf(DEFAULT_AI_MODEL));
+    expect(ai?.budget().dailyTokens).toBe(DEFAULT_DAILY_TOKENS);
   });
-
-  it("takes the daily token budget from SHELF_AI_DAILY_TOKENS", () => {
-    expect(aiFromEnv({ ...withKey, SHELF_AI_DAILY_TOKENS: "250000" })?.budget().dailyTokens).toBe(
-      250_000,
-    );
-  });
-
-  it.each(["abc", "", " ", "0", "-5", "1.5", "NaN", "Infinity", "9007199254740993"])(
-    "falls back to the default daily budget for an invalid SHELF_AI_DAILY_TOKENS (%j)",
-    (value) => {
-      expect(aiFromEnv({ ...withKey, SHELF_AI_DAILY_TOKENS: value })?.budget().dailyTokens).toBe(
-        DEFAULT_DAILY_TOKENS,
-      );
-    },
-  );
 });
 
 describe("what reaches a log", () => {
   it("names the model and never the key", async () => {
-    const ai = aiFromEnv({ ...withKey, SHELF_AI_MODEL: "claude-haiku-5-5" });
+    const ai = aiFromEnv(withKey);
 
     expect(aiLogFields(ai)).toEqual({ aiModel: idOf("claude-haiku-5-5") });
     // Nothing the demo logs or serves about the AI carries the key, and none of it is built from it.

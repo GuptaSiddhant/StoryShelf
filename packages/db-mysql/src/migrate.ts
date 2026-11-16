@@ -7,6 +7,8 @@
  * duplicate-index error from a repeated DDL statement is ignored.
  */
 import {
+  gatedMigration,
+  sqlSchemaLevelStore,
   duplicateGroupsSql,
   logSkippedIndex,
   parseUniqueIndex,
@@ -57,6 +59,14 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
   { table: "projects", column: "component_owners", definition: "TEXT" },
   { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  {
+    table: "projects",
+    column: "require_verified_default",
+    definition: "TINYINT(1) NOT NULL DEFAULT 1",
+  },
+  { table: "projects", column: "switch_stories", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  // Expand step (ADR 0053): nullable, so the previous release keeps working against it.
+  { table: "content_uses", column: "size_bytes", definition: "BIGINT NULL" },
   { table: "snapshots", column: "infra_hash", definition: "TEXT" },
   {
     table: "snapshots",
@@ -99,10 +109,16 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "affected_import_paths", definition: "TEXT" },
   { table: "builds", column: "inherited_count", definition: "INTEGER NOT NULL DEFAULT 0" },
   { table: "builds", column: "test_results", definition: "TEXT" },
+  { table: "builds", column: "branch_verified", definition: "VARCHAR(16) NULL" },
   { table: "builds", column: "review_cycle", definition: "INT NOT NULL DEFAULT 0" },
   { table: "builds", column: "review_requested_cycle", definition: "INT NULL" },
   { table: "builds", column: "capture_job_id", definition: "VARCHAR(26) NULL" },
   { table: "builds", column: "capture_generation", definition: "INTEGER NOT NULL DEFAULT 0" },
+  { table: "builds", column: "skipped_from_build_id", definition: "VARCHAR(26) NULL" },
+  { table: "builds", column: "superseded_by_build_id", definition: "VARCHAR(26) NULL" },
+  { table: "builds", column: "idempotency_key", definition: "VARCHAR(191) NULL" },
+  { table: "builds", column: "manifest_sha256", definition: "VARCHAR(64) NULL" },
+  { table: "projects", column: "cancel_superseded", definition: "TINYINT(1) NOT NULL DEFAULT 1" },
   {
     table: "notification_subscriptions",
     column: "review_requests",
@@ -144,6 +160,16 @@ const BUILD_CAPTURE_JOB_BACKFILL =
 
 const IDENTITY_INDEXES = [
   {
+    table: "builds",
+    name: "builds_skipped_from_idx",
+    sql: "CREATE INDEX builds_skipped_from_idx ON builds (skipped_from_build_id)",
+  },
+  {
+    table: "builds",
+    name: "builds_project_idempotency_idx",
+    sql: "CREATE UNIQUE INDEX builds_project_idempotency_idx ON builds (project_id, idempotency_key)",
+  },
+  {
     table: "snapshots",
     name: "snapshots_build_story_mode_browser_idx",
     sql: "CREATE UNIQUE INDEX snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser)",
@@ -161,7 +187,22 @@ const IDENTITY_INDEXES = [
 ];
 
 /** Run the full migration set through any row-query runner. */
-export async function runMigrations(run: MigrationRunner, logger?: Logger): Promise<void> {
+export async function runMigrations(
+  run: MigrationRunner,
+  logger?: Logger,
+  release?: string,
+): Promise<void> {
+  await gatedMigration({
+    release,
+    logger,
+    store: sqlSchemaLevelStore(run, "mysql"),
+    migrate: async () => {
+      await migrateEverything(run, logger);
+    },
+  });
+}
+
+async function migrateEverything(run: MigrationRunner, logger?: Logger): Promise<void> {
   await assertReviewSchema(run);
   await runDdl(run);
   await ensureColumns(run);
@@ -180,6 +221,22 @@ async function ensureColumns(run: MigrationRunner): Promise<void> {
   }
 }
 
+async function migrateBuildsListIndexes(run: MigrationRunner): Promise<void> {
+  await ensureIndex(
+    run,
+    "builds",
+    "builds_project_created_idx",
+    "CREATE INDEX builds_project_created_idx ON builds (project_id, created_at)",
+  );
+  await ensureIndex(
+    run,
+    "builds",
+    "builds_project_branch_created_idx",
+    "CREATE INDEX builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
+  );
+  await dropIndexIfExists(run, "builds", "builds_git_branch_idx");
+}
+
 async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<void> {
   await dropIndexIfExists(run, "snapshots", "snapshots_build_story_viewport_idx");
   await dropIndexIfExists(run, "baselines", "baselines_project_story_viewport_branch_idx");
@@ -196,6 +253,7 @@ async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<vo
     "builds_project_gitsha_idx",
     "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)",
   );
+  await migrateBuildsListIndexes(run);
   await ensureUniqueIndex(
     run,
     "design_links",

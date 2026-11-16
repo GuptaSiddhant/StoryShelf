@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { ProjectModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
@@ -174,7 +175,7 @@ async function listProjects(): Promise<PickerProject[]> {
 /** Dropdown to jump between projects; on global pages it reads "All projects". */
 const ProjectPicker: FC<{ nav?: NavConfig }> = async ({ nav }) => {
   const { user, config } = getStore();
-  const urls = createUrlBuilder("/", config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(config));
   const projects = await listProjects();
   const canCreate = !user || user.role === "admin" || user.role === "member";
   const current = nav?.projectSlug;
@@ -233,7 +234,7 @@ const Crumbs: FC<{ crumbs: NavCrumb[] }> = ({ crumbs }) => {
 
 /** Top bar: mobile menu button, project picker, and breadcrumbs. */
 export const TopBar: FC<{ nav?: NavConfig }> = ({ nav }) => {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   return (
     <header class={shellTopbar} role="banner">
       <div class="topbar__inner">

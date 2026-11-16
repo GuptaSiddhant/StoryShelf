@@ -59,30 +59,84 @@ function themePart(): string {
     });`;
 }
 
-/** Desktop rail collapse (persisted) and the mobile drawer. */
-function sidebarPart(): string {
+/** Sidebar group folding, remembered per browser; without storage every group stays open. */
+function foldPart(): string {
   return `
+    var foldKey='storyshelf_nav_folded';
+    function readFolded(){
+      try{ var v=JSON.parse(localStorage.getItem(foldKey)||'[]'); return Array.isArray(v)?v:[]; }
+      catch(_){ return []; }
+    }
+    function showFolded(id,folded){
+      var group=document.querySelector('[data-nav-group="'+id+'"]');
+      var head=document.querySelector('[data-nav-fold="'+id+'"]');
+      if(group){ if(folded){ group.setAttribute('data-folded',''); } else { group.removeAttribute('data-folded'); } }
+      if(head){ head.setAttribute('aria-expanded',folded?'false':'true'); }
+    }
+    function toggleGroup(id){
+      var group=document.querySelector('[data-nav-group="'+id+'"]');
+      if(!group) return;
+      var folded=!group.hasAttribute('data-folded');
+      showFolded(id,folded);
+      var list=readFolded().filter(function(x){ return x!==id; });
+      if(folded) list.push(id);
+      try{ localStorage.setItem(foldKey,JSON.stringify(list)); }catch(_){}
+    }
+    inits.push(function(){ readFolded().forEach(function(id){ showFolded(id,true); }); });
+  `;
+}
+
+/** The mobile drawer: focus moves in on open, the page behind is inert, focus returns on close. */
+function drawerPart(): string {
+  return `
+    function syncCollapse(){
+      var c=document.querySelector('[data-sidebar-collapse]');
+      if(c){ c.setAttribute('aria-expanded',document.documentElement.getAttribute('data-sidebar')==='rail'?'false':'true'); }
+    }
+    inits.push(syncCollapse);
     function setDrawer(open){
       var sidebar=document.getElementById('sidebar');
       if(!sidebar) return;
+      var wasOpen=sidebar.classList.contains('sidebar--open');
       sidebar.classList.toggle('sidebar--open',open);
+      // The page behind an open drawer is not reachable by Tab or a screen reader.
+      var main=document.querySelector('[data-shell-main]');
+      if(main){ if(open){ main.setAttribute('inert',''); } else { main.removeAttribute('inert'); } }
+      if(open&&!wasOpen){
+        var first=sidebar.querySelector('a[href]');
+        if(first) try{ first.focus(); }catch(_){}
+      }
       var backdrop=document.querySelector('[data-sidebar-backdrop]');
       if(backdrop){ backdrop.hidden=!open; }
       var btn=document.querySelector('[data-sidebar-toggle]');
       if(btn){ btn.setAttribute('aria-expanded',open?'true':'false'); }
-    }
+    }`;
+}
+
+/** Desktop rail collapse (persisted) and the mobile drawer. */
+function sidebarPart(): string {
+  return `
     document.addEventListener('click',function(e){
       var t=e.target instanceof Element ? e.target : null;
       if(!t) return;
       if(t.closest('[data-sidebar-toggle]')){
         var sidebar=document.getElementById('sidebar');
         setDrawer(!(sidebar&&sidebar.classList.contains('sidebar--open')));
+        if(!(sidebar&&sidebar.classList.contains('sidebar--open'))){
+          var tg=t.closest('[data-sidebar-toggle]');
+          if(tg) tg.focus();
+        }
       } else if(t.closest('[data-sidebar-backdrop]')){
         setDrawer(false);
+        var tb=document.querySelector('[data-sidebar-toggle]');
+        if(tb) tb.focus();
+      } else if(t.closest('[data-nav-fold]')){
+        toggleGroup(t.closest('[data-nav-fold]').getAttribute('data-nav-fold'));
       } else if(t.closest('[data-sidebar-collapse]')){
         var next=document.documentElement.getAttribute('data-sidebar')==='rail' ? 'full' : 'rail';
         shell.applySidebar(next);
         shell.writeCookie(shell.sidebarCookie,next);
+        syncCollapse();
       }
     });
     document.addEventListener('keydown',function(e){
@@ -190,12 +244,30 @@ function toastPart(): string {
  */
 function formPart(): string {
   return `
+    function mergeSheet(sheet,text){
+      var have=sheet.textContent||'', add='', depth=0, start=0;
+      for(var i=0;i<text.length;i++){
+        if(text[i]==='{'){ depth++; }
+        else if(text[i]==='}'&&--depth===0){
+          var rule=text.slice(start,i+1);
+          if(have.indexOf(rule)===-1) add+=rule;
+          start=i+1;
+        }
+      }
+      if(add) sheet.textContent=have+add;
+    }
     document.addEventListener('htmx:beforeSwap',function(e){
       // A body swap only replaces <body>, so classes first used by the new page
       // would be unstyled: adopt the stylesheet the server collected for it.
       var match=/<style id="storyshelf-css">([\\s\\S]*?)<\\/style>/.exec(e.detail.serverResponse||'');
       var sheet=document.getElementById('storyshelf-css');
       if(match&&sheet&&e.detail.target===document.body){ sheet.textContent=match[1]; }
+      else if(match&&sheet){
+        // An in-place swap (the next snapshot, a posted comment) opens with the sheet of its own
+        // markup: add only the rules the page lacks, and keep the block out of the page.
+        mergeSheet(sheet,match[1]);
+        e.detail.serverResponse=e.detail.serverResponse.replace(match[0],'');
+      }
       var status=e.detail.xhr ? e.detail.xhr.status : 0;
       if(status===400||status===409||status===422){
         e.detail.shouldSwap=true;
@@ -380,6 +452,26 @@ function focusPart(): string {
   return `
     document.addEventListener('htmx:afterSwap',function(e){
       var target=e.detail && e.detail.target;
+      var fresh=e.target instanceof Element && e.target!==target ? e.target : null;
+      if(fresh&&fresh.id&&target&&target.id===fresh.id){
+        // An in-place outerHTML swap (the next snapshot after approve or reject, a posted
+        // comment): wire up the new markup, then focus the new snapshot's heading, or the box
+        // marked autofocus, without scrolling the reviewer away from where they are.
+        if(window.__ssInit) window.__ssInit();
+        var into=fresh.querySelector('[data-focus-heading]')||fresh.querySelector('[autofocus]');
+        if(into) try{ into.focus({preventScroll:true}); }catch(_){}
+        return;
+      }
+      if(target===document.body){
+        // A whole-page swap (review verdict, next snapshot, a failed sign-in) drops the focused
+        // element: put focus on the page's main heading so keyboard and screen-reader users stay.
+        var heading=document.querySelector('[data-focus-heading]') || document.querySelector('main h1');
+        if(heading){
+          if(!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex','-1');
+          try{ heading.focus({preventScroll:true}); }catch(_){}
+        }
+        return;
+      }
       if(target&&target.querySelector&&target!==document.body){
         var focusable=target.querySelector('[autofocus], input, select, textarea, button');
         if(focusable) try{ focusable.focus(); }catch(_){}
@@ -404,7 +496,9 @@ export function clientScript(): string {
     csrfPart(),
     originPart(),
     themePart(),
+    drawerPart(),
     sidebarPart(),
+    foldPart(),
     dropdownPart(),
     toastPart(),
     formPart(),

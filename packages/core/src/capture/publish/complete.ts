@@ -4,12 +4,14 @@
  * single owner of the acceptance rule.
  */
 import type { DatabaseAdapter } from "../../adapters/database.ts";
+import type { StorageAdapter } from "../../adapters/storage.ts";
 import type { Logger } from "../../logger.ts";
 import { BuildModel } from "../../models/build.ts";
 import { ProjectModel } from "../../models/project.ts";
 import type { Build } from "../../schema/build.ts";
 import type { Project } from "../../schema/project.ts";
 import { publishVerdict } from "./accept.ts";
+import { dropUploadZip } from "./drop-zip.ts";
 
 /** How publishing ended. */
 export type PublishOutcome = { ok: true } | { ok: false; error: string };
@@ -38,6 +40,11 @@ export interface PublishCompleter {
 /** What {@link createPublishCompleter} needs. */
 export interface PublishCompleterOptions {
   db: DatabaseAdapter;
+  /**
+   * Storage holding the build. With it, a successful publish deletes the build's `storybook.zip`
+   * once its manifest is committed and the content uses are recorded (#850).
+   */
+  storage?: StorageAdapter | undefined;
   /** Whether a capture runs for uploads (`testing`); capture then owns the build status. */
   captureWillRun: boolean;
   /** Hooks, read on every call so later registrations count. */
@@ -55,6 +62,7 @@ export function createPublishCompleter(options: PublishCompleterOptions): Publis
         return null;
       }
       const build = await applyVerdict(options, target.build, target.project, outcome);
+      if (outcome.ok) await dropZip(options, build);
       await runHooks(options, { build, project: target.project, outcome });
       return build;
     },
@@ -86,11 +94,28 @@ async function applyVerdict(
   });
   if (!outcome.ok) {
     options.logger.error({ buildId: build.id, error: outcome.error, verdict }, "publish failed");
+    // A failed publish gives the manifest claim back, so a corrected manifest can be sent again.
+    if (build.manifestSha256) {
+      await new BuildModel(options.db).releaseManifest(build.id, build.manifestSha256);
+    }
   }
   if (verdict === "unchanged") {
     return build;
   }
   return await new BuildModel(options.db).setStatus(build.id, verdict);
+}
+
+/** Free the upload once the statics are stored once. A failure is logged: the zip is only kept longer. */
+async function dropZip(options: PublishCompleterOptions, build: Build): Promise<void> {
+  if (options.storage === undefined) return;
+  try {
+    await dropUploadZip(
+      { storage: options.storage, db: options.db, logger: options.logger },
+      { projectId: build.projectId, buildId: build.id },
+    );
+  } catch (error) {
+    options.logger.warn({ err: error, buildId: build.id }, "upload zip not deleted");
+  }
 }
 
 async function runHooks(

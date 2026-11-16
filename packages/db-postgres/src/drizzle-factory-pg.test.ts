@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { pgTable, text } from "drizzle-orm/pg-core";
+import { PgDialect, pgTable, text } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 
@@ -18,10 +18,30 @@ interface CannedRows {
 }
 
 /** In-memory stand-in for a Postgres Drizzle dialect instance. */
-function fakePgDb(canned: CannedRows = {}): { db: unknown; calls: string[] } {
+function fakePgDb(canned: CannedRows = {}): {
+  db: unknown;
+  calls: string[];
+  orders: SQL[];
+} {
   const calls: string[] = [];
+  const orders: SQL[] = [];
   const returning = canned.returning ?? [{ id: "w1", name: "Widget" }];
   const select = canned.select ?? [{ id: "w1", name: "Widget" }];
+  /** A chainable, awaitable select that records its ORDER BY. */
+  const selectChain = (): unknown => {
+    const chain: Record<string, unknown> = {
+      where: () => chain,
+      limit: () => chain,
+      offset: () => chain,
+      orderBy: (order: SQL) => {
+        orders.push(order);
+        return chain;
+      },
+      // oxlint-disable-next-line unicorn/no-thenable -- stands in for a Drizzle query builder
+      then: (resolve: (rows: unknown[]) => unknown) => resolve(select),
+    };
+    return chain;
+  };
   const db = {
     insert: vi.fn((_table: unknown) => ({
       values: vi.fn((_values: unknown) => ({
@@ -44,34 +64,7 @@ function fakePgDb(canned: CannedRows = {}): { db: unknown; calls: string[] } {
       })),
     })),
     select: vi.fn(() => ({
-      from: vi.fn((_table: unknown) => ({
-        where: vi.fn((_where: unknown) => ({
-          limit: vi.fn(async (_n: number) => {
-            await Promise.resolve();
-            return select;
-          }),
-          orderBy: vi.fn(async (_order: unknown) => {
-            await Promise.resolve();
-            return select;
-          }),
-          offset: vi.fn(async (_n: number) => {
-            await Promise.resolve();
-            return select;
-          }),
-        })),
-        limit: vi.fn(async (_n: number) => {
-          await Promise.resolve();
-          return select;
-        }),
-        orderBy: vi.fn(async (_order: unknown) => {
-          await Promise.resolve();
-          return select;
-        }),
-        offset: vi.fn(async (_n: number) => {
-          await Promise.resolve();
-          return select;
-        }),
-      })),
+      from: vi.fn((_table: unknown) => selectChain()),
     })),
     delete: vi.fn((_table: unknown) => ({
       where: vi.fn(async (_where: unknown) => {
@@ -90,11 +83,15 @@ function fakePgDb(canned: CannedRows = {}): { db: unknown; calls: string[] } {
       return canned.all ?? [];
     }),
   };
-  return { db, calls };
+  return { db, calls, orders };
 }
 
-function setup(canned?: CannedRows): { adapter: DatabaseAdapter; calls: string[] } {
-  const { db, calls } = fakePgDb(canned);
+function setup(canned?: CannedRows): {
+  adapter: DatabaseAdapter;
+  calls: string[];
+  orders: SQL[];
+} {
+  const { db, calls, orders } = fakePgDb(canned);
   const adapter = createDrizzlePgAdapter(db, {
     metadata: {
       name: "Test PG",
@@ -107,7 +104,7 @@ function setup(canned?: CannedRows): { adapter: DatabaseAdapter; calls: string[]
     migrate: () => {},
     close: () => {},
   });
-  return { adapter, calls };
+  return { adapter, calls, orders };
 }
 
 describe("createDrizzlePgAdapter", () => {
@@ -146,6 +143,15 @@ describe("createDrizzlePgAdapter", () => {
     expect(rows).toHaveLength(1);
     expect(await adapter.count(widgets)).toBe(2);
     expect(calls).toContain("count");
+  });
+
+  it("always orders a list, with id as the final tie-break", async () => {
+    const { adapter, orders } = setup();
+    await adapter.list(widgets);
+    await adapter.list(widgets, { orderBy: asc(widgets.name) });
+    const dialect = new PgDialect();
+    const rendered = orders.map((order) => dialect.sqlToQuery(order).sql);
+    expect(rendered).toEqual(['"widgets"."id"', '"widgets"."name" asc, "widgets"."id"']);
   });
 
   it("runs raw SQL via all", async () => {

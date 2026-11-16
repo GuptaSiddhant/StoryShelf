@@ -64,9 +64,16 @@ const pgPreset: Preset = {
     ((await (pool as PgPool).query(COUNT, [name])).rows[0] as { n: number }).n,
 };
 
+/**
+ * Client-side deadlines for the Neon pool. A WebSocket that goes silent (#1067) never errors by
+ * itself, so a stalled statement held its test for the whole 240 s; with these it fails in 30 s
+ * with "Query read timeout" or a connection timeout. The slowest healthy statement takes seconds.
+ */
+const WEBSOCKET_DEADLINES = { query_timeout: 30_000, connectionTimeoutMillis: 30_000 };
+
 const neonPreset: Preset = {
   name: "neon",
-  pool: () => new NeonPool({ connectionString: url, max: 3 }),
+  pool: () => new NeonPool({ connectionString: url, max: 3, ...WEBSOCKET_DEADLINES }),
   adapter: (pool) => createNeonDatabase({ client: pool }),
   database: (pool) => drizzleNeon(pool),
   count: async (pool, name) =>

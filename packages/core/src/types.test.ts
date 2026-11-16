@@ -36,3 +36,16 @@ describe("readSessionCookie", () => {
     expect(readSessionCookie(`${SESSION_COOKIE}=tok.sig==`)).toBe("tok.sig==");
   });
 });
+
+describe("readSessionCookie with the __Host- name", () => {
+  it("prefers the __Host- cookie over the __Secure- and plain ones", async () => {
+    const { HOST_SESSION_COOKIE } = await import("./types.ts");
+    expect(HOST_SESSION_COOKIE).toBe("__Host-storyshelf_session");
+    expect(
+      readSessionCookie(
+        `${SESSION_COOKIE}=plain; ${SECURE_SESSION_COOKIE}=secure; ${HOST_SESSION_COOKIE}=host`,
+      ),
+    ).toBe("host");
+    expect(readSessionCookie(`${HOST_SESSION_COOKIE}=host`)).toBe("host");
+  });
+});

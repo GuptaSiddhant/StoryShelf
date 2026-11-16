@@ -44,9 +44,9 @@ describe("generatePackageJson", () => {
   });
 
   it("pins the StoryShelf packages to the CLI version", () => {
-    const { dependencies } = pkg({ git: "git" });
+    const { dependencies } = pkg({ notifications: true });
     expect(dependencies["@storyshelf/app"]).toBe("0.3.2");
-    expect(dependencies["@storyshelf/notify-git"]).toBe("0.3.2");
+    expect(dependencies["@storyshelf/core"]).toBe("0.3.2");
   });
 
   it("falls back to 0.0.0 when the build did not define the version", () => {
@@ -112,12 +112,13 @@ describe("generatePackageJson", () => {
     expect(pkg({ auth: "oauth" }).dependencies["@storyshelf/auth"]).toBeDefined();
   });
 
-  it("adds the notification packages and nodemailer when enabled", () => {
+  it("adds nodemailer and core only when SMTP is chosen", () => {
     const { dependencies } = pkg({ notifications: true });
-    expect(dependencies["@storyshelf/notify-chat"]).toBeDefined();
-    expect(dependencies["@storyshelf/notify-email"]).toBeDefined();
     expect(dependencies["nodemailer"]).toBeDefined();
-    expect(pkg({ notifications: false }).dependencies["@storyshelf/notify-chat"]).toBeUndefined();
+    expect(dependencies["@storyshelf/core"]).toBeDefined();
+    const off = pkg({ notifications: false }).dependencies;
+    expect(off["nodemailer"]).toBeUndefined();
+    expect(off["@storyshelf/core"]).toBeUndefined();
   });
 
   it("adds the observability packages only when asked", () => {
@@ -127,15 +128,12 @@ describe("generatePackageJson", () => {
     expect(pkg().dependencies["@storyshelf/observability"]).toBeUndefined();
   });
 
-  it("adds the Figma package only when asked", () => {
-    expect(pkg({ design: true }).dependencies["@storyshelf/design-figma"]).toBeDefined();
-    expect(pkg().dependencies["@storyshelf/design-figma"]).toBeUndefined();
-  });
-
-  it("adds no git package for a git-less server and no stray adapter name", () => {
-    const { dependencies } = pkg({ git: "git" });
-    expect(Object.keys(dependencies).some((name) => name.includes("git-git"))).toBe(false);
-    expect(pkg({ git: "none" }).dependencies["@storyshelf/notify-git"]).toBeUndefined();
+  it("installs no integration package: git, chat, email and Figma are built in", () => {
+    const { dependencies } = pkg({ notifications: true, design: true, git: "git" });
+    const stale = Object.keys(dependencies).filter((name) =>
+      /@storyshelf\/(notify-|design-figma)/u.test(name),
+    );
+    expect(stale).toEqual([]);
   });
 
   it("has plain docker scripts for a single container", () => {

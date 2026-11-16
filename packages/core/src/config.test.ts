@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateConfig } from "./config.ts";
+import { parseTrustProxy, validateConfig } from "./config.ts";
 
 describe("validateConfig", () => {
   it("accepts the serverTiming opt-in", () => {
@@ -93,5 +93,36 @@ describe("validateConfig publish limits", () => {
     ["maxUnzippedBytes", "big"],
   ])("rejects %s = %s", (key, value) => {
     expect(() => validateConfig({ [key]: value })).toThrow();
+  });
+});
+
+describe("trustProxy", () => {
+  it("accepts a hop count, a list of IPs and CIDRs, or fly", () => {
+    expect(validateConfig({ trustProxy: 1 }).trustProxy).toBe(1);
+    expect(validateConfig({ trustProxy: ["10.0.0.0/8", "::1"] }).trustProxy).toEqual([
+      "10.0.0.0/8",
+      "::1",
+    ]);
+    expect(validateConfig({ trustProxy: "fly" }).trustProxy).toBe("fly");
+  });
+
+  it("refuses zero, an empty list, host names and other strings", () => {
+    expect(() => validateConfig({ trustProxy: 0 })).toThrow(/trustProxy/u);
+    expect(() => validateConfig({ trustProxy: [] })).toThrow(/trustProxy/u);
+    expect(() => validateConfig({ trustProxy: ["proxy.internal"] })).toThrow(/trustProxy/u);
+    expect(() => validateConfig({ trustProxy: "true" })).toThrow(/trustProxy/u);
+  });
+
+  it("maps TRUST_PROXY values", () => {
+    expect(parseTrustProxy()).toBeUndefined();
+    expect(parseTrustProxy(" ")).toBeUndefined();
+    expect(parseTrustProxy("false")).toBeUndefined();
+    expect(parseTrustProxy("0")).toBeUndefined();
+    expect(parseTrustProxy("fly")).toBe("fly");
+    expect(parseTrustProxy("2")).toBe(2);
+    expect(parseTrustProxy("10.0.0.0/16, 2001:db8::/32,")).toEqual([
+      "10.0.0.0/16",
+      "2001:db8::/32",
+    ]);
   });
 });

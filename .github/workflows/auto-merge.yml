@@ -54,10 +54,17 @@ jobs:
               );
               core.info(`Auto-merge (${mergeMethod.toLowerCase()}) enabled on #${pr.number}.`);
             } catch (error) {
-              // Already mergeable ("clean status") or already enabled: nothing to do. Anything else
-              // fails the run, so a broken call is not hidden behind a green check.
+              // Already mergeable ("clean status") or already enabled: nothing to do. "Unstable
+              // status" (a check still running or failing when the PR leaves draft) is a warning,
+              // not a failure: a red `enable` check would itself keep the PR unstable, so auto-merge
+              // could never be turned on later. Anything else fails the run, so a broken call is not
+              // hidden behind a green check.
               if (/clean status|already enabled/iu.test(error.message)) {
                 core.notice(`#${pr.number}: ${error.message}`);
+              } else if (/unstable status/iu.test(error.message)) {
+                core.warning(
+                  `#${pr.number}: auto-merge not enabled yet (checks not green); re-run this job or merge once they are.`,
+                );
               } else {
                 core.setFailed(`#${pr.number}: auto-merge not enabled: ${error.message}`);
               }

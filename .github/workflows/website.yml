@@ -4,15 +4,25 @@
 #
 name: Deploy Astro site to Pages
 
+# The site shows the latest stable release only (ADR 0043, amendments 2026-11-10 and 2026-11-11).
+# A push to `main` deploys nothing: `release.yml` calls this workflow after a stable release is
+# tagged, and `workflow_dispatch` rebuilds on demand. A website PR is still built and link-checked
+# by ci.yml, and its docs reach the site with the next release.
 on:
-  # Runs on pushes targeting the default branch
-  push:
-    branches: ["main"]
-    paths:
-      - "apps/website/**"
-      - ".github/workflows/website.yml"
-  # Allows you to run this workflow manually from the Actions tab
+  workflow_call:
+    inputs:
+      tag:
+        description: "The release tag to build (for example v0.12.0). Empty: the latest stable tag."
+        required: false
+        default: ""
+        type: string
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag to build (for example v0.12.0). Empty: the latest stable tag."
+        required: false
+        default: ""
+        type: string
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -35,10 +45,36 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout
+      # Only to read the tags: the site is built from the tag checked out below.
+      - name: Checkout (tags)
         uses: actions/checkout@v7
         with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve the release tag
+        id: release
+        env:
+          REQUESTED: ${{ inputs.tag }}
+        run: |
+          set -e
+          if [ -n "$REQUESTED" ]; then
+            tag="$REQUESTED"
+          else
+            # Latest stable tag: vX.Y.Z only, never a pre-release.
+            tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -Ev -- '-' | head -n 1)
+          fi
+          if ! git rev-parse -q --verify "refs/tags/${tag}^{commit}" >/dev/null; then
+            echo "::error::No release tag found (${tag:-none}); nothing to build."
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Building the site from ${tag}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Checkout the release
+        uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
           fetch-depth: 0 # full history so "last updated" dates are accurate
+          persist-credentials: false
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
         with:

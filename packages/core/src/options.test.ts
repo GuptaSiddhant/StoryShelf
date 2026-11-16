@@ -8,6 +8,7 @@ import {
   resolveShelfOptions,
   sequentialTransactionsWarning,
 } from "./options.ts";
+import { makeFakeDesign } from "./test-helpers/fake-design.ts";
 
 const runner = { metadata: { kind: "r" } } as unknown as CaptureRunner;
 const base = {
@@ -16,6 +17,26 @@ const base = {
 } as unknown as ShelfOptions;
 
 describe("resolveShelfOptions", () => {
+  it("resolves the integration groups into lists (ADR 0049)", () => {
+    const design = makeFakeDesign().provider;
+    const resolved = resolveShelfOptions({
+      ...base,
+      design: (builtIn) => [...builtIn, design],
+      notifications: { notifiers: false, config: { fromName: "Shelf" } },
+    });
+    expect(resolved.design?.map((p) => p.metadata.kind)).toEqual(["figma", "fake"]);
+    expect(resolved.notifications?.notifiers).toEqual([]);
+    expect(resolved.notifications?.email).toEqual([]);
+    expect(resolved.notifications?.config).toEqual({ fromName: "Shelf" });
+  });
+
+  it("throws at startup on a repeated provider kind, naming it", () => {
+    const design = makeFakeDesign("figma").provider;
+    expect(() => resolveShelfOptions({ ...base, design: [design, design] })).toThrow(
+      /design\[1\] \(".*"\): kind "figma" is already used/u,
+    );
+  });
+
   it("defaults scratchDir for a hosting-only deployment: publishing extracts zips there", () => {
     expect(resolveShelfOptions(base).config?.scratchDir).toBe(DEFAULT_SCRATCH_DIR);
   });
@@ -224,6 +245,13 @@ describe("sequentialTransactionsWarning", () => {
   });
 });
 
+/** An attempt to resolve options with `config`, as a function so a test can expect it to throw. */
+const sub =
+  (config: Record<string, unknown>, extra: Partial<ShelfOptions> = {}) =>
+  (): void => {
+    resolveShelfOptions({ ...base, ...extra, config } as unknown as ShelfOptions);
+  };
+
 describe("resolveShelfOptions storybook hosting", () => {
   const auth = {} as ShelfOptions["auth"];
 
@@ -242,9 +270,65 @@ describe("resolveShelfOptions storybook hosting", () => {
     expect(hosted("sandboxed", { auth, config: { secret: "s" } })).not.toThrow();
   });
 
-  it("refuses subdomain, whose serving is not wired, rather than serving it as trusted", () => {
-    expect(hosted("subdomain", { auth, config: { secret: "s" } })).toThrow(/not available/u);
-    expect(hosted("subdomain")).toThrow(/not available/u);
+  describe("subdomain", () => {
+    const hosting = { mode: "subdomain", baseDomain: "shelf.example.com" };
+    const ok = {
+      secret: "s",
+      publicBaseUrl: "https://shelf.example.com",
+      storybookHosting: hosting,
+    };
+    const hostAuth = { hostSessionCookie: true } as ShelfOptions["auth"];
+
+    it("accepts a configured https portal, with the __Host- cookie engine when sign-in is on", () => {
+      expect(sub(ok)).not.toThrow();
+      expect(sub(ok, { auth: hostAuth })).not.toThrow();
+    });
+
+    it("refuses a missing portal origin and a missing or malformed base domain", () => {
+      expect(sub({ ...ok, publicBaseUrl: undefined })).toThrow(/needs config.publicBaseUrl/u);
+      expect(sub({ ...ok, storybookHosting: { mode: "subdomain" } })).toThrow(
+        /baseDomain is required/u,
+      );
+      expect(
+        sub({ ...ok, storybookHosting: { mode: "subdomain", baseDomain: "*.x.com" } }),
+      ).toThrow(/plain domain/u);
+    });
+
+    it("refuses an http portal except on a localhost name", () => {
+      expect(sub({ ...ok, publicBaseUrl: "http://shelf.example.com" })).toThrow(/https/u);
+      const local = {
+        ...ok,
+        publicBaseUrl: "http://localhost:3000",
+        storybookHosting: { mode: "subdomain", baseDomain: "localhost" },
+      };
+      expect(sub(local)).not.toThrow();
+      expect(sub({ ...local, publicBaseUrl: "ftp://localhost:3000" })).toThrow(/https/u);
+      expect(sub({ ...local, publicBaseUrl: "http://app.localhost:3000" })).toThrow(
+        /would also match the portal host/u,
+      );
+    });
+
+    it("refuses a base domain that would also match the portal host", () => {
+      expect(
+        sub({ ...ok, storybookHosting: { mode: "subdomain", baseDomain: "example.com" } }),
+      ).toThrow(/would also match the portal host/u);
+    });
+
+    it("refuses sign-in without the __Host- session cookie", () => {
+      const plain = {} as ShelfOptions["auth"];
+      expect(sub(ok, { auth: plain })).toThrow(/__Host- session cookie/u);
+    });
+
+    it("reads the deprecated publishedBaseDomain as the same mode, with the same rules", () => {
+      const alias = {
+        secret: "s",
+        publicBaseUrl: "https://shelf.example.com",
+        publishedBaseDomain: "shelf.example.com",
+      };
+      expect(sub(alias)).not.toThrow();
+      expect(sub({ ...alias, publicBaseUrl: undefined })).toThrow(/needs config.publicBaseUrl/u);
+      expect(sub({ ...alias, publishedBaseDomain: "bad domain" })).toThrow(/plain domain/u);
+    });
   });
 
   it("validates the top-level storybookUrlRateLimit as a positive whole number", () => {

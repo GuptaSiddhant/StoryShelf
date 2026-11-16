@@ -3,8 +3,19 @@ name: Fly dry run
 # Reusable: proves a merge would still deploy to Fly. Builds the Fly image from the same
 # Dockerfile and context as fly.yml (no push), boots it, seeds the demo into it and checks
 # the demo captures. Called by ci.yml and nightly.yml.
+#
+# `e2e: true` adds the browser golden path (#941) on the same container: password sign-in and a
+# confirmed PUBLIC_BASE_URL are switched on at boot, and after the seed `apps/fly-app/e2e` uploads
+# one changed build, signs in, approves it with the keyboard, checks the git status recorded by the
+# `git-log` provider and the private Storybook, and runs axe on the pages it visits. Off by default;
+# ci.yml turns it on for `release/v*` PRs and manual runs, nightly.yml always.
 on:
   workflow_call:
+    inputs:
+      e2e:
+        description: Run the browser golden-path test on the booted container.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -17,6 +28,10 @@ jobs:
     env:
       STORYSHELF_URL: http://127.0.0.1:3000
       STORYSHELF_ADMIN_TOKEN: ci-admin-token
+      # Throwaway values for the e2e container only (the password is 12+ characters).
+      E2E_EMAIL: reviewer@example.com
+      E2E_PASSWORD: e2e-password-123
+      E2E_SECRET: e2e-secret-that-is-long-enough-1234567890
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -38,8 +53,14 @@ jobs:
 
       - name: Boot the image
         run: |
+          # With e2e: password sign-in and a confirmed public origin, as a deployment would have.
+          extra=()
+          if [ "${{ inputs.e2e }}" = "true" ]; then
+            extra=(-e SECRET="$E2E_SECRET" -e AUTH_EMAIL="$E2E_EMAIL" -e AUTH_PASSWORD="$E2E_PASSWORD" \
+              -e PUBLIC_BASE_URL="$STORYSHELF_URL")
+          fi
           docker run -d --name storyshelf -p 3000:3000 \
-            -e STORYSHELF_ADMIN_TOKEN="$STORYSHELF_ADMIN_TOKEN" storyshelf-fly
+            -e STORYSHELF_ADMIN_TOKEN="$STORYSHELF_ADMIN_TOKEN" "${extra[@]}" storyshelf-fly
           for i in $(seq 1 30); do
             curl -fsS "$STORYSHELF_URL/api/v1/health" && exit 0
             sleep 2
@@ -67,6 +88,41 @@ jobs:
 
       - name: Re-seed is a no-op
         run: apps/fly-app/seed.sh | tee reseed.log && grep -q "up to date" reseed.log
+
+      # The same browser cache as capture.yml, so a warm cache serves both.
+      - name: Cache Playwright browsers
+        if: ${{ inputs.e2e }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.63.0-chromium-firefox-${{ runner.os }}
+
+      - name: Install Playwright Chromium
+        if: ${{ inputs.e2e }}
+        working-directory: apps/fly-app
+        run: |
+          nubx playwright-core install chromium
+          if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
+            echo "chromium failed to launch; installing system dependencies"
+            nubx playwright-core install-deps chromium
+          fi
+
+      - name: Browser golden path (e2e)
+        if: ${{ inputs.e2e }}
+        working-directory: apps/fly-app
+        env:
+          # A failed run leaves its Playwright trace here; a passing run leaves nothing.
+          E2E_TRACE_DIR: ${{ runner.temp }}/e2e-trace
+        run: nub run test:e2e
+
+      - name: Upload the e2e trace (failure only)
+        if: ${{ failure() && inputs.e2e }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-trace
+          path: ${{ runner.temp }}/e2e-trace
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Container logs
         if: ${{ failure() }}

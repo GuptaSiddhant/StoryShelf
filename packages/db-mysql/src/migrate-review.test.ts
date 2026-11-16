@@ -102,3 +102,14 @@ describe("an upgrade that cannot proceed", () => {
     );
   });
 });
+
+describe("the manifest claim column on an old MySQL database", () => {
+  it("is added nullable, once", async () => {
+    const server = fakeServer();
+    await runMigrations(server.run);
+    expect(server.added).toContain("builds.manifest_sha256 VARCHAR(64) NULL");
+    const before = server.added.length;
+    await runMigrations(server.run);
+    expect(server.added).toHaveLength(before);
+  });
+});

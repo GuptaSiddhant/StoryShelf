@@ -20,6 +20,8 @@ export type ConsumerJob = PollableJob & {
   maxAttempts?: number;
   /** Kind-specific fields given at enqueue. */
   data?: Record<string, unknown>;
+  /** Payload version (database queue); absent means 1. */
+  payloadVersion?: number;
 };
 
 /** What a handler gets besides the job. */
@@ -36,6 +38,11 @@ export interface JobRunContext {
 export interface KindHandler {
   /** Run the job; resolve to ack it, reject to retry (or fail it on its last attempt). */
   run(job: ConsumerJob, context: JobRunContext): Promise<void>;
+  /**
+   * The highest payload version this handler reads (default 1). A job with a higher one is handed
+   * back to the queue unrun and without spending an attempt (ADR 0053, decision 5).
+   */
+  payloadVersion?: number;
   /** Whether the job is well-formed; a job that is not is failed without retries. */
   accepts?(job: ConsumerJob): boolean;
   /**

@@ -63,7 +63,8 @@ describe("route classification", () => {
   });
 
   it("classifies by exact entry first, then by prefix", () => {
-    expect(classOfRoute("GET", "/projects/:slug/builds/:buildId/diff")).toBe("testing");
+    expect(classOfRoute("GET", "/projects/:slug/jobs")).toBe("testing");
+    expect(classOfRoute("GET", "/projects/:slug/builds/:buildId/diff")).toBe("both");
     expect(classOfRoute("PUT", "/api/v1/projects/:slug/builds/:buildId/zip")).toBe("hosting");
     expect(classOfRoute("GET", "/assets/htmx.js")).toBe("hosting");
     expect(classOfRoute("GET", "/not-a-route")).toBeUndefined();

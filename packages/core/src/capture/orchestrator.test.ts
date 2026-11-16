@@ -1,4 +1,5 @@
 import AdmZip from "adm-zip";
+import { createHash } from "node:crypto";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -183,7 +184,10 @@ async function setupBrowsers(projectPatch: Record<string, unknown>): Promise<{
 }> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await new ProjectModel(db, tables(db)).create({ name: "Browsers" });
+  const project = await new ProjectModel(db, tables(db)).create({
+    name: "Browsers",
+    requireVerifiedDefault: false,
+  });
   await db.update(db.tables.projects, project.id, projectPatch);
   const build = await new BuildModel(db, tables(db)).create(project.id, {
     gitSha: "sha-browsers",
@@ -211,7 +215,10 @@ describe("executeCaptureJob", () => {
   it("loads the target, extracts, renders, and persists the capture end to end", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
@@ -236,7 +243,10 @@ describe("executeCaptureJob", () => {
   it("moves no baseline and keeps the build cancelled when a cancel lands while stories render", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const builds = new BuildModel(db, tables(db));
     const build = await builds.create(project.id, {
       gitSha: "sha-abc",
@@ -278,16 +288,23 @@ describe("executeCaptureJob", () => {
   it("does not persist the statics again when publishing already wrote the manifest", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
       isDefault: true,
     });
-    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const index = new AdmZip(zipWithIndex()).readFile("index.json") as Buffer;
+    const hash = createHash("sha256").update(index).digest("hex");
+    await storage.write(`content/${hash}`, index);
     const manifestKey = `${storybookDir(project.id, build.id)}/manifest.json`;
-    await storage.write(manifestKey, Buffer.from("{}"));
+    const manifest = Buffer.from(JSON.stringify({ "index.json": hash }));
+    await storage.write(manifestKey, manifest);
     const write = vi.spyOn(storage, "write");
+    const readStream = vi.spyOn(storage, "readStream");
     const { runner } = fakeRunner();
 
     await executeCaptureJob(
@@ -299,7 +316,41 @@ describe("executeCaptureJob", () => {
     expect(
       written.filter((key) => key.includes("/storybook/") || key.startsWith("content/")),
     ).toEqual([]);
-    expect((await storage.read(manifestKey)).toString()).toBe("{}");
+    expect((await storage.read(manifestKey)).toString()).toBe(manifest.toString());
+    // No zip was ever stored, and capture never asked for one.
+    expect(readStream).not.toHaveBeenCalled();
+  });
+
+  it("removes the materialized Storybook when capture fails", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    const index = new AdmZip(zipWithIndex()).readFile("index.json") as Buffer;
+    const hash = createHash("sha256").update(index).digest("hex");
+    await storage.write(`content/${hash}`, index);
+    await storage.write(
+      `${storybookDir(project.id, build.id)}/manifest.json`,
+      Buffer.from(JSON.stringify({ "index.json": hash })),
+    );
+    const { runner } = fakeRunner();
+    vi.spyOn(runner, "render").mockRejectedValue(new Error("boom"));
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    ).catch(() => null);
+
+    expect(
+      await readdir(join(scratchDir, ".storyshelf-scratch", project.id)).catch(() => []),
+    ).toEqual([]);
   });
 
   it("records the build's use of the persisted content, so retention knows who uses it", async () => {
@@ -343,7 +394,10 @@ describe("executeCaptureJob", () => {
   it("records the runner's reported environment in the baseline fingerprint", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Environment" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Environment",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-env",
       gitBranch: "main",
@@ -382,7 +436,10 @@ describe("executeCaptureJob", () => {
   it("stores streamed captures as they arrive and persists them without re-writing", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Streaming" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Streaming",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-stream",
       gitBranch: "main",
@@ -420,7 +477,10 @@ describe("executeCaptureJob", () => {
   it("records partitioning, runner lines, progress and the finish on the attempt log", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "AttemptLogs" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "AttemptLogs",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-logs",
       gitBranch: "main",
@@ -482,7 +542,10 @@ describe("executeCaptureJob", () => {
   it("reports a streamed capture that is not a PNG as a render failure", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "StreamingBad" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "StreamingBad",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-stream-bad",
       gitBranch: "main",
@@ -529,7 +592,10 @@ describe("executeCaptureJob", () => {
     }> {
       const { db } = makeDatabase();
       const { storage } = makeStorage();
-      const project = await new ProjectModel(db, tables(db)).create({ name: "Modes" });
+      const project = await new ProjectModel(db, tables(db)).create({
+        name: "Modes",
+        requireVerifiedDefault: false,
+      });
       await db.update(db.tables.projects, project.id, projectPatch);
       const build = await new BuildModel(db, tables(db)).create(project.id, {
         gitSha: "sha-modes",
@@ -893,7 +959,10 @@ describe("executeCaptureJob", () => {
   it("marks the build failed when the renderer rejects", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
@@ -920,7 +989,10 @@ describe("executeCaptureJob", () => {
   it("fails only the story that crashed the browser and keeps the rest", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
@@ -942,7 +1014,10 @@ describe("executeCaptureJob", () => {
   it("cancels the runner and fails the build when render times out", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
@@ -973,7 +1048,10 @@ describe("executeCaptureJob", () => {
   it("persists statics before render so preview survives render failure", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
@@ -1025,7 +1103,10 @@ describe("executeCaptureJob", () => {
   it("does not capture a build that was cancelled before the job ran", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const builds = new BuildModel(db, tables(db));
     const build = await builds.create(project.id, { gitSha: "sha-abc", gitBranch: "main" });
     await builds.setStatus(build.id, "cancelled");
@@ -1044,7 +1125,10 @@ describe("executeCaptureJob", () => {
   it("leaves a build cancelled mid-capture cancelled when the capture finishes late", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const builds = new BuildModel(db, tables(db));
     const build = await builds.create(project.id, {
       gitSha: "sha-abc",
@@ -1082,7 +1166,10 @@ describe("executeCaptureJob", () => {
   it("blocks path traversal in the streamed extract", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Orchestrator",
+      requireVerifiedDefault: false,
+    });
     const build = await new BuildModel(db, tables(db)).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",

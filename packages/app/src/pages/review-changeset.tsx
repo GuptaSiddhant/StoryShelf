@@ -1,4 +1,5 @@
 /** The changeset card (ADR 0013, decision 8): components the build added, removed or changed. */
+import { contentHostSuffix } from "@storyshelf/core/config";
 import type { ChangesetComponent } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -132,7 +133,7 @@ function ChangeRow(props: {
 function RowLinks(props: { data: ReviewSectionData; kind: Kind; importPath: string }): Rendered {
   const { data, kind, importPath } = props;
   const { project, build } = data;
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   const story = data.firstStory.get(importPath);
   const componentBuild = kind === "removed" ? undefined : build.id;
   return (

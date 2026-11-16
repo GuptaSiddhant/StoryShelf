@@ -17,6 +17,16 @@ describe("UserModel", () => {
     expect(user.lastLoginAt).not.toBeNull();
   });
 
+  it("finds a user by email, ignoring case and blanks", async () => {
+    const { db } = makeDatabase();
+    const model = new UserModel(db, { users: db.tables.users });
+    await model.upsert({ id: "u1", email: "u@example.com", name: "U", role: "member" });
+    expect((await model.getByEmail(" u@example.com "))?.id).toBe("u1");
+    expect((await model.getByEmail("U@Example.com"))?.id).toBe("u1");
+    expect(await model.getByEmail("nobody@example.com")).toBeNull();
+    expect(await model.getByEmail("  ")).toBeNull();
+  });
+
   it("refreshes profile fields and role on subsequent upserts", async () => {
     const { db } = makeDatabase();
     const model = new UserModel(db, { users: db.tables.users });

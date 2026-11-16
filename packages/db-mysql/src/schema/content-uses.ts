@@ -1,4 +1,4 @@
-import { index, mysqlTable, primaryKey, varchar } from "drizzle-orm/mysql-core";
+import { bigint, index, mysqlTable, primaryKey, varchar } from "drizzle-orm/mysql-core";
 import { datetime } from "./datetime.ts";
 
 /** A build's use of one shared content blob; see the core `ContentUse` row type. */
@@ -9,6 +9,7 @@ export const contentUses = mysqlTable(
     contentHash: varchar("content_hash", { length: 128 }).notNull(),
     projectId: varchar("project_id", { length: 64 }).notNull(),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
     releasedAt: datetime("released_at", { mode: "string", fsp: 3 }),
     collectingAt: datetime("collecting_at", { mode: "string", fsp: 3 }),
     claimToken: varchar("claim_token", { length: 64 }),
@@ -25,6 +26,7 @@ export interface ContentUse {
   contentHash: string;
   projectId: string;
   createdAt: string;
+  sizeBytes: number | null;
   releasedAt: string | null;
   collectingAt: string | null;
   claimToken: string | null;

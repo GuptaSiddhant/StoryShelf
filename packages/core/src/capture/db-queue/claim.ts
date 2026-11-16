@@ -16,9 +16,10 @@ const MAX_CLAIM_TRIES = 3;
 
 /** Probe once and claim the job found; on a lost race, try the next candidate (a few times). */
 export async function claimNext(rt: QueueRuntime): Promise<DatabaseJob | null> {
-  for (let tries = 0; tries < MAX_CLAIM_TRIES; tries += 1) {
+  const kinds = rt.claimKinds ?? rt.kinds;
+  for (let tries = 0; tries < (kinds.length === 0 ? 0 : MAX_CLAIM_TRIES); tries += 1) {
     // oxlint-disable-next-line no-await-in-loop -- one candidate at a time, in order
-    const candidate = await rt.model.nextCandidate(rt.kinds, isoAt(rt));
+    const candidate = await rt.model.nextCandidate(kinds, isoAt(rt));
     if (candidate === null) {
       return null;
     }

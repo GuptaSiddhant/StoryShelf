@@ -6,6 +6,7 @@ import { isStateProvider, type NotifierProvider } from "../adapters/notifier/pro
 import type { NotificationChannel } from "../adapters/notifier/types.ts";
 import type { NotificationChannelRow } from "../schema/notification.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
+import { checkOutboundUrl, outboundReasonText } from "../utils/outbound.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
 
@@ -155,9 +156,22 @@ export class NotificationChannelModel {
 
   /**
    * Validate channel input against the matching notifier's schema. With `scope`, also
-   * enforce what `state` providers (git hosts) need: a project and a token.
+   * enforce what `state` providers (git hosts) need: a project and a token. Then the outbound
+   * guard checks the destination URLs (chat webhook URL in `secret`, GitLab `host`); it runs
+   * again at send time, which stays the real check because DNS can change.
    */
-  static validateInput(
+  static async validateInput(
+    notifiers: readonly NotifierProvider[],
+    provider: string,
+    config: unknown,
+    scope?: { projectId: string | null; hasSecret: boolean },
+    secret?: string,
+  ): Promise<ChannelValidation> {
+    const shape = NotificationChannelModel.validateShape(notifiers, provider, config, scope);
+    return shape.ok ? await destinationProblem(provider, config, secret) : shape;
+  }
+
+  private static validateShape(
     notifiers: readonly NotifierProvider[],
     provider: string,
     config: unknown,
@@ -200,6 +214,36 @@ export class NotificationChannelModel {
       return {};
     }
   }
+}
+
+/** The config field that holds the destination URL of a git provider, when it has one. */
+const GIT_HOST_FIELD: Record<string, string> = { gitlab: "host", github: "apiUrl" };
+
+/** Refuse a chat webhook URL, GitLab host or GHES API base that is private or local; never echoes an address. */
+async function destinationProblem(
+  provider: string,
+  config: unknown,
+  secret: string | undefined,
+): Promise<ChannelValidation> {
+  const hostField = GIT_HOST_FIELD[provider];
+  const host = hostField ? (config as Record<string, unknown> | null)?.[hostField] : undefined;
+  const [field, url] =
+    provider === "slack" || provider === "teams"
+      ? (["secret", secret] as const)
+      : typeof host === "string"
+        ? (["config", host] as const)
+        : ([null, undefined] as const);
+  if (field === null || !url) {
+    return { ok: true };
+  }
+  const reason = await checkOutboundUrl(url);
+  if (reason === null) {
+    return { ok: true };
+  }
+  const message = outboundReasonText(reason);
+  return field === "secret"
+    ? { ok: false, field, message }
+    : { ok: false, field, message, issues: [{ path: hostField ?? "host", message }] };
 }
 
 /** Git channels belong to one project and carry their own token. */

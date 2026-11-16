@@ -11,7 +11,8 @@ import { typeDocGroups, typeDocPlugins } from "./typedoc-packages.mjs";
 const SITE = "https://storyshelf.js.org";
 const REPO = "https://github.com/GuptaSiddhant/StoryShelf";
 const OG_IMAGE = `${SITE}/og-image.png`;
-const OG_ALT = "StoryShelf: visual testing for Storybook, with the build review workspace";
+const OG_ALT =
+  "StoryShelf: self-hosted visual testing and review for Storybook, shown with the build review workspace";
 
 /** A package's page, with its generated TypeScript API nested under it when it has one. */
 const packageItem = (slug) => {
@@ -39,8 +40,12 @@ export default defineConfig({
     mermaid({ autoTheme: true }),
     starlight({
       title: "StoryShelf",
-      description: "Self-hosted visual testing for Storybook.",
-      logo: { src: "./src/assets/logo.svg", alt: "" },
+      description: "An open-source, self-hosted alternative to Chromatic.",
+      logo: {
+        light: "./src/assets/brand/storyshelf-logo-purple-white-rounded.svg",
+        dark: "./src/assets/brand/storyshelf-logo-white-purple-rounded.svg",
+        alt: "",
+      },
       components: {
         Hero: "./src/components/overrides/Hero.astro",
         SocialIcons: "./src/components/overrides/SocialIcons.astro",
@@ -68,7 +73,7 @@ export default defineConfig({
           tag: "link",
           attrs: { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
         },
-        { tag: "meta", attrs: { name: "theme-color", content: "#1d5fcf" } },
+        { tag: "meta", attrs: { name: "theme-color", content: "#5b3fd6" } },
         {
           // Tables, and code blocks the page's own scripts left without a focus stop, that scroll
           // sideways on narrow screens must be keyboard-focusable.

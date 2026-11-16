@@ -3,6 +3,8 @@ import type {
   Baseline,
   Build,
   BuildComponent,
+  CaptureAttempt,
+  CaptureLog,
   Comment,
   Project,
   Snapshot,
@@ -24,6 +26,17 @@ export const BUILD_REVIEW = id("BLD002");
 export const BUILD_FAILED = id("BLD003");
 export const BUILD_CAPTURING = id("BLD004");
 export const BUILD_REJECTED = id("BLD005");
+/** An older build of the capturing build's branch, cancelled when that newer commit arrived (ADR 0045). */
+export const BUILD_SUPERSEDED = id("BLD013");
+export const BUILD_CANCELLED = id("BLD006");
+/** An approved build whose Storybook retention already removed. */
+export const BUILD_PURGED = id("BLD012");
+/** Skipped builds (ADR 0044), one per state of the source they repeat. */
+export const BUILD_SKIPPED = id("BLD007");
+export const BUILD_SKIPPED_REJECTED_SOURCE = id("BLD008");
+export const BUILD_SKIPPED_PURGED_STORYBOOK = id("BLD009");
+export const BUILD_SKIPPED_SOURCE_GONE = id("BLD010");
+export const BUILD_SKIPPED_MANY_FILES = id("BLD011");
 
 export const project: Project = {
   id: PROJECT_ID,
@@ -76,6 +89,86 @@ const build = (overrides: Partial<Build> & Pick<Build, "id" | "gitSha" | "gitBra
   ...overrides,
 });
 
+/** A skipped build: no snapshots, no upload; it names the build it repeats and what was compared. */
+const skipped = (
+  overrides: Partial<Build> & Pick<Build, "id" | "gitSha" | "gitBranch" | "skippedFromBuildId">,
+  changedFiles: string[],
+): Build =>
+  build({
+    status: "skipped",
+    message: "docs: fix a typo",
+    changedFiles: JSON.stringify(changedFiles),
+    ...overrides,
+  });
+
+export const skippedBuilds = (): Build[] => [...recentSkipped(), ...olderSkipped()];
+
+const recentSkipped = (): Build[] => [
+  skipped(
+    {
+      id: BUILD_SKIPPED,
+      gitSha: "e4f5a6b",
+      gitBranch: "main",
+      skippedFromBuildId: BUILD_MAIN,
+      baselineSha: "a1b2c3d",
+      createdAt: hoursAgo(2),
+      updatedAt: hoursAgo(2),
+    },
+    ["README.md", "docs/guide.md"],
+  ),
+];
+
+const olderSkipped = (): Build[] => [
+  skipped(
+    {
+      id: BUILD_SKIPPED_REJECTED_SOURCE,
+      gitSha: "4c3b2a1",
+      gitBranch: "feature/card-shadow",
+      skippedFromBuildId: BUILD_REJECTED,
+      baselineSha: "3b2a1c0",
+      createdAt: hoursAgo(30),
+      updatedAt: hoursAgo(30),
+    },
+    ["CHANGELOG.md"],
+  ),
+  skipped(
+    {
+      id: BUILD_SKIPPED_PURGED_STORYBOOK,
+      gitSha: "7e8f9a0",
+      gitBranch: "release/1.x",
+      skippedFromBuildId: BUILD_PURGED,
+      baselineSha: "0d1e2f3",
+      createdAt: hoursAgo(24 * 20),
+      updatedAt: hoursAgo(24 * 20),
+    },
+    ["package.json"],
+  ),
+  skipped(
+    {
+      id: BUILD_SKIPPED_SOURCE_GONE,
+      gitSha: "b1c2d3e",
+      gitBranch: "chore/ci",
+      skippedFromBuildId: id("BLDGONE"),
+      baselineSha: "f0e1d2c",
+      createdAt: hoursAgo(72),
+      updatedAt: hoursAgo(72),
+    },
+    [".github/workflows/ci.yml"],
+  ),
+  skipped(
+    {
+      id: BUILD_SKIPPED_MANY_FILES,
+      gitSha: "9a8b7c6",
+      gitBranch: "main",
+      skippedFromBuildId: BUILD_MAIN,
+      baselineSha: "a1b2c3d",
+      createdAt: hoursAgo(6),
+      updatedAt: hoursAgo(6),
+    },
+    Array.from({ length: 24 }, (_, index) => `docs/reference/page-${index + 1}.md`),
+  ),
+];
+
 export const builds: Build[] = [
   build({
     id: BUILD_CAPTURING,
@@ -126,6 +219,17 @@ export const builds: Build[] = [
     updatedAt: hoursAgo(47),
   }),
   build({
+    id: BUILD_CANCELLED,
+    gitSha: "2d1c0b9",
+    gitBranch: "feature/tooltip-arrow",
+    status: "cancelled",
+    authorName: "Alan Turing",
+    authorEmail: "alan@example.com",
+    message: "feat(tooltip): arrow placement",
+    createdAt: hoursAgo(30),
+    updatedAt: hoursAgo(29.9),
+  }),
+  build({
     id: BUILD_REJECTED,
     gitSha: "3b2a1c0",
     gitBranch: "feature/card-shadow",
@@ -139,6 +243,30 @@ export const builds: Build[] = [
     createdAt: hoursAgo(96),
     updatedAt: hoursAgo(94),
   }),
+  build({
+    id: BUILD_SUPERSEDED,
+    gitSha: "e4f5a6b",
+    gitBranch: "feature/dark-tabs",
+    status: "cancelled",
+    supersededByBuildId: BUILD_CAPTURING,
+    authorName: "Grace Hopper",
+    authorEmail: "grace@example.com",
+    message: "wip(tabs): dark mode tab bar",
+    createdAt: hoursAgo(0.5),
+    updatedAt: hoursAgo(0.1),
+  }),
+  build({
+    id: BUILD_PURGED,
+    gitSha: "0d1e2f3",
+    gitBranch: "release/1.x",
+    status: "approved",
+    message: "chore: cut 1.x",
+    snapshotCount: 11,
+    approvedCount: 11,
+    createdAt: hoursAgo(24 * 30),
+    updatedAt: hoursAgo(24 * 30),
+  }),
+  ...skippedBuilds(),
 ];
 
 const entry = (component: string, name: string, tags: string[] = ["autodocs"]): CatalogEntry => ({
@@ -293,3 +421,37 @@ export const buildComponents: BuildComponent[] = [BUILD_MAIN, BUILD_REVIEW].flat
     };
   }),
 );
+
+/** The failed build's one capture attempt, and the error that ended it. */
+export const captureAttempts: CaptureAttempt[] = [
+  {
+    id: id("ATT001"),
+    projectId: PROJECT_ID,
+    buildId: BUILD_FAILED,
+    attemptNo: 1,
+    status: "failed",
+    error: "page.goto: 404 for iframe.html\n    at capture (runner.ts:42)",
+    reqId: null,
+    storyCount: 0,
+    failedCount: 0,
+    queuedAt: hoursAgo(20),
+    startedAt: hoursAgo(19.9),
+    finishedAt: hoursAgo(19.8),
+    createdAt: hoursAgo(20),
+    updatedAt: hoursAgo(19.8),
+  },
+];
+
+export const captureLogs: CaptureLog[] = [
+  {
+    id: id("LOG001"),
+    projectId: PROJECT_ID,
+    buildId: BUILD_FAILED,
+    attemptId: id("ATT001"),
+    seq: 1,
+    level: "error",
+    message: "page.goto: 404 for iframe.html",
+    fields: null,
+    createdAt: hoursAgo(19.8),
+  },
+];

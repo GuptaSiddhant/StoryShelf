@@ -1,3 +1,4 @@
+import type { BuildStateSource } from "../../adapters/notifier/build-state.ts";
 /**
  * Delivering a build's state to git channels: read the build now, compute what each channel shows
  * ({@link statusesForBuild}), write it. Reading at delivery time is what makes a retried, delayed
@@ -5,6 +6,7 @@
  */
 import { channelPrefix, statusesForBuild, writeBuildState } from "../../adapters/notifier/index.ts";
 import { isStateProvider } from "../../adapters/notifier/provider.ts";
+import { contentHostSuffix } from "../../content-hosts.ts";
 import { latestVerdicts } from "../../models/build-review-status.ts";
 import { BuildReviewModel } from "../../models/build-review.ts";
 import { BuildModel } from "../../models/build.ts";
@@ -67,11 +69,13 @@ export async function writeTo(
     build,
     projectSlug: project.slug,
     prefix: channelPrefix(target.channel),
-    urls: createUrlBuilder(origin, deps.config.publishedBaseDomain),
+    urls: createUrlBuilder(origin, contentHostSuffix(deps.config)),
     flags: deps.flags(project),
     publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
+    source: (await skipSourceOf(deps, build)) ?? undefined,
     approvals: await approvalsOf(deps, build, project),
     changes: await changesOf(deps, build, project),
+    supersededBy: await supersededByOf(deps, build),
   });
   if (states.statuses.length === 0) {
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
@@ -87,17 +91,36 @@ export async function writeTo(
   });
 }
 
+/** What reading a project's git channels needs. */
+export type ChannelDeps = Pick<BuildStateDeps, "db" | "notifiers" | "secret"> & {
+  logger?: BuildStateDeps["logger"] | undefined;
+};
+
+/**
+ * For a `skipped` build, the build it repeats as it is now, with whether its Storybook is available
+ * (ADR 0044, decision 5); null for any other build, and for a skipped one whose source is gone.
+ */
+async function skipSourceOf(deps: BuildStateDeps, build: Build): Promise<BuildStateSource | null> {
+  const source =
+    build.status === "skipped" ? await new BuildModel(deps.db).skipSourceOf(build) : null;
+  if (source === null) return null;
+  const publishing = await publishingOfBuild({ db: deps.db, storage: deps.storage }, source);
+  return {
+    id: source.id,
+    gitSha: source.gitSha,
+    status: source.status,
+    available: publishing === "success",
+  };
+}
+
 /** The project's enabled channels with a wired `state` provider; unreadable secrets are logged and skipped. */
-export async function stateTargets(
-  deps: BuildStateDeps,
-  projectId: string,
-): Promise<StateTarget[]> {
+export async function stateTargets(deps: ChannelDeps, projectId: string): Promise<StateTarget[]> {
   const model = channelModel(deps);
   const rows = await model.list(projectId);
   return rows.flatMap((row) => {
     const view = row.enabled ? model.toView(row) : null;
     if (row.enabled && view === null) {
-      deps.logger.warn(
+      deps.logger?.warn(
         { channelId: row.id, provider: row.provider },
         "failed to decrypt channel secret",
       );
@@ -127,12 +150,15 @@ async function loadTarget(
   return targetOf(deps, view)[0] ?? "no-provider";
 }
 
-function targetOf(deps: BuildStateDeps, channel: StateTarget["channel"]): StateTarget[] {
+function targetOf(
+  deps: Pick<ChannelDeps, "notifiers">,
+  channel: StateTarget["channel"],
+): StateTarget[] {
   const provider = deps.notifiers.find((candidate) => candidate.metadata.kind === channel.provider);
   return provider !== undefined && isStateProvider(provider) ? [{ channel, provider }] : [];
 }
 
-function channelModel(deps: BuildStateDeps): NotificationChannelModel {
+function channelModel(deps: Pick<ChannelDeps, "db" | "secret">): NotificationChannelModel {
   return new NotificationChannelModel(
     deps.db,
     { notificationChannels: deps.db.tables.notificationChannels },
@@ -165,4 +191,16 @@ async function changesOf(
 ): Promise<Snapshot[] | undefined> {
   const wanted = deps.flags(project).testing && build.changedCount > 0;
   return wanted ? await new SnapshotModel(deps.db).listByBuild(build.id) : undefined;
+}
+
+/** The newer build that cancelled this one (ADR 0045), or undefined for any other build. */
+async function supersededByOf(
+  deps: BuildStateDeps,
+  build: Build,
+): Promise<{ id: string; sha: string } | undefined> {
+  if (build.status !== "cancelled" || !build.supersededByBuildId) {
+    return undefined;
+  }
+  const newer = await new BuildModel(deps.db).get(build.supersededByBuildId);
+  return newer ? { id: newer.id, sha: newer.gitSha } : undefined;
 }

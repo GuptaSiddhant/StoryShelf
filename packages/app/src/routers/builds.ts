@@ -19,11 +19,50 @@ import {
   APPROVER_ROLES,
   buildCreateJsonSchema,
   buildListQuery,
+  assertNotSkipped,
   buildForProject,
   createBuildRecord,
   storeUploadStream,
 } from "./builds.handlers.ts";
 import { discardZip, planUpload, publishUpload } from "./publish-upload.ts";
+
+/** SHA-256 of the manifest with its paths sorted, so the same files hash the same in any order. */
+function manifestHash(manifest: Record<string, string>): string {
+  const sorted = Object.entries(manifest).toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return createHash("sha256").update(JSON.stringify(sorted)).digest("hex");
+}
+
+/**
+ * Write-once publish: the first manifest of a build claims it and publishes; the same one again
+ * resolves false (nothing to do) and another is a 409. A publish that fails gives the claim back.
+ */
+async function publishManifest(
+  projectId: string,
+  buildId: string,
+  files: { rel: string; hash: string; size: number }[],
+  manifest: Record<string, string>,
+): Promise<boolean> {
+  const builds = new BuildModel(getStore().db);
+  const sha256 = manifestHash(manifest);
+  const claim = await builds.claimManifest(buildId, sha256);
+  if (claim === "duplicate") return false;
+  if (claim === "conflict") {
+    throw new HTTPException(409, { message: "This build already accepted a different manifest" });
+  }
+  try {
+    await recordUses(projectId, buildId, files);
+    await getStore().storage.write(
+      `${projectId}/builds/${buildId}/storybook/manifest.json`,
+      Buffer.from(JSON.stringify(manifest)),
+    );
+    // The files are stored content-addressed: nothing to extract, so publishing is complete.
+    await getStore().publish?.completer.complete(buildId, { ok: true });
+  } catch (error) {
+    await builds.releaseManifest(buildId, sha256);
+    throw error;
+  }
+  return true;
+}
 
 /** Decide how the stored zip is published; a zip this host cannot publish is removed and refused. */
 async function planOrDiscard(
@@ -44,6 +83,7 @@ async function recordUses(
   projectId: string,
   buildId: string,
   files: readonly { hash: string }[],
+  sizes?: ReadonlyMap<string, number>,
 ): Promise<void> {
   try {
     await recordContentUses(
@@ -51,6 +91,8 @@ async function recordUses(
       getStore().storage,
       { projectId, buildId },
       files.map((file) => file.hash),
+      undefined,
+      sizes,
     );
   } catch (error) {
     if (!(error instanceof ContentCollectingError)) throw error;
@@ -63,6 +105,8 @@ async function recordUses(
 import { registerBuildCancel } from "./build-cancel.ts";
 import { registerBuildChangeset } from "./build-changeset.ts";
 import { registerBuildReviews } from "./build-reviews.ts";
+import { registerBuildSkip } from "./build-skip.ts";
+import { registerBuildsInFlight } from "./builds-in-flight.ts";
 import { registerComments } from "./comments.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -76,8 +120,12 @@ import {
   unauthorized,
 } from "./schemas.ts";
 import { registerSnapshots } from "./snapshots.ts";
+import { registerStoryStatus } from "./story-status.ts";
 /** Register the build list, upload, fetch, retry, and delete endpoints. */
 export function registerBuilds(app: ShelfRouter): void {
+  // Before `GET …/builds/:buildId`, which would otherwise take `in-flight` or `skip-source` for a build id.
+  registerBuildsInFlight(app);
+  registerBuildSkip(app);
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { status, branch, labelKey, labelValue } = c.req.valid("query");
@@ -180,6 +228,12 @@ export function registerBuilds(app: ShelfRouter): void {
         // oxlint-disable-next-line no-await-in-loop -- one write at a time keeps the order stable
         await getStore().storage.write(contentKey(hash), buffer);
       }
+      await recordUses(
+        project.id,
+        buildId,
+        files,
+        new Map(files.map(({ hash, buffer }) => [hash, buffer.length])),
+      );
     } else {
       // Single content upload via PUT with hash header
       const hash = c.req.header("x-content-hash") ?? "";
@@ -187,6 +241,7 @@ export function registerBuilds(app: ShelfRouter): void {
       const buffer = Buffer.from(await c.req.arrayBuffer());
       refuseMismatch(hash, buffer);
       await getStore().storage.write(contentKey(hash), buffer);
+      await recordUses(project.id, buildId, [{ hash }], new Map([[hash, buffer.length]]));
     }
     return c.json({ ok: true });
   });
@@ -200,16 +255,9 @@ export function registerBuilds(app: ShelfRouter): void {
     for (const f of files) {
       manifest[f.rel] = f.hash;
     }
-    await recordUses(project.id, build.id, files);
-    await getStore().storage.write(
-      `${project.id}/builds/${build.id}/storybook/manifest.json`,
-      Buffer.from(JSON.stringify(manifest)),
-    );
-    // The files are stored content-addressed: nothing to extract, so publishing is complete.
-    await getStore().publish?.completer.complete(build.id, { ok: true });
-    const reqId = c.get("requestId");
-    await getStore().enqueueCapture?.(build.id, reqId);
-    return c.json({ ok: true });
+    const published = await publishManifest(project.id, build.id, files, manifest);
+    if (published) await getStore().enqueueCapture?.(build.id, c.get("requestId"));
+    return c.json({ ok: true }, 200);
   });
 
   app.openapi(getBuildRoute, async (c) => {
@@ -223,6 +271,7 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
+    assertNotSkipped(build, "retried");
     const updated = await new BuildModel(getStore().db).resetStatus(build.id, "pending");
     await getStore().enqueueCapture?.(build.id, c.get("requestId"));
     hxRefresh(c);
@@ -239,6 +288,7 @@ export function registerBuilds(app: ShelfRouter): void {
   });
 
   registerSnapshots(app);
+  registerStoryStatus(app);
   registerComments(app);
   registerBuildReviews(app);
   registerBuildChangeset(app);
@@ -443,7 +493,11 @@ const manifestRoute = createRoute({
   responses: {
     200: {
       content: { "application/json": { schema: z.object({ ok: z.boolean() }) } },
-      description: "Manifest stored",
+      description: "Manifest stored, or the same manifest was already accepted (no-op)",
+    },
+    409: {
+      content: { "application/json": { schema: errorSchema } },
+      description: "The build already accepted a different manifest",
     },
     ...notFoundResponse,
   },

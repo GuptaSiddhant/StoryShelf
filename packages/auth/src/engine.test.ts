@@ -762,6 +762,55 @@ describe("the session cookie", () => {
     expect(cookie.name).toBe("__Secure-storyshelf_session");
   });
 
+  it("is the __Host- cookie with hostSessionCookie: Secure, Path=/, no Domain, and it signs in", async () => {
+    const baseURL = "https://shelf.example.com";
+    const { shelf } = await testEngine(false, false, false, false, {
+      baseURL,
+      hostSessionCookie: true,
+    });
+    expect(shelf.adapter.hostSessionCookie).toBe(true);
+    await inviteUser(shelf, "ada@example.com", "Ada");
+    const res = await shelf.auth.handler(
+      new Request(`${baseURL}/api/auth/sign-in/email`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: baseURL },
+        body: JSON.stringify({ email: "ada@example.com", password: "hunter2hunter2" }),
+      }),
+    );
+    const line = res.headers.getSetCookie()[0] ?? "";
+    const cookie = attributesOf(line);
+    expect(cookie.name).toBe("__Host-storyshelf_session");
+    expect(cookie.flags).toEqual(["httponly", "max-age", "path", "samesite", "secure"]);
+    expect(line).toMatch(/Path=\/(?:;|$)/u);
+    expect(line).not.toMatch(/;\s*Domain=/iu);
+    const user = await shelf.adapter.check(
+      new Request(`${baseURL}/`, { headers: { cookie: line.split(";")[0] ?? "" } }),
+    );
+    expect(user?.email).toBe("ada@example.com");
+  }, 30_000);
+
+  it("keeps Secure on the library's other cookies (OAuth state) with hostSessionCookie", async () => {
+    const { shelf } = await testEngine(false, false, false, false, {
+      baseURL: "https://shelf.example.com",
+      hostSessionCookie: true,
+    });
+    const { $context } = shelf.auth as unknown as {
+      $context: Promise<{
+        createAuthCookie: (name: string) => { attributes: Record<string, unknown> };
+        authCookies: { sessionToken: { name: string } };
+      }>;
+    };
+    const context = await $context;
+    expect(context.createAuthCookie("state").attributes["secure"]).toBe(true);
+    expect(context.createAuthCookie("oauth_state").attributes["secure"]).toBe(true);
+    expect(context.authCookies.sessionToken.name).toBe("__Host-storyshelf_session");
+  });
+
+  it("does not claim the __Host- cookie by default", async () => {
+    const { shelf } = await testEngine();
+    expect(shelf.adapter.hostSessionCookie).toBe(false);
+  });
+
   it("never sets a Domain, so the cookie stays on the exact host", async () => {
     expect(await signInSetCookie("https://shelf.example.com")).not.toMatch(/;\s*Domain=/iu);
   });

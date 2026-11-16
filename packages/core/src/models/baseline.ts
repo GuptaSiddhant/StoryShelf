@@ -1,6 +1,6 @@
 /* oxlint-disable typescript/promise-function-async -- map callbacks return promises from async helpers */
 /** Per-branch baseline screenshots with default-branch fallback. */
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
@@ -15,6 +15,7 @@ import { ulid } from "../utils/ulid.ts";
 import { approveInTransaction, type AtomicBaselineApproval } from "./baseline-approval.ts";
 import { upsertAtomicBaseline } from "./baseline-atomic.ts";
 import { BaselineWriteConflict } from "./baseline-conflict.ts";
+import { BaselineMap } from "./baseline-map.ts";
 import { assertBuildLive, assertBuildLiveInTx, type CapturingBuild } from "./baseline-promotion.ts";
 import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
@@ -122,6 +123,30 @@ export class BaselineModel {
       }
     }
     return this.getFor(projectId, storyId, viewport, defaultBranch, browser);
+  }
+
+  /**
+   * Every baseline a pass can compare against, in one query: the branch's own rows first, the default
+   * branch's otherwise, for the given engines. Same answer as {@link resolve} per key.
+   */
+  async loadFor(
+    projectId: string,
+    branch: string,
+    defaultBranch: string,
+    browsers: readonly string[],
+  ): Promise<BaselineMap> {
+    const map = new BaselineMap();
+    if (browsers.length === 0) return map;
+    const rows = (await this.db.list(this.tables.baselines, {
+      where: and(
+        eq(col(this.tables.baselines, "projectId"), projectId),
+        inArray(col(this.tables.baselines, "branch"), [...new Set([branch, defaultBranch])]),
+        inArray(col(this.tables.baselines, "browser"), [...browsers]),
+      ),
+    })) as unknown as Baseline[];
+    for (const row of rows.filter((candidate) => candidate.branch === branch)) map.add(row);
+    for (const row of rows.filter((candidate) => candidate.branch !== branch)) map.add(row);
+    return map;
   }
 
   /** Whether the project has any baseline captured on this engine. */

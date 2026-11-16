@@ -13,7 +13,7 @@ import {
   type ConsumerJob,
   type KindHandler,
 } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
@@ -193,7 +193,7 @@ export function reviewRequestExhausted(
 
 /** Wire review requests: the enqueuer and handler on the `notify` queue, none when there is no queue. */
 export function setupReviewRequests(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   jobs: JobQueue | null,
 ): ReviewRequestWiring {

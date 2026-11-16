@@ -5,11 +5,10 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
+import { parseTrustProxy } from "@storyshelf/core/config";
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
-import { chatNotifiers } from "@storyshelf/notify-chat";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -43,6 +42,12 @@ const authPassword = env["AUTH_PASSWORD"];
 const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
+// Rate limits key on the client, not Fly's proxy (#911): on Fly (`FLY_APP_NAME` is set by the
+// platform) trust `Fly-Client-IP` unless `TRUST_PROXY` says otherwise; `TRUST_PROXY=false` opts out.
+const trustProxy =
+  env["TRUST_PROXY"] === undefined && env["FLY_APP_NAME"]
+    ? "fly"
+    : parseTrustProxy(env["TRUST_PROXY"]);
 
 function buildAuthUi(): AuthUiConfig | undefined {
   const pairs: Array<[string, string | undefined]> = [
@@ -119,21 +124,25 @@ shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
 // Only the model in use (null while AI is off): the Anthropic key never reaches a log.
 shelfLogger.info(aiLogFields(ai), "ai insights");
 
-// Notifications: SMTP sender from SMTP_* env (undefined keeps invites
-// out-of-band); chat + email providers serve stored channels.
-const emailSender = smtpPresetFromEnv(env, shelfLogger);
-const emailNotifiers = emailSender
-  ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
-  : [];
+// Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
+// SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
+// (undefined keeps invites out-of-band).
+const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
-  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   ai,
   notifications: {
-    notifiers: [...chatNotifiers, ...emailNotifiers],
+    notifiers: (builtIn) =>
+      emailSender
+        ? builtIn.map((provider) =>
+            provider.metadata.kind === "email"
+              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+              : provider,
+          )
+        : builtIn,
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   auth:
@@ -159,6 +168,7 @@ const app = createShelfApp({
     migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken,
     publicBaseUrl,
+    ...(trustProxy === undefined ? {} : { trustProxy }),
     scratchDir: dataDir,
     ...(purgeTtlDays === undefined ? {} : { purgeTtlDays }),
     // Emit Server-Timing response headers (total + db/storage roll-ups).

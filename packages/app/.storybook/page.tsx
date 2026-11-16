@@ -45,8 +45,9 @@ export function standalonePage(html: string, theme: string): string {
     .replaceAll(/<link\b[^>]*\brel="icon"[^>]*>/gu, "")
     .replaceAll("/assets/mark-storybook.svg", markDataUri)
     .replaceAll(
-      /src="\/api\/v1\/[^"]*\/(?<kind>image|diff|baseline)"/gu,
-      (_match, kind: string) => `src="${SCREENSHOTS[kind] ?? currentShot}"`,
+      /(?<attribute>src|<image href)="\/api\/v1\/[^"]*\/(?<kind>image|diff|baseline)"/gu,
+      (_match, attribute: string, kind: string) =>
+        `${attribute}="${SCREENSHOTS[kind] ?? currentShot}"`,
     )
     .replaceAll(/src="\/api\/v1\/[^"]*"/gu, `src="${designShot}"`)
     .replace('data-theme="system"', `data-theme="${theme}"`)

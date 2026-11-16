@@ -1,6 +1,7 @@
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import { BuildModel, ProjectModel, SiteSettingsModel } from "@storyshelf/core/models";
+import { CONTENT_BACKFILL_KEY } from "@storyshelf/core/retention";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
 import { describe, expect, it, vi } from "vitest";
@@ -48,7 +49,7 @@ function boot(
   } as unknown as ServerRuntime;
   runBootTasks(
     cell,
-    { database: db } as unknown as ShelfOptions,
+    { database: db } as unknown as ResolvedShelfOptions,
     runtime,
     extra.buildState as never,
   );
@@ -120,7 +121,7 @@ async function replay(extra: Parameters<typeof boot>[1], ok = true) {
   };
   runBootTasks(
     cell,
-    { database: db } as unknown as ShelfOptions,
+    { database: db } as unknown as ResolvedShelfOptions,
     {
       config: {},
       logger,
@@ -152,8 +153,12 @@ describe("runBootTasks: git state replay", () => {
 describe("runBootTasks: content uses backfill", () => {
   const HASH = "d".repeat(64);
 
-  async function bootWith(ready: { ok: boolean }, withLifecycle: boolean) {
+  async function bootWith(ready: { ok: boolean }, withLifecycle: boolean, finished = false) {
     const { db } = makeDatabase();
+    if (finished) {
+      await new SiteSettingsModel(db).set(CONTENT_BACKFILL_KEY, JSON.stringify({ done: true }));
+    }
+    const list = vi.spyOn(db, "list");
     const { storage, objects } = makeStorage();
     const record = vi.fn(async () => await Promise.resolve([] as string[]));
     if (withLifecycle)
@@ -178,18 +183,24 @@ describe("runBootTasks: content uses backfill", () => {
       notifiers: [],
       publicOrigin: { url: async () => await Promise.resolve("") },
     } as unknown as ServerRuntime;
-    runBootTasks(cell, { database: db, storage } as unknown as ShelfOptions, runtime);
+    runBootTasks(cell, { database: db, storage } as unknown as ResolvedShelfOptions, runtime);
     await Promise.all(cell.background ?? []);
-    return record;
+    return { record, list, db };
   }
 
   it("records the uses of existing builds once adapters are ready and the capability exists", async () => {
-    const record = await bootWith({ ok: true }, true);
+    const { record } = await bootWith({ ok: true }, true);
     expect(record).toHaveBeenCalledWith("p1", "b1", [HASH]);
   });
 
   it("does nothing without the capability or after a failed setup", async () => {
-    expect(await bootWith({ ok: true }, false)).not.toHaveBeenCalled();
-    expect(await bootWith({ ok: false }, true)).not.toHaveBeenCalled();
+    expect((await bootWith({ ok: true }, false)).record).not.toHaveBeenCalled();
+    expect((await bootWith({ ok: false }, true)).record).not.toHaveBeenCalled();
+  });
+
+  it("runs none of its builds queries on a start after the backfill finished", async () => {
+    const { record, list, db } = await bootWith({ ok: true }, true, true);
+    expect(record).not.toHaveBeenCalled();
+    expect(list.mock.calls.filter(([table]) => table === db.tables.builds)).toEqual([]);
   });
 });

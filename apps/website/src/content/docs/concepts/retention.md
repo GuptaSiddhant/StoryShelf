@@ -43,6 +43,7 @@ Turning a project's review off accepts its pending builds that no capture worked
 
 - **Orphaned baselines:** a story renamed/removed from Storybook never gets a natural diff. On each default-branch build, StoryShelf diffs `index.json` against `baselines` and deletes baselines whose `story_id` no longer exists.
 - **Stale branches:** a daily sweep (`branchGcIntervalMs` 24h, staggered 1h) deletes `baselines/{branch}/**` files and rows for branches whose latest build is older than `branchTtlDays`. Default branch never GC’d.
+- **AI and auth rows:** the same daily sweep deletes insights older than `insightsTtlDays` (default 180), AI usage rows older than `aiUsageTtlDays` (default 400, which covers every budget window) and sessions and verifications `expiredAuthTtlDays` (default 7) after they expire. `null` keeps a table's rows. Deletes run in batches.
 
 ## Triggers
 

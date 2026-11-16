@@ -18,6 +18,21 @@ describe("requestOpenBuildStates", () => {
     expect(ids).toContain(reviewing.id);
   });
 
+  it("does not ask for a skipped build: it follows its source, never resumes (ADR 0044)", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "approved");
+    const skipped = await w.builds.createSkipped({
+      projectId: w.project.id,
+      gitSha: "fedcba987654",
+      gitBranch: "main",
+      sourceBuildId: w.build.id,
+      changedFiles: [],
+    });
+    const request = vi.fn(async (_id: string) => {});
+    await expect(requestOpenBuildStates(w.deps, { request })).resolves.toBe(0);
+    expect(request.mock.calls.map(([id]) => id)).not.toContain(skipped.id);
+  });
+
   it("skips open builds that have no git commit to show state on", async () => {
     const w = await world();
     await w.builds.create(w.project.id, { gitSha: "", gitBranch: "main" });

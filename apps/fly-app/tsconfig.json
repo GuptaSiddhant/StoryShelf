@@ -15,6 +15,7 @@
     "storage.test.ts",
     "migrate.ts",
     "migrate.test.ts",
-    "migrate-to-s3.ts"
+    "migrate-to-s3.ts",
+    "e2e/golden-path.test.ts"
   ]
 }

@@ -4,6 +4,7 @@ import type {
   ListOptions,
   TxStore,
 } from "@storyshelf/core/adapter/database";
+import { listSelection } from "@storyshelf/core/adapter/database";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
 import type { SQL } from "drizzle-orm";
 import type { SQLWrapper } from "drizzle-orm";
@@ -30,7 +31,7 @@ interface DrizzlePgLike {
   update(table: Table): {
     set(values: unknown): { where(where: SQL): { returning(): Promise<unknown[]> } };
   };
-  select(): { from(table: Table): DrizzlePgSelectChain };
+  select(fields?: Record<string, unknown>): { from(table: Table): DrizzlePgSelectChain };
   delete(table: Table): { where(where: SQL): Promise<unknown> };
   $count(table: Table, where?: SQL): Promise<number>;
   execute<T>(query: SQL): Promise<T>;
@@ -134,7 +135,11 @@ export function createDrizzlePgAdapter(
       table: T,
       opts: ListOptions = {},
     ): Promise<T["$inferSelect"][]> => {
-      const rows: unknown = await applyListOptions(drizzle.select().from(table), opts);
+      const rows: unknown = await applyListOptions(
+        drizzle.select(listSelection(table, opts.columns)).from(table),
+        opts,
+        idColumn(table),
+      );
       return rows as T["$inferSelect"][];
     },
     count: async (table: Table, where?: SQL): Promise<number> => await drizzle.$count(table, where),
@@ -160,7 +165,11 @@ function buildTxStore(drizzle: DrizzlePgLike): TxStore {
       await drizzle.delete(table).where(where);
     },
     list: async (table, opts: ListOptions = {}) => {
-      const rows: unknown = await applyListOptions(drizzle.select().from(table), opts);
+      const rows: unknown = await applyListOptions(
+        drizzle.select(listSelection(table, opts.columns)).from(table),
+        opts,
+        idColumn(table),
+      );
       return rows as never[];
     },
     count: async (table, where) => await drizzle.$count(table, where),

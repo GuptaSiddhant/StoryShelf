@@ -184,7 +184,7 @@ export const INFRA_PROMPTS: Prompt[] = [
   {
     type: "confirm",
     name: "notifications",
-    message: "Enable email + chat notifications (Slack/Teams/email channels)?",
+    message: "Send email through SMTP (notifications and sign-in mail; installs nodemailer)?",
     initial: false,
   },
   {
@@ -206,16 +206,6 @@ const AUTH_SELECT: SelectPrompt = {
   ],
 };
 
-const GIT_SELECT: SelectPrompt = {
-  type: "select",
-  name: "git",
-  message: "Post build statuses to a git host?",
-  choices: [
-    { title: "No", value: "none" },
-    { title: "Yes: GitHub or GitLab (configure channels in project settings)", value: "git" },
-  ],
-};
-
 const DOCKER_CONFIRM: ConfirmPrompt = {
   type: "confirm",
   name: "docker",
@@ -226,15 +216,8 @@ const DOCKER_CONFIRM: ConfirmPrompt = {
 const NOTIFICATIONS_CONFIRM: ConfirmPrompt = {
   type: "confirm",
   name: "notifications",
-  message: "Enable email + chat notifications (Slack/Teams/email channels)?",
+  message: "Send email through SMTP (notifications and sign-in mail; installs nodemailer)?",
   initial: false,
-};
-
-const DESIGN_CONFIRM: ConfirmPrompt = {
-  type: "confirm",
-  name: "design",
-  message: "Link components to Figma designs (adds @storyshelf/design-figma)?",
-  initial: true,
 };
 
 const OBSERVABILITY_CONFIRM: ConfirmPrompt = {
@@ -264,10 +247,8 @@ export function localInfraPrompts(advanced: boolean): Prompt[] {
       choices: storageChoices(advanced),
     },
     AUTH_SELECT,
-    GIT_SELECT,
     DOCKER_CONFIRM,
     NOTIFICATIONS_CONFIRM,
-    DESIGN_CONFIRM,
     OBSERVABILITY_CONFIRM,
   ];
 }

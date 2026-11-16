@@ -16,8 +16,23 @@ import { timingSafeEqualString } from "./hash.ts";
 export const STORYBOOK_TOKEN_PREFIX = "/_s/";
 /** The path prefix of a read grant (ADR 0051, decision 4): `/_r/<token>/`, never `/_s/`. */
 export const STORYBOOK_READ_PREFIX = "/_r/";
+/**
+ * The path prefix of the exchange on a content host (ADR 0051, decision 5): `/_x/<token>/`. It exists
+ * on content hosts only and is never `/_r/` or `/_s/`.
+ */
+export const STORYBOOK_EXCHANGE_PREFIX = "/_x/";
+/**
+ * The cookie a content host sets after the exchange (ADR 0051, decision 5). The `__Host-` prefix forces
+ * `Secure`, `Path=/` and no `Domain`, so it stays on the one host. Its value is a sealed `cookie`
+ * token naming the build and the expiry; the content host checks it on every request.
+ */
+export const STORYBOOK_GRANT_COOKIE = "__Host-storyshelf-grant";
 /** Lifetime of a read grant, in seconds (1 hour); the longest a `read` token may claim. */
 export const STORYBOOK_READ_TTL = 3600;
+/** Lifetime of an exchange token, in seconds (60); the longest an `exchange` token may claim. */
+export const STORYBOOK_EXCHANGE_TTL = 60;
+/** Lifetime of the sealed value of a content host's grant cookie, in seconds (1 hour). */
+export const STORYBOOK_COOKIE_TTL = 3600;
 /** Regex source of a token, shared by the shape check and the log redaction. */
 export const STORYBOOK_TOKEN_SOURCE = "[A-Za-z0-9_-]{8,200}\\.[A-Za-z0-9_-]{43}";
 
@@ -50,19 +65,31 @@ export const MIN_STORYBOOK_URL_TTL_OVERRIDE =
 const KEY_CONTEXTS: Record<StorybookTokenPurpose, string> = {
   capture: "storyshelf/storybook-url/v1",
   read: "storyshelf/storybook-read/v1",
+  exchange: "storyshelf/storybook-exchange/v1",
+  cookie: "storyshelf/storybook-cookie/v1",
+};
+
+/** Lifetime of a purpose that has a fixed one, and the longest it may claim. */
+const PURPOSE_TTL: Partial<Record<StorybookTokenPurpose, number>> = {
+  read: STORYBOOK_READ_TTL,
+  exchange: STORYBOOK_EXCHANGE_TTL,
+  cookie: STORYBOOK_COOKIE_TTL,
 };
 const TOKEN_SHAPE = new RegExp(`^${STORYBOOK_TOKEN_SOURCE}$`, "u");
 const CLAIMS_SHAPE =
-  /^([A-Za-z0-9_-]{1,64}):([A-Za-z0-9_-]{1,64}):(\d{1,12})(?::(capture|read))?$/u;
+  /^([A-Za-z0-9_-]{1,64}):([A-Za-z0-9_-]{1,64}):(\d{1,12})(?::(capture|read|exchange|cookie))?$/u;
 
 /**
  * What a token was minted for, signed into it and verified against the route that receives it.
  * `capture` marks the tokens the server mints for a render pass or slice (`storybookUrlSource`); it
  * is the only claim that may opt into browser-private caching of the build's assets, and `/_s/`
  * accepts nothing else. `read` marks a read grant for one viewer's browser (`/_r/`, ADR 0051): one
- * hour at most, signed with its own key, verified with the current secret only.
+ * hour at most, signed with its own key, verified with the current secret only. `exchange` (ADR 0051,
+ * decision 5) is the 60 second token a portal redirect hands to a content host's `/_x/`; `cookie` is
+ * the sealed value of that host's grant cookie, never the exchange token itself. Like `read`, both
+ * verify with the current secret only and each has its own key, so no purpose opens another's route.
  */
-export type StorybookTokenPurpose = "capture" | "read";
+export type StorybookTokenPurpose = "capture" | "read" | "exchange" | "cookie";
 
 /** What a valid token grants: read-only access to one build's static files until `expiresAt`. */
 export interface StorybookTokenClaims {
@@ -115,12 +142,13 @@ export function signStorybookToken(input: SignStorybookTokenInput): string {
 
 /** The lifetime a token is minted with, checked against the range and the purpose's own ceiling. */
 function lifetimeOf(input: SignStorybookTokenInput): number {
-  const ttl =
-    input.ttlSeconds ?? (input.purpose === "read" ? STORYBOOK_READ_TTL : DEFAULT_STORYBOOK_URL_TTL);
-  assertStorybookUrlTtl(ttl);
-  if (input.purpose === "read" && ttl > STORYBOOK_READ_TTL) {
+  const ttl = input.ttlSeconds ?? PURPOSE_TTL[input.purpose] ?? DEFAULT_STORYBOOK_URL_TTL;
+  const longest = PURPOSE_TTL[input.purpose];
+  if (longest === undefined) {
+    assertStorybookUrlTtl(ttl);
+  } else if (!Number.isInteger(ttl) || ttl < MIN_STORYBOOK_URL_TTL || ttl > longest) {
     throw new Error(
-      `A read grant lasts at most ${String(STORYBOOK_READ_TTL)} seconds, got ${String(ttl)}`,
+      `A ${input.purpose} token lasts at most ${String(longest)} seconds, got ${String(ttl)}`,
     );
   }
   return ttl;
@@ -144,7 +172,7 @@ export function verifyStorybookToken(
     return { ok: false, reason: "malformed" };
   }
   const [payload = "", given = ""] = token.split(".");
-  const keys = purpose === "read" ? currentOnly(secret) : secretsOf(secret);
+  const keys = purpose === "capture" ? secretsOf(secret) : currentOnly(secret);
   const signed = keys.some((key) => timingSafeEqualString(signature(key, purpose, payload), given));
   if (!signed) {
     return { ok: false, reason: "signature" };
@@ -155,6 +183,11 @@ export function verifyStorybookToken(
 /** The path of a capture token's root: `/_s/<token>/`. */
 export function storybookTokenPath(token: string): string {
   return `${STORYBOOK_TOKEN_PREFIX}${token}/`;
+}
+
+/** The path of an exchange token's root on a content host: `/_x/<token>/`. */
+export function storybookExchangePath(token: string): string {
+  return `${STORYBOOK_EXCHANGE_PREFIX}${token}/`;
 }
 
 /** The path of a read grant's root: `/_r/<token>/`. */
@@ -234,7 +267,7 @@ function claimsFailure(
   if (expiresAt <= nowSeconds) {
     return "expired";
   }
-  const longest = expected === "read" ? STORYBOOK_READ_TTL : MAX_STORYBOOK_URL_TTL;
+  const longest = PURPOSE_TTL[expected] ?? MAX_STORYBOOK_URL_TTL;
   return expiresAt > nowSeconds + longest ? "scope" : undefined;
 }
 

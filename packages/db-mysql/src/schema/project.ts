@@ -16,6 +16,7 @@ export const projects = mysqlTable("projects", {
   playTimeoutMs: int("play_timeout_ms").notNull().default(10_000),
   runA11y: boolean("run_a11y").notNull().default(true),
   runTests: boolean("run_tests").notNull().default(false),
+  switchStories: boolean("switch_stories").notNull().default(false),
   detectUnstable: boolean("detect_unstable").notNull().default(true),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
@@ -25,8 +26,10 @@ export const projects = mysqlTable("projects", {
   aiProfile: text("ai_profile"),
   reviewEnabled: boolean("review_enabled").notNull().default(true),
   reviewApprovals: int("review_approvals").notNull().default(1),
+  requireVerifiedDefault: boolean("require_verified_default").notNull().default(true),
   storybookUrlTtlSeconds: int("storybook_url_ttl_seconds"),
   componentOwners: text("component_owners"),
+  cancelSuperseded: boolean("cancel_superseded").notNull().default(true),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
   updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
 });
@@ -46,6 +49,7 @@ export interface Project {
   playTimeoutMs: number;
   runA11y?: boolean;
   runTests?: boolean;
+  switchStories?: boolean;
   detectUnstable?: boolean;
   browser?: string;
   viewports?: string | null;
@@ -55,8 +59,10 @@ export interface Project {
   aiProfile: string | null;
   reviewEnabled: boolean;
   reviewApprovals: number;
+  requireVerifiedDefault: boolean;
   storybookUrlTtlSeconds: number | null;
   componentOwners: string | null;
+  cancelSuperseded: boolean;
   createdAt: string;
   updatedAt: string;
 }

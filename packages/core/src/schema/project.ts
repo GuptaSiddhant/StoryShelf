@@ -18,6 +18,11 @@ export interface Project {
    * decision 11); off by default because it changes what a build contains.
    */
   runTests?: boolean;
+  /**
+   * Render a session's stories in one loaded page (ADR 0052, decision 2); off by default and
+   * subject to the operator veto (`switchStoriesAllowed`).
+   */
+  switchStories?: boolean;
   /** Re-render a changed snapshot once and flag it when the two renders differ; on by default. */
   detectUnstable?: boolean;
   browser?: string;
@@ -34,12 +39,20 @@ export interface Project {
   /** Approvals a build needs when `testing` is off (ADR 0013, decision 3); default 1. */
   reviewApprovals?: number;
   /**
+   * A build claiming the default branch counts as one only once a git channel confirmed the commit
+   * is on it (ADR 0009, amendment 2026-11-13); the column defaults to true. Off, a claim no channel
+   * can check counts as before and is shown as unverified.
+   */
+  requireVerifiedDefault?: boolean;
+  /**
    * Lifetime in seconds of the signed Storybook URLs of this project's renders (ADR 0007,
    * decision 5); null derives it from the build's stories.
    */
   storybookUrlTtlSeconds?: number | null;
   /** JSON `OwnerRule[]` mapping story-file globs to member user ids (#465); null when none. */
   componentOwners?: string | null;
+  /** Cancel a branch's builds a newer commit supersedes (ADR 0045); the column defaults to true. */
+  cancelSuperseded?: boolean;
   createdAt: string;
   updatedAt: string;
 }

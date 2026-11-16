@@ -5,6 +5,7 @@ import type { Build } from "../schema/build.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
+import { SkipSourceRefused } from "./skip-source-refused.ts";
 
 function buildTables(db: DatabaseAdapter) {
   return {
@@ -44,6 +45,17 @@ describe("BuildModel", () => {
     const fetched = await model.get(build.id);
     expect(fetched?.id).toBe(build.id);
     expect(fetched?.gitSha).toBe("sha-1");
+  });
+
+  it("lists summaries without the stored test results", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
+    await model.setTestResults(build.id, [{ id: "t", status: "passed" }]);
+    const [summary] = await model.listSummary("p1", { branch: "main", limit: 1 });
+    expect(summary?.id).toBe(build.id);
+    expect(summary).not.toHaveProperty("testResults");
+    expect((await model.list("p1"))[0]?.testResults).toContain("passed");
   });
 
   it("updates build status", async () => {
@@ -587,5 +599,179 @@ describe("BuildModel: a cancelled build is terminal", () => {
     const { model, id } = await cancelled();
     expect((await model.resetStatus(id, "pending")).status).toBe("pending");
     expect((await model.setStatus(id, "capturing")).status).toBe("capturing");
+  });
+});
+
+async function setUpSkipped() {
+  const { db } = makeDatabase();
+  const model = new BuildModel(db, buildTables(db));
+  const source = await model.create("p1", { gitSha: "aaaaaaa1111", gitBranch: "main" });
+  await model.setStatus(source.id, "approved");
+  return { db, model, source };
+}
+
+const skip = (sourceBuildId: string, gitSha = "bbbbbbb2222") => ({
+  projectId: "p1",
+  gitSha,
+  gitBranch: "main",
+  sourceBuildId,
+  changedFiles: ["README.md"],
+});
+
+describe("BuildModel: skip eligibility (ADR 0044, decision 3)", () => {
+  it("is the newest build of another commit, whatever its status, and only approved counts", async () => {
+    const { model, source } = await setUpSkipped();
+    expect((await model.skipCandidate("p1", "main", "head"))?.id).toBe(source.id);
+    expect((await model.findSkipSource("p1", "main", "head"))?.id).toBe(source.id);
+    expect(await model.skipCandidate("p1", "main", source.gitSha)).toBeNull();
+    expect(await model.eligibleSkipSource(null)).toBeNull();
+  });
+
+  it("refuses a source that is no longer the candidate, writing nothing", async () => {
+    const { model, source } = await setUpSkipped();
+    await model.setStatus(source.id, "rejected");
+    await expect(model.createSkippedIfEligible(skip(source.id))).rejects.toBeInstanceOf(
+      SkipSourceRefused,
+    );
+    expect(await model.skippedFrom(source.id)).toEqual([]);
+  });
+
+  it("creates the build when the source is still the candidate", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkippedIfEligible(skip(source.id));
+    expect(skipped).toMatchObject({ status: "skipped", skippedFromBuildId: source.id });
+  });
+});
+
+describe("BuildModel: skipped builds (ADR 0044)", () => {
+  it("creates a skipped build that names its source and holds what was compared", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkipped({
+      ...skip(source.id),
+      message: "docs only",
+      author: { email: "a@example.com", name: "A" },
+    });
+    expect(skipped).toMatchObject({
+      status: "skipped",
+      skippedFromBuildId: source.id,
+      baselineSha: "aaaaaaa1111",
+      gitSha: "bbbbbbb2222",
+      message: "docs only",
+      authorEmail: "a@example.com",
+      authorName: "A",
+    });
+    expect(JSON.parse(skipped.changedFiles ?? "null")).toEqual(["README.md"]);
+    expect((await model.get(skipped.id))?.status).toBe("skipped");
+  });
+
+  it("resolves a chain: a build skipped from a skipped build points at the real source", async () => {
+    const { model, source } = await setUpSkipped();
+    const first = await model.createSkipped(skip(source.id));
+    const second = await model.createSkipped(skip(first.id, "ccccccc3333"));
+    expect(second.skippedFromBuildId).toBe(source.id);
+    expect((await model.skipSourceOf(second))?.id).toBe(source.id);
+    expect((await model.skipSourceOf(source))?.id).toBe(source.id);
+  });
+
+  it("lists the builds skipped from a source, newest first", async () => {
+    const { db, model, source } = await setUpSkipped();
+    const first = await model.createSkipped(skip(source.id));
+    const second = await model.createSkipped(skip(first.id, "ccccccc3333"));
+    // Distinct creation times are assigned, not slept for: the order is the point under test.
+    await db.update(db.tables.builds, first.id, { createdAt: "2026-11-11T10:00:00.000Z" });
+    await db.update(db.tables.builds, second.id, { createdAt: "2026-11-11T10:00:01.000Z" });
+    expect((await model.skippedFrom(source.id)).map((build) => build.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+    expect(await model.skippedFrom(first.id)).toEqual([]);
+  });
+
+  it("has no source once the source build is gone", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkipped(skip(source.id));
+    await model.remove(source.id);
+    expect(await model.skipSourceOf(skipped)).toBeNull();
+  });
+
+  it("refuses a source that is missing or in another project", async () => {
+    const { model, source } = await setUpSkipped();
+    await expect(model.createSkipped(skip("nope"))).rejects.toThrow("Skip source build not found");
+    await expect(model.createSkipped({ ...skip(source.id), projectId: "other" })).rejects.toThrow(
+      "Skip source build not found",
+    );
+  });
+
+  it("never moves a skipped build, and never moves a build to skipped", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkipped(skip(source.id));
+    for (const status of ["pending", "capturing", "approved", "rejected", "cancelled"] as const) {
+      // oxlint-disable-next-line no-await-in-loop -- one write per status, in order
+      expect((await model.setStatus(skipped.id, status)).status).toBe("skipped");
+      // oxlint-disable-next-line no-await-in-loop
+      expect((await model.update(skipped.id, { status })).status).toBe("skipped");
+    }
+    expect((await model.setStatus(skipped.id, "skipped")).status).toBe("skipped");
+    const open = await model.create("p1", { gitSha: "ddddddd4444", gitBranch: "x" });
+    expect((await model.setStatus(open.id, "skipped")).status).toBe("pending");
+    expect((await model.update(open.id, { status: "skipped" })).status).toBe("pending");
+  });
+
+  it("does not retry a skipped build", async () => {
+    const { model, source } = await setUpSkipped();
+    const skipped = await model.createSkipped(skip(source.id));
+    const reset = await model.resetStatus(skipped.id, "pending");
+    expect(reset.status).toBe("skipped");
+    expect((await model.get(skipped.id))?.status).toBe("skipped");
+    await expect(model.resetStatus("missing", "pending")).rejects.toThrow("Build not found");
+  });
+});
+
+async function seedSkipped() {
+  const { db } = makeDatabase();
+  const model = new BuildModel(db, buildTables(db));
+  const source = await model.create("p1", { gitSha: "base", gitBranch: "main" });
+  await model.setStatus(source.id, "approved");
+  const skipped = await model.createSkipped({
+    projectId: "p1",
+    gitSha: "head",
+    gitBranch: "main",
+    sourceBuildId: source.id,
+    changedFiles: [],
+  });
+  return { db, model, skipped };
+}
+
+describe("BuildModel.createSuperseding", () => {
+  it("inserts the build and replaces the skipped build of its commit together", async () => {
+    const { model, skipped } = await seedSkipped();
+    const { build, replaced } = await model.createSuperseding("p1", {
+      gitSha: "head",
+      gitBranch: "main",
+    });
+    expect(build.status).toBe("pending");
+    expect(replaced.map((row) => row.id)).toEqual([skipped.id]);
+    expect((await model.get(skipped.id))?.supersededByBuildId).toBe(build.id);
+  });
+
+  it("leaves no normal build behind when replacing the skipped build fails", async () => {
+    const { db, model, skipped } = await seedSkipped();
+    const real = db.transact;
+    if (!real) throw new Error("the fake database has transactions");
+    db.transact = async (run) =>
+      await real(async (tx) => {
+        return await run({
+          ...tx,
+          update: async () => {
+            throw new Error("supersede failed");
+          },
+        });
+      });
+    await expect(
+      model.createSuperseding("p1", { gitSha: "head", gitBranch: "main" }),
+    ).rejects.toThrow("supersede failed");
+    const rows = await model.list("p1", {});
+    expect(rows.filter((row) => row.gitSha === "head").map((row) => row.id)).toEqual([skipped.id]);
+    expect((await model.get(skipped.id))?.supersededByBuildId ?? null).toBeNull();
   });
 });

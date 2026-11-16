@@ -1,4 +1,4 @@
-<img src="apps/website/public/favicon.svg" alt="" width="72" height="72" />
+<img src="apps/website/src/assets/brand/storyshelf-logo-purple-white-rounded.svg" alt="" width="72" height="72" />
 
 # StoryShelf
 
@@ -6,9 +6,9 @@
 [![CI](https://github.com/GuptaSiddhant/StoryShelf/actions/workflows/ci.yml/badge.svg)](https://github.com/GuptaSiddhant/StoryShelf/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/GuptaSiddhant/StoryShelf)](LICENSE)
 
-Self-hosted visual testing platform for Storybook. Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship.
+**Self-hosted visual testing and review for Storybook.**
 
-**Self-hosted Chromatic alternative. Storybook-native. Unlimited snapshots.**
+An open-source, self-hosted alternative to Chromatic. Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship. Storybook-native, with unlimited snapshots.
 
 [**Live demo**](https://storyshelf.fly.dev) · [**Documentation**](https://storyshelf.js.org) · [Getting started](https://storyshelf.js.org/guides/getting-started/)
 
@@ -24,15 +24,26 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
 
+## Quick start
+
+```sh
+docker run -p 3000:3000 -v storyshelf:/data ghcr.io/guptasiddhant/storyshelf
+```
+
+Open <http://localhost:3000>. SQLite and local storage live on the `/data` volume, and capture uses the
+image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64`
+(`:<version>`, `:latest`, and `-hosting` variants without a browser); see the
+[Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose.
+
 ## StoryShelf vs Chromatic
 
-| | Chromatic (SaaS) | StoryShelf (self-hosted) |
-|---|---|---|
-| **Pricing** | 5k snapshots free, then $179/mo per 35k | MIT, unlimited; infrastructure cost only |
-| **Hosting** | Chromatic cloud only | Your infrastructure |
-| **Data residency** | US / EU regions | Your database and storage |
-| **Interaction tests** | `play` functions | `play` functions |
-| **Lock-in** | Proprietary | Open source, standard `/api/v1` |
+|                       | Chromatic (SaaS)                        | StoryShelf (self-hosted)                 |
+| --------------------- | --------------------------------------- | ---------------------------------------- |
+| **Pricing**           | 5k snapshots free, then $179/mo per 35k | MIT, unlimited; infrastructure cost only |
+| **Hosting**           | Chromatic cloud only                    | Your infrastructure                      |
+| **Data residency**    | US / EU regions                         | Your database and storage                |
+| **Interaction tests** | `play` functions                        | `play` functions                         |
+| **Lock-in**           | Proprietary                             | Open source, standard `/api/v1`          |
 
 Full breakdown: [Chromatic comparison](https://storyshelf.js.org/guides/chromatic-comparison/) · [Migration guide](https://storyshelf.js.org/guides/chromatic-migration/).
 
@@ -57,7 +68,7 @@ packages/
 apps/
   dev-server/     dev-server      — local dev server (from TS source via nub watch)
   website/        website         — public docs (Astro Starlight)
-  fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
+  fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on a stable release via fly.yml)
 fixtures/
   storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
   storybook-9/    storybook-fixture -- SB 9 Vite React

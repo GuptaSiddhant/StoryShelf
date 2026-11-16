@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import {
   BuildModel,
   componentHistory,
@@ -173,7 +174,7 @@ export async function loadComponentPage(
     selection: requested ? selectionOf(requested, captured, view) : null,
     story,
     previewBase: await previewBaseOf(project, view.build),
-    publishedBaseDomain: getStore().config.publishedBaseDomain,
+    publishedBaseDomain: contentHostSuffix(getStore().config),
     review: await loadComponentReview(project, view.build),
     ...tabbed,
   };
