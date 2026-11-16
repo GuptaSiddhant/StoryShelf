@@ -55,13 +55,20 @@ false`. The manifest must name a webhook URL; it points at a path on the server 
 - **An existing GitHub App, entered by hand.** A site admin who manages their own App (or rotates
   a key) enters its App ID and private key once for the server. This is also how today's
   hand-made per-project Apps move to a connection (decision 8).
-- **Token connections** (a GitHub token, a GitLab group or project access token) stay available.
-  The System page opens the host's token form prefilled with the name and the minimum scope
-  (`repo:status`, or GitLab `api`), and the admin pastes the token once for the server.
-  `[inferred]` Both hosts accept those prefill parameters in the form's URL; if one does not, the
-  page shows the scope to pick instead.
+- **GitHub connections are Apps only.** There is no GitHub token connection (owner, 2026-11-16).
+  A token belongs to a person, expires (a fine-grained token within a year, often sooner by
+  organization policy), needs the broad `repo` scope to comment, and cannot post check runs. When
+  its owner leaves, every required check it served stops posting and blocks merges. An organization
+  that does not allow the manifest flow creates the App by hand and uses the path above, which also
+  covers GitHub Enterprise Server.
+- **GitLab connections are tokens, of the bot kinds only.** GitLab has no App equivalent, and its
+  OAuth applications act as a user. A connection takes a **group or project access token** (a bot
+  user, not a person), with the `api` scope, never a personal access token. The System page opens
+  GitLab's form for that token with the name and scope filled in, records the expiry the admin
+  enters, and warns site admins 30 days before it. `[inferred]` GitLab accepts those prefill
+  parameters in the form's URL; if not, the page shows the scope to pick instead.
 
-Every secret a connection holds (private key, client secret, webhook secret, token) is stored
+Every secret a connection holds (a private key or a GitLab token) is stored
 encrypted with `SECRET`, never returned by the API or shown again, and removed from logs and error
 text through the existing redaction. `git_connections` joins the rotation list in
 `credentials.ts`, so `SECRET_PREVIOUS` and the re-encrypt action cover it.
@@ -152,7 +159,8 @@ secret.
   per-project credentials only when none does.
 - **Release N+1:** new per-project git channels are no longer accepted. The System page lists the
   remaining ones with a one-click move: the site admin creates or picks a connection, and the
-  channel becomes an approved link.
+  channel becomes an approved link. A per-project GitHub token channel cannot move as it is: its
+  site admin creates an App connection first, and the release notes of N and N+1 say so.
 - **Release N+2 or later:** per-project git credentials are removed (contract), one minor after the
   last release that read them. A channel nobody moved stops posting then, and a required check
   that stops posting blocks merges. So from N+1 the System page and the project's settings warn on
@@ -164,6 +172,11 @@ Chat, email and push channels stay per project; this ADR covers git hosts only.
 
 - Setup moves to the person who runs the server, once per git host account; a project owner pastes
   a URL or picks a repository.
+- Each server has its own GitHub App. A single public App shared by every server would need its
+  private key on every server, which would let any operator write to every repository that
+  installed it; making it safe needs a relay service holding the key, a central dependency the
+  self-hosted workflow avoids. An optional hosted relay could be a separate, opt-in decision later.
+- A team that used a GitHub token per project must create an App to keep its gate.
 - No project admin can make a merge gate appear on a repository a site admin has not approved for
   that project, unless the operator switches that check off.
 - A server-wide key reaches every repository its App is installed on. The installation list on the
