@@ -51,7 +51,7 @@ describe("GitHub Enterprise Server API base", () => {
     });
     await gitHubNotifier.create({ config: REPO, secret: "t" }).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "m" },
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "m" },
       state: "success",
       url: "https://shelf.example/b/1",
     });

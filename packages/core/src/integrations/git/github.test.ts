@@ -80,7 +80,7 @@ describe("gitHubNotifier", () => {
     ).rejects.toThrow("401");
   });
 
-  it("creates the pull-request comment with the url marker when none exists", async () => {
+  it("creates the pull-request comment with the project marker when none exists", async () => {
     const calls = stubFetch((url) => {
       if (url.endsWith("/pulls")) {
         return Response.json([{ number: 7, state: "open" }]);
@@ -92,7 +92,13 @@ describe("gitHubNotifier", () => {
     });
     await adapter(REPO).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "Visual tests passed" },
+      target: {
+        kind: "comment",
+        sha: "abc",
+        project: "web",
+        buildId: "01B",
+        markdown: "Visual tests passed",
+      },
       state: "success",
       url: "https://shelf.example/b/1",
     });
@@ -100,7 +106,7 @@ describe("gitHubNotifier", () => {
     expect(create?.url).toBe("https://api.github.com/repos/acme/widgets/issues/7/comments");
     expect(create?.init.method).toBe("POST");
     expect(bodyOf(create)["body"]).toBe(
-      "<!-- storyshelf:https://shelf.example/b/1 -->\nVisual tests passed",
+      "<!-- storyshelf:project=web -->\n<!-- storyshelf:build=01B -->\nVisual tests passed",
     );
   });
 
@@ -118,7 +124,7 @@ describe("gitHubNotifier", () => {
     });
     await adapter(REPO).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "new" },
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "new" },
       state: "failure",
       url: "https://shelf.example/b/1",
     });
@@ -131,7 +137,7 @@ describe("gitHubNotifier", () => {
     const calls = stubFetch(() => Response.json([]));
     await adapter(REPO).setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "m" },
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "m" },
       state: "success",
       url: "u",
     });
