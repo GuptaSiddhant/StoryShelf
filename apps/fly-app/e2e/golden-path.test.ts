@@ -200,13 +200,15 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
 
   it("reviews the changed build: count, comparison, approve with the keyboard", async () => {
     await page.goto(`${BASE}/projects/${SLUG}/builds/${buildId}`);
-    const label = page.getByText(/changed \/ new/iu);
-    await label.waitFor({ state: "visible" });
-    expect(((await label.locator("xpath=..").textContent()) ?? "").trim()).toMatch(/^1(?!\d)/u);
+    // The build page is the review workspace: the header counts the changes still waiting for a
+    // verdict (one here), and the comparison of the selected change is on the page itself.
+    await page.getByRole("button", { name: "Approve remaining 1", exact: true }).waitFor();
     await expectAccessible("build page");
 
-    await page.getByRole("link", { name: "Review diffs" }).click();
-    await page.locator("[data-compare]").first().waitFor({ state: "visible" });
+    await page
+      .getByRole("group", { name: /screenshot$/iu })
+      .first()
+      .waitFor({ state: "visible" });
     await expectAccessible("comparison");
     await page.keyboard.press("a");
     await page
@@ -247,7 +249,8 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
     expect(anonymous.status).not.toBe(200);
 
     await page.goto(`${BASE}/projects/${SLUG}/builds/${buildId}`);
-    await page.getByRole("link", { name: "View Storybook" }).first().click();
+    await page.getByLabel("More build actions").click();
+    await page.getByRole("menuitem", { name: /^Open Storybook/u }).click();
     await page.waitForURL(new RegExp(`/_/${buildId}/`, "u"));
     await page
       .frameLocator("iframe#storybook-preview-iframe")

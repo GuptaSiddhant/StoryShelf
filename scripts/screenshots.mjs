@@ -37,7 +37,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const websiteDir = join(root, "apps/website");
 const shotsDir = join(websiteDir, "src/assets/screenshots");
 const ogPath = join(websiteDir, "public/og-image.png");
-const logoPath = join(websiteDir, "src/assets/logo.svg");
+const logoPath = join(websiteDir, "src/assets/brand/storyshelf-logo-white-purple-rounded.svg");
 mkdirSync(shotsDir, { recursive: true });
 
 // Mock "component screenshots" so the docs show a believable review, not blank images.
@@ -140,6 +140,21 @@ function demoAi() {
   };
 }
 
+/** A capture runner for the demo: the seeded build is already captured, so it never renders. */
+function stubRunner() {
+  const unused = async () => {
+    throw new Error("the screenshot demo does not capture");
+  };
+  return {
+    metadata: { name: "Demo", version: "0.0.0", kind: "demo", category: "capture-runner" },
+    render: unused,
+    cancel: async () => {},
+    setup: async () => {},
+    teardown: async () => {},
+    health: async () => ({ ok: true }),
+  };
+}
+
 /** Generate the demo triage and health digest through the real API. */
 async function seedInsights(base, slug, buildId) {
   const post = (path, body) =>
@@ -171,7 +186,10 @@ async function captureApp() {
     authorEmail: "alex@example.com",
     message: "feat: add primary button variant with new tokens",
   });
-  await buildModel.update(build.id, { status: "reviewing" });
+  // Statuses move only along the lifecycle table (ADR 0046): walk the build to review.
+  for (const status of ["capturing", "comparing", "reviewing"]) {
+    await buildModel.setStatus(build.id, status);
+  }
 
   const snapModel = new SnapshotModel(db);
   const viewport = { name: "desktop", width: 1280, height: 720 };
@@ -245,6 +263,10 @@ async function captureApp() {
   const app = createShelfApp({
     database: db,
     storage,
+    // Testing on, so the pages show captures, diffs and thumbnails. Nothing is queued, so the
+    // stub runner is never asked to render.
+    testing: { runner: stubRunner(), concurrency: 1 },
+    config: { scratchDir: join(root, ".tmp/screenshots-scratch"), secret: "test-secret" },
     ai: demoAi(),
     logger: createShelfLogger({ level: "silent" }),
   });
@@ -310,23 +332,23 @@ async function captureApp() {
 
 const dataUrl = (file) => `data:image/png;base64,${readFileSync(file).toString("base64")}`;
 
-/** Social card (1200x630): brand, tagline, and the review workspace. */
+/** Social card (1200x630): the mark, the wordmark, the tagline and the review workspace (docs/brand.md). */
 async function captureOg() {
   const shot = dataUrl(join(shotsDir, "diff-review-dark.png"));
   // Read the mark rather than inlining a copy, so the card cannot drift from
   // the site's logo.
   const logo = `data:image/svg+xml;base64,${readFileSync(logoPath).toString("base64")}`;
   const html = `<!doctype html><html><body style="margin:0;width:1200px;height:630px;overflow:hidden;position:relative;
-    background:radial-gradient(900px 500px at 85% 0%,#12254a,transparent 70%),#09090b;color:#fafafa;
+    background:radial-gradient(900px 500px at 85% 0%,#2a1d63,transparent 70%),#09090b;color:#fafafa;
     font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
     <div style="position:absolute;left:72px;top:72px;width:480px">
       <div style="display:flex;align-items:center;gap:16px">
         <img src="${logo}" width="56" height="56" alt=""/>
-        <div style="font-size:44px;font-weight:700;letter-spacing:-0.02em">StoryShelf</div>
+        <div style="font-size:44px;font-weight:600;letter-spacing:-0.02em">StoryShelf</div>
       </div>
       <div style="margin-top:44px;font-size:52px;line-height:1.1;font-weight:700;letter-spacing:-0.03em">
-        Visual testing for Storybook, on your own infrastructure.</div>
-      <div style="margin-top:28px;font-size:26px;color:#a1a1aa">Self-hosted. Unlimited snapshots.</div>
+        Self-hosted visual testing and review for Storybook.</div>
+      <div style="margin-top:28px;font-size:26px;color:#a1a1aa">Unlimited snapshots. No lock-in.</div>
     </div>
     <img src="${shot}" style="position:absolute;left:600px;top:150px;width:900px;border-radius:14px;
       border:1px solid #27272a;box-shadow:0 30px 80px rgba(0,0,0,.6)"/>

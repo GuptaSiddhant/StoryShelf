@@ -38,6 +38,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEvent[] = [
   { event: "build:pending", label: "Build sent back to pending" },
   { event: "build:failed", label: "Build failed" },
   { event: "build:cancelled", label: "Build cancelled" },
+  { event: "build:skipped", label: "Build skipped (no story changed)" },
   { event: "baseline:created", label: "Baseline created" },
   { event: "baseline:updated", label: "Baseline updated" },
   { event: COMMENT_CREATED, label: "Comment posted" },

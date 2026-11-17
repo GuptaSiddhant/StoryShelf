@@ -3,7 +3,7 @@
 ## Status
 
 Accepted. Amended with the details of the statuses function and the `notify` job kind (decisions 5
-and 7), recorded while implementing them (#221, #222). Decision 3 is replaced by ADR 0049.
+and 7), recorded while implementing them (#221, #222). Decision 3 is replaced by ADR 0049. ADR 0054 (accepted) moves git credentials to server-wide connections set up by site admins, amending decisions 1 and 4, the per-channel credentials of decision 13, and decision 2's "write-only" (git connections also read, ADR 0054 decision 10).
 
 Supersedes (archived): ADR 0010, ADR 0024, ADR 0036
 

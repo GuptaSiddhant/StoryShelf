@@ -1,7 +1,12 @@
 import { PGlite } from "@electric-sql/pglite";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { describeSchemaLevelContract } from "@storyshelf/core/test-helpers";
+import { vi } from "vitest";
 import { createPgliteDatabase } from "./pglite.ts";
+
+// Each case boots a fresh PGlite (WASM) and runs every migration, which outlasts vitest's
+// default 5 s on a loaded CI runner; the same limits as the package's other PGlite suites.
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
 
 const silent = createShelfLogger({ level: "silent" });
 

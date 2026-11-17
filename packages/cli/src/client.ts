@@ -61,6 +61,8 @@ export interface BuildCreateInput {
   authorName?: string;
   affectedOnly?: boolean;
   labels?: { key: string; value: string }[];
+  /** Older in-flight builds this one replaces (ADR 0045); the server decides. */
+  supersedes?: string[];
 }
 
 /** Affected-capture computation posted after build creation. */
@@ -68,6 +70,33 @@ export interface AffectedInput {
   baselineSha: string | null;
   changedFiles: string[];
   affectedImportPaths: string[] | null;
+}
+
+/** The build a commit that changed no story may repeat (`GET …/builds/skip-source`, ADR 0044). */
+export interface SkipSource {
+  sourceBuildId: string;
+  sha: string;
+}
+
+/** Body of `POST …/builds/skipped`. */
+export interface SkippedBuildInput {
+  gitSha: string;
+  gitBranch: string;
+  sourceBuildId: string;
+  changedFiles: string[];
+  /** Every entry id of the new Storybook index; the server answers 409 unless they equal the source's. */
+  entryIds: string[];
+  /** Generated once per run; a retry with the same key returns the build the first call created. */
+  idempotencyKey: string;
+  labels?: { key: string; value: string }[];
+  message?: string;
+  author?: { email?: string; name?: string };
+}
+
+/** Answer of `POST …/builds/skipped`. */
+export interface SkippedBuildCreated {
+  build: { id: string };
+  buildUrl: string;
 }
 
 /** One story-to-package usage row posted after build creation. */
@@ -103,6 +132,8 @@ interface Client {
     };
     builds: {
       createJson: (slug: string, json: BuildCreateInput) => Promise<BuildCreated>;
+      /** The branch's builds still working, as `{ id, sha }` (404 on an old server or testing off). */
+      inFlight: (slug: string, branch: string) => Promise<{ id: string; sha: string }[]>;
       uploadZip: (uploadUrl: string, body: NodeJS.ReadableStream) => Promise<unknown>;
       /** File-by-file upload, step 1: which of these content hashes the server lacks. */
       dedup: (slug: string, buildId: string, hashes: string[]) => Promise<string[]>;
@@ -117,6 +148,10 @@ interface Client {
       postAffected: (slug: string, buildId: string, json: AffectedInput) => Promise<unknown>;
       postUsage: (slug: string, buildId: string, usage: PackageUsageInput[]) => Promise<unknown>;
       retry: (slug: string, buildId: string) => Promise<unknown>;
+      /** The build a skip on `branch` for `sha` would repeat, or null (a hint, never a promise). */
+      skipSource: (slug: string, branch: string, sha: string) => Promise<SkipSource | null>;
+      /** Record a commit that changed no story; a `409` (`RequestError`) means upload normally. */
+      createSkipped: (slug: string, json: SkippedBuildInput) => Promise<SkippedBuildCreated>;
     };
     admin: {
       purge: (json: { ttlDays?: number }) => Promise<unknown>;
@@ -242,6 +277,47 @@ function createFileUploadApi(
   };
 }
 
+/** An answer that is not a list (an unexpected server) counts as no in-flight builds. */
+function toInFlight(answer: unknown): { id: string; sha: string }[] {
+  return Array.isArray(answer) ? (answer as { id: string; sha: string }[]) : [];
+}
+
+/** The two skip calls (ADR 0044): the hint, then the creation of the skipped build. */
+function createSkipApi(
+  baseUrl: string,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): Pick<Client["projects"]["builds"], "skipSource" | "createSkipped"> {
+  return {
+    skipSource: async (slug: string, branch: string, sha: string) =>
+      (await fetchJson(
+        `${baseUrl}/api/v1/projects/${slug}/builds/skip-source?${new URLSearchParams({ branch, sha }).toString()}`,
+        { method: "GET", headers: requestHeaders() },
+      )) as SkipSource | null,
+    createSkipped: async (slug: string, json: SkippedBuildInput) =>
+      (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/skipped`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
+      })) as SkippedBuildCreated,
+  };
+}
+
+/** The in-flight lookup behind superseded-build detection (ADR 0045). */
+function createInFlightApi(
+  baseUrl: string,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): Pick<Client["projects"]["builds"], "inFlight"> {
+  return {
+    inFlight: async (slug: string, branch: string) =>
+      toInFlight(
+        await fetchJson(
+          `${baseUrl}/api/v1/projects/${slug}/builds/in-flight?branch=${encodeURIComponent(branch)}`,
+          { headers: requestHeaders() },
+        ),
+      ),
+  };
+}
+
 function createBuildsApi(
   baseUrl: string,
   authHeaders: Record<string, string>,
@@ -249,12 +325,14 @@ function createBuildsApi(
 ): Client["projects"]["builds"] {
   return {
     ...createFileUploadApi(baseUrl, requestHeaders),
+    ...createSkipApi(baseUrl, requestHeaders),
     createJson: async (slug: string, json: BuildCreateInput) =>
       (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds`, {
         method: "POST",
         headers: requestHeaders("application/json"),
         body: JSON.stringify(json),
       })) as BuildCreated,
+    ...createInFlightApi(baseUrl, requestHeaders),
     uploadZip: async (uploadUrl: string, body: NodeJS.ReadableStream) => {
       const init = {
         method: "PUT",

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended 2026-11-16 (owner) with decision 10, forms open from summaries.
 
 Supersedes (archived): ADR 0012, 0025
 
@@ -107,6 +107,27 @@ with readable `ss-<label>-<hash>` names and one `<style id="storyshelf-css">` mo
 with zero tolerance on classes, imports and inline styles. `app/src/ui/` stays presentational: it never
 imports app state (store, routers, middleware, pages, core models), which the same test enforces; the
 app-coupled chrome lives in `app/src/shell/`. The `ui-building-blocks` skill is the working guide.
+
+### 10. Forms open from summaries
+
+Settings and admin pages list what is configured as summaries (a card or a table row each, with its
+state) and an **Add** or **Edit** action. A page never renders a long form inline.
+
+- **One form, two ways to open it.** Every Add and Edit is a link to the form's own page. HTMX opens
+  the same form in a dialog (the native `<dialog>`, opened with `showModal()`, so focus is trapped,
+  Escape closes it and focus returns to the opener). Short, one-step forms open in the dialog; long
+  forms, and flows that leave the app (connecting a git host), stay on their page with a Back link.
+  Saving returns to the list (a page) or closes the dialog and refreshes the summary. Validation
+  errors render in place. Our own forms never open in a new tab; external places (git hosts, the
+  published Storybook) do.
+- **Fields follow the selected option.** When a form's fields depend on a choice (a discriminated
+  union: GitHub or GitLab, one storage provider or another), the choice comes first, and each
+  option's fields are one group. Groups of unselected options are hidden and disabled, so they are
+  neither submitted nor validated; CSS hides them without script, and the client script disables
+  them. Values typed into a hidden group are kept while the form is open. The server validates the
+  selected option only and rejects fields of another option.
+- These are facade components (a dialog, an option-switched field group, a summary list) with
+  stories, and `consistency.test.ts` refuses an inline form on a settings page.
 
 ## Consequences
 

@@ -14,10 +14,13 @@ git diff --cached --check || {
 BIN="$ROOT/node_modules/.bin"
 CODE_GLOB='*.ts *.tsx *.js *.jsx *.mjs *.cjs'
 JSON_GLOB='*.json'
+# Same skip as `nub run lint:files` (scripts/check-files.mjs SKIPPED): fixtures are independent
+# Storybook projects with their own conventions, never linted by the workspace config.
+SKIP=':(exclude)fixtures/'
 
 # oxfmt also formats JSON; oxlint runs on code files only.
-format_files="$(git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB $JSON_GLOB | tr -d '\0' | wc -c)"
-lint_files="$(git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB | tr -d '\0' | wc -c)"
+format_files="$(git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB $JSON_GLOB "$SKIP" | tr -d '\0' | wc -c)"
+lint_files="$(git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB "$SKIP" | tr -d '\0' | wc -c)"
 
 # 2. Formatting gate.
 if [ "$format_files" -gt 0 ]; then
@@ -25,7 +28,7 @@ if [ "$format_files" -gt 0 ]; then
     echo "error: oxfmt not installed. Run \`nub ci\` first." >&2
     exit 1
   fi
-  git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB $JSON_GLOB |
+  git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB $JSON_GLOB "$SKIP" |
     xargs -0 "$BIN/oxfmt" --check || {
     echo "error: staged files are not oxfmt-formatted. Run \`nub run fmt\` and re-stage." >&2
     exit 1
@@ -38,7 +41,7 @@ if [ "$lint_files" -gt 0 ]; then
     echo "error: oxlint not installed. Run \`nub ci\` first." >&2
     exit 1
   fi
-  git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB |
+  git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB "$SKIP" |
     xargs -0 "$BIN/oxlint" || {
     echo "error: staged files failed lint. Run \`nub run lint\` and fix the issues." >&2
     exit 1

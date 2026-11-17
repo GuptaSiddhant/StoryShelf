@@ -30,6 +30,7 @@ export const projects = sqliteTable("projects", {
     .default(true),
   storybookUrlTtlSeconds: integer("storybook_url_ttl_seconds"),
   componentOwners: text("component_owners"),
+  cancelSuperseded: integer("cancel_superseded", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -62,6 +63,7 @@ export interface Project {
   requireVerifiedDefault: boolean;
   storybookUrlTtlSeconds: number | null;
   componentOwners: string | null;
+  cancelSuperseded: boolean;
   createdAt: string;
   updatedAt: string;
 }

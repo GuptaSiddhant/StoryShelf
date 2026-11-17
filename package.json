@@ -1,7 +1,7 @@
 {
   "name": "storyshelf-monorepo",
   "private": true,
-  "description": "Self-hosted visual testing platform for Storybook.",
+  "description": "Self-hosted visual testing and review for Storybook.",
   "license": "MIT",
   "author": "Siddhant Gupta <guptasiddhant@icloud.com>",
   "repository": "git@github.com:GuptaSiddhant/StoryShelf.git",

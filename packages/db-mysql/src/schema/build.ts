@@ -1,5 +1,13 @@
 import type { BuildStatus } from "@storyshelf/core/types";
-import { boolean, index, int, mysqlTable, text, varchar } from "drizzle-orm/mysql-core";
+import {
+  boolean,
+  index,
+  int,
+  mysqlTable,
+  text,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/mysql-core";
 import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
@@ -35,12 +43,17 @@ export const builds = mysqlTable(
     reviewCycle: int("review_cycle").notNull().default(0),
     reviewRequestedCycle: int("review_requested_cycle"),
     captureJobId: varchar("capture_job_id", { length: 26 }),
+    skippedFromBuildId: varchar("skipped_from_build_id", { length: 26 }),
+    supersededByBuildId: varchar("superseded_by_build_id", { length: 26 }),
+    idempotencyKey: varchar("idempotency_key", { length: 191 }),
     manifestSha256: varchar("manifest_sha256", { length: 64 }),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
   (t) => [
     index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
+    index("builds_skipped_from_idx").on(t.skippedFromBuildId),
+    uniqueIndex("builds_project_idempotency_idx").on(t.projectId, t.idempotencyKey),
     index("builds_project_created_idx").on(t.projectId, t.createdAt),
     index("builds_project_branch_created_idx").on(t.projectId, t.gitBranch, t.createdAt),
   ],
@@ -73,6 +86,9 @@ export interface Build {
   reviewCycle: number;
   reviewRequestedCycle: number | null;
   captureJobId: string | null;
+  skippedFromBuildId: string | null;
+  supersededByBuildId: string | null;
+  idempotencyKey: string | null;
   manifestSha256: string | null;
   createdAt: string;
   updatedAt: string;

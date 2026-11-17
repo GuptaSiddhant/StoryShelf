@@ -17,7 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { gitLabNotifier } from "./index.ts";
 
-const LIVE = process.env["LIVE_CLOUD"] === "1" && process.env["LIVE_GL_TOKEN"] !== undefined;
+const LIVE = process.env["LIVE_CLOUD"] === "1" && (process.env["LIVE_GL_TOKEN"] ?? "") !== "";
 
 function liveToken(): string {
   const token = process.env["LIVE_GL_TOKEN"];
