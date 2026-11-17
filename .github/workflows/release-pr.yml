@@ -101,6 +101,13 @@ jobs:
             # Append-only: a merge commit on top of the open head (what this workflow last pushed)
             # and main, carrying the freshly prepared tree. A plain push, so a moved branch is refused.
             git fetch origin "$OPEN_REF"
+            # The new tree is a fresh release, so a commit someone else added would be dropped from
+            # it. Refuse unless every commit the branch has beyond main came from this workflow.
+            others=$(git log --format='%an' "origin/main..${OPEN_SHA}" | grep -vxc 'github-actions\[bot\]' || true)
+            if [ "$others" != 0 ]; then
+              echo "::error::${OPEN_REF} has commits not made by this workflow; refusing to refresh it. Close the pull request or fold those commits into main."
+              exit 1
+            fi
             commit=$(git commit-tree "release/v${version}^{tree}" \
               -p "$OPEN_SHA" -p "release/v${version}^" \
               -m "chore(release): refresh v${version} with main")
