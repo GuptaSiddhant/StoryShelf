@@ -37,9 +37,20 @@ describe("mapState", () => {
 describe("findPrNumber", () => {
   const opts = { token: "ghp_test", owner: "acme", repo: "widgets", sha: "abc" };
 
-  it("returns the first associated PR number", async () => {
-    stubFetch(() => pullsResponse([{ number: 42 }, { number: 43 }]));
+  it("returns the first open associated PR number", async () => {
+    stubFetch(() =>
+      pullsResponse([
+        { number: 41, state: "closed" },
+        { number: 42, state: "open" },
+        { number: 43, state: "open" },
+      ]),
+    );
     await expect(findPrNumber(opts)).resolves.toBe(42);
+  });
+
+  it("returns undefined when only a merged or closed PR is associated", async () => {
+    stubFetch(() => pullsResponse([{ number: 41, state: "closed" }]));
+    await expect(findPrNumber(opts)).resolves.toBeUndefined();
   });
 
   it("returns undefined when no PR is associated", async () => {
@@ -53,7 +64,7 @@ describe("findPrNumber", () => {
   });
 
   it("ignores non-numeric PR numbers", async () => {
-    stubFetch(() => pullsResponse([{ number: "42" }]));
+    stubFetch(() => pullsResponse([{ number: "42", state: "open" }]));
     await expect(findPrNumber(opts)).resolves.toBeUndefined();
   });
 

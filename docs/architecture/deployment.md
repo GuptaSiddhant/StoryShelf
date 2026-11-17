@@ -14,6 +14,8 @@ The release workflow's image job builds `apps/server-image/Dockerfile` instead, 
 
 The public website and the Fly demo follow stable releases only (ADR 0043): `release.yml` calls `website.yml` (built from the release tag) and `fly.yml` (the official image of that version when it exists, else a build from the tag) after the tag is created, and a push to `main` deploys neither. Both can be run by hand with `workflow_dispatch`; website PRs are still built and link-checked in `ci.yml`.
 
+The stable release pull request is kept current by `release-pr.yml` (ADR 0043, #1098). While one `release/v*` pull request is open and `main` has gained changesets its branch does not consume, the workflow prepares the release again on `main`. Release branches are append-only: nothing force-pushes them. An unchanged version adds one merge commit to the branch (parents: the open pull request's head, which is what the workflow last pushed, and `main`; tree: the freshly prepared release) and pushes it as a plain fast-forward, so the pull request keeps its number and auto-merge. If the branch moved since, the push is rejected and the job fails with a message. A changed bump (patch to minor) pushes a new `release/v<version>`, opens its pull request and closes the old one. The workflow never force-pushes any branch. `scripts/release-due.mjs` makes the open, refresh or nothing decision.
+
 ```sh
 docker build -f apps/fly-app/Dockerfile -t storyshelf .
 docker run -p 3000:3000 \

@@ -3,9 +3,13 @@ import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
 
 interface CommitMergeRequest {
   iid: number;
+  state?: string;
 }
 
-/** Find the merge request IID associated with a commit SHA, if any. */
+/**
+ * Find the open merge request associated with a commit SHA, if any. GitLab also lists merged and
+ * closed merge requests, and those get no comment.
+ */
 export async function findMrIid(opts: {
   host?: string;
   owner: string;
@@ -21,7 +25,7 @@ export async function findMrIid(opts: {
       headers: gitlabHeaders(opts.token),
       destination: "project",
     });
-    return data[0]?.iid;
+    return data.find((mr) => mr.state === "opened")?.iid;
   } catch {
     return undefined;
   }

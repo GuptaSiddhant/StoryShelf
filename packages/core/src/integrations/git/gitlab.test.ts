@@ -83,7 +83,7 @@ describe("gitLabNotifier", () => {
   it("creates the merge-request note with the url marker when none exists", async () => {
     const calls = stubFetch((url) => {
       if (url.endsWith("/merge_requests")) {
-        return Response.json([{ iid: 3 }]);
+        return Response.json([{ iid: 3, state: "opened" }]);
       }
       if (url.includes("/notes?")) {
         return Response.json([]);
@@ -109,7 +109,7 @@ describe("gitLabNotifier", () => {
   it("updates the existing note instead of adding a second one", async () => {
     const calls = stubFetch((url) => {
       if (url.endsWith("/merge_requests")) {
-        return Response.json([{ iid: 3 }]);
+        return Response.json([{ iid: 3, state: "opened" }]);
       }
       if (url.includes("/notes?")) {
         return Response.json([
