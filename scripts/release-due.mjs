@@ -12,7 +12,7 @@
  * never opened twice: the open one is refreshed when `main` has gained changesets it does not
  * consume (`refresh`), and otherwise left alone. The bump itself (minor or patch) comes from the
  * changesets, never from the trigger; if a refresh changes the version, `refreshOutcome` says to
- * replace the pull request instead of updating its branch.
+ * replace the pull request instead of appending to its branch (release branches are append-only).
  *
  * CLI: node scripts/release-due.mjs <event> — reads MERGED, LABELS (comma-separated), HEAD_REF,
  * OPEN_RELEASE_PRS (JSON array of `{ number, ref, sha }`, one per open `release/v*` pull request)
@@ -88,7 +88,7 @@ export function releasePlan(input) {
 const stripV = (version) => version.replace(/^v/u, "");
 
 /**
- * After a refresh was prepared: update the open pull request's branch (same version) or replace
+ * After a refresh was prepared: append a commit to the open pull request's branch (same version) or replace
  * the pull request (the bump changed, e.g. patch to minor).
  *
  * @param {string} openVersion Version of the open release pull request (`v0.13.1` or `0.13.1`).

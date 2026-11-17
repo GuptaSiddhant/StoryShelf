@@ -10,17 +10,17 @@
 # `nub run release:prepare` on `main`, pushes `release/v<version>` and opens the pull request. Only
 # the owner merges it; merging is what publishes (`release.yml`).
 #
-# Refresh (#1098): while one `release/v*` pull request is open and `main` has gained changesets that
-# branch does not consume, the job prepares the release again on `main` and
-# - same version: updates that branch with `git push --force-with-lease=<ref>:<sha>`, where <sha> is
-#   the open pull request's head, i.e. what this workflow last pushed. The pull request keeps its
-#   number and the owner's auto-merge. A branch someone else moved since is refused, never
-#   overwritten.
+# Refresh (#1098): release branches are append-only; nothing here ever force-pushes. While one
+# `release/v*` pull request is open and `main` has gained changesets that branch does not consume,
+# the job prepares the release again on `main` (the result is what a fresh release would be) and
+# - same version: adds one merge commit to the open branch. Its parents are the open pull request's
+#   head (what this workflow last pushed) and `main`, its tree is the freshly prepared release, and
+#   a plain fast-forward push delivers it. A branch someone else moved since makes the push fail the
+#   job with a message; nothing is overwritten. The pull request keeps its number and the owner's
+#   auto-merge.
 # - new version (patch to minor): pushes the new `release/v<version>`, opens its pull request and
-#   closes the old one, deleting the old branch.
-# Only this workflow pushes to `release/*` (the owner's ruleset restricts it to the workflow's
-# token), and nothing here ever force-pushes another branch. Without a refresh, a conflict after
-# `main` moved had to be cleared by hand.
+#   closes the old one, deleting the old branch only if it still sits at the planned sha.
+# Without a refresh, a conflict after `main` moved had to be cleared by hand.
 #
 # pull_request_target runs this file from `main` and checks out `main`, never the pull request's
 # code. The branch is pushed with AUTOUPDATE_TOKEN when it is set, so CI runs on the release pull
@@ -98,8 +98,16 @@ jobs:
           fi
           echo "outcome=${outcome}" >> "$GITHUB_OUTPUT"
           if [ "$outcome" = update ]; then
-            # Only the sha this workflow last pushed (the open PR's head) may be replaced.
-            git push --force-with-lease="release/v${version}:${OPEN_SHA}" origin "release/v${version}"
+            # Append-only: a merge commit on top of the open head (what this workflow last pushed)
+            # and main, carrying the freshly prepared tree. A plain push, so a moved branch is refused.
+            git fetch origin "$OPEN_REF"
+            commit=$(git commit-tree "release/v${version}^{tree}" \
+              -p "$OPEN_SHA" -p "release/v${version}^" \
+              -m "chore(release): refresh v${version} with main")
+            if ! git push origin "${commit}:refs/heads/release/v${version}"; then
+              echo "::error::release/v${version} moved since this workflow last pushed it, or is not a fast-forward; nothing was overwritten. Resolve it by hand or close the pull request."
+              exit 1
+            fi
           else
             git push -u origin "release/v${version}"
           fi
