@@ -60,11 +60,24 @@ function mockFetch(json: unknown, ok = true): void {
 }
 
 describe("findMrIid", () => {
-  it("returns the first associated MR iid", async () => {
-    mockFetch([{ iid: 7 }]);
+  it("returns the first open associated MR iid", async () => {
+    mockFetch([
+      { iid: 6, state: "merged" },
+      { iid: 7, state: "opened" },
+    ]);
     await expect(
       findMrIid({ owner: "acme", repo: "widgets", token: "t", sha: "abc" }),
     ).resolves.toBe(7);
+  });
+
+  it("returns undefined when only a merged or closed MR is associated", async () => {
+    mockFetch([
+      { iid: 6, state: "merged" },
+      { iid: 5, state: "closed" },
+    ]);
+    await expect(
+      findMrIid({ owner: "acme", repo: "widgets", token: "t", sha: "abc" }),
+    ).resolves.toBeUndefined();
   });
 
   it("returns undefined when no MR is associated", async () => {

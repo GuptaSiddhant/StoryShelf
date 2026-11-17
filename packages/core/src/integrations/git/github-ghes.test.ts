@@ -45,7 +45,7 @@ describe("GitHub Enterprise Server API base", () => {
   it("looks up and writes the pull-request comment on the API base", async () => {
     const calls = stubFetch((url) => {
       if (url.endsWith("/pulls")) {
-        return Response.json([{ number: 7 }]);
+        return Response.json([{ number: 7, state: "open" }]);
       }
       return url.includes("/comments?") ? Response.json([]) : Response.json({ id: 1 });
     });

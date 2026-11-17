@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestError } from "../client.ts";
-import { decideSuperseded, findSupersedes } from "./supersede.ts";
+import { MAX_SUPERSEDES, decideSuperseded, findSupersedes } from "./supersede.ts";
 
 const run = (cwd: string, ...args: string[]): string =>
   execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -82,7 +82,7 @@ describe("decideSuperseded (real git repository)", () => {
     const decision = decideSuperseded([{ id: "x", sha: "f".repeat(40) }], {
       cwd: work,
       branch: "main",
-      headSha: `${head.slice(0, 39)}0`,
+      headSha: `${head.slice(0, 39)}${head.endsWith("0") ? "1" : "0"}`,
     });
     expect(decision).toEqual({ superseded: [], undecided: 1 });
   });
@@ -132,6 +132,24 @@ describe("findSupersedes", () => {
       },
     );
     expect(ids).toEqual(["old"]);
+  });
+
+  it("sends at most MAX_SUPERSEDES ids and says how many wait", async () => {
+    const first = commit(work, "a");
+    const head = commit(work, "b");
+    const many = Array.from({ length: MAX_SUPERSEDES + 13 }, (_unused, index) => ({
+      id: `old${index}`,
+      sha: first,
+    }));
+    const log = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const ids = await findSupersedes(
+      client(async () => many),
+      { slug: "p", cwd: work, branch: "main", headSha: head },
+    );
+    const printed = log.mock.calls.map(([line]) => String(line)).join("");
+    log.mockRestore();
+    expect(ids).toHaveLength(MAX_SUPERSEDES);
+    expect(printed).toContain(`Superseding ${MAX_SUPERSEDES} of ${MAX_SUPERSEDES + 13}`);
   });
 
   it("sends nothing on a 404", async () => {
