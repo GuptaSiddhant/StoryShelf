@@ -3,6 +3,6 @@ contact_links:
   - name: Architecture docs
     url: https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/architecture/README.md
     about: Read the canonical architecture spec before filing architecture-related tasks.
-  - name: Task board (archived)
-    url: https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/TASKS.md
-    about: Historical task record. GitHub Issues is the source of truth for new work.
+  - name: Pickup list (#370)
+    url: https://github.com/GuptaSiddhant/StoryShelf/issues/370
+    about: The pickup list. GitHub Issues is the source of truth for new work.
