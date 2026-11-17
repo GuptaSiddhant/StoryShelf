@@ -1,5 +1,7 @@
 # @storyshelf/notify-chat
 
+> **Deprecated.** The chat integration is built into `@storyshelf/core` (ADR 0049); import it from `@storyshelf/core/integrations`. This package is a re-export and stops being published one minor release after this one.
+
 Chat notification providers for StoryShelf: formatted build and admin alerts over Slack and Teams incoming webhooks (plus a log provider for tests/dev). Zero runtime dependencies — all sends go through `@storyshelf/core/utils` (`httpText`: timeout + retry with `Retry-After`).
 
 ## Install

@@ -5,7 +5,7 @@
  *
  * ```ts
  * import { queueContractSuite } from "@storyshelf/core/test-helpers";
- * queueContractSuite("sqs", () => createSqsCaptureQueue({ queueUrl, client: fake }));
+ * queueContractSuite("my-queue", () => createMyCaptureQueue({ client: fake }));
  * ```
  *
  * Behavioral cases (enqueue/status/active/recent) need a fake transport that

@@ -1,7 +1,7 @@
 /**
- * Idle backoff for queues whose `poll()` returns immediately when empty (GCP Pub/Sub synchronous
- * pull, Azure Storage Queues). Queues that long-poll (SQS, Redis, Service Bus, the IPC queue) block
- * inside `poll()` and never trigger it. The database queue paces itself (`db-queue/cadence.ts`).
+ * Idle backoff for a queue whose `poll()` returns immediately when empty. A queue that long-polls
+ * blocks inside `poll()` and never triggers it. The database queue (`capture_jobs`) paces itself
+ * (`db-queue/cadence.ts`).
  */
 
 /** An empty poll that returns faster than this did not long-poll. */
