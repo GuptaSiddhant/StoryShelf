@@ -99,6 +99,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "tsrs": "catalog:",
     "pg": "^8.0.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",

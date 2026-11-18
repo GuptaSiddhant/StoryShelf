@@ -81,6 +81,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "tsrs": "catalog:",
     "pino": "catalog:",
     "playwright-core": "1.63.0",
     "storybook": "10.6.5",
