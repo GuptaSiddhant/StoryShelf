@@ -74,7 +74,8 @@ services:
       - PUBLIC_BASE_URL=http://localhost:3000
       # Postgres instead of SQLite:
       # - DATABASE_URL=postgres://storyshelf:password@db:5432/storyshelf
-      # Auth — see /guides/auth/. To run without sign-in, replace this line with SHELF_AUTH=none.
+      # Auth — see /guides/auth/. To run without sign-in, replace the AUTH_PASSWORD line below with
+      # SHELF_AUTH=none (the image refuses to start with both set).
       - AUTH_PASSWORD=${AUTH_PASSWORD:?set AUTH_PASSWORD (at least 12 characters)}
 volumes:
   storyshelf-data:
