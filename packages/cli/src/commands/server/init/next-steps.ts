@@ -57,6 +57,7 @@ function terraformSteps(cloud: CloudSteps): string[] {
 function dockerSteps(compose: boolean): string[] {
   return compose
     ? [
+        `  export SECRET=...      # at least 32 random characters; keep and reuse it`,
         `  npm run docker:up      # builds + starts the app`,
         `  npm run docker:logs    # follow logs`,
         `  npm run docker:down    # tear down`,

@@ -134,9 +134,11 @@ describe("attachLifecycle", () => {
     const app = {} as ShelfRouter;
     attachLifecycle(app, options, runtime, cell);
     const lifecycle = (app as unknown as { lifecycle: { setup(): Promise<void> } }).lifecycle;
-    await expect(lifecycle.setup()).rejects.toThrow("Adapter setup failed: auth/auth: bad secret");
+    await expect(lifecycle.setup()).rejects.toThrow("Adapter setup failed: auth/auth");
     // A second call refuses too, and readiness stays failed (no later adapter run masks it).
-    await expect(lifecycle.setup()).rejects.toThrow("bad secret");
+    await expect(lifecycle.setup()).rejects.toThrow("auth/auth");
+    // The hook's own text stays in the failures (and the log), never the thrown message.
+    await expect(lifecycle.setup()).rejects.not.toThrow("bad secret");
     expect(cell.settled?.ok).toBe(false);
     expect((await cell.ready).failures[0]).toMatchObject({ category: "auth" });
   });
@@ -307,5 +309,88 @@ describe("job consumer lifecycle", () => {
     const lifecycle = lifecycleOf(consumer);
     await expect(lifecycle.setup()).resolves.toBeUndefined();
     await expect(lifecycle.teardown()).resolves.toBeUndefined();
+  });
+});
+
+/** The adapter with a `lifecycle.setup` hook that calls `onSetup`. */
+function withSetupHook<T extends object>(adapter: T, onSetup: () => void): T {
+  return {
+    ...adapter,
+    lifecycle: {
+      setup: async (): Promise<void> => {
+        onSetup();
+      },
+      teardown: async (): Promise<void> => {},
+      health: async () => ({ ok: true }),
+    },
+  };
+}
+
+describe("boot checks and the adapter phase", () => {
+  const runtime = {
+    config: { branchTtlDays: null },
+    logger: silentLogger,
+  } as unknown as ServerRuntime;
+
+  it("runs the AI purge only after the adapter setups (migrations) finished", async () => {
+    const order: string[] = [];
+    const { db } = makeDatabase();
+    const list = db.list.bind(db);
+    Object.assign(db, {
+      list: async (...args: Parameters<typeof db.list>) => {
+        order.push("query");
+        return await list(...args);
+      },
+    });
+    const storage = withSetupHook(makeStorage().storage, () => {
+      order.push("migrate");
+    });
+    const ai = {
+      setup: async (): Promise<void> => {
+        order.push("ai check");
+      },
+      teardown: async (): Promise<void> => {},
+    };
+    const options = { database: db, storage, ai } as unknown as ResolvedShelfOptions;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    attachLifecycle({} as ShelfRouter, options, runtime, cell);
+    await cell.ready;
+    expect(order.indexOf("ai check")).toBeLessThan(order.indexOf("migrate"));
+    expect(order.indexOf("migrate")).toBeLessThan(order.lastIndexOf("query"));
+  });
+
+  it("does not resume a setup() whose boot checks settle after teardown", async () => {
+    const gate = Promise.withResolvers<null>();
+    let adapterRuns = 0;
+    const { db } = makeDatabase();
+    const auth = {
+      ...failingAuth(),
+      setup: async (): Promise<void> => {
+        await gate.promise;
+      },
+    };
+    const storage = withSetupHook(makeStorage().storage, () => {
+      adapterRuns += 1;
+    });
+    const options = { database: db, storage, auth } as unknown as ResolvedShelfOptions;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    const lifecycle = (
+      app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
+    ).lifecycle;
+    const pending = lifecycle.setup();
+    await lifecycle.teardown();
+    gate.resolve(null);
+    await expect(pending).rejects.toThrow("teardown ran");
+    await cell.ready;
+    // Only the eager boot run reached the adapters; the abandoned setup() did not.
+    expect(adapterRuns).toBe(1);
   });
 });

@@ -116,6 +116,16 @@ async function firstBootFailure(
   return null;
 }
 
+/** The adapter setups (migrations included), then the AI purge that reads migrated tables. */
+async function runAdapterPhase(
+  options: ResolvedShelfOptions,
+  ctx: AdapterSetupContext,
+  logger: Logger,
+): Promise<AdapterSetupResult> {
+  const result = await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger);
+  return result.ok ? ((await runAiPurge(options)) ?? result) : result;
+}
+
 /** Kick the eager background setup run (resolves; never rejects). */
 function kickSetup(
   options: ResolvedShelfOptions,
@@ -135,9 +145,7 @@ function kickSetup(
   );
   cell.ready = (async (): Promise<AdapterSetupResult> => {
     const failed = await bootFailure;
-    return (
-      failed ?? (await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger))
-    );
+    return failed ?? (await runAdapterPhase(options, ctx, logger));
   })();
   trackSettlement(cell, cell.ready);
 }
@@ -218,14 +226,30 @@ async function runAuthSetup(options: ResolvedShelfOptions): Promise<AdapterSetup
     };
   }
 }
-/** Run AI boot checks and the stale-run sweep; failure fails readiness like auth. */
+/** Run the AI boot check; failure fails readiness like auth. Its data purge waits for migrations. */
 async function runAiSetup(options: ResolvedShelfOptions): Promise<AdapterSetupResult | null> {
+  return await aiStep(options, async (ai) => {
+    await ai.setup();
+  });
+}
+
+/** The AI retention sweep, once the adapters (and so the database migrations) are set up. */
+async function runAiPurge(options: ResolvedShelfOptions): Promise<AdapterSetupResult | null> {
+  return await aiStep(options, async () => {
+    await purgeAiData(options.database);
+  });
+}
+
+/** Run one AI step, turning a throw into an `ai` failure result (null without AI). */
+async function aiStep(
+  options: ResolvedShelfOptions,
+  step: (ai: NonNullable<ResolvedShelfOptions["ai"]>) => Promise<void>,
+): Promise<AdapterSetupResult | null> {
   if (!options.ai) {
     return null;
   }
   try {
-    await options.ai.setup();
-    await purgeAiData(options.database);
+    await step(options.ai);
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -277,8 +301,8 @@ function invalidSources(
 function refuseBootCheck(cell: LifecycleCell, failed: AdapterSetupResult | null | undefined): void {
   if (failed) {
     settleFailure(cell, failed);
-    // The checks' own sanitized text (never a secret), so the message names the cause.
-    throw new AdapterLifecycleError("setup", failed.failures, true);
+    // Names only: a hook's own text stays in `failures` and the structured log, never the message.
+    throw new AdapterLifecycleError("setup", failed.failures);
   }
 }
 /**
@@ -298,8 +322,12 @@ function refuseFailedBoot(
     refuseBootCheck(cell, cell.bootChecked);
     return null;
   }
+  const stoppedBefore = cell.consumerStopped === true;
   return cell.bootFailure.then((failed) => {
     refuseBootCheck(cell, failed);
+    if (!stoppedBefore && cell.consumerStopped === true) {
+      throw new Error("Setup abandoned: teardown ran while the boot checks were pending");
+    }
   });
 }
 
@@ -314,7 +342,7 @@ async function rerunSetup(
   logger: Logger,
   cell: LifecycleCell,
 ): Promise<AdapterSetupResult> {
-  const running = runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger);
+  const running = runAdapterPhase(options, ctx, logger);
   cell.ready = running;
   const result = await running;
   cell.settled = result;

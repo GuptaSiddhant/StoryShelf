@@ -34,7 +34,8 @@ const COMPOSE_BASE_LINES = [
   "    volumes:",
   "      - storyshelf-data:/data",
   "    environment:",
-  "      - SECRET=change-me",
+  "      # At least 32 random characters (openssl rand -hex 32): generate once, keep it, reuse it.",
+  "      - SECRET=${SECRET:?set SECRET to at least 32 random characters}",
   "      - PORT=3000",
   "      - DATA_DIR=/data",
 ];
@@ -80,8 +81,7 @@ function composeLines(database: string): string[] {
   return [
     ...COMPOSE_BASE_LINES,
     "      # Add your env vars here:",
-    "      # - SECRET=at-least-32-random-characters",
-    "      # - AUTH_PASSWORD=your-password",
+    "      # - AUTH_PASSWORD=${AUTH_PASSWORD:?set AUTH_PASSWORD}",
     ...(database === "turso" ? COMPOSE_TURSO_LINES : []),
     ...(database === "postgres" ? COMPOSE_POSTGRES_LINES : []),
     ...COMPOSE_VOLUMES_LINES,

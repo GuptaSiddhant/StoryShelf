@@ -92,12 +92,15 @@ export type ImageAuth =
   | { mode: "password"; password: string; email: string; secret: string }
   | { mode: "none" };
 
+/** The shortest `SECRET` sign-in accepts (the auth engine's own rule). */
+const MIN_SECRET_LENGTH = 32;
+
 const AUTH_MODE_HINT =
   "set AUTH_PASSWORD and SECRET (at least 32 characters) to sign in, or SHELF_AUTH=none to run with every route open";
 
 /**
  * Sign-in is on unless `SHELF_AUTH=none` says otherwise: a missing variable never turns it off.
- * A set `SECRET` is passed on; `createShelfAuth` refuses one shorter than 32 characters.
+ * `SECRET` must be at least 32 characters; `createShelfAuth` checks it again.
  */
 export function authFromEnv(env: Env): ImageAuth {
   const mode = nonEmpty(env["SHELF_AUTH"]) ?? "password";
@@ -122,6 +125,10 @@ function passwordAuth(env: Env, password: string | undefined): ImageAuth {
   }
   if (secret === undefined) {
     throw new Error(`SECRET is unset: ${AUTH_MODE_HINT}`);
+  }
+  // Checked again by createShelfAuth; refused here too, before any adapter is created.
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(`SECRET is shorter than ${MIN_SECRET_LENGTH} characters: ${AUTH_MODE_HINT}`);
   }
   return {
     mode: "password",

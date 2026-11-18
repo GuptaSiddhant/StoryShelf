@@ -22,3 +22,18 @@ export function assertAuthSecret(secret: unknown): asserts secret is string {
     );
   }
 }
+
+/**
+ * Throw when `BETTER_AUTH_SECRETS` is set: the auth library would sign with its first entry and
+ * ignore `secret`, so the checked SECRET would not be the key in use. Rotation goes through
+ * `SECRET_PREVIOUS`, never the library's variable.
+ */
+export function assertNoLibrarySecretOverride(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): void {
+  if (env["BETTER_AUTH_SECRETS"] !== undefined && env["BETTER_AUTH_SECRETS"] !== "") {
+    throw new Error(
+      "BETTER_AUTH_SECRETS is set, so the auth library would sign with it instead of SECRET: unset it",
+    );
+  }
+}

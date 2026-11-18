@@ -124,6 +124,18 @@ describe("authFromEnv", () => {
     );
   });
 
+  it("refuses a SECRET shorter than 32 characters, without echoing it", () => {
+    const short = "s".repeat(31);
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: short })).toThrow(
+      expect.objectContaining({
+        message: expect.stringMatching(/^SECRET is shorter than 32 characters/u),
+      }),
+    );
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: short })).toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining(short) }),
+    );
+  });
+
   it("refuses to start with no sign-in configured unless SHELF_AUTH=none", () => {
     expect(() => authFromEnv({})).toThrow(/^AUTH_PASSWORD is unset.*SHELF_AUTH=none/u);
     expect(() => authFromEnv({ SECRET: secret })).toThrow(/^AUTH_PASSWORD is unset/u);
