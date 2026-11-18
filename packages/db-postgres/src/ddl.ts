@@ -506,6 +506,40 @@ CREATE TABLE IF NOT EXISTS content_uses (
   PRIMARY KEY (build_id, content_hash)
 );
 CREATE INDEX IF NOT EXISTS content_uses_hash_idx ON content_uses (content_hash);
+CREATE TABLE IF NOT EXISTS git_connections (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  name TEXT NOT NULL,
+  api_base TEXT,
+  config TEXT NOT NULL,
+  secret_encrypted TEXT,
+  created_by TEXT,
+  state TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS git_repository_links (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  connection_id TEXT NOT NULL REFERENCES git_connections(id),
+  host TEXT NOT NULL,
+  owner TEXT NOT NULL,
+  repo TEXT NOT NULL,
+  host_repository_id TEXT,
+  prefix TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL DEFAULT 'pending',
+  reason TEXT,
+  outputs TEXT NOT NULL DEFAULT '{}',
+  installation_id TEXT,
+  requested_by TEXT,
+  approved_by TEXT,
+  approved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS git_repository_links_repository_idx ON git_repository_links (host, owner, repo, prefix);
+CREATE INDEX IF NOT EXISTS git_repository_links_project_id_idx ON git_repository_links (project_id);
+CREATE INDEX IF NOT EXISTS git_repository_links_connection_id_idx ON git_repository_links (connection_id);
 CREATE TABLE IF NOT EXISTS "user" (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
