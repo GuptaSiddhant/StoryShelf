@@ -15,14 +15,17 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * Everything comes from the environment: `DATABASE_URL` (SQLite on `/data` when unset), `AWS_BUCKET`
  * (local storage on `/data` when unset), `SECRET`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`,
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
- * unless set) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Bundled by
- * rolldown (`rolldown.config.ts`).
+ * unless set) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
+ * `AUTH_PASSWORD` and `SECRET` are required unless `SHELF_AUTH=none` opts out explicitly, and a
+ * missing or short secret stops the server. Bundled by rolldown (`rolldown.config.ts`).
  */
 import { mkdirSync } from "node:fs";
 import {
+  authFromEnv,
   browsersFromEnv,
   captureEnabled,
   databaseFromEnv,
+  isLoopback,
   nonEmpty,
   storageFromEnv,
 } from "./env.ts";
@@ -30,11 +33,14 @@ import {
 const env = process.env;
 const dataDir = env["DATA_DIR"] ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
+const hostname = "0.0.0.0";
 const secret = nonEmpty(env["SECRET"]);
-const authPassword = nonEmpty(env["AUTH_PASSWORD"]);
-const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const publicBaseUrl = nonEmpty(env["PUBLIC_BASE_URL"]);
 const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
+
+// Every refusal below throws before the server listens: Node exits non-zero with the message
+// (naming the variable, never its value) as the first line.
+const imageAuth = authFromEnv(env);
 
 mkdirSync(dataDir, { recursive: true });
 const { database, log: databaseLog } = databaseFromEnv(env, dataDir);
@@ -48,6 +54,21 @@ const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
+
+// Sign-in first: a short SECRET throws here, before anything listens.
+const auth =
+  imageAuth.mode === "password"
+    ? createShelfAuth({
+        db: database,
+        secret: imageAuth.secret,
+        baseURL: publicBaseUrl ?? `http://localhost:${port}`,
+        passkeys: {},
+        emailSender,
+        fromEmail: env["SMTP_FROM"],
+        onAuthSystemEvent: createAuthSystemHook(),
+        logger: shelfLogger,
+      }).adapter
+    : undefined;
 
 const app = createShelfApp({
   database,
@@ -63,19 +84,7 @@ const app = createShelfApp({
           )
         : builtIn,
   },
-  auth:
-    authPassword && secret
-      ? createShelfAuth({
-          db: database,
-          secret,
-          baseURL: publicBaseUrl ?? `http://localhost:${port}`,
-          passkeys: {},
-          emailSender,
-          fromEmail: env["SMTP_FROM"],
-          onAuthSystemEvent: createAuthSystemHook(),
-          logger: shelfLogger,
-        }).adapter
-      : undefined,
+  ...(auth ? { auth } : {}),
   logger: shelfLogger,
   observability,
   config: {
@@ -87,15 +96,18 @@ const app = createShelfApp({
   },
 });
 
+// A failed boot check (auth secret, AI, images, adapters) stops the server: it never listens.
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
 
-if (authPassword && secret) {
-  await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
-  logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
+if (imageAuth.mode === "password") {
+  await ensurePasswordAdmin(database, { email: imageAuth.email, password: imageAuth.password });
+  logger.info({ email: imageAuth.email }, "Local admin login enabled from AUTH_PASSWORD");
+} else if (!isLoopback(hostname)) {
+  logger.warn({ hostname }, "SHELF_AUTH=none on a non-loopback address: every route is open");
 }
 
-const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
+const server = serve({ fetch: app.fetch, port, hostname }, () => {
   logger.info({ port, dataDir, capture: testing !== undefined }, "StoryShelf listening");
 });
 

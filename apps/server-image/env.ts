@@ -86,3 +86,52 @@ export function browsersFromEnv(env: Env): (BrowserName | RemoteBrowser)[] {
   }
   return ["chromium", azurePlaywright({ endpoint, token, engines: ["chromium"] })];
 }
+
+/** How the image signs people in: the local password admin, or nobody (an explicit `SHELF_AUTH=none`). */
+export type ImageAuth =
+  | { mode: "password"; password: string; email: string; secret: string }
+  | { mode: "none" };
+
+const AUTH_MODE_HINT =
+  "set AUTH_PASSWORD and SECRET (at least 32 characters) to sign in, or SHELF_AUTH=none to run with every route open";
+
+/**
+ * Sign-in is on unless `SHELF_AUTH=none` says otherwise: a missing variable never turns it off.
+ * A set `SECRET` is passed on; `createShelfAuth` refuses one shorter than 32 characters.
+ */
+export function authFromEnv(env: Env): ImageAuth {
+  const mode = nonEmpty(env["SHELF_AUTH"]) ?? "password";
+  const password = nonEmpty(env["AUTH_PASSWORD"]);
+  if (mode === "none") {
+    if (password !== undefined) {
+      throw new Error("SHELF_AUTH=none and AUTH_PASSWORD are both set: unset one of them");
+    }
+    return { mode: "none" };
+  }
+  if (mode !== "password") {
+    throw new Error("SHELF_AUTH must be password (the default) or none");
+  }
+  return passwordAuth(env, password);
+}
+
+/** The password mode's settings: AUTH_PASSWORD and SECRET are both required. */
+function passwordAuth(env: Env, password: string | undefined): ImageAuth {
+  const secret = nonEmpty(env["SECRET"]);
+  if (password === undefined) {
+    throw new Error(`AUTH_PASSWORD is unset: ${AUTH_MODE_HINT}`);
+  }
+  if (secret === undefined) {
+    throw new Error(`SECRET is unset: ${AUTH_MODE_HINT}`);
+  }
+  return {
+    mode: "password",
+    password,
+    email: nonEmpty(env["AUTH_EMAIL"]) ?? "admin@example.com",
+    secret,
+  };
+}
+
+/** Whether a listen address reaches only this machine (so an open server is not exposed). */
+export function isLoopback(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "::1" || hostname.startsWith("127.");
+}

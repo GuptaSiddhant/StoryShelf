@@ -21,6 +21,7 @@ import {
   describeLoginMethods,
 } from "./engine/login-methods.ts";
 import { sendAuthMail } from "./engine/mail.ts";
+import { assertAuthSecret } from "./engine/secret.ts";
 import { SSO_MANAGEMENT_PATHS } from "./engine/sso.ts";
 import type { ShelfAuth, ShelfAuthInstance, ShelfAuthOptions } from "./engine/types.ts";
 
@@ -49,6 +50,8 @@ export type {
  */
 export function createShelfAuth(options: ShelfAuthOptions): ShelfAuth {
   const { db } = options;
+  // Never hand the library a missing or weak secret: it would fall back to its built-in default.
+  assertAuthSecret(options.secret);
   // Fail fast at boot (login descriptors and plugin paths are fixed at creation).
   describeLoginMethods(options);
   assertNoReservedEndpointCollision(options.plugins);

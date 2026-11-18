@@ -12,6 +12,26 @@ async function throwingSetup(): Promise<void> {
   throw new Error("bad secret");
 }
 
+/** A complete auth singleton whose boot check (`setup`) fails. */
+function failingAuth() {
+  return {
+    handler: () => new Response(),
+    loginMethods: () => [{ kind: "password", id: "local", label: "Local" }],
+    setup: throwingSetup,
+    issueInvite: async () => ({}),
+    verifyInvite: async () => ({}),
+    acceptInvite: async () => ({}),
+    passkeysEnabled: () => false,
+    listSessions: async () => [],
+    listPasskeys: async () => [],
+    hasPassword: async () => false,
+    setDisabled: async () => {},
+    check: async () => null,
+    createSession: async () => "",
+    destroySession: async () => {},
+  };
+}
+
 function fakeAdapter(kind: string, setLogger?: (logger: unknown) => void) {
   return {
     metadata: { name: kind, version: "0.0.0", kind, category: "capture-queue" },
@@ -79,22 +99,7 @@ describe("attachLifecycle", () => {
     const options = {
       database: db,
       storage,
-      auth: {
-        handler: () => new Response(),
-        loginMethods: () => [{ kind: "password", id: "local", label: "Local" }],
-        setup: throwingSetup,
-        issueInvite: async () => ({}),
-        verifyInvite: async () => ({}),
-        acceptInvite: async () => ({}),
-        passkeysEnabled: () => false,
-        listSessions: async () => [],
-        listPasskeys: async () => [],
-        hasPassword: async () => false,
-        setDisabled: async () => {},
-        check: async () => null,
-        createSession: async () => "",
-        destroySession: async () => {},
-      },
+      auth: failingAuth(),
     } as unknown as ResolvedShelfOptions;
     const runtime = {
       config: { branchTtlDays: null },
@@ -108,6 +113,32 @@ describe("attachLifecycle", () => {
     const result = await cell.ready;
     expect(result.ok).toBe(false);
     expect(result.failures[0]).toMatchObject({ category: "auth", error: "bad secret" });
+  });
+
+  it("refuses setup() when the auth boot check failed, instead of continuing", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const options = {
+      database: db,
+      storage,
+      auth: failingAuth(),
+    } as unknown as ResolvedShelfOptions;
+    const runtime = {
+      config: { branchTtlDays: null },
+      logger: silentLogger,
+    } as unknown as ServerRuntime;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    const lifecycle = (app as unknown as { lifecycle: { setup(): Promise<void> } }).lifecycle;
+    await expect(lifecycle.setup()).rejects.toThrow("Adapter setup failed: auth/auth: bad secret");
+    // A second call refuses too, and readiness stays failed (no later adapter run masks it).
+    await expect(lifecycle.setup()).rejects.toThrow("bad secret");
+    expect(cell.settled?.ok).toBe(false);
+    expect((await cell.ready).failures[0]).toMatchObject({ category: "auth" });
   });
 });
 

@@ -26,6 +26,10 @@ import type { ServerRuntime } from "./runtime.ts";
 export interface LifecycleCell {
   ready: Promise<AdapterSetupResult>;
   settled: AdapterSetupResult | null;
+  /** The boot checks' outcome (auth secret, AI, images): `setup()` throws while it is a failure. */
+  bootFailure?: Promise<AdapterSetupResult | null>;
+  /** `bootFailure` once settled (undefined while the checks run), so `setup()` need not wait a tick. */
+  bootChecked?: AdapterSetupResult | null;
   /** Fire-and-forget boot tasks (recovery, credential check) that teardown must outwait. */
   background?: Promise<unknown>[];
   /** Override of {@link BACKGROUND_DRAIN_MS} (tests). */
@@ -105,7 +109,7 @@ async function firstBootFailure(
     // eslint-disable-next-line no-await-in-loop -- boot checks run in order and stop at the first failure
     const failed = await run(options);
     if (failed) {
-      logger.error({ failures: failed.failures, step: label }, "boot check setup failed");
+      logger.error({ failures: failed.failures, step: label }, "boot check failed");
       return failed;
     }
   }
@@ -121,8 +125,16 @@ function kickSetup(
 ): void {
   // Auth is not an adapter: its one-shot boot validation runs first, then
   // the adapter setups. A failing secret check fails readiness, like others.
+  const bootFailure = firstBootFailure(options, logger);
+  cell.bootFailure = bootFailure;
+  bootFailure.then(
+    (result) => {
+      cell.bootChecked = result;
+    },
+    () => {}, // Intentionally empty — `cell.ready` settles the rejection as a failed readiness
+  );
   cell.ready = (async (): Promise<AdapterSetupResult> => {
-    const failed = await firstBootFailure(options, logger);
+    const failed = await bootFailure;
     return (
       failed ?? (await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger))
     );
@@ -245,20 +257,52 @@ async function runImagesSetup(): Promise<AdapterSetupResult | null> {
     };
   }
 }
+/** Keep a failed result on the cell, so health and readers never see a later run's success. */
+function settleFailure(cell: LifecycleCell, result: AdapterSetupResult): AdapterSetupResult {
+  cell.ready = Promise.resolve(result);
+  cell.settled = result;
+  return result;
+}
+
 /** Validation failure settled on the cell — null when the assembly is sound. */
 function invalidSources(
   options: ResolvedShelfOptions,
   cell: LifecycleCell,
 ): AdapterSetupResult | null {
   const invalid = validateBootAssembly(adapterSourcesOf(options));
-  if (invalid.length === 0) {
+  return invalid.length === 0 ? null : settleFailure(cell, { ok: false, failures: invalid });
+}
+
+/** Throw a failed boot check, settling it on the cell (setup must not mask it with a later run). */
+function refuseBootCheck(cell: LifecycleCell, failed: AdapterSetupResult | null | undefined): void {
+  if (failed) {
+    settleFailure(cell, failed);
+    // The checks' own sanitized text (never a secret), so the message names the cause.
+    throw new AdapterLifecycleError("setup", failed.failures, true);
+  }
+}
+/**
+ * Throw when the assembly is invalid or a boot check failed: there is no "failed, continuing" path,
+ * so the host never starts listening. Synchronous once the checks settled (the usual case), so a
+ * passing `setup()` still publishes its run on the cell in the same tick; else it waits for them.
+ */
+function refuseFailedBoot(
+  options: ResolvedShelfOptions,
+  cell: LifecycleCell,
+): Promise<void> | null {
+  const blocked = invalidSources(options, cell);
+  if (blocked) {
+    throw new AdapterLifecycleError("setup", blocked.failures);
+  }
+  if (cell.bootChecked !== undefined || cell.bootFailure === undefined) {
+    refuseBootCheck(cell, cell.bootChecked);
     return null;
   }
-  const result: AdapterSetupResult = { ok: false, failures: invalid };
-  cell.ready = Promise.resolve(result);
-  cell.settled = result;
-  return result;
+  return cell.bootFailure.then((failed) => {
+    refuseBootCheck(cell, failed);
+  });
 }
+
 /**
  * Run the adapter setups again. The run is published on the cell before it is awaited: readers
  * (the retention timer among them) must never see the previous run's result while a new setup is
@@ -291,9 +335,9 @@ function createLifecycle(
     },
     logger,
     setup: async () => {
-      const blocked = invalidSources(options, cell);
-      if (blocked) {
-        throw new AdapterLifecycleError("setup", blocked.failures);
+      const checking = refuseFailedBoot(options, cell);
+      if (checking) {
+        await checking;
       }
       const result = await rerunSetup(options, ctx, logger, cell);
       if (!result.ok) {

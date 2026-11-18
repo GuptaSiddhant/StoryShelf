@@ -22,8 +22,8 @@ else
   DATA_DIR="${DATA_DIR:-.tmp/smoke-${RUN_ID}}"
   LOG=".tmp/smoke-${RUN_ID}.log"
 
-  # Auth must stay off: with AUTH_PASSWORD set but SECRET unset (or vice
-  # versa) `/` redirects to login and the HTML assertion false-fails.
+  # Auth must stay off: with AUTH_PASSWORD set `/` redirects to login and the
+  # HTML assertion false-fails (and without a valid SECRET the server refuses to start).
   unset SECRET AUTH_PASSWORD AUTH_VIEWER_PASSWORD STORYSHELF_ADMIN_TOKEN ADMIN_TOKEN PUBLIC_BASE_URL
 
   export PORT DATA_DIR

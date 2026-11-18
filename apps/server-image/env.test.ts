@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  authFromEnv,
   browsersFromEnv,
   captureEnabled,
   databaseFromEnv,
+  isLoopback,
   storageFromEnv,
   type Factories,
 } from "./env.ts";
@@ -100,5 +102,60 @@ describe("browsersFromEnv", () => {
     expect(browsers).toHaveLength(2);
     expect(browsers[0]).toBe("chromium");
     expect(typeof browsers[1]).toBe("object");
+  });
+});
+
+describe("authFromEnv", () => {
+  const secret = "s".repeat(32);
+
+  it("signs in with AUTH_PASSWORD and SECRET by default", () => {
+    expect(authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: secret })).toEqual({
+      mode: "password",
+      password: "a-long-password",
+      email: "admin@example.com",
+      secret,
+    });
+  });
+
+  it("refuses AUTH_PASSWORD without SECRET instead of turning auth off", () => {
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password" })).toThrow(/^SECRET is unset/u);
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: "" })).toThrow(
+      /^SECRET is unset/u,
+    );
+  });
+
+  it("refuses to start with no sign-in configured unless SHELF_AUTH=none", () => {
+    expect(() => authFromEnv({})).toThrow(/^AUTH_PASSWORD is unset.*SHELF_AUTH=none/u);
+    expect(() => authFromEnv({ SECRET: secret })).toThrow(/^AUTH_PASSWORD is unset/u);
+    expect(authFromEnv({ SHELF_AUTH: "none" })).toEqual({ mode: "none" });
+  });
+
+  it("refuses SHELF_AUTH=none together with AUTH_PASSWORD, and an unknown mode", () => {
+    expect(() => authFromEnv({ SHELF_AUTH: "none", AUTH_PASSWORD: "a-long-password" })).toThrow(
+      /both set/u,
+    );
+    expect(() => authFromEnv({ SHELF_AUTH: "off" })).toThrow(/password .* or none/u);
+  });
+
+  it("never echoes the password or the secret", () => {
+    const password = "do-not-print-this-password";
+    for (const env of [
+      { AUTH_PASSWORD: password },
+      { SHELF_AUTH: "none", AUTH_PASSWORD: password },
+    ]) {
+      expect(() => authFromEnv(env)).toThrow(
+        expect.objectContaining({ message: expect.not.stringContaining(password) }),
+      );
+    }
+  });
+});
+
+describe("isLoopback", () => {
+  it("tells loopback addresses from the wildcard and public ones", () => {
+    expect(isLoopback("127.0.0.1")).toBe(true);
+    expect(isLoopback("localhost")).toBe(true);
+    expect(isLoopback("::1")).toBe(true);
+    expect(isLoopback("0.0.0.0")).toBe(false);
+    expect(isLoopback("10.0.0.5")).toBe(false);
   });
 });

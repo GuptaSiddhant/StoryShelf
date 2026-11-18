@@ -80,6 +80,7 @@ function composeLines(database: string): string[] {
   return [
     ...COMPOSE_BASE_LINES,
     "      # Add your env vars here:",
+    "      # - SECRET=at-least-32-random-characters",
     "      # - AUTH_PASSWORD=your-password",
     ...(database === "turso" ? COMPOSE_TURSO_LINES : []),
     ...(database === "postgres" ? COMPOSE_POSTGRES_LINES : []),
