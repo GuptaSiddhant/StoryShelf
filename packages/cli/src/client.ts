@@ -112,9 +112,30 @@ export interface PackageUsageInput {
 export interface BuildCreated {
   build: { id: string };
   uploadUrl: string;
+  /** Path of the build page; absent on servers that predate the field. */
+  buildUrl?: string;
   baselineSha?: string | null;
   /** False when the server has no `testing` option; absent on servers that predate the field. */
   testing?: boolean;
+}
+
+/** The absolute build page URL: the server URL joined to `buildUrl`, or `null` without both. */
+export function buildPageUrl(
+  serverUrl: string | undefined,
+  buildUrl: string | undefined,
+): string | null {
+  if (serverUrl === undefined || buildUrl === undefined || !buildUrl.startsWith("/")) return null;
+  return `${normalizeBaseUrl(serverUrl)}${buildUrl}`;
+}
+
+/** The line that ends an upload: the build page link, else the build id (older servers). */
+export function describeBuildLink(
+  serverUrl: string | undefined,
+  build: { id: string },
+  buildUrl: string | undefined,
+): string {
+  const link = buildPageUrl(serverUrl, buildUrl);
+  return link === null ? `Build created: ${build.id}` : `View the build: ${link}`;
 }
 
 /** The open liveness answer of `GET /api/v1/health`; fields newer than the server are absent. */
