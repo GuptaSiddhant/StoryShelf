@@ -33,6 +33,7 @@ import {
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { getPublishOrder, packagesDir } from "./publish-order.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -49,9 +50,9 @@ function log(message) {
   console.log(`\n[packed-smoke] ${message}`);
 }
 
+/** Fail the run: thrown so `main` still stops the server and cleans up. */
 function fail(message) {
-  console.error(`::error::packed-install-smoke: ${message}`);
-  process.exit(1);
+  throw new Error(message);
 }
 
 /** Run a command to completion, inheriting nothing; fail with its output unless it exits 0. */
@@ -104,6 +105,18 @@ function freePort() {
   });
 }
 
+/** Collect a child's output, and call `onData` after each chunk. */
+function collect(child, onData) {
+  const state = { text: "" };
+  const listen = (chunk) => {
+    state.text += chunk.toString();
+    onData?.(state);
+  };
+  child.stdout.on("data", listen);
+  child.stderr.on("data", listen);
+  return state;
+}
+
 /**
  * Answer `storyshelf server init` with its defaults: Enter whenever the prompt has been quiet
  * for a moment (the prompts library redraws with escape codes, so lines cannot be counted).
@@ -115,30 +128,22 @@ function initWithDefaults(cli, cwd) {
       cwd,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    let output = "";
     let idle;
-    const enterWhenQuiet = () => {
+    const output = collect(child, (state) => {
       clearTimeout(idle);
+      if (state.text.includes("npm start")) {
+        // The last line of the next steps: the CLI has finished (it may linger on stdin).
+        child.stdin.end();
+        setTimeout(() => child.kill("SIGTERM"), 1000);
+        return;
+      }
       idle = setTimeout(() => child.stdin.write("\n"), 400);
-    };
-    for (const stream of [child.stdout, child.stderr]) {
-      stream.on("data", (chunk) => {
-        output += chunk.toString();
-        if (output.includes("npm start")) {
-          // The last line of the next steps: the CLI has finished (it may linger on stdin).
-          clearTimeout(idle);
-          child.stdin.end();
-          setTimeout(() => child.kill("SIGTERM"), 1000);
-          return;
-        }
-        enterWhenQuiet();
-      });
-    }
+    });
     const timeout = setTimeout(() => child.kill("SIGKILL"), 60_000);
     child.on("exit", (code) => {
       clearTimeout(idle);
       clearTimeout(timeout);
-      done({ code, output });
+      done({ code, output: output.text });
     });
   });
 }
@@ -148,34 +153,116 @@ function useTarballs(projectDir, tarballs) {
   const file = join(projectDir, "package.json");
   const pkg = JSON.parse(readFileSync(file, "utf8"));
   const own = Object.keys(tarballs);
-  const direct = Object.keys(pkg.dependencies ?? {}).filter((name) => own.includes(name));
-  for (const name of direct) {
-    pkg.dependencies[name] = `file:${tarballs[name]}`;
+  for (const name of Object.keys(pkg.dependencies ?? {})) {
+    if (own.includes(name)) {
+      pkg.dependencies[name] = `file:${tarballs[name]}`;
+    }
   }
   pkg.overrides = Object.fromEntries(own.map((name) => [name, `file:${tarballs[name]}`]));
   writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`);
   return pkg;
 }
 
-async function waitForOk(url, server, timeoutMs, readLog) {
+/** True when `url` answers 2xx. */
+async function answers(url) {
+  try {
+    return (await fetch(url)).ok;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForOk(url, server, timeoutMs, state) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (server.exitCode !== null) {
-      fail(`server exited early with code ${server.exitCode}\n${readLog()}`);
+      fail(`server exited early with code ${server.exitCode}\n${state.text}`);
     }
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- poll until the server answers
-      const response = await fetch(url);
-      if (response.ok) {
-        return response;
-      }
-    } catch {
-      // not listening yet
+    // oxlint-disable-next-line no-await-in-loop -- poll until the server answers
+    if (await answers(url)) {
+      return;
     }
     // oxlint-disable-next-line no-await-in-loop -- poll interval
-    await new Promise((r) => setTimeout(r, 300));
+    await sleep(300);
   }
-  return fail(`no answer from ${url} within ${timeoutMs} ms\n${readLog()}`);
+  fail(`no answer from ${url} within ${timeoutMs} ms\n${state.text}`);
+}
+
+/** The CLI installed from its tarball, and the scaffold installed from the tarballs. */
+async function installFromTarballs(scratch, tarballs) {
+  const tool = join(scratch, "tool");
+  mkdirSync(tool);
+  writeFileSync(join(tool, "package.json"), '{ "name": "tool", "private": true }\n');
+  log("installing the CLI from its tarball");
+  run("npm", ["install", "--no-audit", "--no-fund", tarballs["storyshelf"]], { cwd: tool });
+  const cli = join(tool, "node_modules/storyshelf/dist/index.js");
+
+  const project = join(scratch, "my-storyshelf");
+  log("storyshelf server init (all defaults)");
+  const init = await initWithDefaults(cli, scratch);
+  if (!init.output.includes("Scaffolded") || !existsSync(join(project, "package.json"))) {
+    fail(`server init failed (exit ${init.code})\n${init.output}`);
+  }
+  const pkg = useTarballs(project, tarballs);
+  log(`scaffold depends on: ${Object.keys(pkg.dependencies).join(", ")}`);
+  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: project });
+  return { cli, project };
+}
+
+/** `npm start` in the scaffold; resolves once the health endpoint answers. */
+async function startServer(project) {
+  const port = await freePort();
+  log(`npm start on :${port}`);
+  const child = spawn("npm", ["start"], {
+    cwd: project,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      DATA_DIR: join(project, "data"),
+      SECRET,
+      STORYSHELF_ADMIN_TOKEN: ADMIN_TOKEN,
+    },
+    // Its own process group, so stopping it also stops the node process `npm start` runs.
+    detached: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const output = collect(child);
+  const url = `http://127.0.0.1:${port}`;
+  await waitForOk(`${url}/api/v1/health`, child, 60_000, output);
+  return { child, url };
+}
+
+/** A copy of the Storybook project, so `create` writes its config into scratch and not the fixture. */
+function copyStorybook(scratch) {
+  const sb = join(scratch, "storybook");
+  mkdirSync(sb);
+  for (const name of [".storybook", "storybook-static", "package.json"]) {
+    cpSync(join(storybookDir, name), join(sb, name), { recursive: true });
+  }
+  rmSync(join(sb, ".storybook/storyshelf.json"), { force: true });
+  return sb;
+}
+
+/** `create` then `upload`, as a user would. */
+function createAndUpload(cli, url, sb) {
+  log("storyshelf create");
+  const created = run(
+    process.execPath,
+    [cli, "create", "--url", url, "--name", "packed-smoke", "--token", ADMIN_TOKEN],
+    { cwd: sb },
+  );
+  const ciToken = /CI token: (?<token>\S+)/u.exec(created)?.groups?.["token"];
+  if (!ciToken) {
+    fail(`create printed no CI token\n${created}`);
+  }
+  log("storyshelf upload");
+  const uploadArgs = ["--build-dir", "storybook-static", "--branch", "main", "--sha", "packed-1"];
+  const uploaded = run(process.execPath, [cli, "upload", ...uploadArgs], {
+    cwd: sb,
+    env: { ...process.env, STORYSHELF_TOKEN: ciToken },
+  });
+  console.log(uploaded);
+  return ciToken;
 }
 
 async function main() {
@@ -185,7 +272,6 @@ async function main() {
   // Outside this checkout, so no ancestor node_modules can satisfy a missing dependency.
   const scratch = mkdtempSync(join(process.env["RUNNER_TEMP"] ?? tmpdir(), "packed-smoke-"));
   let server;
-  let serverLog = "";
   try {
     log(`scratch directory ${scratch}`);
     const tarDir = join(scratch, "tarballs");
@@ -193,87 +279,20 @@ async function main() {
     log("packing every public package");
     const tarballs = packAll(tarDir);
     log(`packed ${Object.keys(tarballs).length} packages`);
-
-    const tool = join(scratch, "tool");
-    mkdirSync(tool);
-    writeFileSync(join(tool, "package.json"), '{ "name": "tool", "private": true }\n');
-    log("installing the CLI from its tarball");
-    run("npm", ["install", "--no-audit", "--no-fund", tarballs["storyshelf"]], { cwd: tool });
-    const cli = join(tool, "node_modules/storyshelf/dist/index.js");
-
-    const project = join(scratch, "my-storyshelf");
-    log("storyshelf server init (all defaults)");
-    const init = await initWithDefaults(cli, scratch);
-    if (!init.output.includes("Scaffolded") || !existsSync(join(project, "package.json"))) {
-      fail(`server init failed (exit ${init.code})\n${init.output}`);
-    }
-    const pkg = useTarballs(project, tarballs);
-    log(`scaffold depends on: ${Object.keys(pkg.dependencies).join(", ")}`);
-    run("npm", ["install", "--no-audit", "--no-fund"], { cwd: project });
-
-    const port = await freePort();
-    const url = `http://127.0.0.1:${port}`;
-    log(`npm start on :${port}`);
-    server = spawn("npm", ["start"], {
-      cwd: project,
-      env: {
-        ...process.env,
-        PORT: String(port),
-        DATA_DIR: join(project, "data"),
-        SECRET,
-        STORYSHELF_ADMIN_TOKEN: ADMIN_TOKEN,
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    for (const stream of [server.stdout, server.stderr]) {
-      stream.on("data", (chunk) => (serverLog += chunk.toString()));
-    }
-    await waitForOk(`${url}/api/v1/health`, server, 60_000, () => serverLog);
-
-    // A copy, so `create` writes .storybook/storyshelf.json into scratch and not the fixture.
-    const sb = join(scratch, "storybook");
-    mkdirSync(sb);
-    cpSync(join(storybookDir, ".storybook"), join(sb, ".storybook"), { recursive: true });
-    cpSync(join(storybookDir, "storybook-static"), join(sb, "storybook-static"), {
-      recursive: true,
-    });
-    cpSync(join(storybookDir, "package.json"), join(sb, "package.json"));
-    rmSync(join(sb, ".storybook/storyshelf.json"), { force: true });
-
-    log("storyshelf create");
-    const created = run(
-      process.execPath,
-      [cli, "create", "--url", url, "--name", "packed-smoke", "--token", ADMIN_TOKEN],
-      { cwd: sb },
-    );
-    const ciToken = /CI token: (\S+)/u.exec(created)?.[1];
-    if (!ciToken) {
-      fail(`create printed no CI token\n${created}`);
-    }
-
-    log("storyshelf upload");
-    const uploaded = run(
-      process.execPath,
-      [
-        cli,
-        "upload",
-        "--build-dir",
-        "storybook-static",
-        "--branch",
-        "main",
-        "--sha",
-        "packed-smoke-1",
-      ],
-      { cwd: sb, env: { ...process.env, STORYSHELF_TOKEN: ciToken } },
-    );
-    console.log(uploaded);
-
-    await assertBuildPassed(url, ciToken);
+    const { cli, project } = await installFromTarballs(scratch, tarballs);
+    server = await startServer(project);
+    const ciToken = createAndUpload(cli, server.url, copyStorybook(scratch));
+    await assertBuildPassed(server.url, ciToken);
     log("ok: packed install, scaffold, start, create, upload and one passing build");
   } catch (error) {
-    fail(error instanceof Error ? error.stack : String(error));
+    console.error(
+      `::error::packed-install-smoke: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exitCode = 1;
   } finally {
-    server?.kill("SIGTERM");
+    if (server) {
+      process.kill(-server.child.pid, "SIGTERM");
+    }
     if (keep) {
       console.log(`kept ${scratch}`);
     } else {
@@ -282,32 +301,40 @@ async function main() {
   }
 }
 
+/** The build list from the API; its first entry is the newest build. */
+async function newestBuild(url, token) {
+  const response = await fetch(`${url}/api/v1/projects/packed-smoke/builds`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  const text = await response.text();
+  const builds = JSON.parse(text);
+  const list = Array.isArray(builds) ? builds : (builds.builds ?? builds.items ?? []);
+  return { build: list[0], text };
+}
+
 /** The one build must finish capture without failing, and hold snapshots. */
 async function assertBuildPassed(url, token) {
-  const headers = { authorization: `Bearer ${token}` };
   const deadline = Date.now() + 120_000;
   let last = "";
   while (Date.now() < deadline) {
     // oxlint-disable-next-line no-await-in-loop -- poll
-    const response = await fetch(`${url}/api/v1/projects/packed-smoke/builds`, { headers });
-    last = await response.text();
-    const builds = JSON.parse(last);
-    const list = Array.isArray(builds) ? builds : (builds.builds ?? builds.items ?? []);
-    const status = list[0]?.status;
+    const { build, text } = await newestBuild(url, token);
+    last = text;
     // A first build has no baseline, so a finished capture waits for review (`reviewing`).
-    if (status === "reviewing" || status === "approved") {
-      if (!(list[0].snapshotCount > 0)) {
-        fail(`build ${status} with no snapshots\n${last}`);
+    if (build?.status === "reviewing" || build?.status === "approved") {
+      if (!(build.snapshotCount > 0)) {
+        fail(`build ${build.status} with no snapshots\n${last}`);
       }
       return;
     }
-    if (status === "failed" || status === "cancelled") {
-      fail(`build ended ${status}\n${last}`);
+    if (build?.status === "failed" || build?.status === "cancelled") {
+      fail(`build ended ${build.status}\n${last}`);
     }
     // oxlint-disable-next-line no-await-in-loop -- poll interval
-    await new Promise((r) => setTimeout(r, 1000));
+    await sleep(1000);
   }
   fail(`build never passed\n${last}`);
 }
 
 await main();
+process.exit(process.exitCode ?? 0);
