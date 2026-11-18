@@ -37,6 +37,14 @@ describe("generateServer", () => {
     expect(code).toContain("scratchDir: dataDir,");
   });
 
+  it("wires the bootstrap admin token from STORYSHELF_ADMIN_TOKEN, with or without auth", () => {
+    for (const auth of ["none", "password"] as const) {
+      expect(server({ auth })).toContain(
+        "adminToken: process.env.STORYSHELF_ADMIN_TOKEN || undefined,",
+      );
+    }
+  });
+
   it("ends with the listener and the shutdown hooks", () => {
     const code = server();
     expect(code).toContain("await app.lifecycle.setup();");
