@@ -64,6 +64,20 @@ export function projectNavGroups(urls: NavUrls, slug: string): NavGroup[] {
   ];
 }
 
+/**
+ * The one group a visitor who is not signed in gets: the project's Builds, the only pages of a
+ * public project they may read (ADR 0011, #1172). No Library, Settings or project list.
+ */
+export function visitorNavGroups(urls: Pick<NavUrls, "buildsList">, slug: string): NavGroup[] {
+  return [
+    {
+      id: "project",
+      title: "Project",
+      items: [{ key: "builds", label: "Builds", href: urls.buildsList(slug), icon: "layers" }],
+    },
+  ];
+}
+
 /** Help menu entries (API reference), shown next to the theme toggle. */
 export function helpNavItems(): NavItem[] {
   return [

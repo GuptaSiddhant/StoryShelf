@@ -1,4 +1,5 @@
 import type { Context, Next } from "hono";
+import { anonymousRead } from "../routers/anonymous-read.ts";
 import { currentProjectRole, findProjectBySlug, requestHasAdminToken } from "../routers/helpers.ts";
 import { getStore } from "../store.ts";
 
@@ -18,7 +19,8 @@ function pageProjectSlug(path: string): string | undefined {
  * exist (`403` stays for a caller who can see the project but lacks the role for the action, and is
  * decided where the action is). The API does this in `assertRole`; this covers the pages, which
  * would otherwise render for any signed-in user. It runs after the auth gate, which redirects
- * visitors who are not signed in, and does nothing when auth is off or for the bootstrap admin token.
+ * visitors who are not signed in (except for a public build's pages, which `anonymousRead` opens),
+ * and does nothing when auth is off or for the bootstrap admin token.
  */
 export function requireProjectVisible() {
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
@@ -28,11 +30,20 @@ export function requireProjectVisible() {
       await next();
       return;
     }
-    const project = await findProjectBySlug(slug);
-    if (project && (await currentProjectRole(project.id))) {
+    if (await mayView(c, slug)) {
       await next();
       return;
     }
     return c.notFound();
   };
+}
+
+/** A member of the project, or a visitor reading a public build (ADR 0011, #1172). */
+async function mayView(c: Context, slug: string): Promise<boolean> {
+  const project = await findProjectBySlug(slug);
+  if (project && (await currentProjectRole(project.id))) {
+    return true;
+  }
+  // The one resolver decides a visitor's read.
+  return (await anonymousRead(c)) === "read";
 }

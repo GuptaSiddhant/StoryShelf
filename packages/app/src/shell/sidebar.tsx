@@ -10,6 +10,7 @@ import {
   adminNavItems,
   helpNavItems,
   projectNavGroups,
+  visitorNavGroups,
   type NavConfig,
   type NavGroup,
   type NavItem,
@@ -372,22 +373,28 @@ export const Sidebar: FC<{ nav?: NavConfig; name: string; logo?: string }> = ({
   const { user, authEnabled, config } = getStore();
   const urls = createUrlBuilder("/", contentHostSuffix(config));
   const showAdmin = !authEnabled || user?.role === "admin";
+  // A visitor reads one public project's builds (#1172): no project list, Library or Settings.
+  const visitor = authEnabled && !user;
   const projects: NavItem = {
     key: "projects",
     label: "Projects",
     href: urls.projects(),
     icon: "folder",
   };
+  const slug = nav?.projectSlug;
+  const groups = slug ? (visitor ? visitorNavGroups : projectNavGroups)(urls, slug) : [];
   return (
     <aside id="sidebar" class={shellSidebar} aria-label="Primary" data-sidebar>
-      <Brand name={name} logo={logo} href={urls.projects()} />
+      <Brand
+        name={name}
+        logo={logo}
+        href={visitor && slug ? urls.buildsList(slug) : urls.projects()}
+      />
       <nav class="sidebar__nav">
-        <NavLink item={projects} active={nav?.active} />
-        {nav?.projectSlug
-          ? projectNavGroups(urls, nav.projectSlug).map((group) => (
-              <NavSection key={group.id} group={group} active={nav.active} />
-            ))
-          : null}
+        {visitor ? null : <NavLink item={projects} active={nav?.active} />}
+        {groups.map((group) => (
+          <NavSection key={group.id} group={group} active={nav?.active} />
+        ))}
         {showAdmin ? (
           <NavSection
             group={{ id: "admin", title: "Administration", items: adminNavItems() }}

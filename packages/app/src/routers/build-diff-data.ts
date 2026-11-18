@@ -5,14 +5,19 @@
  */
 import { contentHostSuffix } from "@storyshelf/core/config";
 import { CommentModel, SnapshotModel } from "@storyshelf/core/models";
-import type { Build, Project } from "@storyshelf/core/schema";
+import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import { loadInsightPanel } from "../insights/panel.ts";
 import { loadBuildDetails } from "../pages/build-detail.tsx";
 import { selectedSnapshot, type BuildDiffData } from "../pages/build-diff.tsx";
 import { getStore } from "../store.ts";
+import { anonymousRead, isVisitorReadable } from "./anonymous-read.ts";
 import { loadBaselineView } from "./baseline-guard.ts";
-import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
+import {
+  loadBaselineReference,
+  loadDefaultComparison,
+  type BaselineReference,
+} from "./baseline-reference.ts";
 import { isBuildAuthor } from "./comment-triage.ts";
 import { designUrlsFor, loadDesignResolutions, loadReviewDesign } from "./design.handlers.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
@@ -25,8 +30,23 @@ export interface BuildDiffView {
   returnPath: string;
 }
 
-/** Everything `renderBuildDiffPage` and `renderReviewSwap` need for one build and snapshot. */
+/**
+ * Everything `renderBuildDiffPage` and `renderReviewSwap` need for one build and snapshot. A
+ * visitor reading a public build (`anonymousRead`) gets {@link loadVisitorDiffData} instead.
+ */
 export async function loadBuildDiffData(
+  c: Context,
+  project: Project,
+  build: Build,
+  view: BuildDiffView,
+): Promise<BuildDiffData> {
+  if ((await anonymousRead(c)) === "read") {
+    return await loadVisitorDiffData(project, build, view);
+  }
+  return await loadMemberDiffData(c, project, build, view);
+}
+
+async function loadMemberDiffData(
   c: Context,
   project: Project,
   build: Build,
@@ -69,4 +89,57 @@ export async function loadBuildDiffData(
     publishedBaseDomain: contentHostSuffix(config),
     currentSize: selected ? await readPngSize(selected.screenshotPath) : null,
   };
+}
+
+/**
+ * The review page of a public build for a visitor who is not signed in (#1172), read-only by
+ * construction: no capability is granted, so no review, comment, retry or settings control renders,
+ * and nothing that names people or other builds is loaded. Comments, verdicts and change requests
+ * (names and discussion), capture logs, AI insights, design and package links, and the current
+ * default-branch comparison are left out; a reference build the visitor may not read is unnamed.
+ */
+async function loadVisitorDiffData(
+  project: Project,
+  build: Build,
+  view: BuildDiffView,
+): Promise<BuildDiffData> {
+  const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
+  const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
+  const selected = selectedSnapshot(snapshots, view.snapshotId);
+  const details = await loadBuildDetails(project, build);
+  return {
+    project,
+    build,
+    snapshots,
+    comments: [],
+    selectedId: view.snapshotId,
+    readOnly: true,
+    canReview: false,
+    canTriage: false,
+    canManage: false,
+    names: new Map(),
+    hasBaseline,
+    drifted,
+    reference: selected ? await visitorReference(project, build, selected) : undefined,
+    defaultComparison: null,
+    insight: null,
+    details: { ...details, attempts: [], review: null },
+    design: [],
+    usage: [],
+    publishedBaseDomain: contentHostSuffix(getStore().config),
+    currentSize: selected ? await readPngSize(selected.screenshotPath) : null,
+  };
+}
+
+/** The snapshot's reference, with its build unnamed unless a visitor may read that build too. */
+async function visitorReference(
+  project: Project,
+  build: Build,
+  selected: Snapshot,
+): Promise<BaselineReference> {
+  const reference = await loadBaselineReference(project, build, selected);
+  if (reference.kind !== "known" || !reference.build) {
+    return reference;
+  }
+  return isVisitorReadable(project, reference.build) ? reference : { ...reference, build: null };
 }

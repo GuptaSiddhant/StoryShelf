@@ -19,9 +19,10 @@ import {
 /**
  * Which data a page story renders over: `populated` is the "Design system" project with builds
  * in every state, `empty` has one project and no builds, `blank` has no projects at all, and
- * `skipped-only` has a project whose every build was skipped.
+ * `skipped-only` has a project whose every build was skipped, and `public-main` is `populated` with
+ * the `main` builds public (`publicBranchRegex`), as a visitor who is not signed in sees it.
  */
-export type StoryDataset = "populated" | "empty" | "blank" | "skipped-only";
+export type StoryDataset = "populated" | "empty" | "blank" | "skipped-only" | "public-main";
 
 interface Seeded {
   db: DatabaseAdapter;
@@ -68,7 +69,8 @@ const PUBLISHED: CatalogLoader = {
 export async function seedStoryDatabase(dataset: StoryDataset): Promise<Seeded> {
   const { db } = makeDatabase();
   if (dataset === "blank") return { db, catalog: NO_CATALOG };
-  await insertAll(db, db.tables.projects, [project, otherProject]);
+  const own = dataset === "public-main" ? { ...project, publicBranchRegex: "^main$" } : project;
+  await insertAll(db, db.tables.projects, [own, otherProject]);
   if (dataset === "empty") return { db, catalog: NO_CATALOG };
   if (dataset === "skipped-only") {
     await insertAll(db, db.tables.builds, skippedBuilds());

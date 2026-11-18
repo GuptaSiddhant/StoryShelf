@@ -12,8 +12,9 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
+import { ANONYMOUS_CACHE_CONTROL, anonymousRead, isAnonymousVisitor } from "./anonymous-read.ts";
 import { readComparisonImage, validFrozenReference } from "./comparison-image.ts";
-import { notFound, resolveAuthorizedProject } from "./helpers.ts";
+import { findProjectBySlug, notFound, projectHidden, resolveAuthorizedProject } from "./helpers.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 
@@ -45,30 +46,54 @@ async function findSnapshot(
   return snapshot;
 }
 
+/**
+ * The project of the route, for a caller who may view it: a member (or token), or a visitor reading
+ * a public build (`anonymousRead`, #1172). Any other visitor gets the answer for an unknown project,
+ * whatever the build, so a private build's images answer exactly like a missing build's.
+ */
+async function viewableProject(c: Context): Promise<{ project: Project; visitor: boolean }> {
+  const slug = c.req.param("slug") ?? "";
+  if ((await anonymousRead(c)) === "read") {
+    const project = await findProjectBySlug(slug);
+    return project ? { project, visitor: true } : projectHidden();
+  }
+  if (isAnonymousVisitor(c)) {
+    projectHidden();
+  }
+  return { project: await resolveAuthorizedProject(c, slug, ...VIEW_ROLES), visitor: false };
+}
+
 /** Authorize the caller on the project of the route and load the snapshot it names. */
-async function authorizedSnapshot(c: Context): Promise<{ project: Project; snapshot: Snapshot }> {
-  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", ...VIEW_ROLES);
+async function authorizedSnapshot(
+  c: Context,
+): Promise<{ project: Project; snapshot: Snapshot; visitor: boolean }> {
+  const { project, visitor } = await viewableProject(c);
   const snapshot = await findSnapshot(
     c.req.param("buildId") ?? "",
     c.req.param("snapshotId") ?? "",
     project.id,
   );
-  return { project, snapshot };
+  return { project, snapshot, visitor };
+}
+
+/** A member's image may be kept an hour; a visitor's is revalidated on every use. */
+function cacheFor(visitor: boolean): string | undefined {
+  return visitor ? ANONYMOUS_CACHE_CONTROL : undefined;
 }
 
 /** The snapshot's screenshot. */
 export async function serveSnapshotImage(c: Context): Promise<Response> {
-  const { snapshot } = await authorizedSnapshot(c);
-  return imageResponse(await getStore().storage.read(snapshot.screenshotPath));
+  const { snapshot, visitor } = await authorizedSnapshot(c);
+  return imageResponse(await getStore().storage.read(snapshot.screenshotPath), cacheFor(visitor));
 }
 
 /** The snapshot's diff image; 404 when it has none. */
 export async function serveSnapshotDiff(c: Context): Promise<Response> {
-  const { snapshot } = await authorizedSnapshot(c);
+  const { snapshot, visitor } = await authorizedSnapshot(c);
   if (!snapshot.diffPath) {
     notFound("No diff for this snapshot");
   }
-  return imageResponse(await getStore().storage.read(snapshot.diffPath));
+  return imageResponse(await getStore().storage.read(snapshot.diffPath), cacheFor(visitor));
 }
 
 function designNodes(): DesignNodeModel {
@@ -96,12 +121,12 @@ export async function serveDesignRender(c: Context): Promise<Response> {
 
 /** The baseline a snapshot was compared against, frozen at diff time, or the live one. */
 export async function serveBaseline(c: Context): Promise<Response> {
-  const { project, snapshot } = await authorizedSnapshot(c);
+  const { project, snapshot, visitor } = await authorizedSnapshot(c);
   const build = await new BuildModel(getStore().db).get(snapshot.buildId);
   if (!build) {
     notFound("Build not found");
   }
-  const isDefault = c.req.query("reference") === "default";
+  const isDefault = wantsDefaultReference(c, visitor);
   if (!isDefault && (snapshot.comparisonImagePath || snapshot.comparisonMetadata)) {
     return await frozenReference(snapshot, project, build);
   }
@@ -110,6 +135,18 @@ export async function serveBaseline(c: Context): Promise<Response> {
     ? await defaultBaseline(c, baselines, project, snapshot)
     : await currentBaseline(baselines, project, snapshot, build);
   return imageResponse(await baselines.read(baseline), NO_STORE);
+}
+
+/**
+ * Whether the current default-branch reference is asked for. It is not part of a public build's
+ * diff, so a visitor asking for it gets the answer for an unknown project.
+ */
+function wantsDefaultReference(c: Context, visitor: boolean): boolean {
+  const isDefault = c.req.query("reference") === "default";
+  if (visitor && isDefault) {
+    projectHidden();
+  }
+  return isDefault;
 }
 
 async function frozenReference(

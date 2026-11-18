@@ -31,6 +31,8 @@ export interface BuildDiffData {
   snapshots: Snapshot[];
   comments: Comment[];
   selectedId?: string;
+  /** A visitor who is not signed in reads a public build (#1172): no comment thread renders. */
+  readOnly?: boolean;
   canReview: boolean;
   /** Whether the viewer may retry or cancel the build; omitted, the header hides the menu. */
   canManage?: boolean;
@@ -63,6 +65,8 @@ export interface DiffReviewGridProps {
   snapshots: Snapshot[];
   comments: Comment[];
   selected?: Snapshot;
+  /** A visitor who is not signed in reads a public build (#1172): no comment thread renders. */
+  readOnly?: boolean;
   canReview: boolean;
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
@@ -87,13 +91,13 @@ export function selectedSnapshot(snapshots: Snapshot[], selectedId?: string): Sn
   );
 }
 
-/** The comment thread of the selected snapshot; none while the project has review off. */
+/** The comment thread of the selected snapshot; none while review is off, or for a visitor. */
 function SnapshotComments(props: {
   grid: DiffReviewGridProps;
   selected: Snapshot;
 }): HtmlEscapedString | Promise<HtmlEscapedString> | null {
   const { grid, selected } = props;
-  return grid.project.reviewEnabled === false ? null : (
+  return grid.project.reviewEnabled === false || grid.readOnly === true ? null : (
     <DiffComments
       project={grid.project}
       build={grid.build}
@@ -151,6 +155,7 @@ export function ReviewCanvas(
               design={props.design}
               publishedBaseDomain={props.publishedBaseDomain}
               currentSize={props.currentSize}
+              readOnly={props.readOnly}
             />
             <DiffActionBar
               project={project}

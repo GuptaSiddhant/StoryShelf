@@ -1,0 +1,14 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`anonymous pages of a public build > links, posts and fetches nothing but what a visitor may read 1`] = `
+[
+  "/_/:build/",
+  "/api/v1/docs",
+  "/api/v1/openapi.json",
+  "/api/v1/projects/demo/builds/:build/snapshots/:snapshot/diff",
+  "/api/v1/projects/demo/builds/:build/snapshots/:snapshot/image",
+  "/auth/login",
+  "/projects/demo/builds",
+  "/projects/demo/builds/:build/diff?snapshot=:snapshot",
+]
+`;

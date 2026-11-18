@@ -20,6 +20,8 @@ export interface LoginPageState {
   email?: string;
   /** The same-site page to land on after signing in; the home page when absent. */
   returnTo?: string;
+  /** Builds a visitor may browse without an account (a project with a public build, #1172). */
+  publicHref?: string;
 }
 
 /** Resolve auth UI text with defaults. */
@@ -114,6 +116,12 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
               </VStack>
               <script dangerouslySetInnerHTML={{ __html: passkeyLoginScript() }} />
             </div>
+          ) : null}
+
+          {state.publicHref ? (
+            <Button variant="ghost" href={state.publicHref} icon="layers">
+              Browse public builds without an account
+            </Button>
           ) : null}
 
           {ui.helpText ? (

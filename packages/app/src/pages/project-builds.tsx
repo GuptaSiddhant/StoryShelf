@@ -2,6 +2,7 @@ import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
+import { isAnonymousVisitor, publicBuildsOf } from "../routers/anonymous-read.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
@@ -232,7 +233,9 @@ export async function renderProjectBuildsPage(
   if (!project) {
     return null;
   }
-  const all = await new BuildModel(getStore().db).list(project.id);
+  const listed = await new BuildModel(getStore().db).list(project.id);
+  // A visitor sees the public builds only, and nothing (counts, branches) of the others (#1172).
+  const all = isAnonymousVisitor() ? publicBuildsOf(project, listed) : listed;
   const builds = all.filter((build) => matches(build, query));
   const sources = await loadSkipSources(builds);
 

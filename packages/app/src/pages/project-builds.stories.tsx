@@ -52,3 +52,12 @@ export const EveryBuildSkippedShown = pageStory(
   () => renderProjectBuildsPage("design-system", { skipped: "1" }),
   { dataset: "skipped-only" },
 );
+
+/**
+ * A visitor who is not signed in (#1172): only the public `main` builds, no other branch in the
+ * filter, and chrome with the project's Builds and a Sign in button, nothing else.
+ */
+export const AnonymousVisitor = pageStory(() => renderProjectBuildsPage("design-system"), {
+  dataset: "public-main",
+  store: { authEnabled: true, user: null },
+});

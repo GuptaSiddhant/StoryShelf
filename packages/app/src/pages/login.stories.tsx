@@ -46,3 +46,8 @@ export const WrongPassword = pageStory(() =>
 );
 
 export const NoMethodsConfigured = pageStory(() => renderLoginPage({ engineMethods: [] }));
+
+/** A project has a public build: a visitor may browse its builds without an account (#1172). */
+export const WithPublicBuilds = pageStory(() =>
+  renderLoginPage({ engineMethods: [password], publicHref: "/projects/demo/builds" }),
+);

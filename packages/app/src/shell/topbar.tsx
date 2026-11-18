@@ -7,6 +7,7 @@ import { Button } from "../ui/buttons.tsx";
 import { css } from "../ui/css.ts";
 import { Dropdown, DropdownDivider, DropdownItem } from "../ui/dropdown.tsx";
 import { Icon } from "../ui/icons/icon.tsx";
+import { HStack } from "../ui/stacks.tsx";
 import { breadcrumbs, type NavConfig, type NavCrumb } from "./nav.ts";
 /** Slim, translucent bar: project picker plus breadcrumbs (account lives in the sidebar). */
 const shellTopbar = css`
@@ -172,9 +173,25 @@ async function listProjects(): Promise<PickerProject[]> {
   }
 }
 
+/**
+ * A visitor who is not signed in reads one public project (#1172): its name, with no list of the
+ * instance's other projects and no way to create one.
+ */
+const VisitorProject: FC<{ nav?: NavConfig }> = ({ nav }) => (
+  <span class="topbar__pick" data-single="true">
+    <HStack gap="sm" wrap={false}>
+      <Icon name="folder" size="sm" />
+      <span class="topbar__picker">{nav?.projectName ?? nav?.projectSlug ?? ""}</span>
+    </HStack>
+  </span>
+);
+
 /** Dropdown to jump between projects; on global pages it reads "All projects". */
 const ProjectPicker: FC<{ nav?: NavConfig }> = async ({ nav }) => {
-  const { user, config } = getStore();
+  const { user, config, authEnabled } = getStore();
+  if (authEnabled && !user) {
+    return <VisitorProject nav={nav} />;
+  }
   const urls = createUrlBuilder("/", contentHostSuffix(config));
   const projects = await listProjects();
   const canCreate = !user || user.role === "admin" || user.role === "member";

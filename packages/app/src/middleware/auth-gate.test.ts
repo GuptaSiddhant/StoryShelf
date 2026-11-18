@@ -65,7 +65,8 @@ describe("the sign-in gate", () => {
 
   it("keeps the destination (path and query) for a plain and an HTMX request", async () => {
     const app = await anonymousApp();
-    const target = "/projects/app/builds?branch=main";
+    // The builds list of a project with a public build opens to a visitor (#1172); the Library does not.
+    const target = "/projects/app/library?branch=main";
     const expected = `/auth/login?return_to=${encodeURIComponent(target)}`;
     const plain = await app.request(target);
     expect(plain.headers.get("location")).toBe(expected);

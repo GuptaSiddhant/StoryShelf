@@ -1,3 +1,4 @@
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
@@ -14,6 +15,7 @@ import { renderProjectCreatePage } from "../pages/project-create.tsx";
 import { renderProjectsPage } from "../pages/projects.tsx";
 import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
+import { anonymousRead } from "./anonymous-read.ts";
 import { loadBuildDiffData } from "./build-diff-data.ts";
 import { loadComponentPage } from "./component.handlers.ts";
 import { registerDesignCoverage } from "./design-coverage.ts";
@@ -79,7 +81,13 @@ export function registerUiPages(app: ShelfRouter): void {
     }
   });
 
-  app.get("/projects/:slug", (c) => c.redirect(`/projects/${c.req.param("slug")}/library`, 302));
+  // A visitor reads only the builds of a public project (ADR 0011, #1172), so lands on its list.
+  app.get("/projects/:slug", async (c) => {
+    const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
+    const slug = c.req.param("slug");
+    const visitor = (await anonymousRead(c)) === "read";
+    return c.redirect(visitor ? urls.buildsList(slug) : urls.library(slug), 302);
+  });
 
   app.get("/projects/:slug/builds", async (c) => {
     const html = await renderProjectBuildsPage(c.req.param("slug"), {

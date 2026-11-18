@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breadcrumbs, type NavUrls } from "./nav.ts";
+import { breadcrumbs, type NavUrls, visitorNavGroups } from "./nav.ts";
 
 const urls: NavUrls = {
   projects: () => "/projects",
@@ -55,5 +55,12 @@ describe("breadcrumbs (ancestors of the current page only)", () => {
       urls,
     );
     expect(crumbs.every((crumb) => crumb.href !== undefined)).toBe(true);
+  });
+});
+
+describe("visitorNavGroups (a visitor who is not signed in)", () => {
+  it("links the project's builds and nothing else", () => {
+    const items = visitorNavGroups(urls, "docs").flatMap((group) => group.items);
+    expect(items.map((item) => item.href)).toEqual(["/p/docs/builds"]);
   });
 });

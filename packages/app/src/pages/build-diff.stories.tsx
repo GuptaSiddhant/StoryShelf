@@ -48,6 +48,30 @@ async function buildPage(
   });
 }
 
+/**
+ * A visitor who is not signed in reads a public build (#1172): no review controls, comment thread,
+ * retry menu or insights, and chrome with only the project's Builds and Sign in.
+ */
+export const AnonymousVisitor = pageStory(
+  async () =>
+    await buildPage(BUILD_MAIN, {
+      details: {
+        ...(await loadBuildDetails(project, fixture(BUILD_MAIN))),
+        attempts: [],
+        review: null,
+      },
+      readOnly: true,
+      canReview: false,
+      canTriage: false,
+      canManage: false,
+      insight: null,
+      defaultComparison: null,
+      design: [],
+      usage: [],
+    }),
+  { dataset: "public-main", store: { authEnabled: true, user: null } },
+);
+
 /** Undecided changes: the stage, the Approve all / Reject all header and the collapsed details. */
 export const Reviewing = pageStory(() => buildPage(BUILD_REVIEW));
 

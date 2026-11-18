@@ -509,7 +509,8 @@ describe("short links for a signed-out visitor (auth on)", () => {
 
   it("does not open the gate for other paths under /_", async () => {
     const app = await signedOutApp();
-    const paths = ["/_", "/_/", "/_x/y", "/projects/test-project/builds"];
+    // A public project's builds list opens to a visitor (#1172); its Library stays behind sign-in.
+    const paths = ["/_", "/_/", "/_x/y", "/projects/test-project/library"];
     const responses = await Promise.all(paths.map(async (path) => await app.request(path)));
     expect(
       responses.map((response) => [response.status, response.headers.get("location")]),

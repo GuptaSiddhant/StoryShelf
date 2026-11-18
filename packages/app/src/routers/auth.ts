@@ -1,7 +1,9 @@
 import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
 import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
+import { contentHostSuffix } from "@storyshelf/core/config";
 import { UserModel } from "@storyshelf/core/models";
 import { HOST_SESSION_COOKIE, SESSION_COOKIE } from "@storyshelf/core/types";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import { UserFacingError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -10,6 +12,7 @@ import { notifySystem } from "../notify.ts";
 import { renderInviteInvalidPage, renderInvitePage } from "../pages/invite.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
 import { getStore } from "../store.ts";
+import { firstBrowsableProject } from "./anonymous-read.ts";
 import { loginFailureOf } from "./auth-login-failure.ts";
 import { syncLoginMemberships } from "./auth-sync.ts";
 import { publicMessage } from "./helpers.ts";
@@ -117,6 +120,16 @@ interface LoginView {
   returnTo: string;
 }
 
+/** The builds of the first project a visitor may browse, if any; never fails the sign-in page. */
+async function publicHref(): Promise<string | undefined> {
+  const project = await firstBrowsableProject().catch(() => null);
+  if (!project) {
+    return undefined;
+  }
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
+  return urls.buildsList(project.slug);
+}
+
 async function renderEngineLogin(c: Context, engine: Auth, view: LoginView): Promise<Response> {
   return c.html(
     await renderLoginPage({
@@ -124,6 +137,7 @@ async function renderEngineLogin(c: Context, engine: Auth, view: LoginView): Pro
       email: view.email,
       returnTo: view.returnTo,
       engineMethods: loginLinks(engine.loginMethods(), view.returnTo),
+      publicHref: await publicHref(),
     }),
     view.status ?? 200,
   );

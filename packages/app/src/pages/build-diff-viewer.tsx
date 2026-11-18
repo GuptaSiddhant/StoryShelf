@@ -50,6 +50,8 @@ export interface DiffViewerProps {
   publishedBaseDomain?: string;
   /** Natural size of the current screenshot (from its PNG header), when known. */
   currentSize?: ImageSize | null;
+  /** A visitor reads a public build (#1172): no link to the Library, which they may not open. */
+  readOnly?: boolean;
 }
 
 /** The baseline image's natural size, when the reference knows it. */
@@ -193,7 +195,9 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
             {snapshotVariant(selected)} · {selected.viewportWidth}×{selected.viewportHeight}
           </span>
           <DiffFigures selected={selected} sizeChanged={sizeChanged} />
-          <ViewComponentButton project={project} selected={selected} base={publishedBaseDomain} />
+          {props.readOnly === true ? null : (
+            <ViewComponentButton project={project} selected={selected} base={publishedBaseDomain} />
+          )}
         </p>
       </div>
       <ComparisonLine {...props} />
