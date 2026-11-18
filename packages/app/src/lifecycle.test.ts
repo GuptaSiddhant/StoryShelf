@@ -401,6 +401,38 @@ describe("boot checks and the adapter phase", () => {
     expect(adapterRuns).toBe(0);
   });
 
+  it("abandons a setup() whose teardown starts right after the boot checks settle", async () => {
+    let adapterRuns = 0;
+    const { db } = makeDatabase();
+    const storage = withSetupHook(makeStorage().storage, () => {
+      adapterRuns += 1;
+    });
+    const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    const lifecycle = (
+      app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
+    ).lifecycle;
+    await cell.ready;
+    // Boot checks still pending. Callbacks run in registration order, so the teardown below starts
+    // after setup()'s own boot-check callback and before its continuation.
+    const passed = Promise.resolve(null);
+    cell.bootChecked = undefined;
+    cell.bootFailure = passed;
+    const pending = lifecycle.setup();
+    const closing = passed.then(async () => {
+      await lifecycle.teardown();
+    });
+    await expect(pending).rejects.toThrow("teardown ran");
+    await closing;
+    // Only the eager boot run reached the adapters.
+    expect(adapterRuns).toBe(1);
+  });
+
   it("drains an in-flight setup() rerun before teardown and never restarts the consumer", async () => {
     const gate = Promise.withResolvers<null>();
     const order: string[] = [];

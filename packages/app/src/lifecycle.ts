@@ -342,7 +342,6 @@ function refuseBootCheck(cell: LifecycleCell, failed: AdapterSetupResult | null 
 function refuseFailedBoot(
   options: ResolvedShelfOptions,
   cell: LifecycleCell,
-  generation: number,
 ): Promise<void> | null {
   const blocked = invalidSources(options, cell);
   if (blocked) {
@@ -354,7 +353,6 @@ function refuseFailedBoot(
   }
   return cell.bootFailure.then((failed) => {
     refuseBootCheck(cell, failed);
-    assertCurrent(cell, generation);
   });
 }
 
@@ -377,6 +375,22 @@ async function rerunSetup(
   return result;
 }
 
+/** Throw a failed rerun, or a teardown that overtook it; otherwise (re)start the consumer. */
+function resumeAfterSetup(
+  cell: LifecycleCell,
+  generation: number,
+  result: AdapterSetupResult,
+  logger: Logger,
+): void {
+  if (!result.ok) {
+    throw new AdapterLifecycleError("setup", result.failures);
+  }
+  // A teardown during the run closed the adapters: never restart the consumer on them.
+  assertCurrent(cell, generation);
+  cell.consumerStopped = false;
+  startConsumer(cell, logger);
+}
+
 /** Build the `app.lifecycle` namespace closing over one settlement cell. */
 function createLifecycle(
   options: ResolvedShelfOptions,
@@ -392,18 +406,14 @@ function createLifecycle(
     logger,
     setup: async () => {
       const generation = generationOf(cell);
-      const checking = refuseFailedBoot(options, cell, generation);
+      const checking = refuseFailedBoot(options, cell);
       if (checking) {
         await checking;
       }
-      const result = await rerunSetup(options, ctx, logger, cell);
-      if (!result.ok) {
-        throw new AdapterLifecycleError("setup", result.failures);
-      }
-      // A teardown during the run closed the adapters: never restart the consumer on them.
+      // Checked here, in the continuation itself: a teardown may start in any microtask before it.
       assertCurrent(cell, generation);
-      cell.consumerStopped = false;
-      startConsumer(cell, logger);
+      const result = await rerunSetup(options, ctx, logger, cell);
+      resumeAfterSetup(cell, generation, result, logger);
     },
     teardown: async () => {
       timer?.stop();
