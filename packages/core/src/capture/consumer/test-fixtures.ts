@@ -45,6 +45,17 @@ export function gate(): { promise: Promise<null>; open: () => void } {
   };
 }
 
+/** Resolves once `signal` aborts (a handler that stops at its next checkpoint), or `other` settles. */
+export async function untilAborted(signal: AbortSignal, other?: Promise<unknown>): Promise<void> {
+  const aborted = new Promise<void>((resolve) => {
+    if (signal.aborted) resolve();
+    signal.addEventListener("abort", () => {
+      resolve();
+    });
+  });
+  await Promise.race(other === undefined ? [aborted] : [aborted, other]);
+}
+
 export interface Rig {
   clock: ManualClock;
   db: DatabaseAdapter;
