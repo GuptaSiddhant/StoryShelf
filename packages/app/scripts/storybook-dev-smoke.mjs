@@ -105,9 +105,10 @@ async function checkSummaryRing(page, errors) {
   }
 }
 
+const isSummary = () => globalThis.document.activeElement?.tagName === "SUMMARY";
+
 /** The `outline-style` of the first `<summary>` reached by Tab, or `null` when none is reachable. */
 async function focusFirstSummary(page) {
-  const isSummary = () => globalThis.document.activeElement?.tagName === "SUMMARY";
   for (let step = 0; step < 60; step += 1) {
     await page.keyboard.press("Tab");
     if (await page.evaluate(isSummary)) {
