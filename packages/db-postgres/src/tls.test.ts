@@ -100,8 +100,8 @@ async function connect(query: string, ssl?: { ca: string }): Promise<string> {
     fetch_types: false,
   });
   let code = "";
-  sql`select 1`.then(noop, (error: { code?: string }) => {
-    code = error.code ?? "error";
+  sql`select 1`.then(noop, (error: unknown) => {
+    code = (error as { code?: string }).code ?? "error";
   });
   // TLS 1.3: the client checks the certificate after the server's handshake completes.
   await new Promise((resolve) => setTimeout(resolve, 500));
