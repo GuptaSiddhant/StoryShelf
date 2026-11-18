@@ -433,6 +433,49 @@ jobs:
             docker rm -f smoke
           done
 
+  # What a user gets (#393 launch slice, #1134 B5): every public package packed with `npm pack`,
+  # installed from the tarballs (no workspace links, outside this checkout), then the default
+  # `storyshelf server init` scaffold, `npm start`, `create`, `upload` of fixtures/storybook-9 and
+  # one finished build. A dependency missing from a manifest or from the scaffold (#1137) fails here.
+  packed-install:
+    name: packed-install
+    needs: changes
+    if: ${{ needs.changes.outputs.heavy == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.63.0-chromium-${{ runner.os }}
+
+      - name: Install Playwright browser (chromium)
+        working-directory: packages/runner-playwright
+        run: |
+          nubx playwright-core install chromium
+          if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
+            echo "chromium failed to launch; installing system dependencies"
+            nubx playwright-core install-deps chromium
+          fi
+
+      - name: Build packages
+        run: nubx turbo run build --filter='!website'
+
+      - name: Build fixture Storybook
+        uses: ./.github/actions/build-fixture
+        with:
+          fixture: storybook-9
+
+      - name: Install the packed tarballs, scaffold, start, upload, one build
+        run: node scripts/packed-install-smoke.mjs --storybook fixtures/storybook-9
+
   # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
   # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child
   # checks, so requiring those by name would wait forever. This passes when every job passed or
@@ -440,7 +483,18 @@ jobs:
   ci:
     name: ci
     if: ${{ always() }}
-    needs: [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly, image]
+    needs:
+      [
+        changes,
+        verify,
+        storybook-dev,
+        postgres-lifecycle,
+        website,
+        capture,
+        fly,
+        image,
+        packed-install,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
