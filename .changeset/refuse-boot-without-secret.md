@@ -1,7 +1,7 @@
 ---
 "@storyshelf/auth": patch
 "@storyshelf/app": patch
-"@storyshelf/cli": patch
+"storyshelf": patch
 ---
 
 Security: never start with sign-in configured and no valid SECRET
