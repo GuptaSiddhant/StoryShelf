@@ -30,7 +30,10 @@ export interface JobRunContext {
   logger: Logger;
   /** Report progress: renews the job's lease (throttled) and tells the host (`onProgress`). */
   touch(): void;
-  /** Aborted when the job passes `testing.maxJobSeconds`: stop in-process work. */
+  /**
+   * Aborted when the job is cancelled, loses its lease or passes `testing.maxJobSeconds`: stop
+   * in-process work. The consumer keeps the job's slot until `run` returns (at most `STOP_GRACE_MS`).
+   */
   signal: AbortSignal;
 }
 
