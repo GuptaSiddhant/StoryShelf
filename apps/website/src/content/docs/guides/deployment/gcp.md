@@ -29,7 +29,7 @@ terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
 
 ## Wiring outputs
 
-Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): `GCS_BUCKET` + `GOOGLE_CLOUD_PROJECT`, `DATABASE_URL` (`?sslmode=require`), `OIDC_*`, `SECRET`. Output keys (`run_url`, `gcs_bucket`, `database_url`, `identity_tenant_id`) are a stable contract parsed by CI — always present. Grant the runtime service account the Cloud SQL Client and Secret Manager accessor roles post-apply — Terraform creates the resources, IAM bindings stay with your org policy.
+Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): `GCS_BUCKET` + `GOOGLE_CLOUD_PROJECT`, `DATABASE_URL` (the module's URL carries `?sslmode=require`, which does not verify the certificate: use `?sslmode=verify-full` and set `DATABASE_CA` or `DATABASE_CA_FILE` to the instance's server CA; see [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate)), `OIDC_*`, `SECRET`. Output keys (`run_url`, `gcs_bucket`, `database_url`, `identity_tenant_id`) are a stable contract parsed by CI — always present. Grant the runtime service account the Cloud SQL Client and Secret Manager accessor roles post-apply — Terraform creates the resources, IAM bindings stay with your org policy.
 
 See the generated `terraform/README.md` for the CI test profile (unique project prefix per run, documented destroy).
 

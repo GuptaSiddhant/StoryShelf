@@ -66,10 +66,70 @@ describe("runCreate validation", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("exits 1 without a token", async () => {
+  it("exits 1 without a token when the server has sign-in on", async () => {
     setupProject();
+    mockFetch(() => ({ status: "ok", auth: true }));
     await runCreate({ url: "https://shelf.example.com", name: "demo", cwd: dir });
     expect(process.exitCode).toBe(1);
+  });
+
+  it("exits 1 without a token when the server cannot be probed", async () => {
+    setupProject();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => await Promise.reject(new TypeError("fetch failed"))),
+    );
+    await runCreate({ url: "https://shelf.example.com", name: "demo", cwd: dir });
+    expect(process.exitCode).toBe(1);
+  });
+});
+
+describe("runCreate without a token", () => {
+  it("creates the project and token when the server reports sign-in off", async () => {
+    setupProject();
+    const auth: (string | undefined)[] = [];
+    mockFetch((url: string, init?: RequestInit) => {
+      auth.push((init?.headers as Record<string, string> | undefined)?.["Authorization"]);
+      if (url.endsWith("/health")) {
+        return { status: "ok", auth: false };
+      }
+      return url.endsWith("/tokens") ? { token: "ci-token" } : { slug: "demo" };
+    });
+
+    await runCreate({ url: "https://shelf.example.com", name: "demo", cwd: dir });
+
+    expect(process.exitCode).toBeUndefined();
+    expect(auth).toEqual([undefined, undefined, undefined]);
+    await expect(loadStorybookConfig(dir)).resolves.toEqual({
+      slug: "demo",
+      url: "https://shelf.example.com",
+    });
+  });
+
+  it("says the project exists and what to do when the token call fails", async () => {
+    setupProject();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        await Promise.resolve();
+        if (url.endsWith("/tokens")) {
+          return Response.json({ error: { message: "nope" } }, { status: 401 });
+        }
+        return Response.json(url.endsWith("/health") ? { auth: false } : { slug: "demo" });
+      }),
+    );
+    const errors: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+      errors.push(String(chunk));
+      return true;
+    });
+
+    await runCreate({ url: "https://shelf.example.com", name: "demo", cwd: dir });
+
+    expect(process.exitCode).toBe(1);
+    expect(errors.join("\n")).toContain('Project "demo" was created');
+    expect(errors.join("\n")).toContain("Next:");
+    await expect(loadStorybookConfig(dir)).resolves.toMatchObject({ slug: "demo" });
   });
 });
 

@@ -19,6 +19,8 @@ export const Initials = jsxStory(() => (
   </VStack>
 ));
 
+export const Extra = jsxStory(() => <Avatar name="Ada Lovelace" size="xl" />);
+
 export const Group = jsxStory(() => (
   <AvatarGroup>
     <Avatar name="Ada Lovelace" />
