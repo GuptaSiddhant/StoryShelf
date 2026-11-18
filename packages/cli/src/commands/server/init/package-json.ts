@@ -90,7 +90,7 @@ function coreNames(answers: Answers): string[] {
 function featureNames(answers: Answers): string[] {
   const auth = AUTH_PACKAGE[answers.auth];
   return [
-    ...(answers.storage === "local" ? [] : [STORAGE_PACKAGE[answers.storage]]),
+    STORAGE_PACKAGE[answers.storage],
     "@storyshelf/runner-playwright",
     ...(auth === null ? [] : [auth]),
   ];
