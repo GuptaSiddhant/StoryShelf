@@ -13,7 +13,8 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * The StoryShelf product image's server (`docker run ghcr.io/guptasiddhant/storyshelf`).
  *
  * Everything comes from the environment: `DATABASE_URL` (SQLite on `/data` when unset), `AWS_BUCKET`
- * (local storage on `/data` when unset), `SECRET`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`,
+ * (local storage on `/data` when unset), `SECRET` (`SECRET_PREVIOUS` and `SECRET_MIGRATE` to rotate it),
+ * `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`,
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
  * unless set) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
  * `AUTH_PASSWORD` and `SECRET` are required unless `SHELF_AUTH=none` opts out explicitly, and a
@@ -89,6 +90,9 @@ const app = createShelfApp({
   observability,
   config: {
     secret,
+    // Rotation (guides/deployment/secret-rotation): the old key decrypts until credentials move.
+    previousSecret: nonEmpty(env["SECRET_PREVIOUS"]),
+    migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken: env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"],
     publicBaseUrl,
     ...(trustProxy === undefined ? {} : { trustProxy }),

@@ -48,6 +48,7 @@ Everything comes from the environment:
 | `DATABASE_URL`                                            | `postgres://…` or `mysql://…`. Unset: SQLite at `/data/shelf.db`.        |
 | `AWS_BUCKET`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`         | S3-compatible storage (credentials from the AWS SDK chain). Unset: `/data`. |
 | `SECRET`                                                  | At least 32 characters; signs sessions and encrypts stored credentials. Required with sign-in. |
+| `SECRET_PREVIOUS`, `SECRET_MIGRATE=true`                   | Rotate `SECRET` without losing stored credentials: see [Rotating the server secret](/guides/deployment/secret-rotation/). |
 | `PUBLIC_BASE_URL`                                         | The public origin; required for notification links.                      |
 | `AUTH_PASSWORD`, `AUTH_EMAIL`                             | Bootstrap the local admin (needs `SECRET`). Required unless `SHELF_AUTH=none`. |
 | `SHELF_AUTH=none`                                         | Run without sign-in: every route is open. Refused together with `AUTH_PASSWORD`. |
