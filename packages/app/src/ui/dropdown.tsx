@@ -154,7 +154,9 @@ export const Dropdown: FC<{
       <summary class={block ? dropdownTriggerGhost : dropdownTrigger} aria-label={ariaLabel}>
         {label}
         {iconOnly ? null : (
-          <Icon name={placement === "above" ? "chevron-up" : "chevron-down"} size="sm" />
+          <span data-dropdown-chevron>
+            <Icon name={placement === "above" ? "chevron-up" : "chevron-down"} size="sm" />
+          </span>
         )}
       </summary>
       <div class={menuClasses[placement][align]} role="menu">

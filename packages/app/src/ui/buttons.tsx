@@ -29,12 +29,21 @@ const btnBase = css`
     border-color var(--dur-fast) var(--ease),
     filter var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
-  &:active:not(:disabled) {
+  &:active:not(:disabled):not([aria-disabled="true"]) {
     transform: translateY(1px);
   }
-  &:disabled {
-    opacity: 0.55;
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 1;
+    background: var(--surface-muted);
+    border-color: var(--border);
+    color: var(--text-secondary);
+    box-shadow: none;
+    filter: none;
     cursor: not-allowed;
+  }
+  &[aria-disabled="true"] {
+    pointer-events: none;
   }
 `;
 

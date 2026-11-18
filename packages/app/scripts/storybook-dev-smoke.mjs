@@ -91,6 +91,32 @@ async function inspect(page, id, errors) {
     errors.push("smoke: the story rendered an empty canvas");
   }
   await page.waitForTimeout(200);
+  await checkSummaryRing(page, errors);
+}
+
+/** Tab to the first `<summary>` of a story (if any) and fail if it shows the browser's own ring (#1132). */
+async function checkSummaryRing(page, errors) {
+  if ((await page.locator("summary").count()) === 0) {
+    return;
+  }
+  const outline = await focusFirstSummary(page);
+  if (outline === "auto") {
+    errors.push("focus: a <summary> shows the browser's default ring (outline-style: auto)");
+  }
+}
+
+/** The `outline-style` of the first `<summary>` reached by Tab, or `null` when none is reachable. */
+async function focusFirstSummary(page) {
+  const isSummary = () => globalThis.document.activeElement?.tagName === "SUMMARY";
+  for (let step = 0; step < 60; step += 1) {
+    await page.keyboard.press("Tab");
+    if (await page.evaluate(isSummary)) {
+      return await page.evaluate(
+        () => globalThis.getComputedStyle(globalThis.document.activeElement).outlineStyle,
+      );
+    }
+  }
+  return null;
 }
 
 async function check(browser, id) {
