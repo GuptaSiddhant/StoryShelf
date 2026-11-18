@@ -40,10 +40,27 @@ export interface LifecycleCell {
   consumerRun?: Promise<void>;
   /** Teardown ran: the consumer stays stopped (a late "adapters are ready" must not restart it). */
   consumerStopped?: boolean;
+  /** How many teardowns have started: a setup attempt begun before one is stale and stops. */
+  teardowns?: number;
 }
 
 /** Longest teardown waits for background boot tasks before closing adapters anyway. */
 const BACKGROUND_DRAIN_MS = 5000;
+
+/** Thrown by a `setup()` whose attempt a teardown overtook: it neither runs hooks nor starts the consumer. */
+const ABANDONED_SETUP = "Setup abandoned: teardown ran while setup was pending";
+
+/** The current teardown generation; an attempt compares it to the one it started in. */
+function generationOf(cell: LifecycleCell): number {
+  return cell.teardowns ?? 0;
+}
+
+/** Throw when a teardown started since `generation` was read. */
+function assertCurrent(cell: LifecycleCell, generation: number): void {
+  if (generationOf(cell) !== generation) {
+    throw new Error(ABANDONED_SETUP);
+  }
+}
 
 /** Register a boot task so `teardown()` does not close adapters underneath it. */
 export function trackBackground(cell: LifecycleCell, task: Promise<unknown>): void {
@@ -61,8 +78,12 @@ export function startConsumer(cell: LifecycleCell, logger: Logger): void {
   });
 }
 
-/** Stop polling and wait for the jobs in flight to finish (the SIGTERM drain). */
+/**
+ * Stop polling and wait for the jobs in flight to finish (the SIGTERM drain). Also invalidates
+ * pending setup attempts, whose adapter hooks `drainBackground` then outwaits.
+ */
 async function stopConsumer(cell: LifecycleCell): Promise<void> {
+  cell.teardowns = generationOf(cell) + 1;
   cell.consumerStopped = true;
   await cell.consumer?.stop();
   await cell.consumerRun;
@@ -143,11 +164,19 @@ function kickSetup(
     },
     () => {}, // Intentionally empty — `cell.ready` settles the rejection as a failed readiness
   );
+  const generation = generationOf(cell);
   cell.ready = (async (): Promise<AdapterSetupResult> => {
     const failed = await bootFailure;
-    return failed ?? (await runAdapterPhase(options, ctx, logger));
+    if (failed) {
+      return failed;
+    }
+    // Teardown overtook the boot checks: never run adapter hooks on adapters being closed.
+    return generationOf(cell) === generation
+      ? await runAdapterPhase(options, ctx, logger)
+      : { ok: false, failures: [] };
   })();
   trackSettlement(cell, cell.ready);
+  trackBackground(cell, cell.ready);
 }
 
 /** Login method count, or null when the engine throws during introspection. */
@@ -313,6 +342,7 @@ function refuseBootCheck(cell: LifecycleCell, failed: AdapterSetupResult | null 
 function refuseFailedBoot(
   options: ResolvedShelfOptions,
   cell: LifecycleCell,
+  generation: number,
 ): Promise<void> | null {
   const blocked = invalidSources(options, cell);
   if (blocked) {
@@ -322,12 +352,9 @@ function refuseFailedBoot(
     refuseBootCheck(cell, cell.bootChecked);
     return null;
   }
-  const stoppedBefore = cell.consumerStopped === true;
   return cell.bootFailure.then((failed) => {
     refuseBootCheck(cell, failed);
-    if (!stoppedBefore && cell.consumerStopped === true) {
-      throw new Error("Setup abandoned: teardown ran while the boot checks were pending");
-    }
+    assertCurrent(cell, generation);
   });
 }
 
@@ -344,6 +371,7 @@ async function rerunSetup(
 ): Promise<AdapterSetupResult> {
   const running = runAdapterPhase(options, ctx, logger);
   cell.ready = running;
+  trackBackground(cell, running);
   const result = await running;
   cell.settled = result;
   return result;
@@ -363,7 +391,8 @@ function createLifecycle(
     },
     logger,
     setup: async () => {
-      const checking = refuseFailedBoot(options, cell);
+      const generation = generationOf(cell);
+      const checking = refuseFailedBoot(options, cell, generation);
       if (checking) {
         await checking;
       }
@@ -371,6 +400,8 @@ function createLifecycle(
       if (!result.ok) {
         throw new AdapterLifecycleError("setup", result.failures);
       }
+      // A teardown during the run closed the adapters: never restart the consumer on them.
+      assertCurrent(cell, generation);
       cell.consumerStopped = false;
       startConsumer(cell, logger);
     },

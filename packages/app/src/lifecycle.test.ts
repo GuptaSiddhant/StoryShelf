@@ -313,14 +313,20 @@ describe("job consumer lifecycle", () => {
 });
 
 /** The adapter with a `lifecycle.setup` hook that calls `onSetup`. */
-function withSetupHook<T extends object>(adapter: T, onSetup: () => void): T {
+function withSetupHook<T extends object>(
+  adapter: T,
+  onSetup: () => Promise<void> | void,
+  onTeardown: () => void = () => {},
+): T {
   return {
     ...adapter,
     lifecycle: {
       setup: async (): Promise<void> => {
-        onSetup();
+        await onSetup();
       },
-      teardown: async (): Promise<void> => {},
+      teardown: async (): Promise<void> => {
+        onTeardown();
+      },
       health: async () => ({ ok: true }),
     },
   };
@@ -386,11 +392,51 @@ describe("boot checks and the adapter phase", () => {
       app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
     ).lifecycle;
     const pending = lifecycle.setup();
-    await lifecycle.teardown();
+    const closing = lifecycle.teardown();
     gate.resolve(null);
     await expect(pending).rejects.toThrow("teardown ran");
+    await closing;
     await cell.ready;
-    // Only the eager boot run reached the adapters; the abandoned setup() did not.
-    expect(adapterRuns).toBe(1);
+    // Neither the eager boot run nor the abandoned setup() reached the closed adapters.
+    expect(adapterRuns).toBe(0);
+  });
+
+  it("drains an in-flight setup() rerun before teardown and never restarts the consumer", async () => {
+    const gate = Promise.withResolvers<null>();
+    const order: string[] = [];
+    let runs = 0;
+    const { db } = makeDatabase();
+    const storage = withSetupHook(
+      makeStorage().storage,
+      async () => {
+        runs += 1;
+        if (runs === 2) {
+          await gate.promise;
+        }
+        order.push(`setup ${runs}`);
+      },
+      () => order.push("teardown"),
+    );
+    const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+    const consumer = { isRunning: () => false, start: vi.fn(async () => {}), stop: async () => {} };
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+      consumer: consumer as unknown as LifecycleCell["consumer"],
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    const lifecycle = (
+      app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
+    ).lifecycle;
+    await cell.ready;
+    const pending = lifecycle.setup();
+    const closing = lifecycle.teardown();
+    gate.resolve(null);
+    await expect(pending).rejects.toThrow("teardown ran");
+    await closing;
+    // The rerun's hook finished before the adapters were torn down, and nothing restarted polling.
+    expect(order).toEqual(["setup 1", "setup 2", "teardown"]);
+    expect(consumer.start).not.toHaveBeenCalled();
   });
 });
