@@ -85,5 +85,10 @@ const wide = (
   </table>
 );
 
+/** No rows: one full-width message row, and no header for nothing. */
+export const Empty = jsxStory(() => (
+  <Table label="Tokens" empty="No tokens yet. Create one for CI." />
+));
+
 /** Wider than a 375px phone: the surface scrolls sideways and takes focus, so a keyboard can scroll it. */
 export const Overflowing = jsxStory(() => <Table label="Recent captures">{wide}</Table>);

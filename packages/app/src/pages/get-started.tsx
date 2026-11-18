@@ -48,15 +48,15 @@ const markerCurrent = css`
   ${markerBase}
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent-fg);
+  color: var(--accent-contrast);
 `;
 
 const markerDone = css`
   /* get-started-marker-done */
   ${markerBase}
-  background: var(--status-approved);
+  background: var(--status-approved-bg);
   border-color: var(--status-approved);
-  color: var(--accent-fg);
+  color: var(--status-approved-fg);
 `;
 
 type StepState = "pending" | "current" | "done";

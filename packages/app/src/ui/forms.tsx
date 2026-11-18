@@ -52,14 +52,13 @@ const fieldInput = css`
   &:hover:not(:disabled) {
     border-color: color-mix(in srgb, var(--text-secondary) 45%, var(--border));
   }
-  &:focus {
-    outline: none;
+  &:focus-visible {
     border-color: var(--ring);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent);
   }
   &:disabled {
     background: var(--surface-muted);
     color: var(--text-secondary);
+    opacity: 1;
     cursor: not-allowed;
   }
 `;
@@ -68,9 +67,8 @@ const fieldInputError = css`
   /* field-input-error */
   ${fieldInput}
   border-color: var(--status-rejected);
-  &:focus {
+  &:focus-visible {
     border-color: var(--status-rejected);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-rejected) 25%, transparent);
   }
 `;
 
@@ -264,6 +262,10 @@ const checkLabel = css`
   font-weight: 500;
   font-size: var(--text-base);
   cursor: pointer;
+  &:has(input:disabled) {
+    color: var(--text-secondary);
+    cursor: not-allowed;
+  }
 `;
 
 const checkInput = css`
@@ -272,6 +274,11 @@ const checkInput = css`
   height: 1rem;
   accent-color: var(--accent);
   flex: none;
+  &:disabled {
+    opacity: 1;
+    cursor: not-allowed;
+    accent-color: var(--text-secondary);
+  }
 `;
 
 /** Inline checkbox row with an optional hint. */
