@@ -4,7 +4,7 @@ exports[`server init output > is unchanged for auth oauth 1`] = `
 {
   "files": [
     "package.json 602 60b3e140a2ba3dab0f8a4dbabb73436ab05d0cd5118e980cd6f1fce4f04220e9",
-    "src/index.ts 1558 1acf2d991a546048913d14678bf89223469d6ffd8a6ef08342b5734be5db4079",
+    "src/index.ts 1726 17040519ef43045002a9bf58fbc7f8e255fb9d642ec09252ac3ab70dc1939d77",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -24,7 +24,7 @@ exports[`server init output > is unchanged for auth password 1`] = `
 {
   "files": [
     "package.json 602 60b3e140a2ba3dab0f8a4dbabb73436ab05d0cd5118e980cd6f1fce4f04220e9",
-    "src/index.ts 1598 d568bdadfa83c4f1580163c067894662b48b4c0d936b5d8b3afdda029554904d",
+    "src/index.ts 1766 f4efd409a3c61c112e558065b8804439a26b81da48b0fedec81d7cc9fc0fa1e8",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -47,7 +47,7 @@ exports[`server init output > is unchanged for aws full 1`] = `
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
     "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
-    "src/index.ts 1745 3766956929e3cade526d40b4341424e6b62b181a2ad16db0257436403941d3c0",
+    "src/index.ts 1913 f900dd85940217081c40f4c5890735a37c8ae249210d3704913ec45b3827b79a",
     "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
     "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
     "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
@@ -89,7 +89,7 @@ exports[`server init output > is unchanged for aws minimal 1`] = `
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
     "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
-    "src/index.ts 1745 3766956929e3cade526d40b4341424e6b62b181a2ad16db0257436403941d3c0",
+    "src/index.ts 1913 f900dd85940217081c40f4c5890735a37c8ae249210d3704913ec45b3827b79a",
     "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
     "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
     "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
@@ -131,7 +131,7 @@ exports[`server init output > is unchanged for azure full 1`] = `
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
     "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
-    "src/index.ts 1653 bbd6623e80ab6a65c000e1f778b733466900e010555a993607bbca2b0f3fb48a",
+    "src/index.ts 1821 4e98bc65dfb313968e13b4e30039ad9469f496a02881f1f6471098919acdedb5",
     "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
     "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
     "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
@@ -174,7 +174,7 @@ exports[`server init output > is unchanged for azure minimal 1`] = `
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
     "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
-    "src/index.ts 1653 bbd6623e80ab6a65c000e1f778b733466900e010555a993607bbca2b0f3fb48a",
+    "src/index.ts 1821 4e98bc65dfb313968e13b4e30039ad9469f496a02881f1f6471098919acdedb5",
     "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
     "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
     "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
@@ -214,7 +214,7 @@ exports[`server init output > is unchanged for database better-sqlite3 1`] = `
 {
   "files": [
     "package.json 602 8cf82eaada0fb263126528259cc98e3d15de70efb61c0186361de230deea4f9b",
-    "src/index.ts 1215 4daab7c6b397b75bd8049ec5c4ce9be49d60675412d8644208a92a1c747492f1",
+    "src/index.ts 1383 f2618dec8f867406935dd3a04473db3810e75d660f26916620fd9a11de90e422",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -234,7 +234,7 @@ exports[`server init output > is unchanged for database bun-sqlite 1`] = `
 {
   "files": [
     "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
-    "src/index.ts 1203 0e1ac81afc772f32b8d1f7f29a87400a56990debdefa39b4446f15ca53efdca3",
+    "src/index.ts 1371 af2b8e7c4fe7e482cb2fb0836ee16cb21359730bd54af33a110ac0fa0b12ef03",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -254,7 +254,7 @@ exports[`server init output > is unchanged for database d1 1`] = `
 {
   "files": [
     "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
-    "src/index.ts 1339 4ac97bc084a961d73662c4ad2b6fce6de923550034e6e015357b3a14ab65f832",
+    "src/index.ts 1507 ce6f283c6abda1bc084a4eb1ea2d11da2cc78b9f1146d44aae9587c17fa02f1d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -274,7 +274,7 @@ exports[`server init output > is unchanged for database mysql 1`] = `
 {
   "files": [
     "package.json 592 57b9162eafcfa4898f1826e8f15de4b860704810cd00f0707eb82b061a3a2601",
-    "src/index.ts 1186 3a7bcc52db7b364ff21d814808aa3aedc6d21cf29c63223e2d852c5ee7e6b768",
+    "src/index.ts 1354 47d2721269e685e0818c6de3d793d06c3b4d9148b7ff458db30af2ffca3a8945",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -294,7 +294,7 @@ exports[`server init output > is unchanged for database neon 1`] = `
 {
   "files": [
     "package.json 613 b0337a26c5b1bd3489f0a3e9fd4caadba84eb5577aa4336046c3c0705328a4b4",
-    "src/index.ts 1192 652d808ab341eaf740ef4dd82ca3082e11b6a5240d109828659e4d17dfb6af8f",
+    "src/index.ts 1360 8ad19552820056778aa59f34c21e6ffa8423f71ff9af20c7897e7b730f17c507",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -314,7 +314,7 @@ exports[`server init output > is unchanged for database neon-http 1`] = `
 {
   "files": [
     "package.json 613 b0337a26c5b1bd3489f0a3e9fd4caadba84eb5577aa4336046c3c0705328a4b4",
-    "src/index.ts 1205 5a6d8ac57ad794adf73e47dea3ddfb780785892ff1e0e6a3409849acb5d44698",
+    "src/index.ts 1373 6d31faa2f561888be6418f44fa121e30d3d79f24e983b2fbe6c225b3bd5b6cdb",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -334,7 +334,7 @@ exports[`server init output > is unchanged for database pg 1`] = `
 {
   "files": [
     "package.json 591 20aac0ee0138bfad7023ab533fd8b683a5d0a517d1556ad013fb92e0255ba2a9",
-    "src/index.ts 1186 322ac2d25c33aa32137bc4f5f900403b8370f55c56955b3c48016a1126e383c9",
+    "src/index.ts 1354 dc05013e2c1a26ce93f9dddec3ef777296fc3cd2611b8aabad179a9a9f232d1c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -354,7 +354,7 @@ exports[`server init output > is unchanged for database pglite 1`] = `
 {
   "files": [
     "package.json 609 4bea65654d3f94c08f493689cd3989c67e1b1162e1b4b59ad9240e6545c56fa0",
-    "src/index.ts 1164 13058f975c149f7347230e60b37bd44653969250bdce5d843389824dd4bc4d50",
+    "src/index.ts 1332 67b53b9cc40b081cb319c797245e36e0d8b4c089d407db301e56ac3b526ebbb5",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -374,7 +374,7 @@ exports[`server init output > is unchanged for database planetscale 1`] = `
 {
   "files": [
     "package.json 608 a8da912b4d662495aa43262b5a2c4f28c3774031908c9dbcb99e1908306601fb",
-    "src/index.ts 1210 db29550a58afcea062e930b57a1fa87c49ea0ea002f7fd6757fb6502d02741db",
+    "src/index.ts 1378 8559b1ce21d08fb137565b58fc02c94a67682c596ee9fd0b76afc915f1b70d2b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -394,7 +394,7 @@ exports[`server init output > is unchanged for database postgres 1`] = `
 {
   "files": [
     "package.json 571 29be6efe38d016df0dce21cc39450d16905cfae489371f84ef80df98fb3ecae8",
-    "src/index.ts 1195 e2eae3f2d52328b0c40a0a1be8a6da7e00df0f4a4f1776bdf3cda26fb3ef4d28",
+    "src/index.ts 1363 889fe35a7e6f38bd2426bffb03c3448f99af87745b8be59baf1f7a949de7c9db",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -414,7 +414,7 @@ exports[`server init output > is unchanged for database sqlite 1`] = `
 {
   "files": [
     "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -434,7 +434,7 @@ exports[`server init output > is unchanged for database tidb 1`] = `
 {
   "files": [
     "package.json 607 e1760ad1e1b859fc4014a60bee67ea014442f7b215f094da93ed58c932c8d281",
-    "src/index.ts 1189 f51e304db4f919450461e25d57cedcfa970ce8586dbe3071b373a6bfbda68993",
+    "src/index.ts 1357 7d4365d6140b13f01ff007c84a4f8a97cdba2a222d55ff2738ce07186c577362",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -454,7 +454,7 @@ exports[`server init output > is unchanged for database turso 1`] = `
 {
   "files": [
     "package.json 602 dfe838845f36dc3738b4748a4fa48b4d72f92d3749cbf72ac650101a66ab8bfa",
-    "src/index.ts 1240 930248aac2bfcc5ce355f7cb72d51c67130c382da3b56fd7e5fb37003f668087",
+    "src/index.ts 1408 a4d3ace68aabb6ff02b84d3841d37e4d76ba6b8a0495af7f9e39e7d8e1870121",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -474,7 +474,7 @@ exports[`server init output > is unchanged for database vercel 1`] = `
 {
   "files": [
     "package.json 606 865f1363ae1a272928ccf18f987dbc8e8502100b068b455104a02e9aa81c18e3",
-    "src/index.ts 1164 468c4fdc1dec69e978845e536ddb85dcb574f3f7bc9994b64c1f335867b03660",
+    "src/index.ts 1332 272b799482eed6d07ebb62d2634acac175d45d891309da020304526e6423488d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -494,7 +494,7 @@ exports[`server init output > is unchanged for design 1`] = `
 {
   "files": [
     "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -516,7 +516,7 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "package.json 747 952fc180079deca9fbd980cfe13a1326407e849186c56783649f8d38fa94b689",
-    "src/index.ts 1186 3a7bcc52db7b364ff21d814808aa3aedc6d21cf29c63223e2d852c5ee7e6b768",
+    "src/index.ts 1354 47d2721269e685e0818c6de3d793d06c3b4d9148b7ff458db30af2ffca3a8945",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -539,7 +539,7 @@ exports[`server init output > is unchanged for docker single container 1`] = `
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "package.json 724 cb1904979c9b31421ee7878583671480cec542920d73744ee6f7c1c25dbedc1a",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -563,7 +563,7 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
     "package.json 748 50458104ffc240628488cd54781db547c985118dff1c5ca0602ff634e811aff9",
-    "src/index.ts 1195 e2eae3f2d52328b0c40a0a1be8a6da7e00df0f4a4f1776bdf3cda26fb3ef4d28",
+    "src/index.ts 1363 889fe35a7e6f38bd2426bffb03c3448f99af87745b8be59baf1f7a949de7c9db",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -585,7 +585,7 @@ exports[`server init output > is unchanged for everything on 1`] = `
 {
   "files": [
     "package.json 748 f227703cd9e56ea6bb1b8a6f62e08d3242343f49ad727d08260d39fb2f24f0d5",
-    "src/index.ts 2802 4e15bac4f50c3172312a15e39b03e6bca9f5e24c761f1dd5603ae1c3e755ef64",
+    "src/index.ts 2970 b8b7032c6a24ec8c3f620a413c8916b7c84006ee242363cf39bc9f5814708416",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -608,7 +608,7 @@ exports[`server init output > is unchanged for gcp full 1`] = `
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
     "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
-    "src/index.ts 1599 c7f0427190e3dc8b5620666aa73284f3b2621ce01ff86a3fa329fa7e9bb34583",
+    "src/index.ts 1767 8f4b9bb8f1c346b6f9b13ad3264bc43557d776dde93b5d587dfcd6512530fd47",
     "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
     "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
     "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
@@ -651,7 +651,7 @@ exports[`server init output > is unchanged for gcp minimal 1`] = `
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
     "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
-    "src/index.ts 1599 c7f0427190e3dc8b5620666aa73284f3b2621ce01ff86a3fa329fa7e9bb34583",
+    "src/index.ts 1767 8f4b9bb8f1c346b6f9b13ad3264bc43557d776dde93b5d587dfcd6512530fd47",
     "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
     "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
     "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
@@ -691,7 +691,7 @@ exports[`server init output > is unchanged for git on 1`] = `
 {
   "files": [
     "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -713,7 +713,7 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "package.json 724 cb1904979c9b31421ee7878583671480cec542920d73744ee6f7c1c25dbedc1a",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -734,7 +734,7 @@ exports[`server init output > is unchanged for local with advanced adapters 1`] 
 {
   "files": [
     "package.json 607 e1760ad1e1b859fc4014a60bee67ea014442f7b215f094da93ed58c932c8d281",
-    "src/index.ts 1189 f51e304db4f919450461e25d57cedcfa970ce8586dbe3071b373a6bfbda68993",
+    "src/index.ts 1357 7d4365d6140b13f01ff007c84a4f8a97cdba2a222d55ff2738ce07186c577362",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -754,7 +754,7 @@ exports[`server init output > is unchanged for notifications 1`] = `
 {
   "files": [
     "package.json 632 6b615b4d431c63f16df500c2c7e6bf60ef1aa00a86371d825a6ec2aea054fea7",
-    "src/index.ts 1781 b9e2945dfe974fdf2bde23e4900d7f64402c9ba55ccef1bf7b24c5d72db7a9f0",
+    "src/index.ts 1949 ca28a54db59d9a4e75d677c385d913f419e9e016037a7210ee3115e92ea22761",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -774,7 +774,7 @@ exports[`server init output > is unchanged for notifications with oauth 1`] = `
 {
   "files": [
     "package.json 665 5cbc9e474910ad7cf3d396729c279e68f1bddab02d04b586c45633a0b5e2e79a",
-    "src/index.ts 2287 7a7326c90ff824e4971cc0c30e433802b26e4bf8a090c5bbd176925be698d730",
+    "src/index.ts 2455 cdaa63638a1b2a42ee02602261310654c1b515ca2fb2ca4d3cb6c45d4975b51d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -794,7 +794,7 @@ exports[`server init output > is unchanged for notifications with password auth 
 {
   "files": [
     "package.json 665 5cbc9e474910ad7cf3d396729c279e68f1bddab02d04b586c45633a0b5e2e79a",
-    "src/index.ts 2327 d339d8aa0200e2b3dbf2c15ce439dfc13956d4da95914569b5befec3487c1b94",
+    "src/index.ts 2495 86fb05f36accc19eacc94761f439bd329bdcf640b92c0d37c91bca85aec6d8d3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -814,7 +814,7 @@ exports[`server init output > is unchanged for observability 1`] = `
 {
   "files": [
     "package.json 644 3a105bb0479e928391d362c69e3e9b4bdb37eeb5019b1b133d6333672faff84a",
-    "src/index.ts 1582 eb10945da5377af69d8d5a8f5d12109605190a64e08d9c9ff3807afecf81fd3b",
+    "src/index.ts 1750 ba269103db39a6bc9cbf24cd42086050bbdd5fad580267f34a8a415c8a151bfc",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -834,7 +834,7 @@ exports[`server init output > is unchanged for storage azure 1`] = `
 {
   "files": [
     "package.json 611 e224a556aa4439de652f02498d720e8f3b445a5a20aae791e813bb352be22fe7",
-    "src/index.ts 1252 55c0dcc7f6b1cee42929bc38815e7eb5f6f1048da3ac137ac74059532a66130b",
+    "src/index.ts 1420 42c2a8d21d1ae49f220ff7d104d6aedfd016ade9c61b73d159827b6368d293ba",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -854,7 +854,7 @@ exports[`server init output > is unchanged for storage gcs 1`] = `
 {
   "files": [
     "package.json 609 cf7dd0cbba67757021776230b2d2fd535197afbbef555414c08185e2cc986fbf",
-    "src/index.ts 1198 43298caf06392f88d844d347ad7d105e54a7c88bf0ad0c6db95263dacd71c321",
+    "src/index.ts 1366 e27b48a8f36e2af674bd728f9eb3a593d15cb68734f982c155520bed232a8a9b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
@@ -874,7 +874,7 @@ exports[`server init output > is unchanged for storage s3 1`] = `
 {
   "files": [
     "package.json 608 0492e5b8eaeab1f08e0aeb43886ad71610e519135acf29b31519b625acd0419f",
-    "src/index.ts 1226 0409f7c07d1504dde3a74859838280a54d1d9dc7fe9a18f1783153abc904efce",
+    "src/index.ts 1394 de5940a16b3c1b6faa870fac7461d811e3ff681f59c0673d4c3ec3d20572dbef",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts

@@ -16,6 +16,7 @@ export function createClient(serverUrl: string, token?: string): Client {
     buildRequestHeaders(authHeaders, contentType);
 
   return {
+    health: async () => (await fetchJson(`${baseUrl}/api/v1/health`, {})) as ServerHealth,
     projects: createProjectsApi(baseUrl, authHeaders, requestHeaders),
   };
 }
@@ -116,7 +117,17 @@ export interface BuildCreated {
   testing?: boolean;
 }
 
+/** The open liveness answer of `GET /api/v1/health`; fields newer than the server are absent. */
+export interface ServerHealth {
+  /** Whether the server has sign-in; false means development mode, where every operation is permitted. */
+  auth?: boolean;
+  testing?: boolean;
+  version?: string;
+}
+
 interface Client {
+  /** Probe the server's open health endpoint (no token needed). */
+  health: () => Promise<ServerHealth>;
   projects: {
     create: (json: {
       name: string;

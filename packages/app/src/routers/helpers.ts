@@ -43,8 +43,8 @@ export function unauthorized(): never {
 }
 
 /** Throw a 403 Forbidden error for requests lacking the required role. */
-export function forbidden(): never {
-  throw new HTTPException(403, { message: "Forbidden" });
+export function forbidden(message = "Forbidden"): never {
+  throw new HTTPException(403, { message });
 }
 
 /** Throw a 404 Not Found error with a custom message. */
@@ -199,16 +199,31 @@ export async function resolveAuthorizedProject(
   return found;
 }
 
-/** The token's project when its owner's effective role is one of `minRoles`; 403 otherwise. */
+/**
+ * The token's project when its owner's effective role is one of `minRoles`; 403 otherwise, saying
+ * which role the token has and which it needs. With no auth adapter (development mode, ADR 0008)
+ * a project token may do anything, as `assertRole` permits for everyone.
+ */
 async function authorizeToken(
   { project, token }: { project: Project; token: Token },
   minRoles: readonly ProjectRole[],
 ): Promise<Project> {
+  if (!getStore().authEnabled) {
+    return project;
+  }
   const role = await tokenProjectRole(token, project.id);
   if (!role || !minRoles.includes(role)) {
-    forbidden();
+    forbidden(tokenRefusal(role, minRoles));
   }
   return project;
+}
+
+/** Why a token was refused: its role (or none, when its owner is gone) and the roles that may. */
+function tokenRefusal(role: ProjectRole | null, minRoles: readonly ProjectRole[]): string {
+  const needs = `needs the ${minRoles.join(" or ")} role`;
+  return role
+    ? `This token has the ${role} role on the project but this action ${needs}. Create a token as a project developer or admin.`
+    : `This token's owner has no role on the project, so it cannot act; this action ${needs}. Create a new token.`;
 }
 
 /**
