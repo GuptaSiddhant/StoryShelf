@@ -562,6 +562,10 @@
           "uploadUrl": {
             "type": "string"
           },
+          "buildUrl": {
+            "type": "string",
+            "description": "Path of the build page, from the server's URL builder. Never absolute: a client joins it to the server URL it already uses."
+          },
           "baselineSha": {
             "type": "string",
             "nullable": true
@@ -571,7 +575,7 @@
             "description": "False when the server has no `testing` option: the build is published but never captured or compared."
           }
         },
-        "required": ["build", "uploadUrl", "baselineSha", "testing"]
+        "required": ["build", "uploadUrl", "buildUrl", "baselineSha", "testing"]
       },
       "BuildCreate": {
         "type": "object",
