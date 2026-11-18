@@ -149,6 +149,7 @@ describe("streaming build upload (JSON + PUT)", () => {
   interface CreatedBody {
     build: Build;
     uploadUrl: string;
+    buildUrl: string;
     testing: boolean;
   }
 
@@ -195,6 +196,7 @@ describe("streaming build upload (JSON + PUT)", () => {
     expect(created.uploadUrl).toBe(
       `/api/v1/projects/stream-project/builds/${created.build.id}/zip`,
     );
+    expect(created.buildUrl).toBe(`/projects/stream-project/builds/${created.build.id}/diff`);
     expect(await storage.exists(storybookZipPath("p1", created.build.id))).toBe(false);
     const labels = await new LabelModel(db).listForBuild(created.build.id);
     expect(labels.map((label) => `${label.typeKey}=${label.value}`)).toEqual(["pr=7"]);

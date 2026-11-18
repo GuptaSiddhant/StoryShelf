@@ -162,7 +162,10 @@ class CaptureChild {
   readonly #handler: KindHandler;
   readonly #logger: Logger;
   readonly #send: (message: ChildMessage) => void;
-  readonly #running = new Map<string, { job: ConsumerJob; done: Promise<void> }>();
+  readonly #running = new Map<
+    string,
+    { job: ConsumerJob; done: Promise<void>; abort: AbortController }
+  >();
 
   constructor(handler: KindHandler, logger: Logger, send: (message: ChildMessage) => void) {
     this.#handler = handler;
@@ -180,6 +183,9 @@ class CaptureChild {
     }
     const run = this.#running.get(message.runId);
     if (run) {
+      // Abort the run's signal too: the render the runner stops must not be followed by another
+      // pass, slice or target; the run stops at its next checkpoint.
+      run.abort.abort(new Error("job cancelled"));
       this.#handler.cancel?.(run.job).catch(ignore);
     }
   }
@@ -197,21 +203,23 @@ class CaptureChild {
   }
 
   #start(runId: string, job: ConsumerJob): void {
-    const done = this.#execute(runId, job).finally(() => {
+    const abort = new AbortController();
+    const done = this.#execute(runId, job, abort.signal).finally(() => {
       this.#running.delete(runId);
     });
-    this.#running.set(runId, { job, done });
+    this.#running.set(runId, { job, done, abort });
   }
 
-  async #execute(runId: string, job: ConsumerJob): Promise<void> {
+  async #execute(runId: string, job: ConsumerJob, signal: AbortSignal): Promise<void> {
     try {
       await this.#handler.run(job, {
         logger: this.#logger.child({ buildId: job.buildId, jobId: job.jobId, runId }),
         touch: throttled(() => {
           this.#send({ type: "progress", runId });
         }),
-        // The parent holds the lease and the deadline; it stops this run through its cancel path.
-        signal: new AbortController().signal,
+        // The parent holds the lease and the deadline; it stops this run through its cancel path,
+        // which aborts this signal (a cancel, a lost lease or the deadline alike).
+        signal,
       });
       this.#send({ type: "done", runId });
     } catch (error) {

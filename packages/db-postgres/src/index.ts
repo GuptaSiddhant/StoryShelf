@@ -56,7 +56,8 @@ function openClient(options: PostgresDatabaseOptions): ReturnType<typeof postgre
     );
   }
   return postgres(connectionString, {
-    ssl: options.ssl as never,
+    // Only when given: a key holding `undefined` overrides the URL's own `sslmode`, leaving TLS off.
+    ...(options.ssl === undefined ? {} : { ssl: options.ssl as never }),
     prepare: options.prepare,
     max: options.max,
     idle_timeout: options.idleTimeout,

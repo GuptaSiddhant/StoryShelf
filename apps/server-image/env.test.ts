@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   browsersFromEnv,
   captureEnabled,
+  databaseCaFromEnv,
   databaseFromEnv,
   storageFromEnv,
+  unverifiedDatabaseTls,
   type Factories,
 } from "./env.ts";
 
@@ -31,8 +33,8 @@ describe("databaseFromEnv", () => {
     const { set, as } = factories();
     databaseFromEnv({ DATABASE_URL: "postgresql://u:p@h/db" }, "/data", as);
     databaseFromEnv({ DATABASE_URL: "mysql://u:p@h/db" }, "/data", as);
-    expect(set.postgres).toHaveBeenCalledWith("postgresql://u:p@h/db");
-    expect(set.mysql).toHaveBeenCalledWith("mysql://u:p@h/db");
+    expect(set.postgres).toHaveBeenCalledWith("postgresql://u:p@h/db", undefined);
+    expect(set.mysql).toHaveBeenCalledWith("mysql://u:p@h/db", undefined);
   });
 
   it("refuses another scheme without echoing the URL", () => {
@@ -100,5 +102,75 @@ describe("browsersFromEnv", () => {
     expect(browsers).toHaveLength(2);
     expect(browsers[0]).toBe("chromium");
     expect(typeof browsers[1]).toBe("object");
+  });
+});
+
+const missing = () => {
+  throw new Error("ENOENT /secret/path.pem");
+};
+
+describe("database CA", () => {
+  const PEM = "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----\n";
+
+  it("is unset without either variable, and unchanged for the adapters", () => {
+    const { set, as } = factories();
+    expect(databaseCaFromEnv({})).toBeUndefined();
+    databaseFromEnv({ DATABASE_URL: "postgres://u:p@h/db" }, "/data", as);
+    expect(set.postgres).toHaveBeenCalledWith("postgres://u:p@h/db", undefined);
+  });
+
+  it("hands DATABASE_CA to the Postgres and MySQL adapters", () => {
+    const { set, as } = factories();
+    databaseFromEnv({ DATABASE_URL: "postgres://u:p@h/db", DATABASE_CA: PEM }, "/data", as);
+    databaseFromEnv({ DATABASE_URL: "mysql://u:p@h/db", DATABASE_CA: PEM }, "/data", as);
+    expect(set.postgres).toHaveBeenCalledWith("postgres://u:p@h/db", PEM);
+    expect(set.mysql).toHaveBeenCalledWith("mysql://u:p@h/db", PEM);
+  });
+
+  it("reads DATABASE_CA_FILE", () => {
+    const read = vi.fn(() => PEM);
+    expect(databaseCaFromEnv({ DATABASE_CA_FILE: "/run/ca.pem" }, read)).toBe(PEM);
+    expect(read).toHaveBeenCalledWith("/run/ca.pem");
+  });
+
+  it("refuses both being set, naming neither value", () => {
+    const env = { DATABASE_CA: PEM, DATABASE_CA_FILE: "/secret/path.pem" };
+    expect(() => databaseCaFromEnv(env)).toThrow("only one of DATABASE_CA and DATABASE_CA_FILE");
+    expect(() => databaseCaFromEnv(env)).not.toThrow(/secret|BEGIN/u);
+  });
+
+  it("refuses an unreadable or empty file without echoing the path or contents", () => {
+    expect(() => databaseCaFromEnv({ DATABASE_CA_FILE: "/secret/path.pem" }, missing)).toThrow(
+      "could not be read",
+    );
+    expect(() => databaseCaFromEnv({ DATABASE_CA_FILE: "/x" }, missing)).not.toThrow(/ENOENT/u);
+    expect(() => databaseCaFromEnv({ DATABASE_CA_FILE: "/x" }, () => "  \n")).toThrow("empty");
+  });
+
+  it("never puts the CA or the URL in the log object", () => {
+    const { as } = factories();
+    const chosen = databaseFromEnv(
+      { DATABASE_URL: "postgres://u:secretpw@h/db", DATABASE_CA: PEM },
+      "/data",
+      as,
+    );
+    expect(JSON.stringify(chosen.log)).not.toMatch(/secretpw|BEGIN/u);
+  });
+});
+
+const url = (query: string) => ({ DATABASE_URL: `postgres://u:p@h/db${query}` });
+
+describe("unverifiedDatabaseTls", () => {
+  it.each(["require", "prefer", "allow"])("warns for sslmode=%s without a CA", (mode) => {
+    expect(unverifiedDatabaseTls(url(`?sslmode=${mode}`))).toBe(true);
+    expect(unverifiedDatabaseTls(url(`?x=1&sslmode=${mode}&y=2`))).toBe(true);
+  });
+
+  it("is quiet with verify-full, no sslmode, a CA, SQLite or MySQL", () => {
+    expect(unverifiedDatabaseTls(url("?sslmode=verify-full"))).toBe(false);
+    expect(unverifiedDatabaseTls(url(""))).toBe(false);
+    expect(unverifiedDatabaseTls({ ...url("?sslmode=require"), DATABASE_CA: "pem" })).toBe(false);
+    expect(unverifiedDatabaseTls({})).toBe(false);
+    expect(unverifiedDatabaseTls({ DATABASE_URL: "mysql://u:p@h/db?sslmode=require" })).toBe(false);
   });
 });

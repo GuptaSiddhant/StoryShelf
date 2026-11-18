@@ -144,13 +144,45 @@ async function runHandler(
   const run = invoke(handler, job, { logger, touch, signal: keeper.signal });
   try {
     const raced = await Promise.race([run, endOf(keeper)]);
-    return raced.kind === "ended"
-      ? await abandon(rt, held, raced.end)
-      : await settle(rt, held, raced);
+    return raced.kind === "settled"
+      ? await settle(rt, held, raced)
+      : await abandonAndWait(rt, held, { end: raced.end, run });
   } finally {
     keeper.stop();
     run.catch(() => {});
   }
+}
+
+/** Stop an abandoned job, then keep its slot until its handler has returned (bounded). */
+async function abandonAndWait(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+  stopped: { end: LeaseEnd; run: Promise<Race> },
+): Promise<JobOutcome> {
+  const outcome = await abandon(rt, held, stopped.end);
+  // The slot is this job's until its work has stopped: never count it free while a render runs.
+  await awaitStop(rt, stopped.run, held.logger);
+  return outcome;
+}
+
+/**
+ * Longest an abandoned job's handler (cancelled, lease lost, past its deadline) may keep its slot
+ * once it was told to stop: its signal is aborted and its runner cancelled, so it ends at its next
+ * checkpoint, well within this. One that does not is logged and its slot freed anyway.
+ */
+export const STOP_GRACE_MS = 30_000;
+
+/** Wait for an abandoned handler to return, at most {@link STOP_GRACE_MS}; log how it ended. */
+async function awaitStop(rt: JobRuntime, run: Promise<Race>, logger: Logger): Promise<void> {
+  const since = rt.now();
+  if (await within(rt, run, STOP_GRACE_MS)) {
+    logger.info({ waitedMs: rt.now() - since }, "abandoned job stopped");
+    return;
+  }
+  logger.error(
+    { seconds: STOP_GRACE_MS / 1000 },
+    "abandoned job still running after its stop grace; freeing its slot",
+  );
 }
 
 function keepLease(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKeeper {
@@ -236,8 +268,9 @@ async function requeue(
 }
 
 /**
- * The lease is gone or the job was cancelled while the handler ran: stop the work. A lost lease
- * means another consumer owns the job (it settles it); a cancel is settled here as `cancelled`.
+ * The lease is gone or the job was cancelled while the handler ran: stop the work (its signal is
+ * already aborted; the runner is cancelled here). A lost lease means another consumer owns the job
+ * (it settles it); a cancel is settled here as `cancelled`. The caller then waits for the handler.
  */
 async function abandon(
   rt: JobRuntime,
@@ -248,16 +281,24 @@ async function abandon(
   if (end === "deadline") {
     return await endAtDeadline(rt, held);
   }
+  logAbort(logger, end);
   await handler.cancel?.(job).catch((error: unknown) => {
     logger.warn({ err: error }, "failed to cancel the running job");
   });
   if (end === "lost") {
-    logger.warn("queue lease lost, aborting job");
     return "lost";
   }
-  logger.info("job cancelled, aborting");
   await rt.queue.nack(job, { requeue: false, error: "cancelled" });
   return "cancelled";
+}
+
+/** The job's logger carries its build id, so this line says which build is being stopped. */
+function logAbort(logger: Logger, end: "lost" | "cancelled"): void {
+  if (end === "lost") {
+    logger.warn("queue lease lost, aborting job");
+  } else {
+    logger.info("job cancelled, aborting");
+  }
 }
 
 /**
@@ -290,22 +331,26 @@ async function boundedCleanup(
   if (work === undefined) {
     return;
   }
-  const timers = rt.timers ?? REAL_TIMERS;
-  const stalled = Promise.withResolvers<"stalled">();
-  const handle = timers.setTimeout(() => {
-    stalled.resolve("stalled");
-  }, DEADLINE_CLEANUP_MS);
   const finished = work.then(
-    () => "finished" as const,
+    () => {},
     (error: unknown) => {
       logger.warn({ err: error }, `failed to ${what}`);
-      return "finished" as const;
     },
   );
+  if (!(await within(rt, finished, DEADLINE_CLEANUP_MS))) {
+    logger.warn({ what }, "cleanup past the deadline stalled; leaving it to the lease");
+  }
+}
+
+/** Whether `work` (which never rejects) settles within `ms`. */
+async function within(rt: JobRuntime, work: Promise<unknown>, ms: number): Promise<boolean> {
+  const timers = rt.timers ?? REAL_TIMERS;
+  const stalled = Promise.withResolvers<false>();
+  const handle = timers.setTimeout(() => {
+    stalled.resolve(false);
+  }, ms);
   try {
-    if ((await Promise.race([finished, stalled.promise])) === "stalled") {
-      logger.warn({ what }, "cleanup past the deadline stalled; leaving it to the lease");
-    }
+    return await Promise.race([work.then(() => true), stalled.promise]);
   } finally {
     timers.clearTimeout(handle);
   }
