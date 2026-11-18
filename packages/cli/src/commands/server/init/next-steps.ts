@@ -20,7 +20,7 @@ function stepsFor(answers: Answers, runner: PackageRunner): string[] {
     return terraformSteps(cloud);
   }
   if (target === "docker") {
-    return dockerSteps(needsCompose(answers));
+    return dockerSteps(needsCompose(answers), answers.auth === "password");
   }
   return [`  ${installCommand(runner)}`, `  ${startCommand(runner)}`];
 }
@@ -54,10 +54,13 @@ function terraformSteps(cloud: CloudSteps): string[] {
   ];
 }
 
-function dockerSteps(compose: boolean): string[] {
+function dockerSteps(compose: boolean, password: boolean): string[] {
   return compose
     ? [
         `  export SECRET=...      # at least 32 random characters; keep and reuse it`,
+        ...(password
+          ? [`  export AUTH_PASSWORD=...  # the local admin's password (12+ characters)`]
+          : []),
         `  npm run docker:up      # builds + starts the app`,
         `  npm run docker:logs    # follow logs`,
         `  npm run docker:down    # tear down`,

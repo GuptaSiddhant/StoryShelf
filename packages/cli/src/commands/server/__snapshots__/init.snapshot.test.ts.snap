@@ -45,7 +45,7 @@ exports[`server init output > is unchanged for aws full 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 936 002adc4ff39e9d43c6c05f55d39985ee15f71a166211ddecc847772c8d7b5543",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
     "src/index.ts 1745 3766956929e3cade526d40b4341424e6b62b181a2ad16db0257436403941d3c0",
     "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
@@ -87,7 +87,7 @@ exports[`server init output > is unchanged for aws minimal 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 936 002adc4ff39e9d43c6c05f55d39985ee15f71a166211ddecc847772c8d7b5543",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
     "src/index.ts 1745 3766956929e3cade526d40b4341424e6b62b181a2ad16db0257436403941d3c0",
     "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
@@ -129,7 +129,7 @@ exports[`server init output > is unchanged for azure full 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 936 002adc4ff39e9d43c6c05f55d39985ee15f71a166211ddecc847772c8d7b5543",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
     "src/index.ts 1653 bbd6623e80ab6a65c000e1f778b733466900e010555a993607bbca2b0f3fb48a",
     "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
@@ -172,7 +172,7 @@ exports[`server init output > is unchanged for azure minimal 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 936 002adc4ff39e9d43c6c05f55d39985ee15f71a166211ddecc847772c8d7b5543",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
     "src/index.ts 1653 bbd6623e80ab6a65c000e1f778b733466900e010555a993607bbca2b0f3fb48a",
     "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
@@ -561,7 +561,7 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 936 002adc4ff39e9d43c6c05f55d39985ee15f71a166211ddecc847772c8d7b5543",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 790 a826359c7aa0f5d8644af8f51a8074e49f1a4a062e52215e81fb4357aaa6d7b4",
     "src/index.ts 1195 e2eae3f2d52328b0c40a0a1be8a6da7e00df0f4a4f1776bdf3cda26fb3ef4d28",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
@@ -607,7 +607,7 @@ exports[`server init output > is unchanged for gcp full 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 936 002adc4ff39e9d43c6c05f55d39985ee15f71a166211ddecc847772c8d7b5543",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
     "src/index.ts 1599 c7f0427190e3dc8b5620666aa73284f3b2621ce01ff86a3fa329fa7e9bb34583",
     "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
@@ -650,7 +650,7 @@ exports[`server init output > is unchanged for gcp minimal 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 936 002adc4ff39e9d43c6c05f55d39985ee15f71a166211ddecc847772c8d7b5543",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
     "src/index.ts 1599 c7f0427190e3dc8b5620666aa73284f3b2621ce01ff86a3fa329fa7e9bb34583",
     "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
