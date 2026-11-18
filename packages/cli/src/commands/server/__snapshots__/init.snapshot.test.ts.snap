@@ -3,7 +3,7 @@
 exports[`server init output > is unchanged for auth oauth 1`] = `
 {
   "files": [
-    "package.json 602 60b3e140a2ba3dab0f8a4dbabb73436ab05d0cd5118e980cd6f1fce4f04220e9",
+    "package.json 644 6c56da0350f249ad3c24aff42db4c73caa54f10d6527f71e05176e744af09811",
     "src/index.ts 1726 17040519ef43045002a9bf58fbc7f8e255fb9d642ec09252ac3ab70dc1939d77",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -23,7 +23,7 @@ Next steps:
 exports[`server init output > is unchanged for auth password 1`] = `
 {
   "files": [
-    "package.json 602 60b3e140a2ba3dab0f8a4dbabb73436ab05d0cd5118e980cd6f1fce4f04220e9",
+    "package.json 644 6c56da0350f249ad3c24aff42db4c73caa54f10d6527f71e05176e744af09811",
     "src/index.ts 1766 f4efd409a3c61c112e558065b8804439a26b81da48b0fedec81d7cc9fc0fa1e8",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -213,7 +213,7 @@ Next steps:
 exports[`server init output > is unchanged for database better-sqlite3 1`] = `
 {
   "files": [
-    "package.json 602 8cf82eaada0fb263126528259cc98e3d15de70efb61c0186361de230deea4f9b",
+    "package.json 644 57a721070f0105087e9255ebe93974467c957c1f6a0406b8876be4248877b4ce",
     "src/index.ts 1383 f2618dec8f867406935dd3a04473db3810e75d660f26916620fd9a11de90e422",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -233,7 +233,7 @@ Next steps:
 exports[`server init output > is unchanged for database bun-sqlite 1`] = `
 {
   "files": [
-    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
     "src/index.ts 1371 af2b8e7c4fe7e482cb2fb0836ee16cb21359730bd54af33a110ac0fa0b12ef03",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -253,7 +253,7 @@ Next steps:
 exports[`server init output > is unchanged for database d1 1`] = `
 {
   "files": [
-    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
     "src/index.ts 1507 ce6f283c6abda1bc084a4eb1ea2d11da2cc78b9f1146d44aae9587c17fa02f1d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -273,7 +273,7 @@ Next steps:
 exports[`server init output > is unchanged for database mysql 1`] = `
 {
   "files": [
-    "package.json 592 57b9162eafcfa4898f1826e8f15de4b860704810cd00f0707eb82b061a3a2601",
+    "package.json 634 0faabfdd850a8e963e44797b6508d6185d9c5434cd33850bd8c3b7e903faca2c",
     "src/index.ts 1354 47d2721269e685e0818c6de3d793d06c3b4d9148b7ff458db30af2ffca3a8945",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -293,7 +293,7 @@ Next steps:
 exports[`server init output > is unchanged for database neon 1`] = `
 {
   "files": [
-    "package.json 613 b0337a26c5b1bd3489f0a3e9fd4caadba84eb5577aa4336046c3c0705328a4b4",
+    "package.json 655 5ca362d4c11a3a1ddb6d951616290b6f212d0967aab679fe62ac3d16640f4a72",
     "src/index.ts 1360 8ad19552820056778aa59f34c21e6ffa8423f71ff9af20c7897e7b730f17c507",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -313,7 +313,7 @@ Next steps:
 exports[`server init output > is unchanged for database neon-http 1`] = `
 {
   "files": [
-    "package.json 613 b0337a26c5b1bd3489f0a3e9fd4caadba84eb5577aa4336046c3c0705328a4b4",
+    "package.json 655 5ca362d4c11a3a1ddb6d951616290b6f212d0967aab679fe62ac3d16640f4a72",
     "src/index.ts 1373 6d31faa2f561888be6418f44fa121e30d3d79f24e983b2fbe6c225b3bd5b6cdb",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -333,7 +333,7 @@ Next steps:
 exports[`server init output > is unchanged for database pg 1`] = `
 {
   "files": [
-    "package.json 591 20aac0ee0138bfad7023ab533fd8b683a5d0a517d1556ad013fb92e0255ba2a9",
+    "package.json 633 9494384798242e1626a46f6c82bdac26a1fbd210dd5acd4de858b7f369e905ab",
     "src/index.ts 1354 dc05013e2c1a26ce93f9dddec3ef777296fc3cd2611b8aabad179a9a9f232d1c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -353,7 +353,7 @@ Next steps:
 exports[`server init output > is unchanged for database pglite 1`] = `
 {
   "files": [
-    "package.json 609 4bea65654d3f94c08f493689cd3989c67e1b1162e1b4b59ad9240e6545c56fa0",
+    "package.json 651 cf4e12c06ac23bc891d40241642df3977a446112ef9b7120fb48ccf96a1a60b1",
     "src/index.ts 1332 67b53b9cc40b081cb319c797245e36e0d8b4c089d407db301e56ac3b526ebbb5",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -373,7 +373,7 @@ Next steps:
 exports[`server init output > is unchanged for database planetscale 1`] = `
 {
   "files": [
-    "package.json 608 a8da912b4d662495aa43262b5a2c4f28c3774031908c9dbcb99e1908306601fb",
+    "package.json 650 ba26dcaae6c73405bcb75d020c1a3f8dd740b6ff552f82148988d1cc59641249",
     "src/index.ts 1378 8559b1ce21d08fb137565b58fc02c94a67682c596ee9fd0b76afc915f1b70d2b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -393,7 +393,7 @@ Next steps:
 exports[`server init output > is unchanged for database postgres 1`] = `
 {
   "files": [
-    "package.json 571 29be6efe38d016df0dce21cc39450d16905cfae489371f84ef80df98fb3ecae8",
+    "package.json 613 9c1cdaaa4066da27a4b446b6a3925979f7c637e10e3e72763f9853c68e878ba0",
     "src/index.ts 1363 889fe35a7e6f38bd2426bffb03c3448f99af87745b8be59baf1f7a949de7c9db",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -413,7 +413,7 @@ Next steps:
 exports[`server init output > is unchanged for database sqlite 1`] = `
 {
   "files": [
-    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -433,7 +433,7 @@ Next steps:
 exports[`server init output > is unchanged for database tidb 1`] = `
 {
   "files": [
-    "package.json 607 e1760ad1e1b859fc4014a60bee67ea014442f7b215f094da93ed58c932c8d281",
+    "package.json 649 ba3c509a26913ca5aa81f1cbd0dd3607de8f0ce8ed621a88f844a36a1851c6b0",
     "src/index.ts 1357 7d4365d6140b13f01ff007c84a4f8a97cdba2a222d55ff2738ce07186c577362",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -453,7 +453,7 @@ Next steps:
 exports[`server init output > is unchanged for database turso 1`] = `
 {
   "files": [
-    "package.json 602 dfe838845f36dc3738b4748a4fa48b4d72f92d3749cbf72ac650101a66ab8bfa",
+    "package.json 644 dade401c3ef83e55ebfb3d5c15175db38a7ce8018c541c9ee5c7f2413e9699b3",
     "src/index.ts 1408 a4d3ace68aabb6ff02b84d3841d37e4d76ba6b8a0495af7f9e39e7d8e1870121",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -473,7 +473,7 @@ Next steps:
 exports[`server init output > is unchanged for database vercel 1`] = `
 {
   "files": [
-    "package.json 606 865f1363ae1a272928ccf18f987dbc8e8502100b068b455104a02e9aa81c18e3",
+    "package.json 648 f9289676a5eb058fbd087c69bc4f7c96d961f2f95b1216fe2c5767453bde5f11",
     "src/index.ts 1332 272b799482eed6d07ebb62d2634acac175d45d891309da020304526e6423488d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -493,7 +493,7 @@ Next steps:
 exports[`server init output > is unchanged for design 1`] = `
 {
   "files": [
-    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -515,7 +515,7 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 747 952fc180079deca9fbd980cfe13a1326407e849186c56783649f8d38fa94b689",
+    "package.json 789 b1d62d2056242c0d53e0f961efeee1065fc47ed24d0f71244da15b726d6ee219",
     "src/index.ts 1354 47d2721269e685e0818c6de3d793d06c3b4d9148b7ff458db30af2ffca3a8945",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -538,7 +538,7 @@ exports[`server init output > is unchanged for docker single container 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 724 cb1904979c9b31421ee7878583671480cec542920d73744ee6f7c1c25dbedc1a",
+    "package.json 766 eb488521c07884e84661da25ea0204d003a18f782e0795c0584b57245ad63425",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -562,7 +562,7 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
     "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 748 50458104ffc240628488cd54781db547c985118dff1c5ca0602ff634e811aff9",
+    "package.json 790 a826359c7aa0f5d8644af8f51a8074e49f1a4a062e52215e81fb4357aaa6d7b4",
     "src/index.ts 1363 889fe35a7e6f38bd2426bffb03c3448f99af87745b8be59baf1f7a949de7c9db",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -690,7 +690,7 @@ Next steps:
 exports[`server init output > is unchanged for git on 1`] = `
 {
   "files": [
-    "package.json 569 5eb8565cbfcccf8fafb55da505737daa3b37036fa30154f52c80d6f8e25c8707",
+    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -712,7 +712,7 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 724 cb1904979c9b31421ee7878583671480cec542920d73744ee6f7c1c25dbedc1a",
+    "package.json 766 eb488521c07884e84661da25ea0204d003a18f782e0795c0584b57245ad63425",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -733,7 +733,7 @@ Next steps:
 exports[`server init output > is unchanged for local with advanced adapters 1`] = `
 {
   "files": [
-    "package.json 607 e1760ad1e1b859fc4014a60bee67ea014442f7b215f094da93ed58c932c8d281",
+    "package.json 649 ba3c509a26913ca5aa81f1cbd0dd3607de8f0ce8ed621a88f844a36a1851c6b0",
     "src/index.ts 1357 7d4365d6140b13f01ff007c84a4f8a97cdba2a222d55ff2738ce07186c577362",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -753,7 +753,7 @@ Next steps:
 exports[`server init output > is unchanged for notifications 1`] = `
 {
   "files": [
-    "package.json 632 6b615b4d431c63f16df500c2c7e6bf60ef1aa00a86371d825a6ec2aea054fea7",
+    "package.json 674 ce6927696524333da0fcfbca2427b50c21884a700a4ded677c01409c0265a784",
     "src/index.ts 1949 ca28a54db59d9a4e75d677c385d913f419e9e016037a7210ee3115e92ea22761",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -773,7 +773,7 @@ Next steps:
 exports[`server init output > is unchanged for notifications with oauth 1`] = `
 {
   "files": [
-    "package.json 665 5cbc9e474910ad7cf3d396729c279e68f1bddab02d04b586c45633a0b5e2e79a",
+    "package.json 707 ace1380255c2f527d8786611dbeba8786acd9fd353e2e9dcf53d36234654a64e",
     "src/index.ts 2455 cdaa63638a1b2a42ee02602261310654c1b515ca2fb2ca4d3cb6c45d4975b51d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -793,7 +793,7 @@ Next steps:
 exports[`server init output > is unchanged for notifications with password auth 1`] = `
 {
   "files": [
-    "package.json 665 5cbc9e474910ad7cf3d396729c279e68f1bddab02d04b586c45633a0b5e2e79a",
+    "package.json 707 ace1380255c2f527d8786611dbeba8786acd9fd353e2e9dcf53d36234654a64e",
     "src/index.ts 2495 86fb05f36accc19eacc94761f439bd329bdcf640b92c0d37c91bca85aec6d8d3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -813,7 +813,7 @@ Next steps:
 exports[`server init output > is unchanged for observability 1`] = `
 {
   "files": [
-    "package.json 644 3a105bb0479e928391d362c69e3e9b4bdb37eeb5019b1b133d6333672faff84a",
+    "package.json 686 b6fc158061e395dde1c9fc9789a82a40db84095cc536b8a5445583c20be7ac8a",
     "src/index.ts 1750 ba269103db39a6bc9cbf24cd42086050bbdd5fad580267f34a8a415c8a151bfc",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
