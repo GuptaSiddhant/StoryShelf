@@ -17,7 +17,9 @@ The container image is published from v0.12.0. Until that release, build it from
 ```sh
 # Generate SECRET once and store it safely: it encrypts stored credentials, so every later run on
 # the same volume needs the same value.
-export SECRET="$(openssl rand -hex 32)" AUTH_PASSWORD='choose-a-long-password'
+export SECRET="$(openssl rand -hex 32)"
+# Choose a private admin password (at least 12 characters); it is not echoed.
+read -rsp 'Admin password: ' AUTH_PASSWORD && export AUTH_PASSWORD
 docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data -e SECRET -e AUTH_PASSWORD \
   ghcr.io/guptasiddhant/storyshelf
 ```

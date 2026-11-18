@@ -28,7 +28,9 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 
 ```sh
 # Generate SECRET once and keep it: the data volume needs the same value on every run.
-export SECRET="$(openssl rand -hex 32)" AUTH_PASSWORD='choose-a-long-password'
+export SECRET="$(openssl rand -hex 32)"
+# Choose a private admin password (at least 12 characters); it is not echoed.
+read -rsp 'Admin password: ' AUTH_PASSWORD && export AUTH_PASSWORD
 docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data -e SECRET -e AUTH_PASSWORD \
   ghcr.io/guptasiddhant/storyshelf
 ```
