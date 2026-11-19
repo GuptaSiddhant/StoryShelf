@@ -32,7 +32,8 @@ export const BUNDLES = [
   {
     file: "llms-deploy.txt",
     title: "StoryShelf: deployment and operations",
-    about: "Running a StoryShelf server: deployment, sizing, configuration, secrets, observability.",
+    about:
+      "Running a StoryShelf server: deployment, sizing, configuration, secrets, observability.",
     groups: ["Deploy & operate"],
     budget: 25_000,
   },

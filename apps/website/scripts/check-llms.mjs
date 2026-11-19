@@ -12,8 +12,9 @@ const DIST = "dist";
 const SITE = (process.env.SITE_URL ?? "https://storyshelf.js.org").replace(/\/$/u, "");
 const BASE = (process.env.BASE_PATH ?? "/").replace(/\/$/u, "");
 // Pages that have no Markdown copy (generated references and the home page).
-const NO_MARKDOWN = [`${BASE}/`, `${BASE}/api/`, `${BASE}/reference/`, `${BASE}/openapi/`];
+const NO_MARKDOWN = new Set([`${BASE}/`, `${BASE}/api/`, `${BASE}/reference/`, `${BASE}/openapi/`]);
 
+const STAMP = /^> Describes StoryShelf \S+ \(built from \S+ on \d{4}-\d{2}-\d{2}\)$/mu;
 const errors = [];
 const fail = (message) => errors.push(message);
 
@@ -45,7 +46,7 @@ function checkSitemap() {
   const paths = sitemapPaths();
   if (paths.length === 0) fail("sitemap: no pages found in dist/sitemap-*.xml");
   for (const path of paths) {
-    if (NO_MARKDOWN.includes(path) || /^\/(api|reference)\//u.test(path.slice(BASE.length))) {
+    if (NO_MARKDOWN.has(path) || /^\/(api|reference)\//u.test(path.slice(BASE.length))) {
       continue;
     }
     if (!existsSync(join(DIST, path.slice(BASE.length), "index.md"))) {
@@ -68,21 +69,22 @@ function checkLlmsLinks() {
   return links.length;
 }
 
-function checkBudgets() {
-  for (const { file, budget } of [...BUNDLES, FULL]) {
-    const path = join(DIST, file);
-    if (!existsSync(path)) {
-      fail(`${file}: missing`);
-      continue;
-    }
-    const text = readFileSync(path, "utf8");
-    const tokens = Math.ceil(text.length / CHARS_PER_TOKEN);
-    if (tokens > budget) fail(`${file}: about ${tokens} tokens, over its budget of ${budget}`);
-    if (!/^> Describes StoryShelf \S+ \(built from \S+ on \d{4}-\d{2}-\d{2}\)$/mu.test(text)) {
-      fail(`${file}: no version stamp`);
-    }
-    console.log(`  ${file}: about ${tokens} of ${budget} tokens`);
+/** One bundle's size and version stamp, as problems and a log line. */
+function checkBundle({ file, budget }) {
+  const path = join(DIST, file);
+  if (!existsSync(path)) {
+    fail(`${file}: missing`);
+    return;
   }
+  const text = readFileSync(path, "utf8");
+  const tokens = Math.ceil(text.length / CHARS_PER_TOKEN);
+  if (tokens > budget) fail(`${file}: about ${tokens} tokens, over its budget of ${budget}`);
+  if (!STAMP.test(text)) fail(`${file}: no version stamp`);
+  console.log(`  ${file}: about ${tokens} of ${budget} tokens`);
+}
+
+function checkBudgets() {
+  for (const bundle of [...BUNDLES, FULL]) checkBundle(bundle);
 }
 
 /** The Markdown outside fenced code blocks. */
@@ -132,7 +134,9 @@ const mdCount = checkLeftovers();
 console.log(`  ${pageCount} sitemap pages, ${linkCount} llms.txt links, ${mdCount} .md files`);
 
 if (errors.length > 0) {
-  console.error(`\n${errors.length} problem(s):\n${errors.map((error) => `  - ${error}`).join("\n")}`);
+  console.error(
+    `\n${errors.length} problem(s):\n${errors.map((error) => `  - ${error}`).join("\n")}`,
+  );
   process.exit(1);
 }
 console.log("llms check: ok");
