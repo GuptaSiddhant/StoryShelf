@@ -1,8 +1,9 @@
 import { defineRouteMiddleware } from "@astrojs/starlight/route-data";
 
-/** Pages with no Markdown copy: the home page and the generated API and TypeScript references. */
+/** Pages with no Markdown copy: the home page, the 404 page and the generated references. */
 export function hasMarkdownCopy(path: string): boolean {
-  return path !== "/" && !path.startsWith("/api") && !path.startsWith("/reference");
+  if (path === "/" || path.startsWith("/404")) return false;
+  return !path.startsWith("/api") && !path.startsWith("/reference");
 }
 
 /** Points every page's `<head>` at its Markdown copy (scripts/markdown-export.mjs writes it). */
