@@ -53,6 +53,8 @@ export default defineConfig({
         PageTitle: "./src/components/overrides/PageTitle.astro",
       },
       customCss: ["./src/styles/custom.css"],
+      // Adds the Markdown copy of each page to its <head> (see the file).
+      routeMiddleware: "./src/routeData.ts",
       editLink: { baseUrl: `${REPO}/edit/main/apps/website/` },
       lastUpdated: true,
       social: [{ label: "GitHub", href: REPO, icon: "github" }],
@@ -117,6 +119,7 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "Live demo", slug: "guides/demo" },
+            { label: "Set up with an AI agent", slug: "guides/ai-agent-setup" },
             { label: "How it works", slug: "concepts/how-it-works" },
             { label: "Common setups", slug: "guides/recipes" },
             { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
