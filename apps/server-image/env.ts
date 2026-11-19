@@ -120,6 +120,22 @@ export function captureEnabled(env: Env): boolean {
   return nonEmpty(env["SHELF_CAPTURE"]) !== "off";
 }
 
+/**
+ * `SHELF_STORYBOOK_HOSTING`: `trusted` (the default when unset) or `sandboxed` (ADR 0051). Any other
+ * value stops boot and never falls back to `trusted`; `subdomain` needs a base domain and DNS, so the
+ * image does not offer it yet.
+ */
+export function storybookHostingFromEnv(env: Env): { mode: "trusted" | "sandboxed" } | undefined {
+  const mode = nonEmpty(env["SHELF_STORYBOOK_HOSTING"]);
+  if (mode === undefined) {
+    return undefined;
+  }
+  if (mode !== "trusted" && mode !== "sandboxed") {
+    throw new Error("SHELF_STORYBOOK_HOSTING must be trusted (the default) or sandboxed");
+  }
+  return { mode };
+}
+
 /** The runner's `browsers`: the bundled Chromium, plus `chromium@azure` when a workspace is configured. */
 export function browsersFromEnv(env: Env): (BrowserName | RemoteBrowser)[] {
   const endpoint = nonEmpty(env["PLAYWRIGHT_SERVICE_URL"]);
