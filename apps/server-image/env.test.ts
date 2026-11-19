@@ -8,6 +8,7 @@ import {
   describeBootFailure,
   isLoopback,
   storageFromEnv,
+  storybookHostingFromEnv,
   unverifiedDatabaseTls,
   type Factories,
 } from "./env.ts";
@@ -86,6 +87,30 @@ describe("captureEnabled", () => {
   it("is on unless SHELF_CAPTURE is off", () => {
     expect(captureEnabled({})).toBe(true);
     expect(captureEnabled({ SHELF_CAPTURE: "off" })).toBe(false);
+  });
+});
+
+describe("storybookHostingFromEnv", () => {
+  it("is unset by default, which the app reads as trusted", () => {
+    expect(storybookHostingFromEnv({})).toBeUndefined();
+    expect(storybookHostingFromEnv({ SHELF_STORYBOOK_HOSTING: "" })).toBeUndefined();
+  });
+
+  it("accepts trusted and sandboxed", () => {
+    expect(storybookHostingFromEnv({ SHELF_STORYBOOK_HOSTING: "trusted" })).toEqual({
+      mode: "trusted",
+    });
+    expect(storybookHostingFromEnv({ SHELF_STORYBOOK_HOSTING: "sandboxed" })).toEqual({
+      mode: "sandboxed",
+    });
+  });
+
+  it("refuses anything else instead of falling back to trusted", () => {
+    for (const value of ["subdomain", "Sandboxed", "off"]) {
+      expect(() => storybookHostingFromEnv({ SHELF_STORYBOOK_HOSTING: value })).toThrow(
+        /SHELF_STORYBOOK_HOSTING must be trusted/u,
+      );
+    }
   });
 });
 

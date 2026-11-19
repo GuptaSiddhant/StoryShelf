@@ -16,7 +16,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * (local storage on `/data` when unset), `SECRET` (`SECRET_PREVIOUS` and `SECRET_MIGRATE` to rotate it),
  * `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`,
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
- * unless set) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
+ * unless set), `SHELF_STORYBOOK_HOSTING` (`trusted` by default, or `sandboxed`; ADR 0051) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
  * `AUTH_PASSWORD` and `SECRET` are required unless `SHELF_AUTH=none` opts out explicitly, and a
  * missing or short secret stops the server. Bundled by rolldown (`rolldown.config.ts`).
  */
@@ -31,6 +31,7 @@ import {
   nonEmpty,
   unverifiedDatabaseTls,
   storageFromEnv,
+  storybookHostingFromEnv,
 } from "./env.ts";
 
 const env = process.env;
@@ -48,6 +49,7 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 const imageAuth = authFromEnv(env);
+const storybookHosting = storybookHostingFromEnv(env);
 
 mkdirSync(dataDir, { recursive: true });
 const { database, log: databaseLog } = databaseFromEnv(env, dataDir);
@@ -107,6 +109,7 @@ const app = createShelfApp({
     migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken: env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"],
     publicBaseUrl,
+    ...(storybookHosting === undefined ? {} : { storybookHosting }),
     ...(trustProxy === undefined ? {} : { trustProxy }),
     scratchDir: dataDir,
   },
