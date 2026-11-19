@@ -145,6 +145,17 @@ describe("generatePackageJson", () => {
     expect(scripts["infra:plan"]).toBeUndefined();
   });
 
+  it("forwards SECRET, and AUTH_PASSWORD for password auth, from the shell to docker:run", () => {
+    const open = pkg({ deployTarget: "docker", docker: true }).scripts["docker:run"];
+    const password = pkg({ deployTarget: "docker", docker: true, auth: "password" }).scripts[
+      "docker:run"
+    ];
+    expect(open).toMatch(/ -e SECRET /u);
+    expect(open).not.toContain("AUTH_PASSWORD");
+    expect(password).toMatch(/ -e SECRET -e AUTH_PASSWORD /u);
+    expect(`${open} ${password}`).not.toMatch(/SECRET=|change-me/u);
+  });
+
   it("has compose scripts when the stack has more than one service", () => {
     const { scripts } = pkg({ deployTarget: "docker", docker: true, database: "postgres" });
     expect(scripts["docker:up"]).toBe("docker compose up --build");

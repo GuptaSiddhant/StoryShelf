@@ -73,7 +73,10 @@ async function writeDockerFiles(outDir: string, answers: Answers): Promise<void>
   await writeFile(join(outDir, "Dockerfile"), generateDockerfile());
   await writeFile(join(outDir, ".dockerignore"), generateDockerignore());
   if (needsCompose(answers)) {
-    await writeFile(join(outDir, "compose.yaml"), generateComposeYaml(answers.database));
+    await writeFile(
+      join(outDir, "compose.yaml"),
+      generateComposeYaml(answers.database, answers.auth),
+    );
     created.push("compose.yaml");
   }
   printLine(`Created ${created.join(", ")}`);

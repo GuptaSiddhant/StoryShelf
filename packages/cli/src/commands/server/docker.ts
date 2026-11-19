@@ -34,7 +34,8 @@ const COMPOSE_BASE_LINES = [
   "    volumes:",
   "      - storyshelf-data:/data",
   "    environment:",
-  "      - SECRET=change-me",
+  "      # At least 32 random characters (openssl rand -hex 32): generate once, keep it, reuse it.",
+  "      - SECRET=${SECRET:?set SECRET to at least 32 random characters}",
   "      - PORT=3000",
   "      - DATA_DIR=/data",
 ];
@@ -76,11 +77,18 @@ export function generateDockerignore(): string {
   return DOCKERIGNORE_LINES.join("\n");
 }
 
-function composeLines(database: string): string[] {
+/** The password admin's variable: required for a password scaffold (it signs in with it). */
+function authLines(auth: string): string[] {
+  return auth === "password"
+    ? ["      - AUTH_PASSWORD=${AUTH_PASSWORD:?set AUTH_PASSWORD (at least 12 characters)}"]
+    : [];
+}
+
+function composeLines(database: string, auth: string): string[] {
   return [
     ...COMPOSE_BASE_LINES,
+    ...authLines(auth),
     "      # Add your env vars here:",
-    "      # - AUTH_PASSWORD=your-password",
     ...(database === "turso" ? COMPOSE_TURSO_LINES : []),
     ...(database === "postgres" ? COMPOSE_POSTGRES_LINES : []),
     ...COMPOSE_VOLUMES_LINES,
@@ -88,6 +96,6 @@ function composeLines(database: string): string[] {
   ];
 }
 
-export function generateComposeYaml(database = "sqlite"): string {
-  return composeLines(database).join("\n");
+export function generateComposeYaml(database = "sqlite", auth = "none"): string {
+  return composeLines(database, auth).join("\n");
 }

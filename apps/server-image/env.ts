@@ -129,3 +129,73 @@ export function browsersFromEnv(env: Env): (BrowserName | RemoteBrowser)[] {
   }
   return ["chromium", azurePlaywright({ endpoint, token, engines: ["chromium"] })];
 }
+
+/** How the image signs people in: the local password admin, or nobody (an explicit `SHELF_AUTH=none`). */
+export type ImageAuth =
+  | { mode: "password"; password: string; email: string; secret: string }
+  | { mode: "none" };
+
+/** The shortest `SECRET` sign-in accepts (the auth engine's own rule). */
+const MIN_SECRET_LENGTH = 32;
+
+const AUTH_MODE_HINT =
+  "set AUTH_PASSWORD and SECRET (at least 32 characters) to sign in, or SHELF_AUTH=none to run with every route open";
+
+/**
+ * Sign-in is on unless `SHELF_AUTH=none` says otherwise: a missing variable never turns it off.
+ * `SECRET` must be at least 32 characters; `createShelfAuth` checks it again.
+ */
+export function authFromEnv(env: Env): ImageAuth {
+  const mode = nonEmpty(env["SHELF_AUTH"]) ?? "password";
+  const password = nonEmpty(env["AUTH_PASSWORD"]);
+  if (mode === "none") {
+    if (password !== undefined) {
+      throw new Error("SHELF_AUTH=none and AUTH_PASSWORD are both set: unset one of them");
+    }
+    return { mode: "none" };
+  }
+  if (mode !== "password") {
+    throw new Error("SHELF_AUTH must be password (the default) or none");
+  }
+  return passwordAuth(env, password);
+}
+
+/** The password mode's settings: AUTH_PASSWORD and SECRET are both required. */
+function passwordAuth(env: Env, password: string | undefined): ImageAuth {
+  const secret = nonEmpty(env["SECRET"]);
+  if (password === undefined) {
+    throw new Error(`AUTH_PASSWORD is unset: ${AUTH_MODE_HINT}`);
+  }
+  if (secret === undefined) {
+    throw new Error(`SECRET is unset: ${AUTH_MODE_HINT}`);
+  }
+  // Checked again by createShelfAuth; refused here too, before any adapter is created.
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(`SECRET is shorter than ${MIN_SECRET_LENGTH} characters: ${AUTH_MODE_HINT}`);
+  }
+  return {
+    mode: "password",
+    password,
+    email: nonEmpty(env["AUTH_EMAIL"]) ?? "admin@example.com",
+    secret,
+  };
+}
+
+/** Whether a listen address reaches only this machine (so an open server is not exposed). */
+export function isLoopback(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "::1" || hostname.startsWith("127.");
+}
+
+/**
+ * What a failed start prints: `storyshelf: <reason>` as the first line, then the stack. A refusal's
+ * reason names the variable and never its value, so the first line is safe to show and to grep.
+ */
+export function describeBootFailure(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return `storyshelf: ${String(error)}\n`;
+  }
+  const frames = (error.stack ?? "")
+    .split("\n")
+    .filter((line) => line.trimStart().startsWith("at "));
+  return [`storyshelf: ${error.message}`, ...frames, ""].join("\n");
+}

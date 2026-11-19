@@ -474,7 +474,8 @@ jobs:
         run: |
           set -e
           for variant in storyshelf:ci storyshelf:ci-hosting; do
-            docker run -d --name smoke -p 3000:3000 "$variant"
+            # No sign-in on purpose: the image refuses to start without AUTH_PASSWORD unless told.
+            docker run -d --name smoke -p 3000:3000 -e SHELF_AUTH=none "$variant"
             if ! SMOKE_BASE_URL=http://127.0.0.1:3000 bash scripts/smoke.sh; then
               docker logs smoke
               exit 1
