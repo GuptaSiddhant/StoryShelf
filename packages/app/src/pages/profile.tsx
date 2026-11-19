@@ -5,6 +5,7 @@ import { csrfField } from "../shell/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Alert,
+  Avatar,
   Badge,
   Button,
   Card,
@@ -65,19 +66,6 @@ const profileAvatar = css`
   object-fit: cover;
 `;
 
-const profileAvatarFallback = css`
-  /* profile-avatar-fallback */
-  width: 64px;
-  height: 64px;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 1.5rem;
-  font-weight: 700;
-`;
-
 const profileName = css`
   /* profile-name */
   font-weight: 700;
@@ -95,7 +83,7 @@ type PasskeyState = SecurityState["passkeys"][number];
 /** Registered passkey rows with per-key remove actions. */
 const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
   return (
-    <Table dense label="Passkeys">
+    <Table dense label="Passkeys" empty={passkeys.length === 0 ? "No passkeys yet." : undefined}>
       <table>
         <thead>
           <tr>
@@ -220,11 +208,7 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
           Register a 2nd key so a lost device doesn&apos;t lock you out.
         </Alert>
       ) : null}
-      {security.passkeys.length === 0 ? (
-        <p class={profileMeta}>No passkeys yet.</p>
-      ) : (
-        <PasskeyTable passkeys={security.passkeys} />
-      )}
+      <PasskeyTable passkeys={security.passkeys} />
       <HStack>
         <Field label="Key name" name="keyName" type="text" placeholder="e.g. Security key" />
         <Button variant="primary" size="sm" type="button" data-passkey-register="true">
@@ -261,9 +245,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
             {avatar ? (
               <img class={profileAvatar} src={avatar} alt="" width="64" height="64" />
             ) : (
-              <span class={profileAvatarFallback} aria-hidden="true">
-                {user.name.slice(0, 1).toUpperCase()}
-              </span>
+              <Avatar name={user.name} size="xl" />
             )}
             <VStack>
               <div class={profileName}>{displayName}</div>

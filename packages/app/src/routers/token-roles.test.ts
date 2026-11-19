@@ -25,7 +25,7 @@ const passwordAuth = stubAuth(null, {
   },
 });
 
-async function seed() {
+async function seed(options: { auth?: boolean } = {}) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const now = new Date().toISOString();
@@ -50,7 +50,7 @@ async function seed() {
   const app = createShelfApp({
     database: db,
     storage,
-    auth: passwordAuth,
+    ...(options.auth === false ? {} : { auth: passwordAuth }),
     logger: silentLogger,
     config: { secret: "s" },
   });
@@ -115,6 +115,9 @@ describe("bearer token permissions", () => {
       body: BUILD_BODY,
     });
     expect(upload.status).toBe(403);
+    const body = (await upload.json()) as { error: { message: string } };
+    expect(body.error.message).toContain("viewer role");
+    expect(body.error.message).toContain("developer");
   });
 
   it("denies tokens whose owner no longer exists", async () => {
@@ -164,5 +167,46 @@ describe("bearer token permissions", () => {
       headers: { authorization: "Bearer dev-token" },
     });
     expect(response.status).toBe(403);
+  });
+});
+
+describe("bearer tokens with no auth adapter (ADR 0008 development mode)", () => {
+  it("lets an ownerless token upload", async () => {
+    const { app, db } = await seed({ auth: false });
+    await mint(db, "legacy-ci", "legacy-token", null);
+
+    const upload = await app.request("/api/v1/projects/token-project/builds", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer legacy-token" },
+      body: BUILD_BODY,
+    });
+    expect(upload.status).toBe(202);
+  });
+
+  it("lets a token whose owner is gone act", async () => {
+    const { app, db } = await seed({ auth: false });
+    await mint(db, "ghost-ci", "ghost-token", "ghost");
+
+    const read = await app.request("/api/v1/projects/token-project", {
+      headers: { authorization: "Bearer ghost-token" },
+    });
+    expect(read.status).toBe(200);
+  });
+
+  it("still scopes a token to its own project and rejects an unknown one", async () => {
+    const { app, db } = await seed({ auth: false });
+    await mint(db, "ci", "ci-token", null);
+
+    const other = await app.request("/api/v1/projects/other-slug", {
+      headers: { authorization: "Bearer ci-token" },
+    });
+    expect(other.status).toBe(403);
+
+    const unknown = await app.request("/api/v1/projects/token-project/builds", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer nope" },
+      body: BUILD_BODY,
+    });
+    expect(unknown.status).toBe(401);
   });
 });

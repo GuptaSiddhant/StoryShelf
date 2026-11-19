@@ -13,7 +13,7 @@ function resetCss(): string {
     body { margin: 0; font-size: 14px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: var(--surface-base); color: var(--text-primary); line-height: 1.5; -webkit-font-smoothing: antialiased; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--radius-sm); }
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     code, kbd, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
     kbd { display: inline-block; padding: .1rem .35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text-secondary); font-size: .75rem; line-height: 1.2; }
     [hidden] { display: none !important; }

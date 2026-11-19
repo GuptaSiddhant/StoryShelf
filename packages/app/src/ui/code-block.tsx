@@ -22,10 +22,6 @@ const codeWrap = css`
     line-height: var(--leading-normal);
     white-space: pre;
   }
-  & pre:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
 `;
 
 /**
