@@ -27,6 +27,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -87,7 +88,9 @@ function packAll(dest) {
     }
   } finally {
     for (const [file, content] of originals) {
-      writeFileSync(file, content);
+      // Same-directory temp file, then rename: an interrupted restore never leaves a partial manifest.
+      writeFileSync(`${file}.restore`, content);
+      renameSync(`${file}.restore`, file);
     }
   }
   return tarballs;
@@ -148,17 +151,22 @@ function initWithDefaults(cli, cwd) {
   });
 }
 
+/** `overrides` that resolve every packed @storyshelf/* package, wherever it is required, to its tarball. */
+function tarballOverrides(tarballs) {
+  return Object.fromEntries(Object.entries(tarballs).map(([name, file]) => [name, `file:${file}`]));
+}
+
 /** Point every @storyshelf/* dependency at its tarball, transitive ones through `overrides`. */
 function useTarballs(projectDir, tarballs) {
   const file = join(projectDir, "package.json");
   const pkg = JSON.parse(readFileSync(file, "utf8"));
-  const own = Object.keys(tarballs);
+  const overrides = tarballOverrides(tarballs);
   for (const name of Object.keys(pkg.dependencies ?? {})) {
-    if (own.includes(name)) {
-      pkg.dependencies[name] = `file:${tarballs[name]}`;
+    if (name in overrides) {
+      pkg.dependencies[name] = overrides[name];
     }
   }
-  pkg.overrides = Object.fromEntries(own.map((name) => [name, `file:${tarballs[name]}`]));
+  pkg.overrides = overrides;
   writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`);
   return pkg;
 }
@@ -192,9 +200,16 @@ async function waitForOk(url, server, timeoutMs, state) {
 async function installFromTarballs(scratch, tarballs) {
   const tool = join(scratch, "tool");
   mkdirSync(tool);
-  writeFileSync(join(tool, "package.json"), '{ "name": "tool", "private": true }\n');
+  // The CLI's own @storyshelf/* dependencies (affected) must come from tarballs too, not the registry.
+  const toolPackage = {
+    name: "tool",
+    private: true,
+    dependencies: { storyshelf: `file:${tarballs["storyshelf"]}` },
+    overrides: tarballOverrides(tarballs),
+  };
+  writeFileSync(join(tool, "package.json"), `${JSON.stringify(toolPackage, null, 2)}\n`);
   log("installing the CLI from its tarball");
-  run("npm", ["install", "--no-audit", "--no-fund", tarballs["storyshelf"]], { cwd: tool });
+  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: tool });
   const cli = join(tool, "node_modules/storyshelf/dist/index.js");
 
   const project = join(scratch, "my-storyshelf");
@@ -207,6 +222,22 @@ async function installFromTarballs(scratch, tarballs) {
   log(`scaffold depends on: ${Object.keys(pkg.dependencies).join(", ")}`);
   run("npm", ["install", "--no-audit", "--no-fund"], { cwd: project });
   return { cli, project };
+}
+
+/** Stop `npm start` and the node process under it (its own process group), and wait for them to exit. */
+async function stopServer(child) {
+  if (child.exitCode !== null) {
+    return;
+  }
+  const exited = new Promise((done) => {
+    child.once("exit", done);
+  });
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch {
+    return;
+  }
+  await Promise.race([exited, sleep(5000)]);
 }
 
 /** `npm start` in the scaffold; resolves once the health endpoint answers. */
@@ -228,7 +259,13 @@ async function startServer(project) {
   });
   const output = collect(child);
   const url = `http://127.0.0.1:${port}`;
-  await waitForOk(`${url}/api/v1/health`, child, 60_000, output);
+  try {
+    await waitForOk(`${url}/api/v1/health`, child, 60_000, output);
+  } catch (error) {
+    // `main` has no handle on the server yet, so stop its process group here before rethrowing.
+    await stopServer(child);
+    throw error;
+  }
   return { child, url };
 }
 
@@ -291,7 +328,7 @@ async function main() {
     process.exitCode = 1;
   } finally {
     if (server) {
-      process.kill(-server.child.pid, "SIGTERM");
+      await stopServer(server.child);
     }
     if (keep) {
       console.log(`kept ${scratch}`);
