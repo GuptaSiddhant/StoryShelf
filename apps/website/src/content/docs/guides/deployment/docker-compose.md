@@ -34,9 +34,9 @@ the `/data` volume and captures with its bundled Chromium. It runs as a non-root
 
 ## Tags
 
-| Tag                              | Contents                                                       |
-| -------------------------------- | -------------------------------------------------------------- |
-| `:<version>`, `:latest`          | The app and Chromium for server-side capture.                  |
+| Tag                                     | Contents                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `:<version>`, `:latest`                 | The app and Chromium for server-side capture.                           |
 | `:<version>-hosting`, `:latest-hosting` | No browser, capture off (`SHELF_CAPTURE=off`): hosting and review only. |
 
 Pin `:<version>` in production. A `next` build is never pushed.
@@ -45,18 +45,19 @@ Pin `:<version>` in production. A `next` build is never pushed.
 
 Everything comes from the environment:
 
-| Variable                                                  | Effect                                                                   |
-| --------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `DATABASE_URL`                                            | `postgres://…` or `mysql://…`. Unset: SQLite at `/data/shelf.db`.        |
-| `AWS_BUCKET`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`         | S3-compatible storage (credentials from the AWS SDK chain). Unset: `/data`. |
-| `SECRET`                                                  | At least 32 characters; signs sessions and encrypts stored credentials. Required with sign-in. |
-| `SECRET_PREVIOUS`, `SECRET_MIGRATE=true`                   | Rotate `SECRET` without losing stored credentials: see [Rotating the server secret](/guides/deployment/secret-rotation/). |
-| `PUBLIC_BASE_URL`                                         | The public origin; required for notification links.                      |
-| `AUTH_PASSWORD`, `AUTH_EMAIL`                             | Bootstrap the local admin (needs `SECRET`). Required unless `SHELF_AUTH=none`. |
-| `SHELF_AUTH=none`                                         | Run without sign-in: every route is open. Refused together with `AUTH_PASSWORD`. |
-| `SMTP_*`                                                  | Email notifications and invites.                                         |
-| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` | Adds `chromium@azure` (Azure Playwright Workspaces, experimental). Off unless both are set. |
-| `SHELF_CAPTURE=off`                                       | Hosting only: no capture, compare or baselines.                          |
+| Variable                                                    | Effect                                                                                                                                                                                                    |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                              | `postgres://…` or `mysql://…`. Unset: SQLite at `/data/shelf.db`.                                                                                                                                         |
+| `DATABASE_CA` / `DATABASE_CA_FILE`                          | PEM text, or a path to a PEM file, of the CA that signed the database's certificate. Set one, not both. See [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate). |
+| `AWS_BUCKET`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`           | S3-compatible storage (credentials from the AWS SDK chain). Unset: `/data`.                                                                                                                               |
+| `SECRET`                                                    | At least 32 characters; signs sessions and encrypts stored credentials. Required with sign-in.                                                                                                            |
+| `SECRET_PREVIOUS`, `SECRET_MIGRATE=true`                    | Rotate `SECRET` without losing stored credentials: see [Rotating the server secret](/guides/deployment/secret-rotation/).                                                                                 |
+| `PUBLIC_BASE_URL`                                           | The public origin; required for notification links.                                                                                                                                                       |
+| `AUTH_PASSWORD`, `AUTH_EMAIL`                               | Bootstrap the local admin (needs `SECRET`). Required unless `SHELF_AUTH=none`.                                                                                                                            |
+| `SHELF_AUTH=none`                                           | Run without sign-in: every route is open. Refused together with `AUTH_PASSWORD`.                                                                                                                          |
+| `SMTP_*`                                                    | Email notifications and invites.                                                                                                                                                                          |
+| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` | Adds `chromium@azure` (Azure Playwright Workspaces, experimental). Off unless both are set.                                                                                                               |
+| `SHELF_CAPTURE=off`                                         | Hosting only: no capture, compare or baselines.                                                                                                                                                           |
 
 ## Compose file
 

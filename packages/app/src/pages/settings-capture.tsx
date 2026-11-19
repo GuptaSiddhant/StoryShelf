@@ -37,16 +37,18 @@ function BrowserFields(props: {
         options={targets.choices}
         hint="Used for the published preview and to bootstrap other engines."
       />
-      {targets.choices.map((engine) => (
-        <CheckField
-          key={engine.value}
-          label={`Also capture on ${engine.label}`}
-          name={`extra_${engine.value}`}
-          value={engine.value}
-          checked={extras.includes(engine.value) ? true : undefined}
-          disabled={disabled}
-        />
-      ))}
+      {targets.choices
+        .filter((engine) => engine.value !== primary)
+        .map((engine) => (
+          <CheckField
+            key={engine.value}
+            label={`Also capture on ${engine.label}`}
+            name={`extra_${engine.value}`}
+            value={engine.value}
+            checked={extras.includes(engine.value) ? true : undefined}
+            disabled={disabled}
+          />
+        ))}
       {targets.unavailable.length > 0 ? (
         <Meta>Not selectable on this server: {targets.unavailable.join("; ")}.</Meta>
       ) : null}

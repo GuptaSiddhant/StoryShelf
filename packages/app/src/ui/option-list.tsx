@@ -42,7 +42,9 @@ const option = css`
     color: var(--accent-fg);
   }
   &:disabled {
-    opacity: 0.55;
+    opacity: 1;
+    background: var(--surface-muted);
+    color: var(--text-secondary);
     cursor: not-allowed;
   }
 `;

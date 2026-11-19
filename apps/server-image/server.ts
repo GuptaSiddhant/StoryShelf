@@ -28,6 +28,7 @@ import {
   databaseFromEnv,
   isLoopback,
   nonEmpty,
+  unverifiedDatabaseTls,
   storageFromEnv,
 } from "./env.ts";
 
@@ -49,6 +50,12 @@ const { storage, log: storageLog } = storageFromEnv(env, dataDir);
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 shelfLogger.info({ ...databaseLog, ...storageLog }, "adapters");
+if (unverifiedDatabaseTls(env)) {
+  shelfLogger.warn(
+    { sslmode: "unverified" },
+    "DATABASE_URL asks for TLS without checking the database certificate; set DATABASE_CA (or DATABASE_CA_FILE) and sslmode=verify-full",
+  );
+}
 
 // Every built-in integration is registered (ADR 0049); with SMTP_* set the `email` notifier sends through it.
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);

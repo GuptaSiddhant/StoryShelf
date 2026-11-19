@@ -7,10 +7,6 @@ const tableWrap = css`
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  &:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
   & table {
     width: 100%;
     border-collapse: separate;
@@ -59,6 +55,13 @@ const tableDense = css`
   }
 `;
 
+const tableEmptyCell = css`
+  /* table-empty */
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text-secondary);
+`;
+
 /**
  * Scrollable bordered table surface. Pass native `<table>` markup as
  * children; the header, row hover, and spacing are styled here. The surface
@@ -67,14 +70,26 @@ const tableDense = css`
  * give each table on a page its own name (two regions with the same name fail
  * axe's `landmark-unique`).
  */
-export const Table: FC<{ dense?: boolean; label: string; children?: unknown }> = ({
-  dense = false,
-  label,
-  children,
-}) => {
+export const Table: FC<{
+  dense?: boolean;
+  label: string;
+  /** "Nothing here" message: one full-width row, no header, and `children` are not rendered. */
+  empty?: unknown;
+  children?: unknown;
+}> = ({ dense = false, label, empty, children }) => {
   return (
     <div class={dense ? tableDense : tableWrap} role="region" aria-label={label} tabindex={0}>
-      {children}
+      {empty === undefined ? (
+        children
+      ) : (
+        <table>
+          <tbody>
+            <tr>
+              <td class={tableEmptyCell}>{empty}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
     </div>
   );
 };
