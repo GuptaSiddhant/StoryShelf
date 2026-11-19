@@ -226,18 +226,26 @@ async function installFromTarballs(scratch, tarballs) {
 
 /** Stop `npm start` and the node process under it (its own process group), and wait for them to exit. */
 async function stopServer(child) {
-  if (child.exitCode !== null) {
-    return;
-  }
   const exited = new Promise((done) => {
-    child.once("exit", done);
+    if (child.exitCode === null) {
+      child.once("exit", done);
+    } else {
+      done();
+    }
   });
-  try {
-    process.kill(-child.pid, "SIGTERM");
-  } catch {
-    return;
-  }
+  signalGroup(child, "SIGTERM");
   await Promise.race([exited, sleep(5000)]);
+  // `npm` may be gone while a descendant lingers or ignores SIGTERM: whatever is left in the group is killed.
+  signalGroup(child, "SIGKILL");
+}
+
+/** Signal the child's whole process group; a group that is already gone is not an error. */
+function signalGroup(child, signal) {
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    // ESRCH: no member left
+  }
 }
 
 /** `npm start` in the scaffold; resolves once the health endpoint answers. */
