@@ -5,6 +5,7 @@ import {
   captureEnabled,
   databaseCaFromEnv,
   databaseFromEnv,
+  describeBootFailure,
   isLoopback,
   storageFromEnv,
   unverifiedDatabaseTls,
@@ -161,6 +162,20 @@ describe("authFromEnv", () => {
         expect.objectContaining({ message: expect.not.stringContaining(password) }),
       );
     }
+  });
+});
+
+describe("describeBootFailure", () => {
+  it("prints the reason as the first line, then the stack frames", () => {
+    const text = describeBootFailure(new Error("SECRET is unset: set it"));
+    const [first, ...rest] = text.trimEnd().split("\n");
+    expect(first).toBe("storyshelf: SECRET is unset: set it");
+    expect(rest.length).toBeGreaterThan(0);
+    expect(rest.every((line) => line.trimStart().startsWith("at "))).toBe(true);
+  });
+
+  it("prints a non-error value on one line", () => {
+    expect(describeBootFailure("boom")).toBe("storyshelf: boom\n");
   });
 });
 

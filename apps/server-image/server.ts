@@ -26,6 +26,7 @@ import {
   browsersFromEnv,
   captureEnabled,
   databaseFromEnv,
+  describeBootFailure,
   isLoopback,
   nonEmpty,
   unverifiedDatabaseTls,
@@ -40,8 +41,12 @@ const secret = nonEmpty(env["SECRET"]);
 const publicBaseUrl = nonEmpty(env["PUBLIC_BASE_URL"]);
 const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
 
-// Every refusal below throws before the server listens: Node exits non-zero with the message
-// (naming the variable, never its value) as the first line.
+// Every refusal below throws before the server listens. Node would print the throwing source line
+// first, so the reason (naming the variable, never its value) is printed as the first line instead.
+process.on("uncaughtException", (error) => {
+  process.stderr.write(describeBootFailure(error));
+  process.exit(1);
+});
 const imageAuth = authFromEnv(env);
 
 mkdirSync(dataDir, { recursive: true });

@@ -185,3 +185,17 @@ function passwordAuth(env: Env, password: string | undefined): ImageAuth {
 export function isLoopback(hostname: string): boolean {
   return hostname === "localhost" || hostname === "::1" || hostname.startsWith("127.");
 }
+
+/**
+ * What a failed start prints: `storyshelf: <reason>` as the first line, then the stack. A refusal's
+ * reason names the variable and never its value, so the first line is safe to show and to grep.
+ */
+export function describeBootFailure(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return `storyshelf: ${String(error)}\n`;
+  }
+  const frames = (error.stack ?? "")
+    .split("\n")
+    .filter((line) => line.trimStart().startsWith("at "));
+  return [`storyshelf: ${error.message}`, ...frames, ""].join("\n");
+}
