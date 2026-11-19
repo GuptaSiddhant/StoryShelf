@@ -51,6 +51,13 @@ describe("printNextSteps", () => {
     expect(printed).not.toContain("docker:up");
   });
 
+  it("asks a single container for SECRET and AUTH_PASSWORD before docker:run", () => {
+    printNextSteps(answers({ deployTarget: "docker", docker: true, auth: "password" }), "npm");
+    expect(printed.indexOf("export SECRET=")).toBeGreaterThan(-1);
+    expect(printed.indexOf("export AUTH_PASSWORD=")).toBeGreaterThan(-1);
+    expect(printed.indexOf("export AUTH_PASSWORD=")).toBeLessThan(printed.indexOf("docker:run"));
+  });
+
   it("points a compose stack at docker:up, logs and down", () => {
     printNextSteps(answers({ deployTarget: "docker", docker: true, database: "postgres" }), "npm");
     expect(printed).toContain("npm run docker:up");

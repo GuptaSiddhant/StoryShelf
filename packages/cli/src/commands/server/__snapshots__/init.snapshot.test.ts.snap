@@ -515,7 +515,7 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 789 b1d62d2056242c0d53e0f961efeee1065fc47ed24d0f71244da15b726d6ee219",
+    "package.json 779 f8052b980318e42f2490fe3dd8bdeedc7dcb407c81470f7f70076152bc48ea8e",
     "src/index.ts 1354 47d2721269e685e0818c6de3d793d06c3b4d9148b7ff458db30af2ffca3a8945",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -527,6 +527,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -538,7 +539,7 @@ exports[`server init output > is unchanged for docker single container 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 766 eb488521c07884e84661da25ea0204d003a18f782e0795c0584b57245ad63425",
+    "package.json 756 5d5384854436838f0daca9ffdf231643aa0927aa24121a7e6f21dba06819ffce",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -550,6 +551,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -713,7 +715,7 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 766 eb488521c07884e84661da25ea0204d003a18f782e0795c0584b57245ad63425",
+    "package.json 756 5d5384854436838f0daca9ffdf231643aa0927aa24121a7e6f21dba06819ffce",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -725,6 +727,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",

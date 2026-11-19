@@ -55,17 +55,21 @@ function terraformSteps(cloud: CloudSteps): string[] {
 }
 
 function dockerSteps(compose: boolean, password: boolean): string[] {
+  const env = [
+    `  export SECRET=...      # at least 32 random characters; keep and reuse it`,
+    ...(password
+      ? [`  export AUTH_PASSWORD=...  # the local admin's password (12+ characters)`]
+      : []),
+  ];
   return compose
     ? [
-        `  export SECRET=...      # at least 32 random characters; keep and reuse it`,
-        ...(password
-          ? [`  export AUTH_PASSWORD=...  # the local admin's password (12+ characters)`]
-          : []),
+        ...env,
         `  npm run docker:up      # builds + starts the app`,
         `  npm run docker:logs    # follow logs`,
         `  npm run docker:down    # tear down`,
       ]
     : [
+        ...env,
         `  npm run docker:build   # builds the image`,
         `  npm run docker:run     # runs it on :3000 (data in a named volume)`,
       ];
