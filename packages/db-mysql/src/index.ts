@@ -38,7 +38,11 @@ function resolvePool(options: MysqlDatabaseOptions): {
   if (connectionString) {
     // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- Pool vs PoolLike width
     return {
-      pool: mysql.createPool({ uri: connectionString, dateStrings: true }),
+      pool: mysql.createPool({
+        uri: connectionString,
+        ...(options.ssl === undefined ? {} : { ssl: options.ssl as never }),
+        dateStrings: true,
+      }),
       owned: true,
     };
   }

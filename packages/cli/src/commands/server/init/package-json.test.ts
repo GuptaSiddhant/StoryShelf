@@ -40,6 +40,7 @@ describe("generatePackageJson", () => {
       "@storyshelf/app",
       "@storyshelf/db-sqlite",
       "@storyshelf/runner-playwright",
+      "@storyshelf/storage-local",
     ]);
   });
 
@@ -99,8 +100,8 @@ describe("generatePackageJson", () => {
     }
   });
 
-  it("adds the storage package only for a remote store", () => {
-    expect(pkg({ storage: "local" }).dependencies["@storyshelf/storage-local"]).toBeUndefined();
+  it("adds the storage package the scaffold imports, local included", () => {
+    expect(pkg({ storage: "local" }).dependencies["@storyshelf/storage-local"]).toBeDefined();
     expect(pkg({ storage: "s3" }).dependencies["@storyshelf/storage-s3"]).toBeDefined();
     expect(pkg({ storage: "azure" }).dependencies["@storyshelf/storage-azure"]).toBeDefined();
     expect(pkg({ storage: "gcs" }).dependencies["@storyshelf/storage-gcs"]).toBeDefined();

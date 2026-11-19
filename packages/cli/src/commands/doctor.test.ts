@@ -186,6 +186,74 @@ describe("runDoctor", () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it("fails when the token can read the project but not upload, and says why", async () => {
+    setupStorybook();
+    seedValidOutput();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        await Promise.resolve();
+        if (url.endsWith("/usage")) {
+          return Response.json(
+            { error: { message: "This token has the viewer role" } },
+            { status: 403 },
+          );
+        }
+        return Response.json(url.endsWith("/health") ? { auth: true } : { name: "Demo" });
+      }),
+    );
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await runDoctor({ url: "https://shelf.example.com", slug: "demo", token: "t", cwd: dir });
+    expect(process.exitCode).toBe(1);
+    expect(lines.join("")).toContain(
+      "Token may not upload: forbidden (403) — This token has the viewer role",
+    );
+  });
+
+  it("passes the upload check when the probe reaches the build lookup (404)", async () => {
+    setupStorybook();
+    seedValidOutput();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        await Promise.resolve();
+        if (url.endsWith("/usage")) {
+          return Response.json({ error: { message: "Build not found" } }, { status: 404 });
+        }
+        return Response.json(url.endsWith("/health") ? { auth: true } : { name: "Demo" });
+      }),
+    );
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await runDoctor({ url: "https://shelf.example.com", slug: "demo", token: "t", cwd: dir });
+    expect(process.exitCode).toBeUndefined();
+    expect(lines.join("")).toContain("Token may upload builds");
+  });
+
+  it("passes the upload check without probing when the server has sign-in off", async () => {
+    setupStorybook();
+    seedValidOutput();
+    const seen: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        await Promise.resolve();
+        seen.push(url);
+        return Response.json(url.endsWith("/health") ? { auth: false } : { name: "Demo" });
+      }),
+    );
+    await runDoctor({ url: "https://shelf.example.com", slug: "demo", token: "t", cwd: dir });
+    expect(process.exitCode).toBeUndefined();
+    expect(seen.some((url) => url.endsWith("/usage"))).toBe(false);
+  });
+
   it("warns but passes when the build output is missing", async () => {
     setupStorybook();
     mockFetch(() => ({ slug: "demo" }));

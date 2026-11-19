@@ -10,7 +10,13 @@ import {
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
-import { createClient, normalizeBaseUrl, RequestError, type BuildCreated } from "../client.ts";
+import {
+  createClient,
+  describeBuildLink,
+  normalizeBaseUrl,
+  RequestError,
+  type BuildCreated,
+} from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
 import { HashRoutesMissingError, isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
@@ -315,7 +321,7 @@ async function buildAndPost(
   }
   await reportPackageUsage(client, created, cwd, collected);
   await uploadBuild(client, created, cwd, collected);
-  printLine(`Build created: ${created.build.id}`);
+  printLine(describeBuildLink(collected.url, created.build, created.buildUrl));
   if (hostingOnly) {
     printLine(HOSTING_ONLY_NOTICE);
   }
