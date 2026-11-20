@@ -305,6 +305,19 @@ describe("type and colour tokens", () => {
     expect(offenders.map(({ file }) => file)).toEqual([]);
   });
 
+  it("renders a PageHeader at most once per page file, bar the files whose branches are exclusive", async () => {
+    // These render one header per mutually exclusive branch (empty, populated, error), never two at once.
+    const exclusiveBranches: Record<string, number> = {
+      "invite.tsx": 2,
+      "label-detail.tsx": 2,
+      "library.tsx": 3,
+    };
+    const offenders = (await pageSources())
+      .map(({ file, source }) => ({ file, count: source.match(/<PageHeader[\s>]/gu)?.length ?? 0 }))
+      .filter(({ file, count }) => count > (exclusiveBranches[file] ?? 1));
+    expect(offenders).toEqual([]);
+  });
+
   it("prints no raw status, verdict, role, kind or provider enum as a badge label", async () => {
     const raw =
       /<Badge[^>]*>\s*\{[^{}()]*\.(?:status|verdict|role|kind|provider|level)\}\s*<\/Badge>/gu;
