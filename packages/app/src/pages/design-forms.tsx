@@ -15,7 +15,8 @@ interface LinkFormProps {
   error?: string | undefined;
 }
 
-const designBack = (project: Project): string => `/projects/${project.slug}/settings/capture#design`;
+const designBack = (project: Project): string =>
+  `/projects/${project.slug}/settings/capture#design`;
 
 /** Link a design file to the project. */
 export const AddDesignFileForm: FC<LinkFormProps> = ({ project, standalone, urlHint, error }) => {

@@ -242,20 +242,20 @@ function healthOf(channel: SettingsNotificationChannel): NonNullable<SummaryItem
     : { label: "OK", tone: "success" };
 }
 
+/** The last outcome as text: the failure with its day, the last delivery, or never. */
+function lastOutcome(channel: SettingsNotificationChannel): string {
+  if (channel.lastError === null) {
+    return channel.lastDeliveredAt === null
+      ? "Never delivered"
+      : `Last delivered ${formatAbsolute(channel.lastDeliveredAt, "date")}`;
+  }
+  const when = channel.lastErrorAt ? ` ${formatAbsolute(channel.lastErrorAt, "date")}` : "";
+  return `Failed${when}: ${channel.lastError}`;
+}
+
 /** Provider, what it reacts to and its last delivery or error, as one line. */
 function detailsOf(channel: SettingsNotificationChannel): string {
-  const parts = [statusLabel(channel.provider), reactsTo(channel)];
-  if (channel.lastError !== null) {
-    const when = channel.lastErrorAt ? ` ${formatAbsolute(channel.lastErrorAt, "date")}` : "";
-    parts.push(`Failed${when}: ${channel.lastError}`);
-  } else {
-    parts.push(
-      channel.lastDeliveredAt === null
-        ? "Never delivered"
-        : `Last delivered ${formatAbsolute(channel.lastDeliveredAt, "date")}`,
-    );
-  }
-  return parts.join(" · ");
+  return [statusLabel(channel.provider), reactsTo(channel), lastOutcome(channel)].join(" · ");
 }
 
 /** A channel's actions (admins only): Edit for message channels, Retry for git ones, Delete. */
@@ -283,6 +283,24 @@ const ChannelActions: FC<{
   </HStack>
 );
 
+const AddChannelLink: FC<{ project: Project }> = ({ project }) => (
+  <DialogLink
+    dialogId={ADD_CHANNEL_DIALOG}
+    href={`/projects/${project.slug}/settings/notifications/new`}
+    variant="primary"
+    icon="plus"
+  >
+    Add channel
+  </DialogLink>
+);
+
+const ChannelDialogs: FC = () => (
+  <>
+    <FormDialog id={ADD_CHANNEL_DIALOG} title="Add channel" submitLabel="Add channel" />
+    <FormDialog id={EDIT_CHANNEL_DIALOG} title="Edit channel" submitLabel="Save channel" />
+  </>
+);
+
 /** Channels as a summary: chat, email and git channels side by side, each with its delivery health. */
 const ChannelsSection: FC<{
   project: Project;
@@ -291,17 +309,8 @@ const ChannelsSection: FC<{
   isAdmin: boolean;
   paused: boolean;
 }> = ({ project, channels, messageKinds, isAdmin, paused }) => {
-  const add =
-    isAdmin && messageKinds.length > 0 ? (
-      <DialogLink
-        dialogId={ADD_CHANNEL_DIALOG}
-        href={`/projects/${project.slug}/settings/notifications/new`}
-        variant="primary"
-        icon="plus"
-      >
-        Add channel
-      </DialogLink>
-    ) : undefined;
+  const canAdd = isAdmin && messageKinds.length > 0;
+  const add = canAdd ? <AddChannelLink project={project} /> : undefined;
   return (
     <VStack>
       <SectionTitle>Channels</SectionTitle>
@@ -333,12 +342,7 @@ const ChannelsSection: FC<{
         add={add}
       />
       {channels.length > 0 ? add : null}
-      {isAdmin && messageKinds.length > 0 ? (
-        <>
-          <FormDialog id={ADD_CHANNEL_DIALOG} title="Add channel" submitLabel="Add channel" />
-          <FormDialog id={EDIT_CHANNEL_DIALOG} title="Edit channel" submitLabel="Save channel" />
-        </>
-      ) : null}
+      {canAdd ? <ChannelDialogs /> : null}
     </VStack>
   );
 };

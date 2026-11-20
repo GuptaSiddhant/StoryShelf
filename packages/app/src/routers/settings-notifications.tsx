@@ -1,5 +1,5 @@
 import { NotificationChannelModel, NotificationSubscriptionModel } from "@storyshelf/core/models";
-import type { Project } from "@storyshelf/core/schema";
+import type { NotificationChannelRow, Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import { z } from "zod";
 import type { ShelfRouter } from "../app-types.ts";
@@ -314,7 +314,7 @@ async function handleNewChannel(c: Context): Promise<Response> {
 }
 
 /** A message channel of this project, or a 404 (git channels have their own form). */
-async function messageChannelOf(c: Context, project: Project) {
+async function messageChannelOf(c: Context, project: Project): Promise<NotificationChannelRow> {
   const channel = await notificationChannelModel().get(c.req.param("channelId") ?? "");
   const found = channel && channel.projectId === project.id ? channel : undefined;
   if (!found || NotificationChannelModel.isStateKind(getStore().notifiers, found.provider)) {
@@ -370,13 +370,13 @@ async function handleEditChannelForm(c: Context): Promise<Response> {
   );
 }
 
-async function handleEditChannel(c: Context): Promise<Response> {
-  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
-  const channel = await messageChannelOf(c, project);
-  const form = await c.req.formData();
-  const target = asString(form.get("target")) ?? "";
+/** The refusal of an edit, or null when the edit is valid. */
+async function editRefusal(
+  channel: NotificationChannelRow,
+  config: Record<string, unknown>,
+  target: string,
+): Promise<string | null> {
   const email = channel.provider === "email";
-  const config = channelConfig(channel.provider, target, form);
   const checked = await NotificationChannelModel.validateInput(
     getStore().notifiers,
     channel.provider,
@@ -384,26 +384,58 @@ async function handleEditChannel(c: Context): Promise<Response> {
     undefined,
     email || target === "" ? undefined : target,
   );
-  if (!checked.ok || (email && target === "")) {
-    const message = checked.ok ? "Enter an email address" : checked.message;
-    return editChannelAnswer(
-      c,
-      project,
-      channel,
-      {
-        errors: { target: message },
-        to: target,
-        events: asString(form.get("events")) ?? "",
-        style: asString(form.get("style")) ?? "compact",
-      },
-      400,
-    );
+  if (!checked.ok) {
+    return checked.message;
   }
+  return email && target === "" ? "Enter an email address" : null;
+}
+
+/** Persist an edit: the config and events always, the secret only for a webhook kind with a new URL. */
+async function saveChannelEdit(
+  channel: NotificationChannelRow,
+  config: Record<string, unknown>,
+  form: FormData,
+  target: string,
+): Promise<void> {
+  const events = parseEvents(form);
   await notificationChannelModel().update(channel.id, {
     config,
-    ...(parseEvents(form) ? { events: parseEvents(form) } : {}),
-    ...(email || target === "" ? {} : { secret: target }),
+    ...(events ? { events } : {}),
+    ...(channel.provider === "email" || target === "" ? {} : { secret: target }),
   });
+}
+
+async function handleEditChannel(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  return await applyEdit(c, project, await messageChannelOf(c, project));
+}
+
+async function applyEdit(
+  c: Context,
+  project: Project,
+  channel: NotificationChannelRow,
+): Promise<Response> {
+  const form = await c.req.formData();
+  const target = asString(form.get("target")) ?? "";
+  const config = channelConfig(channel.provider, target, form);
+  const problem = await editRefusal(channel, config, target);
+  if (problem !== null) {
+    return editChannelAnswer(c, project, channel, typedEdit(form, problem), 400);
+  }
+  await saveChannelEdit(channel, config, form, target);
   flash(c, "Notification channel saved");
   return hxRedirect(c, settingsHref(project.slug, "notifications"));
+}
+
+/** What the Edit form shows again after a refusal: the problem and what was typed. */
+function typedEdit(
+  form: FormData,
+  problem: string,
+): ChannelFormState & { to?: string | undefined } {
+  return {
+    errors: { target: problem },
+    to: asString(form.get("target")) ?? "",
+    events: asString(form.get("events")) ?? "",
+    style: asString(form.get("style")) ?? "compact",
+  };
 }

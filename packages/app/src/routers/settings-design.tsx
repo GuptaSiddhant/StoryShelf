@@ -4,16 +4,12 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
-import {
-  AddDesignFileForm,
-  DesignTokenForm,
-  MapComponentForm,
-} from "../pages/design-forms.tsx";
+import { AddDesignFileForm, DesignTokenForm, MapComponentForm } from "../pages/design-forms.tsx";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
-import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 import { respondWithForm } from "./form-response.tsx";
+import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString } from "./settings.handlers.ts";
 
@@ -82,9 +78,19 @@ async function linkForm(
     file ? "Add design file" : "Map component",
     (standalone) =>
       file ? (
-        <AddDesignFileForm project={project} standalone={standalone} urlHint={urlHint()} error={error} />
+        <AddDesignFileForm
+          project={project}
+          standalone={standalone}
+          urlHint={urlHint()}
+          error={error}
+        />
       ) : (
-        <MapComponentForm project={project} standalone={standalone} urlHint={urlHint()} error={error} />
+        <MapComponentForm
+          project={project}
+          standalone={standalone}
+          urlHint={urlHint()}
+          error={error}
+        />
       ),
     status,
   );
@@ -108,7 +114,9 @@ async function tokenForm(c: Context, error?: string, status: 200 | 400 = 200): P
           kind: metadata.kind,
           name: metadata.name,
           credentialLabel: metadata.credentialLabel,
-          ...(metadata.credentialPlaceholder ? { placeholder: metadata.credentialPlaceholder } : {}),
+          ...(metadata.credentialPlaceholder
+            ? { placeholder: metadata.credentialPlaceholder }
+            : {}),
         }}
         replace={replace}
         standalone={standalone}
@@ -131,7 +139,8 @@ async function handleAddFile(c: Context): Promise<Response> {
   try {
     await designModel().addProjectLink(project.id, { label, url: asString(form.get("url")) ?? "" });
   } catch (error) {
-    if (error instanceof InvalidDesignUrlError) return await linkForm(c, "file", error.message, 400);
+    if (error instanceof InvalidDesignUrlError)
+      return await linkForm(c, "file", error.message, 400);
     throw error;
   }
   return done(c, project.slug, "Design file added");

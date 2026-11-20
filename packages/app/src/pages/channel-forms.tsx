@@ -40,6 +40,7 @@ function targetField(
     <Field
       label={email ? "Email address" : "Webhook URL"}
       name="target"
+      id={`target-${kind}`}
       type={email ? "email" : "url"}
       required={options?.optional !== true}
       placeholder={email ? "team@example.com" : "https://hooks.example.com/…"}

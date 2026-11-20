@@ -609,13 +609,15 @@ describe("dialog forms (ADR 0012, decision 10)", () => {
       "/projects/notify-project/settings/general/edit": "edit-general-form",
       "/projects/notify-project/settings/review/edit": "edit-review-form",
     };
-    for (const [path, id] of Object.entries(forms)) {
-      const fragment = await app.request(path, { headers: hx });
-      expect(fragment.status, path).toBe(200);
-      const text = await fragment.text();
-      expect(text, path).toContain(`id="${id}"`);
-      expect(text, path).not.toContain("<html");
-      expect(await (await app.request(path)).text(), path).toContain("<html");
-    }
+    await Promise.all(
+      Object.entries(forms).map(async ([path, id]) => {
+        const fragment = await app.request(path, { headers: hx });
+        expect(fragment.status, path).toBe(200);
+        const text = await fragment.text();
+        expect(text, path).toContain(`id="${id}"`);
+        expect(text, path).not.toContain("<html");
+        expect(await (await app.request(path)).text(), path).toContain("<html");
+      }),
+    );
   });
 });

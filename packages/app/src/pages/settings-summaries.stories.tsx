@@ -52,25 +52,51 @@ const channel = (
   ...changes,
 });
 
+const accessMembers = [
+  {
+    id: "m1",
+    projectId: project.id,
+    userId: "ana@example.com",
+    role: "admin",
+    createdAt: hoursAgo(900),
+  },
+  {
+    id: "m2",
+    projectId: project.id,
+    userId: "li@example.com",
+    role: "viewer",
+    createdAt: hoursAgo(300),
+  },
+];
+
+const accessTokens = [
+  {
+    id: "t1",
+    projectId: project.id,
+    name: "ci",
+    userId: null,
+    createdAt: hoursAgo(500),
+    lastUsedAt: hoursAgo(5),
+  },
+  {
+    id: "t2",
+    projectId: project.id,
+    name: "release",
+    userId: null,
+    createdAt: hoursAgo(100),
+    lastUsedAt: null,
+  },
+] as ProjectSettingsData["tokens"];
+
+const accessWebhooks = [
+  { id: "w1", url: "https://example.com/hooks/storyshelf", events: [] },
+  { id: "w2", url: "https://ci.example.com/hook", events: ["build.approved", "build.rejected"] },
+];
+
 /** Access with members, group mappings, tokens and webhooks listed. */
 export const AccessList = pageStory(() =>
   page("access", {
-    members: [
-      {
-        id: "m1",
-        projectId: project.id,
-        userId: "ana@example.com",
-        role: "admin",
-        createdAt: hoursAgo(900),
-      },
-      {
-        id: "m2",
-        projectId: project.id,
-        userId: "li@example.com",
-        role: "viewer",
-        createdAt: hoursAgo(300),
-      },
-    ],
+    members: accessMembers,
     groupMappings: [
       {
         id: "g1",
@@ -80,32 +106,8 @@ export const AccessList = pageStory(() =>
         createdAt: hoursAgo(200),
       },
     ],
-    tokens: [
-      {
-        id: "t1",
-        projectId: project.id,
-        name: "ci",
-        userId: null,
-        createdAt: hoursAgo(500),
-        lastUsedAt: hoursAgo(5),
-      },
-      {
-        id: "t2",
-        projectId: project.id,
-        name: "release",
-        userId: null,
-        createdAt: hoursAgo(100),
-        lastUsedAt: null,
-      },
-    ] as ProjectSettingsData["tokens"],
-    webhooks: [
-      { id: "w1", url: "https://example.com/hooks/storyshelf", events: [] },
-      {
-        id: "w2",
-        url: "https://ci.example.com/hook",
-        events: ["build.approved", "build.rejected"],
-      },
-    ],
+    tokens: accessTokens,
+    webhooks: accessWebhooks,
   }),
 );
 

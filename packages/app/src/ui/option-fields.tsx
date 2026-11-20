@@ -7,11 +7,15 @@ export const MAX_OPTIONS = 6;
 
 const positions = Array.from({ length: MAX_OPTIONS }, (_, index) => index + 1);
 
-/** Hide every group, then show the one whose radio is checked (no script). */
+/**
+ * Hide every group, then show the one whose radio is checked (no script). The attribute value is
+ * unquoted on purpose: `hono/css` escapes a quote in an interpolated string (`\"`), which makes the
+ * selector invalid and the browser drops the rule, so no group would ever show.
+ */
 const groupRules = positions
   .map(
     (n) =>
-      `&:has(input[type="radio"]:nth-of-type(${n}):checked) fieldset[data-option-group]:nth-of-type(${n}){display:block;}`,
+      `&:has(input[type=radio]:nth-of-type(${n}):checked) fieldset[data-option-group]:nth-of-type(${n}){display:block;}`,
   )
   .join("\n  ");
 
