@@ -79,6 +79,7 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   // testing
   "GET /projects/:slug/jobs": "testing",
   "POST /projects/:slug/settings/tests": "testing",
+  "GET /projects/:slug/settings/capture/extras": "testing",
   "POST /projects/:slug/settings/capture": "testing",
   "POST /projects/:slug/settings/capture/superseded": "testing",
   "POST /projects/:slug/settings/thresholds": "testing",
