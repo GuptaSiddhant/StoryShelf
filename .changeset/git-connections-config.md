@@ -2,7 +2,7 @@
 "@storyshelf/core": minor
 ---
 
-Added: server-wide git connections: a stored model, configuration, GitHub App manifest and installation lookup
+Added: server-wide git connections, their configuration, GitHub App manifest and installation lookup
 
 `GitConnectionModel` stores GitHub App and GitLab token connections with their secret encrypted
 with `SECRET` and never returned. `ShelfOptions.git` declares connections and approved links in
