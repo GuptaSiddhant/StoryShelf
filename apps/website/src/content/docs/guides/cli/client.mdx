@@ -98,7 +98,7 @@ Affected capture is on by default: the CLI traces `git diff baseline..HEAD` thro
 The CLI does **not** run Playwright. It hashes the static build, sends only the files the server does not hold yet, then posts the manifest; the server renders and diffs asynchronously. A second upload of an unchanged build sends the manifest alone.
 :::
 
-**Output.** `upload` (and `doctor`, `server init`) report in phases: `==> Checking config` opens one and `--> Checked config (0.4s)` closes it with its time. `upload` runs config, Storybook build, build creation, affected stories, package usage and upload, with `42% of 18.3 MiB` for a zip or `120/860 files` for a file-by-file upload, then ends with a summary on stdout: files, size, stories affected out of the total (or full capture), the build ID and the build link. Phases and progress go to stderr, so stdout holds only results. When stderr is not a terminal, or `CI` is set, there are no spinners, bars or `\r`: one line opens and one line closes each phase. `NO_COLOR` turns off bold text. Exit codes are unchanged. Output never contains a token or a signed URL.
+**Output.** Phases and progress go to stderr, results to stdout; `CI` turns off `\r` frames.
 
 **Servers without `testing`.** An instance that [hosts Storybooks only](/concepts/hosting-only/) reports `testing: false` when the build is created. `storyshelf upload` then skips the affected-capture computation, uploads as usual, and ends with `Testing is off on this server: the Storybook is published, but no captures or visual checks will run.`
 
