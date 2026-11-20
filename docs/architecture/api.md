@@ -69,6 +69,15 @@ POST   /api/v1/projects/:slug/baselines/import          # application/zip body, 
 POST   /api/v1/projects/:slug/builds/:buildId/publish     # mark build publicly viewable
 POST   /api/v1/projects/:slug/builds/:buildId/unpublish
 
+# Installable app, offline and push (ADR 0048; see installable-app.md)
+GET    /manifest.webmanifest                        # web app manifest (hosting, no session)
+GET    /sw.js                                       # the one service worker, scope / (hosting, no session)
+GET    /api/v1/offline?projects=<slug,...>          # default-branch build + file manifest per readable project (hosting)
+GET    /api/v1/push/public-key                      # VAPID public key; 404 without keys (hosting)
+POST   /api/v1/me/push-subscriptions                # register this browser for push (hosting, signed-in user)
+DELETE /api/v1/me/push-subscriptions/:id            # remove a device (hosting)
+GET    /profile/offline                             # "This device": keep Storybooks offline, cap, sync
+
 # Admin
 POST   /api/v1/admin/purge                          # manual retention purge
 

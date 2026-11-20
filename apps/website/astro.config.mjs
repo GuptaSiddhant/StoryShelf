@@ -161,6 +161,8 @@ export default defineConfig({
             { label: "Reviewing changes", slug: "guides/review" },
             { label: "Merge gate", slug: "guides/merge-gate" },
             { label: "Notifications", slug: "guides/notifications" },
+            { label: "Install & offline", slug: "guides/installable-app" },
+            { label: "Web push", slug: "guides/web-push" },
             { label: "Project settings", slug: "guides/project-settings" },
             { label: "Baseline portability", slug: "guides/portability" },
           ],
