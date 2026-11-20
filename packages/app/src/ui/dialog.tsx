@@ -81,10 +81,12 @@ export const Dialog: FC<{
   /** Accessible name of the close button. */
   closeLabel?: string;
   footer?: unknown;
+  /** Render it showing (non-modal): for a form page or a story that shows the open state. */
+  open?: boolean;
   children?: unknown;
-}> = ({ id, title, closeLabel = "Close", footer, children }) => {
+}> = ({ id, title, closeLabel = "Close", footer, open, children }) => {
   return (
-    <dialog id={id} class={dialogRoot} aria-labelledby={`${id}-title`} data-dialog>
+    <dialog id={id} class={dialogRoot} aria-labelledby={`${id}-title`} data-dialog open={open}>
       <div class={dialogHeader}>
         <h2 id={`${id}-title`} class={dialogTitle}>
           {title}

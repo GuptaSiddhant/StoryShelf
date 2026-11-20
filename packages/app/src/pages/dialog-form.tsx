@@ -60,15 +60,19 @@ export const DialogForm: FC<DialogFormSpec> = ({
 };
 
 /** An empty dialog for `DialogLink` to fill, with its Cancel and save buttons in the footer. */
-export const FormDialog: FC<{ id: string; title: string; submitLabel: string }> = ({
-  id,
-  title,
-  submitLabel,
-}) => {
+export const FormDialog: FC<{
+  id: string;
+  title: string;
+  submitLabel: string;
+  /** Show it open with its form (stories). */
+  open?: boolean;
+  children?: unknown;
+}> = ({ id, title, submitLabel, open, children }) => {
   return (
     <Dialog
       id={id}
       title={title}
+      open={open}
       footer={
         <>
           <Button variant="secondary" type="button" data-dialog-close>
@@ -79,7 +83,9 @@ export const FormDialog: FC<{ id: string; title: string; submitLabel: string }> 
           </Button>
         </>
       }
-    />
+    >
+      {children}
+    </Dialog>
   );
 };
 

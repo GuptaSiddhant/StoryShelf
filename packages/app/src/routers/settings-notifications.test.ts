@@ -488,3 +488,134 @@ describe("notifications settings tab", () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe("dialog forms (ADR 0012, decision 10)", () => {
+  const hx = { "HX-Request": "true" };
+
+  it("answers an HTMX request with the add form's fragment and a plain one with the page", async () => {
+    const app = testApp(await seed(), false);
+    const path = "/projects/notify-project/settings/notifications/new";
+    const fragment = await (await app.request(path, { headers: hx })).text();
+    expect(fragment).toContain('id="add-channel-form"');
+    expect(fragment).not.toContain("<html");
+    expect(fragment).toContain('data-option-fields="provider"');
+    expect(fragment).toContain('name="csrf_token"');
+    const page = await (await app.request(path)).text();
+    expect(page).toContain("<html");
+    expect(page).toContain('id="add-channel-form"');
+    expect(page).toContain("Add channel");
+  });
+
+  it("re-renders the add form inside the dialog on a refusal, keeping the chosen kind", async () => {
+    const app = testApp(await seed(), false);
+    const refused = await app.request("/projects/notify-project/settings/notifications", {
+      method: "POST",
+      headers: {
+        ...hx,
+        cookie: "storyshelf_session=ok",
+        "content-type": "application/x-www-form-urlencoded",
+        "sec-fetch-site": "same-origin",
+        "x-csrf-token": getCsrfToken(secret, "ok"),
+      },
+      body: new URLSearchParams({
+        provider: "email",
+        target: "",
+        events: "build.created",
+      }).toString(),
+    });
+    expect(refused.status).toBe(400);
+    const html = await refused.text();
+    expect(html).toContain('id="add-channel-form"');
+    expect(html).not.toContain("<html");
+    expect(html).toContain("Enter a target");
+    expect(html).toContain('value="build.created"');
+  });
+
+  it("refuses fields of another kind than the one selected", async () => {
+    const app = testApp(await seed(), false);
+    const refused = await postForm(
+      "/projects/notify-project/settings/notifications",
+      { provider: "email", target: "a@example.com" },
+      app,
+    );
+    expect(refused.status).toBe(302);
+    const unknown = await postForm(
+      "/projects/notify-project/settings/notifications",
+      { provider: "nope", target: "x" },
+      app,
+    );
+    expect(unknown.status).toBe(400);
+  });
+
+  it("edits a message channel: the address, the events and the style, keeping the secret on a blank URL", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, false);
+    const model = new NotificationChannelModel(seeded.db, undefined, secret);
+    const email = await model.create({
+      projectId: "p1",
+      provider: "email",
+      config: { to: "a@example.com", style: "compact" },
+    });
+    const log = await model.create({
+      projectId: "p1",
+      provider: "log",
+      config: { style: "compact" },
+      secret: "https://hooks.example.com/old",
+    });
+    const base = "/projects/notify-project/settings/notifications";
+    const form = await (await app.request(`${base}/${email.id}/edit`, { headers: hx })).text();
+    expect(form).toContain('value="a@example.com"');
+    const saved = await postForm(
+      `${base}/${email.id}/edit`,
+      { target: "b@example.com", events: "build.approved", style: "verbose" },
+      app,
+    );
+    expect(saved.status).toBe(302);
+    const row = await model.get(email.id);
+    expect(NotificationChannelModel.configOf(row!)).toMatchObject({
+      to: "b@example.com",
+      style: "verbose",
+    });
+    expect(NotificationChannelModel.eventsOf(row!)).toEqual(["build.approved"]);
+    await postForm(`${base}/${log.id}/edit`, { target: "", style: "verbose" }, app);
+    const kept = await model.get(log.id);
+    expect(model.decryptSecret(kept!)).toBe("https://hooks.example.com/old");
+    const blankEmail = await postForm(`${base}/${email.id}/edit`, { target: "" }, app);
+    expect(blankEmail.status).toBe(400);
+  });
+
+  it("does not edit a git channel or another project's channel", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, false);
+    const model = new NotificationChannelModel(seeded.db, undefined, secret);
+    const git = await model.create({
+      projectId: "p1",
+      provider: "github",
+      config: { owner: "o", repo: "r" },
+      secret: "t",
+    });
+    const base = "/projects/notify-project/settings/notifications";
+    expect((await app.request(`${base}/${git.id}/edit`)).status).toBe(404);
+    expect((await app.request(`${base}/missing/edit`)).status).toBe(404);
+  });
+
+  it("serves the member, token, webhook, general and review forms as fragments and pages", async () => {
+    const app = testApp(await seed(), false);
+    const forms: Record<string, string> = {
+      "/projects/notify-project/settings/members/new": "add-member-form",
+      "/projects/notify-project/settings/members/groups/new": "add-group-mapping-form",
+      "/projects/notify-project/settings/tokens/new": "create-token-form",
+      "/projects/notify-project/settings/webhooks/new": "add-webhook-form",
+      "/projects/notify-project/settings/general/edit": "edit-general-form",
+      "/projects/notify-project/settings/review/edit": "edit-review-form",
+    };
+    for (const [path, id] of Object.entries(forms)) {
+      const fragment = await app.request(path, { headers: hx });
+      expect(fragment.status, path).toBe(200);
+      const text = await fragment.text();
+      expect(text, path).toContain(`id="${id}"`);
+      expect(text, path).not.toContain("<html");
+      expect(await (await app.request(path)).text(), path).toContain("<html");
+    }
+  });
+});
