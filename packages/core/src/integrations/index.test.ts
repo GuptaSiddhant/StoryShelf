@@ -124,6 +124,17 @@ describe("resolveShelfIntegrations", () => {
     );
   });
 
+  it("refuses an availability that is not a function (#1126)", () => {
+    const odd = { ...notifier("odd"), availability: "available" };
+    expect(() => resolveShelfIntegrations({ notifiers: [odd as never] })).toThrow(
+      /notifications\.notifiers\[0\]: availability must be a function/u,
+    );
+    const design = { ...makeFakeDesign().provider, availability: true };
+    expect(() => resolveShelfIntegrations({ design: [design as never] })).toThrow(
+      /design\[0\]: availability must be a function/u,
+    );
+  });
+
   it("keeps kinds per group: the same kind in two groups is not a duplicate", () => {
     const resolved = resolveShelfIntegrations({
       notifiers: [notifier("log")],

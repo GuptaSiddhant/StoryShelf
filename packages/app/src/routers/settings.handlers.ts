@@ -23,11 +23,13 @@ import type { AuthUser } from "@storyshelf/core/types";
 import { sanitizeErrorText, type SecretInput } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { credentialKeys } from "../credential-keys.ts";
+import { unofferedIntegrations, unofferedReason } from "../integrations.ts";
 import { notificationsPaused } from "../notifications-pause.ts";
 import {
   insightsShown,
   renderProjectSettingsPage,
   type SettingsFormState,
+  type SettingsUnoffered,
 } from "../pages/project-settings.tsx";
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
 import type { DesignCredentialState } from "../pages/settings-design-credential.tsx";
@@ -151,7 +153,9 @@ async function loadNotificationChannels(
   notifiers: readonly NotifierProvider[],
 ): Promise<SettingsNotificationChannel[]> {
   const rows = await new NotificationChannelModel(db, undefined, secret).list(projectId);
-  return rows.map((row) => ({
+  // A channel of a kind the server does not offer is hidden, not deleted; System lists it (#1126).
+  const offered = rows.filter((row) => unofferedReason(row.provider) === undefined);
+  return offered.map((row) => ({
     id: row.id,
     provider: row.provider,
     delivery: deliveryOf(notifiers, row.provider),
@@ -365,9 +369,21 @@ export async function renderSettingsPage(
       notificationsPaused: data.notifyProviders.length > 0 && (await notificationsPaused()),
       ai: aiSettingsData(c),
       targets: await runnerTargets(),
+      unoffered: unofferedFor(c),
     },
     formState,
   );
+}
+
+/** What a site admin is told the server does not offer projects (issue #1126); nobody else is. */
+function unofferedFor(c: Context): SettingsUnoffered | undefined {
+  if (!isSiteAdmin(c)) {
+    return undefined;
+  }
+  return {
+    notifications: unofferedIntegrations("notifiers"),
+    design: unofferedIntegrations("design"),
+  };
 }
 
 /** AI availability and profile choices for the settings AI tab. */

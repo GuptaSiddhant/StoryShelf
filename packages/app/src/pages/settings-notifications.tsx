@@ -19,6 +19,7 @@ import {
   VStack,
   statusLabel,
 } from "../ui/components.tsx";
+import { UnofferedNotice, type UnofferedIntegrationView } from "./integrations-unoffered.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
 
@@ -403,7 +404,11 @@ const CreateChannelCard: FC<{
   </Card>
 );
 
-/** Notifications settings tab: channel list, create forms, and my preferences. */
+/**
+ * Notifications settings tab: channel list, create forms, and my preferences. Only the providers the
+ * server offers are listed (issue #1126); with none, a site admin sees one line naming what is
+ * missing (`unoffered`, site admins only) and a project admin sees nothing.
+ */
 export function renderSettingsNotifications(
   project: Project,
   channels: SettingsNotificationChannel[],
@@ -412,14 +417,28 @@ export function renderSettingsNotifications(
   isAdmin: boolean,
   formState?: NotificationsFormState,
   paused?: boolean,
+  unoffered?: readonly UnofferedIntegrationView[],
 ): unknown {
+  if (providers.length === 0) {
+    // A refused form (a stale page posting a kind no longer offered) still says why.
+    const refusal = formState?.globalError ?? formState?.errors?.["provider"];
+    return (
+      <>
+        {refusal ? <Alert tone="danger">{refusal}</Alert> : null}
+        <UnofferedNotice area="Notifications are" integrations={unoffered} />
+      </>
+    );
+  }
   const messageProviders = providers.filter((provider) => provider.delivery === "message");
   const gitProviders = providers.filter((provider) => provider.delivery === "state");
+  // The personal card's switches are about email: it shows only while email is offered.
+  const personal = providers.some((provider) => provider.kind === "email");
   return (
     <div class="grid max-w-form">
+      <UnofferedNotice area="Some integrations are" integrations={unoffered} />
       <NotificationsPausedNotice paused={paused} />
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <MyNotificationsCard project={project} mySubscription={mySubscription} />
+      {personal ? <MyNotificationsCard project={project} mySubscription={mySubscription} /> : null}
       <ChannelsCard
         project={project}
         channels={channels}
