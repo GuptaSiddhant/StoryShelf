@@ -2,8 +2,14 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
 import type { IconName } from "./icons/paths.ts";
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-secondary" | "outline";
-type ButtonSize = "md" | "sm";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "danger"
+  | "danger-secondary"
+  | "outline";
+export type ButtonSize = "md" | "sm";
 
 const btnBase = css`
   /* btn */

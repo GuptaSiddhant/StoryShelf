@@ -1,30 +1,72 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
-import type { HtmlEscapedString } from "hono/utils/html";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
-  Card,
   CodeBlock,
-  Field,
-  FormActions,
+  DialogLink,
   Meta,
+  formatAbsolute,
   SectionTitle,
-  Table,
-  Time,
+  SummaryList,
+  VStack,
+  type SummaryItem,
 } from "../ui/components.tsx";
+import { FormDialog } from "./dialog-form.tsx";
 import { uploadCommand } from "./get-started.tsx";
+import { CREATE_TOKEN_DIALOG } from "./token-forms.tsx";
 
-/** Tokens settings tab: project CLI tokens plus the create-token form. */
+function tokenItems(
+  project: Project,
+  tokens: Omit<Token, "hash">[],
+  isAdmin: boolean,
+): SummaryItem[] {
+  return tokens.map((token) => {
+    const action = `/projects/${project.slug}/settings/tokens/${token.id}/delete`;
+    return {
+      id: token.id,
+      name: token.name,
+      details: `Created ${formatAbsolute(token.createdAt, "date")} · Last used ${
+        token.lastUsedAt ? formatAbsolute(token.lastUsedAt, "date") : "never"
+      }`,
+      actions: isAdmin ? (
+        <form
+          method="post"
+          action={action}
+          hx-post={action}
+          hx-target="body"
+          hx-confirm="Delete this token? CI jobs using it will stop working."
+        >
+          {csrfField()}
+          <Button variant="ghost" size="sm" type="submit">
+            Revoke
+          </Button>
+        </form>
+      ) : undefined,
+    };
+  });
+}
+
+/** Tokens settings tab: project CLI tokens as a summary; creating one opens a dialog. */
 export function renderSettingsTokens(
   project: Project,
   tokens: Omit<Token, "hash">[],
   isAdmin: boolean,
   formState?: { globalError?: string; secret?: string; origin?: string },
 ): unknown {
+  const add = isAdmin ? (
+    <DialogLink
+      dialogId={CREATE_TOKEN_DIALOG}
+      href={`/projects/${project.slug}/settings/tokens/new`}
+      variant="primary"
+      icon="plus"
+    >
+      Create token
+    </DialogLink>
+  ) : undefined;
   return (
-    <div class="grid max-w-form">
+    <VStack>
       {formState?.secret ? (
         <Alert tone="success" title="Token created">
           <div id="new-token" tabindex={-1}>
@@ -43,75 +85,19 @@ export function renderSettingsTokens(
         </Alert>
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <Card>
-        <SectionTitle>API tokens</SectionTitle>
-        <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
-        <Table label="API tokens">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Created</th>
-                <th>Last used</th>
-                <th>
-                  <span class="visually-hidden">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {tokens.map((token): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                <tr key={token.id}>
-                  <td>{token.name}</td>
-                  <td>
-                    <Time value={token.createdAt} format="date" />
-                  </td>
-                  <td>
-                    {token.lastUsedAt ? <Time value={token.lastUsedAt} format="date" /> : "—"}
-                  </td>
-                  <td>
-                    {isAdmin ? (
-                      <form
-                        method="post"
-                        action={`/projects/${project.slug}/settings/tokens/${token.id}/delete`}
-                        hx-post={`/projects/${project.slug}/settings/tokens/${token.id}/delete`}
-                        hx-target="body"
-                        hx-confirm="Delete this token? CI jobs using it will stop working."
-                      >
-                        {csrfField()}
-                        <Button variant="ghost" type="submit">
-                          Revoke
-                        </Button>
-                      </form>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
-        {tokens.length === 0 ? <Meta>No tokens yet. Create one for CI.</Meta> : null}
-      </Card>
-
+      <SectionTitle>API tokens</SectionTitle>
+      <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
+      <SummaryList
+        label="API tokens"
+        items={tokenItems(project, tokens, isAdmin)}
+        emptyTitle="No tokens yet"
+        emptyDescription="Create one for CI."
+        add={add}
+      />
+      {tokens.length > 0 ? add : null}
       {isAdmin ? (
-        <Card>
-          <SectionTitle level={3}>Create token</SectionTitle>
-          <form
-            method="post"
-            action={`/projects/${project.slug}/settings/tokens`}
-            hx-post={`/projects/${project.slug}/settings/tokens`}
-            hx-target="body"
-          >
-            {csrfField()}
-            <Field label="Name" name="tokenName" required placeholder="ci" />
-            <FormActions>
-              <Button variant="primary" type="submit" icon="plus">
-                Create token
-              </Button>
-            </FormActions>
-          </form>
-          <Meta>Token value is shown once after creation. Store it securely.</Meta>
-        </Card>
+        <FormDialog id={CREATE_TOKEN_DIALOG} title="Create token" submitLabel="Create token" />
       ) : null}
-    </div>
+    </VStack>
   );
 }

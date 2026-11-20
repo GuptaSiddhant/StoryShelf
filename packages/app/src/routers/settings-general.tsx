@@ -3,16 +3,30 @@ import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { EditGeneralForm, EditReviewForm } from "../pages/project-forms.tsx";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { flash } from "./flash.ts";
+import { respondWithForm } from "./form-response.tsx";
 import { publicMessage, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { runSwitchOffPass } from "./review-switch-off.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** General project settings (name, repo, thresholds) and danger-zone delete. */
 export function registerGeneralSettings(app: ShelfRouter): void {
+  app.get("/projects/:slug/settings/general/edit", async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+    return respondWithForm(c, project, "general", "Edit project", (standalone) => (
+      <EditGeneralForm project={project} standalone={standalone} />
+    ));
+  });
+  app.get("/projects/:slug/settings/review/edit", async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+    return respondWithForm(c, project, "review", "Edit review", (standalone) => (
+      <EditReviewForm project={project} standalone={standalone} />
+    ));
+  });
   app.post("/projects/:slug/settings", handleGeneralUpdate);
   app.post("/projects/:slug/settings/tests", handleTestsUpdate);
   app.post("/projects/:slug/settings/review", handleReviewUpdate);
@@ -47,8 +61,18 @@ async function handleGeneralUpdate(c: Context): Promise<Response> {
   const form = await c.req.formData();
   const name = form.get("name");
   if (typeof name !== "string" || name.trim() === "") {
-    return c.html(
-      (await renderSettingsPage(c, "general", { errors: { name: "Name is required" } })) ?? "",
+    return respondWithForm(
+      c,
+      project,
+      "general",
+      "Edit project",
+      (standalone) => (
+        <EditGeneralForm
+          project={project}
+          standalone={standalone}
+          errors={{ name: "Name is required" }}
+        />
+      ),
       400,
     );
   }
@@ -87,7 +111,14 @@ async function persistGeneralUpdate(
     return hxRedirect(c, settingsHref(slug, "general"));
   } catch (error) {
     const message = publicMessage(error, "Failed to update");
-    return c.html((await renderSettingsPage(c, "general", { globalError: message })) ?? "", 400);
+    return respondWithForm(
+      c,
+      project,
+      "general",
+      "Edit project",
+      (standalone) => <EditGeneralForm project={project} standalone={standalone} error={message} />,
+      400,
+    );
   }
 }
 
@@ -182,10 +213,18 @@ async function handleReviewUpdate(c: Context): Promise<Response> {
   const form = await c.req.formData();
   const approvals = approvalsOf(form, project);
   if (approvals === null) {
-    return c.html(
-      (await renderSettingsPage(c, "review", {
-        errors: { reviewApprovals: `Enter a whole number from 1 to ${MAX_APPROVALS}` },
-      })) ?? "",
+    return respondWithForm(
+      c,
+      project,
+      "review",
+      "Edit review",
+      (standalone) => (
+        <EditReviewForm
+          project={project}
+          standalone={standalone}
+          errors={{ reviewApprovals: `Enter a whole number from 1 to ${MAX_APPROVALS}` }}
+        />
+      ),
       400,
     );
   }

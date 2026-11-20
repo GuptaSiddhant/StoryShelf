@@ -43,6 +43,30 @@ describe("NotificationChannelModel", () => {
     expect(NotificationChannelModel.eventsOf(channel)).toEqual([]);
   });
 
+  it("updates config and events, and the secret only when one is given", async () => {
+    const { db } = makeDatabase();
+    const created = await model(db).create({
+      projectId: "p1",
+      provider: "slack-webhook",
+      config: { style: "compact" },
+      secret: "https://hooks.slack.com/old",
+      events: ["build:reviewing"],
+    });
+    await model(db).update(created.id, { config: { style: "verbose" } });
+    const kept = await model(db).get(created.id);
+    expect(NotificationChannelModel.configOf(kept!)).toEqual({ style: "verbose" });
+    expect(NotificationChannelModel.eventsOf(kept!)).toEqual([]);
+    expect(model(db).decryptSecret(kept!)).toBe("https://hooks.slack.com/old");
+    await model(db).update(created.id, {
+      config: { style: "verbose" },
+      events: ["build:approved"],
+      secret: "https://hooks.slack.com/new",
+    });
+    const changed = await model(db).get(created.id);
+    expect(NotificationChannelModel.eventsOf(changed!)).toEqual(["build:approved"]);
+    expect(model(db).decryptSecret(changed!)).toBe("https://hooks.slack.com/new");
+  });
+
   it("lists project channels separately from system channels", async () => {
     const { db } = makeDatabase();
     await model(db).create({ projectId: "p1", provider: "log", config: {} });
