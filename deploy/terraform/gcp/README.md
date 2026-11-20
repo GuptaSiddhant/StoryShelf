@@ -112,8 +112,10 @@ destroying the stack; there is no firewall rule to loosen.
   (remote-browser connections, rate limits, the AI budget) are in the scaling docs.
 - **Shutdown.** Cloud Run sends SIGTERM and stops the container 10 seconds later; that period is not
   configurable. The app drains running captures for `shutdown_grace_seconds`
-  (`SHUTDOWN_GRACE_SECONDS`, 1-9, default 8), then hands the rest back to the queue. The grace stays below 10 seconds so the exit after the
-  drain still fits in Cloud Run's window; a copy killed anyway loses its lease and the job is retried.
+  (`SHUTDOWN_GRACE_SECONDS`, 1-9, default 8), then hands the rest back to the queue. The process
+  forces its exit 1 second after the drain, so the default leaves 1 second of margin inside Cloud
+  Run's window and 9 leaves none. A copy killed anyway loses its lease: the job is retried unless
+  that attempt was its last one, in which case the job fails, its build fails and admins are alerted.
 
 ## Domain and TLS
 
