@@ -50,20 +50,9 @@ const badgeTones: Record<BadgeTone, Promise<string>> = {
   `,
   quiet: css`
     /* badge-quiet */
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: var(--text-xs);
-    line-height: 1.5;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    &::before {
-      content: "";
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--status-approved);
-    }
+    ${badgeBase}
+    background: transparent;
+    border-color: transparent;
   `,
   info: css`
     /* badge-info */
@@ -277,7 +266,7 @@ export const Badge: FC<{ tone?: BadgeTone; icon?: boolean; children?: unknown }>
 }) => {
   return (
     <span class={badgeTones[tone]}>
-      {icon && tone !== "quiet" ? <Icon name={toneIcons[tone]} size="sm" /> : null}
+      {icon ? <Icon name={toneIcons[tone]} size="sm" /> : null}
       {children}
     </span>
   );

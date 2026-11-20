@@ -38,6 +38,21 @@ export const Badges = jsxStory(() => (
   </VStack>
 ));
 
+/** A status column: the quiet badge shares height, padding and icon slot with the pills. */
+export const QuietAlignedWithPills = jsxStory(() => (
+  <VStack gap="sm" align="start">
+    <Badge tone="quiet" icon>
+      Approved
+    </Badge>
+    <Badge tone="warning" icon>
+      Needs review
+    </Badge>
+    <Badge tone="danger" icon>
+      Failed
+    </Badge>
+  </VStack>
+));
+
 export const BuildStatusBadges = jsxStory(() => (
   <HStack>
     {[
