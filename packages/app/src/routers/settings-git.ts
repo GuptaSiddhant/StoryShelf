@@ -96,11 +96,12 @@ type LinkRead =
 function findRepository(
   typed: string,
   connections: readonly GitConnection[],
+  current?: GitConnection,
 ): { repository: ParsedRepository; connection: GitConnection } | null {
   const repository = parseRepositoryUrl(typed);
   // One answer for "not a URL", "no connection on that host" and "several hosts": the form never
   // says what the server can reach (decision 2).
-  const connection = repository === null ? null : connectionFor(connections, repository);
+  const connection = repository === null ? null : connectionFor(connections, repository, current);
   return repository !== null && connection !== null ? { repository, connection } : null;
 }
 
@@ -114,10 +115,14 @@ function fieldErrors(noRepository: boolean, badPrefix: string | null): Record<st
 }
 
 /** The repository and prefix typed into the form, or the field errors. */
-function readForm(form: FormData, connections: readonly GitConnection[]): LinkRead {
+function readForm(
+  form: FormData,
+  connections: readonly GitConnection[],
+  current?: GitConnection,
+): LinkRead {
   const typed = asString(form.get("repository")) ?? "";
   const prefix = asString(form.get("prefix")) ?? "";
-  const found = findRepository(typed, connections);
+  const found = findRepository(typed, connections, current);
   const problem = prefix.length === 0 ? null : prefixProblem(prefix);
   if (found !== null && problem === null) {
     return { ok: true, ...found, typed, prefix };
@@ -219,7 +224,8 @@ async function saveLink(
 ): Promise<Response> {
   const form = await c.req.formData();
   const connections = await usableConnections();
-  const read = readForm(form, connections);
+  const own = connections.find((candidate) => candidate.id === link.connectionId);
+  const read = readForm(form, connections, own);
   if (!read.ok) {
     return formResponse(c, ctx, link.id, { errors: read.errors, values: read.values }, 400);
   }

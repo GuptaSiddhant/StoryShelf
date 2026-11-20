@@ -56,6 +56,19 @@ describe("connectionFor", () => {
     expect(connectionFor([github, gitlab], repo)).toBeNull();
   });
 
+  it("keeps an edited link's own connection when several share its host", () => {
+    const first = connection("a", "gitlab-token", "https://gitlab.example.com");
+    const second = connection("b", "gitlab-token", "https://gitlab.example.com");
+    const repo = { host: "gitlab.example.com", owner: "a", repo: "b" };
+    expect(connectionFor([first, second], repo)).toBeNull();
+    expect(connectionFor([first, second], repo, second)?.id).toBe("b");
+    expect(connectionFor([first, second], { ...repo, host: null }, first)?.id).toBe("a");
+    // Moving the link to another host drops the kept connection.
+    expect(
+      connectionFor([first, second, github], { ...repo, host: "github.com" }, second)?.id,
+    ).toBe("gh");
+  });
+
   it("ignores a connection shadowed by configuration", () => {
     const shadowed = { ...github, ignored: true } as GitConnection;
     expect(connectionFor([shadowed], { host: "github.com", owner: "a", repo: "b" })).toBeNull();

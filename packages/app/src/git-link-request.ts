@@ -49,13 +49,21 @@ export function webHostOf(connection: Pick<GitConnection, "provider" | "apiBase"
 /**
  * The connection a repository URL belongs to: the one on its host, or the only connection when
  * `owner/repo` was typed without a host. Null when none or several match (the form then says to
- * type the full URL; it does not say which hosts exist).
+ * type the full URL; it does not say which hosts exist). With `current` (the edited link's
+ * connection), that connection wins while the URL names its host.
  */
 export function connectionFor(
   connections: readonly GitConnection[],
   repository: ParsedRepository,
+  current?: GitConnection,
 ): GitConnection | null {
   const usable = connections.filter((connection) => !connection.ignored);
+  // An edit keeps the link's own connection while the URL still names its host: that choice was
+  // made when the link was requested, so several connections on one host cannot block it.
+  const kept = usable.find((connection) => connection.id === current?.id);
+  if (kept !== undefined && (repository.host === null || webHostOf(kept) === repository.host)) {
+    return kept;
+  }
   const matches =
     repository.host === null
       ? usable
