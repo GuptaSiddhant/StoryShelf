@@ -317,3 +317,15 @@ timeout 60 sh -c 'until docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -pp
 
 Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not
 pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job uses `--env-mode=loose`).
+
+## Previous-release database job (ADR 0053, decision 8)
+
+`previous-release-db` in `ci.yml` runs on pull requests that touch a schema or migration file (the
+`schema` output of the `changes` job), for SQLite and Postgres. `scripts/previous-release.sh
+<dialect>` installs the newest `v*` release from npm, migrates an empty database with it and
+seeds a project, migrates the same database with the checkout as the next minor, then starts the
+published release on it and smokes it (health, project list, a write, a read-back, the root page).
+The release must skip its migrations and leave `schema_meta` alone. Postgres also runs the release's
+own `postgres.live.test.ts` from a checkout of its tag. To reproduce: `DATABASE_URL=… bash
+scripts/previous-release.sh postgres`. MySQL (nightly) and the mixed-queue test are not part of it
+yet.

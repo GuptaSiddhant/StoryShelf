@@ -94,6 +94,15 @@ describe("loadStorybookConfig", () => {
     await expect(loadStorybookConfig(dir)).resolves.toBeNull();
   });
 
+  it("loads the skipUnchanged flag and rejects a non-boolean", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    const file = join(dir, ".storybook", "storyshelf.json");
+    writeFileSync(file, JSON.stringify({ slug: "demo", skipUnchanged: true }));
+    await expect(loadStorybookConfig(dir)).resolves.toEqual({ slug: "demo", skipUnchanged: true });
+    writeFileSync(file, JSON.stringify({ slug: "demo", skipUnchanged: "yes" }));
+    await expect(loadStorybookConfig(dir)).resolves.toBeNull();
+  });
+
   it("loads the buildStats flag and rejects a non-boolean", async () => {
     mkdirSync(join(dir, ".storybook"), { recursive: true });
     const file = join(dir, ".storybook", "storyshelf.json");

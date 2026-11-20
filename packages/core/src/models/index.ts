@@ -64,12 +64,14 @@ export {
   type BuildCreateInput,
   type BuildListFilter,
   type BuildSummary,
+  type SkippedBuildInput,
 } from "./build.ts";
 export {
   RECENT_BUILDS_FOR_INHERITED_RATIO,
   averageInheritedRatio,
   type InheritedRatio,
 } from "./inherited-ratio.ts";
+export type { SupersedeOptions, SupersedingBuild } from "./build-supersede.ts";
 export { BuildReviewModel, type BuildReviewTables } from "./build-review.ts";
 export {
   deriveReviewStatus,
@@ -175,3 +177,4 @@ export {
   type ResolvedPublicOrigin,
   type StoredPublicOrigin,
 } from "./public-origin.ts";
+export { SkipSourceRefused } from "./skip-source-refused.ts";

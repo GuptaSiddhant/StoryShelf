@@ -24,6 +24,9 @@ const filterWrap = css`
     font: inherit;
     font-size: var(--text-base);
   }
+  & input:focus-visible {
+    border-color: var(--ring);
+  }
   & input::placeholder {
     color: var(--text-muted);
   }

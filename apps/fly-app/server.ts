@@ -5,8 +5,12 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
-import { parseShutdownGraceMs, parseTrustProxy } from "@storyshelf/core/config";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+import { parseTrustProxy } from "@storyshelf/core/config";
+import {
+  createEmailNotifier,
+  integrationsFromEnv,
+  smtpPresetFromEnv,
+} from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -30,6 +34,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 import { mkdirSync } from "node:fs";
 import { aiFromEnv, aiLogFields } from "./ai.ts";
 import { refuseLegacyVariables } from "./legacy-env.ts";
+import { exitBy, shutdownGraceMs } from "./shutdown.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
@@ -42,6 +47,8 @@ const authPassword = env["AUTH_PASSWORD"];
 const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
+// Bound of the SIGTERM drain: jobs still running then are handed back for another machine (#912).
+const graceMs = shutdownGraceMs(env);
 // Rate limits key on the client, not Fly's proxy (#911): on Fly (`FLY_APP_NAME` is set by the
 // platform) trust `Fly-Client-IP` unless `TRUST_PROXY` says otherwise; `TRUST_PROXY=false` opts out.
 const trustProxy =
@@ -128,28 +135,34 @@ shelfLogger.info(aiLogFields(ai), "ai insights");
 // SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
 // (undefined keeps invites out-of-band).
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
+// SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
+const integrations = integrationsFromEnv(env);
 
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
   ai,
+  design: integrations.design,
   notifications: {
     notifiers: (builtIn) =>
-      emailSender
-        ? builtIn.map((provider) =>
-            provider.metadata.kind === "email"
-              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
-              : provider,
-          )
-        : builtIn,
+      integrations.notifiers(
+        emailSender
+          ? builtIn.map((provider) =>
+              provider.metadata.kind === "email"
+                ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+                : provider,
+            )
+          : builtIn,
+      ),
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   auth:
-    authPassword && secret
+    // AUTH_PASSWORD without a valid SECRET refuses to start (createShelfAuth throws); never auth off.
+    authPassword
       ? createShelfAuth({
           db: database,
-          secret,
+          secret: secret ?? "",
           baseURL: publicBaseUrl ?? `http://localhost:${port}`,
           passkeys: {},
           emailSender,
@@ -179,7 +192,7 @@ const app = createShelfApp({
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
 
-if (authPassword && secret) {
+if (authPassword) {
   await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
   logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
 }
@@ -191,8 +204,11 @@ const server = serve({ fetch: app.fetch, port }, () => {
 // Teardown is idempotent (SHUTDOWN_GRACE_SECONDS bounds its job drain) and logs its own errors; close the listener either way.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
+    // A bounded drain may leave a stuck handler to its lease: the process must end it, whatever
+    // the rest of the teardown does, so the exit is armed now, not after it.
+    if (graceMs !== undefined) exitBy(graceMs);
     app.lifecycle
-      .teardown({ graceMs: parseShutdownGraceMs(process.env["SHUTDOWN_GRACE_SECONDS"]) })
+      .teardown(graceMs === undefined ? {} : { graceMs })
       .catch(() => {}) // Intentionally empty — teardown errors are already logged
       .finally(() => {
         server.close();

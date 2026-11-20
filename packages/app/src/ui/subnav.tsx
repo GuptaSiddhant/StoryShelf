@@ -45,7 +45,7 @@ const link = css`
   border-radius: var(--radius);
   color: var(--text-secondary);
   font-size: var(--text-base);
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   text-decoration: none;
   white-space: nowrap;
   transition:
@@ -63,7 +63,7 @@ const linkActive = css`
   ${link}
   background: var(--accent-subtle);
   color: var(--accent-fg);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   &:hover {
     background: var(--accent-subtle);
     color: var(--accent-fg);

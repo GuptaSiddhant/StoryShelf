@@ -152,7 +152,7 @@ function MoreMenu(props: DiffHeaderProps & { showReject: boolean }): Rendered {
           <DropdownItem type="submit">Reject all</DropdownItem>
         </ActionForm>
       ) : null}
-      {manage && !isRetryable(build) ? (
+      {manage && !isRetryable(build) && !build.supersededByBuildId ? (
         <ActionForm action={`${base}/retry`}>
           <DropdownItem type="submit">Retry capture</DropdownItem>
         </ActionForm>

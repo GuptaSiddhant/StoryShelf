@@ -25,6 +25,12 @@ COPY apps ./apps
 RUN nubx --yes turbo@2.11.2 prune server-image --docker --out-dir out && mv out/json/pnpm-lock.yaml out/json/nub.lock
 
 FROM toolchain AS builder
+# Native install scripts (bufferutil, from @vercel/postgres) have no prebuilt binary on every
+# platform; on linux/arm64 they compile with node-gyp, which needs Python and a C++ toolchain. This
+# stage only: the shipped images copy the bundle, never these tools.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=pruner /app/out/json ./
 COPY --from=pruner /app/nub.jsonc ./nub.jsonc

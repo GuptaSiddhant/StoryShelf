@@ -17,14 +17,43 @@ import {
   TextareaField,
 } from "../ui/components.tsx";
 import { targetChoices, type TargetChoices } from "./target-choices.ts";
+type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
+
+/** The "Also capture on" checkboxes: every selectable target except the primary. */
+export function BrowserExtras(props: {
+  primary: string;
+  extras: readonly string[];
+  disabled: boolean;
+  choices: TargetChoices["choices"];
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { primary, extras, disabled, choices } = props;
+  return (
+    <div id="browser-extras">
+      {choices
+        .filter((engine) => engine.value !== primary)
+        .map((engine) => (
+          <CheckField
+            key={engine.value}
+            label={`Also capture on ${engine.label}`}
+            name={`extra_${engine.value}`}
+            value={engine.value}
+            checked={extras.includes(engine.value) ? true : undefined}
+            disabled={disabled}
+          />
+        ))}
+    </div>
+  );
+}
+
 /** Primary engine select plus one checkbox per additional engine. */
 function BrowserFields(props: {
+  slug: string;
   primary: string;
   extras: string[];
   disabled: boolean;
   targets: TargetChoices;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { primary, extras, disabled, targets } = props;
+  const { slug, primary, extras, disabled, targets } = props;
   return (
     <>
       <SelectField
@@ -34,17 +63,20 @@ function BrowserFields(props: {
         disabled={disabled}
         options={targets.choices}
         hint="Used for the published preview and to bootstrap other engines."
+        hx={{
+          "hx-get": `/projects/${slug}/settings/capture/extras`,
+          "hx-trigger": "change",
+          "hx-target": "#browser-extras",
+          "hx-swap": "outerHTML",
+          "hx-include": "closest form",
+        }}
       />
-      {targets.choices.map((engine) => (
-        <CheckField
-          key={engine.value}
-          label={`Also capture on ${engine.label}`}
-          name={`extra_${engine.value}`}
-          value={engine.value}
-          checked={extras.includes(engine.value) ? true : undefined}
-          disabled={disabled}
-        />
-      ))}
+      <BrowserExtras
+        primary={primary}
+        extras={extras}
+        disabled={disabled}
+        choices={targets.choices}
+      />
       {targets.unavailable.length > 0 ? (
         <Meta>Not selectable on this server: {targets.unavailable.join("; ")}.</Meta>
       ) : null}
@@ -90,6 +122,49 @@ function UrlLifetimeField(props: {
   );
 }
 
+/** The cancel-superseded switch (ADR 0045): its own form, so saving it leaves the browser fields alone. */
+function SupersededCard(props: { project: Project; isAdmin: boolean }): Rendered {
+  const { project, isAdmin } = props;
+  const action = `/projects/${project.slug}/settings/capture/superseded`;
+  return (
+    <Card>
+      <SectionTitle>Superseded builds</SectionTitle>
+      <Meta>A newer commit on a branch makes an older build of it unnecessary.</Meta>
+      <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
+        {csrfField()}
+        <CheckField
+          label="Cancel superseded builds"
+          name="cancelSuperseded"
+          value="true"
+          checked={project.cancelSuperseded !== false}
+          disabled={!isAdmin}
+          hint="When a newer commit is pushed to a branch, an older build of it that is still capturing is cancelled. Builds that have finished capturing are never touched."
+        />
+        {isAdmin ? (
+          <FormActions>
+            <Button variant="primary" type="submit" icon="check">
+              Save superseded-build setting
+            </Button>
+          </FormActions>
+        ) : null}
+      </form>
+    </Card>
+  );
+}
+
+/** The save button for admins, a note for everyone else. */
+function SaveChanges(props: { isAdmin: boolean }): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return props.isAdmin ? (
+    <FormActions>
+      <Button variant="primary" type="submit" icon="check">
+        Save changes
+      </Button>
+    </FormActions>
+  ) : (
+    <Meta>You need admin access to edit settings.</Meta>
+  );
+}
+
 /** Capture settings tab: engines to capture on and the mode allowlist. */
 export function renderSettingsCapture(
   project: Project,
@@ -119,20 +194,19 @@ export function renderSettingsCapture(
         </Meta>
         <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
           {csrfField()}
-          <BrowserFields primary={primary} extras={extras} disabled={!isAdmin} targets={targets} />
+          <BrowserFields
+            slug={project.slug}
+            primary={primary}
+            extras={extras}
+            disabled={!isAdmin}
+            targets={targets}
+          />
           <AllowlistField allowlist={allowlist} />
           <UrlLifetimeField project={project} disabled={!isAdmin} />
-          {isAdmin ? (
-            <FormActions>
-              <Button variant="primary" type="submit" icon="check">
-                Save changes
-              </Button>
-            </FormActions>
-          ) : (
-            <Meta>You need admin access to edit settings.</Meta>
-          )}
+          <SaveChanges isAdmin={isAdmin} />
         </form>
       </Card>
+      <SupersededCard project={project} isAdmin={isAdmin} />
     </div>
   );
 }

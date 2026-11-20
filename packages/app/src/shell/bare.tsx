@@ -18,7 +18,7 @@ const bareRoot = css`
     gap: 0.6rem;
     color: var(--text-primary);
     font-size: var(--text-xl);
-    font-weight: 700;
+    font-weight: var(--weight-bold);
     letter-spacing: -0.02em;
   }
   .bare__mark {

@@ -1,6 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { detectPackageRunner } from "../../config.ts";
+import { printError } from "../../output.ts";
+import type { Answers } from "./init/answers.ts";
 import { isCloud, runCloudInit } from "./init/cloud.ts";
 import { printNextSteps } from "./init/next-steps.ts";
 import { collectAnswers } from "./init/prompts.ts";
@@ -16,6 +18,32 @@ export interface ServerInitOptions {
   cloud?: string;
 }
 
+const NO_TERMINAL =
+  "server init asks questions and needs an interactive terminal; nothing was written. Run it in a terminal.";
+
+/** Input ended mid-question: say why, and leave exit code 1 for when Node finds nothing left to run. */
+function onInputEnd(): void {
+  printError(NO_TERMINAL);
+  process.exitCode = 1;
+}
+
+/**
+ * Ask the questions. Input that ends before they are answered (no terminal, `< /dev/null`) would
+ * leave the prompt pending and Node would exit 0 having written nothing: fail with the reason instead.
+ */
+async function collectAnswersOrFail(dir?: string): Promise<Answers | null> {
+  process.stdin.once("end", onInputEnd);
+  try {
+    const answers = await collectAnswers(dir);
+    if (answers === null && !process.stdin.isTTY) {
+      printError(NO_TERMINAL);
+    }
+    return answers;
+  } finally {
+    process.stdin.removeListener("end", onInputEnd);
+  }
+}
+
 /**
  * Scaffold a new StoryShelf server project via interactive prompts.
  *
@@ -25,15 +53,22 @@ export interface ServerInitOptions {
  *
  * With `--cloud` it writes a Terraform module stub for that cloud instead.
  *
- * @param options - `dir` presets the output directory; `cloud` selects the Terraform stub
+ * @param options - `dir` skips the directory question (every other choice is asked interactively);
+ *   `cloud` selects the Terraform stub
  */
 export async function runServerInit(options: ServerInitOptions): Promise<void> {
   if (options.cloud !== undefined) {
     await initCloud(options.cloud, options.dir);
     return;
   }
-  const answers = await collectAnswers();
+  await scaffoldServer(options.dir);
+}
+
+/** Ask the questions, then write the server files and print the next steps. */
+async function scaffoldServer(dir: string | undefined): Promise<void> {
+  const answers = await collectAnswersOrFail(dir);
   if (answers === null) {
+    process.exitCode = 1;
     return;
   }
 

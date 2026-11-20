@@ -5,8 +5,9 @@
  * - the built CLI launched through a `.bin`-style symlink, as `npx` does
  * - a freshly scaffolded server project: type-checks, boots, serves, shuts down
  *
- * Workspace packages are symlinked into the generated project instead of
- * installed from npm, so it runs against the code in this checkout.
+ * The workspace packages the generated package.json declares (and only
+ * those) are symlinked into the project instead of installed from npm, so it
+ * runs against the code in this checkout and a missing dependency fails.
  */
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync } from "node:fs";
@@ -120,11 +121,17 @@ describe.skipIf(!enabled)("scaffolded server project", () => {
     });
     await runServerInit({});
 
-    // Link the workspace packages (and the one runtime dep outside them).
+    // Link exactly the workspace packages the scaffold declares (and the one runtime dep outside them).
     const scope = join(dir, "node_modules/@storyshelf");
     mkdirSync(scope, { recursive: true });
-    for (const name of ["app", "core", "db-sqlite", "storage-local", "runner-playwright"]) {
-      symlinkSync(join(repoRoot, "packages", name), join(scope, name));
+    const { dependencies } = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    for (const dep of Object.keys(dependencies)) {
+      if (dep.startsWith("@storyshelf/")) {
+        const name = dep.slice("@storyshelf/".length);
+        symlinkSync(join(repoRoot, "packages", name), join(scope, name));
+      }
     }
     mkdirSync(join(dir, "node_modules/@hono"), { recursive: true });
     symlinkSync(honoNodeServer, join(dir, "node_modules/@hono/node-server"));

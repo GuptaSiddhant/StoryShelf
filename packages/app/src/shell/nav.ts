@@ -85,6 +85,9 @@ export function adminNavItems(): NavItem[] {
 
 /**
  * Breadcrumbs after the project picker: the *ancestors* of the current page.
+ * The rule: a page that is not its section's root declares `trail` ending with
+ * itself (no `href`); intermediate levels carry links; the section is added here
+ * and never repeated in the trail. A section root declares no trail.
  * The page itself is named by its heading, so it is never repeated here —
  * the section plus `nav.trail` describe where the page is, and the last item
  * (the current page) is dropped. Every returned crumb links somewhere, and
@@ -92,7 +95,11 @@ export function adminNavItems(): NavItem[] {
  */
 export function breadcrumbs(nav: NavConfig | undefined, urls: NavUrls): NavCrumb[] {
   const section = sectionCrumb(nav, urls);
-  const path = section ? [section, ...(nav?.trail ?? [])] : [...(nav?.trail ?? [])];
+  // A trail level that names the section again (same link or label) is the section, not a level.
+  const levels = (nav?.trail ?? []).filter(
+    (crumb) => !section || (crumb.href !== section.href && crumb.label !== section.label),
+  );
+  const path = section ? [section, ...levels] : levels;
   return path.slice(0, -1).filter((crumb) => crumb.href !== undefined);
 }
 

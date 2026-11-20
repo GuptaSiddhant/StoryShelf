@@ -4,11 +4,11 @@
  * Markdown copy (scripts/markdown-export.mjs writes one next to every built page).
  */
 import Default from "@astrojs/starlight/components/PageTitle.astro";
+import { hasMarkdownCopy } from "../../routeData";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/u, "");
 const path = Astro.url.pathname.slice(base.length);
-// The generated references and the home page have no Markdown copy.
-const hasMarkdown = path !== "/" && !path.startsWith("/api") && !path.startsWith("/reference");
+const hasMarkdown = hasMarkdownCopy(path);
 ---
 
 <Default {...Astro.props}><slot /></Default>
@@ -16,10 +16,10 @@ const hasMarkdown = path !== "/" && !path.startsWith("/api") && !path.startsWith
   hasMarkdown && (
     <div class="page-actions" data-page-actions>
       <button type="button" data-copy-markdown>
-        Copy page as Markdown
+        Copy as Markdown
       </button>
       <a href="index.md" rel="alternate" type="text/markdown">
-        View as Markdown
+        View Markdown
       </a>
       <span role="status" aria-live="polite" data-copy-status />
     </div>
@@ -54,7 +54,7 @@ const hasMarkdown = path !== "/" && !path.startsWith("/api") && !path.startsWith
         await navigator.clipboard.writeText(await markdownOfPage());
         say("Copied");
       } catch {
-        say("Couldn't copy: use View as Markdown");
+        say("Couldn't copy: use View Markdown");
       }
     });
   }

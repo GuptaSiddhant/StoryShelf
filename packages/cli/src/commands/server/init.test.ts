@@ -184,3 +184,25 @@ describe("runServerInit", () => {
     await expect(runServerInit({ cloud: "fly" })).rejects.toThrow("Unknown --cloud");
   });
 });
+
+describe("runServerInit without answers", () => {
+  it("fails with exit code 1 and says why when there is no terminal", async () => {
+    vi.mocked(prompts).mockResolvedValue({});
+    const stdinTty = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+    Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
+    const errors: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
+      errors.push(String(chunk));
+      return true;
+    });
+    try {
+      await runServerInit({});
+    } finally {
+      if (stdinTty) Object.defineProperty(process.stdin, "isTTY", stdinTty);
+      else Reflect.deleteProperty(process.stdin, "isTTY");
+    }
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
+    expect(errors.join("")).toContain("interactive terminal");
+  });
+});

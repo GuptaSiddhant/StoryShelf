@@ -151,6 +151,7 @@ export const INFRA_PROMPTS: Prompt[] = [
     type: "select",
     name: "auth",
     message: "Which auth?",
+    initial: 1,
     choices: [
       { title: "None", value: "none" },
       { title: "Local accounts", value: "password" },
@@ -190,6 +191,7 @@ const AUTH_SELECT: SelectPrompt = {
   type: "select",
   name: "auth",
   message: "Which auth?",
+  initial: 1,
   choices: [
     { title: "None", value: "none" },
     { title: "Local accounts", value: "password" },

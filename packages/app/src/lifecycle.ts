@@ -26,6 +26,10 @@ import type { ServerRuntime } from "./runtime.ts";
 export interface LifecycleCell {
   ready: Promise<AdapterSetupResult>;
   settled: AdapterSetupResult | null;
+  /** The boot checks' outcome (auth secret, AI, images): `setup()` throws while it is a failure. */
+  bootFailure?: Promise<AdapterSetupResult | null>;
+  /** `bootFailure` once settled (undefined while the checks run), so `setup()` need not wait a tick. */
+  bootChecked?: AdapterSetupResult | null;
   /** Fire-and-forget boot tasks (recovery, credential check) that teardown must outwait. */
   background?: Promise<unknown>[];
   /** Override of {@link BACKGROUND_DRAIN_MS} (tests). */
@@ -36,10 +40,29 @@ export interface LifecycleCell {
   consumerRun?: Promise<void>;
   /** Teardown ran: the consumer stays stopped (a late "adapters are ready" must not restart it). */
   consumerStopped?: boolean;
+  /** The eager run `attachLifecycle` started and no `setup()` has adopted yet: the first `setup()` awaits it instead of running every hook a second time. */
+  eager?: Promise<AdapterSetupResult>;
+  /** How many teardowns have started: a setup attempt begun before one is stale and stops. */
+  teardowns?: number;
 }
 
 /** Longest teardown waits for background boot tasks before closing adapters anyway. */
 const BACKGROUND_DRAIN_MS = 5000;
+
+/** Thrown by a `setup()` whose attempt a teardown overtook: it neither runs hooks nor starts the consumer. */
+const ABANDONED_SETUP = "Setup abandoned: teardown ran while setup was pending";
+
+/** The current teardown generation; an attempt compares it to the one it started in. */
+function generationOf(cell: LifecycleCell): number {
+  return cell.teardowns ?? 0;
+}
+
+/** Throw when a teardown started since `generation` was read. */
+function assertCurrent(cell: LifecycleCell, generation: number): void {
+  if (generationOf(cell) !== generation) {
+    throw new Error(ABANDONED_SETUP);
+  }
+}
 
 /** Register a boot task so `teardown()` does not close adapters underneath it. */
 export function trackBackground(cell: LifecycleCell, task: Promise<unknown>): void {
@@ -58,15 +81,15 @@ export function startConsumer(cell: LifecycleCell, logger: Logger): void {
 }
 
 /**
- * Stop polling and drain the jobs in flight (the SIGTERM drain): unbounded, or, given `graceMs`,
- * until the grace is spent, when the jobs left are handed back to the queue.
+ * Stop polling and wait for the jobs in flight to finish (the SIGTERM drain), at most `graceMs`
+ * when given: the jobs still running then are handed back (#912). Also invalidates pending setup
+ * attempts, whose adapter hooks `drainBackground` then outwaits.
  */
-async function stopConsumer(cell: LifecycleCell, graceMs?: number): Promise<void> {
+async function stopConsumer(cell: LifecycleCell, graceMs: number | undefined): Promise<void> {
+  cell.teardowns = generationOf(cell) + 1;
   cell.consumerStopped = true;
-  await cell.consumer?.stop(graceMs === undefined ? undefined : { graceMs });
-  if (graceMs === undefined) {
-    await cell.consumerRun;
-  }
+  await cell.consumer?.stop(graceMs === undefined ? {} : { graceMs });
+  await cell.consumerRun;
 }
 
 /**
@@ -129,11 +152,21 @@ async function firstBootFailure(
     // eslint-disable-next-line no-await-in-loop -- boot checks run in order and stop at the first failure
     const failed = await run(options);
     if (failed) {
-      logger.error({ failures: failed.failures, step: label }, "boot check setup failed");
+      logger.error({ failures: failed.failures, step: label }, "boot check failed");
       return failed;
     }
   }
   return null;
+}
+
+/** The adapter setups (migrations included), then the AI purge that reads migrated tables. */
+async function runAdapterPhase(
+  options: ResolvedShelfOptions,
+  ctx: AdapterSetupContext,
+  logger: Logger,
+): Promise<AdapterSetupResult> {
+  const result = await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger);
+  return result.ok ? ((await runAiPurge(options)) ?? result) : result;
 }
 
 /** Kick the eager background setup run (resolves; never rejects). */
@@ -145,13 +178,28 @@ function kickSetup(
 ): void {
   // Auth is not an adapter: its one-shot boot validation runs first, then
   // the adapter setups. A failing secret check fails readiness, like others.
+  const bootFailure = firstBootFailure(options, logger);
+  cell.bootFailure = bootFailure;
+  bootFailure.then(
+    (result) => {
+      cell.bootChecked = result;
+    },
+    () => {}, // Intentionally empty — `cell.ready` settles the rejection as a failed readiness
+  );
+  const generation = generationOf(cell);
   cell.ready = (async (): Promise<AdapterSetupResult> => {
-    const failed = await firstBootFailure(options, logger);
-    return (
-      failed ?? (await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger))
-    );
+    const failed = await bootFailure;
+    if (failed) {
+      return failed;
+    }
+    // Teardown overtook the boot checks: never run adapter hooks on adapters being closed.
+    return generationOf(cell) === generation
+      ? await runAdapterPhase(options, ctx, logger)
+      : { ok: false, failures: [] };
   })();
+  cell.eager = cell.ready;
   trackSettlement(cell, cell.ready);
+  trackBackground(cell, cell.ready);
 }
 
 /** Login method count, or null when the engine throws during introspection. */
@@ -230,14 +278,30 @@ async function runAuthSetup(options: ResolvedShelfOptions): Promise<AdapterSetup
     };
   }
 }
-/** Run AI boot checks and the stale-run sweep; failure fails readiness like auth. */
+/** Run the AI boot check; failure fails readiness like auth. Its data purge waits for migrations. */
 async function runAiSetup(options: ResolvedShelfOptions): Promise<AdapterSetupResult | null> {
+  return await aiStep(options, async (ai) => {
+    await ai.setup();
+  });
+}
+
+/** The AI retention sweep, once the adapters (and so the database migrations) are set up. */
+async function runAiPurge(options: ResolvedShelfOptions): Promise<AdapterSetupResult | null> {
+  return await aiStep(options, async () => {
+    await purgeAiData(options.database);
+  });
+}
+
+/** Run one AI step, turning a throw into an `ai` failure result (null without AI). */
+async function aiStep(
+  options: ResolvedShelfOptions,
+  step: (ai: NonNullable<ResolvedShelfOptions["ai"]>) => Promise<void>,
+): Promise<AdapterSetupResult | null> {
   if (!options.ai) {
     return null;
   }
   try {
-    await options.ai.setup();
-    await purgeAiData(options.database);
+    await step(options.ai);
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -269,20 +333,70 @@ async function runImagesSetup(): Promise<AdapterSetupResult | null> {
     };
   }
 }
+/** Keep a failed result on the cell, so health and readers never see a later run's success. */
+function settleFailure(cell: LifecycleCell, result: AdapterSetupResult): AdapterSetupResult {
+  cell.ready = Promise.resolve(result);
+  cell.settled = result;
+  return result;
+}
+
 /** Validation failure settled on the cell — null when the assembly is sound. */
 function invalidSources(
   options: ResolvedShelfOptions,
   cell: LifecycleCell,
 ): AdapterSetupResult | null {
   const invalid = validateBootAssembly(adapterSourcesOf(options));
-  if (invalid.length === 0) {
+  return invalid.length === 0 ? null : settleFailure(cell, { ok: false, failures: invalid });
+}
+
+/** Throw a failed boot check, settling it on the cell (setup must not mask it with a later run). */
+function refuseBootCheck(cell: LifecycleCell, failed: AdapterSetupResult | null | undefined): void {
+  if (failed) {
+    settleFailure(cell, failed);
+    // Names only: a hook's own text stays in `failures` and the structured log, never the message.
+    throw new AdapterLifecycleError("setup", failed.failures);
+  }
+}
+/**
+ * Throw when the assembly is invalid or a boot check failed: there is no "failed, continuing" path,
+ * so the host never starts listening. Synchronous once the checks settled (the usual case), so a
+ * passing `setup()` still publishes its run on the cell in the same tick; else it waits for them.
+ */
+function refuseFailedBoot(
+  options: ResolvedShelfOptions,
+  cell: LifecycleCell,
+): Promise<void> | null {
+  const blocked = invalidSources(options, cell);
+  if (blocked) {
+    throw new AdapterLifecycleError("setup", blocked.failures);
+  }
+  if (cell.bootChecked !== undefined || cell.bootFailure === undefined) {
+    refuseBootCheck(cell, cell.bootChecked);
     return null;
   }
-  const result: AdapterSetupResult = { ok: false, failures: invalid };
-  cell.ready = Promise.resolve(result);
-  cell.settled = result;
-  return result;
+  return cell.bootFailure.then((failed) => {
+    refuseBootCheck(cell, failed);
+  });
 }
+
+/**
+ * The eager run's result when the first `setup()` can adopt it (it succeeded), else null: a failed
+ * eager run, or any later call, runs the hooks again so a transient failure is retryable.
+ */
+async function adoptEagerRun(
+  eager: Promise<AdapterSetupResult>,
+): Promise<AdapterSetupResult | null> {
+  const result = await eager;
+  return result.ok ? result : null;
+}
+
+/** Take the unadopted eager run off the cell, synchronously (a later call must publish its rerun in the same tick). */
+function takeEagerRun(cell: LifecycleCell): Promise<AdapterSetupResult> | undefined {
+  const eager = cell.eager;
+  cell.eager = undefined;
+  return eager;
+}
+
 /**
  * Run the adapter setups again. The run is published on the cell before it is awaited: readers
  * (the retention timer among them) must never see the previous run's result while a new setup is
@@ -294,11 +408,28 @@ async function rerunSetup(
   logger: Logger,
   cell: LifecycleCell,
 ): Promise<AdapterSetupResult> {
-  const running = runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger);
+  const running = runAdapterPhase(options, ctx, logger);
   cell.ready = running;
+  trackBackground(cell, running);
   const result = await running;
   cell.settled = result;
   return result;
+}
+
+/** Throw a failed rerun, or a teardown that overtook it; otherwise (re)start the consumer. */
+function resumeAfterSetup(
+  cell: LifecycleCell,
+  generation: number,
+  result: AdapterSetupResult,
+  logger: Logger,
+): void {
+  if (!result.ok) {
+    throw new AdapterLifecycleError("setup", result.failures);
+  }
+  // A teardown during the run closed the adapters: never restart the consumer on them.
+  assertCurrent(cell, generation);
+  cell.consumerStopped = false;
+  startConsumer(cell, logger);
 }
 
 /** Build the `app.lifecycle` namespace closing over one settlement cell. */
@@ -315,16 +446,18 @@ function createLifecycle(
     },
     logger,
     setup: async () => {
-      const blocked = invalidSources(options, cell);
-      if (blocked) {
-        throw new AdapterLifecycleError("setup", blocked.failures);
+      const generation = generationOf(cell);
+      const checking = refuseFailedBoot(options, cell);
+      if (checking) {
+        await checking;
       }
-      const result = await rerunSetup(options, ctx, logger, cell);
-      if (!result.ok) {
-        throw new AdapterLifecycleError("setup", result.failures);
-      }
-      cell.consumerStopped = false;
-      startConsumer(cell, logger);
+      // Checked here, in the continuation itself: a teardown may start in any microtask before it.
+      assertCurrent(cell, generation);
+      const eager = takeEagerRun(cell);
+      const result =
+        (eager ? await adoptEagerRun(eager) : null) ??
+        (await rerunSetup(options, ctx, logger, cell));
+      resumeAfterSetup(cell, generation, result, logger);
     },
     teardown: async (teardownOptions) => {
       timer?.stop();

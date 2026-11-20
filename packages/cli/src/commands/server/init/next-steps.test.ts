@@ -44,11 +44,26 @@ describe("printNextSteps", () => {
     expect(printed).not.toContain("docker");
   });
 
+  it("names the three variables before npm start with local accounts", () => {
+    printNextSteps(answers({ auth: "password" }), "npm");
+    expect(printed).toContain("export SECRET=");
+    expect(printed).toContain("export PUBLIC_BASE_URL=http://localhost:3000");
+    expect(printed).toContain("export AUTH_PASSWORD=");
+    expect(printed.indexOf("export AUTH_PASSWORD=")).toBeLessThan(printed.indexOf("npm start"));
+  });
+
   it("points a single container at docker:build and docker:run", () => {
     printNextSteps(answers({ deployTarget: "docker", docker: true }), "npm");
     expect(printed).toContain("npm run docker:build");
     expect(printed).toContain("npm run docker:run");
     expect(printed).not.toContain("docker:up");
+  });
+
+  it("asks a single container for SECRET and AUTH_PASSWORD before docker:run", () => {
+    printNextSteps(answers({ deployTarget: "docker", docker: true, auth: "password" }), "npm");
+    expect(printed.indexOf("export SECRET=")).toBeGreaterThan(-1);
+    expect(printed.indexOf("export AUTH_PASSWORD=")).toBeGreaterThan(-1);
+    expect(printed.indexOf("export AUTH_PASSWORD=")).toBeLessThan(printed.indexOf("docker:run"));
   });
 
   it("points a compose stack at docker:up, logs and down", () => {
@@ -57,5 +72,16 @@ describe("printNextSteps", () => {
     expect(printed).toContain("npm run docker:logs");
     expect(printed).toContain("npm run docker:down");
     expect(printed).not.toContain("docker:run");
+    expect(printed).toContain("export SECRET=");
+    expect(printed).not.toContain("export AUTH_PASSWORD=");
+  });
+
+  it("asks a password compose stack for AUTH_PASSWORD before docker:up", () => {
+    printNextSteps(
+      answers({ deployTarget: "docker", docker: true, database: "postgres", auth: "password" }),
+      "npm",
+    );
+    expect(printed.indexOf("export AUTH_PASSWORD=")).toBeGreaterThan(-1);
+    expect(printed.indexOf("export AUTH_PASSWORD=")).toBeLessThan(printed.indexOf("docker:up"));
   });
 });

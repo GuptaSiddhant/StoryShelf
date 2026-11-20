@@ -7,6 +7,7 @@ import type {
 } from "../../adapters/notifier/index.ts";
 import type { Logger } from "../../logger.ts";
 import { describeState } from "./describe.ts";
+import type { CommentInput } from "./review-comment.ts";
 
 /** What a host-specific writer does for each target kind. */
 export interface StateWriter {
@@ -25,9 +26,11 @@ export interface StateWriter {
     annotations?: StateAnnotation[] | undefined;
     /** Changed snapshots left out of `annotations`. */
     omitted?: number | undefined;
+    /** Markdown for a host that shows a summary (a check run). */
+    summary?: string | undefined;
   }): Promise<void>;
-  /** Create or update the single review comment of the build keyed by `url`. */
-  comment(input: { sha: string; url: string; markdown: string }): Promise<unknown>;
+  /** Create or update the project's single review comment; the newest build wins. */
+  comment(input: CommentInput): Promise<unknown>;
   /** Whether the host says `sha` is on `branch`; see `StateNotifierAdapter.commitOnBranch`. */
   commitOnBranch?(input: { sha: string; branch: string }): Promise<boolean>;
 }
@@ -55,15 +58,22 @@ export function createStateAdapter(
           informational: target.informational,
           annotations: target.annotations,
           omitted: target.omitted,
+          summary: target.summary,
         });
         return;
       }
       if (url === undefined) {
-        // The comment is keyed by the build's link; without a public origin there is none.
+        // The comment links the build; without a public origin there is none.
         return;
       }
       logger?.debug({ sha: target.sha }, "upserting review comment");
-      await writer.comment({ sha: target.sha, url, markdown: target.markdown });
+      await writer.comment({
+        sha: target.sha,
+        project: target.project,
+        buildId: target.buildId,
+        url,
+        markdown: target.markdown,
+      });
     },
   };
 }

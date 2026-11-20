@@ -5,14 +5,18 @@ import { csrfField } from "../shell/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Alert,
+  Avatar,
   Badge,
   Button,
   Card,
   Field,
   HStack,
+  Meta,
   PageHeader,
+  SectionTitle,
   Table,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
@@ -65,29 +69,16 @@ const profileAvatar = css`
   object-fit: cover;
 `;
 
-const profileAvatarFallback = css`
-  /* profile-avatar-fallback */
-  width: 64px;
-  height: 64px;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 1.5rem;
-  font-weight: 700;
-`;
-
 const profileName = css`
   /* profile-name */
-  font-weight: 700;
-  font-size: 1.2rem;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xl);
 `;
 
 const profileMeta = css`
   /* profile-meta */
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 `;
 type SecurityState = NonNullable<ProfilePageState["security"]>;
 type PasskeyState = SecurityState["passkeys"][number];
@@ -95,7 +86,7 @@ type PasskeyState = SecurityState["passkeys"][number];
 /** Registered passkey rows with per-key remove actions. */
 const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
   return (
-    <Table dense label="Passkeys">
+    <Table dense label="Passkeys" empty={passkeys.length === 0 ? "No passkeys yet." : undefined}>
       <table>
         <thead>
           <tr>
@@ -174,7 +165,8 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
 const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
   return (
     <Card>
-      <PageHeader level={2} title="Devices" description="Where you are signed in" />
+      <SectionTitle>Devices</SectionTitle>
+      <Meta>Where you are signed in</Meta>
       <Table dense label="Devices">
         <table>
           <thead>
@@ -210,21 +202,14 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
 const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
   return (
     <Card>
-      <PageHeader
-        level={2}
-        title="Passkeys"
-        description="Sign in without a password using your device"
-      />
+      <SectionTitle>Passkeys</SectionTitle>
+      <Meta>Sign in without a password using your device</Meta>
       {security.passkeys.length < 2 ? (
         <Alert title="Add a backup key">
           Register a 2nd key so a lost device doesn&apos;t lock you out.
         </Alert>
       ) : null}
-      {security.passkeys.length === 0 ? (
-        <p class={profileMeta}>No passkeys yet.</p>
-      ) : (
-        <PasskeyTable passkeys={security.passkeys} />
-      )}
+      <PasskeyTable passkeys={security.passkeys} />
       <HStack>
         <Field label="Key name" name="keyName" type="text" placeholder="e.g. Security key" />
         <Button variant="primary" size="sm" type="button" data-passkey-register="true">
@@ -261,16 +246,14 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
             {avatar ? (
               <img class={profileAvatar} src={avatar} alt="" width="64" height="64" />
             ) : (
-              <span class={profileAvatarFallback} aria-hidden="true">
-                {user.name.slice(0, 1).toUpperCase()}
-              </span>
+              <Avatar name={user.name} size="xl" />
             )}
             <VStack>
               <div class={profileName}>{displayName}</div>
               <div class={profileMeta}>{user.email}</div>
               <HStack>
-                <Badge>{user.role}</Badge>
-                <Badge>via {provider}</Badge>
+                <Badge>{statusLabel(user.role)}</Badge>
+                <Badge>{statusLabel(`via ${provider}`)}</Badge>
               </HStack>
             </VStack>
           </HStack>
@@ -282,11 +265,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
       </Card>
 
       <Card>
-        <PageHeader
-          level={2}
-          title="Display name"
-          description="Shown in comments and the header. Survives SSO refresh."
-        />
+        <SectionTitle>Display name</SectionTitle>
+        <Meta>Shown in comments and the header. Survives SSO refresh.</Meta>
         <form method="post" action="/profile" novalidate>
           <Field label="Display name" name="displayName" type="text" required value={displayName} />
           <Button variant="primary" type="submit">
@@ -297,7 +277,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
 
       {isLocal ? (
         <Card>
-          <PageHeader level={2} title="Change password" description="For local accounts only" />
+          <SectionTitle>Change password</SectionTitle>
+          <Meta>For local accounts only</Meta>
           <form method="post" action="/profile/password" novalidate>
             <Field
               label="Current password"
@@ -332,7 +313,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
       {security?.passkeysEnabled ? <PasskeysSection security={security} /> : null}
 
       <Card>
-        <PageHeader level={2} title="Project memberships" description="Your role on each project" />{" "}
+        <SectionTitle>Project memberships</SectionTitle>
+        <Meta>Your role on each project</Meta>{" "}
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
         ) : (
@@ -354,7 +336,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
                         <a href={`/projects/${m.projectSlug}`}>{m.projectName}</a>
                       </td>
                       <td>
-                        <Badge>{m.role}</Badge>
+                        <Badge>{statusLabel(m.role)}</Badge>
                       </td>
                       <td>{m.source}</td>
                     </tr>
@@ -367,11 +349,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
       </Card>
 
       <Card>
-        <PageHeader
-          level={2}
-          title="Notifications"
-          description="Email alerts per project. Fine-tune topics in each project's settings."
-        />
+        <SectionTitle>Notifications</SectionTitle>
+        <Meta>Email alerts per project. Fine-tune topics in each project's settings.</Meta>
         <NotificationsPausedNotice paused={state.notificationsPaused} />
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>

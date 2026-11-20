@@ -44,6 +44,7 @@ export async function writeBuildState(
           ...(status.progress === undefined ? {} : { progress: status.progress }),
           ...(status.annotations === undefined ? {} : { annotations: status.annotations }),
           ...(status.omitted === undefined ? {} : { omitted: status.omitted }),
+          ...(status.summary === undefined ? {} : { summary: status.summary }),
         },
         state: status.state,
         url: status.url,
@@ -73,7 +74,13 @@ async function upsertComment(input: {
   await adapter
     .setState({
       channel,
-      target: { kind: "comment", sha, markdown: comment.markdown },
+      target: {
+        kind: "comment",
+        sha,
+        project: comment.projectSlug,
+        buildId: comment.buildId,
+        markdown: comment.markdown,
+      },
       state: comment.state,
       url: comment.url,
       logger,

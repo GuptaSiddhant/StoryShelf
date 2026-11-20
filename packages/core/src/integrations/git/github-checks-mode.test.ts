@@ -94,7 +94,7 @@ describe("gitHubNotifier in checks mode", () => {
     const calls = recordedGitHub();
     await adapter().setState({
       channel,
-      target: { kind: "comment", sha: "abc", markdown: "m" },
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "m" },
       state: "success",
       url: "https://shelf.example/b/1",
     });
