@@ -502,25 +502,3 @@ export async function postForm<TData>(
   }
   return (await response.json()) as TData;
 }
-
-/**
- * POST a `FormData` body with future progress reporting and parse the JSON response.
- * Currently behaves like {@link postForm}; the name is kept for CLI compatibility
- * and to allow streaming progress hooks without a breaking change.
- *
- * @param url - Absolute request URL
- * @param form - Multipart form payload
- * @param headers - Extra headers (e -g - auth)
- * @returns Parsed response body
- */
-export async function postFormWithProgress<TData>(
-  url: string,
-  form: FormData,
-  headers: Record<string, string> = {},
-): Promise<TData> {
-  const response = await fetch(url, { method: "POST", headers, body: form });
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status}): ${apiErrorText(await response.text())}`);
-  }
-  return (await response.json()) as TData;
-}

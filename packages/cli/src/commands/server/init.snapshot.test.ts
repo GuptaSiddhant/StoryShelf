@@ -167,7 +167,10 @@ async function scaffold(answers: Record<string, unknown>): Promise<void> {
 describe("server init output", () => {
   it.each(Object.entries(PRESETS))("is unchanged for %s", async (_name, answers) => {
     await scaffold(answers);
-    const output = written.replaceAll(tmpRoot, "<tmp>").replaceAll(/\/private(?=<tmp>)/gu, "");
+    const output = written
+      .replaceAll(tmpRoot, "<tmp>")
+      .replaceAll(/\/private(?=<tmp>)/gu, "")
+      .replaceAll(/\(\d+(?:\.\d)?m?s\)/gu, "(<time>)");
     expect({ files: fingerprint(join(tmpRoot, "my-server")), output }).toMatchSnapshot();
   });
 

@@ -10,8 +10,10 @@ exports[`server init output > is unchanged for auth oauth 1`] = `
     "src/index.ts 2195 847a5719da5b08ca6072bab36bf04db432f0fdfb51a985fa6a4ba6c1925c31f7",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -36,8 +38,10 @@ exports[`server init output > is unchanged for auth password 1`] = `
     "src/index.ts 2252 6aa3da7a32638a2c48145ef20ce16502d12bf7f9c2baae819dd2a25299f1a97a",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -79,10 +83,12 @@ exports[`server init output > is unchanged for aws full 1`] = `
     "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -124,10 +130,12 @@ exports[`server init output > is unchanged for aws minimal 1`] = `
     "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -169,10 +177,12 @@ exports[`server init output > is unchanged for azure full 1`] = `
     "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -215,10 +225,12 @@ exports[`server init output > is unchanged for azure minimal 1`] = `
     "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -246,8 +258,10 @@ exports[`server init output > is unchanged for database better-sqlite3 1`] = `
     "src/index.ts 1624 25d8c01028e8674f1cbbdf852a881115c83b0f8cba7d669fb6ce28171ab4883d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -269,8 +283,10 @@ exports[`server init output > is unchanged for database bun-sqlite 1`] = `
     "src/index.ts 1612 69dd3802f36204e3c6c408142dfe4a90b88cbd8492a939f35b0cf5eb24b70c6a",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -292,8 +308,10 @@ exports[`server init output > is unchanged for database d1 1`] = `
     "src/index.ts 1748 0a38d65c3cbf91f8e75d9f3556232407c643b01b45b7fee166fb5b6e400f8e8f",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -315,8 +333,10 @@ exports[`server init output > is unchanged for database mysql 1`] = `
     "src/index.ts 1810 21ae7359ec7e731911bbc4e32286b56f2fbe7124b661eefa74c61a53cf328253",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -340,8 +360,10 @@ exports[`server init output > is unchanged for database neon 1`] = `
     "src/index.ts 1816 dd45c06ed0cd829f9fef14ae08d0b1b5422d779bfe952cd450db45fac9c0ef0f",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -365,8 +387,10 @@ exports[`server init output > is unchanged for database neon-http 1`] = `
     "src/index.ts 1829 62c3924d20fec6690944ed3fb3493694d40571244e0fbaecfd0766fe73c6683c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -390,8 +414,10 @@ exports[`server init output > is unchanged for database pg 1`] = `
     "src/index.ts 1810 df17537b6a30426616ae9567f8cf80e0c2b77d2ce61e58935ad01710f2df1fc7",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -415,8 +441,10 @@ exports[`server init output > is unchanged for database pglite 1`] = `
     "src/index.ts 1573 36d7c61fb727add52758695d60ed02ef2f33e5830f42105c983236119f386e30",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -438,8 +466,10 @@ exports[`server init output > is unchanged for database planetscale 1`] = `
     "src/index.ts 1834 571f38371e70b84698c20794529e6d00ac8619d9e7b5f2f3d8c231f4b4f7c902",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -463,8 +493,10 @@ exports[`server init output > is unchanged for database postgres 1`] = `
     "src/index.ts 1819 ca1f00fb168cb6afdccbe9a8535e2e3f78080151f7b6a60ac5cc3bcc592d4860",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -488,8 +520,10 @@ exports[`server init output > is unchanged for database sqlite 1`] = `
     "src/index.ts 1585 c9bce31a5ae452d8af996e1f3575d3a0517a5c0efaa83edf7ceece16ba1e0deb",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -511,8 +545,10 @@ exports[`server init output > is unchanged for database tidb 1`] = `
     "src/index.ts 1813 84cb04576cc0b3b0de406294a5dd38f0527cb14ec803815ebfc7ef30c9c0c45d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -536,8 +572,10 @@ exports[`server init output > is unchanged for database turso 1`] = `
     "src/index.ts 1649 9f0763525327f0059b5ed0c49e4c86956a54803d247e21ca699bd1417c5ed115",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -559,8 +597,10 @@ exports[`server init output > is unchanged for database vercel 1`] = `
     "src/index.ts 1573 8fdda57bed7a90092e5d61b25312c8d9a5d7d44f34437f029fef75f5959d1a54",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -582,8 +622,10 @@ exports[`server init output > is unchanged for design 1`] = `
     "src/index.ts 1585 c9bce31a5ae452d8af996e1f3575d3a0517a5c0efaa83edf7ceece16ba1e0deb",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -607,9 +649,11 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
     "src/index.ts 1810 21ae7359ec7e731911bbc4e32286b56f2fbe7124b661eefa74c61a53cf328253",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -634,9 +678,11 @@ exports[`server init output > is unchanged for docker single container 1`] = `
     "src/index.ts 1585 c9bce31a5ae452d8af996e1f3575d3a0517a5c0efaa83edf7ceece16ba1e0deb",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -662,9 +708,11 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
     "src/index.ts 1819 ca1f00fb168cb6afdccbe9a8535e2e3f78080151f7b6a60ac5cc3bcc592d4860",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -688,8 +736,10 @@ exports[`server init output > is unchanged for everything on 1`] = `
     "src/index.ts 3472 deb2d87beed84e7b6cec664fa74f2c9cf8aeb8a99b7ebc86b3c9dc2d32a91218",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -732,10 +782,12 @@ exports[`server init output > is unchanged for gcp full 1`] = `
     "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -778,10 +830,12 @@ exports[`server init output > is unchanged for gcp minimal 1`] = `
     "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -809,8 +863,10 @@ exports[`server init output > is unchanged for git on 1`] = `
     "src/index.ts 1585 c9bce31a5ae452d8af996e1f3575d3a0517a5c0efaa83edf7ceece16ba1e0deb",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -834,9 +890,11 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
     "src/index.ts 1585 c9bce31a5ae452d8af996e1f3575d3a0517a5c0efaa83edf7ceece16ba1e0deb",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -859,8 +917,10 @@ exports[`server init output > is unchanged for local with advanced adapters 1`] 
     "src/index.ts 1813 84cb04576cc0b3b0de406294a5dd38f0527cb14ec803815ebfc7ef30c9c0c45d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -884,8 +944,10 @@ exports[`server init output > is unchanged for notifications 1`] = `
     "src/index.ts 2190 299879ceec7da37d9ba32eceff891155f270fd4738426cdf51fd988fb74bf1d4",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -907,8 +969,10 @@ exports[`server init output > is unchanged for notifications with oauth 1`] = `
     "src/index.ts 2924 54e9b3a97d1132c0b41fb1d960e6f0a48133f0ca22268f08b21292f0a1356d25",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -933,8 +997,10 @@ exports[`server init output > is unchanged for notifications with password auth 
     "src/index.ts 2981 13dbf9afadf4aa36ef55739c1ba0fecb0b5b912501d186d6a705c39b1286a167",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -961,8 +1027,10 @@ exports[`server init output > is unchanged for observability 1`] = `
     "src/index.ts 1991 5f1920b26465988e475084ddee706e3e1cef3c3d4f1eeafebbb063f4375b6c0f",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -984,8 +1052,10 @@ exports[`server init output > is unchanged for storage azure 1`] = `
     "src/index.ts 1661 68b16cc006b118c1039061f43aece3b64b4c41dd7b088293ba6455cebd511128",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -1007,8 +1077,10 @@ exports[`server init output > is unchanged for storage gcs 1`] = `
     "src/index.ts 1607 5254b1c0e59a545c83bd7adfac8c7c637dfddda00ce75d98385d668077e4a2ca",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -1030,8 +1102,10 @@ exports[`server init output > is unchanged for storage s3 1`] = `
     "src/index.ts 1635 2f1c8dbb5ec715d495ae1255ecf74acc9b506bc6d6feb297f5dbb59ea9d33a9b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (<time>)
 
 Scaffolded my-server in <tmp>/my-server
 
