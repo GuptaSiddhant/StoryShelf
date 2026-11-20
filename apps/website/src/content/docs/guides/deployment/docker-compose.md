@@ -84,6 +84,10 @@ volumes:
   storyshelf-data:
 ```
 
+## Keep it running
+
+Captures run in the background after an upload. Run the container on a host that does not stop it when traffic stops; if you move it to Fly, Render or Railway, read [Keep one instance running](/guides/deployment/#keep-one-instance-running) first.
+
 ## Published Storybook subdomains
 
 Opt in to per-project subdomains by setting `PUBLISHED_BASE_DOMAIN` and adding a wildcard DNS record + TLS cert:
