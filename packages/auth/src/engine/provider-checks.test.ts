@@ -70,12 +70,42 @@ describe("providerChecksOf", () => {
     expect(await check?.check()).toMatchObject({ ok: false });
   });
 
-  it("rejects when the provider is unreachable (the report turns that into a failed row)", async () => {
+  it("reports HTTP <status> from the origin, never the IdP's response body", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response("no", { status: 404 })),
+      vi.fn(async () => new Response("boom token=FAKE-TOKEN-abc123 secret", { status: 500 })),
     );
     const [check] = providerChecksOf(options({ sso: { providers: [sso] } }));
-    await expect(check?.check()).rejects.toThrow();
+    const result = await check?.check();
+    expect(result).toEqual({ ok: false, detail: "HTTP 500 from https://idp.acme.example" });
+    expect(JSON.stringify(result)).not.toContain("FAKE-TOKEN");
+  });
+
+  it("says no answer within 2 s for a timeout", async () => {
+    const timeout = Object.assign(new Error("The operation was aborted due to timeout"), {
+      name: "TimeoutError",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(timeout)),
+    );
+    const [check] = providerChecksOf(options({ sso: { providers: [sso] } }));
+    expect(await check?.check()).toEqual({
+      ok: false,
+      detail: "no answer from https://idp.acme.example within 2 s",
+    });
+  });
+
+  it("says unreachable for any other failure, without the error text", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Promise.reject(new Error("connect ECONNREFUSED https://u:pw@idp.acme.example/x?k=1")),
+      ),
+    );
+    const [check] = providerChecksOf(options({ sso: { providers: [sso] } }));
+    const result = await check?.check();
+    expect(result).toEqual({ ok: false, detail: "unreachable: https://idp.acme.example" });
+    expect(JSON.stringify(result)).not.toMatch(/pw|k=1/u);
   });
 });
