@@ -108,11 +108,24 @@ export interface CaptureConsumerOptions {
   lease?: { renewEveryMs?: number; checkMs?: number };
 }
 
+/** Options of {@link CaptureConsumer.stop}. */
+export interface ConsumerStopOptions {
+  /**
+   * Bound of the drain in ms (#912). Jobs still running near its end (it keeps a reserve of up to
+   * `HAND_BACK_RESERVE_MS`) are stopped and handed back to the queue: visible again at once, their
+   * attempt not spent, so another instance takes them over. Absent: wait for every job to end.
+   */
+  graceMs?: number;
+}
+
 /** Handle returned by {@link createCaptureConsumer}. */
 export interface CaptureConsumer {
   /** Start consuming. Resolves once stopped and drained; rejects when the image engine cannot load. */
   start(): Promise<void>;
-  /** Stop polling and wait for the jobs in flight to finish (SIGTERM drain). */
-  stop(): Promise<void>;
+  /**
+   * Stop polling and wait for the jobs in flight to finish (SIGTERM drain); with `graceMs`, at most
+   * that long, handing back the jobs still running. The first call's options apply.
+   */
+  stop(options?: ConsumerStopOptions): Promise<void>;
   isRunning(): boolean;
 }

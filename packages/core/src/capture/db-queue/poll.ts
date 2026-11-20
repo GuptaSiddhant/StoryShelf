@@ -121,7 +121,9 @@ const DEFAULT_HAND_BACK_DELAY_MS = 30_000;
 
 /**
  * Give a claimed job back without spending an attempt (see `PollableCaptureQueue.handBack`). Only
- * the current holder can: a stale holder writes nothing.
+ * the current holder can: a stale holder writes nothing. A job whose cancel was asked is not handed
+ * back: it ends `cancelled`, as its holder's nack would have ended it (a cancel that lands while a
+ * draining shutdown releases the job, #912).
  */
 export async function handBackJob(
   rt: QueueRuntime,
@@ -129,6 +131,11 @@ export async function handBackJob(
   options: { delayMs?: number; reason?: string } = {},
 ): Promise<void> {
   const ref = attemptRef(job);
+  const row = await rt.model.get(ref.jobId);
+  if (row !== null && row.cancelRequestedAt !== null) {
+    await nackJob(rt, job, { requeue: false, error: "cancelled" });
+    return;
+  }
   const delayMs = Math.min(
     Math.max(options.delayMs ?? DEFAULT_HAND_BACK_DELAY_MS, 0),
     MAX_NACK_DELAY_MS,

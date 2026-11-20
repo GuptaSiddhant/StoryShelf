@@ -8,10 +8,10 @@
  *
  *  1. pack every public package (manifests rewritten as the release does, then restored),
  *  2. install the CLI from its tarball in an empty directory outside this checkout,
- *  3. run the default `storyshelf server init` (answers: all defaults),
+ *  3. run the default `storyshelf server init` (answers: all defaults, so local accounts),
  *  4. `npm install` the scaffold, with every @storyshelf/* dependency (direct or transitive)
  *     resolved to a tarball instead of the registry,
- *  5. `npm start`, then `storyshelf create` and `storyshelf upload` of a built Storybook,
+ *  5. `npm start`, sign in, create a project and a token, and `storyshelf upload` a built Storybook,
  *  6. wait for the build to finish and fail unless it passed.
  *
  * Needs a built workspace (`nubx turbo run build --filter='!website'`) and a built Storybook.
@@ -45,6 +45,8 @@ const storybookDir = resolve(
   storybookArg === -1 ? join(root, "fixtures/storybook-9") : (args[storybookArg + 1] ?? ""),
 );
 const ADMIN_TOKEN = "packed-smoke-admin-token";
+const PASSWORD = "packed-smoke-password";
+const PROJECT_NAME = "packed-smoke";
 const SECRET = "packed-smoke-secret-packed-smoke-secret";
 
 function log(message) {
@@ -259,6 +261,9 @@ async function startServer(project) {
       PORT: String(port),
       DATA_DIR: join(project, "data"),
       SECRET,
+      // The default scaffold uses local accounts, which need all three variables.
+      PUBLIC_BASE_URL: `http://127.0.0.1:${port}`,
+      AUTH_PASSWORD: PASSWORD,
       STORYSHELF_ADMIN_TOKEN: ADMIN_TOKEN,
     },
     // Its own process group, so stopping it also stops the node process `npm start` runs.
@@ -274,7 +279,7 @@ async function startServer(project) {
     await stopServer(child);
     throw error;
   }
-  return { child, url };
+  return { child, url, output };
 }
 
 /** A copy of the Storybook project, so `create` writes its config into scratch and not the fixture. */
@@ -288,20 +293,60 @@ function copyStorybook(scratch) {
   return sb;
 }
 
-/** `create` then `upload`, as a user would. */
-function createAndUpload(cli, url, sb) {
-  log("storyshelf create");
-  const created = run(
-    process.execPath,
-    [cli, "create", "--url", url, "--name", "packed-smoke", "--token", ADMIN_TOKEN],
-    { cwd: sb },
-  );
-  const ciToken = /CI token: (?<token>\S+)/u.exec(created)?.groups?.["token"];
+/** A signed-in request to the server: the cookie jar of one sign-in, with the portal origin a write needs. */
+async function signedIn(url) {
+  const origin = new URL(url).origin;
+  const response = await fetch(`${url}/api/auth/sign-in/email`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin },
+    body: JSON.stringify({ email: "admin@example.com", password: PASSWORD }),
+  });
+  if (!response.ok) {
+    fail(`sign-in failed (${response.status})\n${await response.text()}`);
+  }
+  const cookie = response.headers
+    .getSetCookie()
+    .map((entry) => entry.split(";")[0])
+    .join("; ");
+  return async (path, body) => {
+    const answer = await fetch(`${url}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin, cookie },
+      body: JSON.stringify(body),
+    });
+    if (!answer.ok) {
+      fail(`POST ${path} failed (${answer.status})\n${await answer.text()}`);
+    }
+    return await answer.json();
+  };
+}
+
+/**
+ * Sign in, make a project and a token (what the UI's "Get your first build" card does), then `upload`,
+ * as the getting-started guide says. `create --token` is not used: with sign-in on, the token it
+ * mints has no owner and so is a viewer.
+ */
+async function createAndUpload(cli, url, sb) {
+  log("sign in, create a project and a token");
+  const post = await signedIn(url);
+  await post("/api/v1/projects", { name: PROJECT_NAME });
+  const ciToken = (await post(`/api/v1/projects/${PROJECT_NAME}/tokens`, { name: "ci" })).token;
   if (!ciToken) {
-    fail(`create printed no CI token\n${created}`);
+    fail("the token call returned no token");
   }
   log("storyshelf upload");
-  const uploadArgs = ["--build-dir", "storybook-static", "--branch", "main", "--sha", "packed-1"];
+  const uploadArgs = [
+    "--url",
+    url,
+    "--slug",
+    PROJECT_NAME,
+    "--build-dir",
+    "storybook-static",
+    "--branch",
+    "main",
+    "--sha",
+    "packed-1",
+  ];
   const uploaded = run(process.execPath, [cli, "upload", ...uploadArgs], {
     cwd: sb,
     env: { ...process.env, STORYSHELF_TOKEN: ciToken },
@@ -326,13 +371,18 @@ async function main() {
     log(`packed ${Object.keys(tarballs).length} packages`);
     const { cli, project } = await installFromTarballs(scratch, tarballs);
     server = await startServer(project);
-    const ciToken = createAndUpload(cli, server.url, copyStorybook(scratch));
+    const ciToken = await createAndUpload(cli, server.url, copyStorybook(scratch));
     await assertBuildPassed(server.url, ciToken);
     log("ok: packed install, scaffold, start, create, upload and one passing build");
   } catch (error) {
     console.error(
       `::error::packed-install-smoke: ${error instanceof Error ? error.message : error}`,
     );
+    if (server) {
+      console.error(
+        `server output (tail):\n${server.output.text.split("\n").slice(-25).join("\n")}`,
+      );
+    }
     process.exitCode = 1;
   } finally {
     if (server) {

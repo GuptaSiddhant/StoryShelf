@@ -122,7 +122,11 @@ export async function detectPackageName(cwd: string = process.cwd()): Promise<st
  */
 export function detectGitRepository(cwd: string = process.cwd()): string | null {
   try {
-    const url = execSync("git config --get remote.origin.url", { cwd, encoding: "utf8" }).trim();
+    const url = execSync("git config --get remote.origin.url", {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
     if (!url) {
       return null;
     }
@@ -147,6 +151,7 @@ export function detectGitRepository(cwd: string = process.cwd()): string | null 
 export function detectGitDefaultBranch(cwd: string = process.cwd()): string | null {
   try {
     const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
       cwd,
       encoding: "utf8",
     }).trim();
@@ -158,7 +163,11 @@ export function detectGitDefaultBranch(cwd: string = process.cwd()): string | nu
     // Fallback
   }
   try {
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd, encoding: "utf8" }).trim();
+    const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
     if (branch && branch !== "HEAD") {
       return branch;
     }

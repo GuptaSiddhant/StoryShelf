@@ -181,6 +181,8 @@ describe("server init output", () => {
       process.chdir(cwd);
     }
     expect(filesUnder(tmpRoot)).toEqual([]);
-    expect(written).toBe("[stderr] Cancelled.\n");
+    expect(written).toContain("[stderr] Cancelled.\n");
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
   });
 });
