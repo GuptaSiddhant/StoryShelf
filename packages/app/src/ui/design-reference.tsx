@@ -18,7 +18,7 @@ const referenceRoot = css`
     border-bottom: 1px solid var(--border);
     color: var(--text-secondary);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }

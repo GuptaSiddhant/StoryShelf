@@ -11,6 +11,7 @@ import {
   Meta,
   SectionTitle,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
 /** Badge tone for a health verdict. */
 export function healthTone(verdict: string | null): "success" | "warning" | "danger" | "neutral" {
@@ -97,7 +98,7 @@ export function HealthPanel(
         <HStack>
           <SectionTitle level={3}>Project health (AI, last {HEALTH_UI_WINDOW})</SectionTitle>
           {latest?.status === "done" ? (
-            <Badge tone={healthTone(latest.verdict)}>{latest.verdict}</Badge>
+            <Badge tone={healthTone(latest.verdict)}>{statusLabel(latest.verdict ?? "")}</Badge>
           ) : null}
           {inFlight ? <Badge tone="info">generating…</Badge> : null}
         </HStack>

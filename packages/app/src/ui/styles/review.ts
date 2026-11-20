@@ -45,7 +45,7 @@ export const snapshotCardHead = css`
 
 export const snapshotCardMeta = css`
   /* snapshot-card-meta */
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
 `;
 
@@ -69,7 +69,7 @@ export const reviewCommentHead = css`
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   flex-wrap: wrap;
 `;
@@ -79,7 +79,7 @@ export const reviewCommentBody = css`
   margin: 0.5rem 0 0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 `;
 
 /** An `@mention` of a project member inside a comment body (#463). */
@@ -89,7 +89,7 @@ export const reviewMention = css`
   color: var(--text-primary);
   border-radius: 0.25rem;
   padding: 0 0.25em;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 `;
 
 export const reviewCommentActions = css`

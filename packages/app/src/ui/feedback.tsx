@@ -14,7 +14,7 @@ const badgeBase = css`
   padding: 0.1rem 0.55rem;
   border-radius: var(--radius-pill);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   line-height: 1.5;
   border: 1px solid var(--border);
   background: var(--surface-muted);
@@ -141,17 +141,17 @@ const alertIconTones: Record<AlertTone, Promise<string>> = {
   success: css`
     /* alert-icon-success */
     margin-top: 0.1rem;
-    color: var(--status-approved);
+    color: var(--status-approved-fg);
   `,
   warning: css`
     /* alert-icon-warning */
     margin-top: 0.1rem;
-    color: var(--status-new);
+    color: var(--status-new-fg);
   `,
   danger: css`
     /* alert-icon-danger */
     margin-top: 0.1rem;
-    color: var(--status-rejected);
+    color: var(--status-rejected-fg);
   `,
 };
 
@@ -167,8 +167,8 @@ const emptyWrap = css`
 const emptyTitle = css`
   /* empty-title */
   margin: 0 0 0.3rem;
-  font-size: 1.05rem;
-  font-weight: 650;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
 `;
 
@@ -176,7 +176,7 @@ const emptyDesc = css`
   /* empty-desc */
   margin: 0 auto;
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   max-width: 50ch;
 `;
 
@@ -193,8 +193,8 @@ const statWrap = css`
 
 const statValueBase = css`
   /* stat-value */
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 `;
@@ -207,12 +207,12 @@ const statValueTones: Record<StatTone, Promise<string>> = {
   success: css`
     /* stat-value-success */
     ${statValueBase}
-    color: var(--status-approved);
+    color: var(--status-approved-fg);
   `,
   warning: css`
     /* stat-value-warning */
     ${statValueBase}
-    color: var(--status-new);
+    color: var(--status-new-fg);
   `,
 };
 
@@ -226,7 +226,7 @@ const metaText = css`
   /* meta */
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 `;
 
 const metaMono = css`
@@ -238,7 +238,7 @@ const metaMono = css`
 const metaCode = css`
   /* meta-code */
   ${metaMono}
-  font-size: 0.85em;
+  font-size: var(--text-xs);
 `;
 
 const metaPre = css`
@@ -250,14 +250,14 @@ const metaPre = css`
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0.75rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   overflow: auto;
 `;
 
 const metaDanger = css`
   /* meta-danger */
   ${metaText}
-  color: var(--status-rejected);
+  color: var(--status-rejected-fg);
 `;
 
 const metaCenter = css`
@@ -285,7 +285,7 @@ export const Badge: FC<{ tone?: BadgeTone; icon?: boolean; children?: unknown }>
 
 /** Sentence-case label for a status; `reviewing` reads "Needs review". */
 export function statusLabel(status: string): string {
-  const text = status === "reviewing" ? "needs review" : status;
+  const text = status === "reviewing" ? "needs review" : status.replaceAll("-", " ");
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -358,7 +358,7 @@ const alertTitle = css`
   /* alert-title */
   display: block;
   margin-bottom: 0.2rem;
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
 `;
 
 /** Centered empty state with an optional title and call-to-action. */

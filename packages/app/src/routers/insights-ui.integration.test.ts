@@ -116,7 +116,7 @@ describe("build review insight panel", () => {
     const html = await (
       await shelf.request(`/projects/p/builds/${build.id}/insights/panel`)
     ).text();
-    expect(html).toContain("needs-review");
+    expect(html).toContain("Needs review");
     expect(html).not.toContain("<script>alert(1)");
     expect(html).not.toContain("<b>k</b>");
     expect(html).toContain("Regenerate");
@@ -162,7 +162,7 @@ describe("project health UI", () => {
     expect(await started.text()).toContain("generating");
     await settleInsightJobs();
     const panel = await (await shelf.request("/projects/p/insights/health/panel")).text();
-    expect(panel).toContain("healthy");
+    expect(panel).toContain("Healthy");
     expect(panel).toContain("Refresh health");
     const cards = await (await shelf.request("/projects")).text();
     expect(cards).toContain("health: healthy");
