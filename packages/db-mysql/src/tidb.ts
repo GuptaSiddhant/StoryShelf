@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createMysqlDatabase, type MysqlDatabaseOptions } from "./index.ts";
+import { createMysqlAdapter, type MysqlDatabaseOptions } from "./index.ts";
 
 /**
  * TiDB Serverless (MySQL wire, serverless) preset.
@@ -10,5 +10,9 @@ import { createMysqlDatabase, type MysqlDatabaseOptions } from "./index.ts";
 export type TidbDatabaseOptions = MysqlDatabaseOptions;
 
 export function createTidbDatabase(options: TidbDatabaseOptions): DatabaseAdapter {
-  return createMysqlDatabase(options);
+  // Build retention (ADR 0039) was never proven on TiDB Serverless: it stays fail closed.
+  return createMysqlAdapter(
+    options,
+    "the TiDB Serverless preset is not verified for build retention",
+  );
 }

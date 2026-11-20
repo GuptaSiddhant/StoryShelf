@@ -1,8 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
-import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert } from "../ui/components.tsx";
+import { Alert, VStack } from "../ui/components.tsx";
 import { UnofferedNotice, type UnofferedIntegrationView } from "./integrations-unoffered.tsx";
-import { CredentialCard, type SettingsDesignProvider } from "./settings-design-credential.tsx";
+import { CredentialsSection, type SettingsDesignProvider } from "./settings-design-credential.tsx";
 import {
   ComponentsCard,
   FilesCard,
@@ -44,7 +43,7 @@ export function renderSettingsDesign(
     return <UnofferedNotice area="Design tools are" integrations={unoffered} />;
   }
   return (
-    <div class="grid max-w-form">
+    <VStack>
       <UnofferedNotice area="Some design tools are" integrations={unoffered} />
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <FilesCard
@@ -62,16 +61,7 @@ export function renderSettingsDesign(
           urlHint={urlHint}
         />
       ) : null}
-      {isAdmin
-        ? design.providers.map((provider): HtmlEscapedString | Promise<HtmlEscapedString> => (
-            <CredentialCard
-              key={provider.kind}
-              base={base}
-              provider={provider}
-              formState={formState}
-            />
-          ))
-        : null}
-    </div>
+      {isAdmin ? <CredentialsSection base={base} providers={design.providers} /> : null}
+    </VStack>
   );
 }

@@ -13,6 +13,7 @@ import {
   VStack,
   statusLabel,
   statusTone,
+  Time,
 } from "../ui/components.tsx";
 
 /** Build statuses the retry button of the jobs table offers. */
@@ -40,10 +41,12 @@ function QueueRow(props: { slug: string; job: QueueView }): Rendered {
         <Badge tone={statusTone(job.status)}>{statusLabel(job.status)}</Badge>
       </td>
       <td>
-        <Meta as="span">{new Date(job.queuedAt).toLocaleTimeString()}</Meta>
+        <Meta as="span">
+          <Time value={job.queuedAt} format="time" />
+        </Meta>
       </td>
       <td>
-        <Meta as="span">{job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "—"}</Meta>
+        <Meta as="span">{job.startedAt ? <Time value={job.startedAt} format="time" /> : "—"}</Meta>
       </td>
     </tr>
   );
@@ -126,7 +129,9 @@ function BuildRow(props: {
         </Meta>
       </td>
       <td>
-        <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
+        <Meta as="span">
+          <Time value={build.createdAt} />
+        </Meta>
       </td>
       <td class="nowrap">
         <HStack wrap={false}>

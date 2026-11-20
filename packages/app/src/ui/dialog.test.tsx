@@ -22,6 +22,21 @@ describe("Dialog", () => {
     expect(html).toContain("<b>Save</b>");
   });
 
+  it("renders showing when asked to, closed otherwise", async () => {
+    const shown = await render(
+      <Dialog id="d" title="Edit" open>
+        x
+      </Dialog>,
+    );
+    expect(shown).toMatch(/<dialog[^>]* open/u);
+    const hidden = await render(
+      <Dialog id="d" title="Edit">
+        x
+      </Dialog>,
+    );
+    expect(hidden).not.toMatch(/<dialog[^>]* open/u);
+  });
+
   it("omits the footer when none is given", async () => {
     expect(
       await render(

@@ -125,14 +125,10 @@ function inlineForms(source: string): number {
  * shrink (move the form into a `Dialog` or its own page, then delete the entry).
  */
 const INLINE_FORM_ALLOWANCE: Record<string, number> = {
-  "settings-design-links.tsx": 2,
-  "settings-general.tsx": 1,
   "settings-labels.tsx": 2,
   "settings-links.tsx": 1,
-  "settings-members.tsx": 2,
-  "settings-notifications.tsx": 2,
+  "settings-notifications.tsx": 1,
   "settings-tests.tsx": 1,
-  "settings-webhooks.tsx": 1,
 };
 
 describe("ui-building-blocks contract", () => {
@@ -379,5 +375,35 @@ describe("type and colour tokens", () => {
         /^ui\/(?:theme|styles\/tokens)\.ts$|^ui\/design-reference|assets\//u,
       ),
     ).toEqual([]);
+  });
+  it("sets padding, margin and gap from the space scale", async () => {
+    // A value is `0`, `auto` or built from `var(--space-N)` (inside `calc` for a negative or a multiple).
+    const spacing =
+      /(?<![-\w])(?:padding|margin|gap)(?:-[a-z]+)*\s*:(?!\s*(?:(?:0|auto|var\(--swipe[^)]*\)|var\(--space-[1-8]\)|calc\([^;}\n]*var\(--space-[1-8]\)[^;}\n]*\))\s*)+(?:[;}\n`]|$))[^;}\n]*/gu;
+    expect(
+      await offendersOf(
+        spacing,
+        /^ui\/(?:styles\/base|stacks)\.(?:ts|tsx)$|^pages\/storybook\.tsx$/u,
+      ),
+    ).toEqual([]);
+  });
+
+  it("sets the height of a control from the control tokens", async () => {
+    expect(await offendersOf(/min-height:\s*\d+px/gu)).toEqual([]);
+  });
+
+  it("gives SectionTitle and PageHeader no margin of their own", async () => {
+    const layout = (await styledSources()).find(({ file }) => file === "ui/layout.tsx");
+    const blocks = [
+      ...(layout?.source ?? "").matchAll(/\/\* (section-title[\w-]*|page-header) \*\/[^`]*/gu),
+    ];
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks.filter(([block]) => /margin:(?!\s*0;)/u.test(block))).toEqual([]);
+  });
+
+  it("uses only the three named breakpoints", async () => {
+    expect(await offendersOf(/@media \(max-width:(?!\s*(?:480|880|1024)px\))[^)]*\)/gu)).toEqual(
+      [],
+    );
   });
 });

@@ -30,3 +30,14 @@ Areas of particular interest:
 - Server-side request forgery through webhooks or git-provider integrations.
 
 Out of scope: vulnerabilities in third-party dependencies with no StoryShelf-specific exploit path (report those upstream), findings that need an already-compromised admin account, and denial of service by sheer volume.
+
+## Known advisories
+
+Dependency advisories that remain open on `main`, with the reason each is not reachable. `nub audit` on the root lockfile is clean (checked 2026-11-20). The advisory text was not retrievable when this was written, so each entry rests on how the package is used, not on the advisory's description; recheck it against the advisory when upgrading.
+
+| Advisory | Where | Why it is not reachable |
+| --- | --- | --- |
+| `uuid` 9 ([GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq)) | Root lockfile: `@google-cloud/storage` 7 (`@storyshelf/storage-gcs`) via `gaxios` 6 and `teeny-request` 9. Also `fixtures/storybook-8` via `@storybook/addon-actions`. | The only calls are `uuid.v4()` with no arguments (a multipart boundary in `gaxios` and `teeny-request`; random ids in the addon). No caller passes a buffer or a name or namespace. `@google-cloud/storage` 8+ drops `uuid` but deprecates `keyFilename` and `credentials`; moving to `GoogleAuth` needs `google-auth-library` as a new direct dependency of the adapter, so the upgrade is a separate task. Fixture code only runs at Storybook build time, and the uploaded output is static files. |
+| `@vitest/mocker` 3.2.4 ([GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9), [GHSA-qxg6-89mg-rqv8](https://github.com/advisories/GHSA-qxg6-89mg-rqv8)) | `fixtures/storybook-9` via Storybook 9.1 | Pulled in by Storybook's own tooling, not by StoryShelf code. The fixture is an independent install that only runs `storybook build` on a developer or CI machine and never runs Vitest; the uploaded output is static files. Per #335, patched versions need a newer Vitest major than Storybook 9 allows. |
+
+Fixed by upgrading (#335): `basic-ftp`, `extract-zip` and `zod` 3 left the root lockfile with `puppeteer-core` 25, whose browser downloader no longer depends on them.

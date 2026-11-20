@@ -37,7 +37,7 @@ const accountRoot = css`
     text-transform: capitalize;
   }
   .account__meta {
-    padding: 0.4rem 0.6rem 0.5rem;
+    padding: var(--space-2) var(--space-3) var(--space-2);
     color: var(--text-secondary);
     font-size: var(--text-sm);
     line-height: 1.3;

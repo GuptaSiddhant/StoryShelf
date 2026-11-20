@@ -1,6 +1,6 @@
 ---
 title: CLI — Client
-description: storyshelf init, create, upload, build, doctor, whoami, retry, purge, protect — client-side commands.
+description: storyshelf init, create, upload, build, doctor, whoami, retry, cancel, purge, protect — client-side commands.
 ---
 
 import { PackageManagers } from "starlight-package-managers";
@@ -88,6 +88,8 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--untraced <glob>`               | Exclude matching files from affected tracing (repeatable, e.g. `"**/*.generated.ts"`; unions with `untraced` in config)                                                               |
 | `--stats-file <path>`             | Bundler stats file (default `<buildDir>/preview-stats.json`)                                                                                                                          |
 | `--zip`                           | Upload one zip instead of hashing files; for servers without the hash routes (or `STORYSHELF_ZIP=1`)                                                                                  |
+| `--wait`                          | After the upload, follow the build until it stops needing the server, and exit by how it ended (see [Gating CI with `--wait`](#gating-ci-with---wait))                                |
+| `--timeout <duration>`            | With `--wait`, stop waiting after this long: `90`, `90s`, `30m`, `2h` (default `30m`). Never cancels the build                                                                        |
 | `--dry-run`                       | Validate/build but send no requests                                                                                                                                                   |
 
 Affected capture is on by default: the CLI traces `git diff baseline..HEAD` through the build's dependency graph, posts the affected set, and prints a summary (`Affected capture: rendering 3 stories (baseline abc1234)`). Anything it cannot prove unchanged renders anyway — see [Affected capture](/concepts/affected-capture/). `STORYSHELF_FULL=1` and `"affectedOnly": false` opt out the same way as `--full`.
@@ -97,6 +99,29 @@ Affected capture is on by default: the CLI traces `git diff baseline..HEAD` thro
 :::note
 The CLI does **not** run Playwright. It hashes the static build, sends only the files the server does not hold yet, then posts the manifest; the server renders and diffs asynchronously. A second upload of an unchanged build sends the manifest alone.
 :::
+
+### Gating CI with `--wait`
+
+`storyshelf upload --wait` follows the build after the upload: `==> Publishing`, then `==> Capturing 120/860 stories`, then the verdict, so a CI job can gate on visual changes without the git integration. The wait ends once the build stops needing the _server_. It never waits for a person: a build that needs a review ends the wait with exit code 2.
+
+| Exit | The build ended as                                                                                                                                                               |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Approved: no changes, an [unchanged-commit skip](/concepts/affected-capture/#skipping-unchanged-commits), or a hosting-only build accepted on publish                            |
+| `2`  | Changes need review (`N visual changes need review`), or, on a [hosting-only](/concepts/hosting-only/) server with review on, the Storybook is published and waits for a verdict |
+| `3`  | Rejected                                                                                                                                                                         |
+| `4`  | Failed, including a failing Storybook test, which blocks                                                                                                                         |
+| `5`  | Cancelled, including superseded by a newer build (the newer build is named)                                                                                                      |
+| `6`  | `--timeout` reached with the build still running: `Timed out waiting: still capturing; nothing was cancelled`                                                                    |
+| `1`  | The CLI itself failed: config, network, auth, or the upload (unchanged)                                                                                                          |
+
+The timeout and Ctrl+C stop the _wait_ only; the build keeps running and nothing is cancelled. Ctrl+C exits `130`. `--wait` polls `GET /api/v1/projects/:slug/builds/:id` every 2 s, backing off to 10 s, and honours `Retry-After` on a `429` or `503`; it never approves anything and prints no token or signed URL. On a server without `testing` the wait ends after publishing.
+
+```sh
+storyshelf upload --wait --timeout 20m
+case $? in 0) ;; 2) echo "visual changes need review" ;; *) exit 1 ;; esac
+```
+
+**Output.** Phases and progress go to stderr; the summary and build link go to stdout.
 
 **Servers without `testing`.** An instance that [hosts Storybooks only](/concepts/hosting-only/) reports `testing: false` when the build is created. `storyshelf upload` then skips the affected-capture computation, uploads as usual, and ends with `Testing is off on this server: the Storybook is published, but no captures or visual checks will run.`
 
@@ -129,7 +154,7 @@ storyshelf retry --url http://localhost:3000 --slug my-design-system --build-id 
 storyshelf purge --url http://localhost:3000 --token $STORYSHELF_ADMIN_TOKEN
 ```
 
-`retry` re-runs capture without a new revision. `purge` triggers retention GC (normally scheduled).
+`retry` re-runs capture. `purge` runs retention GC. `cancel [--dry-run]` cancels older unfinished builds.
 
 ## `storyshelf protect`
 

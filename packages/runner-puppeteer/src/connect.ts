@@ -44,7 +44,7 @@ async function connectOnce(connection: RemoteConnection, timeoutMs: number): Pro
   return await puppeteer.connect({
     ...(isHttp ? { browserURL: connection.endpoint } : { browserWSEndpoint: connection.endpoint }),
     protocolTimeout: timeoutMs,
-    ...(connection.headers === undefined ? {} : { headers: connection.headers }),
+    ...(connection.headers === undefined ? {} : { wsOptions: { headers: connection.headers } }),
   });
 }
 

@@ -333,6 +333,42 @@
           "required": ["id", "sha"]
         }
       },
+      "BulkCancelResult": {
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "integer"
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        },
+        "required": ["cancelled", "count", "dryRun"]
+      },
+      "BulkCancelRequest": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keepNewest": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 1
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "SkipSource": {
         "type": "object",
         "nullable": true,
@@ -448,11 +484,33 @@
             "type": "string",
             "nullable": true
           },
+          "supersededByBuildId": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
           "updatedAt": {
             "type": "string"
+          },
+          "publishing": {
+            "type": "string",
+            "enum": ["pending", "success", "failure", "unavailable"]
+          },
+          "capture": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "done": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number",
+                "nullable": true
+              }
+            },
+            "required": ["done", "total"]
           }
         },
         "required": [
@@ -2075,6 +2133,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InFlightBuilds"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
+      }
+    },
+    "/api/v1/projects/{slug}/builds/cancel": {
+      "post": {
+        "tags": ["Builds"],
+        "summary": "Cancel older unfinished builds",
+        "description": "Cancels the unfinished builds (pending, capturing or comparing) of the project, or of one `branch`, keeping the `keepNewest` newest unfinished builds of each branch (default 1; 0 cancels them all). Builds in any other status are left alone. Each build is cancelled as `POST …/builds/{buildId}/cancel` does, in batches: its jobs end, it ends `cancelled`, `build:cancelled` is raised and its git statuses are requested. A build that reaches a verdict meanwhile is skipped. With `dryRun` nothing changes and `cancelled` lists the builds that would be. `testing` class; same roles as a single cancel.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkCancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The IDs of the cancelled builds (or those a dry run would cancel) and their count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkCancelResult"
                 }
               }
             }

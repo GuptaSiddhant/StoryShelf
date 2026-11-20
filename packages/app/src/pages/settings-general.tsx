@@ -1,6 +1,18 @@
 import type { Project } from "@storyshelf/core/schema";
 import { csrfField } from "../shell/csrf-field.tsx";
-import { Alert, Button, Card, Field, FormActions, Meta, SectionTitle } from "../ui/components.tsx";
+import {
+  Alert,
+  Button,
+  Card,
+  DialogLink,
+  Meta,
+  SectionTitle,
+  SummaryList,
+  VStack,
+  type SummaryItem,
+} from "../ui/components.tsx";
+import { FormDialog } from "./dialog-form.tsx";
+import { EDIT_GENERAL_DIALOG } from "./project-forms.tsx";
 
 /** Form state for the settings tabs (field errors and global error). */
 export interface SettingsFormState {
@@ -10,51 +22,36 @@ export interface SettingsFormState {
 
 type Rendered = ReturnType<typeof Card>;
 
-/** Project metadata form. */
-function GeneralCard(props: {
-  project: Project;
-  errors: Record<string, string>;
-  isAdmin: boolean;
-}): Rendered {
-  const { project, errors, isAdmin } = props;
-  return (
-    <Card>
-      <SectionTitle>General</SectionTitle>
-      <form
-        method="post"
-        action={`/projects/${project.slug}/settings`}
-        hx-post={`/projects/${project.slug}/settings`}
-        hx-target="body"
-        hx-swap="outerHTML"
-      >
-        {csrfField()}
-        <Field label="Name" name="name" value={project.name} error={errors["name"]} />
-        <Field
-          label="Git repository"
-          name="gitRepository"
-          value={project.gitRepository ?? ""}
-          placeholder="owner/repo"
-        />
-        <Field label="Default branch" name="gitDefaultBranch" value={project.gitDefaultBranch} />
-        <Field
-          label="Public branch regex"
-          name="publicBranchRegex"
-          value={project.publicBranchRegex ?? ""}
-          placeholder="^main$"
-          hint="Branches matching this regex are publicly viewable."
-        />
-        {isAdmin ? (
-          <FormActions>
-            <Button variant="primary" type="submit" icon="check">
-              Save changes
-            </Button>
-          </FormActions>
-        ) : (
-          <Meta>You need admin access to edit settings.</Meta>
-        )}
-      </form>
-    </Card>
-  );
+/** What the project is called and where it lives, as one line. */
+function generalDetails(project: Project): string {
+  const parts = [
+    project.gitRepository ? `Repository ${project.gitRepository}` : "No git repository",
+    `Default branch ${project.gitDefaultBranch}`,
+  ];
+  if (project.publicBranchRegex) {
+    parts.push(`Public branches ${project.publicBranchRegex}`);
+  }
+  return parts.join(" · ");
+}
+
+function generalItems(project: Project, isAdmin: boolean): SummaryItem[] {
+  return [
+    {
+      id: project.id,
+      name: project.name,
+      details: generalDetails(project),
+      actions: isAdmin ? (
+        <DialogLink
+          dialogId={EDIT_GENERAL_DIALOG}
+          href={`/projects/${project.slug}/settings/general/edit`}
+          variant="secondary"
+          size="sm"
+        >
+          Edit
+        </DialogLink>
+      ) : undefined,
+    },
+  ];
 }
 
 /** Project deletion (admins only). */
@@ -85,18 +82,25 @@ function DangerZoneCard(props: { project: Project }): Rendered {
   );
 }
 
-/** General settings tab: project metadata and the danger zone. */
+/** General settings tab: the project as a summary (Edit opens a dialog) and the danger zone. */
 export function renderSettingsGeneral(
   project: Project,
   formState: SettingsFormState | undefined,
   isAdmin: boolean,
 ): unknown {
-  const errors = formState?.errors ?? {};
   return (
-    <div class="grid max-w-form">
+    <VStack>
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <GeneralCard project={project} errors={errors} isAdmin={isAdmin} />
-      {isAdmin ? <DangerZoneCard project={project} /> : null}
-    </div>
+      <SectionTitle>General</SectionTitle>
+      <SummaryList label="General" items={generalItems(project, isAdmin)} emptyTitle="No project" />
+      {isAdmin ? (
+        <>
+          <FormDialog id={EDIT_GENERAL_DIALOG} title="Edit project" submitLabel="Save changes" />
+          <DangerZoneCard project={project} />
+        </>
+      ) : (
+        <Meta>You need admin access to edit settings.</Meta>
+      )}
+    </VStack>
   );
 }
