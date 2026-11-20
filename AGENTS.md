@@ -69,8 +69,8 @@ rather than pushing and waiting.
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `image`, `affected`, `runner-{playwright,puppeteer}`,
-  `notify-{git,chat,email}`, `design-figma`, `observability`, `ai`, `mcp`.
+  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner-{playwright,puppeteer}`,
+  `observability`, `ai`, `mcp`.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
 - `fixtures/storybook-{8,9,10}` — Storybook 8.6 / 9 / 10 (pnpm, built on demand).
@@ -135,7 +135,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   header only from `sandboxHeaders` (route family + `config.storybookHosting.mode`, ADR 0051: never
   `allow-same-origin`). Both token routes are rate-limited per IP in one bucket before the token is
   read; every refusal returns one identical 404 (`refuseToken`) with `Cache-Control: private,
-  no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
+no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
   what a token grants, or accept one purpose on the other's route (ADR 0051 allows only these two
   routes plus the content host's `/_x/` exchange, purpose `exchange`, with #358; nothing more). Only `signedCacheControl`
   (`packages/app/src/routers/capture-cache.ts`) may give a signed answer freshness: a success for a
@@ -244,7 +244,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   is accepted: the one service worker caches only opted-in default-branch Storybooks and the
   offline home page, never app HTML or `/api/v1` answers. ADR 0049 (built-in integrations) is accepted: git, chat, email, push and design integrations
   move into `packages/core/src/integrations/`, `@storyshelf/image` folds into core, and the app
-  stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
+  stops requiring observability; the compatibility packages were retired in 0.14.0 (§8). ADR 0050 (cloud deployment) is
   accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
   versioned Terraform module per cloud on the published image. ADR 0052 (story switching during
   capture) is accepted behind `projects.switch_stories` (default off) and ships only after its
