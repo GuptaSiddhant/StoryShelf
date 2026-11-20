@@ -106,3 +106,13 @@ The project setting `cancel_superseded` decides on the server whether the named 
 - [Labels](/concepts/labels/) — typed values for search and stable URLs
 - [Review workflow](/guides/review/) — approve/reject, comments, retry
 - [Retention](/concepts/retention/) — what survives purge
+
+## Clearing a backlog
+
+A stopped machine, a runner outage or a burst of pushes can leave many builds `pending` or `capturing` ahead of the one you care about. Cancel them in one step instead of one by one:
+
+- **Builds page:** when some branch has more than one unfinished build, **Cancel older unfinished builds (N)** appears. It asks for confirmation with the count, then cancels all but the newest unfinished build of each branch.
+- **CLI:** `storyshelf cancel [--branch <name>] [--keep-newest <n>] [--dry-run]`. Run it with `--dry-run` first to see the IDs.
+- **API:** `POST /api/v1/projects/:slug/builds/cancel` with `{ "branch"?, "keepNewest"?, "dryRun"? }`.
+
+Each build is cancelled exactly as a single cancel is (its jobs end, it ends `cancelled`, `build:cancelled` is raised and git statuses settle), a batch at a time. Builds that are not `pending`, `capturing` or `comparing` are left alone, and a build that reaches a verdict while the cancel runs is skipped. Needs the `testing` option and the developer role. Supersede (above) covers only the same branch and at most 50 builds per upload; this is the way out of a larger backlog.

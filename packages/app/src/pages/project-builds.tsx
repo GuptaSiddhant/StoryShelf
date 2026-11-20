@@ -2,8 +2,9 @@ import { contentHostSuffix } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
+import { canManageJobs } from "../routers/settings-insights.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { getStore } from "../store.ts";
+import { getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
   Button,
@@ -17,6 +18,7 @@ import {
   statusLabel,
 } from "../ui/components.tsx";
 import { GetStarted } from "./get-started.tsx";
+import { CancelOlderBuilds, olderUnfinishedCount } from "./project-builds-cancel.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 import { loadSkipSources } from "./skipped-source.ts";
 
@@ -240,6 +242,8 @@ export async function renderProjectBuildsPage(
   const all = await new BuildModel(getStore().db).list(project.id);
   const builds = all.filter((build) => matches(build, query));
   const sources = await loadSkipSources(builds);
+  const cancellable =
+    testingEnabled() && (await canManageJobs(project.id)) ? olderUnfinishedCount(all) : 0;
 
   return (
     <DocumentLayout
@@ -248,6 +252,9 @@ export async function renderProjectBuildsPage(
     >
       <PageHeader
         title="Builds"
+        actions={
+          cancellable > 0 ? <CancelOlderBuilds project={project} count={cancellable} /> : undefined
+        }
         description={
           <>
             {project.gitRepository ? `${project.gitRepository} · ` : ""}default branch{" "}

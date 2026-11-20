@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import type { BuildOptions } from "./commands/build.ts";
+import type { CancelOptions } from "./commands/cancel.ts";
 import type { ConnectionOptions } from "./commands/connection.ts";
 import type { CreateOptions } from "./commands/create.ts";
 import type { DoctorOptions } from "./commands/doctor.ts";
@@ -38,6 +39,7 @@ export function createProgram(): Command {
     buildDoctorCommand(),
     buildWhoamiCommand(),
     buildRetryCommand(),
+    buildCancelCommand(),
     buildProtectCommand(),
   ];
   for (const command of commands) {
@@ -251,6 +253,19 @@ function buildRetryCommand(): Command {
     .requiredOption("--build-id <id>", "build id")
     .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
     .action(run<RetryOptions>(async () => (await import("./commands/retry.ts")).runRetry));
+}
+
+function buildCancelCommand(): Command {
+  return new Command("cancel")
+    .description("Cancel older unfinished builds, keeping the newest of each branch")
+    .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
+    .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
+    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option("--branch <name>", "only cancel builds of this branch")
+    .option("--keep-newest <n>", "unfinished builds to keep per branch (default 1)")
+    .option("--dry-run", "list what would be cancelled without cancelling")
+    .action(run<CancelOptions>(async () => (await import("./commands/cancel.ts")).runCancel));
 }
 
 function buildProtectCommand(): Command {

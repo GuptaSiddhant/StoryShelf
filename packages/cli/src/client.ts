@@ -180,6 +180,8 @@ interface Client {
       postAffected: (slug: string, buildId: string, json: AffectedInput) => Promise<unknown>;
       postUsage: (slug: string, buildId: string, usage: PackageUsageInput[]) => Promise<unknown>;
       retry: (slug: string, buildId: string) => Promise<unknown>;
+      /** Cancel older unfinished builds (`dryRun` only lists them). */
+      cancelOlder: (slug: string, json: CancelOlderInput) => Promise<CancelOlderResult>;
       /** The build a skip on `branch` for `sha` would repeat, or null (a hint, never a promise). */
       skipSource: (slug: string, branch: string, sha: string) => Promise<SkipSource | null>;
       /** Record a commit that changed no story; a `409` (`RequestError`) means upload normally. */
@@ -190,6 +192,20 @@ interface Client {
       checkStorage: (json: { sample?: number }) => Promise<unknown>;
     };
   };
+}
+
+/** Body of `POST …/builds/cancel`. */
+export interface CancelOlderInput {
+  branch?: string;
+  keepNewest?: number;
+  dryRun?: boolean;
+}
+
+/** Answer of `POST …/builds/cancel`: the cancelled IDs (or those a dry run would cancel). */
+export interface CancelOlderResult {
+  cancelled: string[];
+  count: number;
+  dryRun: boolean;
 }
 
 function buildAuthHeaders(token?: string): Record<string, string> {
@@ -350,6 +366,18 @@ function createInFlightApi(
   };
 }
 
+function cancelOlderApi(
+  baseUrl: string,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): (slug: string, json: CancelOlderInput) => Promise<CancelOlderResult> {
+  return async (slug, json) =>
+    (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/cancel`, {
+      method: "POST",
+      headers: requestHeaders("application/json"),
+      body: JSON.stringify(json),
+    })) as CancelOlderResult;
+}
+
 function createBuildsApi(
   baseUrl: string,
   authHeaders: Record<string, string>,
@@ -381,6 +409,7 @@ function createBuildsApi(
         headers: requestHeaders("application/json"),
         body: JSON.stringify({}),
       }),
+    cancelOlder: cancelOlderApi(baseUrl, requestHeaders),
     postUsage: async (slug: string, buildId: string, usage: PackageUsageInput[]) =>
       await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/usage`, {
         method: "POST",

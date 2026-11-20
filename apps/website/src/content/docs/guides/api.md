@@ -46,7 +46,7 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Group       | Path prefix                                                                               | Typical use                                              |
 | ----------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Projects    | `/api/v1/projects`                                                                        | Create and manage Storybook projects                     |
-| Builds      | `/api/v1/projects/{slug}/builds`                                                          | Upload builds, list, retry, review                       |
+| Builds      | `/api/v1/projects/{slug}/builds`                                                          | Upload builds, list, retry, cancel, review               |
 | Snapshots   | `/api/v1/projects/{slug}/builds/{id}/snapshots`                                           | Inspect and approve/reject individual screenshots        |
 | Comments    | `/api/v1/projects/{slug}/builds/{id}/comments`                                            | Review discussion threads (build, story, snapshot)       |
 | Reviews     | `/api/v1/projects/{slug}/builds/{id}/reviews`, `…/changeset`                              | Build-level verdicts (approver and admin), the changeset |
@@ -56,6 +56,8 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Webhooks    | `/api/v1/projects/{slug}/webhooks`                                                        | Outbound event notifications                             |
 | Insights    | `/api/v1/projects/{slug}/builds/{id}/insights`, `/api/v1/projects/{slug}/insights/health` | AI build triage and project health ([AI insights](/ai/)) |
 | Admin       | `/api/v1/admin`                                                                           | Site-wide operations (retention purge)                   |
+
+`POST /api/v1/projects/{slug}/builds/cancel` cancels older unfinished builds in one call (`testing` class, developer role). The optional JSON body takes `branch`, `keepNewest` (default 1 per branch) and `dryRun`; the answer is `{ "cancelled": [ids], "count": n, "dryRun": false }`. See [Clearing a backlog](/concepts/builds/#clearing-a-backlog).
 
 AI agents can use this API through the [MCP server](/ai/mcp/), which wraps the read and comment endpoints.
 
