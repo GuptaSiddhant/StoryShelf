@@ -103,6 +103,38 @@ function hasNestedCard(source: string): boolean {
   return false;
 }
 
+/** Settings and admin pages: the ones that must open forms from summaries (ADR 0012, decision 10). */
+function isSettingsPage(file: string): boolean {
+  return /settings|^admin/u.test(file);
+}
+
+/** `<form>` elements with more than one input, on a page. A page with a form page of its own renders it outside these files. */
+function inlineForms(source: string): number {
+  const forms = [...source.matchAll(/<form\b[\s\S]*?<\/form>/gu)].map(([form]) => form);
+  return forms.filter(
+    (form) =>
+      countMatches(
+        form,
+        /<(?:Field|TextareaField|SelectField|CheckField|input|select|textarea)\b/gu,
+      ) > 1,
+  ).length;
+}
+
+/**
+ * Pages that still render a multi-input form inline: the ratchet's current allowance. It can only
+ * shrink (move the form into a `Dialog` or its own page, then delete the entry).
+ */
+const INLINE_FORM_ALLOWANCE: Record<string, number> = {
+  "settings-design-links.tsx": 2,
+  "settings-general.tsx": 1,
+  "settings-labels.tsx": 2,
+  "settings-links.tsx": 1,
+  "settings-members.tsx": 2,
+  "settings-notifications.tsx": 2,
+  "settings-tests.tsx": 1,
+  "settings-webhooks.tsx": 1,
+};
+
 describe("ui-building-blocks contract", () => {
   it("has no raw component or retired utility classes in pages/", async () => {
     const forbidden =
@@ -188,6 +220,22 @@ describe("ui-building-blocks contract", () => {
     ];
     expect(runtime.filter((source) => !usesUrlsAtRuntime(source))).toEqual([]);
     expect(erased.filter((source) => usesUrlsAtRuntime(source))).toEqual([]);
+  });
+
+  it("renders no multi-input form inline on a settings or admin page beyond the allowance", async () => {
+    const found: Record<string, number> = {};
+    for (const { file, source } of await pageSources()) {
+      const count = isSettingsPage(file) ? inlineForms(source) : 0;
+      if (count > 0) {
+        found[file] = count;
+      }
+    }
+    expect(found).toEqual(INLINE_FORM_ALLOWANCE);
+  });
+
+  it("counts a form with two inputs and ignores a single-input one", () => {
+    expect(inlineForms("<form><Field /><Field /></form>")).toBe(1);
+    expect(inlineForms("<form><input /><Button /></form>")).toBe(0);
   });
 
   it("has no inline styles in pages/", async () => {
