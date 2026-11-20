@@ -1,6 +1,6 @@
 import { summarizeTests, type TestResult } from "@storyshelf/core/capture";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Card, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
+import { Badge, Card, HStack, Meta, SectionTitle, VStack, statusLabel } from "../ui/components.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** The line under the card title: counts, and what a failure means for the build. */
@@ -60,7 +60,9 @@ function TestRow(props: { result: TestResult }): Rendered {
   return (
     <VStack gap="sm">
       <HStack align="baseline" wrap={false}>
-        <Badge tone={result.status === "failed" ? "danger" : "success"}>{result.status}</Badge>
+        <Badge tone={result.status === "failed" ? "danger" : "success"}>
+          {statusLabel(result.status)}
+        </Badge>
         <span>
           {result.title} <Meta as="span">/ {result.name}</Meta>
         </span>

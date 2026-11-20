@@ -104,7 +104,7 @@ function AttemptsCard(props: { attempts: BuildDetailsData["attempts"] }): Render
             <VStack>
               {logs.map((line): Rendered => (
                 <HStack key={line.id} align="baseline" wrap={false}>
-                  <Badge tone={logTone(line.level)}>{line.level}</Badge>
+                  <Badge tone={logTone(line.level)}>{statusLabel(line.level)}</Badge>
                   <span>{line.message}</span>
                   {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
                 </HStack>

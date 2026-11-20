@@ -11,7 +11,7 @@ const btnBase = css`
   border: 1px solid transparent;
   border-radius: var(--radius);
   padding: 0.55rem 0.9rem;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   font-size: var(--text-base);
   cursor: pointer;
   text-decoration: none;
@@ -64,7 +64,7 @@ const btnPrimarySm = css`
   /* btn-primary-sm */
   ${btnPrimary}
   padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   min-height: 32px;
 `;
 
@@ -85,7 +85,7 @@ const btnSecondarySm = css`
   /* btn-secondary-sm */
   ${btnSecondary}
   padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   min-height: 32px;
 `;
 
@@ -102,7 +102,7 @@ const btnOutlineSm = css`
   /* btn-outline-sm */
   ${btnOutline}
   padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   min-height: 32px;
 `;
 
@@ -123,16 +123,16 @@ const btnGhostSm = css`
   /* btn-ghost-sm */
   ${btnGhost}
   padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   min-height: 32px;
 `;
 
 const btnDanger = css`
   /* btn-danger */
   ${btnBase}
-  background: color-mix(in srgb, var(--status-rejected) 82%, #000);
-  color: #fff;
-  border-color: color-mix(in srgb, var(--status-rejected) 82%, #000);
+  background: var(--status-rejected-solid);
+  color: var(--status-rejected-contrast);
+  border-color: var(--status-rejected-solid);
   &:hover {
     filter: brightness(1.06);
     text-decoration: none;
@@ -143,7 +143,7 @@ const btnDangerSm = css`
   /* btn-danger-sm */
   ${btnDanger}
   padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   min-height: 32px;
 `;
 
@@ -163,7 +163,7 @@ const btnDangerSecondarySm = css`
   /* btn-danger-secondary-sm */
   ${btnDangerSecondary}
   padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   min-height: 32px;
 `;
 
@@ -190,10 +190,10 @@ const tabsLink = css`
   padding: 0.55rem 0.75rem;
   border-bottom: 2px solid transparent;
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   text-decoration: none;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   &:hover {
     color: var(--text-primary);
     text-decoration: none;

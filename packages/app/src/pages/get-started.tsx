@@ -38,7 +38,7 @@ const markerBase = css`
   height: 24px;
   border-radius: 50%;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
   border: 2px solid var(--border);
   color: var(--text-secondary);
 `;

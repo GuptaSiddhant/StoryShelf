@@ -14,7 +14,7 @@ const avatarBase = css`
   color: var(--accent-fg);
   border: 1px solid var(--accent-border);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
   line-height: 1;
   overflow: hidden;
   object-fit: cover;
@@ -26,7 +26,7 @@ const avatarSm = css`
   ${avatarBase}
   width: 1.375rem;
   height: 1.375rem;
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
 `;
 
 const avatarLg = css`
@@ -45,8 +45,8 @@ const avatarXl = css`
   background: var(--accent);
   color: var(--accent-contrast);
   border-color: var(--accent);
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
 `;
 
 const avatarSizes: Record<AvatarSize, Promise<string>> = {
