@@ -27,7 +27,7 @@ Every adapter extends the shared `Adapter<Extra>` base (`core/adapter/metadata`)
 
 ### Health
 
-Two-tier, both ungated by init: `GET /api/v1/health` is open liveness (`{ status: "ok", uptimeSecs, version }`, no adapter I/O — the Fly/Docker probe path); `POST /api/v1/health` is site-admin deep readiness (`{ status, adapters: [{ category, kind, name, state, latencyMs?, detail? }] }`, 200 or 503, error text sanitized).
+Two-tier, both ungated by init: `GET /api/v1/health` is open liveness (`{ status: "ok", uptimeSecs, version }`, no adapter I/O — the Fly/Docker probe path); `POST /api/v1/health` is site-admin deep readiness (`{ status, adapters: [{ category, kind, name, state, latencyMs?, detail? }], statuses: [{ id, label, value, tone, detail? }] }`, 200 or 503, error text sanitized). Probed `adapters` also cover the AI surface (its free `health()`, never inference) and each OIDC login provider (discovery document within the 2 s probe timeout). `statuses` are read, not probed, never change `status`, and are admin-only: telemetry export (exporter origin only), image engine and diff workers, whether the public origin is confirmed, and the Storybook hosting mode.
 
 ### Capture Renderer (pure adapter)
 
