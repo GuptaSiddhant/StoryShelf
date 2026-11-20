@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  exitAfterDrain,
-  FLY_DEFAULT_GRACE_SECONDS,
-  FORCED_EXIT_MS,
-  shutdownGraceMs,
-} from "./shutdown.ts";
+import { exitBy, FLY_DEFAULT_GRACE_SECONDS, FORCED_EXIT_MS, shutdownGraceMs } from "./shutdown.ts";
 
 describe("shutdownGraceMs", () => {
   it("reads SHUTDOWN_GRACE_SECONDS as milliseconds", () => {
@@ -27,13 +22,13 @@ describe("shutdownGraceMs", () => {
   });
 });
 
-describe("exitAfterDrain", () => {
-  it("exits after the delay with an unref'd timer", () => {
+describe("exitBy", () => {
+  it("exits a second past the grace, with an unref'd timer", () => {
     vi.useFakeTimers();
     try {
       const exit = vi.fn();
-      exitAfterDrain(exit, FORCED_EXIT_MS);
-      vi.advanceTimersByTime(FORCED_EXIT_MS - 1);
+      exitBy(5000, exit);
+      vi.advanceTimersByTime(5000 + FORCED_EXIT_MS - 1);
       expect(exit).not.toHaveBeenCalled();
       vi.advanceTimersByTime(1);
       expect(exit).toHaveBeenCalledWith(0);

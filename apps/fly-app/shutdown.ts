@@ -23,20 +23,22 @@ export function shutdownGraceMs(
   return Number(raw) * 1000;
 }
 
-/** How long after a bounded drain the process may take to exit on its own before it is made to. */
+/** How long past the drain's grace the process may run (rest of teardown, closing the listener). */
 export const FORCED_EXIT_MS = 1000;
 
 /**
- * After a bounded drain, make sure the process exits (#912): a released job whose handler never
- * stopped is left to its lease, and only the process ending stops it before that lease runs out.
- * The timer is unref'd, so a process with nothing left running exits on its own first.
+ * Bound the life of a process told to stop (#912): armed when the signal arrives, it exits at
+ * `graceMs + FORCED_EXIT_MS` whatever the teardown is doing, stalled or failed included. A released
+ * job whose handler never stopped is left to its lease, and only the process ending stops that
+ * handler before the lease runs out. The timer is unref'd, so a process with nothing left running
+ * exits on its own first.
  */
-export function exitAfterDrain(
+export function exitBy(
+  graceMs: number,
   // oxlint-disable-next-line unicorn/no-process-exit -- a stuck handler must not outlive the drain
   exit: (code: number) => void = (code) => process.exit(code),
-  ms = FORCED_EXIT_MS,
 ): void {
   setTimeout(() => {
     exit(0);
-  }, ms).unref();
+  }, graceMs + FORCED_EXIT_MS).unref();
 }

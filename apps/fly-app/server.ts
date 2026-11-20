@@ -30,7 +30,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 import { mkdirSync } from "node:fs";
 import { aiFromEnv, aiLogFields } from "./ai.ts";
 import { refuseLegacyVariables } from "./legacy-env.ts";
-import { exitAfterDrain, shutdownGraceMs } from "./shutdown.ts";
+import { exitBy, shutdownGraceMs } from "./shutdown.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
@@ -195,13 +195,14 @@ const server = serve({ fetch: app.fetch, port }, () => {
 // Teardown is idempotent and logs its own errors; close the listener either way.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
+    // A bounded drain may leave a stuck handler to its lease: the process must end it, whatever
+    // the rest of the teardown does, so the exit is armed now, not after it.
+    if (graceMs !== undefined) exitBy(graceMs);
     app.lifecycle
       .teardown(graceMs === undefined ? {} : { graceMs })
       .catch(() => {}) // Intentionally empty — teardown errors are already logged
       .finally(() => {
         server.close();
-        // A bounded drain may leave a stuck handler to its lease: the process must end it.
-        if (graceMs !== undefined) exitAfterDrain();
       });
   });
 }
