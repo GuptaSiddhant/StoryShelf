@@ -89,6 +89,21 @@ export const FormDialog: FC<{
   );
 };
 
+/** The one frame of a form page: header, then the form in a readable column. */
+function formPage(
+  title: string,
+  nav: Parameters<typeof DocumentLayout>[0]["nav"],
+  pageTitle: string,
+  form: unknown,
+): unknown {
+  return (
+    <DocumentLayout title={pageTitle} nav={nav}>
+      <PageHeader title={title} />
+      <div class="max-w-form">{form}</div>
+    </DocumentLayout>
+  );
+}
+
 /** The page a form has without JavaScript or from a pasted link: header, the form, a Back link. */
 export function renderFormPage(
   project: Project,
@@ -97,21 +112,24 @@ export function renderFormPage(
   form: unknown,
 ): unknown {
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
-  return (
-    <DocumentLayout
-      title={`${title} · ${project.name}`}
-      nav={{
-        active: "settings",
-        projectSlug: project.slug,
-        projectName: project.name,
-        trail: [
-          { label: TAB_LABELS[tab], href: urls.settingsTab(project.slug, tab) },
-          { label: title },
-        ],
-      }}
-    >
-      <PageHeader title={title} />
-      <div class="max-w-form">{form}</div>
-    </DocumentLayout>
-  );
+  const trail = [
+    { label: TAB_LABELS[tab], href: urls.settingsTab(project.slug, tab) },
+    { label: title },
+  ];
+  const nav = {
+    active: "settings" as const,
+    projectSlug: project.slug,
+    projectName: project.name,
+    trail,
+  };
+  return formPage(title, nav, `${title} · ${project.name}`, form);
+}
+
+/** The page an admin form has without JavaScript or from a pasted link: System › title. */
+export function renderAdminFormPage(title: string, form: unknown): unknown {
+  const nav = {
+    active: "admin" as const,
+    trail: [{ label: "System", href: "/admin" }, { label: title }],
+  };
+  return formPage(title, nav, `${title} · System`, form);
 }

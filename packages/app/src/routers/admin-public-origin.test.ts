@@ -163,6 +163,29 @@ describe("public origin on the System page", () => {
     );
   });
 
+  it("opens the origin form from the page as a dialog fragment, or as a page of its own", async () => {
+    const app = await seedApp({});
+    const token = await csrfFrom(app);
+    await report(app, token, { origin: ORIGIN });
+    const page = await (await app.request("/admin")).text();
+    expect(page).toContain('href="/admin/public-origin/edit"');
+    expect(page).not.toContain('action="/admin/public-origin"');
+    const fragment = await (
+      await app.request("/admin/public-origin/edit", { headers: { "HX-Request": "true" } })
+    ).text();
+    expect(fragment).toContain('id="edit-origin-form"');
+    expect(fragment).toContain(`value="${ORIGIN}"`);
+    expect(fragment).not.toContain("<html");
+    expect(await (await app.request("/admin/public-origin/edit")).text()).toContain("<html");
+  });
+
+  it("serves no origin form to a member, and none while the configuration answers", async () => {
+    const member = await seedApp({ role: "member" });
+    expect((await member.request("/admin/public-origin/edit")).status).toBe(403);
+    const fixed = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
+    expect((await fixed.request("/admin/public-origin/edit")).status).toBe(404);
+  });
+
   it("stops asking once the configuration or the platform answers", async () => {
     const app = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
     const html = await (await app.request("/admin")).text();
