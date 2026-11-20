@@ -6,7 +6,7 @@ import { registerGeneralSettings } from "./settings-general.ts";
 import { registerLabelSettings } from "./settings-labels.ts";
 import { registerLinkSettings } from "./settings-links.ts";
 import { registerMemberSettings } from "./settings-members.tsx";
-import { registerNotificationSettings } from "./settings-notifications.ts";
+import { registerNotificationSettings } from "./settings-notifications.tsx";
 import { registerSettingsTabs } from "./settings-tabs.ts";
 import { registerTokenSettings } from "./settings-tokens.tsx";
 import { registerWebhookSettings } from "./settings-webhooks.tsx";

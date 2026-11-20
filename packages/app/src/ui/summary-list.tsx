@@ -56,6 +56,8 @@ const actions = css`
 
 export interface SummaryItem {
   id: string;
+  /** DOM id the row answers to (a redirect lands on it, so focus stays on the row). */
+  anchor?: string;
   name: string;
   /** State badge, e.g. "Connected". */
   state?: { label: string; tone?: "neutral" | "success" | "warning" | "danger" | "info" | "quiet" };
@@ -83,7 +85,7 @@ export const SummaryList: FC<{
   return (
     <ul class={list} aria-label={label}>
       {items.map((item) => (
-        <li key={item.id} class={row}>
+        <li key={item.id} id={item.anchor} tabIndex={item.anchor ? -1 : undefined} class={row}>
           <div class={main}>
             <div class={heading}>
               {item.name}

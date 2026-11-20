@@ -119,7 +119,7 @@ describe("notifications settings tab", () => {
     expect(page.status).toBe(200);
     const html = await page.text();
     expect(html).toContain("My notifications for this project");
-    expect(html).toContain("Add a message channel");
+    expect(html).toContain("Add channel");
     expect(html).toContain("Add a git channel");
     expect(html).toContain("Build failed");
     expect(html).not.toContain("settings/status");
@@ -145,7 +145,7 @@ describe("notifications settings tab", () => {
       { provider: "email", target: "team@example.com", events: "build.created", style: "compact" },
       app,
     );
-    expect(saved.status).toBe(201);
+    expect(saved.status).toBe(302);
     const rows = await new NotificationChannelModel(seeded.db, undefined, secret).list("p1");
     expect(rows).toHaveLength(1);
     expect(rows[0]?.provider).toBe("email");
@@ -160,7 +160,7 @@ describe("notifications settings tab", () => {
       { provider: "log", target: "https://hooks.example.com/x" },
       app,
     );
-    expect(saved.status).toBe(201);
+    expect(saved.status).toBe(302);
     const bad = await postForm(
       "/projects/notify-project/settings/notifications",
       { provider: "pigeon", target: "x" },
@@ -448,12 +448,8 @@ describe("notifications settings tab", () => {
     const [row] = await model.list("p1");
     await model.recordOutcome(row!.id, "HTTP 401: Bad credentials");
     const html = await (await app.request("/projects/notify-project/settings/review")).text();
-    expect(html).toContain("failing");
-    expect(html).toContain("HTTP 401: Bad credentials");
-    // The failure time and the error are separate lines, so the time never wraps mid-phrase, and
-    // the error truncates with its whole text on hover.
-    expect(html).toMatch(/<span class="truncate max-w-cell"><span[^>]*>Failed /u);
-    expect(html).toContain('<span class="truncate max-w-cell" title="HTTP 401: Bad credentials">');
+    expect(html).toContain("Failing");
+    expect(html).toMatch(/Failed [^<]*HTTP 401: Bad credentials/u);
   });
 
   it("reports git form problems on the fields they concern", async () => {
