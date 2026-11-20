@@ -1,9 +1,9 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
 import { jsxStory } from "../../.storybook/render.tsx";
-import { RelativeTime, VStack } from "./components.tsx";
+import { RelativeTime, Time, VStack } from "./components.tsx";
 
-const meta: Meta = { title: "UI/RelativeTime" };
+const meta: Meta = { title: "UI/Time" };
 export default meta;
 
 /** The clock is frozen at 2026-01-15 12:00 UTC (see `.storybook/render.tsx`). */
@@ -15,5 +15,17 @@ export const Ranges = jsxStory(() => (
       <RelativeTime key={seconds} value={ago(seconds)} />
     ))}
     <RelativeTime value="not a date" />
+  </VStack>
+));
+
+const STAMP = "2026-01-15T23:30:00.000Z";
+
+/** Always UTC and `en`, so the story renders the same on every machine. */
+export const Absolute = jsxStory(() => (
+  <VStack>
+    <Time value={STAMP} />
+    <Time value={STAMP} format="date" />
+    <Time value={STAMP} format="time" />
+    <Time value="not a date" />
   </VStack>
 ));
