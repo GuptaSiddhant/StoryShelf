@@ -65,10 +65,6 @@ One measurement, to set expectations. On 2026-11-20 we rendered every story of S
 
 With the default `max_diff_ratio` (0.01, one percent of the pixels) all of these would pass as unchanged, and the environment change itself is recorded either way. A project with `max_diff_ratio` set to 0 or close to it would see all 21. This used our own capture settings, not a StoryShelf capture, so treat the counts as an estimate. Your Storybook will differ: text-heavy or gradient-heavy stories move more. This is one pair of versions on one host, not a promise.
 
-## Where it is announced
-
-Release notes name a browser change on a line that starts with `Browser:` in the release's changeset, with the old and new version, for example `Browser: Chromium 130.0 → 131.0 (Playwright 1.62 → 1.63)`. Read the notes before you upgrade, and plan step 2 for the day you do.
-
 ## See also
 
 - [Baselines & branches](/concepts/baselines/): how a baseline is chosen.

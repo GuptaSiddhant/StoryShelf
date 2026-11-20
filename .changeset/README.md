@@ -30,11 +30,6 @@ Fixed: the compare page keeps keyboard focus after approving (#812).
 Details for CHANGELOG.md: what changed, why, and anything an operator must do.
 ```
 
-A change that moves the Chromium build (a new `playwright-core` or base image) adds a details line
-that starts with `Browser:`, with the old and new versions, for example
-`Browser: Chromium 130.0 → 131.0 (Playwright 1.62 → 1.63)`. Operators re-baseline as described in
-`apps/website/src/content/docs/guides/browser-changes.md`.
-
 Never edit `CHANGELOG.md` by hand. Merging to `main` publishes a pkg.pr.new preview, never an npm
 build; a stable release comes from a release pull request, and a `next` npm build only by hand (see
 `docs/adr/0043-release-channels.md`).
