@@ -121,7 +121,7 @@ export const filmGroupHead = css`
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   @media (max-width: 1024px) {
@@ -193,7 +193,7 @@ export const filmTitle = css`
   /* film-title */
   overflow: hidden;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 `;
@@ -262,7 +262,7 @@ export const viewerTitle = css`
   /* viewer-title */
   margin: 0;
   font-size: var(--text-lg);
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
 `;
 

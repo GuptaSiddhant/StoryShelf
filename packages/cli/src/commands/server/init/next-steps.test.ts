@@ -44,6 +44,14 @@ describe("printNextSteps", () => {
     expect(printed).not.toContain("docker");
   });
 
+  it("names the three variables before npm start with local accounts", () => {
+    printNextSteps(answers({ auth: "password" }), "npm");
+    expect(printed).toContain("export SECRET=");
+    expect(printed).toContain("export PUBLIC_BASE_URL=http://localhost:3000");
+    expect(printed).toContain("export AUTH_PASSWORD=");
+    expect(printed.indexOf("export AUTH_PASSWORD=")).toBeLessThan(printed.indexOf("npm start"));
+  });
+
   it("points a single container at docker:build and docker:run", () => {
     printNextSteps(answers({ deployTarget: "docker", docker: true }), "npm");
     expect(printed).toContain("npm run docker:build");

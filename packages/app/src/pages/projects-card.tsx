@@ -43,7 +43,7 @@ const cardTitle = css`
   /* project-title */
   margin: 0;
   font-size: var(--text-lg);
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
   & a {
     color: var(--text-primary);

@@ -19,25 +19,17 @@ import {
 import { targetChoices, type TargetChoices } from "./target-choices.ts";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
-/** Primary engine select plus one checkbox per additional engine. */
-function BrowserFields(props: {
+/** The "Also capture on" checkboxes: every selectable target except the primary. */
+export function BrowserExtras(props: {
   primary: string;
-  extras: string[];
+  extras: readonly string[];
   disabled: boolean;
-  targets: TargetChoices;
+  choices: TargetChoices["choices"];
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { primary, extras, disabled, targets } = props;
+  const { primary, extras, disabled, choices } = props;
   return (
-    <>
-      <SelectField
-        label="Primary browser"
-        name="browser"
-        value={primary}
-        disabled={disabled}
-        options={targets.choices}
-        hint="Used for the published preview and to bootstrap other engines."
-      />
-      {targets.choices
+    <div id="browser-extras">
+      {choices
         .filter((engine) => engine.value !== primary)
         .map((engine) => (
           <CheckField
@@ -49,6 +41,42 @@ function BrowserFields(props: {
             disabled={disabled}
           />
         ))}
+    </div>
+  );
+}
+
+/** Primary engine select plus one checkbox per additional engine. */
+function BrowserFields(props: {
+  slug: string;
+  primary: string;
+  extras: string[];
+  disabled: boolean;
+  targets: TargetChoices;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { slug, primary, extras, disabled, targets } = props;
+  return (
+    <>
+      <SelectField
+        label="Primary browser"
+        name="browser"
+        value={primary}
+        disabled={disabled}
+        options={targets.choices}
+        hint="Used for the published preview and to bootstrap other engines."
+        hx={{
+          "hx-get": `/projects/${slug}/settings/capture/extras`,
+          "hx-trigger": "change",
+          "hx-target": "#browser-extras",
+          "hx-swap": "outerHTML",
+          "hx-include": "closest form",
+        }}
+      />
+      <BrowserExtras
+        primary={primary}
+        extras={extras}
+        disabled={disabled}
+        choices={targets.choices}
+      />
       {targets.unavailable.length > 0 ? (
         <Meta>Not selectable on this server: {targets.unavailable.join("; ")}.</Meta>
       ) : null}
@@ -124,6 +152,19 @@ function SupersededCard(props: { project: Project; isAdmin: boolean }): Rendered
   );
 }
 
+/** The save button for admins, a note for everyone else. */
+function SaveChanges(props: { isAdmin: boolean }): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return props.isAdmin ? (
+    <FormActions>
+      <Button variant="primary" type="submit" icon="check">
+        Save changes
+      </Button>
+    </FormActions>
+  ) : (
+    <Meta>You need admin access to edit settings.</Meta>
+  );
+}
+
 /** Capture settings tab: engines to capture on and the mode allowlist. */
 export function renderSettingsCapture(
   project: Project,
@@ -153,18 +194,16 @@ export function renderSettingsCapture(
         </Meta>
         <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
           {csrfField()}
-          <BrowserFields primary={primary} extras={extras} disabled={!isAdmin} targets={targets} />
+          <BrowserFields
+            slug={project.slug}
+            primary={primary}
+            extras={extras}
+            disabled={!isAdmin}
+            targets={targets}
+          />
           <AllowlistField allowlist={allowlist} />
           <UrlLifetimeField project={project} disabled={!isAdmin} />
-          {isAdmin ? (
-            <FormActions>
-              <Button variant="primary" type="submit" icon="check">
-                Save changes
-              </Button>
-            </FormActions>
-          ) : (
-            <Meta>You need admin access to edit settings.</Meta>
-          )}
+          <SaveChanges isAdmin={isAdmin} />
         </form>
       </Card>
       <SupersededCard project={project} isAdmin={isAdmin} />

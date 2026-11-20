@@ -16,6 +16,8 @@ export function createFigmaDesign(options: FigmaDesignOptions = {}): DesignProvi
     metadata: getMetadata(),
     parseUrl: parseFigmaUrl,
     create: ({ credential, authType }) => createFigmaClient(credential, authType),
+    // Personal tokens need nothing from the server; OAuth is offered only when configured.
+    availability: () => "available",
     ...(options.oauth ? { oauth: createFigmaOAuth(options.oauth) } : {}),
   };
 }

@@ -28,7 +28,7 @@ const projectGrid = css`
 const setupSummary = css`
   /* setup-summary */
   cursor: pointer;
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
   font-size: var(--text-lg);
   letter-spacing: -0.01em;
 `;

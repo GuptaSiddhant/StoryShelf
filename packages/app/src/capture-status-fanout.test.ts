@@ -253,7 +253,7 @@ describe("git channel status fan-out", () => {
     });
 
     const url = `${BASE}/projects/${project.slug}/builds/${createdBuild.id}/diff`;
-    const storybook = `${BASE}/projects/${project.slug}/storybook/build/${createdBuild.id}/`;
+    const storybook = `${BASE}/projects/${project.slug}/storybook/build/${createdBuild.id}/index.html`;
     const a = await finalStates(gitA, {
       "storyshelf/testing": "success",
       "storyshelf/storybook": "success",
@@ -322,7 +322,7 @@ describe("git channel status fan-out", () => {
     });
     expect(states["storyshelf/storybook"]).toMatchObject({
       sha: SHA,
-      url: `${BASE}/projects/${project.slug}/storybook/build/${build.id}/`,
+      url: `${BASE}/projects/${project.slug}/storybook/build/${build.id}/index.html`,
     });
   });
 

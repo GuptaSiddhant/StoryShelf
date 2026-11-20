@@ -224,10 +224,13 @@ function fakeConsumer() {
   };
 }
 
-function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
+function lifecycleOf(
+  consumer: ReturnType<typeof fakeConsumer> | null,
+  given?: ResolvedShelfOptions,
+) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+  const options = given ?? ({ database: db, storage } as unknown as ResolvedShelfOptions);
   const runtime = {
     config: { branchTtlDays: null },
     logger: silentLogger,
@@ -239,11 +242,31 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
-  return (app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } })
-    .lifecycle;
+  return (
+    app as unknown as {
+      lifecycle: {
+        setup(): Promise<void>;
+        teardown(options?: { graceMs?: number }): Promise<void>;
+      };
+    }
+  ).lifecycle;
 }
 
 describe("setup rerun", () => {
+  it("runs each adapter hook once when the first setup() adopts the eager run", async () => {
+    const { db } = makeDatabase();
+    let runs = 0;
+    const storage = withSetupHook(makeStorage().storage, () => {
+      runs += 1;
+    });
+    const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+    const lifecycle = lifecycleOf(null, options);
+    await lifecycle.setup();
+    expect(runs).toBe(1);
+    await lifecycle.setup();
+    expect(runs).toBe(2);
+  });
+
   it("publishes the new run on the cell before it finishes", async () => {
     const { db } = makeDatabase();
     const hold = Promise.withResolvers<null>();
@@ -268,6 +291,7 @@ describe("setup rerun", () => {
     attachLifecycle(app, options, runtime, cell);
     await cell.ready;
     const lifecycle = (app as unknown as { lifecycle: { setup(): Promise<void> } }).lifecycle;
+    await lifecycle.setup();
 
     const rerun = lifecycle.setup();
     const published = cell.ready;
@@ -295,6 +319,20 @@ describe("job consumer lifecycle", () => {
     await lifecycle.teardown();
     expect(consumer.stop).toHaveBeenCalledOnce();
     expect(consumer.isRunning()).toBe(false);
+  });
+
+  it("bounds the drain by the teardown's grace, and drains unbounded without one (#912)", async () => {
+    const bounded = fakeConsumer();
+    const lifecycle = lifecycleOf(bounded);
+    await lifecycle.setup();
+    await lifecycle.teardown({ graceMs: 20_000 });
+    expect(bounded.stop).toHaveBeenCalledWith({ graceMs: 20_000 });
+
+    const unbounded = fakeConsumer();
+    const plain = lifecycleOf(unbounded);
+    await plain.setup();
+    await plain.teardown();
+    expect(unbounded.stop).toHaveBeenCalledWith({});
   });
 
   it("works without a consumer (serverless hosts)", async () => {
@@ -462,6 +500,8 @@ describe("boot checks and the adapter phase", () => {
       app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
     ).lifecycle;
     await cell.ready;
+    await lifecycle.setup();
+    consumer.start.mockClear();
     const pending = lifecycle.setup();
     const closing = lifecycle.teardown();
     gate.resolve(null);

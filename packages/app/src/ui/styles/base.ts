@@ -10,12 +10,12 @@ function resetCss(): string {
     /* A sticky review bar must not cover the focused element (WCAG 2.2 focus not obscured). */
     html:has([data-action-bar]) { scroll-padding-bottom: 7rem; }
     main:has([data-action-bar]) { padding-bottom: 7rem; }
-    body { margin: 0; font-size: 14px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: var(--surface-base); color: var(--text-primary); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; font-size: var(--text-base); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: var(--surface-base); color: var(--text-primary); line-height: 1.5; -webkit-font-smoothing: antialiased; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    code, kbd, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
-    kbd { display: inline-block; padding: .1rem .35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text-secondary); font-size: .75rem; line-height: 1.2; }
+    code, kbd, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-xs); }
+    kbd { display: inline-block; padding: .1rem .35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.2; }
     [hidden] { display: none !important; }
     .skip-link { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
     .skip-link:focus { left: 1rem; top: 1rem; width: auto; height: auto; background: var(--surface-card); color: var(--text-primary); padding: .5rem .75rem; border-radius: var(--radius-sm); box-shadow: var(--shadow); z-index: 100; }`;

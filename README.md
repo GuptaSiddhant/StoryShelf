@@ -26,22 +26,35 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 
 ## Quick start
 
+Start a server (Docker; sign-in is on, and these three values are required):
+
 ```sh
 # Generate SECRET once and keep it: the data volume needs the same value on every run.
 export SECRET="$(openssl rand -hex 32)"
+export PUBLIC_BASE_URL=http://localhost:3000
 # Choose a private admin password (at least 12 characters); it is not echoed.
 printf 'Admin password: '; stty -echo; read -r AUTH_PASSWORD; stty echo; echo
 export AUTH_PASSWORD
-docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data -e SECRET -e AUTH_PASSWORD \
+docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data \
+  -e SECRET -e PUBLIC_BASE_URL -e AUTH_PASSWORD \
   ghcr.io/guptasiddhant/storyshelf
 ```
 
-Open <http://localhost:3000> and sign in as `admin@example.com` with your `AUTH_PASSWORD`. Sign-in is
-on by default; `SHELF_AUTH=none` (instead of `AUTH_PASSWORD`) runs without it, and the image never
-turns it off because a variable is missing. SQLite and local storage live on the `/data` volume, and capture uses the
-image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64`
-(`:<version>`, `:latest`, and `-hosting` variants without a browser); see the
-[Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose.
+Then get a first build:
+
+1. Open <http://localhost:3000> and sign in as `admin@example.com` with your `AUTH_PASSWORD`.
+2. Choose **New project**. The project's **Get your first build** card creates a token and shows the upload command.
+3. From your Storybook project, run it (it builds Storybook first if `storybook-static` is missing):
+
+   ```sh
+   STORYSHELF_TOKEN=shelf_… npx storyshelf upload --url http://localhost:3000 --slug my-design-system
+   ```
+
+4. Open the build, approve it as the baseline, and upload again: the second build is compared with it.
+
+Prefer Node.js over Docker? `npx storyshelf server init` scaffolds a server (local accounts by default) with a `.env.example` and a README; it needs the same three values. The full walkthrough, for both paths, is the [getting-started guide](https://storyshelf.js.org/guides/getting-started/).
+
+SQLite and local storage live on the `/data` volume, and capture uses the image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64` (`:<version>`, `:latest`, and `-hosting` variants without a browser); see the [Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose. `SHELF_AUTH=none` (instead of `AUTH_PASSWORD`) runs without sign-in; the image never turns sign-in off because a variable is missing.
 
 ## StoryShelf vs Chromatic
 
@@ -93,17 +106,6 @@ nub ci                           # install workspace deps
 nub run build                    # turbo build all packages
 nub run test                     # turbo test
 nub run verify                   # build + lint + test
-```
-
-## Getting started
-
-Requires Node.js 24 or later.
-
-```sh
-npx storyshelf server init  # scaffold a server project
-cd my-storyshelf
-npm install
-npm start                        # start the server
 ```
 
 ## Documentation

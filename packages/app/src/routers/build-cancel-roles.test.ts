@@ -109,3 +109,25 @@ describe.each(Object.entries(VARIANTS))("cancel through the %s", (_name, headers
     expect((await new BuildModel(db).get(build.id))?.status).toBe("capturing");
   });
 });
+
+describe("cancel older unfinished builds", () => {
+  it.each([
+    ["admin", 200],
+    ["approver", 200],
+    ["developer", 200],
+    ["viewer", 403],
+    ["outsider", 404],
+  ])("%s gets %i, and a refused request cancels nothing", async (id, status) => {
+    const { app, db, build } = await seed();
+    const newer = await createTestBuild(db, db.tables, build.projectId, { gitSha: "sha-2" });
+    const response = await app.request("/api/v1/projects/web/builds/cancel", {
+      method: "POST",
+      headers: { cookie: `storyshelf_session=${id}`, "sec-fetch-site": "same-origin" },
+    });
+    expect(response.status).toBe(status);
+    const states = [build.id, newer.id].map(
+      async (buildId) => (await new BuildModel(db).get(buildId))?.status,
+    );
+    expect((await Promise.all(states)).includes("cancelled")).toBe(status === 200);
+  });
+});

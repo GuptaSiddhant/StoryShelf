@@ -134,14 +134,21 @@ describe("health endpoints", () => {
     const body = (await response.json()) as {
       status: string;
       adapters: { category: string; state: string }[];
+      integrations: { kind: string; state: string; reason?: string }[];
     };
     expect(body.status).toBe("ok");
+    // Email has no sender here, so it is not wired (#1126); the six other built-in notifiers are.
     expect(body.adapters.map((a) => a.category).toSorted()).toEqual([
       "database",
-      ...Array.from({ length: 7 }, () => "notifier"),
+      ...Array.from({ length: 6 }, () => "notifier"),
       "storage",
     ]);
     expect(body.adapters.every((a) => a.state === "ok")).toBe(true);
+    const byKind = new Map(body.integrations.map((entry) => [entry.kind, entry]));
+    expect(byKind.get("email")?.state).toBe("unavailable");
+    expect(byKind.get("email")?.reason).toContain("SMTP_HOST");
+    expect(byKind.get("figma")?.state).toBe("disabled");
+    expect(byKind.get("slack-webhook")?.state).toBe("available");
   });
 
   it("POST /api/v1/health reports setup failures as degraded", async () => {
@@ -181,5 +188,39 @@ describe("health endpoints", () => {
     await app.lifecycle.setup();
     const response = await app.request("/api/v1/health", { method: "POST" });
     expect(response.status).toBe(200);
+  });
+  it("POST /api/v1/health adds the AI probe and the status rows; GET gains neither", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const ai = { health: async () => ({ ok: true }), setup: async () => {} };
+    const app = createShelfApp({
+      database: db,
+      storage,
+      auth: adminAuth,
+      ai: ai as never,
+      logger: silentLogger,
+    });
+    await app.lifecycle.setup();
+    const deep = (await (await app.request("/api/v1/health", { method: "POST" })).json()) as {
+      adapters: { category: string; kind: string; state: string }[];
+      statuses: { id: string }[];
+    };
+    expect(deep.adapters).toContainEqual(
+      expect.objectContaining({ category: "ai", kind: "ai", state: "ok" }),
+    );
+    expect(deep.statuses.map((row) => row.id)).toEqual([
+      "telemetry",
+      "image-engine",
+      "public-origin",
+      "hosting",
+    ]);
+    const open = await (await app.request("/api/v1/health")).json();
+    expect(Object.keys(open as object).toSorted()).toEqual([
+      "auth",
+      "status",
+      "testing",
+      "uptimeSecs",
+      "version",
+    ]);
   });
 });

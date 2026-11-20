@@ -27,6 +27,16 @@ export interface EngineLoginMethod {
   label: string;
 }
 
+/** One free reachability check of a configured login provider (never a sign-in). */
+export interface AuthProviderCheck {
+  /** The login method id (`ShelfOAuthProvider.id` or an SSO provider id). */
+  id: string;
+  /** Human label for the admin System page. */
+  label: string;
+  /** Fetch the provider's discovery document; the caller bounds it and sanitizes the detail. */
+  check: () => Promise<{ ok: boolean; detail?: string }>;
+}
+
 /** One device session for the profile device list. */
 export interface EngineSessionInfo {
   id: string;
@@ -59,6 +69,8 @@ export interface Auth {
   handler: (request: Request) => Response | Promise<Response>;
   /** Login methods in display order (drives the login page). */
   loginMethods: () => EngineLoginMethod[];
+  /** Free discovery checks for the OIDC providers (admin System page); omit when there are none. */
+  providerChecks?: () => AuthProviderCheck[];
   /** One-shot boot validation (secret strength); the app calls it directly. */
   setup: () => Promise<void>;
   /** Stage a shelf user and mint a single-use invite token. */
