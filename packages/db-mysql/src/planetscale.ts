@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createMysqlDatabase, type MysqlDatabaseOptions } from "./index.ts";
+import { createMysqlAdapter, type MysqlDatabaseOptions } from "./index.ts";
 
 /**
  * PlanetScale (serverless MySQL HTTP) preset.
@@ -12,5 +12,6 @@ import { createMysqlDatabase, type MysqlDatabaseOptions } from "./index.ts";
 export type PlanetscaleDatabaseOptions = MysqlDatabaseOptions;
 
 export function createPlanetscaleDatabase(options: PlanetscaleDatabaseOptions): DatabaseAdapter {
-  return createMysqlDatabase(options);
+  // Build retention (ADR 0039) was never proven on PlanetScale: it stays fail closed.
+  return createMysqlAdapter(options, "the PlanetScale preset is not verified for build retention");
 }

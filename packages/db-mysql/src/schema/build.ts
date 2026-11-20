@@ -28,6 +28,8 @@ export const builds = mysqlTable(
     message: text("message"),
     public: boolean("public").notNull().default(false),
     status: text("status").$type<BuildStatus>().notNull().default("pending"),
+    /** `available`, or `deleting` once a deletion is claimed (ADR 0039); never back. */
+    retentionState: varchar("retention_state", { length: 16 }).notNull().default("available"),
     snapshotCount: int("snapshot_count").notNull().default(0),
     changedCount: int("changed_count").notNull().default(0),
     approvedCount: int("approved_count").notNull().default(0),

@@ -42,6 +42,11 @@ const shellContent = css`
   margin: 0 auto;
   padding: var(--space-6) var(--space-6) var(--space-8);
   min-width: 0;
+  /* The page column: header and blocks sit one gap apart, no per-block margins. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-4);
   @media (max-width: 880px) {
     & {
       padding: var(--space-4);

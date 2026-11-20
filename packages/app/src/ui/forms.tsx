@@ -34,8 +34,8 @@ const fieldLabel = css`
 const fieldInput = css`
   /* field-input */
   width: 100%;
-  min-height: 40px;
-  padding: 0.5rem 0.75rem;
+  min-height: var(--control-md);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface-card);

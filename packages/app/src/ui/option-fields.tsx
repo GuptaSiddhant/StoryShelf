@@ -19,7 +19,7 @@ const optionRoot = css`
   /* option-fields */
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-4);
   min-width: 0;
   border: 0;
   margin: 0;
@@ -40,7 +40,7 @@ const optionRoot = css`
 const optionLegend = css`
   /* option-fields-legend */
   padding: 0;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 `;
@@ -49,8 +49,8 @@ const choiceBar = css`
   /* option-fields-bar */
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--space-1);
+  padding: var(--space-1);
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -67,9 +67,9 @@ const choiceLabel = css`
   /* option-fields-choice */
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  min-height: 34px;
-  padding: 0.2rem 0.7rem;
+  gap: var(--space-2);
+  min-height: calc(var(--control-md) - 2 * var(--space-1) - 2px);
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: var(--text-sm);
@@ -95,7 +95,7 @@ const cardBar = css`
   /* option-fields-cards */
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: 0.5rem;
+  gap: var(--space-2);
   input {
     position: absolute;
     opacity: 0;
@@ -118,7 +118,7 @@ const cardLabel = css`
   ${choiceLabel}
   flex-direction: column;
   justify-content: center;
-  padding: 0.75rem;
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface-card);
