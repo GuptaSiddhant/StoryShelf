@@ -1,5 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { CatalogLoader } from "@storyshelf/core/capture";
+import type { Build } from "@storyshelf/core/schema";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
 import {
   baselines,
@@ -12,6 +13,7 @@ import {
   comments,
   otherProject,
   project,
+  backlogBuilds,
   skippedBuilds,
   snapshots,
 } from "./dataset.ts";
@@ -19,9 +21,10 @@ import {
 /**
  * Which data a page story renders over: `populated` is the "Design system" project with builds
  * in every state, `empty` has one project and no builds, `blank` has no projects at all, and
- * `skipped-only` has a project whose every build was skipped.
+ * `skipped-only` has a project whose every build was skipped, and `backlog` a project with
+ * seven unfinished builds queued.
  */
-export type StoryDataset = "populated" | "empty" | "blank" | "skipped-only";
+export type StoryDataset = "populated" | "empty" | "blank" | "skipped-only" | "backlog";
 
 interface Seeded {
   db: DatabaseAdapter;
@@ -64,14 +67,21 @@ const PUBLISHED: CatalogLoader = {
   refresh: async () => await Promise.resolve({ v: 1, entries: catalogEntries }),
 };
 
+/** The builds of a dataset that has only these, or null for the fully populated one. */
+function onlyBuilds(dataset: StoryDataset): Build[] | null {
+  if (dataset === "skipped-only") return skippedBuilds();
+  return dataset === "backlog" ? backlogBuilds() : null;
+}
+
 /** A fresh in-memory database holding the chosen dataset, and the catalog its builds publish. */
 export async function seedStoryDatabase(dataset: StoryDataset): Promise<Seeded> {
   const { db } = makeDatabase();
   if (dataset === "blank") return { db, catalog: NO_CATALOG };
   await insertAll(db, db.tables.projects, [project, otherProject]);
   if (dataset === "empty") return { db, catalog: NO_CATALOG };
-  if (dataset === "skipped-only") {
-    await insertAll(db, db.tables.builds, skippedBuilds());
+  const only = onlyBuilds(dataset);
+  if (only) {
+    await insertAll(db, db.tables.builds, only);
     return { db, catalog: PUBLISHED };
   }
   await insertBuilds(db);

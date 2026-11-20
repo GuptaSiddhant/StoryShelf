@@ -13,7 +13,7 @@ const referenceRoot = css`
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    padding: 0.35rem 0.6rem;
+    padding: var(--space-1) var(--space-3);
     background: var(--surface-subtle);
     border-bottom: 1px solid var(--border);
     color: var(--text-secondary);
@@ -37,7 +37,7 @@ const previewImg = css`
   width: 16rem;
   max-width: 100%;
   max-height: 14rem;
-  margin: 0.25rem auto;
+  margin: var(--space-1) auto;
   object-fit: contain;
   border-radius: var(--radius-sm);
   background: repeating-conic-gradient(var(--surface-muted) 0% 25%, var(--surface-subtle) 0% 50%) 0
@@ -46,7 +46,7 @@ const previewImg = css`
 
 const previewCaption = css`
   /* design-preview-caption */
-  padding: 0 0.6rem 0.25rem;
+  padding: 0 var(--space-3) var(--space-1);
   color: var(--text-secondary);
   font-size: var(--text-xs);
 `;

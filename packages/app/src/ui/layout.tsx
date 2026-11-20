@@ -21,7 +21,12 @@ const cardColumn = css`
 const cardPadded = css`
   /* card-padded */
   ${cardBase}
-  padding: 1rem;
+  padding: var(--space-4);
+  /* The card's children are one flow: the card sets the gap, not each child. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-3);
 `;
 
 const cardDanger = css`
@@ -32,7 +37,7 @@ const cardDanger = css`
 
 const cardSection = css`
   /* card-section */
-  padding: 1rem;
+  padding: var(--space-4);
 `;
 
 const cardSectionDivider = css`
@@ -43,13 +48,13 @@ const cardSectionDivider = css`
 
 const pageHeader = css`
   /* page-header */
-  margin-bottom: 1.25rem;
+  margin: 0;
 `;
 
 const pageHeaderRow = css`
   /* page-header-row */
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
@@ -66,7 +71,7 @@ const pageHeaderTitle = css`
 
 const pageHeaderDesc = css`
   /* page-header-desc */
-  margin: 0.35rem 0 0;
+  margin: var(--space-1) 0 0;
   color: var(--text-secondary);
   font-size: var(--text-base);
   max-width: 65ch;
@@ -79,11 +84,11 @@ const pageHeaderDesc = css`
 
 const pageHeaderMeta = css`
   /* page-header-meta */
-  margin: 0.4rem 0 0;
+  margin: var(--space-2) 0 0;
   color: var(--text-secondary);
   font-size: var(--text-sm);
   display: flex;
-  gap: 0.4rem;
+  gap: var(--space-2);
   align-items: center;
   flex-wrap: wrap;
   font-variant-numeric: tabular-nums;
@@ -92,14 +97,14 @@ const pageHeaderMeta = css`
 const pageHeaderActions = css`
   /* page-header-actions */
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
   align-items: center;
 `;
 
 const sectionTitleH2 = css`
   /* section-title */
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;

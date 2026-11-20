@@ -31,6 +31,7 @@ export const CSRF_PATHS: readonly string[] = [
   "/admin/credentials/*",
   "/admin/public-origin",
   "/admin/public-origin/*",
+  "/projects/:slug/builds/cancel",
   "/projects/:slug/builds/:buildId/insights/generate",
   "/projects/:slug/builds/:buildId/comments",
   "/projects/:slug/builds/:buildId/comments/*",

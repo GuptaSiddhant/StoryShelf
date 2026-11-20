@@ -6,7 +6,7 @@ const list = css`
   /* summary-list */
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -18,8 +18,8 @@ const row = css`
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem 1rem;
-  padding: 0.75rem 1rem;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-4);
   background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -29,7 +29,7 @@ const main = css`
   /* summary-item-main */
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-1);
   min-width: 0;
 `;
 
@@ -37,7 +37,7 @@ const heading = css`
   /* summary-item-heading */
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   font-weight: var(--weight-semibold);
 `;
 
@@ -51,7 +51,7 @@ const details = css`
 const actions = css`
   /* summary-item-actions */
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 `;
 
 export interface SummaryItem {

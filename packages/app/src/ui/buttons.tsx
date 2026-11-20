@@ -10,7 +10,7 @@ const btnBase = css`
   appearance: none;
   border: 1px solid transparent;
   border-radius: var(--radius);
-  padding: 0.55rem 0.9rem;
+  padding: var(--space-2) var(--space-4);
   font-weight: var(--weight-semibold);
   font-size: var(--text-base);
   cursor: pointer;
@@ -18,12 +18,12 @@ const btnBase = css`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: var(--space-2);
   line-height: 1.2;
   /* Top-aligned so a button in a <form> (a block with a line box) is exactly
      as tall as the button instead of picking up a baseline strut. */
   vertical-align: top;
-  min-height: 40px;
+  min-height: var(--control-md);
   transition:
     background var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease),
@@ -63,9 +63,9 @@ const btnPrimary = css`
 const btnPrimarySm = css`
   /* btn-primary-sm */
   ${btnPrimary}
-  padding: 0.35rem 0.6rem;
+  padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
-  min-height: 32px;
+  min-height: var(--control-sm);
 `;
 
 const btnSecondary = css`
@@ -84,9 +84,9 @@ const btnSecondary = css`
 const btnSecondarySm = css`
   /* btn-secondary-sm */
   ${btnSecondary}
-  padding: 0.35rem 0.6rem;
+  padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
-  min-height: 32px;
+  min-height: var(--control-sm);
 `;
 
 const btnOutline = css`
@@ -101,9 +101,9 @@ const btnOutline = css`
 const btnOutlineSm = css`
   /* btn-outline-sm */
   ${btnOutline}
-  padding: 0.35rem 0.6rem;
+  padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
-  min-height: 32px;
+  min-height: var(--control-sm);
 `;
 
 const btnGhost = css`
@@ -122,9 +122,9 @@ const btnGhost = css`
 const btnGhostSm = css`
   /* btn-ghost-sm */
   ${btnGhost}
-  padding: 0.35rem 0.6rem;
+  padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
-  min-height: 32px;
+  min-height: var(--control-sm);
 `;
 
 const btnDanger = css`
@@ -142,9 +142,9 @@ const btnDanger = css`
 const btnDangerSm = css`
   /* btn-danger-sm */
   ${btnDanger}
-  padding: 0.35rem 0.6rem;
+  padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
-  min-height: 32px;
+  min-height: var(--control-sm);
 `;
 
 /** A destructive action that is not the main one: secondary weight, danger text (e.g. Reject). */
@@ -162,9 +162,9 @@ const btnDangerSecondary = css`
 const btnDangerSecondarySm = css`
   /* btn-danger-secondary-sm */
   ${btnDangerSecondary}
-  padding: 0.35rem 0.6rem;
+  padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
-  min-height: 32px;
+  min-height: var(--control-sm);
 `;
 
 const btnClasses: Record<ButtonVariant, Record<ButtonSize, Promise<string>>> = {
@@ -179,15 +179,17 @@ const btnClasses: Record<ButtonVariant, Record<ButtonSize, Promise<string>>> = {
 const tabsNav = css`
   /* tabs */
   display: flex;
-  gap: 0.25rem;
+  gap: var(--space-1);
   border-bottom: 1px solid var(--border);
-  margin-bottom: 1rem;
   overflow-x: auto;
 `;
 
 const tabsLink = css`
   /* tabs-link */
-  padding: 0.55rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-md);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 2px solid transparent;
   color: var(--text-secondary);
   font-size: var(--text-base);
