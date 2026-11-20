@@ -20,7 +20,7 @@ Include affected package(s) and version, reproduction steps or a proof of concep
 
 ## Scope
 
-In scope: the `@storyshelf/*` packages, the `storyshelf` CLI, the server scaffolds it generates, and the project's published Docker image and Terraform reference stacks.
+In scope: the `@storyshelf/*` packages, the `storyshelf` CLI, the server scaffolds it generates, and the project's published Docker image and Terraform modules under `deploy/terraform/`.
 
 Areas of particular interest:
 

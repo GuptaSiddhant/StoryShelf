@@ -106,13 +106,16 @@ destroying the stack; there is no firewall rule to loosen.
   and `REMOTE_BROWSER_TOKEN`. The module builds no browser service.
 - **The queue consumers poll in the background**, so the service sets `cpu_idle = false` (CPU stays
   allocated between requests) and `min_instances >= 1` (validated). Without them captures stall.
-  Cloud Run is not detected as serverless by the app (`K_SERVICE` is set); this setting is what makes
-  it correct.
+  The serverless check (`isServerlessHost`) looks only for AWS Lambda, Vercel and Netlify, so it
+  never warns on Cloud Run (which sets `K_SERVICE`); these two settings are what keep captures running.
 - **Scaling** is more identical copies between `min_instances` and `max_instances`. Per-copy limits
   (remote-browser connections, rate limits, the AI budget) are in the scaling docs.
 - **Shutdown.** Cloud Run sends SIGTERM and stops the container 10 seconds later; that period is not
   configurable. The app drains running captures for `shutdown_grace_seconds`
-  (`SHUTDOWN_GRACE_SECONDS`, 1-9, default 8), then hands the rest back to the queue.
+  (`SHUTDOWN_GRACE_SECONDS`, 1-9, default 8), then hands the rest back to the queue. The process
+  forces its exit 1 second after the drain, so the default leaves 1 second of margin inside Cloud
+  Run's window and 9 leaves none. A copy killed anyway loses its lease: the job is retried unless
+  that attempt was its last one, in which case the job fails, its build fails and admins are alerted.
 
 ## Domain and TLS
 

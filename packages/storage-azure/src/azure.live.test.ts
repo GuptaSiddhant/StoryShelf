@@ -3,7 +3,7 @@
  *
  * Gated on `LIVE_CLOUD=1` so hermetic `turbo test` never touches Azure.
  * The container is pre-provisioned (manually or via `terraform apply` from
- * `storyshelf server init --target azure`); this suite only owns blobs under
+ * `deploy/terraform/azure`); this suite only owns blobs under
  * a unique per-run prefix and deletes them afterwards.
  *
  * Required env when live:
