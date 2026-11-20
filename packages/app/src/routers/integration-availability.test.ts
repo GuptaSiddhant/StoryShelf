@@ -95,7 +95,7 @@ describe("integrations the server cannot deliver (#1126)", () => {
   it("hides email from a project admin, with no placeholder, and keeps the channel", async () => {
     const { db, app, emailId, removedId } = await seed();
     const html = await (await app.request(SETTINGS, as("pa"))).text();
-    expect(html).toContain("Add a message channel");
+    expect(html).toContain("Add channel");
     expect(html).not.toContain(`channel-${emailId}`);
     expect(html).not.toContain(`channel-${removedId}`);
     expect(html).not.toContain('value="email"');
