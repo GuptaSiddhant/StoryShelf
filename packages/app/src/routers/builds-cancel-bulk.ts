@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { BuildModel } from "@storyshelf/core/models";
 import type { BuildSummary } from "@storyshelf/core/models";
-import { CANCELLABLE_BUILD_STATUSES } from "@storyshelf/core/types";
+import { CANCELLABLE_BUILD_STATUSES, selectOlderUnfinished } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -53,24 +53,6 @@ const bulkCancelRoute = createRoute({
   },
 });
 
-/** Newest first, ties broken by id, so the builds kept are stable. */
-function newestFirst(a: BuildSummary, b: BuildSummary): number {
-  return b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
-}
-
-/** The unfinished builds to cancel: all but the `keepNewest` newest of each branch. */
-export function selectOlderUnfinished(
-  unfinished: readonly BuildSummary[],
-  keepNewest: number,
-): BuildSummary[] {
-  const seen = new Map<string, number>();
-  return unfinished.toSorted(newestFirst).filter((build) => {
-    const rank = seen.get(build.gitBranch) ?? 0;
-    seen.set(build.gitBranch, rank + 1);
-    return rank >= keepNewest;
-  });
-}
-
 async function listUnfinished(projectId: string, branch?: string): Promise<BuildSummary[]> {
   const builds = new BuildModel(getStore().db);
   const filter = branch === undefined ? {} : { branch };
@@ -107,6 +89,27 @@ async function cancelInBatches(ids: readonly string[]): Promise<string[]> {
   return cancelled;
 }
 
+/** What to cancel: the API body and the page form both reduce to this. */
+export interface CancelOlderOptions {
+  branch?: string | undefined;
+  keepNewest?: number;
+  dryRun?: boolean;
+}
+
+/**
+ * Cancel the older unfinished builds of a project (or list them with `dryRun`) and return their
+ * IDs. The one implementation behind the API route and the builds page's form.
+ */
+export async function cancelOlderBuilds(
+  projectId: string,
+  options: CancelOlderOptions = {},
+): Promise<string[]> {
+  const { branch, keepNewest = 1, dryRun = false } = options;
+  const unfinished = await listUnfinished(projectId, branch);
+  const ids = selectOlderUnfinished(unfinished, keepNewest).map((build) => build.id);
+  return dryRun ? ids : await cancelInBatches(ids);
+}
+
 /** Register `POST …/builds/cancel` (`testing` class). */
 export function registerBuildsCancelBulk(app: ShelfRouter): void {
   app.openapi(bulkCancelRoute, async (c) => {
@@ -117,10 +120,8 @@ export function registerBuildsCancelBulk(app: ShelfRouter): void {
     );
     // The body is optional: without one the validator hands back no defaults.
     const body = c.req.valid("json") as Partial<z.infer<typeof bulkCancelBodySchema>> | undefined;
-    const { branch, keepNewest = 1, dryRun = false } = body ?? {};
-    const targets = selectOlderUnfinished(await listUnfinished(project.id, branch), keepNewest);
-    const ids = targets.map((build) => build.id);
-    const cancelled = dryRun ? ids : await cancelInBatches(ids);
+    const { dryRun = false } = body ?? {};
+    const cancelled = await cancelOlderBuilds(project.id, body ?? {});
     if (!dryRun) {
       hxRefresh(c);
       flashHx(c, `${cancelled.length} builds cancelled`);

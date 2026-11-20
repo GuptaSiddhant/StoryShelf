@@ -1,6 +1,5 @@
 import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { BuildModel } from "@storyshelf/core/models";
-import type { BuildSummary } from "@storyshelf/core/models";
 import {
   createTestBuild,
   createTestProject,
@@ -11,8 +10,8 @@ import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { requestBuildState } from "../git-status.ts";
 import { createShelfApp } from "../index.tsx";
+import { getCsrfToken } from "../middleware/csrf.ts";
 import { stubRunner } from "../test-runner.ts";
-import { selectOlderUnfinished } from "./builds-cancel-bulk.ts";
 
 vi.mock("../git-status.ts", async (original) => {
   const real = await original<typeof import("../git-status.ts")>();
@@ -157,11 +156,60 @@ describe("POST /builds/cancel", () => {
   });
 });
 
-const row = (id: string): BuildSummary =>
-  ({ id, gitBranch: "main", createdAt: "2026-01-01T00:00:00.000Z" }) as BuildSummary;
+const form = async (app: ReturnType<typeof createShelfApp>, headers: Record<string, string> = {}) =>
+  await app.request("/projects/web/builds/cancel", {
+    method: "POST",
+    headers: {
+      cookie: "storyshelf_session=nobody",
+      "sec-fetch-site": "same-origin",
+      "x-csrf-token": getCsrfToken("s", "nobody"),
+      ...headers,
+    },
+  });
 
-describe("selectOlderUnfinished", () => {
-  it("breaks a createdAt tie by id", () => {
-    expect(selectOlderUnfinished([row("a"), row("b")], 1).map((b) => b.id)).toEqual(["a"]);
+describe("POST /projects/:slug/builds/cancel (the builds page form)", () => {
+  it("cancels like the API route and sends a plain browser form back to the builds list", async () => {
+    const { app, add, builds } = await seed();
+    const old = await add("main", "pending");
+    const newest = await add("main", "pending");
+    const response = await form(app);
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/projects/web/builds");
+    expect((await builds.get(old))?.status).toBe("cancelled");
+    expect((await builds.get(newest))?.status).toBe("pending");
+  });
+
+  it("answers an HTMX post with a refresh", async () => {
+    const { app, add } = await seed();
+    await add("main", "pending");
+    await add("main", "pending");
+    const response = await form(app, { "hx-request": "true" });
+    expect(response.status).toBe(204);
+    expect(response.headers.get("hx-refresh")).toBe("true");
+  });
+
+  it("refuses a post without a CSRF token and cancels nothing", async () => {
+    const { app, add, builds } = await seed();
+    const old = await add("main", "pending");
+    await add("main", "pending");
+    const response = await app.request("/projects/web/builds/cancel", {
+      method: "POST",
+      headers: { cookie: "storyshelf_session=nobody", "sec-fetch-site": "same-origin" },
+    });
+    expect(response.status).toBe(403);
+    expect((await builds.get(old))?.status).toBe("pending");
+  });
+
+  it("answers 404 when testing is off", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await createTestProject(db, db.tables, { name: "web" });
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: pino({ level: "silent" }),
+      config: { secret: "s" },
+    });
+    expect((await form(app)).status).toBe(404);
   });
 });
