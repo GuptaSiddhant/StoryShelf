@@ -69,7 +69,7 @@ function formResponse(
   const link = ctx.data.links.find((candidate) => candidate.id === linkId);
   const props = { ...ctx, link, state };
   const body = isHxRequest(c) ? renderGitLinkFragment(props) : renderGitLinkPage(props);
-  return c.html(body as Parameters<Context["html"]>[0], status);
+  return c.html(body, status);
 }
 
 async function handleForm(c: Context): Promise<Response> {

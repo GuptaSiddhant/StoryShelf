@@ -99,11 +99,10 @@ export function linkDetails(link: SettingsGitLink): string {
   if (link.state === "broken") {
     return `${base}. ${link.reason ?? "The host no longer reaches this repository."} Ask a site admin to reconnect it.`;
   }
-  const delivered =
-    link.lastDeliveredAt === null
-      ? "nothing delivered yet"
-      : `last delivery ${formatRelative(link.lastDeliveredAt)}`;
-  return `${base} · ${delivered}`;
+  // No timestamp, no claim: links record no delivery time yet, so silence is not "nothing delivered".
+  return link.lastDeliveredAt === null
+    ? base
+    : `${base} · last delivery ${formatRelative(link.lastDeliveredAt)}`;
 }
 
 function linkActions(project: Project, link: SettingsGitLink, isAdmin: boolean): unknown {
