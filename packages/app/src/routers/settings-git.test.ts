@@ -120,6 +120,16 @@ describe("Project → Settings → Git", () => {
     expect(form).toContain('value="https://gitlab.example.com/grp/web"');
   });
 
+  it("shows when delivery last posted through an approved link", async () => {
+    const { app, project, links } = await setup();
+    await post(app, BASE, { repository: "grp/web", prefix: "web" });
+    const [link] = await links.list(project.id);
+    await links.approve(link?.id ?? "", { hostRepositoryId: "7" }, null);
+    expect(await (await app.request(REVIEW)).text()).not.toContain("· last delivery");
+    await links.markDelivered(link?.id ?? "", new Date().toISOString());
+    expect(await (await app.request(REVIEW)).text()).toContain("· last delivery");
+  });
+
   it("edits outputs, and a changed prefix sends the link back to pending", async () => {
     const { app, project, links } = await setup();
     await post(app, BASE, { repository: "grp/web", prefix: "web" });
