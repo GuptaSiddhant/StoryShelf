@@ -150,3 +150,21 @@ export const FormActionAlignment = jsxStory(() => (
     ))}
   </VStack>
 ));
+
+/** Native controls take the app theme's `color-scheme`; switch the theme toolbar to Dark to check. */
+export const NativeControls = jsxStory(() => (
+  <VStack>
+    <CheckField label="Show skipped" name="skipped" checked />
+    <CheckField label="Run Storybook tests" name="tests" />
+    <SelectField
+      label="Role"
+      name="role"
+      value="viewer"
+      options={[
+        { value: "viewer", label: "Viewer" },
+        { value: "admin", label: "Admin" },
+      ]}
+    />
+    <input type="range" min="0" max="100" value="40" aria-label="Opacity" />
+  </VStack>
+));

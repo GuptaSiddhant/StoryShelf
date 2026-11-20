@@ -27,7 +27,7 @@ const tableWrap = css`
     background: var(--surface-subtle);
     color: var(--text-secondary);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     white-space: nowrap;

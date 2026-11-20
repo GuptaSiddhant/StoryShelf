@@ -102,6 +102,29 @@ describe("keepJobLease", () => {
     expect(keeper.signal.aborted).toBe(false);
   });
 
+  it("ends with released and aborts its signal on release, and stops renewing (#912)", async () => {
+    const clock = createManualClock();
+    const { queue } = fakeQueue();
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    keeper.release();
+    expect(await keeper.ended).toBe("released");
+    expect(keeper.signal.aborted).toBe(true);
+    expect((keeper.signal.reason as Error).message).toBe("job handed back on shutdown");
+    await clock.advance(RENEW_THROTTLE_MS * 3);
+    expect(queue.extend).not.toHaveBeenCalled();
+    expect(queue.inspect).not.toHaveBeenCalled();
+  });
+
+  it("ignores a release once the job already ended", async () => {
+    const clock = createManualClock();
+    const { queue, state } = fakeQueue();
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    state.inspect = "cancelled";
+    await clock.advance(CANCEL_CHECK_MS);
+    keeper.release();
+    expect(await keeper.ended).toBe("cancelled");
+  });
+
   it("derives the throttle from a short lease", async () => {
     const clock = createManualClock();
     const { queue } = fakeQueue();

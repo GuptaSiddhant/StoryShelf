@@ -51,6 +51,17 @@ export interface UrlBuilder {
   storybook(slug: string): string;
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
+  /** The full Storybook UI of one build: `<storybookBuild>/index.html`, never `iframe.html`. */
+  storybookIndex(slug: string, buildId: string): string;
+  /**
+   * One entry of a build's published Storybook, through `index.html` so it opens the whole UI:
+   * `?path=/story/<id>` for a story, `?path=/docs/<id>` for a docs entry.
+   */
+  storybookStory(slug: string, buildId: string, entryId: string, kind: "story" | "docs"): string;
+  /** The log section of the build page. */
+  buildLog(slug: string, buildId: string): string;
+  /** The retry control of the build page. */
+  buildRetry(slug: string, buildId: string): string;
   /** The project settings page on its first tab (General). */
   settings(slug: string): string;
   /** One tab of the project settings: `general`, `capture`, `review`, `access` or `insights`. */
@@ -61,6 +72,20 @@ export interface UrlBuilder {
 /** The scheme prefix of a content link: the root's own, or protocol-relative for a relative root. */
 function contentScheme(root: string): string {
   return /^https?:\/\//iu.test(root) ? `${new URL(root).protocol}//` : "//";
+}
+
+/** The links a pull-request comment adds: the Storybook through `index.html`, and the build page's sections. */
+function commentLinks(
+  root: string,
+  storybookBuild: (slug: string, buildId: string) => string,
+): Pick<UrlBuilder, "storybookIndex" | "storybookStory" | "buildLog" | "buildRetry"> {
+  return {
+    storybookIndex: (slug, buildId) => `${storybookBuild(slug, buildId)}/index.html`,
+    storybookStory: (slug, buildId, entryId, kind) =>
+      `${storybookBuild(slug, buildId)}/index.html?path=/${kind}/${encodeURIComponent(entryId)}`,
+    buildLog: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff#log`,
+    buildRetry: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff#retry`,
+  };
 }
 
 /**
@@ -75,6 +100,10 @@ function contentScheme(root: string): string {
 export function createUrlBuilder(baseUrl: string, contentHosts?: string): UrlBuilder {
   const root = baseUrl.replace(/\/+$/u, "");
   const scheme = contentScheme(root);
+  const storybookBuild = (slug: string, buildId: string): string =>
+    contentHosts
+      ? `${scheme}${contentHostLabel(buildId)}.${contentHosts}`
+      : `${root}/projects/${slug}/storybook/build/${buildId}`;
 
   return {
     projectsList: () => root || "/",
@@ -109,10 +138,8 @@ export function createUrlBuilder(baseUrl: string, contentHosts?: string): UrlBui
         : `${root}/projects/${slug}/storybook`,
     storybookLabel: (slug, key, value) =>
       `${root}/projects/${slug}/storybook/${encodeURIComponent(key)}/${encodePath(value)}`,
-    storybookBuild: (slug, buildId) =>
-      contentHosts
-        ? `${scheme}${contentHostLabel(buildId)}.${contentHosts}`
-        : `${root}/projects/${slug}/storybook/build/${buildId}`,
+    storybookBuild,
+    ...commentLinks(root, storybookBuild),
     settings: (slug) => `${root}/projects/${slug}/settings/general`,
     settingsTab: (slug, tab) => `${root}/projects/${slug}/settings/${tab}`,
     short: (id) => `${root}/_/${id}/`,

@@ -9,6 +9,7 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationStatus } from "./integrations/availability.ts";
 import type { ShelfGitOptions } from "./integrations/git/connections/types.ts";
 import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
@@ -666,8 +667,15 @@ export interface ResolvedNotificationsOptions extends Omit<
  * hand-built options object (tests, embedders) reads as "none".
  */
 export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  /** Design providers offered to projects: registered and available (issue #1126). */
   design?: DesignProvider[];
+  /** `notifiers` holds only available providers (issue #1126). */
   notifications?: ResolvedNotificationsOptions;
+  /**
+   * Every integration kind with its standing (available, unavailable with a reason, or turned off),
+   * for the System page and deep health. Absent on a hand-built options object.
+   */
+  integrations?: readonly IntegrationStatus[];
 }
 
 /**

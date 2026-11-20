@@ -3,6 +3,7 @@ export { MAX_ANNOTATIONS, statusesForBuild, STORYBOOK_UNAVAILABLE } from "./buil
 export type {
   BuildStateBuild,
   BuildStateChange,
+  BuildStateExtras,
   BuildStateFlags,
   BuildStateInput,
   BuildStateSet,

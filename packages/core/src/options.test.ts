@@ -32,6 +32,18 @@ describe("resolveShelfOptions", () => {
     expect(resolved.notifications?.config).toEqual({ fromName: "Shelf" });
   });
 
+  it("keeps only available providers and reports every kind (#1126)", () => {
+    const resolved = resolveShelfOptions({ ...base, design: false });
+    const kinds = resolved.notifications?.notifiers?.map((p) => p.metadata.kind) ?? [];
+    expect(kinds).toContain("slack-webhook");
+    expect(kinds).not.toContain("email");
+    expect(resolved.design).toEqual([]);
+    const byKind = new Map(resolved.integrations?.map((status) => [status.kind, status]));
+    expect(byKind.get("email")?.state).toBe("unavailable");
+    expect(byKind.get("figma")?.state).toBe("disabled");
+    expect(byKind.get("github")?.state).toBe("available");
+  });
+
   it("throws at startup on a repeated provider kind, naming it", () => {
     const design = makeFakeDesign("figma").provider;
     expect(() => resolveShelfOptions({ ...base, design: [design, design] })).toThrow(
