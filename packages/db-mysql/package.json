@@ -81,6 +81,7 @@
     "@tidbcloud/serverless": "^0.1.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "drizzle-kit": "catalog:",
     "mysql2": "^3.9.0",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",

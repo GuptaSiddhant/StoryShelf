@@ -3,8 +3,9 @@
 ## Status
 
 Accepted (owner, 2026-11-08; amended the same day: one neutral table definition in core, generated
-DDL, shared queries; adapter packages stay, thinner). Decision 2 onwards depends on the spike in
-follow-up task 2; until the neutral tables land, ADR 0002 describes current behavior.
+DDL, shared queries; adapter packages stay, thinner). The spike in follow-up task 2 (#800,
+2026-11-20) succeeded: decisions 2 and 3 hold (see "Spike result"). Until the neutral tables land,
+ADR 0002 describes current behavior.
 
 ## Context
 
@@ -115,6 +116,52 @@ additive `ALTER` migrations. Options (b) and (d) must be checked against each be
    `Dialect` interface in core. The fence and transaction strategy stays per dialect, because it
    really differs. The shared contract suites (ADR 0039) prove each dialect.
 
+## Spike result (#800, 2026-11-20)
+
+`defineTable` and the logical column types live in `packages/core/src/db/` (with `bigint`, which the
+lifecycle tables need); `labels` (`label_types`, `build_labels`), `builds`, `users` and the four
+ADR 0039 lifecycle tables are defined once in `db/tables/`. Each adapter's `table-factory.ts`
+(about 70 lines) builds the Drizzle table; references to tables that are still hand-written
+(`projects`) resolve through the dialect's existing schema, so tables can move one at a time.
+Nothing is wired into an adapter; the neutral layer reaches the factories through
+`@storyshelf/core/test-helpers` until task 3 gives it a subpath. Each adapter's
+`table-factory.test.ts` generates DDL with `drizzle-kit/api` (no database), parses it and
+`ddl.ts` (plus the indexes `migrate.ts` adds) into one structural shape (`ddlShape`) and asserts
+the remaining differences, each classified:
+
+| Dialect  | Difference (today → generated)                             | Class                                                  |
+| -------- | ---------------------------------------------------------- | ------------------------------------------------------ |
+| SQLite   | `users.email` unique index: SQLite's autoindex → named     | Equivalent                                             |
+| Postgres | `build_reference_generations.generation`: INTEGER → BIGINT | Schema: MySQL already has BIGINT; an ADR 0053 widening |
+| MySQL    | none                                                       |                                                        |
+
+- **Equivalent spellings** the comparison normalises: `IF NOT EXISTS`, quoting, `INT`/`INTEGER`,
+  `TINYINT(1)`/`BOOLEAN`, `TIMESTAMPTZ`, `DEFAULT 0`/`false`, inline against table-level keys,
+  foreign keys added by `ALTER TABLE`, `ON UPDATE no action`, a MySQL `UNIQUE` constraint against a
+  unique index, `USING btree`, and Postgres's `"public".` on foreign-key targets (the adapter never
+  sets a `search_path`).
+- **Fixed in the factory**: constraint names (Postgres `<t>_<c>_fkey`, `<t>_pkey`, `<t>_<c>_key`;
+  MySQL `fk_<t>_<c>` and a column-named unique index), MySQL `varchar(n)` from `id(n)`, `key(n)` and
+  `enumOf`, MySQL `DATETIME(3)` through the adapter's `datetime` type, boolean and timestamp modes.
+- **Checked and expressible**: composite and unique indexes, partial indexes (SQLite, Postgres),
+  composite primary keys, named `CHECK`s, `ON DELETE CASCADE`/`RESTRICT`, MySQL's reserved `key`
+  column, literal defaults.
+- **Not expressible**: a partial index on MySQL; the factory refuses one, and no table has one.
+  `json<T>` is defined but unmapped: no column is JSON-typed today (JSON is `TEXT` parsed by the
+  model), and typing one changes its row type, which is task 3's work.
+- **Row types.** Per dialect, the built tables' `$inferSelect` and `$inferInsert` equal the
+  hand-written Drizzle schema's, and every table's equals `InferRow` of its neutral definition, so
+  the three dialects infer one type. `LabelType` and `BuildLabel` equal it; `User` equals it once
+  its four optional fields are required; `Build` also lacks `retentionState` and narrows
+  `branchVerified` (Drizzle reads `string`). Deriving the core types (task 3) settles these.
+- **Drift the neutral tables expose**: `users.email` is `UNIQUE` in every `ddl.ts` but in no Drizzle
+  schema; MySQL's Drizzle schema says `text` where its DDL says `VARCHAR(n)` (the parity test
+  compares type families only); `generation` is BIGINT on MySQL only.
+- **Costs**: `drizzle-kit` (with `esbuild` and `tsx`) is a dev dependency of the three adapters.
+  Its output is migration DDL (no `IF NOT EXISTS`): it replaces the boot DDL only together with
+  decision 4's baseline. The factories type columns as `$Type` over a text builder, so row types
+  are exact but Drizzle's per-column metadata types are not.
+
 ## Adapter packages
 
 The three packages stay, made thin. What remains in each:
@@ -137,7 +184,7 @@ Data lane, after #376:
 1. Parity test for SQLite, Postgres and MySQL, plus the allowlist.
 2. Spike: build three tables (`labels`, `builds`, `users`) through `defineTable` and a factory per
    dialect, generate the DDL with `drizzle-kit`, and diff it against today's `ddl.ts`. If a feature
-   cannot be expressed, record it here and stop at (a).
+   cannot be expressed, record it here and stop at (a). Done (#800); see "Spike result".
 3. Move the remaining tables; derive the core row types; remove the model casts.
 4. DDL generation with a CI drift check; remove the hand-written `ddl.ts` files.
 5. The `Dialect` interface, and the retention lifecycle written once.
