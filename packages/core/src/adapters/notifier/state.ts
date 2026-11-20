@@ -44,6 +44,7 @@ export async function writeBuildState(
           ...(status.progress === undefined ? {} : { progress: status.progress }),
           ...(status.annotations === undefined ? {} : { annotations: status.annotations }),
           ...(status.omitted === undefined ? {} : { omitted: status.omitted }),
+          ...(status.summary === undefined ? {} : { summary: status.summary }),
         },
         state: status.state,
         url: status.url,
