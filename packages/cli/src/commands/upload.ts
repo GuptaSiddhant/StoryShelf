@@ -506,8 +506,9 @@ async function reportAffectedCapture(
       changedFiles: result.changedFiles,
       affectedImportPaths: result.affectedImportPaths,
     });
-    printLine(describeAffected(result, created.baselineSha));
-    return countAffectedStories(cwd, collected.buildDir, result.affectedImportPaths);
+    const count = countAffectedStories(cwd, collected.buildDir, result.affectedImportPaths);
+    printLine(describeAffected(result, count, created.baselineSha));
+    return count;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     printLine(`Full capture (affected post failed: ${reason}): rendering all stories`);
@@ -530,13 +531,16 @@ function countAffectedStories(
 }
 
 /** Human-readable summary of an affected computation. */
-function describeAffected(result: AffectedResult, baselineSha: string): string {
+function describeAffected(
+  result: AffectedResult,
+  count: number | null,
+  baselineSha: string,
+): string {
   if (result.affectedImportPaths === null) {
     return `Full capture (${result.fullReason ?? "unknown reason"}): rendering all stories`;
   }
-  const count = result.affectedImportPaths.length;
   const short = baselineSha.slice(0, 7);
-  if (count === 0) {
+  if (count === null || count === 0) {
     return `Affected capture: no stories affected (baseline ${short})`;
   }
   return `Affected capture: rendering ${count} ${count === 1 ? "story" : "stories"} (baseline ${short})`;
