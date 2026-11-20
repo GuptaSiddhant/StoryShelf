@@ -328,12 +328,23 @@ pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job us
 
 ## Previous-release database job (ADR 0053, decision 8)
 
-`previous-release-db` in `ci.yml` runs on pull requests that touch a schema or migration file (the
-`schema` output of the `changes` job), for SQLite and Postgres. `scripts/previous-release.sh
+`previous-release-db` in `ci.yml` runs on pull requests that touch a schema or migration file, the
+job queue, its consumer or an enqueue path (the `schema` output of the `changes` job), for SQLite
+and Postgres. `scripts/previous-release.sh
 <dialect>` installs the newest `v*` release from npm, migrates an empty database with it and
 seeds a project, migrates the same database with the checkout as the next minor, then starts the
 published release on it and smokes it (health, project list, a write, a read-back, the root page).
 The release must skip its migrations and leave `schema_meta` alone. Postgres also runs the release's
-own `postgres.live.test.ts` from a checkout of its tag. To reproduce: `DATABASE_URL=… bash
-scripts/previous-release.sh postgres`. MySQL (nightly) and the mixed-queue test are not part of it
+own `postgres.live.test.ts` from a checkout of its tag.
+
+Step 5 is the mixed-queue test. The checkout enqueues one job of every kind through its own enqueue
+paths, a repository link's `notify` job at payload version 2 among them
+(`scripts/previous-release/mixed-queue-current.ts`). The published release's own queues and
+consumers then run alone for a while, as after a rollback (`mixed-queue-previous.mjs`; handlers
+keep that release's declarations, and `run` only records). They must run every v1 job and hand
+each newer payload back unrun with no attempt spent. Next they run beside the checkout's consumers
+on a second batch, as during a rolling deploy. Every job must end `done`, run exactly once, and
+each newer payload must run on the checkout. A kind added to `CaptureJobKind` and not enqueued
+there fails the typecheck. To reproduce: `DATABASE_URL=… bash scripts/previous-release.sh postgres`
+(`RUN_TAG_SUITES=0` skips step 4, `RUN_MIXED_QUEUE=0` step 5). MySQL (nightly) is not part of it
 yet.
