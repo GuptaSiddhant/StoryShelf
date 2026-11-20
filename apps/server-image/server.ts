@@ -50,7 +50,8 @@ const publicBaseUrl = nonEmpty(env["PUBLIC_BASE_URL"]);
 const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
 
 // Every refusal below throws before the server listens. Node would print the throwing source line
-// first, so the reason (naming the variable, never its value) is printed as the first line instead.
+// and a bundle stack, so a refusal prints only its reason (naming the variable, never its value);
+// any other error still prints its stack.
 process.on("uncaughtException", (error) => {
   process.stderr.write(describeBootFailure(error));
   process.exit(1);
