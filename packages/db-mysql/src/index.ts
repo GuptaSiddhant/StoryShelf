@@ -2,7 +2,14 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { createDrizzleMySqlAdapter } from "./drizzle-factory-mysql.ts";
+import type { LifecyclePool } from "./lifecycle-transaction.ts";
 import { runMigrations } from "./migrate.ts";
+import {
+  activateRetention,
+  attachRetention,
+  type RetentionActivation,
+  type RetentionSource,
+} from "./retention-activation.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -69,14 +76,42 @@ function resolvePool(options: MysqlDatabaseOptions): {
 }
 
 /**
+ * Where retention may get its connections: only a pool lends each operation a session of its own.
+ * An injected single `Connection` would put every party on one session, where row locks prove
+ * nothing, so it stays fail closed, as a preset that names why does.
+ */
+function retentionSource(pool: PoolLike, refused: string | undefined): RetentionSource {
+  if (refused !== undefined) return { refused };
+  if (typeof (pool as Partial<LifecyclePool>).getConnection !== "function") {
+    return { refused: "an injected single connection, not a pool" };
+  }
+  return { pool: pool as unknown as LifecyclePool };
+}
+
+/**
  * Create a MySQL/MariaDB-backed DatabaseAdapter using mysql2 + Drizzle.
  * Works with MySQL, MariaDB, PlanetScale (via mysql2), TiDB.
+ *
+ * Build retention (ADR 0039) is available on a pool against MySQL 8 with InnoDB; on anything else
+ * the adapter works as before and retention stays fail closed, with a warning at boot.
  */
 export function createMysqlDatabase(options: MysqlDatabaseOptions): DatabaseAdapter {
+  return createMysqlAdapter(options);
+}
+
+/**
+ * {@link createMysqlDatabase}, for a preset: `unverifiedRetention` names a transport the lifecycle
+ * was never proven on, which keeps the capability off whatever the server reports.
+ */
+export function createMysqlAdapter(
+  options: MysqlDatabaseOptions,
+  unverifiedRetention?: string,
+): DatabaseAdapter {
   const { pool, owned } = resolvePool(options);
   const db = drizzle(pool as never, { schema, mode: "default" });
+  const retention: RetentionActivation = {};
 
-  return createDrizzleMySqlAdapter(db, {
+  const adapter = createDrizzleMySqlAdapter(db, {
     metadata: {
       name: "MySQL",
       version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
@@ -87,17 +122,8 @@ export function createMysqlDatabase(options: MysqlDatabaseOptions): DatabaseAdap
     // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- schema is AnyMySqlTable, adapter expects Table
     tables: schema as unknown as DatabaseAdapter["tables"],
     migrate: async ({ logger, release }): Promise<void> => {
-      // oxlint-disable-next-line unicorn/consistent-function-scoping -- closes over pool from createMysqlDatabase
-      const run = async (sql: string): Promise<unknown[]> => {
-        const result: unknown =
-          typeof pool.query === "function" ? await pool.query(sql) : await pool.execute?.(sql);
-        if (!Array.isArray(result)) {
-          return [];
-        }
-        const rows: unknown = result[0];
-        return Array.isArray(rows) ? (rows as unknown[]) : [];
-      };
-      await runMigrations(run, logger, release);
+      await runMigrations(async (sql) => await runRows(pool, sql), logger, release);
+      await activateRetention(retentionSource(pool, unverifiedRetention), retention, logger);
     },
     close: async (): Promise<void> => {
       if (owned && pool.end) {
@@ -108,4 +134,16 @@ export function createMysqlDatabase(options: MysqlDatabaseOptions): DatabaseAdap
       await pool.query("SELECT 1");
     },
   });
+  return attachRetention(adapter, retention);
+}
+
+/** The rows of one statement on the pool, for the migration runner. */
+async function runRows(pool: PoolLike, sql: string): Promise<unknown[]> {
+  const result: unknown =
+    typeof pool.query === "function" ? await pool.query(sql) : await pool.execute?.(sql);
+  if (!Array.isArray(result)) {
+    return [];
+  }
+  const rows: unknown = result[0];
+  return Array.isArray(rows) ? (rows as unknown[]) : [];
 }

@@ -4,6 +4,10 @@ import type { BrandTheme } from "../theme.ts";
  * CSS variable tokens: brand-driven colors (per theme), theme-independent
  * scales (type, space, radius, motion), and tokens derived from the brand
  * accent/status colors so customer themes need no extra fields.
+ *
+ * Breakpoints (`max-width`): only these three exist. 480 px is a phone, 880 px is where the sidebar
+ * becomes a drawer and grids stack, 1024 px is where the review workspace drops its side panel.
+ * `consistency.test.ts` refuses any other `@media (max-width)` outside them.
  */
 export function tokenCss(light: BrandTheme, dark: BrandTheme): string {
   return [
@@ -77,6 +81,9 @@ function scaleTokens(): string {
       --space-5: 1.25rem;
       --space-6: 1.5rem;
       --space-8: 2rem;
+      /* Control heights: every button, input, select, filter and toolbar item is one of the two. */
+      --control-sm: 32px;
+      --control-md: 40px;
       --radius-pill: 999px;
       --ease: cubic-bezier(0.2, 0, 0, 1);
       --dur-fast: 120ms;
