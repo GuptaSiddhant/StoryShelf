@@ -6,7 +6,7 @@ import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
 import { parseTrustProxy } from "@storyshelf/core/config";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+import { createEmailNotifier, gitFromEnv, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -129,10 +129,20 @@ shelfLogger.info(aiLogFields(ai), "ai insights");
 // (undefined keeps invites out-of-band).
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 
+// Git connections from the environment (ADR 0054, decision 9), so the demo's App can move to a
+// configured connection: SHELF_GITHUB_APP_ID + SHELF_GITHUB_APP_PRIVATE_KEY[_FILE], and so on. Unset,
+// there are none and the demo's deployed secrets are untouched.
+const git = gitFromEnv(env);
+shelfLogger.info(
+  { gitConnections: (git.connections ?? []).map((connection) => connection.id) },
+  "git connections",
+);
+
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
+  git,
   ai,
   notifications: {
     notifiers: (builtIn) =>
