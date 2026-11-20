@@ -3,6 +3,13 @@ import { baseStyle } from "../styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "../theme.ts";
 
 describe("baseStyle", () => {
+  it("declares color-scheme per theme so native controls follow the app theme", () => {
+    const css = baseStyle(LIGHT_THEME, DARK_THEME);
+    expect(css).toMatch(/:root \{\s*color-scheme: light;/u);
+    expect(css).toMatch(/\[data-theme="dark"\] \{\s*color-scheme: dark;/u);
+    expect(css).toMatch(/\[data-theme="system"\] \{\s*color-scheme: dark;/u);
+  });
+
   it("contains tokens, components, shell, and review sections", () => {
     const css = baseStyle(LIGHT_THEME, DARK_THEME);
     for (const token of [

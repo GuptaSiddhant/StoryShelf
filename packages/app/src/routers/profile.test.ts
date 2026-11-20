@@ -99,7 +99,7 @@ describe("profile page", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("Ada");
-    expect(html).toContain("via local");
+    expect(html).toContain("Via local");
     expect(html).toContain("Demo");
   });
 

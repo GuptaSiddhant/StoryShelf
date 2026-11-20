@@ -21,6 +21,7 @@ import {
   Stat,
   Table,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
 import { UnverifiedDefaultNotice, type UnverifiedDefaultProject } from "./admin-system-branch.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
@@ -209,7 +210,7 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
     <Card>
       <SectionTitle>Server</SectionTitle>
       <div class="grid grid--3">
-        <Stat label="Status" value={report.status} />
+        <Stat label="Status" value={statusLabel(report.status)} />
         <Stat label="Uptime" value={formatUptime(report.uptimeSecs)} />
         <Stat label="Version" value={report.version} />
       </div>
