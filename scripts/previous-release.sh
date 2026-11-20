@@ -4,10 +4,15 @@
 #   2. migrate the same database with this checkout, as the next minor release;
 #   3. start the published release against it: it must skip its migrations (decision 2), leave
 #      `schema_meta` alone, read what step 1 wrote, and write;
-#   4. (postgres) run that release's own live database suites, checked out at its tag, against it.
+#   4. (postgres) run that release's own live database suites, checked out at its tag, against it;
+#   5. mixed queue: this checkout enqueues every job kind (a repository link's `notify` job at
+#      payload version 2 among them); the published release's consumers run alone (a rollback),
+#      then beside this checkout's (a rolling deploy). No job may end `failed` because of its kind
+#      or payload version, and each must run once, on a consumer that understands it.
 # Fails if any step fails. Run from anywhere:
 #   scripts/previous-release.sh <sqlite|postgres>
-# Env: DATABASE_URL (postgres), PREVIOUS_RELEASE (default: newest `v*` tag), RUN_TAG_SUITES=0 to skip step 4.
+# Env: DATABASE_URL (postgres), PREVIOUS_RELEASE (default: newest `v*` tag), RUN_TAG_SUITES=0 to skip
+# step 4, RUN_MIXED_QUEUE=0 to skip step 5.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.nub/bin:$PATH"
@@ -41,8 +46,10 @@ fi
 
 # The published release, exactly as an operator installs it.
 (cd "$WORK/consumer" && npm init -y >/dev/null && npm install --no-audit --no-fund --silent \
-  "@storyshelf/app@$PREV" "@storyshelf/storage-local@$PREV" "@storyshelf/db-$DIALECT@$PREV")
-cp scripts/previous-release/smoke-previous.mjs "$WORK/consumer/"
+  "@storyshelf/app@$PREV" "@storyshelf/core@$PREV" "@storyshelf/storage-local@$PREV" \
+  "@storyshelf/db-$DIALECT@$PREV")
+cp scripts/previous-release/smoke-previous.mjs scripts/previous-release/mixed-queue-previous.mjs \
+  "$WORK/consumer/"
 
 echo "== step 1: previous release on an empty database"
 (cd "$WORK/consumer" && node smoke-previous.mjs "$DIALECT" seed)
@@ -65,5 +72,21 @@ if [ "$DIALECT" = postgres ] && [ "${RUN_TAG_SUITES:-1}" = 1 ]; then
   # Disposable service database: the suites clear and claim shared rows.
   (cd "$WORK/tag/packages/db-postgres" && LIVE_CLOUD=1 POSTGRES_SCHEMA_MUTATION_TEST=0 \
     nubx vitest run src/postgres.live.test.ts)
+fi
+if [ "${RUN_MIXED_QUEUE:-1}" = 1 ]; then
+  echo "== step 5: mixed queue, $PREV's consumers beside this checkout's"
+  mixed() { DIALECT="$DIALECT" RELEASE="$NEXT" WORK="$WORK" nub scripts/previous-release/mixed-queue-current.ts "$@"; }
+  previous() { (cd "$WORK/consumer" && node mixed-queue-previous.mjs "$DIALECT" "$1" "$WORK/previous.jsonl"); }
+  # Typechecks the kind list against `CaptureJobKind`: a new kind must be enqueued here too.
+  nubx tsc -p scripts/previous-release/tsconfig.json
+  mixed enqueue 1
+  previous 10 # alone, as after a rollback
+  mixed rollback
+  previous 50 & PREVIOUS_PID=$! # beside this checkout, as during a rolling deploy
+  sleep 3
+  mixed enqueue 2
+  mixed consume
+  wait "$PREVIOUS_PID"
+  mixed final
 fi
 echo "== $DIALECT OK"

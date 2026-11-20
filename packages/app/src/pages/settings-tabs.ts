@@ -18,6 +18,7 @@ export type SettingsSection =
   | "owners"
   | "labels"
   | "notifications"
+  | "git"
   | "members"
   | "tokens"
   | "webhooks"
@@ -54,6 +55,7 @@ export const SECTION_TAB: Record<SettingsSection, SettingsTab> = {
   owners: "review",
   labels: "review",
   notifications: "review",
+  git: "review",
   members: "access",
   tokens: "access",
   webhooks: "access",

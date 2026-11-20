@@ -114,6 +114,23 @@ describe("gitHubNotifier in checks mode", () => {
     );
   });
 
+  it("requests the token for a pinned repository id only", async () => {
+    const calls = recordedGitHub();
+    await gitHubNotifier
+      .create({ config: { ...CONFIG, repositoryId: "991" }, secret: TEST_PRIVATE_KEY })
+      .setState({
+        channel,
+        target: { kind: "status", sha: "abc", context: "storyshelf/testing" },
+        state: "success",
+        url: "u",
+      });
+    expect(calls[0]?.url).toBe("https://api.github.com/app/installations/2/access_tokens");
+    expect(bodyOf(calls[0])).toEqual({ repository_ids: [991] });
+    expect(() =>
+      gitHubNotifier.create({ config: { ...CONFIG, repositoryId: "x" }, secret: "k" }),
+    ).toThrow("repository ID");
+  });
+
   it("stays on commit statuses by default and ignores App fields", async () => {
     const calls = stubFetch(() => Response.json({}));
     await gitHubNotifier

@@ -76,6 +76,11 @@ export interface QueueJobInput {
    * one more pass runs after it ends. The id returned is the job that covers the request.
    */
   activeKey?: string;
+  /**
+   * Version of `data` (ADR 0053, decision 5); default `PAYLOAD_VERSION`. A job whose `data`
+   * an older release cannot read is written at a higher one, which that release hands back unrun.
+   */
+  payloadVersion?: number;
 }
 
 /** A job claimed from the database queue. */

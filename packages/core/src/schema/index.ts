@@ -28,6 +28,14 @@ export type { BuildReview } from "./build-review.ts";
 export type { BuildComponent } from "./build-component.ts";
 export { SCHEMA_META_ID, type SchemaMeta } from "./schema-meta.ts";
 export type { SiteSetting } from "./site-setting.ts";
+/** Git connection and project repository link rows. */
+export type {
+  ConfiguredGitConnection,
+  GitConnectionProvider,
+  GitConnectionRow,
+  GitRepositoryLinkRow,
+  GitRepositoryLinkState,
+} from "./git-connection.ts";
 /** Review comment row as stored in the `comments` table. */
 export type { Comment, CommentMention } from "./comment.ts";
 /** Build label and label type rows. */

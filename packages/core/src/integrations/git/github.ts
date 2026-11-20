@@ -55,6 +55,7 @@ function tokenSource(cfg: GitHubConfig, secret: string): () => Promise<string> {
     installationId: cfg.installationId,
     apiUrl: cfg.apiUrl,
     privateKey: secret,
+    ...(cfg.repositoryId === undefined ? {} : { repositoryIds: [cfg.repositoryId] }),
   };
   return async () => await installationToken(creds);
 }

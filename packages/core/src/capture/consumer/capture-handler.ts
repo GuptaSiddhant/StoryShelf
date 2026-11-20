@@ -9,6 +9,7 @@ import type { Logger } from "../../logger.ts";
 import { BuildModel } from "../../models/build.ts";
 import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
 import { CaptureLogModel } from "../../models/capture-log.ts";
+import type { GitConnectionModel } from "../../models/git-connection.ts";
 import { createPublicOriginResolver } from "../../models/public-origin.ts";
 import type { SecretInput } from "../../utils/encrypt.ts";
 import { createBuildStatePublisher } from "../build-state/publisher.ts";
@@ -36,6 +37,8 @@ export interface CaptureHandlerOptions {
   enqueue: (job: ShardJob) => Promise<void>;
   /** Notifier providers; `state` channels (git hosts) get the build statuses. */
   notifiers?: NotifierProvider[];
+  /** The server's git connections: approved repository links take part like git channels (ADR 0054). */
+  gitConnections?: GitConnectionModel | undefined;
   /**
    * Shows a build's state on its git channels at every transition. Default: deliver inline through
    * `notifiers` (a capture always has `testing` on); the app passes its queue-backed publisher.
@@ -197,6 +200,7 @@ export function captureDispatchDeps(
     secret: options.secret,
     design: options.design,
     notifiers: options.notifiers,
+    gitConnections: options.gitConnections,
     publicOrigin,
     shardSize: options.shardSize,
     enqueue: options.enqueue,
@@ -229,6 +233,7 @@ function inlineBuildState(
       db: options.db,
       storage: options.storage,
       notifiers: options.notifiers ?? [],
+      gitConnections: options.gitConnections,
       secret: options.secret,
       config: options.config ?? {},
       publicOrigin,
