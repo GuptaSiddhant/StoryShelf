@@ -65,8 +65,8 @@ exports[`server init output > is unchanged for aws full 1`] = `
     "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 946 9dc21258a4d527464d9a442f12b127eafcc5d3f3ecf368acd5a97f3af183ca3b",
     "src/index.ts 2398 2f9d1259843a6f2c2eecfe4a11e1933c6df0ee7a971383490d9ee6f84ee42f5b",
-    "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
-    "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
+    "terraform/README.md 5054 3501919f329797d3e6d883723e74b0ada6195d6a01bd1f08e45c244148975232",
+    "terraform/compute.tf 8130 148078e836184f66fb68a249109049981e7e977d4afbada5d8c234def007e7b0",
     "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
     "terraform/dns.tf 1879 57e77ea00724ea863c651c49a3997284f3649d7473e0c9459184f7f60fc68909",
     "terraform/identity.tf 1213 4cb9a3f9e6db6205c6c0282a7a7c3ca77d37686f07e94bff146f1681b9befe91",
@@ -75,7 +75,7 @@ exports[`server init output > is unchanged for aws full 1`] = `
     "terraform/secrets.tf 1330 70b15b2d9ea3ca498d4725d7384ade8905309a30c6032e1845e94d0ebbfe83c2",
     "terraform/storage.tf 1148 a7e79b5b49dd4928220ad33f378eecd5a3c54cbfbaa34145907b97ad0727af1c",
     "terraform/terraform.tfvars.example 312 85ce7a55e1dfae761a8875521a434c0a3fafe4677eb679671c329c138394d6a4",
-    "terraform/variables.tf 843 1a7c333726bb9e867b84804097a06dc0da9fabb4a9d8eeb3ea5a54b3428ad97a",
+    "terraform/variables.tf 2028 41aca2e5a53f249d32c3353c08699be92795584f30de7b001097dafaf6094e61",
     "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -110,8 +110,8 @@ exports[`server init output > is unchanged for aws minimal 1`] = `
     "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 946 9dc21258a4d527464d9a442f12b127eafcc5d3f3ecf368acd5a97f3af183ca3b",
     "src/index.ts 2398 2f9d1259843a6f2c2eecfe4a11e1933c6df0ee7a971383490d9ee6f84ee42f5b",
-    "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
-    "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
+    "terraform/README.md 5054 3501919f329797d3e6d883723e74b0ada6195d6a01bd1f08e45c244148975232",
+    "terraform/compute.tf 8130 148078e836184f66fb68a249109049981e7e977d4afbada5d8c234def007e7b0",
     "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
     "terraform/dns.tf 1879 57e77ea00724ea863c651c49a3997284f3649d7473e0c9459184f7f60fc68909",
     "terraform/identity.tf 1213 4cb9a3f9e6db6205c6c0282a7a7c3ca77d37686f07e94bff146f1681b9befe91",
@@ -120,7 +120,7 @@ exports[`server init output > is unchanged for aws minimal 1`] = `
     "terraform/secrets.tf 1330 70b15b2d9ea3ca498d4725d7384ade8905309a30c6032e1845e94d0ebbfe83c2",
     "terraform/storage.tf 1148 a7e79b5b49dd4928220ad33f378eecd5a3c54cbfbaa34145907b97ad0727af1c",
     "terraform/terraform.tfvars.example 312 85ce7a55e1dfae761a8875521a434c0a3fafe4677eb679671c329c138394d6a4",
-    "terraform/variables.tf 843 1a7c333726bb9e867b84804097a06dc0da9fabb4a9d8eeb3ea5a54b3428ad97a",
+    "terraform/variables.tf 2028 41aca2e5a53f249d32c3353c08699be92795584f30de7b001097dafaf6094e61",
     "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -155,23 +155,24 @@ exports[`server init output > is unchanged for azure full 1`] = `
     "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 949 7dcb1330a46022f962aeac8d867cbcd37ab3802ae3ede38fb0e4a6cd290fdb23",
     "src/index.ts 2306 48710e7602e4b52ea84cb8e258ee85cb469f0142bcaa1e5834ce781ff8ebe8ca",
-    "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
-    "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
+    "terraform/README.md 2241 216701ca4772ff1cadcc2bdd14fa7c494e3a9f6cbe9dc603321d91debfaeae62",
+    "terraform/compute.tf 2674 e3fe18f7e15fdd290af9847a8423011216fc4ace573f3c5a5905a6e8dd1a6d66",
     "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
     "terraform/dns.tf 1248 2dc436b7e1ef3afb211fc22c529c11ed7d76043250ca6544c09798454f986961",
+    "terraform/git-access.tf 704 279875546621c9fa35247d9ab043f33aaabfde2de6fa2c4abbbb953b01daac4c",
     "terraform/identity.tf 601 75882c78c59a6653e8dbae4e8b117ecfb9a99b64f5935c4857f4f75024ef03bb",
-    "terraform/main.tf 487 7502b38fc54b0536ea784c00c5d3817faaf98383b6607b0e9e0102da5e186344",
+    "terraform/main.tf 1045 5b7cef1171044179368eff5f283d7a17c3a4bd1d16ec6103460a86208ea9bcf6",
     "terraform/outputs.tf 918 a2cf72b2768eaddcb3e98ec3b6bca44ed2bbb35417404f402709477e5fc1c49b",
     "terraform/secrets.tf 1337 eed50b518c20257bc33dd05304b902251cb79ad349d2c39cc4ce4b798ee5dea5",
     "terraform/storage.tf 666 337a7743dcc0546fad3bcb8c52b5303ccc3cb6bb371fb23eff7e8af419685e26",
     "terraform/terraform.tfvars.example 278 e9941daf32eb57f51201350e1f6b3b3528071eed9d8d3d9a0ed176a38b2a52d3",
-    "terraform/variables.tf 693 b1b6854bd4d2889535539d98a1668694b98391716011bc83414323fe5eb56c82",
+    "terraform/variables.tf 2119 6dc0a99c571ac59756e8a082873542d395f8b0755391d335308b1e309b24e4c2",
     "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-Created terraform/ (12 files)
+Created terraform/ (13 files)
 Created Dockerfile, .dockerignore, compose.yaml
 
 Scaffolded my-server in <tmp>/my-server
@@ -201,23 +202,24 @@ exports[`server init output > is unchanged for azure minimal 1`] = `
     "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 949 7dcb1330a46022f962aeac8d867cbcd37ab3802ae3ede38fb0e4a6cd290fdb23",
     "src/index.ts 2306 48710e7602e4b52ea84cb8e258ee85cb469f0142bcaa1e5834ce781ff8ebe8ca",
-    "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
-    "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
+    "terraform/README.md 2241 216701ca4772ff1cadcc2bdd14fa7c494e3a9f6cbe9dc603321d91debfaeae62",
+    "terraform/compute.tf 2674 e3fe18f7e15fdd290af9847a8423011216fc4ace573f3c5a5905a6e8dd1a6d66",
     "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
     "terraform/dns.tf 1248 2dc436b7e1ef3afb211fc22c529c11ed7d76043250ca6544c09798454f986961",
+    "terraform/git-access.tf 704 279875546621c9fa35247d9ab043f33aaabfde2de6fa2c4abbbb953b01daac4c",
     "terraform/identity.tf 601 75882c78c59a6653e8dbae4e8b117ecfb9a99b64f5935c4857f4f75024ef03bb",
-    "terraform/main.tf 487 7502b38fc54b0536ea784c00c5d3817faaf98383b6607b0e9e0102da5e186344",
+    "terraform/main.tf 1045 5b7cef1171044179368eff5f283d7a17c3a4bd1d16ec6103460a86208ea9bcf6",
     "terraform/outputs.tf 918 a2cf72b2768eaddcb3e98ec3b6bca44ed2bbb35417404f402709477e5fc1c49b",
     "terraform/secrets.tf 1337 eed50b518c20257bc33dd05304b902251cb79ad349d2c39cc4ce4b798ee5dea5",
     "terraform/storage.tf 666 337a7743dcc0546fad3bcb8c52b5303ccc3cb6bb371fb23eff7e8af419685e26",
     "terraform/terraform.tfvars.example 278 e9941daf32eb57f51201350e1f6b3b3528071eed9d8d3d9a0ed176a38b2a52d3",
-    "terraform/variables.tf 693 b1b6854bd4d2889535539d98a1668694b98391716011bc83414323fe5eb56c82",
+    "terraform/variables.tf 2119 6dc0a99c571ac59756e8a082873542d395f8b0755391d335308b1e309b24e4c2",
     "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-Created terraform/ (12 files)
+Created terraform/ (13 files)
 Created Dockerfile, .dockerignore, compose.yaml
 
 Scaffolded my-server in <tmp>/my-server
@@ -718,23 +720,24 @@ exports[`server init output > is unchanged for gcp full 1`] = `
     "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 947 163f5f3f06c6e9e02fd051f5ce85a9059030a41dea9f46d88fd451856ede981e",
     "src/index.ts 2252 e6cdebc3fc522da52a41e6d5f91dfdaac56a54267367ccc8523ee645f0c11d6e",
-    "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
-    "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
+    "terraform/README.md 2048 e24ba88f16760dde3bba8970c68482cb7705209d26e593de4f5a9bb726fe6e14",
+    "terraform/compute.tf 1325 924f0a265f7e2e9c55997516ed00cad28a56685aadf6731c63f23a7fd3fe65c3",
     "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
     "terraform/dns.tf 1145 1c1fd9a3681b045f5ee5328d7408f1c2c0a126fe58b51c3ee3e19a97dc91bd4a",
+    "terraform/git-access.tf 526 351c83f9f299ebd9b34fea118218fe15ddcdaccb1298b858b13f16d644a1853d",
     "terraform/identity.tf 508 e58d0694a0b39491fbb4525fdd04c68db8de1190483f2f8e324da7c6cbf07353",
-    "terraform/main.tf 641 e8f076b3806740a09940320e7c5418e5337ebe092fdb98f5e3843ea5f4894670",
+    "terraform/main.tf 1195 53c83e0572c208412c6020b34ab0bf0599f84f359cc365bab2dc005fa64f374d",
     "terraform/outputs.tf 790 348ba1fb232ec49bfe60c26140e18d15e58624bcaaa44d0f2ad7f568f26e45e3",
     "terraform/secrets.tf 1470 ba751c33e81bd5e0ffc7319b45e148cbd72e449bd0937de11cffc72272d96a7e",
     "terraform/storage.tf 786 231407a3eca6f39124cd397ae9b93c0e420ac5cefca01aa04ef83218dd5c76ff",
     "terraform/terraform.tfvars.example 323 7da5f64c5e3826ae47e9f7cbc803c8280a841bb1801b13377184e87a2b012c62",
-    "terraform/variables.tf 831 07be55482412023486810b54f8f52da751c8b836ac128bbe8b10a1a3323555f5",
+    "terraform/variables.tf 2205 6bd351529bef226b2e6188c517ed91ff48df2542ec00f7723605362b478c0152",
     "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-Created terraform/ (12 files)
+Created terraform/ (13 files)
 Created Dockerfile, .dockerignore, compose.yaml
 
 Scaffolded my-server in <tmp>/my-server
@@ -764,23 +767,24 @@ exports[`server init output > is unchanged for gcp minimal 1`] = `
     "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 947 163f5f3f06c6e9e02fd051f5ce85a9059030a41dea9f46d88fd451856ede981e",
     "src/index.ts 2252 e6cdebc3fc522da52a41e6d5f91dfdaac56a54267367ccc8523ee645f0c11d6e",
-    "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
-    "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
+    "terraform/README.md 2048 e24ba88f16760dde3bba8970c68482cb7705209d26e593de4f5a9bb726fe6e14",
+    "terraform/compute.tf 1325 924f0a265f7e2e9c55997516ed00cad28a56685aadf6731c63f23a7fd3fe65c3",
     "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
     "terraform/dns.tf 1145 1c1fd9a3681b045f5ee5328d7408f1c2c0a126fe58b51c3ee3e19a97dc91bd4a",
+    "terraform/git-access.tf 526 351c83f9f299ebd9b34fea118218fe15ddcdaccb1298b858b13f16d644a1853d",
     "terraform/identity.tf 508 e58d0694a0b39491fbb4525fdd04c68db8de1190483f2f8e324da7c6cbf07353",
-    "terraform/main.tf 641 e8f076b3806740a09940320e7c5418e5337ebe092fdb98f5e3843ea5f4894670",
+    "terraform/main.tf 1195 53c83e0572c208412c6020b34ab0bf0599f84f359cc365bab2dc005fa64f374d",
     "terraform/outputs.tf 790 348ba1fb232ec49bfe60c26140e18d15e58624bcaaa44d0f2ad7f568f26e45e3",
     "terraform/secrets.tf 1470 ba751c33e81bd5e0ffc7319b45e148cbd72e449bd0937de11cffc72272d96a7e",
     "terraform/storage.tf 786 231407a3eca6f39124cd397ae9b93c0e420ac5cefca01aa04ef83218dd5c76ff",
     "terraform/terraform.tfvars.example 323 7da5f64c5e3826ae47e9f7cbc803c8280a841bb1801b13377184e87a2b012c62",
-    "terraform/variables.tf 831 07be55482412023486810b54f8f52da751c8b836ac128bbe8b10a1a3323555f5",
+    "terraform/variables.tf 2205 6bd351529bef226b2e6188c517ed91ff48df2542ec00f7723605362b478c0152",
     "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-Created terraform/ (12 files)
+Created terraform/ (13 files)
 Created Dockerfile, .dockerignore, compose.yaml
 
 Scaffolded my-server in <tmp>/my-server
