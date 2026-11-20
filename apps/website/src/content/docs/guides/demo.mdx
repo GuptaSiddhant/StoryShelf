@@ -1,12 +1,12 @@
 ---
 title: Live Demo
-description: Try StoryShelf at storyshelf.fly.dev — browse its Storybook without an account, seeded with fixtures.
+description: Try StoryShelf at storyshelf.fly.dev — browse its Storybook without an account.
 ---
 
 import { LinkButton } from "@astrojs/starlight/components";
 import Screenshot from "../../../components/Screenshot.astro";
 
-The public demo at **`https://storyshelf.fly.dev`** is a full StoryShelf server (Fly `iad`, SQLite + local storage + Playwright) seeded with the `fixtures/storybook-9` project. Anyone can browse the demo's published Storybook without an account, from a link on the sign-in page; reviewing builds and diffs needs an account.
+The public demo at **`https://storyshelf.fly.dev`** is a full StoryShelf server (Fly `iad`, SQLite + local storage + Playwright) seeded with the `fixtures/storybook-9` project. Browse its published Storybook without an account; reviewing builds and diffs needs one.
 
 <LinkButton href="https://storyshelf.fly.dev" icon="external">
   Open the live demo
@@ -36,17 +36,16 @@ The public demo at **`https://storyshelf.fly.dev`** is a full StoryShelf server 
 
 The demo runs env-driven local-account auth (`@storyshelf/auth`):
 
-- **Anonymous:** the sign-in page links to the demo's latest `main` Storybook (`/_/demo-design-system/`). The demo's builds are public, which covers hosting and the Storybook preview only, never review.
 - **Viewer:** invite-only local accounts (see [Auth](/guides/auth/)) — browse projects, diffs, and published Storybooks; upload, approve, and settings require admin.
 - **Admin:** `AUTH_PASSWORD` (private) provisions the site `admin` on boot. Keep this with maintainers only.
 
-Open `https://storyshelf.fly.dev` and use **Browse the demo's Storybook without an account**; to review diffs, sign in with an account. If auth is disabled on a local fork (`AUTH_PASSWORD` unset), the UI is open without login (trusted-network mode — see [Auth](/guides/auth/)).
+Open the demo and choose **Browse the demo's Storybook without an account**, or sign in to review. With auth off on a local fork (`AUTH_PASSWORD` unset) the UI is open (see [Auth](/guides/auth/)).
 
 ## What’s seeded
 
 - Project `Demo Design System` (slug `demo-design-system`, `acme/design-system`) from `fixtures/storybook-9` — viewports `desktop`/`mobile`.
 - A `reviewing` build (`feature/new-button`) with `changed` snapshots for the diff overlay demo — real Playwright renders (both viewports).
-- A signed-in `viewer` can open the build review (`/projects/demo-design-system/builds/:buildId`) and the published Storybook (`/projects/demo-design-system/storybook`), but **Approve/Reject** and **Settings** require admin.
+- The `viewer` account can open the build review (`/projects/demo-design-system/builds/:buildId`) and the published Storybook (`/projects/demo-design-system/storybook`), but **Approve/Reject** and **Settings** require admin.
 
 ## Related
 
