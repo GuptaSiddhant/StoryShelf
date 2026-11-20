@@ -5,6 +5,7 @@ import {
   gitHeadSha,
   LOCAL_BRANCH,
   localSha,
+  selectAffectedStories,
   type AffectedResult,
 } from "@storyshelf/affected";
 import { ZipArchive } from "archiver";
@@ -32,7 +33,7 @@ import {
   measureBuild,
   uploadFileByFile,
 } from "./file-by-file.ts";
-import { readEntryIds } from "./index-entries.ts";
+import { readEntries, readEntryIds } from "./index-entries.ts";
 import { parseLabels } from "./labels.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
@@ -506,12 +507,26 @@ async function reportAffectedCapture(
       affectedImportPaths: result.affectedImportPaths,
     });
     printLine(describeAffected(result, created.baselineSha));
-    return result.affectedImportPaths?.length ?? null;
+    return countAffectedStories(cwd, collected.buildDir, result.affectedImportPaths);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     printLine(`Full capture (affected post failed: ${reason}): rendering all stories`);
     return null;
   }
+}
+
+/**
+ * Stories the server will render for these affected import paths (one file can hold many), or the
+ * path count when the index cannot be read. Null is a full capture.
+ */
+function countAffectedStories(
+  cwd: string,
+  buildDir: string,
+  paths: readonly string[] | null,
+): number | null {
+  if (paths === null) return null;
+  const entries = readEntries(cwd, buildDir);
+  return entries === null ? paths.length : selectAffectedStories(entries, paths).render.length;
 }
 
 /** Human-readable summary of an affected computation. */

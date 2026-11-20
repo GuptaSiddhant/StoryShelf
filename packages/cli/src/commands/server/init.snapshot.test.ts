@@ -19,6 +19,16 @@ vi.mock("../../config.ts", async (importOriginal) => ({
   detectPackageRunner: async (): Promise<"npm"> => await Promise.resolve("npm"),
 }));
 
+vi.mock("../../output.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../output.ts")>();
+  // A fixed clock and a non-terminal reporter, whatever the terminal, `CI` and `NO_COLOR` are.
+  return {
+    ...original,
+    createReporter: (): ReturnType<typeof original.createReporter> =>
+      original.createReporter({ interactive: false, color: false, now: () => 0 }),
+  };
+});
+
 import prompts from "prompts";
 import { runServerInit } from "./init.ts";
 
@@ -167,10 +177,7 @@ async function scaffold(answers: Record<string, unknown>): Promise<void> {
 describe("server init output", () => {
   it.each(Object.entries(PRESETS))("is unchanged for %s", async (_name, answers) => {
     await scaffold(answers);
-    const output = written
-      .replaceAll(tmpRoot, "<tmp>")
-      .replaceAll(/\/private(?=<tmp>)/gu, "")
-      .replaceAll(/\(\d+(?:\.\d)?m?s\)/gu, "(<time>)");
+    const output = written.replaceAll(tmpRoot, "<tmp>").replaceAll(/\/private(?=<tmp>)/gu, "");
     expect({ files: fingerprint(join(tmpRoot, "my-server")), output }).toMatchSnapshot();
   });
 

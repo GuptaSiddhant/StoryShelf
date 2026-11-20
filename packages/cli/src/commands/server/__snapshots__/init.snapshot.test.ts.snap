@@ -13,7 +13,7 @@ exports[`server init output > is unchanged for auth oauth 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -41,7 +41,7 @@ exports[`server init output > is unchanged for auth password 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -88,7 +88,7 @@ Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -135,7 +135,7 @@ Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -182,7 +182,7 @@ Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -230,7 +230,7 @@ Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -261,7 +261,7 @@ exports[`server init output > is unchanged for database better-sqlite3 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -286,7 +286,7 @@ exports[`server init output > is unchanged for database bun-sqlite 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -311,7 +311,7 @@ exports[`server init output > is unchanged for database d1 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -336,7 +336,7 @@ exports[`server init output > is unchanged for database mysql 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -363,7 +363,7 @@ exports[`server init output > is unchanged for database neon 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -390,7 +390,7 @@ exports[`server init output > is unchanged for database neon-http 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -417,7 +417,7 @@ exports[`server init output > is unchanged for database pg 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -444,7 +444,7 @@ exports[`server init output > is unchanged for database pglite 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -469,7 +469,7 @@ exports[`server init output > is unchanged for database planetscale 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -496,7 +496,7 @@ exports[`server init output > is unchanged for database postgres 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -523,7 +523,7 @@ exports[`server init output > is unchanged for database sqlite 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -548,7 +548,7 @@ exports[`server init output > is unchanged for database tidb 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -575,7 +575,7 @@ exports[`server init output > is unchanged for database turso 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -600,7 +600,7 @@ exports[`server init output > is unchanged for database vercel 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -625,7 +625,7 @@ exports[`server init output > is unchanged for design 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -653,7 +653,7 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -682,7 +682,7 @@ exports[`server init output > is unchanged for docker single container 1`] = `
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -712,7 +712,7 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore, compose.yaml
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -739,7 +739,7 @@ exports[`server init output > is unchanged for everything on 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -787,7 +787,7 @@ Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -835,7 +835,7 @@ Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -866,7 +866,7 @@ exports[`server init output > is unchanged for git on 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -894,7 +894,7 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -920,7 +920,7 @@ exports[`server init output > is unchanged for local with advanced adapters 1`] 
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -947,7 +947,7 @@ exports[`server init output > is unchanged for notifications 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -972,7 +972,7 @@ exports[`server init output > is unchanged for notifications with oauth 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -1000,7 +1000,7 @@ exports[`server init output > is unchanged for notifications with password auth 
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -1030,7 +1030,7 @@ exports[`server init output > is unchanged for observability 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -1055,7 +1055,7 @@ exports[`server init output > is unchanged for storage azure 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -1080,7 +1080,7 @@ exports[`server init output > is unchanged for storage gcs 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -1105,7 +1105,7 @@ exports[`server init output > is unchanged for storage s3 1`] = `
   "output": "[stderr] ==> Writing server project
 Created src/index.ts
 Created package.json, tsconfig.json, .env.example, README.md, .gitignore
-[stderr] --> Wrote server project (<time>)
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
