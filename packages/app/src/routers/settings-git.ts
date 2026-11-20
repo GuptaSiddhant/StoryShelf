@@ -15,6 +15,7 @@ import {
 import type { GitRepositoryLinkRow, Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { gitConnectionModel } from "../git-admin.ts";
 import {
   connectionFor,
   parseRepositoryUrl,
@@ -152,13 +153,13 @@ async function requestLink(
     prefix: read.prefix === "storyshelf" ? "" : read.prefix,
     requestedBy: store.user?.id,
   };
-  if (store.buildState === undefined || store.gitConnections === undefined) {
+  if (store.buildState === undefined) {
     return await new GitRepositoryLinkModel(store.db).create(input);
   }
   return await requestRepositoryLink(
     {
       db: store.db,
-      gitConnections: store.gitConnections,
+      gitConnections: gitConnectionModel(store),
       publisher: store.buildState,
       logger: store.logger,
       settings: new SiteSettingsModel(store.db),

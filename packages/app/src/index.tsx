@@ -51,6 +51,7 @@ import {
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { packageVersion } from "./package-version.ts";
+import { registerAdminGit } from "./routers/admin-git.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerPublicOriginRoutes } from "./routers/admin-public-origin.ts";
 import { registerAdmin } from "./routers/admin.ts";
@@ -369,10 +370,10 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       design,
       notifiers,
       integrations: options.integrations,
-      gitConnections: gitConnectionsOf(options, config),
       gitConfiguredLinks: options.git?.links,
       notificationsConfig: options.notifications?.config,
       ai: options.ai,
+      gitConnections: gitConnectionsOf(options, config),
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),
     }),
   );
@@ -438,11 +439,21 @@ function registerPageRoutes(
   registerStorybook(app);
   registerTokenStorybook(app);
   registerPreviewToken(app);
-  registerAdminPages(app, health, options.auth);
-  registerPublicOriginRoutes(app);
+  registerSystemPages(app, options, health);
   registerUiPages(app);
   registerReviewForms(app);
   registerInsightFragments(app);
+}
+
+/** The site-admin System page, its public-origin routes and System → Git. */
+function registerSystemPages(
+  app: ShelfRouter,
+  options: ResolvedShelfOptions,
+  health: HealthDeps,
+): void {
+  registerAdminPages(app, health, options.auth);
+  registerPublicOriginRoutes(app);
+  registerAdminGit(app);
 }
 
 /** Register every API router and page set, then the error answers that cover them. */

@@ -19,7 +19,7 @@ import { getStore, type Store } from "./store.ts";
  */
 export async function requestBuildState(
   buildId: string,
-  only?: { channelId?: string },
+  only?: { channelId?: string; linkId?: string },
 ): Promise<void> {
   const store = getStore();
   const publisher = store.buildState ?? inlinePublisher(store);
@@ -37,7 +37,7 @@ async function requestSkippedFollowers(
   store: Store,
   publisher: ReturnType<typeof createBuildStatePublisher>,
   buildId: string,
-  only?: { channelId?: string },
+  only?: { channelId?: string; linkId?: string },
 ): Promise<void> {
   try {
     const followers = await new BuildModel(store.db).skippedFrom(buildId);

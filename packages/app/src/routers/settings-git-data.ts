@@ -7,13 +7,14 @@ import { DEFAULT_STATUS_PREFIX } from "@storyshelf/core/adapter/notifier";
 import { postsComments } from "@storyshelf/core/capture";
 import { GitRepositoryLinkModel, linkOutputsOf, type GitConnection } from "@storyshelf/core/models";
 import type { GitRepositoryLinkRow, Project } from "@storyshelf/core/schema";
+import { gitConnectionModel } from "../git-admin.ts";
 import { proposedPrefix } from "../git-link-request.ts";
 import type { SettingsGitData, SettingsGitLink } from "../pages/settings-git.tsx";
 import { getStore } from "../store.ts";
 
 /** The server's usable git connections (a stored row shadowed by configuration is not one). */
 export async function usableConnections(): Promise<GitConnection[]> {
-  const all = (await getStore().gitConnections?.list()) ?? [];
+  const all = await gitConnectionModel().list();
   return all.filter((connection) => !connection.ignored);
 }
 

@@ -40,10 +40,10 @@ export interface StoreScopeDeps {
   design: DesignProvider[];
   notifiers: NotifierProvider[];
   integrations?: readonly IntegrationStatus[];
-  gitConnections?: GitConnectionModel | undefined;
   gitConfiguredLinks?: readonly GitLinkConfig[] | undefined;
   notificationsConfig?: NotificationsConfig;
   ai?: Ai;
+  gitConnections?: GitConnectionModel;
   resolveUser: (c: Context) => Promise<AuthUser | null>;
 }
 
@@ -77,10 +77,10 @@ export function storeScope(deps: StoreScopeDeps) {
         design: deps.design,
         notifiers: deps.notifiers,
         integrations: deps.integrations,
-        gitConnections: deps.gitConnections,
         gitConfiguredLinks: deps.gitConfiguredLinks,
         notificationsConfig: deps.notificationsConfig,
         ai: deps.ai,
+        gitConnections: deps.gitConnections,
       },
       async () => {
         await next();
