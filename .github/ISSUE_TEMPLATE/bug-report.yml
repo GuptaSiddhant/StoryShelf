@@ -1,0 +1,66 @@
+name: Bug report (public)
+description: Something in StoryShelf is not working. Questions go to Discussions.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions and ideas belong in [Discussions](https://github.com/GuptaSiddhant/StoryShelf/discussions). Report security problems privately through the [security advisory form](https://github.com/GuptaSiddhant/StoryShelf/security/advisories/new). Remove tokens, secrets and private URLs from anything you paste.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, what you got, and the steps to reproduce.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: StoryShelf version
+      description: The version in the System page footer, `npx storyshelf --version`, or the image tag.
+      placeholder: "0.15.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install path
+      options:
+        - npm scaffold (storyshelf server init)
+        - Docker image
+        - Fly
+        - Terraform
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: database-storage
+    attributes:
+      label: Database and storage
+      description: For example SQLite and local disk, Postgres and S3.
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      description: Where it runs, for example a Linux VM, Fly, AWS ECS, Kubernetes.
+    validations:
+      required: false
+  - type: textarea
+    id: doctor
+    attributes:
+      label: "`storyshelf doctor` output"
+      description: Run `npx storyshelf doctor` from your Storybook folder and paste the result.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Server log lines around the problem. Include the `x-request-id` response header of the failing request if you have it.
+      render: shell
+    validations:
+      required: false
