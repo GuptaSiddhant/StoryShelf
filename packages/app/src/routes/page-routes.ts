@@ -99,6 +99,7 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   // both
   "GET /projects/:slug": "both",
   "GET /projects/:slug/builds": "both",
+  "POST /projects/:slug/builds/cancel": "testing",
   "GET /projects/:slug/builds/:buildId": "both",
   "GET /projects/:slug/builds/:buildId/diff": "both",
   "GET /projects/:slug/library": "both",

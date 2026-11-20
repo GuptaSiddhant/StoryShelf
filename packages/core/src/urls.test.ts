@@ -255,3 +255,12 @@ describe("storybook entry links", () => {
     );
   });
 });
+
+describe("buildsCancel", () => {
+  it("is the page route under the builds list, behind the content-host root", () => {
+    expect(createUrlBuilder("").buildsCancel("web")).toBe("/projects/web/builds/cancel");
+    expect(createUrlBuilder("https://shelf.example.com").buildsCancel("web")).toBe(
+      "https://shelf.example.com/projects/web/builds/cancel",
+    );
+  });
+});
