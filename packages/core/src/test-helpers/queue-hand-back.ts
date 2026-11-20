@@ -51,11 +51,22 @@ async function setup(makeDb: SharedDatabaseFactory) {
     peer,
     model,
     create,
-    /** End every job the case made, so a database shared by the cases polls nothing of theirs. */
+    /**
+     * End every job the case made, and every attempt it left running, so a database shared by the
+     * cases polls nothing of theirs (a later case that moves its clock past the lease would
+     * otherwise spend its claim tries retiring them).
+     */
     cleanup: async () => {
+      const at = new Date(clock.now).toISOString();
       for (const id of created) {
         // oxlint-disable-next-line no-await-in-loop -- few rows, in order
-        await model.finishJob(id, "cancelled", new Date(clock.now).toISOString(), null);
+        await model.finishJob(id, "cancelled", at, null);
+        // oxlint-disable-next-line no-await-in-loop -- see above
+        const running = (await model.attempts(id)).filter((row) => row.status === "running");
+        // oxlint-disable-next-line no-await-in-loop -- see above
+        await Promise.all(
+          running.map(async (row) => await model.finishAttempt(row.id, "expired", at)),
+        );
       }
     },
     advance: (ms: number) => {
