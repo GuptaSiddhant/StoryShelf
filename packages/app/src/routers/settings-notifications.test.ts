@@ -27,6 +27,7 @@ function stubProvider(kind: string) {
     kind,
     category: "notifier" as const,
     schema: z.object({}).loose(),
+    ...(kind === "email" ? { audience: "person" as const } : {}),
   };
   return {
     metadata,

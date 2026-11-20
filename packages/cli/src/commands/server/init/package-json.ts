@@ -99,7 +99,7 @@ function featureNames(answers: Answers): string[] {
 function buildDeps(answers: Answers): Record<string, string> {
   const sdk = DB_SDK[answers.database];
   return {
-    "@hono/node-server": "^1.17.0",
+    "@hono/node-server": "^2.1.11",
     ...ownPackages(coreNames(answers)),
     ...(sdk ? { [sdk[0]]: sdk[1] } : {}),
     ...ownPackages(featureNames(answers)),

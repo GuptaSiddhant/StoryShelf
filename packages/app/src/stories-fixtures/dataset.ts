@@ -101,6 +101,20 @@ const skipped = (
     ...overrides,
   });
 
+/** A backlog: six builds queued on `main` and a seventh on a feature branch, none started yet. */
+export const backlogBuilds = (): Build[] =>
+  Array.from({ length: 7 }, (_, index) =>
+    build({
+      id: id(`BKL${String(index + 1).padStart(3, "0")}`),
+      gitSha: `b${index}c4d5e6`,
+      gitBranch: index === 6 ? "feature/dark-tabs" : "main",
+      status: "pending",
+      message: `chore: queued commit ${index + 1}`,
+      createdAt: hoursAgo(7 - index),
+      updatedAt: hoursAgo(7 - index),
+    }),
+  );
+
 export const skippedBuilds = (): Build[] => [...recentSkipped(), ...olderSkipped()];
 
 const recentSkipped = (): Build[] => [

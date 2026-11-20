@@ -24,10 +24,10 @@ const fieldWrapInline = css`
 const fieldLabel = css`
   /* field-label */
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   font-size: var(--text-sm);
   & span[aria-hidden] {
-    color: var(--status-rejected);
+    color: var(--status-rejected-fg);
   }
 `;
 
@@ -120,7 +120,7 @@ const fieldError = css`
   margin: 0;
   color: var(--status-rejected-fg);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 `;
 
 const formActions = css`
@@ -259,7 +259,7 @@ const checkLabel = css`
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   font-size: var(--text-base);
   cursor: pointer;
   &:has(input:disabled) {
@@ -386,7 +386,9 @@ export const SelectField: FC<{
   disabled?: boolean;
   required?: boolean;
   layout?: FieldLayout;
-}> = ({ label, name, value, options, hint, disabled, required, layout = "stack" }) => {
+  /** HTMX attributes for the select (`hx-get`, `hx-target`, …), for a field that re-renders others. */
+  hx?: Record<string, string>;
+}> = ({ label, name, value, options, hint, disabled, required, layout = "stack", hx }) => {
   return (
     <div class={layout === "inline" ? fieldWrapInline : fieldWrap}>
       <label class={fieldLabel} for={name}>
@@ -399,6 +401,7 @@ export const SelectField: FC<{
         disabled={disabled}
         required={required}
         aria-describedby={hint ? `${name}-hint` : undefined}
+        {...hx}
       >
         {options.map((opt) => (
           <option value={opt.value} selected={opt.value === value}>

@@ -29,7 +29,7 @@ const dropdownTrigger = css`
   background: var(--surface-card);
   color: var(--text-primary);
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   cursor: pointer;
   &::-webkit-details-marker {
     display: none;

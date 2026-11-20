@@ -27,7 +27,7 @@ const accountRoot = css`
   .account__name {
     overflow: hidden;
     font-size: var(--text-base);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

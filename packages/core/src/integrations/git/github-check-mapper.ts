@@ -20,6 +20,8 @@ export interface CheckRunInput {
   informational?: boolean | undefined;
   annotations?: readonly StateAnnotation[] | undefined;
   omitted?: number | undefined;
+  /** The comment's Markdown: when present it is the summary's opening, in place of the description. */
+  summary?: string | undefined;
   /**
    * Annotations already on the run that no longer match a current finding. GitHub keeps every
    * annotation of a run, so the summary says how many are history.
@@ -125,7 +127,12 @@ export function checkRunBody(input: CheckRunInput): CheckRunBody {
  * annotations are still the current ones.
  */
 export function summaryOf(input: CheckRunInput): string {
-  const lines = [input.description, findingsLines(input.annotations ?? []), linkLine(input)];
+  const lines = [
+    input.summary ?? input.description,
+    // The comment already lists the changes and links the review page.
+    input.summary === undefined ? findingsLines(input.annotations ?? []) : undefined,
+    input.summary === undefined || (input.omitted ?? 0) > 0 ? linkLine(input) : undefined,
+  ];
   if ((input.resolved ?? 0) > 0) {
     lines.push(earlierLine(input.resolved ?? 0));
   }

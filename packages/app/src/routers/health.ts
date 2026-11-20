@@ -1,6 +1,6 @@
 /**
  * Two-tier health: lightweight liveness (GET, no auth) and deep readiness
- * (POST, site-admin). Neither is gated by adapter setup — liveness must
+ * (POST, site-admin; it also lists each integration's standing, issue #1126, admin-only per #1090). Neither is gated by adapter setup — liveness must
  * answer mid-migration so orchestrators don't kill the machine, and deep
  * reports the setup settlement state instead of being masked by the gate.
  *
@@ -12,6 +12,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe } from "../credentials.ts";
 import { getStore, testingEnabled } from "../store.ts";
 import { collectHealthReport, type AdapterState } from "./health-report.ts";
+import { collectStatusRows, type StatusRow } from "./health-status.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 
 /** Dependencies for the health routes (no adapter I/O on the GET path). */
@@ -43,10 +44,23 @@ export interface AdapterReport {
   detail?: string;
 }
 
+/** One integration kind and whether projects are offered it (issue #1126). */
+export interface IntegrationReport {
+  group: "notifiers" | "design";
+  kind: string;
+  name: string;
+  state: "available" | "unavailable" | "disabled";
+  reason?: string;
+}
+
 /** Deep readiness body. */
 export interface ReadinessBody {
   status: "ok" | "starting" | "degraded";
   adapters: AdapterReport[];
+  /** Informational rows (telemetry, image engine, origin, hosting); never change `status`. */
+  statuses: StatusRow[];
+  /** Every integration's standing; informational, it never changes `status`. */
+  integrations: IntegrationReport[];
 }
 
 /** Register `GET /api/v1/health` (open liveness) and `POST` (authed deep readiness). */
@@ -65,13 +79,14 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
 
   app.post("/api/v1/health", async (c) => {
     requireSiteAdmin(c);
-    const { db, config } = getStore();
+    const { db, config, publicOrigin } = getStore();
     const report = await collectHealthReport(
       deps.sources,
       deps.getSettled(),
       deps.bootTimeMs,
       deps.version,
       await loadCredentialProbe(db, config),
+      await collectStatusRows({ env: process.env, config, publicOrigin }),
     );
     const adapters: AdapterReport[] = report.adapters.map((adapter) => {
       const entry: AdapterReport = {
@@ -88,7 +103,13 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
       }
       return entry;
     });
-    const body: ReadinessBody = { status: report.status, adapters };
+    const integrations: IntegrationReport[] = [...(getStore().integrations ?? [])];
+    const body: ReadinessBody = {
+      status: report.status,
+      adapters,
+      statuses: report.statuses,
+      integrations,
+    };
     c.header("Cache-Control", "no-store");
     return c.json(body, body.status === "ok" ? 200 : 503);
   });

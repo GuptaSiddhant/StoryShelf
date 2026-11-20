@@ -26,6 +26,8 @@ export interface StateWriter {
     annotations?: StateAnnotation[] | undefined;
     /** Changed snapshots left out of `annotations`. */
     omitted?: number | undefined;
+    /** Markdown for a host that shows a summary (a check run). */
+    summary?: string | undefined;
   }): Promise<void>;
   /** Create or update the project's single review comment; the newest build wins. */
   comment(input: CommentInput): Promise<unknown>;
@@ -56,6 +58,7 @@ export function createStateAdapter(
           informational: target.informational,
           annotations: target.annotations,
           omitted: target.omitted,
+          summary: target.summary,
         });
         return;
       }

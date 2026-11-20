@@ -28,13 +28,17 @@ function subscribed(channel: NotificationChannel, event: string): boolean {
   return channel.events.length === 0 || channel.events.includes(event);
 }
 
-/** `state` channels (git hosts) follow build state, never the message fan-out. */
+/**
+ * `state` channels (git hosts) follow build state, never the message fan-out. A channel whose
+ * provider is not wired (unavailable or turned off, issue #1126) is skipped: it is not delivered
+ * to and its delivery health is left as it was, and the System page lists it.
+ */
 function isMessageChannel(
   notifiers: NotifierProvider[] | undefined,
   channel: NotificationChannel,
 ): boolean {
   const provider = providerFor(notifiers, channel.provider);
-  return provider === undefined || !isStateProvider(provider);
+  return provider !== undefined && !isStateProvider(provider);
 }
 
 /** Resolve a provider for a channel kind, or undefined when unwired. */
