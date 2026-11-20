@@ -134,14 +134,21 @@ describe("health endpoints", () => {
     const body = (await response.json()) as {
       status: string;
       adapters: { category: string; state: string }[];
+      integrations: { kind: string; state: string; reason?: string }[];
     };
     expect(body.status).toBe("ok");
+    // Email has no sender here, so it is not wired (#1126); the six other built-in notifiers are.
     expect(body.adapters.map((a) => a.category).toSorted()).toEqual([
       "database",
-      ...Array.from({ length: 7 }, () => "notifier"),
+      ...Array.from({ length: 6 }, () => "notifier"),
       "storage",
     ]);
     expect(body.adapters.every((a) => a.state === "ok")).toBe(true);
+    const byKind = new Map(body.integrations.map((entry) => [entry.kind, entry]));
+    expect(byKind.get("email")?.state).toBe("unavailable");
+    expect(byKind.get("email")?.reason).toContain("SMTP_HOST");
+    expect(byKind.get("figma")?.state).toBe("disabled");
+    expect(byKind.get("slack-webhook")?.state).toBe("available");
   });
 
   it("POST /api/v1/health reports setup failures as degraded", async () => {

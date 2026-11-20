@@ -114,10 +114,7 @@ export function renderDesignCoveragePage(data: DesignCoverageData): RenderedCont
         active: "library",
         projectSlug: project.slug,
         projectName: project.name,
-        trail: [
-          { label: "Library", href: urls.library(project.slug) },
-          { label: "Design coverage" },
-        ],
+        trail: [{ label: "Design coverage" }],
       }}
     >
       <PageHeader

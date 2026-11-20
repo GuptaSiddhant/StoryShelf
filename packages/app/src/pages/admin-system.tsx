@@ -24,6 +24,7 @@ import {
   statusLabel,
 } from "../ui/components.tsx";
 import { UnverifiedDefaultNotice, type UnverifiedDefaultProject } from "./admin-system-branch.tsx";
+import { IntegrationsCard, type IntegrationsView } from "./admin-system-integrations.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { RuntimeStatusCard } from "./admin-system-status.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
@@ -56,6 +57,8 @@ export interface AdminSystemData {
   retentionPause?: RetentionPause | undefined;
   /** Projects whose default-branch builds count without the git host's confirmation. */
   unverifiedDefault?: readonly UnverifiedDefaultProject[] | undefined;
+  /** Integrations and whether projects are offered them (issue #1126); omitted when none is known. */
+  integrations?: IntegrationsView | undefined;
 }
 
 /** What the deployment has paused and why: notifications (no public URL) and build retention. */
@@ -352,6 +355,18 @@ function RuntimeSection(props: {
   );
 }
 
+/** The integrations card, anchored for the settings pages' link; absent when no status is known. */
+function IntegrationsSection(props: {
+  view: IntegrationsView | undefined;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { view } = props;
+  return view && view.statuses.length > 0 ? (
+    <div class="mt-1" id="integrations">
+      <IntegrationsCard view={view} />
+    </div>
+  ) : null;
+}
+
 /** Site-admin System page: adapter inventory with in-depth health. */
 export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
   const { report, config, credentials } = data;
@@ -389,6 +404,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
           <CredentialsCard probe={credentials} config={config} />
         </div>
       ) : null}
+      <IntegrationsSection view={data.integrations} />
       <div class="mt-1">
         <Card>
           <SectionTitle>Adapters</SectionTitle>

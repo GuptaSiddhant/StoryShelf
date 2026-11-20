@@ -85,6 +85,8 @@ export type NotifierStateTarget =
       annotations?: StateAnnotation[];
       /** Changed snapshots beyond `annotations` (cut at the cap); the host says "and N more". */
       omitted?: number;
+      /** Markdown a host with a rich summary (a check run) shows in place of the description. */
+      summary?: string;
     }
   | {
       kind: "comment";

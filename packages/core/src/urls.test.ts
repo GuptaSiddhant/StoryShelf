@@ -223,3 +223,35 @@ describe("build url", () => {
     expect(urls.build("app", "B1")).toBe(urls.buildDiff("app", "B1"));
   });
 });
+
+describe("storybook entry links", () => {
+  const urls = createUrlBuilder("https://shelf.example.com");
+  it("always goes through index.html, never iframe.html", () => {
+    expect(urls.storybookIndex("web", "b1")).toBe(
+      "https://shelf.example.com/projects/web/storybook/build/b1/index.html",
+    );
+    expect(urls.storybookStory("web", "b1", "button--primary", "story")).toBe(
+      "https://shelf.example.com/projects/web/storybook/build/b1/index.html?path=/story/button--primary",
+    );
+    expect(urls.storybookStory("web", "b1", "intro--docs", "docs")).toBe(
+      "https://shelf.example.com/projects/web/storybook/build/b1/index.html?path=/docs/intro--docs",
+    );
+    expect(urls.storybookStory("web", "b1", "a", "story")).not.toContain("iframe.html");
+  });
+
+  it("uses the build's content host in subdomain mode", () => {
+    const hosted = createUrlBuilder("https://shelf.example.com", "shelf.example.com");
+    expect(hosted.storybookStory("web", "b1", "a--b", "story")).toMatch(
+      /^https:\/\/[^/]+\.shelf\.example\.com\/index\.html\?path=\/story\/a--b$/u,
+    );
+  });
+
+  it("links the log and retry sections of the build page", () => {
+    expect(urls.buildLog("web", "b1")).toBe(
+      "https://shelf.example.com/projects/web/builds/b1/diff#log",
+    );
+    expect(urls.buildRetry("web", "b1")).toBe(
+      "https://shelf.example.com/projects/web/builds/b1/diff#retry",
+    );
+  });
+});
