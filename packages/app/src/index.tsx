@@ -370,6 +370,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       design,
       notifiers,
       integrations: options.integrations,
+      gitConfiguredLinks: options.git?.links,
       notificationsConfig: options.notifications?.config,
       ai: options.ai,
       gitConnections: gitConnectionsOf(options, config),
