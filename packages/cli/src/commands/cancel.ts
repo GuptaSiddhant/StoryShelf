@@ -1,5 +1,5 @@
 import { createClient, type CancelOlderResult } from "../client.ts";
-import { printLine } from "../output.ts";
+import { createReporter, printLine } from "../output.ts";
 import { resolveConnection, type ConnectionOptions } from "./connection.ts";
 
 /** Options for the `cancel` command. */
@@ -34,11 +34,19 @@ export async function runCancel(options: CancelOptions): Promise<void> {
   const keepNewest = parseKeepNewest(options.keepNewest);
   const { url, slug, token } = await resolveConnection(options);
   const dryRun = options.dryRun === true;
-  const result = await createClient(url, token).projects.builds.cancelOlder(slug, {
+  const input = {
     ...(options.branch === undefined ? {} : { branch: options.branch }),
     ...(keepNewest === undefined ? {} : { keepNewest }),
     dryRun,
-  });
+  };
+  const [open, done] = dryRun
+    ? ["Finding older unfinished builds", "Found older unfinished builds"]
+    : ["Cancelling older unfinished builds", "Cancelled older unfinished builds"];
+  const result = await createReporter().phase(
+    open,
+    done,
+    async () => await createClient(url, token).projects.builds.cancelOlder(slug, input),
+  );
   printResult(result, dryRun);
 }
 

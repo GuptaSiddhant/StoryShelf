@@ -18,6 +18,8 @@ function stubFetch(answer: unknown): { url: string; body: unknown }[] {
 
 function capture(): string[] {
   const lines: string[] = [];
+  // The phase lines go to stderr; keep them out of the test output.
+  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     lines.push(String(chunk));
     return true;
@@ -43,6 +45,20 @@ describe("runCancel", () => {
     ]);
     expect(lines.join("")).toContain("Would cancel 2 build(s):");
     expect(lines.join("")).toContain("  b1");
+  });
+
+  it("reports a phase on stderr and keeps the result on stdout", async () => {
+    stubFetch({ cancelled: ["b1"], count: 1, dryRun: false });
+    const errors: string[] = [];
+    const out = capture();
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      errors.push(String(chunk));
+      return true;
+    });
+    await runCancel(connection);
+    expect(errors.join("")).toContain("==> Cancelling older unfinished builds");
+    expect(errors.join("")).toContain("--> Cancelled older unfinished builds");
+    expect(out.join("")).not.toContain("==>");
   });
 
   it("cancels for real and says so", async () => {
