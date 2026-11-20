@@ -67,6 +67,20 @@ export class NotificationChannelModel {
     })) as unknown as NotificationChannelRow[];
   }
 
+  /**
+   * Every channel, project or site-wide, whose provider is none of `kinds` (the kinds the server
+   * offers): the System page lists them, as they are kept but not delivered to (issue #1126).
+   * Empty `kinds` reads every channel.
+   */
+  async listOutsideProviders(kinds: readonly string[]): Promise<NotificationChannelRow[]> {
+    // Channels are few per server; filtering here keeps the query plain on every dialect.
+    const rows = (await this.db.list(
+      this.tables.notificationChannels,
+    )) as unknown as NotificationChannelRow[];
+    const offered = new Set(kinds);
+    return rows.filter((row) => !offered.has(row.provider));
+  }
+
   /** Create a channel (secret encrypted at rest when provided). */
   async create(input: NotificationChannelCreateInput): Promise<NotificationChannelRow> {
     const now = new Date().toISOString();

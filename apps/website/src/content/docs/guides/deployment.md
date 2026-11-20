@@ -91,7 +91,26 @@ This generates `src/index.ts`, `package.json` and `tsconfig.json` with the corre
 
 Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db-postgres/#provider-recipes)) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
 
-One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
+One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running, as long as the host keeps the instance running: see [Keep one instance running](#keep-one-instance-running).
+
+## Keep one instance running
+
+Captures, publishing and notifications run in the background, after the upload's request has ended. A host that stops the instance when HTTP traffic stops (scale to zero, auto-stop, sleeping free tiers) kills that work mid-run. The jobs stay leased in `capture_jobs`; a lease recovers a killed job by letting another run take it once the lease expires (five minutes by default), but nothing can run it while the instance is asleep. The next request wakes the instance, the job is retried, and the host can stop the instance again before it finishes. Each lost lease counts as an attempt: after the last one the job fails instead of retrying (three attempts for a capture or publish job by default, set by `testing.retries`; five for a notification). Uploads queue up behind the stuck jobs. After you fix the host setting, look for failed builds and retry them from the build page or with `storyshelf retry`.
+
+Set the host to keep at least one instance running, and, where the platform bills CPU only during requests, to keep CPU allocated between them:
+
+| Host | Setting |
+| --- | --- |
+| Fly.io | `min_machines_running = 1` and `auto_stop_machines = 'off'` under `[http_service]` in `fly.toml` (Fly's default is `'stop'` with `0`, which stops the machine when traffic stops) |
+| Google Cloud Run | `min_instance_count = 1` and CPU always allocated (`cpu_idle = false` in Terraform, `--no-cpu-throttling` with `gcloud`) |
+| Azure Container Apps | `min_replicas = 1` |
+| Render | A paid instance type that does not spin down: free web services spin down after a period without traffic, and their local filesystem is not kept, so SQLite and uploaded files on it are lost. Use a database and storage that live elsewhere (see the [recipes](./cloud/)) |
+| Railway | Turn off **Settings → Deploy → Serverless** and redeploy; Railway applies the setting when it creates a container |
+| Docker Compose, a VM, `npm start` | Nothing to change, provided the process is not stopped |
+
+The GCP and Azure reference stacks below already do this. Hosts that cannot do it are not suitable for capture: see [Capture refuses to start on a serverless host](/guides/troubleshooting/#capture).
+
+**The symptom** is builds that stay `pending` or `capturing`, and jobs on the **Compute jobs** page that look running, until someone opens the app, when they move for a while and then stall again. See [Troubleshooting](/guides/troubleshooting/#capture).
 
 ### Object storage on Tigris (Fly.io)
 

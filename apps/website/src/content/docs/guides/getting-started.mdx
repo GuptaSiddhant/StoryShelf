@@ -1,9 +1,9 @@
 ---
 title: Getting started
-description: Install StoryShelf, create a project, and review your first Storybook build in about ten minutes.
+description: Start a StoryShelf server with Docker or npm, sign in, upload a Storybook and review your first build in about ten minutes.
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { Aside, TabItem, Tabs } from "@astrojs/starlight/components";
 import { PackageManagers } from "starlight-package-managers";
 import Screenshot from "../../../components/Screenshot.astro";
 
@@ -15,86 +15,90 @@ StoryShelf is a self-hosted visual testing platform for Storybook. You run one s
   caption="What you will end up with: a project per Storybook, and what still needs review."
 />
 
-You need a Storybook with a `.storybook/main.*` file, and Node.js 24 or later on the machine that will run the server.
+You need a Storybook with a `.storybook/main.*` file, and a machine to run the server on. Pick one way to start the server below (both end in the same place), then follow steps 2 to 4.
 
-## 1. Scaffold a server
+<Aside type="caution" title="Three values you must set">
+  The server starts with sign-in on and refuses to start without these.
 
-Use the CLI to scaffold a new server project:
-
-<PackageManagers type="dlx" pkg="storyshelf" args="server init" />
-
-It asks for a project name and directory, then which database (SQLite by default), storage (local filesystem by default), auth (none by default), and git provider (GitHub, GitLab, or none). It generates `src/index.ts`, a `package.json` with the matching adapters and a `tsconfig.json` for your editor.
-
-## 2. Start the server
-
-```sh
-cd my-storyshelf
-npm install
-npm start
-```
-
-The server listens on `http://localhost:3000`.
-
-## 3. Initialize Storybook and create a project
-
-Initialize the client config and create a project. Creating a project needs a site-admin token when auth is enabled.
-
-Write `.storybook/storyshelf.json` (prompts for anything you leave out):
-
-<PackageManagers
-  type="dlx"
-  pkg="storyshelf"
-  args="init --url http://localhost:3000 --slug my-design-system"
-/>
-
-Or create the project on the server and write the config in one step:
-
-<PackageManagers
-  type="dlx"
-  pkg="storyshelf"
-  args={
-    'create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN'
-  }
-/>
-
-`create` prints the project slug and a CI token, and writes `.storybook/storyshelf.json`.
-
-<Aside type="caution">
-  Keep the CI token secret: set it as `STORYSHELF_TOKEN` in your CI environment. `create` and `init`
-  fail if `.storybook/main.*` is not found.
+  - `SECRET`: at least 32 random characters. Generate it once and keep it; the data volume needs the same value on every start.
+  - `PUBLIC_BASE_URL`: the address people open in a browser, for example `http://localhost:3000`.
+  - `AUTH_PASSWORD`: the first admin's password, at least 12 characters.
 </Aside>
 
-## 4. Upload a build from CI
+## 1. Start the server
 
-With `.storybook/storyshelf.json` present, `upload` flags can be omitted, and running `storyshelf` with no command defaults to `upload`:
+<Tabs syncKey="server">
+  <TabItem label="Docker">
+    One command, with Chromium for capture, SQLite and local storage on a volume. Needs Docker.
+
+    ```sh
+    export SECRET="$(openssl rand -hex 32)"
+    export PUBLIC_BASE_URL=http://localhost:3000
+    # Choose a private admin password (12 or more characters); it is not echoed.
+    printf 'Admin password: '; stty -echo; read -r AUTH_PASSWORD; stty echo; echo
+    export AUTH_PASSWORD
+    docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data \
+      -e SECRET -e PUBLIC_BASE_URL -e AUTH_PASSWORD \
+      ghcr.io/guptasiddhant/storyshelf
+    ```
+
+    The server listens on `http://localhost:3000`. Keep `SECRET`: the same `storyshelf` volume needs it on every start.
+
+  </TabItem>
+  <TabItem label="npm">
+    Scaffold a server project and run it with Node.js 24 or later:
+
+    <PackageManagers type="dlx" pkg="storyshelf" args="server init" />
+
+    Accept the defaults (SQLite, local filesystem, **Local accounts**). It writes the server, a `.env.example` and a README, then prints the next steps:
+
+    ```sh
+    cd my-storyshelf
+    export SECRET="$(openssl rand -hex 32)"
+    export PUBLIC_BASE_URL=http://localhost:3000
+    # Choose a private admin password (12 or more characters); it is not echoed.
+    printf 'Admin password: '; stty -echo; read -r AUTH_PASSWORD; stty echo; echo
+    export AUTH_PASSWORD
+    npm install
+    npm start
+    ```
+
+    The server listens on `http://localhost:3000`. Instead of exporting the variables, copy `.env.example` to `.env`; the server reads it. A missing value stops the server with one line naming it.
+
+    `server init` needs a terminal; `--dir <path>` picks the output directory.
+
+  </TabItem>
+</Tabs>
+
+## 2. Sign in and create a project
+
+Open `http://localhost:3000` and sign in as `admin@example.com` with your `AUTH_PASSWORD`. Choose **New project**, give it a name, and open it. A project with no builds shows **Get your first build**:
+
+1. **Create a token.** It is shown once; copy it.
+2. **Upload.** The card shows the command with your server URL and the project's slug filled in.
+
+## 3. Upload a build
+
+From your Storybook project, run the command from the card:
 
 <PackageManagers
   type="dlx"
   pkg="storyshelf"
-  args={'upload --token shelf_xxx --sha "$GITHUB_SHA" --branch "$GITHUB_REF_NAME"'}
+  args="upload --url http://localhost:3000 --slug my-design-system"
 />
 
-Or, when the config file and environment are in place, simply:
+Set the token first: `STORYSHELF_TOKEN=shelf_… npx storyshelf upload …` (the card prints it that way). `upload` builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline.
 
-<PackageManagers type="dlx" pkg="storyshelf" />
+<Aside type="tip">
+  To save the URL and slug so later runs need no flags, run `npx storyshelf init --url http://localhost:3000 --slug my-design-system`. It writes `.storybook/storyshelf.json`; keep the token in `STORYSHELF_TOKEN` (a CI secret), never in the file. See [CI setup](/guides/ci/) for a pipeline.
 
-Explicit flags always work too:
+On a server with sign-in off, `npx storyshelf create --url http://localhost:3000 --name "My Design System"` creates the project and a CI token and writes the config. With sign-in on it creates the project only and points you to its page for the token, because a token made on the command line has no user behind it and could not upload.
 
-<PackageManagers
-  type="dlx"
-  pkg="storyshelf"
-  args={
-    'upload --url http://localhost:3000 --slug my-design-system --token shelf_xxx --sha "$GITHUB_SHA" --branch "$GITHUB_REF_NAME"'
-  }
-/>
+</Aside>
 
-StoryShelf renders every story server-side and diffs it against the branch baseline. Without `.storybook/storyshelf.json`, running `storyshelf` just shows help pointing you to `init`.
+## 4. Review
 
-For a complete pipeline, see [CI setup](/guides/ci/).
-
-## 5. Review
-
-Open the project in your browser. A build that needs attention shows **N to review** on its project card; open it, and choose **Review diffs** for the review workspace: a filmstrip of changed stories, baseline, current and diff side by side (or swiped, blended or flipped), and **Approve** / **Reject** with the keyboard.
+The first build has nothing to compare against, so it waits for review: open the build and approve it to make it the baseline. Upload again and the new build is compared with that baseline; an unchanged Storybook passes with nothing to review. A build that needs attention shows **N to review** on its project card; open it, and choose **Review diffs** for the review workspace: a filmstrip of changed stories, baseline, current and diff side by side (or swiped, blended or flipped), and **Approve** / **Reject** with the keyboard.
 
 <Screenshot
   name="diff-review"
@@ -110,3 +114,6 @@ When every change is decided, the build's status check goes green and you can me
 - [CI setup](/guides/ci/) and the [merge gate](/guides/merge-gate/): make the check required.
 - [Project settings](/guides/project-settings/): thresholds, viewports, labels, members and tokens.
 - [Deployment](/guides/deployment/): take the server beyond localhost.
+- [Troubleshooting](/guides/troubleshooting/) and [Upgrading and support](/guides/support/): what to check first, and where to ask.
+- [Set up with an AI agent](/guides/ai-agent-setup/): let a coding agent do these steps.
+- [StoryShelf vs Chromatic](/guides/chromatic-comparison/): a factual feature and hosting comparison.

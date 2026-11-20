@@ -3,9 +3,10 @@ name: Fly Deploy
 # The demo runs a stable release only (ADR 0043, amendment 2026-11-10). A push to `main` deploys
 # nothing: `release.yml` calls this workflow after a stable release is tagged and its image is
 # pushed, and `workflow_dispatch` redeploys a version on demand. The release is checked out from its
-# tag. When the official image (#887, `ghcr.io/guptasiddhant/storyshelf:<version>`, first published
-# with v0.12.0) exists for that version, the demo runs it with the demo's own fly.toml; otherwise the
-# image is built from the tag's `apps/fly-app/Dockerfile`.
+# tag, and the image is built from the tag's `apps/fly-app/Dockerfile`. The official image (#887,
+# `ghcr.io/guptasiddhant/storyshelf:<version>`, from v0.12.0) is opt-in through the repository
+# variable `FLY_OFFICIAL_IMAGE=true`: it runs as uid 1000, and the demo's volume was written by the
+# root-run Fly image, so v0.12.0 on it stopped at boot (503) until the volume is migrated.
 on:
   workflow_call:
     inputs:
@@ -88,9 +89,11 @@ jobs:
             exit 1
           fi
 
-      # The official image exists from v0.12.0 on (#887); an older release has none.
+      # The official image exists from v0.12.0 on (#887); an older release has none. Opt-in only
+      # (`FLY_OFFICIAL_IMAGE`), until the demo volume is owned by the image's uid 1000.
       - name: Look for the official image
         id: image
+        if: vars.FLY_OFFICIAL_IMAGE == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
           GH_ACTOR: ${{ github.actor }}

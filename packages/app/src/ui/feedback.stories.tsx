@@ -38,6 +38,21 @@ export const Badges = jsxStory(() => (
   </VStack>
 ));
 
+/** A status column: the quiet badge shares height, padding and icon slot with the pills. */
+export const QuietAlignedWithPills = jsxStory(() => (
+  <VStack gap="sm" align="start">
+    <Badge tone="quiet" icon>
+      Approved
+    </Badge>
+    <Badge tone="warning" icon>
+      Needs review
+    </Badge>
+    <Badge tone="danger" icon>
+      Failed
+    </Badge>
+  </VStack>
+));
+
 export const BuildStatusBadges = jsxStory(() => (
   <HStack>
     {[
@@ -50,6 +65,7 @@ export const BuildStatusBadges = jsxStory(() => (
       "failed",
       "pending",
       "cancelled",
+      "skipped",
     ].map((status) => (
       <Badge key={status} tone={statusTone(status)} icon>
         {statusLabel(status)}
@@ -104,4 +120,13 @@ export const MetaStyles = jsxStory(() => (
     <MetaText as="code">as code: abc1234</MetaText>
     <MetaText as="pre">{"as pre:\n  line one\n  line two"}</MetaText>
   </VStack>
+));
+
+/** Roles, providers and verdicts read in sentence case, like build statuses. */
+export const SentenceCaseLabels = jsxStory(() => (
+  <HStack>
+    {["admin", "viewer", "via password", "github", "slack", "error", "resolved"].map((label) => (
+      <Badge key={label}>{statusLabel(label)}</Badge>
+    ))}
+  </HStack>
 ));

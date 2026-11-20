@@ -11,7 +11,8 @@ import { typeDocGroups, typeDocPlugins } from "./typedoc-packages.mjs";
 const SITE = "https://storyshelf.js.org";
 const REPO = "https://github.com/GuptaSiddhant/StoryShelf";
 const OG_IMAGE = `${SITE}/og-image.png`;
-const OG_ALT = "StoryShelf: visual testing for Storybook, with the build review workspace";
+const OG_ALT =
+  "StoryShelf: self-hosted visual testing and review for Storybook, shown with the build review workspace";
 
 /** A package's page, with its generated TypeScript API nested under it when it has one. */
 const packageItem = (slug) => {
@@ -40,14 +41,21 @@ export default defineConfig({
     starlight({
       title: "StoryShelf",
       description: "An open-source, self-hosted alternative to Chromatic.",
-      logo: { src: "./src/assets/logo.svg", alt: "" },
+      logo: {
+        light: "./src/assets/brand/storyshelf-logo-purple-white-rounded.svg",
+        dark: "./src/assets/brand/storyshelf-logo-white-purple-rounded.svg",
+        alt: "",
+      },
       components: {
+        Footer: "./src/components/overrides/Footer.astro",
         Hero: "./src/components/overrides/Hero.astro",
         SocialIcons: "./src/components/overrides/SocialIcons.astro",
         Sidebar: "./src/components/overrides/Sidebar.astro",
         PageTitle: "./src/components/overrides/PageTitle.astro",
       },
       customCss: ["./src/styles/custom.css"],
+      // Adds the Markdown copy of each page to its <head> (see the file).
+      routeMiddleware: "./src/routeData.ts",
       editLink: { baseUrl: `${REPO}/edit/main/apps/website/` },
       lastUpdated: true,
       social: [{ label: "GitHub", href: REPO, icon: "github" }],
@@ -112,9 +120,11 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "Live demo", slug: "guides/demo" },
+            { label: "Set up with an AI agent", slug: "guides/ai-agent-setup" },
             { label: "How it works", slug: "concepts/how-it-works" },
             { label: "Common setups", slug: "guides/recipes" },
             { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
+            { label: "Upgrading & support", slug: "guides/support" },
             {
               label: "Coming from other tools",
               collapsed: true,

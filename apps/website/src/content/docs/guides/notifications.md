@@ -96,7 +96,13 @@ Password recovery is both: users can request a reset email when a sender is conf
 
 ## Choosing the providers
 
-Git, chat (Slack, Teams) and email providers are built in and registered by default. Registering sends nothing: a provider acts only once a project adds a channel. Email also needs a transport (`SMTP_HOST` and `SMTP_FROM`, or a sender you pass); without one, an email channel reports that it has none. `nodemailer` is needed only for SMTP: `npm install nodemailer`.
+Git, chat (Slack, Teams) and email providers are built in and registered by default. Registering sends nothing: a provider acts only once a project adds a channel. Email also needs a transport (`SMTP_HOST` and `SMTP_FROM`, or a sender you pass); `nodemailer` is needed only for SMTP: `npm install nodemailer`.
+
+A project is offered only the integrations the server can deliver. Without an email transport, email is unavailable: projects see no email option and no **My notifications** card, and creating an email channel through the API answers 400 with the reason. The same holds for a provider the operator turned off. A channel that already exists for such a provider is kept but hidden from its project and not delivered to; **System → Integrations** lists every integration as available, unavailable (with the reason) or turned off, and the channels held back. Site admins also see one line in a project's settings naming what is missing. Turn the integration back on and its channels return. The site-admin `POST /api/v1/health` lists the same under `integrations`.
+
+### Turning integrations off without code
+
+The server image and the Fly demo read `SHELF_INTEGRATIONS_DISABLED`: a comma-separated list of provider kinds to turn off, for example `slack,teams,figma`. The kinds are `github`, `gitlab`, `git-log`, `email`, `slack-webhook` (or `slack`), `teams-workflow` (or `teams`), `log` and `figma`. An unknown kind stops startup and names it. In your own server, `integrationsFromEnv(process.env)` from `@storyshelf/core/integrations` returns the function forms to pass as `notifications.notifiers` and `design`.
 
 `notifications.notifiers`, `notifications.email` and `design` each take:
 

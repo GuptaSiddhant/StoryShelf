@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="StoryShelf">
+  <title>StoryShelf</title>
+  <!-- The maskable icon: the purple-white mark scaled to 80 % (the manifest safe zone) on a full-bleed square tile. The boards are drawn past the tile on both sides, so after the scale they still reach the edge, wherever a mask cuts. -->
+  <rect width="64" height="64" fill="#5b3fd6"/>
+  <g transform="translate(6.4 6.4) scale(0.8)">
+    <path d="M72 13.5 H22.5 a8 8 0 0 0 -8 8 V32 H49.5 V42.5 a8 8 0 0 1 -8 8 H-8" fill="none" stroke="#ffffff" stroke-width="5"/>
+    <rect x="20.75" y="19.75" width="7.75" height="10.5" rx="1.75" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+    <rect x="32.25" y="19" width="9.25" height="12" rx="2.5" fill="#ffffff"/>
+    <rect x="20.75" y="38.25" width="7.75" height="10.5" rx="1.75" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+    <rect x="33" y="38.25" width="7.75" height="10.5" rx="1.75" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+  </g>
+</svg>

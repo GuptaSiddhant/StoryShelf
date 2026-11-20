@@ -1,6 +1,7 @@
 /** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
 import { publishingOf, publishingOfBuild, type Catalog } from "@storyshelf/core/capture";
 import {
+  BuildModel,
   changesetOf,
   CommentModel,
   SnapshotModel,
@@ -47,6 +48,17 @@ export interface ReviewSectionData extends ReviewCapabilities {
   testing: boolean;
   /** Whether the build's Storybook is published; a verdict waits for `success` (ADR 0013). */
   publishing: Awaited<ReturnType<typeof publishingOfBuild>>;
+  /** The newer build that superseded this one (ADR 0045); null when it was not, or that build is gone. */
+  supersededBy: Pick<Build, "id" | "gitSha"> | null;
+}
+
+/** The build that superseded `build`, when it still exists (retention may have purged it). */
+async function supersederOf(build: Build): Promise<ReviewSectionData["supersededBy"]> {
+  if (!build.supersededByBuildId) {
+    return null;
+  }
+  const newer = await new BuildModel(getStore().db).get(build.supersededByBuildId);
+  return newer ? { id: newer.id, gitSha: newer.gitSha } : null;
 }
 
 /** Whether review is on for the project (a row without the column counts as on). */
@@ -110,6 +122,7 @@ export async function loadReviewSection(
     canTriage: capabilities.canComment || isBuildAuthor(build),
     testing,
     publishing,
+    supersededBy: await supersederOf(build),
     ...capabilities,
   };
 }

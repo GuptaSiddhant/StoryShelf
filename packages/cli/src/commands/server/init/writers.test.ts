@@ -49,7 +49,22 @@ describe("writeFiles", () => {
     expect(tsconfig.include).toEqual(["src"]);
     expect(existsSync(join(out, "Dockerfile"))).toBe(false);
     expect(existsSync(join(out, "terraform"))).toBe(false);
-    expect(printed).toBe("Created src/index.ts\nCreated package.json, tsconfig.json\n");
+    expect(printed).toBe(
+      "Created src/index.ts\nCreated package.json, tsconfig.json, .env.example, README.md, .gitignore\n",
+    );
+  });
+
+  it("writes .env.example and a README naming the required variables", async () => {
+    await writeFiles(out, answers({ auth: "password" }));
+    const example = readFileSync(join(out, ".env.example"), "utf8");
+    for (const name of ["SECRET", "PUBLIC_BASE_URL", "AUTH_PASSWORD"]) {
+      expect(example).toContain(`\n${name}=`);
+    }
+    expect(example).toContain("# PORT=3000");
+    expect(readFileSync(join(out, ".gitignore"), "utf8")).toContain(".env\n");
+    const readme = readFileSync(join(out, "README.md"), "utf8");
+    expect(readme).toContain("Get your first build");
+    expect(readme).toContain("`SECRET`");
   });
 
   it("writes a Dockerfile and .dockerignore, and no compose file for one container", async () => {

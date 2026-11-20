@@ -8,9 +8,9 @@ import type { BrandTheme } from "../theme.ts";
 export function tokenCss(light: BrandTheme, dark: BrandTheme): string {
   return [
     scaleTokens(),
-    `:root {\n${colorVars(light, LIGHT_FALLBACK)}\n}`,
-    `[data-theme="dark"] {\n${colorVars(dark, DARK_FALLBACK)}\n}`,
-    `@media (prefers-color-scheme: dark) {\n[data-theme="system"] {\n${colorVars(dark, DARK_FALLBACK)}\n}\n}`,
+    `:root {\n  color-scheme: light;\n${colorVars(light, LIGHT_FALLBACK)}\n}`,
+    `[data-theme="dark"] {\n  color-scheme: dark;\n${colorVars(dark, DARK_FALLBACK)}\n}`,
+    `@media (prefers-color-scheme: dark) {\n[data-theme="system"] {\n  color-scheme: dark;\n${colorVars(dark, DARK_FALLBACK)}\n}\n}`,
   ].join("\n");
 }
 
@@ -64,6 +64,10 @@ function scaleTokens(): string {
       --text-lg: 1rem;
       --text-xl: 1.25rem;
       --text-2xl: 1.5rem;
+      --weight-normal: 400;
+      --weight-medium: 500;
+      --weight-semibold: 600;
+      --weight-bold: 700;
       --leading-tight: 1.25;
       --leading-normal: 1.5;
       --space-1: 0.25rem;
@@ -138,6 +142,8 @@ function derivedVars(fb: Fallbacks): string {
       --status-new-fg: ${mix("--status-new", "60%", "--text-primary")};
       --status-rejected-fg: ${mix("--status-rejected", "60%", "--text-primary")};
       --status-info-fg: ${mix("--status-info", "60%", "--text-primary")};
+      --status-rejected-solid: color-mix(in srgb, var(--status-rejected) 82%, black);
+      --status-rejected-contrast: #fff;
       --status-approved-bg: ${mix("--status-approved", fb.tint, "--surface-card")};
       --status-new-bg: ${mix("--status-new", fb.tint, "--surface-card")};
       --status-rejected-bg: ${mix("--status-rejected", fb.tint, "--surface-card")};

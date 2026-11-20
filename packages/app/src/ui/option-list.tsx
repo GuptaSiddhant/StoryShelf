@@ -25,7 +25,7 @@ const option = css`
   color: var(--text-primary);
   font: inherit;
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   text-align: left;
   cursor: pointer;
   &:hover {
@@ -42,7 +42,9 @@ const option = css`
     color: var(--accent-fg);
   }
   &:disabled {
-    opacity: 0.55;
+    opacity: 1;
+    background: var(--surface-muted);
+    color: var(--text-secondary);
     cursor: not-allowed;
   }
 `;

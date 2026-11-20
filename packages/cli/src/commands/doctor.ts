@@ -1,7 +1,7 @@
 import { gitRepoRoot, gitRepoStatus, pathBase } from "@storyshelf/affected";
 import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createClient } from "../client.ts";
+import { createClient, RequestError } from "../client.ts";
 import { findStorybookMain, loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { printLine } from "../output.ts";
 import {
@@ -68,7 +68,7 @@ function serverErrorMessage(error: unknown): string {
     return "authentication failed (401) — check STORYSHELF_TOKEN";
   }
   if (message.includes("(403)")) {
-    return "forbidden (403) — token lacks access to this project";
+    return `forbidden (403) — ${message.replace(/^Request failed \(403\): /u, "")}`;
   }
   if (message.includes("(404)")) {
     return "project not found (404) — check --slug";
@@ -87,6 +87,33 @@ async function checkServer(connection: ResolvedConnection): Promise<Check> {
   } catch (error) {
     return { status: "fail", message: `Server check failed: ${serverErrorMessage(error)}` };
   }
+}
+
+/**
+ * Whether the token may upload, without uploading: record usage for a build that does not exist.
+ * The server checks the role before it looks the build up, so 404 means permitted and 401/403
+ * means refused (the answer says why). A server with sign-in off permits every token.
+ */
+async function checkUpload(connection: ResolvedConnection): Promise<Check> {
+  const client = createClient(connection.url, connection.token);
+  try {
+    if ((await client.health()).auth === false) {
+      return { status: "pass", message: "Upload permitted (server has sign-in off)" };
+    }
+    await client.projects.builds.postUsage(connection.slug, "doctor-probe", []);
+  } catch (error) {
+    if (error instanceof RequestError && error.status === 404) {
+      return { status: "pass", message: "Token may upload builds" };
+    }
+    return { status: "fail", message: `Token may not upload: ${serverErrorMessage(error)}` };
+  }
+  return { status: "pass", message: "Token may upload builds" };
+}
+
+/** The server check, then the upload check when the server answered. */
+async function checkConnection(connection: ResolvedConnection): Promise<Check[]> {
+  const server = await checkServer(connection);
+  return server.status === "pass" ? [server, await checkUpload(connection)] : [server];
 }
 
 async function checkBuildOutput(cwd: string, inputs: BuildInputs): Promise<Check> {
@@ -135,7 +162,7 @@ export async function runDoctor(options: DoctorOptions): Promise<void> {
   const checks: Check[] = [await checkSetup(cwd), checkConfigFile(cfg)];
   const connection = await tryResolveConnection(options, checks);
   if (connection) {
-    checks.push(await checkServer(connection));
+    checks.push(...(await checkConnection(connection)));
   }
   checks.push(
     await checkBuildOutput(cwd, resolveBuildInputs(options, cfg)),

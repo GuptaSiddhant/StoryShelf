@@ -11,6 +11,7 @@ import {
   type CatalogLoader,
 } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type { IntegrationStatus } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
 import type { PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -30,6 +31,8 @@ export interface Store {
   sessionId: string;
   /** `options.testing` is set: capture, compare and baselines run here (ADR 0006). */
   testing: boolean;
+  /** `options.skippedBuilds` is on: the skip-source and skipped-build endpoints answer (ADR 0044). */
+  skippedBuilds?: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
   /** This instance runs capture jobs itself, so retry and the compute-jobs controls apply. */
@@ -48,7 +51,13 @@ export interface Store {
   publicOrigin?: PublicOriginResolver | undefined;
   /** Design providers (Figma, …); empty when none is wired. */
   design: DesignProvider[];
+  /** Notifiers offered to projects: registered and available (issue #1126). */
   notifiers: NotifierProvider[];
+  /**
+   * Every integration kind with its standing (issue #1126); absent in hand-built stores, which
+   * read as "everything wired is available".
+   */
+  integrations?: readonly IntegrationStatus[];
   /** Brand/sender settings for outgoing notifications (`notifications.config`). */
   notificationsConfig?: NotificationsConfig;
   /** AI insights surface; absent ⇒ AI off site-wide. */

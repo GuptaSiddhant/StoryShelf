@@ -16,6 +16,7 @@ import {
   TextareaField,
   VStack,
   statusTone,
+  statusLabel,
 } from "../ui/components.tsx";
 import { openChangeRequests, openRequestsLabel } from "./review-change-requests.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -39,7 +40,7 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
         {data.state.latest.map((review): Rendered => (
           <HStack key={review.id} align="baseline" wrap={false}>
             <Badge tone={review.verdict === "approved" ? "success" : "danger"}>
-              {review.verdict}
+              {statusLabel(review.verdict)}
             </Badge>
             <strong>
               {review.userId ? (data.names.get(review.userId) ?? review.userId) : "anonymous"}
@@ -140,12 +141,32 @@ function takesNoVerdict(status: string): boolean {
 }
 
 /** The one line a build that cannot be reviewed shows in place of the approval counter; null when it can be. */
-function nothingToReview(data: ReviewSectionData): string | null {
+function nothingToReview(data: ReviewSectionData): Rendered | string | null {
   const { status } = data.build;
   if (!takesNoVerdict(status)) {
     return null;
   }
+  if (data.build.supersededByBuildId) {
+    return supersededLine(data);
+  }
   return `Nothing to review: this build ${status === "failed" ? "failed" : "was cancelled"}.`;
+}
+
+/** A superseded build (ADR 0045) says what replaced it; the link is dropped once that build is purged. */
+function supersededLine(data: ReviewSectionData): Rendered {
+  const { supersededBy, project } = data;
+  if (!supersededBy) {
+    return <>Nothing to review: this build was superseded.</>;
+  }
+  return (
+    <>
+      Nothing to review: this build was superseded by{" "}
+      <a href={`/projects/${project.slug}/builds/${supersededBy.id}`}>
+        {supersededBy.gitSha.slice(0, 7)}
+      </a>
+      .
+    </>
+  );
 }
 
 /** What the card says when the build's Storybook content is gone (the git status keeps its own text). */

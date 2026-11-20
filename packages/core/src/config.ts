@@ -9,6 +9,7 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationStatus } from "./integrations/availability.ts";
 import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
   storybookHostingSchema,
@@ -223,6 +224,13 @@ export interface ShelfConfig {
   serverTiming?: boolean;
   /** Persist gzip and brotli copies of published Storybook files, made when publishing ends (default off). */
   publishedCompression?: boolean;
+  /**
+   * Act on `supersedes` when a build is created (ADR 0045, decision 3): cancel the older in-flight
+   * builds the CLI names, for projects with `cancelSuperseded` on. Default off, so a rolling upgrade
+   * never has a copy cancel builds that a previous copy cannot read as superseded (ADR 0053,
+   * decision 5: readers first); turn it on one minor release after the readers shipped.
+   */
+  supersedeOnCreate?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;
   /**
@@ -317,16 +325,6 @@ const MAX_TRUSTED_HOPS = 10;
 const TRUSTED_PROXY_PATTERN = /^[\da-f:.]+(?:\/\d{1,3})?$/iu;
 
 /**
- * Map a `SHUTDOWN_GRACE_SECONDS` environment value to the drain bound of `lifecycle.teardown`, in
- * ms: unset, empty or not a positive number is `undefined` (an unbounded drain). Set it a few
- * seconds below the platform's stop timeout (Fly 5 s, Cloud Run 10 s, ECS 30 s by default).
- */
-export function parseShutdownGraceMs(raw?: string): number | undefined {
-  const seconds = Number(raw?.trim() === "" ? Number.NaN : raw);
-  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : undefined;
-}
-
-/**
  * Map a `TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
  * or `0` is off; `fly` is Fly.io; digits are a hop count; anything else is a comma-separated list
  * of IPs or CIDRs (checked by {@link validateConfig}).
@@ -391,6 +389,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
     publishedCompression: z.boolean().optional(),
+    supersedeOnCreate: z.boolean().optional(),
     captureAssets: z
       .object({
         cacheMaxAgeSeconds: z.number().int().min(0).max(MAX_CAPTURE_ASSET_CACHE_SECONDS).optional(),
@@ -609,6 +608,14 @@ export interface ShelfOptions {
    */
   testing?: ShelfTestingOptions;
   /**
+   * Accept skipped builds (ADR 0044): `GET …/builds/skip-source` and `POST …/builds/skipped`. Off by
+   * default, and then both answer 404 as if they did not exist, so a release can ship the readers of
+   * the `skipped` status before any server writes it (ADR 0053, decision 5). The release after the
+   * readers turns the default on and removes the option. Needs `testing`; without it the routes
+   * answer 404 either way.
+   */
+  skippedBuilds?: boolean;
+  /**
    * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`,
    * and to the read-grant route, `/_r/<token>/*`, which share one bucket (ADR 0007, decision 5;
    * ADR 0051, decision 10). Default 6000, enough for a render fetching thousands of assets from one
@@ -653,8 +660,15 @@ export interface ResolvedNotificationsOptions extends Omit<
  * hand-built options object (tests, embedders) reads as "none".
  */
 export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  /** Design providers offered to projects: registered and available (issue #1126). */
   design?: DesignProvider[];
+  /** `notifiers` holds only available providers (issue #1126). */
   notifications?: ResolvedNotificationsOptions;
+  /**
+   * Every integration kind with its standing (available, unavailable with a reason, or turned off),
+   * for the System page and deep health. Absent on a hand-built options object.
+   */
+  integrations?: readonly IntegrationStatus[];
 }
 
 /**

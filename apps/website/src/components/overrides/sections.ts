@@ -8,6 +8,9 @@ export const sectionLinks = (base: string): { section: Section; label: string; h
   { section: "api", label: "HTTP API", href: `${base}/api/` },
 ];
 
+/** Where questions go: GitHub Discussions, shown after the section links in the header. */
+export const DISCUSSIONS_URL = "https://github.com/GuptaSiddhant/StoryShelf/discussions";
+
 /** Hand-written pages that sit in the HTTP API menu next to the generated reference. */
 const API_GUIDES = ["/guides/api", "/guides/webhooks"];
 

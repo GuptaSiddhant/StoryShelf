@@ -2,6 +2,7 @@ import { NotificationChannelModel, NotificationSubscriptionModel } from "@storys
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { unofferedKindMessage } from "../integrations.ts";
 import { LISTED_TOPICS, REVIEW_REQUESTED_EVENT } from "../pages/settings-notifications.tsx";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
@@ -94,6 +95,10 @@ async function createChannelRecord(
   target: string,
   form: FormData,
 ): Promise<Response> {
+  const unoffered = unofferedKindMessage(provider);
+  if (unoffered !== undefined) {
+    return await providerError(c, unoffered);
+  }
   const config = channelConfig(provider, target, form);
   const checked = await NotificationChannelModel.validateInput(
     getStore().notifiers,

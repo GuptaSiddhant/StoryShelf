@@ -33,6 +33,12 @@ export interface AdapterMetadata {
   readonly category: AdapterCategory;
 }
 
+/**
+ * Whether the server can deliver an integration (issue #1126): `available`, or unavailable with a
+ * reason a site admin can act on (never a secret). A project is offered only available ones.
+ */
+export type IntegrationAvailability = "available" | { readonly unavailable: string };
+
 /** Context passed to an adapter's `setup` on server startup. */
 export interface AdapterSetupContext {
   /** Resolved shelf configuration (scratchDir, secret, …). Never log the secret. */

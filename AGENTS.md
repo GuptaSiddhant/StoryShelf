@@ -351,11 +351,14 @@ The weekly usage quota is shared, so agents work in short, fresh sessions and ta
   green PR back.
 - **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
   Label those PRs `skip-review`, so CodeRabbit skips them.
-- **Schedules.** Two scheduled runs a day, at 05:41 and 17:41 UTC. Each starts a fresh Sonnet triage
-  session tagged `storyshelf:triage`. It does the mechanical work: auto-merge, starting and archiving
-  sessions, `status-ready`, and the digest. It forwards `architect` items and judgement calls to the
-  architect session and decides nothing itself. No other agent session runs on a clock (CI's own
-  nightly workflows are unaffected).
+- **Triage** (a scheduled Sonnet run at 05:41, 11:41, 17:41 and 23:41 UTC; owner, #1099) does the
+  mechanical work and hands judgement calls to the architect. It carries out mechanical items the
+  architect has already decided (labels, milestones, `status-ready`, archiving finished sessions,
+  auto-merge) in the same run instead of re-reporting them, and never re-lists an answered item
+  unless something on it changed. It reports a session stopped by the usage limit as such, with
+  the time, so the architect can resume it. At most four developer sessions start at once, so one
+  burst can't hit the 5-hour limit together. Until the public launch a lane may run two developer
+  sessions (owner, 2026-11-18); after it, one.
 - **Models.** The architect runs on Opus. Developers run on Sonnet by default, or on Opus when the
   issue has the `model-opus` label. The Expert is the only Fable agent. Interns run on Haiku. Triage
   runs on Sonnet.

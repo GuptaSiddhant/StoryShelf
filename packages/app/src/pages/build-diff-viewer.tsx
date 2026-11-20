@@ -144,7 +144,7 @@ function BrowserTabs(props: {
       label="Browser"
       data-browser-tabs
       items={siblings.map((snap) => ({
-        label: `${snap.browser ?? "chromium"} · ${snap.status}`,
+        label: `${snap.browser ?? "chromium"} · ${statusLabel(snap.status)}`,
         value: snap.id,
         href: snapshotPageUrl(project, build, snap.id),
         active: snap.id === selected.id,

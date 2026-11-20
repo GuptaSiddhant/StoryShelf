@@ -50,6 +50,7 @@ export class ProjectModel {
       ...(input.playTimeoutMs === undefined ? {} : { playTimeoutMs: input.playTimeoutMs }),
       ...(input.reviewEnabled === undefined ? {} : { reviewEnabled: input.reviewEnabled }),
       ...(input.reviewApprovals === undefined ? {} : { reviewApprovals: input.reviewApprovals }),
+      ...(input.cancelSuperseded === undefined ? {} : { cancelSuperseded: input.cancelSuperseded }),
       ...(input.requireVerifiedDefault === undefined
         ? {}
         : { requireVerifiedDefault: input.requireVerifiedDefault }),
@@ -151,6 +152,8 @@ export interface ProjectCreateInput {
   reviewEnabled?: boolean;
   /** Approvals a build needs with `testing` off (column default 1 when omitted). */
   reviewApprovals?: number;
+  /** Cancel superseded builds (column default true when omitted; ADR 0045). */
+  cancelSuperseded?: boolean;
   /** A default-branch claim needs a git channel's confirmation (column default true when omitted). */
   requireVerifiedDefault?: boolean;
 }

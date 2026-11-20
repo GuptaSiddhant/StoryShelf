@@ -18,7 +18,7 @@ const heroCard = css`
 const heroTitle = css`
   /* hero-title */
   margin: 0 0 0.4rem;
-  font-size: 1.9rem;
+  font-size: var(--text-2xl);
   letter-spacing: -0.02em;
 `;
 
