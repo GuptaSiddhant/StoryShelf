@@ -193,7 +193,8 @@ function GitLabTokenLink(props: FieldProps): HtmlEscapedString | Promise<HtmlEsc
   );
 }
 
-function GitLabFields(props: FieldProps): HtmlEscapedString | Promise<HtmlEscapedString> {
+/** Where the token is for, and GitLab's prefilled form for it. */
+function GitLabTarget(props: FieldProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { data } = props;
   return (
     <>
@@ -217,6 +218,15 @@ function GitLabFields(props: FieldProps): HtmlEscapedString | Promise<HtmlEscape
         </Button>
         <GitLabTokenLink data={data} />
       </VStack>
+    </>
+  );
+}
+
+function GitLabFields(props: FieldProps): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { data } = props;
+  return (
+    <>
+      <GitLabTarget data={data} />
       <Field label="Name" name="gl_name" value={value(data, "gl_name", "GitLab")} />
       <Field
         label="Token"
