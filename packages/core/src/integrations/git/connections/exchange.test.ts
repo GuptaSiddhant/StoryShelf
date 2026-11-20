@@ -53,7 +53,7 @@ describe("exchangeManifestCode", () => {
 
   it("reports a refusal by status only, tried once (the code is single-use)", async () => {
     const calls = stubFetch(() => new Response("code expired: code_xyz", { status: 404 }));
-    const error = await exchangeManifestCode("code_xyz").catch((caught: unknown) => caught);
+    const error = await exchangeManifestCode("code_xyz").catch((error_: unknown) => error_);
     expect(String(error)).toBe("Error: GitHub did not exchange the manifest code (HTTP 404)");
     expect(calls).toHaveLength(1);
   });
