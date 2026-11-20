@@ -15,7 +15,7 @@ const disclosureSummary = css`
   align-items: center;
   gap: 0.5rem;
   padding: 0.6rem 1rem;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
   cursor: pointer;
   list-style: none;
@@ -35,7 +35,7 @@ const disclosureBody = css`
 
 const disclosureHint = css`
   /* disclosure-hint */
-  font-weight: 400;
+  font-weight: var(--weight-normal);
   font-size: var(--text-sm);
   color: var(--text-secondary);
 `;
@@ -76,7 +76,7 @@ const definitionTerm = css`
 const definitionDesc = css`
   /* definition-desc */
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
 `;
 

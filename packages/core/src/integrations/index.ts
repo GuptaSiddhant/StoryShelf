@@ -8,30 +8,24 @@ import type { DesignProvider } from "../adapters/design.ts";
 import type { EmailSender } from "../adapters/email-sender.ts";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import { designReasons, emailSenderReasons, notifierReasons } from "../adapters/validate.ts";
-import { chatNotifiers } from "./chat/index.ts";
-import { createFigmaDesign, figmaOAuthFromEnv } from "./design/figma/index.ts";
-import { builtInEmailNotifier } from "./email/index.ts";
-import { gitNotifiers } from "./git/index.ts";
+import { BUILT_IN_INTEGRATIONS, type BuiltInIntegrations } from "./built-in.ts";
 import {
   resolveIntegrationGroup,
   type IntegrationGroup,
   type IntegrationOption,
 } from "./resolve.ts";
 
-/** The integrations core ships, by group. */
-export interface BuiltInIntegrations {
-  readonly notifiers: readonly NotifierProvider[];
-  readonly email: readonly EmailSender[];
-  readonly design: readonly DesignProvider[];
-}
-
-/** Every built-in integration, by group. */
-export const BUILT_IN_INTEGRATIONS: BuiltInIntegrations = Object.freeze({
-  notifiers: Object.freeze([...gitNotifiers, builtInEmailNotifier(), ...chatNotifiers]),
-  email: Object.freeze([]),
-  // Figma OAuth stays off without the operator's client id and secret; personal tokens still work.
-  design: Object.freeze([createFigmaDesign({ oauth: figmaOAuthFromEnv() })]),
-});
+export { BUILT_IN_INTEGRATIONS, type BuiltInIntegrations } from "./built-in.ts";
+export {
+  availabilityOf,
+  CHECK_FAILED_REASON,
+  offerIntegrations,
+  TURNED_OFF_REASON,
+  type IntegrationState,
+  type IntegrationStatus,
+  type OfferedIntegrations,
+} from "./availability.ts";
+export { INTEGRATIONS_DISABLED_VAR, integrationsFromEnv, type EnvIntegrations } from "./env.ts";
 
 /** The operator's choice for each integration group (ADR 0049, decision 3). */
 export interface IntegrationOptions {

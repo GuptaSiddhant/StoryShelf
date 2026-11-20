@@ -134,7 +134,7 @@ function KindBadge(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> | null {
   const { comment } = props;
   if (comment.kind !== "change_request") {
-    return comment.resolved ? <Badge tone="success">resolved</Badge> : null;
+    return comment.resolved ? <Badge tone="success">Resolved</Badge> : null;
   }
   return comment.resolved ? (
     <Badge tone="success" icon>

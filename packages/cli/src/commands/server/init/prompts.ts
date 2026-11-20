@@ -1,3 +1,4 @@
+import { basename, resolve } from "node:path";
 import prompts from "prompts";
 import { printError } from "../../../output.ts";
 import { detectInstalledAdapters, type DetectedAdapters } from "../../shared/detect-adapters.ts";
@@ -26,14 +27,14 @@ export function promptInitial(choices: { value: string }[], value?: string): num
  * (local and docker) or the fixed reference stack with its follow-ups (aws, azure, gcp).
  * Resolves `null` when the project name or directory is missing (the user cancelled).
  */
-export async function collectAnswers(): Promise<Answers | null> {
+export async function collectAnswers(dir?: string): Promise<Answers | null> {
   // Try to autofill from existing package.json (re-init)
   const cwdPkg = detectInstalledAdapters(process.cwd());
 
   // Phase 1 (curated path): project + deploy target first. Legacy single-call
   // mocks return the full answer object here — merge progressively so those
   // tests keep passing while interactive users get filtered phase-2 prompts.
-  const phase1 = await ask([...PROJECT_PROMPTS, DEPLOY_TARGET_PROMPT]);
+  const phase1 = await askProject(dir);
   if (!phase1["name"] || !phase1["dir"]) {
     printError("Cancelled.");
     return null;
@@ -43,6 +44,27 @@ export async function collectAnswers(): Promise<Answers | null> {
   await askLocalAdapters(answers, cwdPkg);
   await askCloudStack(answers);
   return answers;
+}
+
+/** The project questions when `--dir` is given: no directory question, and the name defaults to the directory's. */
+function promptsForDir(dir: string): typeof PROJECT_PROMPTS {
+  return PROJECT_PROMPTS.filter((prompt) => prompt.name !== "dir").map((prompt) =>
+    prompt.type === "text" && prompt.name === "name"
+      ? {
+          type: prompt.type,
+          name: prompt.name,
+          message: prompt.message,
+          initial: basename(resolve(dir)),
+        }
+      : prompt,
+  );
+}
+
+/** The project name and deploy target; `--dir` answers the directory question. */
+async function askProject(dir?: string): Promise<Record<string, unknown>> {
+  const projectPrompts = dir ? promptsForDir(dir) : PROJECT_PROMPTS;
+  const answers = await ask([...projectPrompts, DEPLOY_TARGET_PROMPT]);
+  return dir ? { ...answers, dir } : answers;
 }
 
 /** Ask a question set; a cancelled or empty prompt resolves to no answers. */

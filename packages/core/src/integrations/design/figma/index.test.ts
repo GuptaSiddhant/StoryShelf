@@ -13,4 +13,8 @@ describe("the built-in Figma provider", () => {
     const env = { FIGMA_CLIENT_ID: "id", FIGMA_CLIENT_SECRET: "secret" };
     expect(createFigmaDesign({ oauth: figmaOAuthFromEnv(env) }).oauth).toBeDefined();
   });
+
+  it("is always available: personal tokens need nothing from the server (#1126)", () => {
+    expect(createFigmaDesign().availability?.()).toBe("available");
+  });
 });

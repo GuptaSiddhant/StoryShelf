@@ -6,9 +6,11 @@ import { storybookUrlTtlOverrideError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
+import { BrowserExtras } from "../pages/settings-capture.tsx";
 import { settingsHref } from "../pages/settings-tabs.ts";
+import { targetChoices } from "../pages/target-choices.ts";
 import { getStore } from "../store.ts";
-import { assertTargetsSelectable } from "../targets.ts";
+import { assertTargetsSelectable, runnerTargets } from "../targets.ts";
 import { toProjectPatch } from "./capture-config.ts";
 import { flash } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -17,6 +19,7 @@ import { asString, findProject, renderSettingsPage } from "./settings.handlers.t
 
 /** Capture settings: browsers (primary + extras), the mode allowlist and the signed URL lifetime. */
 export function registerCaptureSettings(app: ShelfRouter): void {
+  app.get("/projects/:slug/settings/capture/extras", handleExtrasFragment);
   app.post("/projects/:slug/settings/capture", handleCaptureUpdate);
   app.post("/projects/:slug/settings/capture/superseded", handleSupersededUpdate);
   app.post("/projects/:slug/settings/thresholds", handleThresholdsUpdate);
@@ -131,4 +134,18 @@ async function handleSupersededUpdate(c: Context): Promise<Response> {
   });
   flash(c, "Superseded-build setting saved");
   return hxRedirect(c, `/projects/${project.slug}/settings/capture`);
+}
+
+/** The "Also capture on" boxes for the primary just picked; ticks already made are kept. */
+async function handleExtrasFragment(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  const query = c.req.query();
+  const primary = query["browser"] ?? "chromium";
+  if (!isCaptureTarget(primary)) throw badBrowser(primary);
+  const extras = Object.keys(query)
+    .filter((key) => key.startsWith(EXTRA_PREFIX))
+    .map((key) => key.slice(EXTRA_PREFIX.length));
+  const current = resolveBrowsers(project);
+  const { choices } = targetChoices(await runnerTargets(), current);
+  return c.html(BrowserExtras({ primary, extras, disabled: false, choices }));
 }

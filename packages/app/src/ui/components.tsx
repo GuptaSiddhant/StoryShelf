@@ -16,12 +16,15 @@ export { Card, CardSection, PageHeader, SectionTitle } from "./layout.tsx";
 export { HStack, VStack } from "./stacks.tsx";
 export { Avatar, AvatarGroup } from "./avatar.tsx";
 export { DefinitionList, Disclosure } from "./disclosure.tsx";
+export { Dialog, DialogLink } from "./dialog.tsx";
 export { Dropdown, DropdownDivider, DropdownItem } from "./dropdown.tsx";
 export { Icon } from "./icons/icon.tsx";
 export type { IconName } from "./icons/paths.ts";
 export { Kbd } from "./kbd.tsx";
+export { OptionFields, parseOptionFields, type OptionFieldsItem } from "./option-fields.tsx";
 export { Option, OptionList } from "./option-list.tsx";
 export { Segmented, type SegmentedItem } from "./segmented.tsx";
+export { SummaryList, type SummaryItem } from "./summary-list.tsx";
 export { Table } from "./table.tsx";
 export { Thumbnail } from "./thumbnail.tsx";
 export {

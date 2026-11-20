@@ -159,6 +159,7 @@ export {
   type ConsumerConfig,
   type ConsumerJob,
   type ConsumerMetrics,
+  type ConsumerStopOptions,
   type JobFinishedEvent,
   type JobHandlers,
   type JobOutcome,

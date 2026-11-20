@@ -4,7 +4,12 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
-import { createEmailNotifier, gitFromEnv, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+import {
+  createEmailNotifier,
+  gitFromEnv,
+  integrationsFromEnv,
+  smtpPresetFromEnv,
+} from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
@@ -68,6 +73,8 @@ if (unverifiedDatabaseTls(env)) {
 
 // Every built-in integration is registered (ADR 0049); with SMTP_* set the `email` notifier sends through it.
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
+// SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
+const integrations = integrationsFromEnv(env);
 // Git connections from the environment (ADR 0054, decision 9): a half-set one stops the server here,
 // naming the variable and never its value. The key and the token are read once and never logged.
 const git = gitFromEnv(env);
@@ -101,16 +108,19 @@ const app = createShelfApp({
   database,
   storage,
   ...(testing ? { testing } : {}),
+  design: integrations.design,
   git,
   notifications: {
     notifiers: (builtIn) =>
-      emailSender
-        ? builtIn.map((provider) =>
-            provider.metadata.kind === "email"
-              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
-              : provider,
-          )
-        : builtIn,
+      integrations.notifiers(
+        emailSender
+          ? builtIn.map((provider) =>
+              provider.metadata.kind === "email"
+                ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+                : provider,
+            )
+          : builtIn,
+      ),
   },
   ...(auth ? { auth } : {}),
   logger: shelfLogger,

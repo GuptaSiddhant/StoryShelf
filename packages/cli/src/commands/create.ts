@@ -66,6 +66,15 @@ function createInputError(inputs: CreateInputs): string | null {
 const TOKEN_REQUIRED =
   "--token is required for site-admin (or STORYSHELF_ADMIN_TOKEN env) because the server has sign-in enabled";
 
+/** Whether the server reports sign-in on; an unreachable or older server counts as off (the old behaviour). */
+async function serverHasAuth(url: string): Promise<boolean> {
+  try {
+    return (await createClient(url).health()).auth === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Whether the server reports sign-in off (development mode, ADR 0008), so `create` needs no token.
  * An unreachable server or an older one without the field counts as "needs a token".
@@ -111,7 +120,24 @@ async function executeCreate(
   const written = await writeStorybookConfig({ slug: project.slug, url }, cwd);
   printLine(`Project slug: ${project.slug}`);
   printLine(`Wrote ${written}`);
+  if (await serverHasAuth(url)) {
+    printTokenPointer(url, project.slug);
+    return;
+  }
   await mintCiToken(client, project.slug, written);
+}
+
+/**
+ * With sign-in on, a token minted here has no owner and so cannot upload (ADR 0013): print where
+ * to make one instead (the project's page shows the "Get your first build" card).
+ */
+function printTokenPointer(url: string, slug: string): void {
+  printLine(
+    `The server has sign-in on, so no CI token is created here (one made with the admin token could not upload).`,
+  );
+  printLine(
+    `Next: open ${url.replace(/\/+$/u, "")}/projects/${slug}/builds, sign in, create a token under "Get your first build", and store it as STORYSHELF_TOKEN.`,
+  );
 }
 
 /** Mint the CI token; a failure after the project exists says so and prints the next step. */
