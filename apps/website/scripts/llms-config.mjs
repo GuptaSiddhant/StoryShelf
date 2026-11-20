@@ -27,6 +27,7 @@ export const BUNDLES = [
       "/concepts/hosting-only/",
       "/concepts/labels/",
       "/guides/support/",
+      "/guides/troubleshooting/",
     ],
     budget: 20_000,
   },
