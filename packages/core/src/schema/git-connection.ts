@@ -6,6 +6,19 @@
 /** How a connection authenticates against its host. */
 export type GitConnectionProvider = "github-app" | "gitlab-token";
 
+/** A connection declared in configuration; links refer to it by `id` across restarts. */
+export interface ConfiguredGitConnection {
+  readonly id: string;
+  readonly provider: GitConnectionProvider;
+  readonly name: string;
+  /** API base for a GitHub Enterprise Server App or a GitLab host; null for api.github.com. */
+  readonly apiBase: string | null;
+  /** Non-secret settings: app id, permission ceiling, token expiry. */
+  readonly config: Readonly<Record<string, unknown>>;
+  /** The private key or token; never serialized. */
+  readonly readSecret: () => string;
+}
+
 /** A configured or operator-created connection to a git host. */
 export interface GitConnectionRow {
   /** Stable id; a connection that comes from configuration keeps the id it is configured with. */

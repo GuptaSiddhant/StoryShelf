@@ -30,6 +30,7 @@ export { SCHEMA_META_ID, type SchemaMeta } from "./schema-meta.ts";
 export type { SiteSetting } from "./site-setting.ts";
 /** Git connection and project repository link rows. */
 export type {
+  ConfiguredGitConnection,
   GitConnectionProvider,
   GitConnectionRow,
   GitRepositoryLinkRow,
