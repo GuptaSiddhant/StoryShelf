@@ -12,6 +12,7 @@ import {
 } from "../sessions.ts";
 import { describeLoginMethods } from "./login-methods.ts";
 import { buildInviteMethods } from "./mail.ts";
+import { assertAuthSecret } from "./secret.ts";
 import { ENGINE_PROVIDER_ID, type ShelfAuthInstance, type ShelfAuthOptions } from "./types.ts";
 
 function toAuthUser(
@@ -144,10 +145,8 @@ export function buildAdapter(
     // eslint-disable-next-line require-await -- Auth.setup is async; validation is sync
     setup: async () => {
       // Better Auth merely warns on short secrets; the shelf fails fast
-      // (32 chars ≈ 128+ bits for generated values; forgeable cookies else).
-      if (options.secret.length < 32) {
-        throw new Error("Shelf auth requires a secret of at least 32 characters");
-      }
+      // (forgeable cookies else). createShelfAuth checks too; this covers other callers.
+      assertAuthSecret(options.secret);
     },
     ...buildInviteMethods(db, options),
     passkeysEnabled: () => options.passkeys !== undefined,

@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  authFromEnv,
   browsersFromEnv,
   captureEnabled,
   databaseCaFromEnv,
   databaseFromEnv,
+  describeBootFailure,
+  isLoopback,
   storageFromEnv,
+  storybookHostingFromEnv,
   unverifiedDatabaseTls,
   type Factories,
 } from "./env.ts";
@@ -86,6 +90,30 @@ describe("captureEnabled", () => {
   });
 });
 
+describe("storybookHostingFromEnv", () => {
+  it("is unset by default, which the app reads as trusted", () => {
+    expect(storybookHostingFromEnv({})).toBeUndefined();
+    expect(storybookHostingFromEnv({ SHELF_STORYBOOK_HOSTING: "" })).toBeUndefined();
+  });
+
+  it("accepts trusted and sandboxed", () => {
+    expect(storybookHostingFromEnv({ SHELF_STORYBOOK_HOSTING: "trusted" })).toEqual({
+      mode: "trusted",
+    });
+    expect(storybookHostingFromEnv({ SHELF_STORYBOOK_HOSTING: "sandboxed" })).toEqual({
+      mode: "sandboxed",
+    });
+  });
+
+  it("refuses anything else instead of falling back to trusted", () => {
+    for (const value of ["subdomain", "Sandboxed", "off"]) {
+      expect(() => storybookHostingFromEnv({ SHELF_STORYBOOK_HOSTING: value })).toThrow(
+        /SHELF_STORYBOOK_HOSTING must be trusted/u,
+      );
+    }
+  });
+});
+
 describe("browsersFromEnv", () => {
   it("is the bundled Chromium only by default", () => {
     expect(browsersFromEnv({})).toEqual(["chromium"]);
@@ -102,6 +130,87 @@ describe("browsersFromEnv", () => {
     expect(browsers).toHaveLength(2);
     expect(browsers[0]).toBe("chromium");
     expect(typeof browsers[1]).toBe("object");
+  });
+});
+
+describe("authFromEnv", () => {
+  const secret = "s".repeat(32);
+
+  it("signs in with AUTH_PASSWORD and SECRET by default", () => {
+    expect(authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: secret })).toEqual({
+      mode: "password",
+      password: "a-long-password",
+      email: "admin@example.com",
+      secret,
+    });
+  });
+
+  it("refuses AUTH_PASSWORD without SECRET instead of turning auth off", () => {
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password" })).toThrow(/^SECRET is unset/u);
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: "" })).toThrow(
+      /^SECRET is unset/u,
+    );
+  });
+
+  it("refuses a SECRET shorter than 32 characters, without echoing it", () => {
+    const short = "s".repeat(31);
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: short })).toThrow(
+      expect.objectContaining({
+        message: expect.stringMatching(/^SECRET is shorter than 32 characters/u),
+      }),
+    );
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: short })).toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining(short) }),
+    );
+  });
+
+  it("refuses to start with no sign-in configured unless SHELF_AUTH=none", () => {
+    expect(() => authFromEnv({})).toThrow(/^AUTH_PASSWORD is unset.*SHELF_AUTH=none/u);
+    expect(() => authFromEnv({ SECRET: secret })).toThrow(/^AUTH_PASSWORD is unset/u);
+    expect(authFromEnv({ SHELF_AUTH: "none" })).toEqual({ mode: "none" });
+  });
+
+  it("refuses SHELF_AUTH=none together with AUTH_PASSWORD, and an unknown mode", () => {
+    expect(() => authFromEnv({ SHELF_AUTH: "none", AUTH_PASSWORD: "a-long-password" })).toThrow(
+      /both set/u,
+    );
+    expect(() => authFromEnv({ SHELF_AUTH: "off" })).toThrow(/password .* or none/u);
+  });
+
+  it("never echoes the password or the secret", () => {
+    const password = "do-not-print-this-password";
+    for (const env of [
+      { AUTH_PASSWORD: password },
+      { SHELF_AUTH: "none", AUTH_PASSWORD: password },
+    ]) {
+      expect(() => authFromEnv(env)).toThrow(
+        expect.objectContaining({ message: expect.not.stringContaining(password) }),
+      );
+    }
+  });
+});
+
+describe("describeBootFailure", () => {
+  it("prints the reason as the first line, then the stack frames", () => {
+    const text = describeBootFailure(new Error("SECRET is unset: set it"));
+    const [first, ...rest] = text.trimEnd().split("\n");
+    expect(first).toBe("storyshelf: SECRET is unset: set it");
+    expect(rest.length).toBeGreaterThan(0);
+    expect(rest.every((line) => line.trimStart().startsWith("at "))).toBe(true);
+  });
+
+  it("prints a non-error value on one line", () => {
+    expect(describeBootFailure("boom")).toBe("storyshelf: boom\n");
+  });
+});
+
+describe("isLoopback", () => {
+  it("tells loopback addresses from the wildcard and public ones", () => {
+    expect(isLoopback("127.0.0.1")).toBe(true);
+    expect(isLoopback("localhost")).toBe(true);
+    expect(isLoopback("::1")).toBe(true);
+    expect(isLoopback("0.0.0.0")).toBe(false);
+    expect(isLoopback("10.0.0.5")).toBe(false);
   });
 });
 

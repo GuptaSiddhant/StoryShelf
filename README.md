@@ -27,10 +27,18 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 ## Quick start
 
 ```sh
-docker run -p 3000:3000 -v storyshelf:/data ghcr.io/guptasiddhant/storyshelf
+# Generate SECRET once and keep it: the data volume needs the same value on every run.
+export SECRET="$(openssl rand -hex 32)"
+# Choose a private admin password (at least 12 characters); it is not echoed.
+printf 'Admin password: '; stty -echo; read -r AUTH_PASSWORD; stty echo; echo
+export AUTH_PASSWORD
+docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data -e SECRET -e AUTH_PASSWORD \
+  ghcr.io/guptasiddhant/storyshelf
 ```
 
-Open <http://localhost:3000>. SQLite and local storage live on the `/data` volume, and capture uses the
+Open <http://localhost:3000> and sign in as `admin@example.com` with your `AUTH_PASSWORD`. Sign-in is
+on by default; `SHELF_AUTH=none` (instead of `AUTH_PASSWORD`) runs without it, and the image never
+turns it off because a variable is missing. SQLite and local storage live on the `/data` volume, and capture uses the
 image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64`
 (`:<version>`, `:latest`, and `-hosting` variants without a browser); see the
 [Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose.

@@ -45,7 +45,7 @@ exports[`server init output > is unchanged for aws full 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
     "src/index.ts 1913 f900dd85940217081c40f4c5890735a37c8ae249210d3704913ec45b3827b79a",
     "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
@@ -87,7 +87,7 @@ exports[`server init output > is unchanged for aws minimal 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
     "src/index.ts 1913 f900dd85940217081c40f4c5890735a37c8ae249210d3704913ec45b3827b79a",
     "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
@@ -129,7 +129,7 @@ exports[`server init output > is unchanged for azure full 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
     "src/index.ts 1821 4e98bc65dfb313968e13b4e30039ad9469f496a02881f1f6471098919acdedb5",
     "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
@@ -172,7 +172,7 @@ exports[`server init output > is unchanged for azure minimal 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
     "src/index.ts 1821 4e98bc65dfb313968e13b4e30039ad9469f496a02881f1f6471098919acdedb5",
     "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
@@ -515,7 +515,7 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 789 b1d62d2056242c0d53e0f961efeee1065fc47ed24d0f71244da15b726d6ee219",
+    "package.json 779 f8052b980318e42f2490fe3dd8bdeedc7dcb407c81470f7f70076152bc48ea8e",
     "src/index.ts 1354 47d2721269e685e0818c6de3d793d06c3b4d9148b7ff458db30af2ffca3a8945",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -527,6 +527,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -538,7 +539,7 @@ exports[`server init output > is unchanged for docker single container 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 766 eb488521c07884e84661da25ea0204d003a18f782e0795c0584b57245ad63425",
+    "package.json 756 5d5384854436838f0daca9ffdf231643aa0927aa24121a7e6f21dba06819ffce",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -550,6 +551,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -561,7 +563,7 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 790 a826359c7aa0f5d8644af8f51a8074e49f1a4a062e52215e81fb4357aaa6d7b4",
     "src/index.ts 1363 889fe35a7e6f38bd2426bffb03c3448f99af87745b8be59baf1f7a949de7c9db",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
@@ -574,6 +576,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:up      # builds + starts the app
   npm run docker:logs    # follow logs
   npm run docker:down    # tear down
@@ -606,7 +609,7 @@ exports[`server init output > is unchanged for gcp full 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
     "src/index.ts 1767 8f4b9bb8f1c346b6f9b13ad3264bc43557d776dde93b5d587dfcd6512530fd47",
     "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
@@ -649,7 +652,7 @@ exports[`server init output > is unchanged for gcp minimal 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
     "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
     "src/index.ts 1767 8f4b9bb8f1c346b6f9b13ad3264bc43557d776dde93b5d587dfcd6512530fd47",
     "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
@@ -712,7 +715,7 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 766 eb488521c07884e84661da25ea0204d003a18f782e0795c0584b57245ad63425",
+    "package.json 756 5d5384854436838f0daca9ffdf231643aa0927aa24121a7e6f21dba06819ffce",
     "src/index.ts 1344 98a0a1516eedb9a2464588694f872cbc1713798293aa8c3c231ef5b45acf2470",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
@@ -724,6 +727,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
