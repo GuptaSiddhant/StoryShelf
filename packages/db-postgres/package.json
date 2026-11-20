@@ -96,6 +96,7 @@
     "@types/node": "catalog:",
     "@vercel/postgres": "^0.10.0",
     "@vitest/coverage-v8": "catalog:",
+    "drizzle-kit": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",

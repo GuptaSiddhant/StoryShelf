@@ -107,6 +107,7 @@ import { registerBuildCancel } from "./build-cancel.ts";
 import { registerBuildChangeset } from "./build-changeset.ts";
 import { registerBuildReviews } from "./build-reviews.ts";
 import { registerBuildSkip } from "./build-skip.ts";
+import { buildWaitState } from "./build-wait-state.ts";
 import { registerBuildsCancelBulk } from "./builds-cancel-bulk.ts";
 import { registerBuildsCancelForm } from "./builds-cancel-form.ts";
 import { registerBuildsInFlight } from "./builds-in-flight.ts";
@@ -276,7 +277,7 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     const build = await buildForProject(project.id, buildId);
-    return c.json(build);
+    return c.json({ ...build, ...(await buildWaitState(build)) });
   });
 
   app.openapi(retryBuildRoute, async (c) => {

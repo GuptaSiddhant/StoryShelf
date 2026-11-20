@@ -484,11 +484,33 @@
             "type": "string",
             "nullable": true
           },
+          "supersededByBuildId": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
           "updatedAt": {
             "type": "string"
+          },
+          "publishing": {
+            "type": "string",
+            "enum": ["pending", "success", "failure", "unavailable"]
+          },
+          "capture": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "done": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number",
+                "nullable": true
+              }
+            },
+            "required": ["done", "total"]
           }
         },
         "required": [

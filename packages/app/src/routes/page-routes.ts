@@ -56,6 +56,7 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "POST /projects/:slug/settings/members/groups/:mappingId/remove": "hosting",
   "GET /admin": "hosting",
   "POST /admin/credentials/reencrypt": "hosting",
+  "GET /admin/public-origin/edit": "hosting",
   "POST /admin/public-origin": "hosting",
   "POST /admin/public-origin/report": "hosting",
   "POST /admin/public-origin/clear": "hosting",

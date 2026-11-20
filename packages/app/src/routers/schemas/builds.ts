@@ -34,8 +34,14 @@ export const buildSchema = z
     testResults: z.string().nullable().optional(),
     /** For a `skipped` build, the real build whose outcome it repeats (ADR 0044). */
     skippedFromBuildId: z.string().nullable().optional(),
+    /** The newer build that replaced this one when it was cancelled as superseded (ADR 0045). */
+    supersededByBuildId: z.string().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
+    /** `GET …/builds/:buildId` only: how publishing stands (`success` once the Storybook is served). */
+    publishing: z.enum(["pending", "success", "failure", "unavailable"]).optional(),
+    /** `GET …/builds/:buildId` only: stories with a snapshot of the catalog's stories; null when nothing captures. */
+    capture: z.object({ done: z.number(), total: z.number().nullable() }).nullable().optional(),
   })
   .openapi("Build");
 
