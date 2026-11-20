@@ -54,6 +54,21 @@ describe("resolveContainerClient with Entra credentials", () => {
     expect(blob.BlobServiceClient).toHaveBeenCalledWith("https://x.example", credential);
   });
 
+  it("propagates a credential constructor failure without trying another sign-in", () => {
+    identity.DefaultAzureCredential.mockImplementationOnce(() => {
+      throw new Error("no identity");
+    });
+    expect(() => resolveContainerClient({ container: "c", accountName: "acct" }, "c")).toThrow(
+      "no identity",
+    );
+    expect(blob.BlobServiceClient).not.toHaveBeenCalled();
+  });
+
+  it("refuses to build a client with no account, URL or connection string", () => {
+    expect(() => resolveContainerClient({ container: "c" }, "c")).toThrow("createAzureStorage");
+    expect(identity.DefaultAzureCredential).not.toHaveBeenCalled();
+  });
+
   it("keeps the connection string and the account key ahead of the identity", () => {
     resolveContainerClient({ container: "c", connectionString: "UseDevelopmentStorage=true" }, "c");
     resolveContainerClient({ container: "c", accountName: "a", accountKey: "k" }, "c");

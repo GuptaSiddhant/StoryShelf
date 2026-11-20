@@ -74,7 +74,8 @@ The app gets every secret as a Container Apps secret that is a **Key Vault refer
 managed identity. No output carries a value.
 
 - **`SECRET`, `ADMIN-TOKEN`** are generated. Their values, the database password and the storage
-  database password are also in the Terraform state: keep the state in an encrypted backend with
+  account's access keys and connection strings are also in the Terraform state (the provider records
+  them as computed attributes of the account, whether or not anything uses them): keep the state in an encrypted backend with
   restricted access.
 - **`OIDC-CLIENT-SECRET`** is an operator step. Terraform writes `change-me` once and never
   overwrites it:
@@ -104,9 +105,11 @@ User` for `identity_principal_id` on that vault; the module does not grant it.
 Blob access uses the app's managed identity, not the account key. The image gets `AZURE_STORAGE_ACCOUNT`,
 `AZURE_STORAGE_CONTAINER` and `AZURE_CLIENT_ID`, and `storage-azure` signs in with
 `DefaultAzureCredential` (the user-assigned identity, by client id), which holds `Storage Blob Data
-Contributor` on the container. No connection string or account key is stored in Key Vault, passed to
-the app or written to the Terraform state by this module. The account itself still allows shared-key
-access (Terraform's own provider and your operators may use it); turn it off yourself if neither does.
+Contributor` on the container. No connection string or account key is stored in Key Vault or passed to
+the app. They **remain in the Terraform state**, because the provider records the storage account's
+keys as computed attributes: keep the state in an encrypted backend. The account itself still allows
+shared-key access (Terraform's own provider and your operators may use it); turn it off yourself if
+neither does, and rotate the keys if the state was ever exposed.
 Outside Azure, the image also takes `AZURE_STORAGE_CONNECTION` (a connection string) instead.
 
 ## Capture, scaling and shutdown

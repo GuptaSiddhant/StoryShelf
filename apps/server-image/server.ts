@@ -18,8 +18,8 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  *
  * Everything comes from the environment: `DATABASE_URL`, or `DATABASE_IAM_HOST` + `DATABASE_IAM_USER` +
  * `DATABASE_IAM_NAME` + `DATABASE_IAM_REGION` for RDS IAM login (SQLite on `/data` when neither is set),
- * `DATABASE_POOL_MAX`, `DATABASE_CA` / `DATABASE_CA_FILE`, `AWS_BUCKET`, `GCS_BUCKET` or `AZURE_STORAGE_ACCOUNT` (+ `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID`;
- * or `AZURE_STORAGE_CONNECTION`) for one object store (local storage on `/data` when none is set),
+ * `DATABASE_POOL_MAX`, `DATABASE_CA` / `DATABASE_CA_FILE`, `AWS_BUCKET`, `GCS_BUCKET` or Azure Blob (`AZURE_STORAGE_CONTAINER` is required, with either
+ * `AZURE_STORAGE_ACCOUNT` [+ `AZURE_CLIENT_ID`] or `AZURE_STORAGE_CONNECTION`) for one object store (local storage on `/data` when none is set),
  * `SECRET` (`SECRET_PREVIOUS` and `SECRET_MIGRATE` to rotate it), `PUBLIC_BASE_URL`, `AUTH_PASSWORD`,
  * `AUTH_EMAIL`, `SMTP_*`,
  * `SHUTDOWN_GRACE_SECONDS` (bound of the SIGTERM drain, a few seconds below the platform's stop timeout),
