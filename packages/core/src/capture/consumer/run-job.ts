@@ -1,6 +1,6 @@
 /**
  * Run one claimed job to its end: pick the handler by kind, keep the lease (heartbeat and progress), then settle
- * the job on the queue (ack, retry with backoff, fail, or leave it to whoever owns it now).
+ * the job on the queue (ack, retry with backoff, fail, hand it back on shutdown, or leave it to whoever owns it now).
  */
 import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
 import type { Logger } from "../../logger.ts";
@@ -9,6 +9,7 @@ import { keepJobLease, type JobLeaseKeeper, type LeaseEnd } from "../db-queue/ke
 import { REAL_TIMERS, type QueueTimers } from "../db-queue/timers.ts";
 import { reportFinished, type ConsumerMetrics, type JobOutcome } from "./metrics.ts";
 import { backoffDelayMs, DEFAULT_BACKOFF_MS, isFinalAttempt } from "./retry.ts";
+import type { Releaser } from "./shutdown.ts";
 import type { ConsumerJob, JobRunContext, KindHandler } from "./types.ts";
 
 /** What {@link runJob} needs from the consumer. */
@@ -26,18 +27,12 @@ export interface JobRuntime {
   lease?: { renewEveryMs?: number; checkMs?: number } | undefined;
   /** Wall-clock bound of one job in ms; absent means unbounded (tests). */
   maxJobMs?: number | undefined;
-  /**
-   * Settles when the shutdown drain ran out of time (`stop({ graceMs })`): every job still running
-   * is cancelled and handed back to the queue without spending its attempt. Set per session.
-   */
-  handBack?: Promise<void> | undefined;
+  /** The session's releaser: a draining stop whose grace ran out releases the running jobs (#912). */
+  releaser?: Releaser | undefined;
 }
 
 /** Why a job's handler stopped: it finished (or threw), or the queue took the job away. */
-type Race =
-  | { kind: "settled"; error?: unknown }
-  | { kind: "ended"; end: LeaseEnd }
-  | { kind: "handback" };
+type Race = { kind: "settled"; error?: unknown } | { kind: "ended"; end: LeaseEnd };
 
 /** Run `job` in the slot the caller holds; never rejects. */
 export async function runJob(rt: JobRuntime, job: ConsumerJob): Promise<void> {
@@ -151,28 +146,120 @@ async function runHandler(
   logger.info("consumer picked up job");
   const run = invoke(handler, job, { logger, touch, signal: keeper.signal });
   try {
-    return await endOfRace(rt, held, await Promise.race([run, endOf(keeper), handedBack(rt)]));
+    const raced = await Promise.race([run, endOf(keeper)]);
+    return raced.kind === "settled"
+      ? await settle(rt, held, raced)
+      : await abandonAndWait(rt, held, { end: raced.end, run });
   } finally {
     keeper.stop();
     run.catch(() => {});
   }
 }
 
-/** Settle the job by how the race ended. */
-async function endOfRace(
+/** Stop an abandoned job, then keep its slot until its handler has returned (bounded). */
+async function abandonAndWait(
   rt: JobRuntime,
   held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
-  raced: Race,
+  stopped: { end: LeaseEnd; run: Promise<Race> },
 ): Promise<JobOutcome> {
-  if (raced.kind === "handback") {
-    return await handBackJob(rt, held);
+  if (stopped.end === "released") {
+    return await handBackReleased(rt, held, stopped.run);
   }
-  return raced.kind === "ended"
-    ? await abandon(rt, held, raced.end)
-    : await settle(rt, held, raced);
+  const outcome = await abandon(rt, held, stopped.end);
+  // The slot is this job's until its work has stopped: never count it free while a render runs.
+  await awaitStop(rt, stopped.run, held.logger);
+  return outcome;
 }
 
+/**
+ * Longest an abandoned job's handler (cancelled, lease lost, past its deadline) may keep its slot
+ * once it was told to stop: its signal is aborted and its runner cancelled, so it ends at its next
+ * checkpoint, well within this. One that does not is logged and its slot freed anyway.
+ */
+export const STOP_GRACE_MS = 30_000;
+
+/** Wait for an abandoned handler to return, at most {@link STOP_GRACE_MS}; log how it ended. */
+async function awaitStop(rt: JobRuntime, run: Promise<Race>, logger: Logger): Promise<void> {
+  const since = rt.now();
+  if (await within(rt, run, STOP_GRACE_MS)) {
+    logger.info({ waitedMs: rt.now() - since }, "abandoned job stopped");
+    return;
+  }
+  logger.error(
+    { seconds: STOP_GRACE_MS / 1000 },
+    "abandoned job still running after its stop grace; freeing its slot",
+  );
+}
+
+/**
+ * The shutdown's grace ran out (#912): the job's signal is aborted; cancel its run and give the
+ * handler the releaser's reserve to stop. Only a stopped handler's job is handed back (visible at
+ * once, no attempt spent): while the handler may still write, another instance must not claim the
+ * job, so one that has not stopped is left to its lease, as before #912. A queue without
+ * `handBack` leaves the job to its lease as well.
+ */
+async function handBackReleased(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+  run: Promise<Race>,
+): Promise<JobOutcome> {
+  if (!(await stopsWithinReserve(rt, held, run))) {
+    return "lost";
+  }
+  if (rt.queue.handBack === undefined) {
+    held.logger.warn("queue cannot hand a job back; leaving it to its lease");
+    return "lost";
+  }
+  await rt.queue.handBack(held.job, { delayMs: 0, reason: "shutdown" });
+  return "handed-back";
+}
+
+/** Cancel a released job's run and wait the releaser's reserve for its handler; logs a stall. */
+async function stopsWithinReserve(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+  run: Promise<Race>,
+): Promise<boolean> {
+  const reserveMs = rt.releaser?.reserveMs ?? 0;
+  held.logger.warn({ reserveMs }, "shutdown grace over; handing job back");
+  // The cancel is not waited for: what decides the hand-back is whether the handler has stopped.
+  cancelQuietly(held).catch(() => {});
+  if (await within(rt, run, reserveMs)) {
+    return true;
+  }
+  held.logger.error({ reserveMs }, "released job still running; leaving it to its lease");
+  return false;
+}
+
+/** Cancel the handler's run; a failure is logged, never thrown. */
+async function cancelQuietly(held: {
+  job: ConsumerJob;
+  handler: KindHandler;
+  logger: Logger;
+}): Promise<void> {
+  try {
+    await held.handler.cancel?.(held.job);
+  } catch (error) {
+    held.logger.warn({ err: error }, "failed to cancel the running job");
+  }
+}
+
+/** Keep the job's lease; the session's releaser can release it until the keeper stops. */
 function keepLease(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKeeper {
+  const keeper = leaseOf(rt, job, logger);
+  const untrack = rt.releaser?.register(() => {
+    keeper.release();
+  });
+  return {
+    ...keeper,
+    stop: () => {
+      untrack?.();
+      keeper.stop();
+    },
+  };
+}
+
+function leaseOf(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKeeper {
   return keepJobLease(rt.queue, job, {
     ...rt.lease,
     ...(rt.maxJobMs === undefined ? {} : { maxJobMs: rt.maxJobMs }),
@@ -201,31 +288,6 @@ async function invoke(
 
 async function endOf(keeper: JobLeaseKeeper): Promise<Race> {
   return { kind: "ended", end: await keeper.ended };
-}
-
-/** Resolves when the shutdown drain gave up on running jobs; never when no drain is bounded. */
-async function handedBack(rt: JobRuntime): Promise<Race> {
-  await (rt.handBack ?? new Promise<never>(() => {}));
-  return { kind: "handback" };
-}
-
-/**
- * The shutdown drain ran out of time: stop the work, then hand the job back so another instance
- * claims it at once and the attempt is not spent. A job that was cancelled meanwhile is left to
- * its cancel (the queue ignores a hand-back of a flagged job). A queue that cannot hand back leaves the
- * job to its lease.
- */
-async function handBackJob(
-  rt: JobRuntime,
-  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
-): Promise<JobOutcome> {
-  const { job, handler, logger } = held;
-  logger.warn("shutdown grace over; handing the job back");
-  await handler.cancel?.(job).catch((error: unknown) => {
-    logger.warn({ err: error }, "failed to cancel the running job");
-  });
-  await rt.queue.handBack?.(job, { delayMs: 0, reason: "shutdown" });
-  return "handed-back";
 }
 
 /** The handler returned: ack, or retry / fail on its error. */
@@ -280,28 +342,37 @@ async function requeue(
 }
 
 /**
- * The lease is gone or the job was cancelled while the handler ran: stop the work. A lost lease
- * means another consumer owns the job (it settles it); a cancel is settled here as `cancelled`.
+ * The lease is gone or the job was cancelled while the handler ran: stop the work (its signal is
+ * already aborted; the runner is cancelled here). A lost lease means another consumer owns the job
+ * (it settles it); a cancel is settled here as `cancelled`. The caller then waits for the handler.
  */
 async function abandon(
   rt: JobRuntime,
   held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
-  end: LeaseEnd,
+  end: Exclude<LeaseEnd, "released">,
 ): Promise<JobOutcome> {
   const { job, handler, logger } = held;
   if (end === "deadline") {
     return await endAtDeadline(rt, held);
   }
+  logAbort(logger, end);
   await handler.cancel?.(job).catch((error: unknown) => {
     logger.warn({ err: error }, "failed to cancel the running job");
   });
   if (end === "lost") {
-    logger.warn("queue lease lost, aborting job");
     return "lost";
   }
-  logger.info("job cancelled, aborting");
   await rt.queue.nack(job, { requeue: false, error: "cancelled" });
   return "cancelled";
+}
+
+/** The job's logger carries its build id, so this line says which build is being stopped. */
+function logAbort(logger: Logger, end: "lost" | "cancelled"): void {
+  if (end === "lost") {
+    logger.warn("queue lease lost, aborting job");
+  } else {
+    logger.info("job cancelled, aborting");
+  }
 }
 
 /**
@@ -334,22 +405,26 @@ async function boundedCleanup(
   if (work === undefined) {
     return;
   }
-  const timers = rt.timers ?? REAL_TIMERS;
-  const stalled = Promise.withResolvers<"stalled">();
-  const handle = timers.setTimeout(() => {
-    stalled.resolve("stalled");
-  }, DEADLINE_CLEANUP_MS);
   const finished = work.then(
-    () => "finished" as const,
+    () => {},
     (error: unknown) => {
       logger.warn({ err: error }, `failed to ${what}`);
-      return "finished" as const;
     },
   );
+  if (!(await within(rt, finished, DEADLINE_CLEANUP_MS))) {
+    logger.warn({ what }, "cleanup past the deadline stalled; leaving it to the lease");
+  }
+}
+
+/** Whether `work` (which never rejects) settles within `ms`. */
+async function within(rt: JobRuntime, work: Promise<unknown>, ms: number): Promise<boolean> {
+  const timers = rt.timers ?? REAL_TIMERS;
+  const stalled = Promise.withResolvers<false>();
+  const handle = timers.setTimeout(() => {
+    stalled.resolve(false);
+  }, ms);
   try {
-    if ((await Promise.race([finished, stalled.promise])) === "stalled") {
-      logger.warn({ what }, "cleanup past the deadline stalled; leaving it to the lease");
-    }
+    return await Promise.race([work.then(() => true), stalled.promise]);
   } finally {
     timers.clearTimeout(handle);
   }

@@ -90,7 +90,7 @@ function coreNames(answers: Answers): string[] {
 function featureNames(answers: Answers): string[] {
   const auth = AUTH_PACKAGE[answers.auth];
   return [
-    ...(answers.storage === "local" ? [] : [STORAGE_PACKAGE[answers.storage]]),
+    STORAGE_PACKAGE[answers.storage],
     "@storyshelf/runner-playwright",
     ...(auth === null ? [] : [auth]),
   ];
@@ -99,22 +99,13 @@ function featureNames(answers: Answers): string[] {
 function buildDeps(answers: Answers): Record<string, string> {
   const sdk = DB_SDK[answers.database];
   return {
-    "@hono/node-server": "^1.17.0",
+    "@hono/node-server": "^2.1.11",
     ...ownPackages(coreNames(answers)),
     ...(sdk ? { [sdk[0]]: sdk[1] } : {}),
     ...ownPackages(featureNames(answers)),
     ...(wantsNotifications(answers) ? { nodemailer: NODEMAILER_SDK } : {}),
   };
 }
-
-/** The Terraform npm scripts of the AWS, Azure and GCP targets. */
-const INFRA_SCRIPTS: Record<string, string> = {
-  "infra:init": "terraform -chdir=terraform init",
-  "infra:plan": "terraform -chdir=terraform plan -out=tfplan",
-  "infra:apply": "terraform -chdir=terraform apply tfplan",
-  "infra:destroy": "terraform -chdir=terraform destroy",
-  "infra:outputs": "terraform -chdir=terraform output -json",
-};
 
 /** `docker:*` npm scripts: compose when several services, plain `docker` for one container. */
 function dockerScripts(answers: Answers): Record<string, string> {
@@ -126,13 +117,16 @@ function dockerScripts(answers: Answers): Record<string, string> {
       "docker:logs": "docker compose logs -f",
     };
   }
+  // Forward the operator's SECRET (and AUTH_PASSWORD) from the shell: a literal here would be
+  // shorter than 32 characters, and the server refuses to start with it.
+  const env = answers.auth === "password" ? "-e SECRET -e AUTH_PASSWORD" : "-e SECRET";
   return {
     "docker:build": `docker build -t ${answers.name} .`,
-    "docker:run": `docker run --rm -p 3000:3000 -v ${answers.name}-data:/data -e SECRET=change-me ${answers.name}`,
+    "docker:run": `docker run --rm -p 3000:3000 -v ${answers.name}-data:/data ${env} ${answers.name}`,
   };
 }
 
-/** The npm scripts: start, dev and typecheck, plus the Docker or Terraform ones of the deploy target. */
+/** The npm scripts: start, dev and typecheck, plus the Docker ones of the deploy target. */
 function scriptsFor(answers: Answers): Record<string, string> {
   const target = resolveDeployTarget(answers);
   return {
@@ -140,7 +134,6 @@ function scriptsFor(answers: Answers): Record<string, string> {
     dev: `node --watch ${SERVER_ENTRY}`,
     typecheck: "tsc",
     ...(target === "docker" ? dockerScripts(answers) : {}),
-    ...(target === "aws" || target === "azure" || target === "gcp" ? INFRA_SCRIPTS : {}),
   };
 }
 

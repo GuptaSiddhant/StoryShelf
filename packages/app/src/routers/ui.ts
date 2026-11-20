@@ -3,6 +3,7 @@ import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { ShelfRouter } from "../app-types.ts";
+import { renderSkippedBuildPage } from "../pages/build-detail-skipped.tsx";
 import { renderBuildDiffPage } from "../pages/build-diff.tsx";
 import { renderComponentPage } from "../pages/component-detail.tsx";
 import { renderActiveQueue } from "../pages/compute-jobs.tsx";
@@ -84,6 +85,7 @@ export function registerUiPages(app: ShelfRouter): void {
     const html = await renderProjectBuildsPage(c.req.param("slug"), {
       status: c.req.query("status"),
       branch: c.req.query("branch"),
+      skipped: c.req.query("skipped"),
     });
     if (!html) {
       return c.notFound();
@@ -124,6 +126,9 @@ export function registerUiPages(app: ShelfRouter): void {
     const build = await new BuildModel(getStore().db).get(buildId);
     if (!build || build.projectId !== project.id) {
       return c.notFound();
+    }
+    if (build.status === "skipped") {
+      return c.html(await renderSkippedBuildPage(project, build));
     }
     const returnPath = returnPathOf(c);
     const data = await loadBuildDiffData(c, project, build, { snapshotId, returnPath });

@@ -4,7 +4,9 @@
  * that prints nothing for longer than the lease is not redelivered. A holder that dies stops
  * renewing and its lease expires. A separate timer reads the job's state every 5 s, so cancel and
  * takeover are seen within that interval even while the run is hung. The heartbeat stops with the
- * keeper: on completion, on a lost lease and on cancel.
+ * keeper: on completion, on a lost lease and on cancel. However the job ends early (cancelled, lease
+ * lost, deadline, released by a draining shutdown), `signal` aborts, so the work in this process
+ * stops at its next checkpoint.
  */
 import type {
   LeaseRenewal,
@@ -18,8 +20,19 @@ import { REAL_TIMERS, repeatEvery, type QueueTimers } from "./timers.ts";
 /** Longest gap between two renewals while progress keeps coming. */
 export const RENEW_THROTTLE_MS = 30_000;
 
-/** Why a held job must stop. */
-export type LeaseEnd = Exclude<LeaseRenewal, "ok"> | "deadline";
+/**
+ * Why a held job must stop. `released`: this process is shutting down and hands the job back to the
+ * queue (#912); like `deadline`, it is decided here, not read from the queue.
+ */
+export type LeaseEnd = Exclude<LeaseRenewal, "ok"> | "deadline" | "released";
+
+/** The reason `signal` aborts with, by how the job ended (the `JobAbortedError` message). */
+const ABORT_REASONS: Record<LeaseEnd, string> = {
+  cancelled: "job cancelled",
+  lost: "job lease lost",
+  deadline: "job deadline exceeded",
+  released: "job handed back on shutdown",
+};
 
 /** Options of {@link keepJobLease}. */
 export interface LeaseKeeperOptions {
@@ -43,10 +56,18 @@ export interface LeaseKeeperOptions {
 export interface JobLeaseKeeper {
   /** Report progress: renews the lease when the throttle allows. */
   touch(): void;
-  /** Resolves once, when the job was cancelled or the lease lost; never while the job is ours. */
+  /** Resolves once, when the job must stop (see {@link LeaseEnd}); never while the job is ours. */
   readonly ended: Promise<LeaseEnd>;
-  /** Aborted when the job passes its deadline, so in-process work can stop. */
+  /**
+   * Aborted the moment `ended` settles (cancelled, lease lost, past the deadline, or released), so
+   * in-process work stops at its next checkpoint. Never aborted by `stop`.
+   */
   readonly signal: AbortSignal;
+  /**
+   * Give the job up (a shutdown's grace ran out): `ended` resolves `released` and `signal` aborts,
+   * unless the job already ended. The caller hands the job back to the queue.
+   */
+  release(): void;
   /** Stop checking; idempotent. */
   stop(): void;
 }
@@ -75,12 +96,13 @@ export function keepJobLease(
     stopped: false,
     settle: (end) => {
       state.stopped = true;
+      controller.abort(new Error(ABORT_REASONS[end]));
       resolve(end);
     },
   };
   const stopChecks = startChecks(queue, job, state, options);
   const stopBeat = startHeartbeat(queue, job, state, { ...options, now });
-  const stopDeadline = startDeadline(state, controller, options);
+  const stopDeadline = startDeadline(state, options);
   const stop = (): void => {
     state.stopped = true;
     stopChecks();
@@ -94,16 +116,17 @@ export function keepJobLease(
     },
     ended: promise,
     signal: controller.signal,
+    release: () => {
+      if (!state.stopped) {
+        state.settle("released");
+      }
+    },
     stop,
   };
 }
 
 /** Arm the job's wall-clock bound; the returned function disarms it. */
-function startDeadline(
-  state: KeeperState,
-  controller: AbortController,
-  options: LeaseKeeperOptions,
-): () => void {
+function startDeadline(state: KeeperState, options: LeaseKeeperOptions): () => void {
   const { maxJobMs } = options;
   if (maxJobMs === undefined) {
     return () => {};
@@ -111,7 +134,6 @@ function startDeadline(
   const timers = options.timers ?? REAL_TIMERS;
   const handle = timers.setTimeout(() => {
     if (!state.stopped) {
-      controller.abort(new Error("job deadline exceeded"));
       state.settle("deadline");
     }
   }, maxJobMs);

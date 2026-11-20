@@ -245,7 +245,7 @@ describe("retry a git channel's current state", () => {
     });
     const html = await page.text();
     expect(html).toContain("Last delivered");
-    expect(html).toContain("no delivery yet");
+    expect(html).toContain("No delivery yet");
     expect(html).toContain("Never delivered");
     expect(html).toContain('aria-label="Retry current state of o/r"');
     expect(html).toContain('id="channel-');

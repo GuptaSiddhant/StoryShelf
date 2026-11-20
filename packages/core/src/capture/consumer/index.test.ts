@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { CaptureJobModel } from "../../models/capture-job.ts";
-import { DEADLINE_CLEANUP_MS } from "./run-job.ts";
-import { gate, rig, recordingHandler } from "./test-fixtures.ts";
+import { DEADLINE_CLEANUP_MS, STOP_GRACE_MS } from "./run-job.ts";
+import { gate, rig, recordingHandler, untilAborted } from "./test-fixtures.ts";
 import type { ConsumerJob, KindHandler } from "./types.ts";
 
 async function stateOf(r: ReturnType<typeof rig>, jobId: string) {
@@ -358,17 +358,19 @@ describe("lease and cancel", () => {
     await started;
   });
 
-  it("stops a job whose lease was taken over: cancels the run, writes nothing, frees the slot", async () => {
+  it("stops a job whose lease was taken over: aborts and cancels the run, writes nothing, frees the slot once it stopped", async () => {
     const hold = gate();
     const cancel = vi.fn(async () => {});
     const seen: string[] = [];
+    const signals: AbortSignal[] = [];
     const r = rig({
       handlers: {
         capture: {
-          run: async (job) => {
+          run: async (job, context) => {
             seen.push(job.buildId);
+            signals.push(context.signal);
             if (job.buildId === "b1") {
-              await hold.promise;
+              await untilAborted(context.signal, hold.promise);
             }
           },
           cancel,
@@ -387,6 +389,7 @@ describe("lease and cancel", () => {
     await r.clock.advance(6000);
 
     expect(cancel).toHaveBeenCalledWith(expect.objectContaining({ buildId: "b1" }));
+    expect(signals[0]?.aborted).toBe(true);
     expect(ack).not.toHaveBeenCalled();
     expect(nack).not.toHaveBeenCalled();
     await r.queue.enqueue({ buildId: "b2" });
@@ -480,7 +483,7 @@ describe("lease and cancel", () => {
     await r.queue.enqueueJob({ kind: "capture", buildId: "b2" });
     await r.clock.advance(61_000);
     expect(seen).toEqual(["b1"]);
-    await r.clock.advance(DEADLINE_CLEANUP_MS + 3000);
+    await r.clock.advance(DEADLINE_CLEANUP_MS + STOP_GRACE_MS + 3000);
 
     expect(seen).toEqual(["b1", "b2"]);
     hold.open();
@@ -535,6 +538,80 @@ describe("lease and cancel", () => {
 
     expect(cancel).toHaveBeenCalledOnce();
     expect((await stateOf(r, id))?.status).toBe("cancelled");
+    await consumer.stop();
+    await started;
+  });
+
+  it("keeps a cancelled job's slot until its handler stopped, and aborts its signal (#1154)", async () => {
+    const seen: string[] = [];
+    const stopped = gate();
+    const r = rig({
+      handlers: {
+        capture: {
+          run: async (job, context) => {
+            seen.push(job.buildId);
+            if (job.buildId !== "b1") return;
+            // A render that ignores the runner's cancel, and stops only at a checkpoint later on.
+            await untilAborted(context.signal);
+            await stopped.promise;
+          },
+          cancel: async () => {},
+        },
+      },
+    });
+    const consumer = r.consume({ config: { concurrency: 1 } });
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.queue.enqueueJob({ kind: "capture", buildId: "b2" });
+    await r.clock.advance(100);
+    await r.queue.cancel(id);
+    await r.clock.advance(6000);
+    expect((await stateOf(r, id))?.status).toBe("cancelled");
+    // A message-only line: the stub logger records its text as `fields`.
+    expect(r.log.calls.some((call) => call.fields === "job cancelled, aborting")).toBe(true);
+    // Its work still runs: the slot is not free yet.
+    await r.clock.advance(5000);
+    expect(seen).toEqual(["b1"]);
+    stopped.open();
+    await r.clock.advance(3000);
+    expect(seen).toEqual(["b1", "b2"]);
+    expect(r.log.calls.some((call) => call.message === "abandoned job stopped")).toBe(true);
+    await consumer.stop();
+    await started;
+  });
+
+  it("frees the slot of a cancelled job whose handler never stops, after the stop grace, and logs it", async () => {
+    const seen: string[] = [];
+    const r = rig({
+      handlers: {
+        capture: {
+          run: async (job) => {
+            seen.push(job.buildId);
+            if (job.buildId === "b1") await new Promise<void>(() => {});
+          },
+          cancel: async () => {},
+        },
+      },
+    });
+    const consumer = r.consume({ config: { concurrency: 1 } });
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.queue.enqueueJob({ kind: "capture", buildId: "b2" });
+    await r.clock.advance(100);
+    await r.queue.cancel(id);
+    // Seen within one cancel check; the slot is still held for most of the grace after it.
+    await r.clock.advance(6000);
+    await r.clock.advance(STOP_GRACE_MS - 2000);
+    expect(seen).toEqual(["b1"]);
+    await r.clock.advance(5000);
+    expect(seen).toEqual(["b1", "b2"]);
+    expect(
+      r.log.calls.some(
+        (call) =>
+          call.level === "error" &&
+          call.message === "abandoned job still running after its stop grace; freeing its slot",
+      ),
+    ).toBe(true);
     await consumer.stop();
     await started;
   });
@@ -634,103 +711,6 @@ describe("drain", () => {
     expect(handler.jobs.map((job) => job.buildId)).toEqual(["again"]);
     await consumer.stop();
     await second;
-  });
-});
-
-function heldRig(extra: Partial<KindHandler> = {}) {
-  const hold = gate();
-  const cancel = vi.fn(async () => {
-    hold.open();
-  });
-  const r = rig({
-    handlers: {
-      capture: {
-        run: async () => {
-          await hold.promise;
-        },
-        cancel,
-        ...extra,
-      },
-    },
-  });
-  return { r, hold, cancel };
-}
-
-describe("bounded drain (stop with a grace)", () => {
-  it("lets a job that ends within the grace finish and ack, handing nothing back", async () => {
-    const { r, hold, cancel } = heldRig();
-    const consumer = r.consume();
-    const started = consumer.start();
-    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
-    await r.clock.advance(100);
-
-    const stopping = consumer.stop({ graceMs: 10_000 });
-    await r.clock.advance(3000);
-    hold.open();
-    await stopping;
-    await started;
-
-    expect(cancel).not.toHaveBeenCalled();
-    expect((await stateOf(r, id))?.status).toBe("done");
-  });
-
-  it("hands a job still running at the grace back: cancelled run, no spent attempt, resolves in time", async () => {
-    const { r, cancel } = heldRig();
-    const consumer = r.consume();
-    const started = consumer.start();
-    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
-    await r.clock.advance(100);
-    const before = await stateOf(r, id);
-
-    let stopped = false;
-    const stopping = consumer.stop({ graceMs: 5000 }).then(() => {
-      stopped = true;
-    });
-    await r.clock.advance(2999);
-    expect(stopped).toBe(false);
-    await r.clock.advance(1);
-    await stopping;
-    await started;
-
-    expect(cancel).toHaveBeenCalledOnce();
-    // Handed back unrun: queued again at once, the attempt count as it was before the claim.
-    expect(await stateOf(r, id)).toMatchObject({ status: "queued", attempt: 0, error: null });
-    expect((await stateOf(r, id))?.maxAttempts).toBe(before?.maxAttempts);
-    // Another copy claims it at once, as attempt 1 of a job that still has all its retries.
-    const next = await r.queue.poll();
-    expect(next).toMatchObject({ jobId: id, attempt: 1 });
-  });
-
-  it("leaves a job cancelled during the drain cancelled, not handed back", async () => {
-    const { r } = heldRig();
-    const consumer = r.consume();
-    const started = consumer.start();
-    const id = await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
-    await r.clock.advance(100);
-
-    const stopping = consumer.stop({ graceMs: 20_000 });
-    expect(await r.queue.cancel(id)).toBe(true);
-    await r.clock.advance(6000);
-    await stopping;
-    await started;
-
-    expect((await stateOf(r, id))?.status).toBe("cancelled");
-  });
-
-  it("still resolves within the grace when the run's cancel hangs", async () => {
-    const { r } = heldRig({ cancel: () => new Promise<void>(() => {}) });
-    const consumer = r.consume();
-    consumer.start().catch(() => {});
-    await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
-    await r.clock.advance(100);
-
-    let stopped = false;
-    const stopping = consumer.stop({ graceMs: 4000 }).then(() => {
-      stopped = true;
-    });
-    await r.clock.advance(4000);
-    await stopping;
-    expect(stopped).toBe(true);
   });
 });
 

@@ -210,3 +210,29 @@ describe("build ids in links", () => {
     expect(showsNewerBuild("https://shelf.example/x", link(OLDER))).toBe(false);
   });
 });
+
+describe("summaryOf: the comment as the summary", () => {
+  it("shows the comment in place of the description and the findings list", () => {
+    const summary = summaryOf({
+      context: "c",
+      state: "pending",
+      description: "short",
+      url: "https://s/b",
+      summary: "### 🟡 StoryShelf: 1 visual change needs review",
+    });
+    expect(summary).toBe("### 🟡 StoryShelf: 1 visual change needs review");
+  });
+
+  it("still says how many changes the annotations leave out", () => {
+    expect(
+      summaryOf({
+        context: "c",
+        state: "pending",
+        description: "d",
+        summary: "S",
+        omitted: 3,
+        url: "u",
+      }),
+    ).toBe("S\n\nand 3 more changed snapshots: [open the build](u)");
+  });
+});

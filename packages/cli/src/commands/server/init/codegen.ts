@@ -1,10 +1,5 @@
 import { DB_IMPORT, DB_INIT, dbPrelude, STORAGE_IMPORT, STORAGE_INIT } from "./adapter-snippets.ts";
-import {
-  resolveDeployTarget,
-  wantsNotifications,
-  wantsObservability,
-  type Answers,
-} from "./answers.ts";
+import { wantsNotifications, wantsObservability, type Answers } from "./answers.ts";
 
 const NAMED_IMPORT_RE = /^import \{ (?<names>[^}]+) \} from "(?<from>[^"]+)";$/u;
 
@@ -41,16 +36,15 @@ const OBSERVABILITY_IMPORTS = [
   `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
 ];
 
-/** The auth imports: the password admin, or the OAuth preset of the deploy target (Cognito on AWS). */
+/** The auth imports: the password admin, or the Keycloak OAuth preset. */
 function authImports(answers: Answers): string[] {
   if (answers.auth === "password") {
     return [`import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";`];
   }
   if (answers.auth === "oauth") {
-    const preset = resolveDeployTarget(answers) === "aws" ? "cognitoPreset" : "keycloakPreset";
     return [
       `import { createShelfAuth } from "@storyshelf/auth";`,
-      `import { ${preset} } from "@storyshelf/auth";`,
+      `import { keycloakPreset } from "@storyshelf/auth";`,
     ];
   }
   return [];
@@ -117,6 +111,9 @@ const OBSERVABILITY_SETUP_LINES = [
 
 const CONFIG_AND_SETUP_LINES = [
   `  config: {`,
+  `    // Lets \`storyshelf create --token $STORYSHELF_ADMIN_TOKEN\` bootstrap projects; unset disables it.`,
+  `    adminToken: process.env.STORYSHELF_ADMIN_TOKEN || undefined,`,
+  `    publicBaseUrl: process.env.PUBLIC_BASE_URL || undefined,`,
   `    secret: process.env.SECRET,`,
   `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
   `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
@@ -136,18 +133,6 @@ const PASSWORD_ADMIN_LINES = [
   `});`,
 ];
 
-const COGNITO_SOCIAL_LINES = [
-  `    social: [`,
-  `      cognitoPreset({`,
-  `        domain: process.env.COGNITO_DOMAIN!,`,
-  `        region: process.env.COGNITO_REGION!,`,
-  `        userPoolId: process.env.COGNITO_USER_POOL_ID!,`,
-  `        clientId: process.env.OIDC_CLIENT_ID!,`,
-  `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
-  `      }),`,
-  `    ],`,
-];
-
 const KEYCLOAK_OAUTH_LINES = [
   `    oauth: [`,
   `      keycloakPreset(process.env.OIDC_ISSUER!, {`,
@@ -162,12 +147,7 @@ function authLines(answers: Answers): string[] {
   if (answers.auth === "none") {
     return [];
   }
-  const provider =
-    answers.auth === "password"
-      ? []
-      : resolveDeployTarget(answers) === "aws"
-        ? COGNITO_SOCIAL_LINES
-        : KEYCLOAK_OAUTH_LINES;
+  const provider = answers.auth === "password" ? [] : KEYCLOAK_OAUTH_LINES;
   return [
     `  auth: createShelfAuth({`,
     `    db: database,`,
@@ -185,6 +165,45 @@ const AUTH_NOTIFICATION_LINES = [
   `    onAuthSystemEvent: createAuthSystemHook(),`,
 ];
 
+/** The variables the server cannot start without, for the chosen auth and database. */
+export function requiredEnv(answers: Answers): string[] {
+  const names = answers.auth === "none" ? [] : ["SECRET", "PUBLIC_BASE_URL"];
+  if (answers.auth === "password") {
+    names.push("AUTH_PASSWORD");
+  }
+  if (DB_INIT[answers.database].includes("process.env.DATABASE_URL")) {
+    names.push("DATABASE_URL");
+  }
+  return names;
+}
+
+/** Read `.env` when there is one (the scaffold ships `.env.example`); the shell's variables win. */
+const LOAD_ENV_LINES = [
+  `// Read .env when there is one (see .env.example); variables already set in the shell win.`,
+  `try {`,
+  `  process.loadEnvFile();`,
+  `} catch {`,
+  `  // no .env: the shell's variables are used`,
+  `}`,
+  ``,
+];
+
+/** One clear line and exit 1 when a required variable is unset, instead of a stack trace deep in a library. */
+function envCheckLines(answers: Answers): string[] {
+  const names = requiredEnv(answers);
+  if (names.length === 0) {
+    return [];
+  }
+  return [
+    `const missing = [${names.map((name) => `"${name}"`).join(", ")}].filter((name) => !process.env[name]);`,
+    `if (missing.length > 0) {`,
+    `  console.error(\`Set \${missing.join(", ")} before starting (see .env.example and README.md).\`);`,
+    `  process.exit(1);`,
+    `}`,
+    ``,
+  ];
+}
+
 export function generateServer(answers: Answers): string {
   return [
     ...buildImports(answers),
@@ -192,6 +211,8 @@ export function generateServer(answers: Answers): string {
     `const dataDir = process.env.DATA_DIR || "./data";`,
     `const port = Number(process.env.PORT) || 3000;`,
     ``,
+    ...LOAD_ENV_LINES,
+    ...envCheckLines(answers),
     ...buildAdapterLines(answers),
     ``,
     ...buildRouterLines(answers),

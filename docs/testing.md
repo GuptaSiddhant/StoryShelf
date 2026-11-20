@@ -179,7 +179,7 @@ Runs compare when the machine, Node and Playwright versions match; quote them wi
 - **Unit:** colocated `*.test.ts` next to sources (hermetic — tmp dirs, fake adapters, mocked `fetch`; never a browser, network, or Storybook build).
 - **HTTP-level integration:** `*.integration.test.ts` in the same dirs (real router over HTTP with fake capture runner; still hermetic and CI-always).
 - **Real browser:** gated behind `RUN_INTEGRATION=1` (`nub run test:integration`, Playwright + `fixtures/storybook-8` by default).
-- **Terraform scaffolds:** `packages/cli/src/commands/server/terraform-*.integration.test.ts` run `terraform fmt`, `init` and `validate`; `init` downloads providers, so they are gated behind `RUN_TERRAFORM=1` (not `RUN_INTEGRATION`, which would switch on the browser suites). With the gate set and no `terraform` binary the suites fail; without it they skip even when Terraform is installed. CI's `verify` job sets it next to `setup-terraform`, and `turbo.json` lists it as a `test` env so the cache key includes it.
+- **Terraform modules:** the CLI no longer generates Terraform (`server init --cloud` writes a module stub, tested in `init/cloud.test.ts`). The modules under `deploy/terraform/` are checked by the deploy checks in CI (ADR 0050).
 - **Real cloud:** `*.live.test.ts` next to sources, gated behind `LIVE_CLOUD=1` — strictly real providers, no fakes, no emulators. See "Live cloud tests" below.
 - **Shared doubles** live in `packages/core/src/test-helpers/` (`fake-adapters.ts`, `create-project.ts`) — never in shippable modules. Test files (and `test-helpers/`) are exempt from size lint rules via `.oxlintrc.json` patterns, not per-file paths.
 
@@ -199,17 +199,17 @@ Strictly real providers — no injected fake clients, no emulators. Hermetic
 and construct adapters inside `beforeAll`, so skipped runs don't even read
 cloud env vars. Live results must never come from the turbo cache — always
 run with `--force`. Manual dispatch only, per provider (the nightly schedules
-are deferred until secrets exist and the AWS scaffold is fixed; see #410):
+are deferred until secrets exist; see #410):
 
 - `.github/workflows/live-cloud-aws.yml` — S3
 - `.github/workflows/live-cloud-azure.yml` — Blob
 - `.github/workflows/live-cloud-gcp.yml` — GCS
 - `.github/workflows/live-cloud-ancillary.yml` — Turso + Postgres + MySQL + OAuth + GitHub + GitLab (matrix `db`/`auth`/`git`; long-lived resources, no scaffold)
 
-Each workflow also validates its terraform scaffold generator (`fmt` +
-`init -backend=false` + `validate`, mirroring the CLI's
-`terraform-*.integration.test.ts`). Scaffold output keys are a frozen
-contract pinned by `terraform-*.test.ts` — renames break CI.
+The Terraform modules under `deploy/terraform/` are checked by the deploy checks in `ci.yml`
+(`fmt`, `validate`, `tflint`). Each workflow's `module-apply` job applies the module's
+`examples/minimal` (see the module README, "Checks"); it stays off until its repository variable
+is `1`.
 
 ### Output → env map
 
@@ -232,13 +232,17 @@ in CI).
 
 ### Manual runbook (follow these steps later)
 
-1. **Provision** (per target, one-time): `storyshelf server init --target
-<aws|azure|gcp>`, then under the generated `terraform/`:
+1. **Provision** (per target, one-time): `storyshelf server init --cloud
+<aws|azure|gcp>` (or `deploy/terraform/<cloud>/examples/minimal`). The stub and `examples/minimal`
+   output only `url` (and `service_name`). For the storage name in the table below, first add a
+   root output that forwards the module's, such as
+   `output "gcs_bucket" { value = module.storyshelf.gcs_bucket }` (GCP) or `s3_bucket` (AWS), so it
+   is in the state the apply writes. Then, in that directory:
    ```sh
    terraform init
-   terraform plan -var "project=shelf-manual-<name>" -out=tfplan  # review!
+   terraform plan -var "name=shelf-manual-<name>" -out=tfplan  # review!
    terraform apply tfplan
-   terraform output -json   # or: npm run infra:outputs
+   terraform output -json
    ```
    Use a personal `shelf-manual-<name>` prefix so parallel runs never share
    resources. Prefer serverless/cheap engines (AWS DSQL, Cloud SQL `f1-micro`).
@@ -254,13 +258,13 @@ in CI).
 4. **Teardown:** suites delete their own keys/messages (unique
    `live/<run-id>/<uuid>` prefixes, per-run build ids), but the
    infrastructure is yours — `terraform destroy -var
-"project=shelf-manual-<name>" -auto-approve` when done.
+"name=shelf-manual-<name>" -auto-approve` when done.
 5. **Costs:** live suites are a handful of API calls; the spend is idle
    infrastructure (RDS, Cloud SQL, Postgres Flexible Server). Destroy promptly.
 
 ### Phase 4 (ancillary: `.github/workflows/live-cloud-ancillary.yml`)
 
-No terraform scaffold covers these — resources are long-lived and shared,
+No terraform module covers these — resources are long-lived and shared,
 isolation is per-run. Matrix legs: `db`, `auth`, `git` (nightly +
 manual dispatch, `--force` so results never come from cache).
 
@@ -313,3 +317,15 @@ timeout 60 sh -c 'until docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -pp
 
 Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not
 pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job uses `--env-mode=loose`).
+
+## Previous-release database job (ADR 0053, decision 8)
+
+`previous-release-db` in `ci.yml` runs on pull requests that touch a schema or migration file (the
+`schema` output of the `changes` job), for SQLite and Postgres. `scripts/previous-release.sh
+<dialect>` installs the newest `v*` release from npm, migrates an empty database with it and
+seeds a project, migrates the same database with the checkout as the next minor, then starts the
+published release on it and smokes it (health, project list, a write, a read-back, the root page).
+The release must skip its migrations and leave `schema_meta` alone. Postgres also runs the release's
+own `postgres.live.test.ts` from a checkout of its tag. To reproduce: `DATABASE_URL=… bash
+scripts/previous-release.sh postgres`. MySQL (nightly) and the mixed-queue test are not part of it
+yet.

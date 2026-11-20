@@ -10,12 +10,21 @@ import {
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
-import { createClient, normalizeBaseUrl, RequestError, type BuildCreated } from "../client.ts";
+import {
+  createClient,
+  describeBuildLink,
+  normalizeBaseUrl,
+  RequestError,
+  type BuildCreated,
+} from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
 import { HashRoutesMissingError, isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
+import { parseLabels } from "./labels.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
+import { findSupersedes } from "./supersede.ts";
+import { trySkipUnchanged } from "./upload-skip.ts";
 
 /**
  * Upload a built Storybook and create a build record.
@@ -73,6 +82,8 @@ export interface UploadOptions {
   label?: string[];
   /** Disable affected capture and render every story. */
   full?: boolean;
+  /** Record a commit that changed no story as a skipped build instead of uploading. */
+  skipUnchanged?: boolean;
   /** Explicit affected-capture opt-in/out (default on; `full` wins). */
   affectedOnly?: boolean;
   /** Append `--stats-json` to the build script (default on; `--no-build-stats` opts out). */
@@ -140,6 +151,7 @@ interface CollectedUploadOptions {
   authorName?: string;
   label?: string[];
   affectedOnly: boolean;
+  skipUnchanged: boolean;
   buildStats: boolean;
   untraced: string[];
   statsFile?: string;
@@ -188,6 +200,7 @@ function collectUploadOptions(
     authorName: options.authorName,
     label: options.label,
     affectedOnly: resolveAffectedOnly(options, cfg),
+    skipUnchanged: resolveSkipUnchanged(options, cfg),
     buildStats: resolveBuildStats(options, cfg),
     untraced: mergeUntraced(cfg?.untraced, options.untraced),
     statsFile: options.statsFile,
@@ -219,6 +232,18 @@ function resolveAffectedOnly(options: UploadOptions, cfg: StorybookConfig | null
   return options.affectedOnly ?? cfg?.affectedOnly ?? true;
 }
 
+/** Skipping is opt-in (flag, `STORYSHELF_SKIP_UNCHANGED=1` or config); `--full` always wins. */
+function resolveSkipUnchanged(options: UploadOptions, cfg: StorybookConfig | null): boolean {
+  if (!resolveAffectedOnly(options, cfg)) {
+    return false;
+  }
+  return (
+    options.skipUnchanged ??
+    (envOf("STORYSHELF_SKIP_UNCHANGED") === "1" || cfg?.skipUnchanged) ??
+    false
+  );
+}
+
 /** Throw on the first missing required upload option. */
 function assertUploadOptions(
   collected: CollectedUploadOptions,
@@ -236,17 +261,6 @@ function assertUploadOptions(
 
 function shouldSkipUpload(skip: string | undefined, branch: string | undefined): boolean {
   return Boolean(skip && branch && picomatch.isMatch(branch, skip));
-}
-
-/** Parse `--label key=value` flags into label pairs. */
-function parseLabels(flags: string[] | undefined): { key: string; value: string }[] {
-  return (flags ?? []).map((flag) => {
-    const eq = flag.indexOf("=");
-    if (eq <= 0) {
-      throw new Error(`--label must be key=value, got "${flag}"`);
-    }
-    return { key: flag.slice(0, eq), value: flag.slice(eq + 1) };
-  });
 }
 
 /** Zip the built Storybook directory as a stream (bounded memory). */
@@ -291,7 +305,35 @@ async function buildAndPost(
     return;
   }
   const client = createClient(collected.url, collected.token);
-  const created: BuildCreated = await client.projects.builds.createJson(collected.slug, {
+  if (collected.skipUnchanged && (await trySkipUnchanged(client, { ...collected, cwd }))) {
+    return;
+  }
+  const supersedes = await findSupersedes(client, {
+    slug: collected.slug,
+    cwd,
+    branch: collected.branch,
+    headSha: collected.sha,
+  });
+  const created = await createBuild(client, collected, supersedes);
+  const hostingOnly = created.testing === false;
+  if (!hostingOnly) {
+    await reportAffectedCapture(client, created, cwd, collected);
+  }
+  await reportPackageUsage(client, created, cwd, collected);
+  await uploadBuild(client, created, cwd, collected);
+  printLine(describeBuildLink(collected.url, created.build, created.buildUrl));
+  if (hostingOnly) {
+    printLine(HOSTING_ONLY_NOTICE);
+  }
+}
+
+/** Create the build record, naming the builds it supersedes (ADR 0045). */
+async function createBuild(
+  client: ReturnType<typeof createClient>,
+  collected: ResolvedUploadOptions,
+  supersedes: string[] | undefined,
+): Promise<BuildCreated> {
+  return await client.projects.builds.createJson(collected.slug, {
     gitSha: collected.sha,
     gitBranch: collected.branch,
     message: collected.message,
@@ -299,17 +341,8 @@ async function buildAndPost(
     authorName: collected.authorName,
     affectedOnly: collected.affectedOnly,
     labels: parseLabels(collected.label),
+    ...(supersedes && { supersedes }),
   });
-  const hostingOnly = created.testing === false;
-  if (!hostingOnly) {
-    await reportAffectedCapture(client, created, cwd, collected);
-  }
-  await reportPackageUsage(client, created, cwd, collected);
-  await uploadBuild(client, created, cwd, collected);
-  printLine(`Build created: ${created.build.id}`);
-  if (hostingOnly) {
-    printLine(HOSTING_ONLY_NOTICE);
-  }
 }
 
 /** Printed when the server reports `testing: false` (ADR 0006, decision 1). */

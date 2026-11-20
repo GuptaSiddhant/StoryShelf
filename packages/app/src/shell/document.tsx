@@ -81,7 +81,7 @@ const DocumentHead: FC<{
     <meta name="csrf-token" content={csrfToken} />
     {/* Favicon is the product's own mark, not brandable: it identifies
         StoryShelf in the tab strip. `ui.logo` stays overridable. */}
-    <link rel="icon" type="image/svg+xml" href={assetManifest.mark.href} />
+    <link rel="icon" type="image/svg+xml" href={assetManifest.favicon.href} />
     <title>
       {title} · {name}
     </title>

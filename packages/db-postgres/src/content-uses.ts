@@ -8,6 +8,7 @@ import { sql, type SQL } from "drizzle-orm";
 import {
   inTransaction,
   instant,
+  textArray,
   textRows,
   type LifecycleDatabase,
   type LifecycleTx,
@@ -65,11 +66,20 @@ export async function recordContentUses(
     await clearAbandonedClaims(tx, distinct, staleBefore);
     const now = new Date().toISOString();
     const uses = JSON.stringify(distinct.map((hash) => ({ hash, size: sizes?.get(hash) ?? null })));
-    await tx.query(sql`INSERT INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
-      SELECT ${buildId}, use->>'hash', ${projectId}, ${instant(now)},
-        COALESCE((use->>'size')::bigint,
-          (SELECT MAX(size_bytes) FROM content_uses WHERE content_hash = use->>'hash'))
-      FROM jsonb_array_elements(${uses}::jsonb) AS use
+    // A blob of unknown size takes the size another use of it recorded. That is one aggregate joined
+    // once, never a subquery per row: a per-row subquery is planned from the table's statistics, and
+    // when an analyze saw only a few rows (a hash shared by several builds) it scans the whole table
+    // for each of tens of thousands of hashes, which ran for minutes in `postgres-lifecycle` (#1067).
+    await tx.query(sql`WITH incoming AS MATERIALIZED (
+        SELECT use->>'hash' AS hash, (use->>'size')::bigint AS size
+        FROM jsonb_array_elements(${uses}::jsonb) AS use),
+      known AS (
+        SELECT content_hash, MAX(size_bytes) AS size FROM content_uses
+        WHERE size_bytes IS NOT NULL AND content_hash = ANY(ARRAY(SELECT hash FROM incoming))
+        GROUP BY content_hash)
+      INSERT INTO content_uses (build_id, content_hash, project_id, created_at, size_bytes)
+      SELECT ${buildId}, incoming.hash, ${projectId}, ${instant(now)}, COALESCE(incoming.size, known.size)
+      FROM incoming LEFT JOIN known ON known.content_hash = incoming.hash
       ON CONFLICT DO NOTHING`);
     return [];
   });
@@ -84,7 +94,7 @@ async function claimedHashes(
   const live: SQL =
     staleBefore === undefined ? sql`true` : sql`collecting_at >= ${instant(staleBefore)}`;
   const rows = await tx.query(sql`SELECT DISTINCT content_hash FROM content_uses
-    WHERE content_hash IN (SELECT * FROM ${textRows(hashes)}) AND collecting_at IS NOT NULL AND ${live}`);
+    WHERE content_hash = ANY(${textArray(hashes)}) AND collecting_at IS NOT NULL AND ${live}`);
   return new Set(rows.map((row) => String(row["content_hash"])));
 }
 
@@ -96,7 +106,7 @@ async function clearAbandonedClaims(
 ): Promise<void> {
   if (staleBefore === undefined) return;
   await tx.query(sql`UPDATE content_uses SET collecting_at = NULL, claim_token = NULL
-    WHERE content_hash IN (SELECT * FROM ${textRows(hashes)}) AND collecting_at IS NOT NULL
+    WHERE content_hash = ANY(${textArray(hashes)}) AND collecting_at IS NOT NULL
       AND collecting_at < ${instant(staleBefore)}`);
 }
 
@@ -104,10 +114,13 @@ async function clearAbandonedClaims(
  * Claim every idle hash (see the capability) under the pass's token, taking over the hashes whose
  * earlier claim is stale. Re-stamping with the new token fences the old collector out.
  *
- * The candidates are read first, only to know which stripes to lock. Under those locks one
- * statement decides again which are claimable (a use recorded in between has either not happened
- * or is visible) and stamps them, so the locks are held for a fixed number of statements however
- * many hashes the pass covers, and a concurrent upload waits for a moment, not a round trip per hash.
+ * The candidates are read first, only to know which stripes to lock. Under those locks a second
+ * read decides again which are claimable (a use recorded in between has either not happened or is
+ * visible) and one statement stamps them, so the locks are held for a fixed number of statements
+ * however many hashes the pass covers, and a concurrent upload waits for a moment, not a round trip
+ * per hash. Deciding and stamping are two statements, never one `UPDATE` over a subquery of the
+ * same table: that shape ran for minutes in `postgres-lifecycle` when the planner re-ran the
+ * aggregate per row (#1067), and the locks make the pair exactly as safe as the single statement.
  */
 export async function claimContent(
   db: LifecycleDatabase,
@@ -121,12 +134,14 @@ export async function claimContent(
     const hashes = candidates.map((row) => String(row["content_hash"]));
     if (hashes.length === 0) return [];
     await lockHashes(tx, hashes);
+    const decided = await tx.query(sql`SELECT content_hash FROM content_uses
+      WHERE content_hash = ANY(${textArray(hashes)})
+      GROUP BY content_hash HAVING ${claimable(idleBefore, staleBefore)}`);
+    const claimed = decided.map((row) => String(row["content_hash"]));
+    if (claimed.length === 0) return [];
     const stamped = await tx.query(sql`UPDATE content_uses
       SET collecting_at = ${instant(new Date().toISOString())}, claim_token = ${token}
-      WHERE content_hash IN (
-        SELECT content_hash FROM content_uses
-        WHERE content_hash IN (SELECT * FROM ${textRows(hashes)})
-        GROUP BY content_hash HAVING ${claimable(idleBefore, staleBefore)})
+      WHERE content_hash = ANY(${textArray(claimed)})
       RETURNING content_hash`);
     return [...new Set(stamped.map((row) => String(row["content_hash"])))].toSorted();
   });

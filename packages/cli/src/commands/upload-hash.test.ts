@@ -49,6 +49,9 @@ function stubServer(opts: { held: boolean; hasHashRoutes: boolean }): string[] {
     vi.fn(async (url: string, init?: RequestInit) => {
       await Promise.resolve();
       const path = new URL(url).pathname.replace("/api/v1/projects/demo/builds", "") || "/";
+      if (path === "/in-flight") {
+        return json([]);
+      }
       seen.push(`${init?.method ?? "GET"} ${path}`);
       if (path === "/") {
         return json({ build: { id: "b1" }, uploadUrl: "/api/v1/projects/demo/builds/b1/zip" });

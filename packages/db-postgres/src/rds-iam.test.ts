@@ -1,4 +1,3 @@
-import type { Logger } from "@storyshelf/core/logger";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const poolConfigs: Record<string, unknown>[] = [];
@@ -56,23 +55,6 @@ afterEach(() => {
   failQueries = false;
 });
 
-/** A logger that records warnings and ignores everything else. */
-const quiet = (): void => {};
-
-function recordingLogger() {
-  const warnings: string[] = [];
-  const logger = {
-    warn: (_fields: unknown, message?: string) => {
-      warnings.push(message ?? String(_fields));
-    },
-    info: quiet,
-    debug: quiet,
-    error: quiet,
-    child: () => logger,
-  } as unknown as Logger;
-  return { logger, warnings };
-}
-
 describe("createRdsIamDatabase", () => {
   it("configures host, port, database and user with no static password", () => {
     createRdsIamDatabase({ ...base, signer: fakeSigner() });
@@ -102,60 +84,18 @@ describe("createRdsIamDatabase", () => {
     expect(poolConfigs[1]?.["ssl"]).toEqual({ ca: ["A", "B"], rejectUnauthorized: true });
   });
 
-  it("keeps verifying when verification is switched on explicitly", () => {
-    createRdsIamDatabase({ ...base, verifyServerCertificate: true, signer: fakeSigner() });
+  it("offers no way to connect without verifying the server", () => {
+    // @ts-expect-error the opt-out was removed: the IAM token is a credential
+    createRdsIamDatabase({ ...base, verifyServerCertificate: false, signer: fakeSigner() });
     expect(poolConfigs[0]?.["ssl"]).toEqual({ ca: RDS_CA_BUNDLE, rejectUnauthorized: true });
   });
 
-  it("never skips verification when a `ca` is given, whatever the opt-out says", () => {
-    createRdsIamDatabase({
-      ...base,
-      ca: "PEM",
-      verifyServerCertificate: false,
-      signer: fakeSigner(),
-    });
-    expect(poolConfigs[0]?.["ssl"]).toEqual({ ca: "PEM", rejectUnauthorized: true });
-  });
-
-  describe("verifyServerCertificate: false", () => {
-    it("encrypts without verifying, only on that explicit opt-out", () => {
-      createRdsIamDatabase({ ...base, verifyServerCertificate: false, signer: fakeSigner() });
-      expect(poolConfigs[0]?.["ssl"]).toEqual({ rejectUnauthorized: false });
-    });
-
-    it("logs one warning when the host binds a logger, without any token", async () => {
-      const db = createRdsIamDatabase({
-        ...base,
-        verifyServerCertificate: false,
-        signer: fakeSigner(),
-      });
-      const { logger, warnings } = recordingLogger();
-      db.setLogger?.(logger);
-      db.setLogger?.(logger);
-      await db.lifecycle?.setup({ config: {}, logger });
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toContain("verifyServerCertificate");
-      expect(warnings[0]).not.toContain("X-Amz-");
-    });
-
-    it("logs the warning from setup when no logger was bound", async () => {
-      const db = createRdsIamDatabase({
-        ...base,
-        verifyServerCertificate: false,
-        signer: fakeSigner(),
-      });
-      const { logger, warnings } = recordingLogger();
-      await db.lifecycle?.setup({ config: {}, logger });
-      expect(warnings).toHaveLength(1);
-    });
-
-    it("logs nothing when the certificate is verified", async () => {
-      const db = createRdsIamDatabase({ ...base, signer: fakeSigner() });
-      const { logger, warnings } = recordingLogger();
-      db.setLogger?.(logger);
-      await db.lifecycle?.setup({ config: {}, logger });
-      expect(warnings).toEqual([]);
-    });
+  it("refuses a blank `ca` instead of verifying against nothing", () => {
+    for (const ca of ["", "  \n", [], [""]]) {
+      expect(() => createRdsIamDatabase({ ...base, ca, signer: fakeSigner() })).toThrow(
+        /`ca` is empty/u,
+      );
+    }
   });
 
   it("asks the signer for a fresh token on every new connection", async () => {

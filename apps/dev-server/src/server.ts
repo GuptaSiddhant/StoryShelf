@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import { parseShutdownGraceMs, parseTrustProxy } from "@storyshelf/core/config";
+import { parseTrustProxy } from "@storyshelf/core/config";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
@@ -55,6 +55,19 @@ function purgeTtlDaysFromEnv(): number | undefined {
   return Number(raw);
 }
 const purgeTtlDays = purgeTtlDaysFromEnv();
+
+// Bound of the SIGTERM drain (#912): `SHUTDOWN_GRACE_SECONDS` hands the jobs still running near its
+// end back to the queue, without spending an attempt. Unset waits for every job. Mirrors
+// apps/fly-app/shutdown.ts (without its Fly default).
+function shutdownGraceMsFromEnv(): number | undefined {
+  const raw = env["SHUTDOWN_GRACE_SECONDS"];
+  if (raw === undefined || raw === "") return undefined;
+  if (!/^\d+$/u.test(raw)) {
+    throw new Error("SHUTDOWN_GRACE_SECONDS must be a whole number of seconds");
+  }
+  return Number(raw) * 1000;
+}
+const graceMs = shutdownGraceMsFromEnv();
 
 function buildAuthUi(): Record<string, string> | undefined {
   const pairs: Array<[string, string | undefined]> = [
@@ -131,10 +144,11 @@ const app = createShelfApp({
   // AUTH_PASSWORD must be at least 12 characters; AUTH_EMAIL overrides the
   // admin address (defaults to admin@example.com). No viewer tier exists anymore.
   auth:
-    authPassword && secret
+    // AUTH_PASSWORD without a valid SECRET refuses to start (createShelfAuth throws); never auth off.
+    authPassword
       ? createShelfAuth({
           db: database,
-          secret,
+          secret: secret ?? "",
           baseURL: publicBaseUrl ?? `http://localhost:${port}`,
           passkeys: {},
           emailSender,
@@ -167,7 +181,7 @@ const app = createShelfApp({
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
 
-if (authPassword && secret) {
+if (authPassword) {
   await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
   logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
 }
@@ -177,10 +191,20 @@ const server = serve({ fetch: app.fetch, port }, () => {
 });
 
 const shutdown = async (): Promise<void> => {
-  await app.lifecycle.teardown({
-    graceMs: parseShutdownGraceMs(process.env["SHUTDOWN_GRACE_SECONDS"]),
-  });
-  server.close();
+  // A bounded drain may leave a stuck handler to its lease: the process must end it, a second past
+  // the grace whatever the rest of the teardown does, so the exit is armed now (unref'd, so a
+  // process with nothing left running exits on its own first). Mirrors apps/fly-app `exitBy`.
+  if (graceMs !== undefined) {
+    setTimeout(() => {
+      // oxlint-disable-next-line unicorn/no-process-exit -- a stuck handler must not outlive the drain
+      process.exit(0);
+    }, graceMs + 1000).unref();
+  }
+  try {
+    await app.lifecycle.teardown(graceMs === undefined ? {} : { graceMs });
+  } finally {
+    server.close();
+  }
 };
 process.on("SIGTERM", () => {
   shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged

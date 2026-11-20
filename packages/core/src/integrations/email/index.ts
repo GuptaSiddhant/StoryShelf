@@ -5,7 +5,7 @@
  */
 import type { NotifierProvider } from "../../adapters/notifier/provider.ts";
 import { createEmailNotifier } from "./email.ts";
-import { unconfiguredSender } from "./unconfigured.ts";
+import { NOT_CONFIGURED, unconfiguredSender } from "./unconfigured.ts";
 
 export { createEmailNotifier } from "./email.ts";
 export type { EmailNotifierDefaults } from "./email.ts";
@@ -22,7 +22,13 @@ export type {
   SmtpPresetOptions,
 } from "./types.ts";
 
-/** The built-in `email` notifier: registered always, inactive until a transport is configured. */
+/**
+ * The built-in `email` notifier: registered always, and unavailable (not offered to projects,
+ * issue #1126) until an operator replaces it with one over a configured transport.
+ */
 export function builtInEmailNotifier(): NotifierProvider {
-  return createEmailNotifier(unconfiguredSender());
+  return {
+    ...createEmailNotifier(unconfiguredSender()),
+    availability: () => ({ unavailable: NOT_CONFIGURED }),
+  };
 }

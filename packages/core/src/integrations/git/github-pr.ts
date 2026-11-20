@@ -3,9 +3,14 @@ import { githubHeaders, repoPath } from "./github-api.ts";
 
 interface AssociatedPull {
   number?: unknown;
+  state?: unknown;
 }
 
-/** Find the pull request number associated with a commit SHA, if any. */
+/**
+ * Find the open pull request associated with a commit SHA, if any. GitHub also lists closed and
+ * merged pull requests (a commit on the default branch returns the PR that merged it), and those
+ * get no comment.
+ */
 export async function findPrNumber(opts: {
   token: string;
   owner: string;
@@ -18,12 +23,12 @@ export async function findPrNumber(opts: {
       repoPath(opts, `/commits/${encodeURIComponent(opts.sha)}/pulls`),
       { headers: githubHeaders(opts.token) },
     );
-    const [pr] = pulls;
-    if (pr && typeof pr.number === "number") {
-      return pr.number;
-    }
-    return undefined;
+    return pulls.find((pull) => isOpenPull(pull))?.number;
   } catch {
     return undefined;
   }
+}
+
+function isOpenPull(pull: AssociatedPull): pull is { number: number; state: "open" } {
+  return pull.state === "open" && typeof pull.number === "number";
 }

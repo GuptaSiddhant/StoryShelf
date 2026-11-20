@@ -26,7 +26,7 @@ const segmentedItem = css`
   color: var(--text-secondary);
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   white-space: nowrap;
   cursor: pointer;
   text-decoration: none;

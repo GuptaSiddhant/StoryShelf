@@ -51,6 +51,16 @@ describe("generateComposeYaml", () => {
     expect(generateComposeYaml("better-sqlite3")).not.toContain("TURSO_DATABASE_URL");
   });
 
+  it("requires SECRET from the environment, and AUTH_PASSWORD for a password scaffold", () => {
+    const open = generateComposeYaml("sqlite");
+    expect(open).toContain("SECRET=${SECRET:?");
+    expect(open).not.toContain("change-me");
+    expect(open).not.toMatch(/^\s+- AUTH_PASSWORD=/mu);
+    expect(generateComposeYaml("postgres", "password")).toMatch(
+      /^\s+- AUTH_PASSWORD=\$\{AUTH_PASSWORD:\?/mu,
+    );
+  });
+
   it("adds postgres service for postgres", () => {
     const yaml = generateComposeYaml("postgres");
     expect(yaml).toContain("postgres:");

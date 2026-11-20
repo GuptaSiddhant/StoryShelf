@@ -3,7 +3,13 @@ import { httpJson } from "../../utils/index.ts";
 import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
 import { findMrIid } from "./gitlab-pr.ts";
 import type { GitLabProject } from "./gitlab-status.ts";
-import { upsertReviewComment, type ReviewThread } from "./review-comment.ts";
+import {
+  listAllPages,
+  PAGE_SIZE,
+  upsertReviewComment,
+  type CommentInput,
+  type ReviewThread,
+} from "./review-comment.ts";
 
 interface MergeRequestNote {
   id: number;
@@ -21,10 +27,13 @@ function createThread(
   return {
     list: async () => {
       try {
-        const notes = await httpJson<MergeRequestNote[]>(`${threadUrl}?per_page=100`, {
-          headers,
-          destination: "project",
-        });
+        const notes = await listAllPages(
+          async (page) =>
+            await httpJson<MergeRequestNote[]>(`${threadUrl}?per_page=${PAGE_SIZE}&page=${page}`, {
+              headers,
+              destination: "project",
+            }),
+        );
         return notes.map((note) => ({ id: note.id, body: note.body ?? "" }));
       } catch {
         return [];
@@ -54,13 +63,15 @@ function createThread(
 /** Create or update the StoryShelf review note on the merge request of a commit. */
 export async function upsertMrNote(
   project: GitLabProject,
-  input: { sha: string; url: string; markdown: string; logger?: Logger },
+  input: CommentInput & { logger?: Logger },
 ): Promise<string> {
   const { host, owner, repo, token } = project;
   const base = apiBase(host);
   const pid = projectId(owner, repo);
   const headers = gitlabHeaders(token);
   return await upsertReviewComment({
+    project: input.project,
+    buildId: input.buildId,
     url: input.url,
     markdown: input.markdown,
     sha: input.sha,

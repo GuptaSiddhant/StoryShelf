@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storage-azure",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "description": "Azure Blob Storage adapter for StoryShelf.",
   "keywords": [
     "azure",
@@ -52,6 +52,7 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
+    "@azure/identity": "^4.14.1",
     "@azure/storage-blob": "^12.26.0",
     "@storyshelf/core": "workspace:*"
   },

@@ -48,7 +48,7 @@ describe("gitLogNotifier", () => {
           events: [],
           enabled: true,
         },
-        target: { kind: "comment", sha: "abc", markdown: "m" },
+        target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "m" },
         state: "success",
         url: "u",
       }),

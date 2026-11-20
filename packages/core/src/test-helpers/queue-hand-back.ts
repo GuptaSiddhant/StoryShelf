@@ -1,7 +1,8 @@
 /**
- * Kind-claim and hand-back suite for the database capture queue (ADR 0053, decision 5): a consumer
+ * Kind-claim, hand-back and shutdown-release suite for the database capture queue (ADR 0053, decision 5): a consumer
  * claims only the kinds it has handlers for, and a job whose payload is newer than it reads goes
- * back to the queue with its attempt count unchanged. Database packages run it against their own
+ * back to the queue with its attempt count unchanged, as does a job a draining shutdown releases
+ * (#912). Database packages run it against their own
  * drivers, next to the single-flight suite:
  *
  * ```ts
@@ -28,6 +29,13 @@ async function setup(makeDb: SharedDatabaseFactory) {
     now: () => clock.now,
   });
   const model = new CaptureJobModel(db);
+  /** Another instance on the same database and clock (a second app copy). */
+  const peer = createDatabaseCaptureQueue(db, {
+    kinds: ["capture", "publish"],
+    leaseMs: LEASE_MS,
+    retries: 2,
+    now: () => clock.now,
+  });
   const created: string[] = [];
   const create = async (name: string, kind: "capture" | "publish", payload: string | null) => {
     const id = `${runId}-${name}`;
@@ -40,13 +48,25 @@ async function setup(makeDb: SharedDatabaseFactory) {
   };
   return {
     queue,
+    peer,
     model,
     create,
-    /** End every job the case made, so a database shared by the cases polls nothing of theirs. */
+    /**
+     * End every job the case made, and every attempt it left running, so a database shared by the
+     * cases polls nothing of theirs (a later case that moves its clock past the lease would
+     * otherwise spend its claim tries retiring them).
+     */
     cleanup: async () => {
+      const at = new Date(clock.now).toISOString();
       for (const id of created) {
         // oxlint-disable-next-line no-await-in-loop -- few rows, in order
-        await model.finishJob(id, "cancelled", new Date(clock.now).toISOString(), null);
+        await model.finishJob(id, "cancelled", at, null);
+        // oxlint-disable-next-line no-await-in-loop -- see above
+        const running = (await model.attempts(id)).filter((row) => row.status === "running");
+        // oxlint-disable-next-line no-await-in-loop -- see above
+        await Promise.all(
+          running.map(async (row) => await model.finishAttempt(row.id, "expired", at)),
+        );
       }
     },
     advance: (ms: number) => {
@@ -132,6 +152,48 @@ export function databaseQueueHandBackSuite(name: string, makeDb: SharedDatabaseF
       await t.queue.ack(job);
       await t.queue.handBack?.(job);
       expect(await t.model.get(id)).toMatchObject({ status: "done", attempt: 1 });
+    });
+    it("releases a job on shutdown: another instance claims it at once, attempt count unchanged", async () => {
+      const t = await start();
+      const id = await t.create("release", "capture", null);
+      const job = await t.queue.poll();
+      expect(job).toMatchObject({ jobId: id, attempt: 1, attempts: 0 });
+      if (job === null) {
+        throw new Error("expected a job");
+      }
+      await t.queue.handBack?.(job, { delayMs: 0, reason: "shutdown" });
+
+      expect(await t.model.get(id)).toMatchObject({ status: "queued", attempt: 0 });
+      expect(await t.peer.poll()).toMatchObject({ jobId: id, attempt: 1, attempts: 0 });
+    });
+
+    it("ignores a late release from a superseded holder", async () => {
+      const t = await start();
+      const id = await t.create("superseded", "capture", null);
+      const stale = await t.queue.poll();
+      if (stale === null) {
+        throw new Error("expected a job");
+      }
+      t.advance(LEASE_MS + 1);
+      expect(await t.peer.poll()).toMatchObject({ jobId: id, attempt: 2 });
+
+      await t.queue.handBack?.(stale, { delayMs: 0, reason: "shutdown" });
+      expect(await t.model.get(id)).toMatchObject({ status: "running", attempt: 2 });
+      expect(await t.queue.poll()).toBeNull();
+    });
+
+    it("ends a job whose cancel was asked as cancelled instead of releasing it", async () => {
+      const t = await start();
+      const id = await t.create("cancelled", "capture", null);
+      const job = await t.queue.poll();
+      if (job === null) {
+        throw new Error("expected a job");
+      }
+      expect(await t.queue.cancel(id)).toBe(true);
+      await t.queue.handBack?.(job, { delayMs: 0, reason: "shutdown" });
+
+      expect(await t.model.get(id)).toMatchObject({ status: "cancelled" });
+      expect(await t.peer.poll()).toBeNull();
     });
   });
 }

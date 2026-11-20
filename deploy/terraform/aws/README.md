@@ -31,8 +31,8 @@ versions together and reading the release notes. A runnable example is in `examp
 | Network  | VPC with 2 public and 2 private subnets (or your own `vpc_id`), no NAT gateway  |
 | Compute  | ECS cluster, one Fargate service of identical copies, ALB, CPU autoscaling      |
 | Database | RDS Postgres in private subnets, IAM authentication on (or your own URL)        |
-| Storage  | S3 bucket: private, versioned, encrypted                                        |
-| Identity | Cognito user pool, app client, optional SAML federation                         |
+| Storage  | S3 bucket: private, versioned, encrypted, TLS only                                       |
+| Identity | Optional (`enable_cognito`): Cognito user pool, app client, SAML federation     |
 | Secrets  | Secrets Manager: `SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET` |
 | DNS      | With `domain_name`: Route 53 zone, ACM certificate, HTTPS listener              |
 | Logs     | CloudWatch log group                                                            |
@@ -60,6 +60,10 @@ security group admits only the ALB. The database is reachable from the task secu
 | `existing_database_url_secret_arn`   | `""`                               | A Postgres URL in Secrets Manager; no database is created                          |
 | `database_instance_class`            | `db.t4g.micro`                     | Created database only                                                              |
 | `database_allocated_storage`         | `20`                               | GiB, created database only                                                         |
+| `database_backup_retention_days`     | `7`                                | Automated backup retention in days (1-35)                                          |
+| `database_init_image`                | ECR Public `postgres:16-alpine`    | Image of the `db-init` container (needs `psql`); override for a mirror             |
+| `enable_cognito`                     | `false`                            | Create the Cognito pool, client and `OIDC_CLIENT_SECRET` (image does not read OIDC yet) |
+| `auth_email`                         | `admin@example.com`                | Local admin login email (`AUTH_EMAIL`)                                             |
 | `deletion_protection`                | `true`                             | Database protection and final snapshot; `false` also empties the bucket on destroy |
 | `remote_browser_endpoint_secret_arn` | `""`                               | Optional remote browser (secret reference)                                         |
 | `remote_browser_token_secret_arn`    | `""`                               | Optional remote browser token (secret reference)                                   |
@@ -83,11 +87,11 @@ App secrets reach the task as ECS `secrets` references from Secrets Manager. No 
 - **Sign-in.** The image turns sign-in on when `AUTH_PASSWORD` and `SECRET` are both set, and the
   module always sets both, so the app never boots open. Read the password with
   `aws secretsmanager get-secret-value --secret-id "$(terraform output -raw auth_password_secret_arn)"`
-  and sign in as `admin@example.com` (or `AUTH_EMAIL`). The load balancer admits only
+  and sign in as `admin@example.com` (or `auth_email`). The load balancer admits only
   `allowed_cidr_blocks`.
-- **Cognito.** The user pool and `OIDC_CLIENT_SECRET` are created and passed to the task, but the
-  image does not read them yet: OIDC sign-in is not wired.
-- **`OIDC_CLIENT_SECRET`** is an operator step. Terraform writes `change-me` once and never
+- **Cognito** is off (`enable_cognito = false`): the image does not read OIDC yet, so the user pool,
+  client and `OIDC_CLIENT_SECRET` are not created.
+- **`OIDC_CLIENT_SECRET`** (with `enable_cognito`) is an operator step. Terraform writes `change-me` once and never
   overwrites it. Put the real value in and restart the service:
 
   ```sh
@@ -101,20 +105,20 @@ The app connects with the `db-postgres/rds-iam` preset: a short-lived token from
 every new connection, verified against the Amazon RDS root certificates. There is no database
 password for the app to read, and nothing to rotate.
 
-**One operator step (Terraform cannot do it: the database has no public route).** RDS cannot grant `rds_iam` to a user. Once, connect with the master
-secret (`db_master_secret_arn`) from inside the VPC and run:
+**First boot needs no operator step.** RDS cannot grant `rds_iam`, so each task runs a `db-init`
+container first (`database_init_image`, `postgres:16-alpine` from the ECR Public mirror, which has
+`psql`). It logs in as the master user over TLS with the RDS-managed secret, then idempotently
+creates the app user `shelf` (`db_iam_user`), grants it `rds_iam`, and gives it rights on the
+database and the `public` schema. The app container starts only after `db-init` succeeds
+(`dependsOn: SUCCESS`); its output is in the log group under the `db-init` stream prefix.
 
-```sql
-GRANT rds_iam TO shelf;
-```
+> **Unverified.** The first-boot database step (db-init: app user, rds_iam grant, backups) is checked by `terraform validate` only and has not yet run against a real RDS; tracked in #1096.
 
-`shelf` is both the master user and the app user (`db_iam_user`). **Once `rds_iam` is granted, `shelf`
-can log in only with an IAM token: its password, including the master secret, stops working.** That
-locks you out of password login as well, so run the grant last, and to administer the database
-afterwards connect with a token too
-(`aws rds generate-db-auth-token`, from inside the VPC). Prefer a separate application user, so the
-master password stays usable? Create it, grant `rds_iam` and the schema rights it needs, and change
-`local.database_user`.
+The master user (`shelf_admin`) is separate and keeps its password, so operators can still log in
+with the secret in `db_master_secret_arn` (from inside the VPC). Only `shelf` is IAM-only.
+
+**Backups.** `database_backup_retention_days` (default 7, range 1-35) sets RDS automated backups
+and point-in-time recovery. The database holds baselines and reviews.
 
 With `existing_database_url_secret_arn` the module creates no database, adds no `rds-db:connect`
 permission and passes the URL as `DATABASE_URL`. The network path to that database is yours.
@@ -170,9 +174,7 @@ only (`execution_role_policy_json`).
 - **Shutdown.** On a deploy ECS sends SIGTERM and the app drains running captures, then hands the
   rest back to the queue. The module sets `SHUTDOWN_GRACE_SECONDS`, the ALB deregistration delay
   (equal to the grace) and the ECS `stopTimeout` (the grace plus 10 seconds; Fargate allows at most
-  120). **The product image does not read `SHUTDOWN_GRACE_SECONDS` yet** and drains for its own
-  built-in grace, so changing `shutdown_grace_seconds` moves the ALB and ECS timings but not the
-  app's drain time.
+  120). The image reads `SHUTDOWN_GRACE_SECONDS` and bounds its drain by it, so the three agree.
 
 ## Domain and TLS
 
@@ -201,12 +203,13 @@ marked _not read_, which the image does not use yet.
 | Variable                                                     | Source                             | Status   |
 | ------------------------------------------------------------ | ---------------------------------- | -------- |
 | `AWS_BUCKET`, `AWS_REGION`, `PUBLIC_BASE_URL`, `TRUST_PROXY` | module                             | read     |
-| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | not read |
+| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | read     |
 | `SECRET`, `ADMIN_TOKEN`, `AUTH_PASSWORD`                     | Secrets Manager                    | read     |
+| `AUTH_EMAIL`                                                 | `auth_email`                       | read     |
 | `DATABASE_URL`                                               | `existing_database_url_secret_arn` | read     |
 | `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`             | the created RDS instance           | read     |
 | `DATABASE_POOL_MAX`                                          | `database_pool_size`               | read     |
-| `OIDC_CLIENT_SECRET` (Cognito)                               | Secrets Manager                    | not read |
+| `OIDC_CLIENT_SECRET` (with `enable_cognito`)                 | Secrets Manager                    | not read |
 | `REMOTE_BROWSER_ENDPOINT`, `REMOTE_BROWSER_TOKEN`            | secret references                  | not read |
 
 The image reads the `DATABASE_IAM_*` variables through the `db-postgres/rds-iam` preset. It refuses

@@ -97,6 +97,7 @@ function buildServerCommand(): Command {
     .command("init")
     .description("Scaffold a new StoryShelf server project")
     .option("--dir <dir>", "output directory")
+    .option("--cloud <cloud>", "write a Terraform module stub for aws, gcp or azure")
     .action(
       run<ServerInitOptions>(async () => (await import("./commands/server/init.ts")).runServerInit),
     );
@@ -177,6 +178,10 @@ function buildUploadCommand(): Command {
       .option("--author-email <email>", "author email")
       .option("--author-name <name>", "author name")
       .option("--full", "disable affected capture (render every story)")
+      .option(
+        "--skip-unchanged",
+        "record a commit that changed no story as a skipped build, without uploading",
+      )
       // Declared first so the negated flag has no implied default: absent means "use the config file".
       .option("--build-stats", "add --stats-json to the build script (default when affected)")
       .option("--no-build-stats", "do not add --stats-json to the build script")

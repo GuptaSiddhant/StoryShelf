@@ -48,6 +48,7 @@ jobs:
       full: ${{ steps.detect.outputs.full }}
       app: ${{ steps.detect.outputs.app }}
       postgres: ${{ steps.detect.outputs.postgres }}
+      schema: ${{ steps.detect.outputs.schema }}
       force: ${{ steps.detect.outputs.force }}
     timeout-minutes: 5
     steps:
@@ -77,6 +78,7 @@ jobs:
           full=true
           app=true
           postgres=true
+          schema=true
           # `--force` (no turbo cache) for a manual run, a diff that failed, or a change to the
           # files that decide every task's hash. Otherwise a full run replays cached tasks; the
           # nightly run (nightly.yml) is the forced full build that catches a wrong cache input.
@@ -103,6 +105,9 @@ jobs:
             # The Postgres retention lifecycle: its package, the shared contract it must pass, and
             # the interface that contract exercises (a locking regression must not merge).
             if grep -qE '^(packages/db-postgres/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then postgres=true; else postgres=false; fi
+            # A schema or migration file (any dialect's DDL, migrations, Drizzle schema, the boot
+            # comparison) or the previous-release job itself: ADR 0053, decision 8.
+            if grep -qE '^(packages/db-(sqlite|postgres|mysql)/src/([^/]*(ddl|migrat)[^/]*|schema/)|packages/core/src/adapters/schema-level|scripts/previous-release|\.github/workflows/ci\.yml)' changed.txt; then schema=true; else schema=false; fi
             if grep -qE "$FULL" changed.txt; then force=true; else force=false; fi
             # A release PR often changes only versions and the changelog (all ignorable above), but it
             # is the deploy gate: the Fly dry run and its browser test must run for it.
@@ -125,6 +130,7 @@ jobs:
           echo "full=$full" >> "$GITHUB_OUTPUT"
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "postgres=$postgres" >> "$GITHUB_OUTPUT"
+          echo "schema=$schema" >> "$GITHUB_OUTPUT"
           echo "force=$force" >> "$GITHUB_OUTPUT"
           echo "website=$website heavy=$heavy full=$full app=$app postgres=$postgres force=$force"
 
@@ -146,15 +152,6 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Setup Terraform
-        # The cli's terraform-*.integration.test.ts skip without a terraform binary, so install one
-        # here: `fmt -check` and `validate` of the generated AWS/GCP/Azure output run on every PR.
-        # 1.9.x matches TERRAFORM_REQUIRED_VERSION (">= 1.9") in packages/cli.
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.x"
-          terraform_wrapper: false
-
       - name: Check ADR references and size
         run: nub run docs:check
 
@@ -173,8 +170,6 @@ jobs:
         # per-package vitest worker pools from oversubscribing a small runner.
         env:
           TURBO_CONCURRENCY: "1"
-          # Switches on the Terraform scaffold suites in packages/cli (setup-terraform installs the binary).
-          RUN_TERRAFORM: "1"
           TURBO_SCM_BASE: origin/main
           TURBO_SCM_HEAD: HEAD
         run: |
@@ -257,8 +252,10 @@ jobs:
           --health-timeout=5s
           --health-retries=12
       # Neon's WebSocket proxy in front of the same server, so `./neon` runs both suites for real.
+      # Pinned by digest (the `latest` of 2026-11-14) so a new upstream build cannot change this job
+      # unseen. #1067 first blamed `latest`, but passing and failing runs pulled this same digest.
       wsproxy:
-        image: ghcr.io/neondatabase/wsproxy:latest
+        image: ghcr.io/neondatabase/wsproxy@sha256:7f2e2149aa6a57ba382a140102fba44f5053f3e44389ccc18adcecf896054efb
         env:
           APPEND_PORT: postgres:5432
           ALLOW_ADDR_REGEX: ".*"
@@ -277,6 +274,20 @@ jobs:
       - name: Build the packages the adapter imports
         run: nubx turbo run build --filter='@storyshelf/db-postgres^...'
 
+      # Samples what the server runs for long, so a stall (#1067) names its statement in the dump below.
+      - name: Sample slow statements in the background
+        run: |
+          cat > "$RUNNER_TEMP/sample.sh" <<'SAMPLER'
+          export PGPASSWORD=test-password
+          psql_() { psql -h 127.0.0.1 -U postgres -d storyshelf_test -At -F ' | ' "$@"; }
+          while true; do
+            psql_ -c "SELECT now()::time(0), pid, state, wait_event_type, wait_event, now() - query_start, left(regexp_replace(query, '\s+', ' ', 'g'), 160) FROM pg_stat_activity WHERE datname = 'storyshelf_test' AND state <> 'idle' AND pid <> pg_backend_pid() AND now() - query_start > interval '3 seconds'"
+            psql_ -c "SELECT now()::time(0), n_live_tup, last_autoanalyze FROM pg_stat_user_tables WHERE relname = 'content_uses'"
+            sleep 5
+          done
+          SAMPLER
+          nohup setsid bash "$RUNNER_TEMP/sample.sh" >> "$RUNNER_TEMP/slow-statements.log" 2>&1 &
+
       - name: Run the build-reference contract against real Postgres
         working-directory: packages/db-postgres
         env:
@@ -293,6 +304,67 @@ jobs:
           nubx vitest run src/retention-activation.test.ts
           nubx vitest run src/retention-pool-presets.test.ts
 
+      # A stalled WebSocket leaves nothing in the test output (#1067): show what the server and the
+      # proxy saw, and whether the server was still running the statement.
+      - name: Show the service containers and live sessions after a failure
+        if: ${{ failure() }}
+        run: |
+          for id in $(docker ps -a --format '{{.ID}}'); do
+            echo "::group::docker logs $(docker inspect --format '{{.Config.Image}}' "$id")"
+            docker logs --tail 80 "$id" 2>&1 || true
+            echo "::endgroup::"
+          done
+          echo "::group::statements active for more than 3 s, every 5 s"
+          tail -120 "$RUNNER_TEMP/slow-statements.log" || true
+          echo "::endgroup::"
+          echo "::group::pg_stat_activity"
+          PGPASSWORD=test-password psql -h 127.0.0.1 -U postgres -d storyshelf_test -c \
+            "SELECT pid, state, wait_event_type, wait_event, now() - query_start AS running, left(query, 80) AS query FROM pg_stat_activity WHERE datname = 'storyshelf_test'" || true
+          echo "::endgroup::"
+
+  # ADR 0053, decision 8: the last published release must keep working on the schema this change
+  # leaves. Installs that release from npm, migrates an empty database with it, migrates again with
+  # this checkout (as the next minor), starts the release on the result and smokes it; Postgres also
+  # runs the release's own live database suites. Only for changes to a schema or migration file.
+  previous-release-db:
+    name: previous-release-db (${{ matrix.dialect }})
+    needs: changes
+    if: ${{ needs.changes.outputs.schema == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: storyshelf_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d storyshelf_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # The newest release tag names the previous release.
+          fetch-depth: 0
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Run the previous release against this schema
+        env:
+          DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
+        run: bash scripts/previous-release.sh "${{ matrix.dialect }}"
+
   website:
     name: website
     needs: changes
@@ -306,8 +378,8 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Verify (build + lint + link check)
-        # `website#verify` builds the docs site and runs its link check (dist/ stays for a11y).
+      - name: Verify (build + lint + link and llms checks)
+        # `website#verify` builds the docs site and runs its link and llms checks (dist/ stays for a11y).
         run: nubx turbo verify --filter=website
 
       - name: Check website accessibility (axe, light/dark/mobile)
@@ -364,9 +436,19 @@ jobs:
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
 
+      - name: Set up QEMU
+        if: steps.filter.outputs.run == 'true'
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Buildx
         if: steps.filter.outputs.run == 'true'
         uses: docker/setup-buildx-action@v3
+
+      # release.yml pushes amd64 and arm64. Native install scripts can differ per platform, so build
+      # the arm64 builder stage too (install + bundle; nothing is loaded or pushed).
+      - name: Build the arm64 builder stage
+        if: steps.filter.outputs.run == 'true'
+        run: docker buildx build -f apps/server-image/Dockerfile --platform linux/arm64 --target builder .
 
       - name: Build both variants (not pushed)
         if: steps.filter.outputs.run == 'true'
@@ -381,7 +463,8 @@ jobs:
         run: |
           set -e
           for variant in storyshelf:ci storyshelf:ci-hosting; do
-            docker run -d --name smoke -p 3000:3000 "$variant"
+            # No sign-in on purpose: the image refuses to start without AUTH_PASSWORD unless told.
+            docker run -d --name smoke -p 3000:3000 -e SHELF_AUTH=none "$variant"
             if ! SMOKE_BASE_URL=http://127.0.0.1:3000 bash scripts/smoke.sh; then
               docker logs smoke
               exit 1
@@ -397,7 +480,9 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: |
           set -e
-          docker run -d --name iam \
+          # No sign-in on purpose, as in the smoke above: the image refuses to start without
+          # AUTH_PASSWORD unless told, and that check runs before the database connection.
+          docker run -d --name iam -e SHELF_AUTH=none \
             -e AWS_ACCESS_KEY_ID=x -e AWS_SECRET_ACCESS_KEY=y \
             -e DATABASE_IAM_HOST=127.0.0.1 -e DATABASE_IAM_PORT=1 \
             -e DATABASE_IAM_USER=shelf -e DATABASE_IAM_NAME=shelf -e DATABASE_IAM_REGION=us-east-1 \
@@ -486,6 +571,49 @@ jobs:
             echo "::endgroup::"
           done
 
+  # What a user gets (#393 launch slice, #1134 B5): every public package packed with `npm pack`,
+  # installed from the tarballs (no workspace links, outside this checkout), then the default
+  # `storyshelf server init` scaffold, `npm start`, `create`, `upload` of fixtures/storybook-9 and
+  # one finished build. A dependency missing from a manifest or from the scaffold (#1137) fails here.
+  packed-install:
+    name: packed-install
+    needs: changes
+    if: ${{ needs.changes.outputs.heavy == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.63.0-chromium-${{ runner.os }}
+
+      - name: Install Playwright browser (chromium)
+        working-directory: packages/runner-playwright
+        run: |
+          nubx playwright-core install chromium
+          if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
+            echo "chromium failed to launch; installing system dependencies"
+            nubx playwright-core install-deps chromium
+          fi
+
+      - name: Build packages
+        run: nubx turbo run build --filter='!website'
+
+      - name: Build fixture Storybook
+        uses: ./.github/actions/build-fixture
+        with:
+          fixture: storybook-9
+
+      - name: Install the packed tarballs, scaffold, start, upload, one build
+        run: node scripts/packed-install-smoke.mjs --storybook fixtures/storybook-9
+
   # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
 
   # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child
@@ -495,7 +623,19 @@ jobs:
     name: ci
     if: ${{ always() }}
     needs:
-      [changes, verify, storybook-dev, postgres-lifecycle, website, capture, fly, image, deploy]
+      [
+        changes,
+        verify,
+        storybook-dev,
+        postgres-lifecycle,
+        previous-release-db,
+        website,
+        capture,
+        fly,
+        image,
+        packed-install,
+        deploy,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

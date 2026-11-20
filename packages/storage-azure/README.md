@@ -72,6 +72,8 @@ interface AzureStorageOptions {
   accountKey?: string; // optional storage account key
   accountUrl?: string; // optional blob service URL (e.g. https://myaccount.blob.core.windows.net)
   sasToken?: string; // optional SAS token (without leading ? OK)
+  credential?: TokenCredential; // optional Entra credential; default DefaultAzureCredential
+  managedIdentityClientId?: string; // client id of a user-assigned managed identity
 }
 ```
 
@@ -85,8 +87,14 @@ Options at a glance:
 | `connectionString`           | no\*     | Storage connection string                              |
 | `accountName` / `accountKey` | no\*     | Explicit credentials pair                              |
 | `accountUrl` / `sasToken`    | no\*     | URL + SAS form (emulator, fine-grained SAS)            |
+| `accountName` alone          | no\*     | Entra: `DefaultAzureCredential` (managed identity)     |
+| `managedIdentityClientId`    | no       | Picks a user-assigned identity for the default         |
+| `credential`                 | no       | Your own `TokenCredential`, instead of the default     |
 
-`*` At least one auth form is needed unless `client` is supplied.
+`*` One auth form is needed unless `client` is supplied. With only an account name or URL (no key,
+SAS token or connection string) the adapter signs in with `DefaultAzureCredential`: a managed
+identity on Azure, `az login` locally. The identity needs `Storage Blob Data Contributor` on the
+container. An anonymous (public) container is no longer the fallback; give a `client` for that.
 
 ### `createAzureStorage(options: AzureStorageOptions): StorageAdapter`
 

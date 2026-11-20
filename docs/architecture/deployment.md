@@ -10,9 +10,13 @@ The server is one container. Capture runs **in-process** with the image's own Ch
 
 The image is built from `apps/fly-app/Dockerfile`, a rolldown bundle of `apps/fly-app/server.ts` started with `node dist/server.mjs`. The build context must be the repository root. The official image (#887) and the cloud modules (ADR 0050) are coming; until then, build from this Dockerfile.
 
-The release workflow's image job builds `apps/server-image/Dockerfile` instead, and pushes one build to `ghcr.io/guptasiddhant/storyshelf` and to `docker.io/guptasiddhant/storyshelf` (#1027) under the same tags (`<version>`, `latest`, and the `-hosting` variants). Both registries therefore share one digest, and the provenance and SBOM attestations travel with the pushed manifest, so both carry them. Docker Hub is skipped with a notice while `DOCKERHUB_USERNAME` or `DOCKERHUB_TOKEN` is unset, and the release still publishes to GHCR.
+The release workflow's image job builds `apps/server-image/Dockerfile` instead, and pushes one build to `ghcr.io/guptasiddhant/storyshelf` and to `docker.io/guptasiddhant/storyshelf` (#1027) under the same tags (`<version>`, `latest`, and the `-hosting` variants). Both registries therefore share one digest, and the provenance and SBOM attestations travel with the pushed manifest, so both carry them. Docker Hub is skipped with a notice while `DOCKERHUB_TOKEN` is unset, and the release still publishes to GHCR. `DOCKERHUB_USERNAME` is optional and defaults to `guptasiddhant`.
 
 The public website and the Fly demo follow stable releases only (ADR 0043): `release.yml` calls `website.yml` (built from the release tag) and `fly.yml` (the official image of that version when it exists, else a build from the tag) after the tag is created, and a push to `main` deploys neither. Both can be run by hand with `workflow_dispatch`; website PRs are still built and link-checked in `ci.yml`.
+
+A release pull request (`release/v*`) runs `release-dry-run.yml` before the owner merges it (#1097), so the blockers of a release show up while it is still a pull request. It publishes and deploys nothing. Three jobs: `images` (check name `release images build`) builds both variants of `apps/server-image/Dockerfile` for `linux/amd64,linux/arm64` (the arm64 build is the one CI never runs); `npm` runs `scripts/check-npm-packages.mjs`, which fails when a public package is not on npm yet (a first publish cannot use trusted publishing, so the message says to publish it once by hand and then run `scripts/npm-trust-all.mjs`) and, when the `NPM_TOKEN` secret is set, also checks each package's trusted publisher; `demo` fills a `/data` volume with the previous release's demo image, boots the image `fly.yml` will deploy (the official image when `FLY_OFFICIAL_IMAGE` is `true`, else `apps/fly-app/Dockerfile`) on that volume, and requires `/api/v1/health` to answer, which catches volume ownership and migration problems before Fly does. On any other pull request the jobs are skipped, so they can be required checks; `workflow_dispatch` runs them on any branch. `changeset` and `docs:check` are separate checks and are unchanged.
+
+The stable release pull request is kept current by `release-pr.yml` (ADR 0043, #1098). While one `release/v*` pull request is open and `main` has gained changesets its branch does not consume, the workflow prepares the release again on `main`. Release branches are append-only: nothing force-pushes them. An unchanged version adds one merge commit to the branch (parents: the open pull request's head, which is what the workflow last pushed, and `main`; tree: the freshly prepared release) and pushes it as a plain fast-forward, so the pull request keeps its number and auto-merge. If the branch moved since, the push is rejected and the job fails with a message. A changed bump (patch to minor) pushes a new `release/v<version>`, opens its pull request and closes the old one. The workflow never force-pushes any branch. `scripts/release-due.mjs` makes the open, refresh or nothing decision.
 
 ```sh
 docker build -f apps/fly-app/Dockerfile -t storyshelf .
@@ -49,7 +53,7 @@ volumes:
   storyshelf-data:
 ```
 
-The variables above are read by `apps/fly-app/server.ts`, which also reads `DATA_DIR`, `PORT`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `ADMIN_TOKEN` and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
+The variables above are read by `apps/fly-app/server.ts`, which also reads `DATA_DIR`, `PORT`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, `SHELF_INTEGRATIONS_DISABLED` (integration kinds projects are not offered, through `integrationsFromEnv`; the server image reads it too) and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
 
 ### Behind a proxy
 
@@ -68,16 +72,16 @@ One resolver (`createClientIpResolver`, `app/src/middleware/client-ip.ts`) serve
 
 Published Storybook files can sit behind a CDN. What a CDN may keep is decided by the `Cache-Control` each answer carries, which the server sets per request. A CDN must obey it: do not add a default TTL, do not override `private`, and do not cache by URL when the response is `private`.
 
-| Route | Who gets it | `Cache-Control` | A shared cache (CDN) may store it |
-| --- | --- | --- | --- |
-| `/_/<buildId>/*` (a ULID short link) | a public build, or any build on an instance without sign-in | `public, max-age=31536000, immutable` | yes, indefinitely |
-| `/projects/:slug/storybook/build/<buildId>/*` | the same | `public, max-age=31536000, immutable` | yes, indefinitely |
-| `/_/<slug>/` (the project's latest build) | the same | `public, max-age=60` | yes, for a minute |
-| `/_/<slug>/*` (a slug, not the root) | the same | `public, max-age=3600` | yes, for an hour |
-| a public build's Storybook landing page | the same | `public, no-cache` | revalidate only |
-| a private build, signed-in viewer with a role | `session` | `private, no-cache` | no |
-| `/_s/:token/*` (a signed URL) | the token holder | `private, no-store`; a capture grant may get `private, max-age=N` when `captureAssets.cacheMaxAgeSeconds` is set | no |
-| `/_r/:token/*` (a read grant) | the token holder | `private, no-store` | no |
+| Route                                         | Who gets it                                                 | `Cache-Control`                                                                                                  | A shared cache (CDN) may store it |
+| --------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `/_/<buildId>/*` (a ULID short link)          | a public build, or any build on an instance without sign-in | `public, max-age=31536000, immutable`                                                                            | yes, indefinitely                 |
+| `/projects/:slug/storybook/build/<buildId>/*` | the same                                                    | `public, max-age=31536000, immutable`                                                                            | yes, indefinitely                 |
+| `/_/<slug>/` (the project's latest build)     | the same                                                    | `public, max-age=60`                                                                                             | yes, for a minute                 |
+| `/_/<slug>/*` (a slug, not the root)          | the same                                                    | `public, max-age=3600`                                                                                           | yes, for an hour                  |
+| a public build's Storybook landing page       | the same                                                    | `public, no-cache`                                                                                               | revalidate only                   |
+| a private build, signed-in viewer with a role | `session`                                                   | `private, no-cache`                                                                                              | no                                |
+| `/_s/:token/*` (a signed URL)                 | the token holder                                            | `private, no-store`; a capture grant may get `private, max-age=N` when `captureAssets.cacheMaxAgeSeconds` is set | no                                |
+| `/_r/:token/*` (a read grant)                 | the token holder                                            | `private, no-store`                                                                                              | no                                |
 
 Rules for the CDN:
 
@@ -109,15 +113,19 @@ Several instances can share one database and one storage adapter. Some state is 
 
 What this means for configured limits with N instances:
 
-| Limit | Total across N instances |
-| --- | --- |
+| Limit                                           | Total across N instances                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `/api/v1/*`, sign-in and signed-URL rate limits | up to N × the configured count for one client, when a load balancer spreads that client over instances |
-| `CAPTURE_CONCURRENCY` | N × the value captures run at once; each capture drives a browser |
-| remote-browser `maxConnections` | N × the value connections to a remote service; divide a provider's session limit by N |
-| render pages per instance | N × the per-instance page limit |
-| AI token budget | not multiplied: it is counted from the database |
+| `CAPTURE_CONCURRENCY`                           | N × the value captures run at once; each capture drives a browser                                      |
+| remote-browser `maxConnections`                 | N × the value connections to a remote service; divide a provider's session limit by N                  |
+| render pages per instance                       | N × the per-instance page limit                                                                        |
+| AI token budget                                 | not multiplied: it is counted from the database                                                        |
 
 Choose each per-instance value as the total limit divided by N. For rate limits, a load balancer that keeps one client on one instance (sticky sessions) keeps the count exact for that client.
+
+### AWS (Terraform module)
+
+The module in `deploy/terraform/aws` runs the published image on ECS Fargate; each task's `db-init` container creates the app database user and grants it `rds_iam` before the app starts. The first-boot database step (db-init: app user, rds_iam grant, backups) is checked by `terraform validate` only and has not yet run against a real RDS; tracked in #1096.
 
 ### Development
 
