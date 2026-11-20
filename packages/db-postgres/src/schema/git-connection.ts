@@ -39,6 +39,7 @@ export const gitRepositoryLinks = pgTable(
     requestedBy: text("requested_by"),
     approvedBy: text("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true, mode: "string" }),
+    lastDeliveredAt: timestamp("last_delivered_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },

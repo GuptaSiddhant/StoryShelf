@@ -534,6 +534,7 @@ CREATE TABLE IF NOT EXISTS git_repository_links (
   requested_by TEXT,
   approved_by TEXT,
   approved_at TIMESTAMPTZ,
+  last_delivered_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

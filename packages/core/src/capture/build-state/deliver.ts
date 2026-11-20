@@ -10,6 +10,7 @@ import { contentHostSuffix } from "../../content-hosts.ts";
 import { latestVerdicts } from "../../models/build-review-status.ts";
 import { BuildReviewModel } from "../../models/build-review.ts";
 import { BuildModel } from "../../models/build.ts";
+import { GitRepositoryLinkModel } from "../../models/git-repository-link.ts";
 import { NotificationChannelModel } from "../../models/notification-channel.ts";
 import { ProjectModel } from "../../models/project.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
@@ -106,6 +107,19 @@ export async function writeTo(
     logger: deps.logger,
     signal: where.signal,
   });
+  await stampLinkDelivery(deps, target);
+}
+
+/** Record the post on a link; a failed stamp is logged, never retried (the status is already out). */
+async function stampLinkDelivery(deps: BuildStateDeps, target: StateTarget): Promise<void> {
+  if (target.link === undefined) {
+    return;
+  }
+  try {
+    await new GitRepositoryLinkModel(deps.db).markDelivered(target.link.id);
+  } catch (error) {
+    deps.logger.warn({ err: error, linkId: target.link.id }, "could not record the link delivery");
+  }
 }
 
 /** What reading a project's git channels (and, with connections, its approved links) needs. */

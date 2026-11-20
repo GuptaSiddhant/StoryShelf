@@ -39,6 +39,7 @@ export const gitRepositoryLinks = sqliteTable(
     requestedBy: text("requested_by"),
     approvedBy: text("approved_by"),
     approvedAt: text("approved_at"),
+    lastDeliveredAt: text("last_delivered_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },

@@ -547,6 +547,7 @@ CREATE TABLE IF NOT EXISTS git_repository_links (
   requested_by VARCHAR(64),
   approved_by VARCHAR(64),
   approved_at DATETIME(3),
+  last_delivered_at DATETIME(3),
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT fk_git_repository_links_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,

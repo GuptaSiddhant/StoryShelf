@@ -547,6 +547,7 @@ const gitRepositoryLinks = defineTable("git_repository_links", {
   requestedBy: "requested_by",
   approvedBy: "approved_by",
   approvedAt: "approved_at",
+  lastDeliveredAt: "last_delivered_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
