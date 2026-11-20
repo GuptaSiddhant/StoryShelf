@@ -20,7 +20,7 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 - **Per-branch baselines** with fallback to the default branch, auto-approved on `main`.
 - **Published Storybook.** Share the latest build of each project at a stable URL.
 - **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
-- **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) or Puppeteer renders it, including `play` functions.
+- **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) renders it, including `play` functions.
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
 
@@ -83,7 +83,7 @@ packages/
   design-figma/   @storyshelf/design-figma  — Figma design links, metadata and rendered previews
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-  runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner
+  runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner (deprecated, removed in 0.15.0)
   observability/  @storyshelf/observability — OpenTelemetry tracing/metrics/log-correlation
   ai/             @storyshelf/ai — AI insights (build triage, project health) on the Vercel AI SDK
 apps/

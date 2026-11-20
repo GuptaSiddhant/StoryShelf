@@ -646,3 +646,24 @@ describe("createPuppeteerCaptureRunner targets (ADR 0007)", () => {
     });
   });
 });
+
+describe("deprecation warning", () => {
+  it("warns once per runner instance when the host binds its logger", () => {
+    const warn = vi.fn();
+    const logger = { warn, info: vi.fn(), debug: vi.fn(), error: vi.fn() } as never;
+    const runner = createPuppeteerCaptureRunner();
+    runner.setLogger?.(logger);
+    runner.setLogger?.(logger);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        removedIn: "0.15.0",
+        replacement: "@storyshelf/runner-playwright",
+      }),
+      expect.stringContaining("deprecated"),
+    );
+
+    createPuppeteerCaptureRunner().setLogger?.(logger);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+});
