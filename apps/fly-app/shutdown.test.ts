@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { FLY_DEFAULT_GRACE_SECONDS, shutdownGraceMs } from "./shutdown.ts";
+import { describe, expect, it, vi } from "vitest";
+import {
+  exitAfterDrain,
+  FLY_DEFAULT_GRACE_SECONDS,
+  FORCED_EXIT_MS,
+  shutdownGraceMs,
+} from "./shutdown.ts";
 
 describe("shutdownGraceMs", () => {
   it("reads SHUTDOWN_GRACE_SECONDS as milliseconds", () => {
@@ -18,6 +23,22 @@ describe("shutdownGraceMs", () => {
       expect(() => shutdownGraceMs({ SHUTDOWN_GRACE_SECONDS: raw })).toThrow(
         "SHUTDOWN_GRACE_SECONDS must be a whole number of seconds",
       );
+    }
+  });
+});
+
+describe("exitAfterDrain", () => {
+  it("exits after the delay with an unref'd timer", () => {
+    vi.useFakeTimers();
+    try {
+      const exit = vi.fn();
+      exitAfterDrain(exit, FORCED_EXIT_MS);
+      vi.advanceTimersByTime(FORCED_EXIT_MS - 1);
+      expect(exit).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(exit).toHaveBeenCalledWith(0);
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

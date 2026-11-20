@@ -193,6 +193,15 @@ const server = serve({ fetch: app.fetch, port }, () => {
 const shutdown = async (): Promise<void> => {
   await app.lifecycle.teardown(graceMs === undefined ? {} : { graceMs });
   server.close();
+  // A bounded drain may leave a stuck handler to its lease: make sure the process ends it, after a
+  // second (unref'd, so a process with nothing left running exits on its own first). Mirrors
+  // apps/fly-app/shutdown.ts `exitAfterDrain`.
+  if (graceMs !== undefined) {
+    setTimeout(() => {
+      // oxlint-disable-next-line unicorn/no-process-exit -- a stuck handler must not outlive the drain
+      process.exit(0);
+    }, 1000).unref();
+  }
 };
 process.on("SIGTERM", () => {
   shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged

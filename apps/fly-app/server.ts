@@ -30,7 +30,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 import { mkdirSync } from "node:fs";
 import { aiFromEnv, aiLogFields } from "./ai.ts";
 import { refuseLegacyVariables } from "./legacy-env.ts";
-import { shutdownGraceMs } from "./shutdown.ts";
+import { exitAfterDrain, shutdownGraceMs } from "./shutdown.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
@@ -200,6 +200,8 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
       .catch(() => {}) // Intentionally empty — teardown errors are already logged
       .finally(() => {
         server.close();
+        // A bounded drain may leave a stuck handler to its lease: the process must end it.
+        if (graceMs !== undefined) exitAfterDrain();
       });
   });
 }
