@@ -8,7 +8,14 @@
  */
 import { configureImages } from "./async.ts";
 
-export { configureImages, DIFF_WORKERS_ENV, diffImagesAsync, shutdownDiffPool } from "./async.ts";
+export {
+  configureImages,
+  DIFF_WORKERS_ENV,
+  diffImagesAsync,
+  type ImageEngineState,
+  imageEngineState,
+  shutdownDiffPool,
+} from "./async.ts";
 export {
   DEFAULT_IMAGE_ENGINE,
   IMAGE_ENGINE_ENV,

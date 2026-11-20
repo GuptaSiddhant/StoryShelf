@@ -107,6 +107,8 @@ import { registerBuildCancel } from "./build-cancel.ts";
 import { registerBuildChangeset } from "./build-changeset.ts";
 import { registerBuildReviews } from "./build-reviews.ts";
 import { registerBuildSkip } from "./build-skip.ts";
+import { registerBuildsCancelBulk } from "./builds-cancel-bulk.ts";
+import { registerBuildsCancelForm } from "./builds-cancel-form.ts";
 import { registerBuildsInFlight } from "./builds-in-flight.ts";
 import { registerComments } from "./comments.ts";
 import { flashHx } from "./flash.ts";
@@ -126,6 +128,8 @@ import { registerStoryStatus } from "./story-status.ts";
 export function registerBuilds(app: ShelfRouter): void {
   // Before `GET …/builds/:buildId`, which would otherwise take `in-flight` or `skip-source` for a build id.
   registerBuildsInFlight(app);
+  registerBuildsCancelBulk(app);
+  registerBuildsCancelForm(app);
   registerBuildSkip(app);
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);

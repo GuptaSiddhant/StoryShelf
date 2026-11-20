@@ -1,6 +1,6 @@
 ---
 title: CLI — Client
-description: storyshelf init, create, upload, build, doctor, whoami, retry, purge, protect — client-side commands.
+description: storyshelf init, create, upload, build, doctor, whoami, retry, cancel, purge, protect — client-side commands.
 ---
 
 import { PackageManagers } from "starlight-package-managers";
@@ -98,6 +98,8 @@ Affected capture is on by default: the CLI traces `git diff baseline..HEAD` thro
 The CLI does **not** run Playwright. It hashes the static build, sends only the files the server does not hold yet, then posts the manifest; the server renders and diffs asynchronously. A second upload of an unchanged build sends the manifest alone.
 :::
 
+**Output.** Phases and progress go to stderr; the summary and build link go to stdout.
+
 **Servers without `testing`.** An instance that [hosts Storybooks only](/concepts/hosting-only/) reports `testing: false` when the build is created. `storyshelf upload` then skips the affected-capture computation, uploads as usual, and ends with `Testing is off on this server: the Storybook is published, but no captures or visual checks will run.`
 
 **Servers without the hash routes.** An older server answers `404` to `/dedup`. The CLI then prints `The server has no hash upload routes; uploading a zip instead` and sends the zip as before. `--zip` (or `STORYSHELF_ZIP=1`) skips the hash path and always sends the zip.
@@ -129,7 +131,7 @@ storyshelf retry --url http://localhost:3000 --slug my-design-system --build-id 
 storyshelf purge --url http://localhost:3000 --token $STORYSHELF_ADMIN_TOKEN
 ```
 
-`retry` re-runs capture without a new revision. `purge` triggers retention GC (normally scheduled).
+`retry` re-runs capture. `purge` runs retention GC. `cancel [--dry-run]` cancels older unfinished builds.
 
 ## `storyshelf protect`
 

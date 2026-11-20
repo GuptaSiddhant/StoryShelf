@@ -12,6 +12,7 @@ import {
 } from "../sessions.ts";
 import { describeLoginMethods } from "./login-methods.ts";
 import { buildInviteMethods } from "./mail.ts";
+import { providerChecksOf } from "./provider-checks.ts";
 import { assertAuthSecret } from "./secret.ts";
 import { ENGINE_PROVIDER_ID, type ShelfAuthInstance, type ShelfAuthOptions } from "./types.ts";
 
@@ -142,6 +143,7 @@ export function buildAdapter(
     hostSessionCookie: options.hostSessionCookie === true,
     handler: async (request: Request): Promise<Response> => await shelf.handler(request),
     loginMethods: (): EngineLoginMethod[] => describeLoginMethods(options),
+    providerChecks: () => providerChecksOf(options),
     // eslint-disable-next-line require-await -- Auth.setup is async; validation is sync
     setup: async () => {
       // Better Auth merely warns on short secrets; the shelf fails fast
