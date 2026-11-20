@@ -125,7 +125,6 @@ function inlineForms(source: string): number {
  * shrink (move the form into a `Dialog` or its own page, then delete the entry).
  */
 const INLINE_FORM_ALLOWANCE: Record<string, number> = {
-  "settings-design-links.tsx": 2,
   "settings-labels.tsx": 2,
   "settings-links.tsx": 1,
   "settings-notifications.tsx": 1,

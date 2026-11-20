@@ -1,7 +1,7 @@
 import type { ShelfRouter } from "../app-types.ts";
 import { registerAiSettings } from "./settings-ai.ts";
 import { registerCaptureSettings } from "./settings-capture.ts";
-import { registerDesignSettings } from "./settings-design.ts";
+import { registerDesignSettings } from "./settings-design.tsx";
 import { registerGeneralSettings } from "./settings-general.tsx";
 import { registerLabelSettings } from "./settings-labels.ts";
 import { registerLinkSettings } from "./settings-links.ts";
