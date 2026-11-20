@@ -14,6 +14,7 @@ import {
   SectionTitle,
   SummaryList,
   VStack,
+  formatAbsolute,
   statusLabel,
   type SummaryItem,
 } from "../ui/components.tsx";
@@ -245,15 +246,13 @@ function healthOf(channel: SettingsNotificationChannel): NonNullable<SummaryItem
 function detailsOf(channel: SettingsNotificationChannel): string {
   const parts = [statusLabel(channel.provider), reactsTo(channel)];
   if (channel.lastError !== null) {
-    const when = channel.lastErrorAt
-      ? ` ${new Date(channel.lastErrorAt).toLocaleDateString()}`
-      : "";
+    const when = channel.lastErrorAt ? ` ${formatAbsolute(channel.lastErrorAt, "date")}` : "";
     parts.push(`Failed${when}: ${channel.lastError}`);
   } else {
     parts.push(
       channel.lastDeliveredAt === null
         ? "Never delivered"
-        : `Last delivered ${new Date(channel.lastDeliveredAt).toLocaleDateString()}`,
+        : `Last delivered ${formatAbsolute(channel.lastDeliveredAt, "date")}`,
     );
   }
   return parts.join(" · ");

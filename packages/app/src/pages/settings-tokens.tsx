@@ -7,6 +7,7 @@ import {
   CodeBlock,
   DialogLink,
   Meta,
+  formatAbsolute,
   SectionTitle,
   SummaryList,
   VStack,
@@ -26,8 +27,8 @@ function tokenItems(
     return {
       id: token.id,
       name: token.name,
-      details: `Created ${new Date(token.createdAt).toLocaleDateString()} · Last used ${
-        token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : "never"
+      details: `Created ${formatAbsolute(token.createdAt, "date")} · Last used ${
+        token.lastUsedAt ? formatAbsolute(token.lastUsedAt, "date") : "never"
       }`,
       actions: isAdmin ? (
         <form

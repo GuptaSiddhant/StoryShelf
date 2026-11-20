@@ -10,6 +10,7 @@ import {
   SectionTitle,
   SummaryList,
   VStack,
+  formatAbsolute,
   statusLabel,
   type SummaryItem,
 } from "../ui/components.tsx";
@@ -42,7 +43,7 @@ function memberItems(project: Project, members: SettingsMember[], isAdmin: boole
     id: member.id,
     name: member.userId,
     state: { label: statusLabel(member.role), tone: member.role === "admin" ? "danger" : "info" },
-    details: `Since ${new Date(member.createdAt).toLocaleDateString()}`,
+    details: `Since ${formatAbsolute(member.createdAt, "date")}`,
     actions: isAdmin ? (
       <RemoveForm
         action={`/projects/${project.slug}/settings/members/${member.userId}/remove`}

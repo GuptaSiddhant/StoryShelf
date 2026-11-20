@@ -53,7 +53,11 @@ export function renderSettingsReview(
       </Meta>
       <SummaryList label="Review" items={reviewItems(project, isAdmin)} emptyTitle="No review" />
       {isAdmin ? (
-        <FormDialog id={EDIT_REVIEW_DIALOG} title="Edit review" submitLabel="Save review settings" />
+        <FormDialog
+          id={EDIT_REVIEW_DIALOG}
+          title="Edit review"
+          submitLabel="Save review settings"
+        />
       ) : null}
     </VStack>
   );
