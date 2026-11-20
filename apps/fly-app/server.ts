@@ -67,11 +67,18 @@ function buildAuthUi(): AuthUiConfig | undefined {
     ["helpText", env["SHELF_AUTH_HELP_TEXT"]],
     ["footerText", env["SHELF_AUTH_FOOTER_TEXT"]],
   ];
-  const out: Record<string, string> = {};
+  const out: AuthUiConfig = {};
   for (const [key, value] of pairs) {
     if (value) {
-      out[key] = value;
+      Object.assign(out, { [key]: value });
     }
+  }
+  const href = env["SHELF_AUTH_PUBLIC_LINK_URL"];
+  if (href) {
+    out.publicLink = {
+      href,
+      label: env["SHELF_AUTH_PUBLIC_LINK_LABEL"] ?? "Browse without an account",
+    };
   }
   return Object.keys(out).length === 0 ? undefined : out;
 }
