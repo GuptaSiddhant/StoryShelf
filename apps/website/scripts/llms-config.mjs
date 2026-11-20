@@ -28,6 +28,7 @@ export const BUNDLES = [
       "/concepts/labels/",
       "/guides/support/",
       "/guides/troubleshooting/",
+      "/guides/browser-changes/",
     ],
     budget: 20_000,
   },

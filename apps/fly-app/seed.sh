@@ -60,6 +60,31 @@ set_demo_public() {
     -d '{"publicBranchRegex":".*"}'
 }
 
+# The sign-in page links visitors to the demo's Storybook at /_/$SLUG/, which serves the latest
+# *approved* build on the default branch (#809). Make sure the seeded `main` build is approved, through
+# the review path a person uses ("Approve all", the same API call; never a direct status write). Waits for
+# capture to settle, does nothing when the build is already approved, so a re-run is a no-op.
+approve_main() {
+  local i build status
+  for i in $(seq 1 120); do
+    build="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG/builds" |
+      jq -c --arg sha "$MAIN_SHA" '[.[] | select(.gitSha == $sha)] | first // empty')"
+    status="$(jq -r '.status // empty' <<<"$build")"
+    case "$status" in
+      approved) return 0 ;;
+      failed | cancelled | rejected) echo "::error::the seeded main build is '$status'"; return 1 ;;
+      "" | pending | capturing | comparing) sleep 5 ;;
+      *)
+        curl -fsS "${AUTH[@]}" -X POST -o /dev/null \
+          "$STORYSHELF_URL/api/v1/projects/$SLUG/builds/$(jq -r '.id' <<<"$build")/approve-all"
+        sleep 2
+        ;;
+    esac
+  done
+  echo "::error::the seeded main build did not reach 'approved' in time"
+  return 1
+}
+
 sha_for() { printf '%s:%s' "$1" "$(sha256sum "$STATIC/index.json" | cut -c1-64)" | sha256sum | cut -c1-40; }
 MAIN_SHA="$(sha_for main)"
 FEATURE_SHA="$(sha_for feature/new-button)"
@@ -77,6 +102,7 @@ case "$CODE" in
       set_demo_browser
       set_demo_public
       set_demo_ai_profile
+      approve_main
       echo "Demo project is up to date; nothing to do."
       exit 0
     fi
@@ -111,3 +137,4 @@ upload "$STATIC" main "$MAIN_SHA" "chore: design system baseline"
 cp -r "$STATIC/." "$VARIANT"
 sed -i "s|</head>|<style>$FEATURE_CSS</style></head>|" "$VARIANT/iframe.html"
 upload "$VARIANT" feature/new-button "$FEATURE_SHA" "feat: rounded primary button in the new brand colour"
+approve_main

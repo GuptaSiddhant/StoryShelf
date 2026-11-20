@@ -15,7 +15,7 @@ const codeWrap = css`
     flex: 1;
     min-width: 0;
     margin: 0;
-    padding: 0.3rem 0;
+    padding: var(--space-1) 0;
     overflow-x: auto;
     font-family: var(--font-mono);
     font-size: var(--text-sm);

@@ -19,14 +19,15 @@ export const diffPaneImg = css`
 export const snapshotGrid = css`
   /* snapshot-grid */
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4);
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 `;
 
 export const snapshotCard = css`
   /* snapshot-card */
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   overflow: hidden;
   background: var(--surface-card);
   display: flex;
@@ -35,11 +36,11 @@ export const snapshotCard = css`
 
 export const snapshotCardHead = css`
   /* snapshot-card-head */
-  padding: 0.6rem 0.75rem;
+  padding: var(--space-3) var(--space-3);
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
 `;
 
@@ -51,23 +52,23 @@ export const snapshotCardMeta = css`
 
 export const snapshotCardBody = css`
   /* snapshot-card-body */
-  padding: 0.5rem;
+  padding: var(--space-2);
   display: grid;
-  gap: 0.5rem;
+  gap: var(--space-2);
 `;
 
 export const reviewComment = css`
   /* review-comment */
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.75rem;
+  padding: var(--space-3);
   background: var(--surface-card);
 `;
 
 export const reviewCommentHead = css`
   /* review-comment-head */
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
   font-size: var(--text-sm);
   color: var(--text-secondary);
@@ -76,7 +77,7 @@ export const reviewCommentHead = css`
 
 export const reviewCommentBody = css`
   /* review-comment-body */
-  margin: 0.5rem 0 0;
+  margin: var(--space-2) 0 0;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: var(--text-base);
@@ -88,11 +89,11 @@ export const reviewMention = css`
   background: var(--accent-subtle);
   color: var(--text-primary);
   border-radius: 0.25rem;
-  padding: 0 0.25em;
+  padding: 0 var(--space-1);
   font-weight: var(--weight-semibold);
 `;
 
 export const reviewCommentActions = css`
   /* review-comment-actions */
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 `;

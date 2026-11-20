@@ -8,22 +8,44 @@ import {
 } from "@storyshelf/core/models";
 import { isProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
+import { AddGroupMappingForm, AddMemberForm } from "../pages/member-forms.tsx";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
+import { respondWithForm } from "./form-response.tsx";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Project member settings (assign roles, remove members). */
 export function registerMemberSettings(app: ShelfRouter): void {
+  app.get("/projects/:slug/settings/members/new", async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+    return respondWithForm(c, project, "access", "Add member", (standalone) => (
+      <AddMemberForm project={project} standalone={standalone} />
+    ));
+  });
+
+  app.get("/projects/:slug/settings/members/groups/new", async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+    return respondWithForm(c, project, "access", "Add group mapping", (standalone) => (
+      <AddGroupMappingForm project={project} standalone={standalone} />
+    ));
+  });
+
   app.post("/projects/:slug/settings/members", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
     const form = await c.req.formData();
     const role = asString(form.get("role"));
     const userId = await resolveMemberUser(form);
     if (!userId.id || !isProjectRole(role)) {
-      return c.html(
-        (await renderSettingsPage(c, "members", { globalError: userId.error })) ?? "",
+      return respondWithForm(
+        c,
+        project,
+        "access",
+        "Add member",
+        (standalone) => (
+          <AddMemberForm project={project} standalone={standalone} error={userId.error} />
+        ),
         400,
       );
     }
@@ -89,9 +111,18 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
     const role = asString(form.get("role"));
     const inputError = ProjectGroupMappingModel.inputError(groupName, role);
     if (inputError || !groupName || !isProjectRole(role)) {
-      return c.html(
-        (await renderSettingsPage(c, "members", { globalError: inputError ?? "Invalid input" })) ??
-          "",
+      return respondWithForm(
+        c,
+        project,
+        "access",
+        "Add group mapping",
+        (standalone) => (
+          <AddGroupMappingForm
+            project={project}
+            standalone={standalone}
+            error={inputError ?? "Invalid input"}
+          />
+        ),
         400,
       );
     }

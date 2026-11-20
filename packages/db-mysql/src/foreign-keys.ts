@@ -5,6 +5,8 @@ export interface ForeignKeyMigration {
   column: string;
   parent: string;
   parentColumn: string;
+  /** What deleting the parent does; `CASCADE` unless the child must keep the parent alive. */
+  onDelete?: "CASCADE" | "RESTRICT";
 }
 
 export const FOREIGN_KEYS: ForeignKeyMigration[] = [
@@ -13,6 +15,50 @@ export const FOREIGN_KEYS: ForeignKeyMigration[] = [
     name: "fk_builds_project_id",
     column: "project_id",
     parent: "projects",
+    parentColumn: "id",
+  },
+  {
+    table: "build_references",
+    name: "fk_build_references_project_id",
+    column: "project_id",
+    parent: "projects",
+    parentColumn: "id",
+  },
+  {
+    // A pin keeps its build: the build row cannot go while a reference names it (ADR 0039).
+    table: "build_references",
+    name: "fk_build_references_build_id",
+    column: "build_id",
+    parent: "builds",
+    parentColumn: "id",
+    onDelete: "RESTRICT",
+  },
+  {
+    table: "build_reference_generations",
+    name: "fk_build_reference_generations_project_id",
+    column: "project_id",
+    parent: "projects",
+    parentColumn: "id",
+  },
+  {
+    table: "build_deletions",
+    name: "fk_build_deletions_build_id",
+    column: "build_id",
+    parent: "builds",
+    parentColumn: "id",
+  },
+  {
+    table: "build_deletions",
+    name: "fk_build_deletions_project_id",
+    column: "project_id",
+    parent: "projects",
+    parentColumn: "id",
+  },
+  {
+    table: "build_content_releases",
+    name: "fk_build_content_releases_build_id",
+    column: "build_id",
+    parent: "builds",
     parentColumn: "id",
   },
   {

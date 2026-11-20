@@ -8,13 +8,16 @@ import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { requestOpenBuildStatesNow } from "../git-status.ts";
+import { OriginForm } from "../pages/public-origin-forms.tsx";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
-import { publicMessage, requireSiteAdmin } from "./helpers.ts";
+import { respondWithAdminForm } from "./form-response.tsx";
+import { notFound, publicMessage, requireSiteAdmin } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 
 /** Register the public-origin routes of the System page. */
 export function registerPublicOriginRoutes(app: ShelfRouter): void {
+  app.get("/admin/public-origin/edit", handleEditForm);
   app.post("/admin/public-origin/report", handleReport);
   app.post("/admin/public-origin", handleSet);
   app.post("/admin/public-origin/clear", handleClear);
@@ -117,4 +120,17 @@ async function handleClear(c: Context): Promise<Response> {
   await publicOrigin?.clear();
   flash(c, "Stored public origin removed");
   return hxRedirect(c, "/admin");
+}
+
+/** The origin form, for the dialog or a page of its own; nothing to edit while the origin is fixed. */
+async function handleEditForm(c: Context): Promise<Response> {
+  requireSiteAdmin(c);
+  const { authEnabled, publicOrigin } = getStore();
+  if (!authEnabled || publicOrigin === undefined || (await isFixed())) {
+    notFound("The public origin is not set from this page");
+  }
+  const stored = await publicOrigin.stored();
+  return respondWithAdminForm(c, "Public origin", (standalone) => (
+    <OriginForm stored={stored} standalone={standalone} />
+  ));
 }

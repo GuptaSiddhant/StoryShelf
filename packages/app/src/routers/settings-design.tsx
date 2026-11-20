@@ -4,16 +4,21 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
+import { AddDesignFileForm, DesignTokenForm, MapComponentForm } from "../pages/design-forms.tsx";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
+import { respondWithForm } from "./form-response.tsx";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
-import { asString, renderSettingsPage } from "./settings.handlers.ts";
+import { asString } from "./settings.handlers.ts";
 
 /** Design settings (project design files, component mapping, provider credentials). */
 export function registerDesignSettings(app: ShelfRouter): void {
   const base = "/projects/:slug/settings/design";
+  app.get(`${base}/files/new`, async (c) => await linkForm(c, "file"));
+  app.get(`${base}/components/new`, async (c) => await linkForm(c, "component"));
+  app.get(`${base}/:provider/token/edit`, async (c) => await tokenForm(c));
   app.post(`${base}/files`, handleAddFile);
   app.post(`${base}/files/:id/delete`, handleRemoveLink);
   app.post(`${base}/components`, handleMapComponent);
@@ -50,8 +55,76 @@ function providerOf(c: Context): DesignProvider {
   return provider;
 }
 
-async function reject(c: Context, errors: Record<string, string>): Promise<Response> {
-  return c.html((await renderSettingsPage(c, "design", { errors })) ?? "", 400);
+/** What the add forms show under their URL field: the providers' own URL hints. */
+function urlHint(): string {
+  return getStore()
+    .design.map((provider) => provider.metadata.urlHint)
+    .join(" or ");
+}
+
+/** The add-file or map-component form, empty or with the refusal that sent it back. */
+async function linkForm(
+  c: Context,
+  which: "file" | "component",
+  error?: string,
+  status: 200 | 400 = 200,
+): Promise<Response> {
+  const project = await adminProject(c);
+  const file = which === "file";
+  return respondWithForm(
+    c,
+    project,
+    "capture",
+    file ? "Add design file" : "Map component",
+    (standalone) =>
+      file ? (
+        <AddDesignFileForm
+          project={project}
+          standalone={standalone}
+          urlHint={urlHint()}
+          error={error}
+        />
+      ) : (
+        <MapComponentForm
+          project={project}
+          standalone={standalone}
+          urlHint={urlHint()}
+          error={error}
+        />
+      ),
+    status,
+  );
+}
+
+/** The set-or-rotate token form of one provider. */
+async function tokenForm(c: Context, error?: string, status: 200 | 400 = 200): Promise<Response> {
+  const project = await adminProject(c);
+  const provider = providerOf(c);
+  const { metadata } = provider;
+  const replace = (await credentialModel().info(project.id, metadata.kind)) !== null;
+  return respondWithForm(
+    c,
+    project,
+    "capture",
+    `${metadata.name} token`,
+    (standalone) => (
+      <DesignTokenForm
+        project={project}
+        provider={{
+          kind: metadata.kind,
+          name: metadata.name,
+          credentialLabel: metadata.credentialLabel,
+          ...(metadata.credentialPlaceholder
+            ? { placeholder: metadata.credentialPlaceholder }
+            : {}),
+        }}
+        replace={replace}
+        standalone={standalone}
+        error={error}
+      />
+    ),
+    status,
+  );
 }
 
 function done(c: Context, slug: string, message: string): Response {
@@ -66,7 +139,8 @@ async function handleAddFile(c: Context): Promise<Response> {
   try {
     await designModel().addProjectLink(project.id, { label, url: asString(form.get("url")) ?? "" });
   } catch (error) {
-    if (error instanceof InvalidDesignUrlError) return await reject(c, { file: error.message });
+    if (error instanceof InvalidDesignUrlError)
+      return await linkForm(c, "file", error.message, 400);
     throw error;
   }
   return done(c, project.slug, "Design file added");
@@ -76,12 +150,12 @@ async function handleMapComponent(c: Context): Promise<Response> {
   const project = await adminProject(c);
   const form = await c.req.formData();
   const importPath = asString(form.get("importPath")) ?? "";
-  if (!importPath) return await reject(c, { component: "Enter the story file path" });
+  if (!importPath) return await linkForm(c, "component", "Enter the story file path", 400);
   try {
     await designModel().setComponentLink(project.id, importPath, asString(form.get("url")) ?? "");
   } catch (error) {
     if (error instanceof InvalidDesignUrlError) {
-      return await reject(c, { component: error.message });
+      return await linkForm(c, "component", error.message, 400);
     }
     throw error;
   }
@@ -98,7 +172,7 @@ async function handleSetToken(c: Context): Promise<Response> {
   const project = await adminProject(c);
   const provider = providerOf(c);
   const token = asString((await c.req.formData()).get("token"));
-  if (!token) return await reject(c, { [`token:${provider.metadata.kind}`]: "Token is required" });
+  if (!token) return await tokenForm(c, "Token is required", 400);
   await credentialModel().set(project.id, provider.metadata.kind, token);
   return done(c, project.slug, `${provider.metadata.name} token saved`);
 }

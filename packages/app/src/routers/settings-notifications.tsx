@@ -1,21 +1,33 @@
 import { NotificationChannelModel, NotificationSubscriptionModel } from "@storyshelf/core/models";
-import type { Project } from "@storyshelf/core/schema";
+import type { NotificationChannelRow, Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
+import { z } from "zod";
 import type { ShelfRouter } from "../app-types.ts";
 import { unofferedKindMessage } from "../integrations.ts";
+import {
+  AddChannelForm,
+  EditChannelForm,
+  type ChannelFormState,
+  type ChannelKind,
+} from "../pages/channel-forms.tsx";
 import { LISTED_TOPICS, REVIEW_REQUESTED_EVENT } from "../pages/settings-notifications.tsx";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
+import { parseOptionFields } from "../ui/components.tsx";
 import { retryChannelState } from "./channel-retry.ts";
 import { flash } from "./flash.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
-import { isHxRequest } from "./htmx.ts";
+import { respondWithForm } from "./form-response.tsx";
+import { notFound, resolveAuthorizedProject } from "./helpers.ts";
+import { hxRedirect, isHxRequest } from "./htmx.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
 import { createGitChannel } from "./settings-git-channel.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 
 /** Notifications settings (message and git channels plus my preferences). */
 export function registerNotificationSettings(app: ShelfRouter): void {
+  app.get("/projects/:slug/settings/notifications/new", handleNewChannel);
+  app.get("/projects/:slug/settings/notifications/:channelId/edit", handleEditChannelForm);
+  app.post("/projects/:slug/settings/notifications/:channelId/edit", handleEditChannel);
   app.post("/projects/:slug/settings/notifications", handleCreateChannel);
   app.post("/projects/:slug/settings/notifications/:channelId/delete", handleDeleteChannel);
   app.post("/projects/:slug/settings/notifications/:channelId/retry", handleRetryChannel);
@@ -53,39 +65,82 @@ async function handleCreateChannel(c: Context): Promise<Response> {
     : await createMessageChannel(c, project, form);
 }
 
-/** The message-channel form: a provider and a target (email address or webhook URL). */
+/** The message kinds the server offers (git hosts have their own form). */
+function messageKinds(): ChannelKind[] {
+  return getStore()
+    .notifiers.filter(
+      (candidate) =>
+        !NotificationChannelModel.isStateKind(getStore().notifiers, candidate.metadata.kind) &&
+        unofferedKindMessage(candidate.metadata.kind) === undefined,
+    )
+    .map((candidate) => ({ kind: candidate.metadata.kind, name: candidate.metadata.name }));
+}
+
+/** The Add form again, with what was typed and the reason it was refused. */
+function addChannelAnswer(
+  c: Context,
+  project: Project,
+  form: FormData,
+  state: ChannelFormState,
+): Response {
+  const typed: ChannelFormState = {
+    ...state,
+    selected: asString(form.get("provider")),
+    events: asString(form.get("events")) ?? "",
+    style: asString(form.get("style")) ?? "compact",
+  };
+  return respondWithForm(
+    c,
+    project,
+    "review",
+    "Add channel",
+    (standalone) => (
+      <AddChannelForm
+        project={project}
+        kinds={messageKinds()}
+        standalone={standalone}
+        state={typed}
+      />
+    ),
+    400,
+  );
+}
+
+/** The message-channel form: a kind (an option) and its target (email address or webhook URL). */
 async function createMessageChannel(
   c: Context,
   project: Project,
   form: FormData,
 ): Promise<Response> {
-  const provider = asString(form.get("provider"));
-  const target = asString(form.get("target"));
-  if (provider && target) {
-    return await createChannelRecord(c, project, provider, target, form);
+  const unoffered = unofferedKindMessage(asString(form.get("provider")) ?? "");
+  if (unoffered !== undefined) {
+    return refusal(c, project, form, "provider", unoffered);
   }
-  const missing = provider ? "target" : "provider";
-  const message = provider ? "Enter a target" : "Choose a provider";
-  return c.html(
-    (await renderSettingsPage(c, "notifications", { errors: { [missing]: message } })) ?? "",
-    400,
+  const picked = parseOptionFields<{ provider: string; target: string }>(
+    Object.fromEntries(form),
+    "provider",
+    Object.fromEntries(
+      messageKinds().map((entry) => [
+        entry.kind,
+        z.object({ target: z.string().trim().min(1, "Enter a target") }),
+      ]),
+    ),
   );
+  if (!picked.ok) {
+    return addChannelAnswer(c, project, form, { errors: { provider: picked.error } });
+  }
+  return await createChannelRecord(c, project, picked.value.provider, picked.value.target, form);
 }
 
-/** Render the tab with a provider-field error. */
-async function providerError(c: Context, message: string): Promise<Response> {
-  return c.html(
-    (await renderSettingsPage(c, "notifications", { errors: { provider: message } })) ?? "",
-    400,
-  );
-}
-
-/** Render the tab with a target-field error. */
-async function targetError(c: Context, message: string): Promise<Response> {
-  return c.html(
-    (await renderSettingsPage(c, "notifications", { errors: { target: message } })) ?? "",
-    400,
-  );
+/** Answer a refused target or provider with the form again. */
+function refusal(
+  c: Context,
+  project: Project,
+  form: FormData,
+  field: "provider" | "target",
+  message: string,
+): Response {
+  return addChannelAnswer(c, project, form, { errors: { [field]: message } });
 }
 
 async function createChannelRecord(
@@ -97,7 +152,7 @@ async function createChannelRecord(
 ): Promise<Response> {
   const unoffered = unofferedKindMessage(provider);
   if (unoffered !== undefined) {
-    return await providerError(c, unoffered);
+    return refusal(c, project, form, "provider", unoffered);
   }
   const config = channelConfig(provider, target, form);
   const checked = await NotificationChannelModel.validateInput(
@@ -108,13 +163,17 @@ async function createChannelRecord(
     provider === "email" ? undefined : target,
   );
   if (!checked.ok) {
-    return checked.field === "provider"
-      ? await providerError(c, checked.message)
-      : await targetError(c, checked.message);
+    return refusal(
+      c,
+      project,
+      form,
+      checked.field === "provider" ? "provider" : "target",
+      checked.message,
+    );
   }
   await persistChannel(project, provider, target, config, form);
   flash(c, "Notification channel added");
-  return c.html((await renderSettingsPage(c, "notifications")) ?? "", 201);
+  return hxRedirect(c, settingsHref(project.slug, "notifications"));
 }
 
 /** Build the provider config from the form (address vs secret per kind). */
@@ -245,4 +304,138 @@ async function saveSubscription(project: Project, userId: string, form: FormData
   }
   await model.setEnabled(project.id, userId, false);
   await model.setReviewRequests(project.id, userId, reviewRequests);
+}
+
+async function handleNewChannel(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  return respondWithForm(c, project, "review", "Add channel", (standalone) => (
+    <AddChannelForm project={project} kinds={messageKinds()} standalone={standalone} />
+  ));
+}
+
+/** A message channel of this project, or a 404 (git channels have their own form). */
+async function messageChannelOf(c: Context, project: Project): Promise<NotificationChannelRow> {
+  const channel = await notificationChannelModel().get(c.req.param("channelId") ?? "");
+  const found = channel && channel.projectId === project.id ? channel : undefined;
+  if (!found || NotificationChannelModel.isStateKind(getStore().notifiers, found.provider)) {
+    notFound("Channel not found");
+  }
+  return found;
+}
+
+/** The Edit form again, from what is stored or from what was typed and refused. */
+function editChannelAnswer(
+  c: Context,
+  project: Project,
+  channel: { id: string; provider: string; config: unknown },
+  state: ChannelFormState & { to?: string | undefined },
+  status: 200 | 400,
+): Response {
+  const kindName =
+    getStore().notifiers.find((entry) => entry.metadata.kind === channel.provider)?.metadata.name ??
+    channel.provider;
+  return respondWithForm(
+    c,
+    project,
+    "review",
+    "Edit channel",
+    (standalone) => (
+      <EditChannelForm
+        project={project}
+        channelId={channel.id}
+        kind={channel.provider}
+        kindName={kindName}
+        standalone={standalone}
+        state={state}
+      />
+    ),
+    status,
+  );
+}
+
+async function handleEditChannelForm(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  const channel = await messageChannelOf(c, project);
+  const config = NotificationChannelModel.configOf(channel);
+  return editChannelAnswer(
+    c,
+    project,
+    channel,
+    {
+      to: typeof config["to"] === "string" ? config["to"] : "",
+      events: NotificationChannelModel.eventsOf(channel).join(", "),
+      style: typeof config["style"] === "string" ? config["style"] : "compact",
+    },
+    200,
+  );
+}
+
+/** The refusal of an edit, or null when the edit is valid. */
+async function editRefusal(
+  channel: NotificationChannelRow,
+  config: Record<string, unknown>,
+  target: string,
+): Promise<string | null> {
+  const email = channel.provider === "email";
+  const checked = await NotificationChannelModel.validateInput(
+    getStore().notifiers,
+    channel.provider,
+    email ? config : { ...NotificationChannelModel.configOf(channel), ...config },
+    undefined,
+    email || target === "" ? undefined : target,
+  );
+  if (!checked.ok) {
+    return checked.message;
+  }
+  return email && target === "" ? "Enter an email address" : null;
+}
+
+/** Persist an edit: the config and events always, the secret only for a webhook kind with a new URL. */
+async function saveChannelEdit(
+  channel: NotificationChannelRow,
+  config: Record<string, unknown>,
+  form: FormData,
+  target: string,
+): Promise<void> {
+  const events = parseEvents(form);
+  await notificationChannelModel().update(channel.id, {
+    config,
+    ...(events ? { events } : {}),
+    ...(channel.provider === "email" || target === "" ? {} : { secret: target }),
+  });
+}
+
+async function handleEditChannel(c: Context): Promise<Response> {
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
+  return await applyEdit(c, project, await messageChannelOf(c, project));
+}
+
+async function applyEdit(
+  c: Context,
+  project: Project,
+  channel: NotificationChannelRow,
+): Promise<Response> {
+  const form = await c.req.formData();
+  const target = asString(form.get("target")) ?? "";
+  const config = channelConfig(channel.provider, target, form);
+  const problem = await editRefusal(channel, config, target);
+  if (problem !== null) {
+    return editChannelAnswer(c, project, channel, typedEdit(form, problem), 400);
+  }
+  await saveChannelEdit(channel, config, form, target);
+  flash(c, "Notification channel saved");
+  return hxRedirect(c, settingsHref(project.slug, "notifications"));
+}
+
+/** What the Edit form shows again after a refusal: the problem and what was typed. */
+function typedEdit(
+  form: FormData,
+  problem: string,
+): ChannelFormState & { to?: string | undefined } {
+  return {
+    errors: { target: problem },
+    to: asString(form.get("target")) ?? "",
+    events: asString(form.get("events")) ?? "",
+    style: asString(form.get("style")) ?? "compact",
+  };
 }

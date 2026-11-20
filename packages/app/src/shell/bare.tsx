@@ -15,7 +15,7 @@ const bareRoot = css`
   .bare__brand {
     display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: var(--space-3);
     color: var(--text-primary);
     font-size: var(--text-xl);
     font-weight: var(--weight-bold);
@@ -25,7 +25,7 @@ const bareRoot = css`
     display: inline-grid;
     place-items: center;
     width: 34px;
-    height: 34px;
+    height: var(--control-sm);
     border-radius: var(--radius);
     background: var(--accent);
     color: var(--accent-contrast);

@@ -5,8 +5,8 @@ const kbdKey = css`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.4rem;
-  padding: 0.05rem 0.35rem;
+  min-width: var(--space-5);
+  padding: 0 var(--space-1);
   border: 1px solid var(--border);
   border-bottom-width: 2px;
   border-radius: var(--radius-sm);
@@ -14,7 +14,7 @@ const kbdKey = css`
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  line-height: 1.3;
+  line-height: 1;
 `;
 
 /** Keyboard key chip: one key, or a sequence given as an array. */

@@ -118,6 +118,12 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "builds", column: "superseded_by_build_id", definition: "VARCHAR(26) NULL" },
   { table: "builds", column: "idempotency_key", definition: "VARCHAR(191) NULL" },
   { table: "builds", column: "manifest_sha256", definition: "VARCHAR(64) NULL" },
+  // Expand step (ADR 0053): a constant default, so the previous release keeps working against it.
+  {
+    table: "builds",
+    column: "retention_state",
+    definition: "VARCHAR(16) NOT NULL DEFAULT 'available'",
+  },
   { table: "projects", column: "cancel_superseded", definition: "TINYINT(1) NOT NULL DEFAULT 1" },
   {
     table: "notification_subscriptions",
@@ -288,7 +294,7 @@ async function ensureForeignKey(
   const parent = quote(foreignKey.parent);
   const parentColumn = quote(foreignKey.parentColumn);
   await run(
-    `ALTER TABLE ${table} ADD CONSTRAINT ${foreignKey.name} FOREIGN KEY (${column}) REFERENCES ${parent}(${parentColumn}) ON DELETE CASCADE`,
+    `ALTER TABLE ${table} ADD CONSTRAINT ${foreignKey.name} FOREIGN KEY (${column}) REFERENCES ${parent}(${parentColumn}) ON DELETE ${foreignKey.onDelete ?? "CASCADE"}`,
   );
 }
 
