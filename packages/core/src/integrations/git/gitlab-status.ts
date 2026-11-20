@@ -1,7 +1,7 @@
 import type { NotifierState } from "../../adapters/notifier/index.ts";
 import type { Logger } from "../../logger.ts";
 import { httpJson } from "../../utils/index.ts";
-import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
+import { apiBase, gitlabHeaders, projectRef } from "./gitlab-api.ts";
 import { mapState } from "./gitlab-mapper.ts";
 
 /** Coordinates and credential of one GitLab project. */
@@ -11,6 +11,8 @@ export interface GitLabProject {
   repo: string;
   /** GitLab host URL; `https://gitlab.com` when undefined. */
   host: string | undefined;
+  /** Numeric project id pinned by a repository link; requests use it instead of the path. */
+  projectId?: string | undefined;
   logger?: Logger | undefined;
 }
 
@@ -31,7 +33,7 @@ export async function postCommitStatus(
   },
 ): Promise<void> {
   const base = apiBase(project.host);
-  const pid = projectId(project.owner, project.repo);
+  const pid = projectRef(project);
   const state = mapState(input.state);
   project.logger?.debug({ context: input.context, sha: input.sha, state }, "posting commit status");
   try {

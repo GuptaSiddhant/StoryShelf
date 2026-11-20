@@ -18,6 +18,7 @@ export const gitLabNotifier: StateNotifierProvider = {
       owner: cfg.owner,
       repo: cfg.repo,
       host: cfg.host,
+      projectId: cfg.projectId,
       logger,
     };
     return createStateAdapter(
