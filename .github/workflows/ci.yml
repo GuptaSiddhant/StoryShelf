@@ -389,8 +389,8 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Verify (build + lint + link check)
-        # `website#verify` builds the docs site and runs its link check (dist/ stays for a11y).
+      - name: Verify (build + lint + link and llms checks)
+        # `website#verify` builds the docs site and runs its link and llms checks (dist/ stays for a11y).
         run: nubx turbo verify --filter=website
 
       - name: Check website accessibility (axe, light/dark/mobile)
