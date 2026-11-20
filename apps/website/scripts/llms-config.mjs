@@ -14,7 +14,7 @@ export const BUNDLES = [
     title: "StoryShelf: start here",
     about: "Start here, Concepts and the CLI: enough to set StoryShelf up in a repository.",
     groups: ["Start here", "Concepts", "CLI & changelog"],
-    // Long or specialised pages, still one link away in llms.txt: the budget leaves no room.
+    // Long or specialised pages, still one link away in llms.txt: the budget leaves no room. A new page in these groups can push the bundle over: add it here or shorten something, as check-llms.mjs says.
     exclude: [
       "/guides/chromatic-comparison/",
       "/guides/chromatic-migration/",
@@ -26,6 +26,7 @@ export const BUNDLES = [
       "/concepts/retention/",
       "/concepts/hosting-only/",
       "/concepts/labels/",
+      "/guides/support/",
     ],
     budget: 20_000,
   },
