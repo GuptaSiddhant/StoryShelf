@@ -64,6 +64,21 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 - **Inline/table/card actions use `size="sm"`** (32px). `md` (40px) is for
   standalone forms and page-header primary actions only.
 
+## Summaries, dialogs and options (ADR 0012, decision 10)
+
+- A settings or admin page lists what is configured with `SummaryList` (name, state badge, short
+  details, Edit/Remove) and an Add action; it never renders a multi-input form inline.
+  `consistency.test.ts` refuses one, bar its shrinking `INLINE_FORM_ALLOWANCE`: lower or delete an
+  entry when you move a form, never raise it.
+- **Dialog or page.** Short one-step forms open in a `Dialog`; long forms and flows that leave the
+  app stay on their page with a Back link. Every opener is a `DialogLink` (a real `href` plus
+  `hx-get`), so it works without JavaScript and from a pasted URL. The server answers an HTMX
+  request with the fragment and a plain one with the full page; saving sends `HX-Trigger:
+closeDialog` (plus a refresh) or `HX-Redirect`; 400/409/422 re-render inside the dialog.
+- **Options.** A form whose fields depend on a choice uses `OptionFields` (segmented or cards, up to
+  six options) and reads it with `parseOptionFields`, which validates the selected option only and
+  refuses another option's fields. Hidden groups are disabled by the shell script.
+
 ## Icons, tokens, and the shell
 
 - **Type and weight come from tokens.** `font-size` is always `var(--text-xs|sm|base|lg|xl|2xl)` and
@@ -89,14 +104,14 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   `styles.test.ts` enforces WCAG AA for the default themes.
 - **Breadcrumbs belong to the shell, not `PageHeader`.** Pass `nav.trail`
   (`{ label, href? }[]`) to `DocumentLayout`, ending with the current
-  page. The top bar renders `[project picker] › ancestors…` and *drops* the
+  page. The top bar renders `[project picker] › ancestors…` and _drops_ the
   current page — its heading names it, so never show a title in both places
   (on phones only the parent shows, as `‹ Parent`, and the project picker shrinks to its icon, keeping its chevron when there are several projects). Account, theme and collapse live in the sidebar footer.
 - **Chrome lives in `shell/`** (`sidebar`, `topbar`, `bare`, boot and
   client scripts, `document.tsx`, `csrf-field.tsx`), not in `ui/`: `ui/` is presentational and
   never imports `store.ts`, `routers/`, `middleware/`, `pages/` or core models (the consistency
   test fails if it does). A component that needs a URL or a token takes it as a prop. `DocumentLayout` takes `layout="default" | "wide" |
-  "bare"` (`bare` = sign-in/invite, no app chrome).
+"bare"` (`bare` = sign-in/invite, no app chrome).
 - **Review comparison:** swipe has a draggable `[data-compare-knob]` (pointer events + capture) mirrored into the `[data-compare-swipe]` range; zoom levels live in `ZOOMS` (`review-script.ts`) and `compare-stage.tsx` — keep them in sync, and keep zoomed images `image-rendering: pixelated`.
 - **The client script runs once per document.** HTMX `body` swaps re-execute
   inline scripts, so `shell/client-script.ts` guards on `window.__ssInit`:
@@ -105,11 +120,11 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   the top level of a re-executed script.
 - **Toasts come from the server.** On a successful mutation call
   `flash(c, "Saved")` (`routers/flash.ts`; `flashHx` for `/api/v1` routes so
-  JSON clients get no cookie) *before* the redirect/response — never on
+  JSON clients get no cookie) _before_ the redirect/response — never on
   validation failure. It sets a 60 s `storyshelf_flash` cookie that the
   shell script shows as a toast and clears, so it works for HTMX redirects,
   in-place swaps, and plain form posts. `data-toast`/`data-toast-tone` on a
-  form is the *optimistic* client variant, used only by review actions where
+  form is the _optimistic_ client variant, used only by review actions where
   an instant message matters more than server confirmation.
 - **Forms.** Use `Field`/`TextareaField`/`SelectField`/`CheckField`,
   `FormActions` for the button row, `hx-confirm` (HTMX) or `data-confirm`
@@ -128,7 +143,7 @@ mounted in `DocumentLayout` right after the token `<style>` tag) with
 - **One labeled template per variant.** Start each `css` template with a
   label comment (`/* btn-primary */`); it becomes the class-name prefix.
 - **Compose via `${base}` extension, never `cx` for variants.** `cx`
-  merges styles into a new *unlabeled* `css-<hash>` class and silently
+  merges styles into a new _unlabeled_ `css-<hash>` class and silently
   drops readability. Reserve `cx` for conditional plain strings only.
 - **`&` nesting for pseudo-states** (`&:hover`, `&:disabled`) at the end of
   the template (native nesting; valid in all supported browsers).
@@ -155,7 +170,9 @@ const meta: Meta = { title: "UI/Badge" };
 export default meta;
 
 export const Tones = jsxStory(() => (
-  <HStack><Badge tone="danger">Failed</Badge></HStack>
+  <HStack>
+    <Badge tone="danger">Failed</Badge>
+  </HStack>
 ));
 ```
 
@@ -183,7 +200,7 @@ export const Tones = jsxStory(() => (
   killing font stacks and every `[attr="…"]` selector. Global CSS goes
   through `dangerouslySetInnerHTML`; component CSS through hono/css `raw()`.
 - **HTMX swaps discard `<head>`.** Mutations return full documents with
-  `hx-target="body"`, so a class *first introduced by swapped content*
+  `hx-target="body"`, so a class _first introduced by swapped content_
   relies on hono/css's fallback append-script. The component set is nearly
   identical across states, so this is safe — but verify with the
   `storyshelf-css` collection test in `shell/document.test.ts` when adding a
