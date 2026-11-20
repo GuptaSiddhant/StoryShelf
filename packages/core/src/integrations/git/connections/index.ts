@@ -24,6 +24,15 @@ export {
   type InstallationLookup,
 } from "./installation.ts";
 export {
+  BROKEN_REASONS,
+  recheckLink,
+  resolveLinkCoverage,
+  type LinkConnection,
+  type LinkCoverage,
+  type LinkRecheck,
+  type LinkRepository,
+} from "./link-host.ts";
+export {
   githubAppManifest,
   manifestFormUrl,
   webHost,

@@ -14,6 +14,11 @@ export interface AppCredentials {
   apiUrl?: string | undefined;
   /** The App's private key (PEM); a one-line key with literal `\n` is accepted. */
   privateKey: string;
+  /**
+   * Numeric repository ids the token is limited to (`repository_ids`): a repository link pins the
+   * one it approved, so a repository re-created under the same name answers 404 (ADR 0054).
+   */
+  repositoryIds?: readonly string[] | undefined;
 }
 
 /** A cached installation token is replaced this long before GitHub expires it. */
@@ -53,7 +58,13 @@ async function exchange(creds: AppCredentials, key: string): Promise<string> {
   const jwt = signAppJwt(creds, Date.now());
   const response = await httpJson<{ token?: unknown; expires_at?: unknown }>(
     `${apiBase(creds.apiUrl)}/app/installations/${encodeURIComponent(creds.installationId)}/access_tokens`,
-    { method: "POST", headers: githubHeaders(jwt) },
+    {
+      method: "POST",
+      headers: githubHeaders(jwt),
+      ...(creds.repositoryIds === undefined
+        ? {}
+        : { json: { repository_ids: creds.repositoryIds.map(Number) } }),
+    },
   );
   if (typeof response.token !== "string" || typeof response.expires_at !== "string") {
     throw new TypeError("GitHub did not return an installation token");
@@ -65,7 +76,8 @@ async function exchange(creds: AppCredentials, key: string): Promise<string> {
 /** The cache key never holds the private key itself, only its digest. */
 function cacheKey(creds: AppCredentials): string {
   const digest = createHash("sha256").update(creds.privateKey).digest("hex").slice(0, 16);
-  return `${creds.apiUrl ?? ""}|${creds.appId}:${creds.installationId}:${digest}`;
+  const scope = creds.repositoryIds?.join(",") ?? "*";
+  return `${creds.apiUrl ?? ""}|${creds.appId}:${creds.installationId}:${scope}:${digest}`;
 }
 
 /** An App JWT (RS256), valid for nine minutes; `now` is in milliseconds. */

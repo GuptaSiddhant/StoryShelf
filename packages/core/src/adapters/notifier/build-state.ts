@@ -8,6 +8,7 @@
 import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import type { UrlBuilder } from "../../urls.ts";
 import { buildCommentMarkdown } from "./build-comment.ts";
+import type { StateOutputs } from "./outputs.ts";
 import type { NotifierState, StateAnnotation } from "./types.ts";
 
 /** Most per-snapshot annotations a build state carries; the rest are counted (`omitted`). */
@@ -101,6 +102,11 @@ export interface BuildStateInput {
    * `cancelled` outcome, described `Superseded by <short sha>`, and the comment links that build.
    */
   supersededBy?: { id: string; sha: string } | undefined;
+  /**
+   * What the target posts besides the gate (ADR 0054, decision 10): a repository link's choices
+   * within its connection's ceiling. Absent (a per-project channel) posts everything.
+   */
+  outputs?: StateOutputs | undefined;
 }
 
 /** One commit status to show. */
@@ -140,12 +146,45 @@ export interface BuildStateSet {
   comment: DesiredComment | null;
 }
 
-/** Statuses and comment for a build; empty without a real commit (no SHA or a local identity). */
+/**
+ * Statuses and comment for a build; empty without a real commit (no SHA or a local identity). The
+ * gate is always there; the Storybook status, the annotations and the comment follow `outputs`.
+ */
 export function statusesForBuild(input: BuildStateInput): BuildStateSet {
   const { build } = input;
   if (build.gitSha.length === 0 || build.gitSha.startsWith(LOCAL_SHA_PREFIX)) {
     return { statuses: [], comment: null };
   }
+  return withOutputs(allStates(input), input);
+}
+
+/** Drop what the target does not post; the gate always stays. */
+function withOutputs(states: BuildStateSet, input: BuildStateInput): BuildStateSet {
+  const { outputs } = input;
+  if (outputs === undefined) {
+    return states;
+  }
+  const statuses = states.statuses
+    .filter((status) => outputs.storybook || status.name !== "storybook")
+    .map((status) => (outputs.annotations ? status : withoutAnnotations(status)));
+  return { statuses, comment: commentWanted(outputs, input.build) ? states.comment : null };
+}
+
+function withoutAnnotations(status: DesiredStatus): DesiredStatus {
+  const { annotations: _annotations, omitted: _omitted, ...rest } = status;
+  return rest;
+}
+
+/** `on-changes` keeps the comment only for a build with visual changes to review. */
+function commentWanted(outputs: StateOutputs, build: BuildStateBuild): boolean {
+  return (
+    outputs.comment === "always" || (outputs.comment === "on-changes" && build.changedCount > 0)
+  );
+}
+
+/** Everything a target that posts every output shows. */
+function allStates(input: BuildStateInput): BuildStateSet {
+  const { build } = input;
   const links = linksOf(input);
   if (build.status === "skipped") {
     return skippedState(input, links);

@@ -1,5 +1,5 @@
 import { httpJson } from "../../utils/index.ts";
-import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
+import { apiBase, gitlabHeaders, projectRef } from "./gitlab-api.ts";
 import type { GitLabProject } from "./gitlab-status.ts";
 
 /** Branches read per page of GitLab's commit refs. */
@@ -38,7 +38,7 @@ export async function commitOnBranch(
 
 async function refsPage(project: GitLabProject, sha: string, page: number): Promise<RefEntry[]> {
   const base = apiBase(project.host);
-  const pid = projectId(project.owner, project.repo);
+  const pid = projectRef(project);
   const query = `type=branch&per_page=${String(PER_PAGE)}&page=${String(page)}`;
   const answer = await httpJson<unknown>(
     `${base}/api/v4/projects/${pid}/repository/commits/${encodeURIComponent(sha)}/refs?${query}`,

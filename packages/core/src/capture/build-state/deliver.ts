@@ -18,11 +18,13 @@ import type { Project } from "../../schema/project.ts";
 import type { Snapshot } from "../../schema/snapshot.ts";
 import { createUrlBuilder } from "../../urls.ts";
 import { publishingOfBuild } from "../publish/published.ts";
-import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
+import { deliverToLink, linkTargets } from "./link-target.ts";
+import type { BuildStateDeps, SkipReason, StateTarget, TargetRef } from "./types.ts";
 
 /**
- * Show the build's current state on one channel. Throws when the host refuses a status, so the
- * caller can retry; resolves to why nothing was written when the build or channel is gone.
+ * Show the build's current state on one channel or repository link. Throws when the host refuses a
+ * status, so the caller can retry; resolves to why nothing was written when the build or channel is
+ * gone, or the link does not post.
  *
  * With a `signal`, an aborted one (the attempt's deadline passed, so a redelivery may be running)
  * stops the delivery before the status is written: the build is read again by that redelivery,
@@ -30,7 +32,7 @@ import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
  */
 export async function deliverBuildState(
   deps: BuildStateDeps,
-  ids: { buildId: string; channelId: string },
+  ids: { buildId: string } & TargetRef,
   signal?: AbortSignal,
 ): Promise<"delivered" | SkipReason> {
   const loaded = await loadBuild(deps, ids.buildId);
@@ -39,11 +41,25 @@ export async function deliverBuildState(
   if (loaded === null || !origin) {
     return loaded === null ? "no-build" : "no-origin";
   }
-  const target = await loadTarget(deps, ids.channelId, loaded.project.id);
+  const write = async (target: StateTarget): Promise<void> => {
+    await writeTo(deps, loaded, { target, origin, signal });
+  };
+  return "linkId" in ids
+    ? await deliverToLink(deps, loaded, { linkId: ids.linkId, write })
+    : await deliverToChannel(deps, loaded, { channelId: ids.channelId, write });
+}
+
+/** Write through a per-project channel; resolves to why not when it cannot take part. */
+async function deliverToChannel(
+  deps: BuildStateDeps,
+  loaded: { build: Build; project: Project },
+  where: { channelId: string; write: (target: StateTarget) => Promise<void> },
+): Promise<"delivered" | SkipReason> {
+  const target = await loadTarget(deps, where.channelId, loaded.project.id);
   if (typeof target === "string") {
     return target;
   }
-  await writeTo(deps, loaded, { target, origin, signal });
+  await where.write(target);
   return "delivered";
 }
 
@@ -76,6 +92,7 @@ export async function writeTo(
     approvals: await approvalsOf(deps, build, project),
     changes: await changesOf(deps, build, project),
     supersededBy: await supersededByOf(deps, build),
+    outputs: target.link?.outputs,
   });
   if (states.statuses.length === 0) {
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
@@ -91,8 +108,8 @@ export async function writeTo(
   });
 }
 
-/** What reading a project's git channels needs. */
-export type ChannelDeps = Pick<BuildStateDeps, "db" | "notifiers" | "secret"> & {
+/** What reading a project's git channels (and, with connections, its approved links) needs. */
+export type ChannelDeps = Pick<BuildStateDeps, "db" | "notifiers" | "secret" | "gitConnections"> & {
   logger?: BuildStateDeps["logger"] | undefined;
 };
 
@@ -113,8 +130,20 @@ async function skipSourceOf(deps: BuildStateDeps, build: Build): Promise<BuildSt
   };
 }
 
-/** The project's enabled channels with a wired `state` provider; unreadable secrets are logged and skipped. */
+/**
+ * Every git target of the project: its enabled channels and its approved repository links (those
+ * that can be reached now; a link that cannot is logged and left out).
+ */
 export async function stateTargets(deps: ChannelDeps, projectId: string): Promise<StateTarget[]> {
+  const [channels, links] = await Promise.all([
+    channelTargets(deps, projectId),
+    linkTargets(deps, projectId),
+  ]);
+  return [...channels, ...links];
+}
+
+/** The project's enabled channels with a wired `state` provider; unreadable secrets are logged and skipped. */
+export async function channelTargets(deps: ChannelDeps, projectId: string): Promise<StateTarget[]> {
   const model = channelModel(deps);
   const rows = await model.list(projectId);
   return rows.flatMap((row) => {

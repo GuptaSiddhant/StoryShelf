@@ -171,9 +171,20 @@ export {
   anyRepositoryLinkAllowed,
   GIT_LINK_ANY_REPOSITORY_KEY,
   GitRepositoryLinkModel,
+  linkOutputsOf,
+  type GitLinkChange,
+  type GitLinkPins,
   type GitRepositoryLinkInput,
   type GitRepositoryLinkTables,
 } from "./git-repository-link.ts";
+export { connectionHost, linkKeyOf, type LinkKey } from "./git-link-key.ts";
+export { GitLinkStateError } from "./git-link-state-error.ts";
+export {
+  CONNECTION_REMOVED_REASON,
+  syncConfiguredLinks,
+  type GitLinkSyncDeps,
+  type GitLinkSyncResult,
+} from "./git-link-sync.ts";
 export { GitRepositoryTakenError } from "./git-repository-taken-error.ts";
 export {
   GitConnectionModel,

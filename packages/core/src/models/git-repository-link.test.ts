@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
+import { GitLinkStateError } from "./git-link-state-error.ts";
 import {
   anyRepositoryLinkAllowed,
   GIT_LINK_ANY_REPOSITORY_KEY,
   GitRepositoryLinkModel,
+  linkOutputsOf,
 } from "./git-repository-link.ts";
 import { GitRepositoryTakenError } from "./git-repository-taken-error.ts";
 import { NotificationChannelModel } from "./notification-channel.ts";
@@ -88,6 +90,133 @@ describe("GitRepositoryLinkModel", () => {
       GitRepositoryTakenError,
     );
     await expect(model.create({ ...INPUT, host: "gitlab.com" })).resolves.toBeDefined();
+  });
+});
+
+async function pending() {
+  const { db } = makeDatabase();
+  const model = new GitRepositoryLinkModel(db);
+  return { db, model, link: await model.create(INPUT) };
+}
+
+describe("GitRepositoryLinkModel transitions", () => {
+  it("approves a pending link, pinning the repository and installation", async () => {
+    const { model, link } = await pending();
+    const approved = await model.approve(
+      link.id,
+      { hostRepositoryId: "42", installationId: "7" },
+      "admin",
+    );
+    expect(approved).toMatchObject({
+      state: "approved",
+      hostRepositoryId: "42",
+      installationId: "7",
+      approvedBy: "admin",
+      reason: null,
+    });
+    expect(approved.approvedAt).not.toBeNull();
+    await expect(model.approve(link.id, { hostRepositoryId: "42" }, "admin")).rejects.toThrow(
+      GitLinkStateError,
+    );
+  });
+
+  it("refuses only a pending link and keeps the record", async () => {
+    const { model, link } = await pending();
+    expect(await model.refuse(link.id, "not ours")).toMatchObject({
+      state: "refused",
+      reason: "not ours",
+    });
+    await expect(model.approve(link.id, { hostRepositoryId: "1" }, "a")).rejects.toMatchObject({
+      state: "refused",
+    });
+    expect(await model.get(link.id)).toMatchObject({ state: "refused" });
+  });
+
+  it("breaks only an approved link, and a reconnect or restore approves it again", async () => {
+    const { model, link } = await pending();
+    expect(await model.markBroken(link.id, "gone")).toBeNull();
+    await model.approve(link.id, { hostRepositoryId: "42", installationId: "7" }, "a");
+    expect(await model.markBroken(link.id, "uninstalled")).toMatchObject({
+      state: "broken",
+      reason: "uninstalled",
+    });
+    expect(await model.restore(link.id)).toMatchObject({
+      state: "approved",
+      reason: null,
+      hostRepositoryId: "42",
+    });
+    await model.markBroken(link.id, "again");
+    expect(await model.approve(link.id, { hostRepositoryId: "43" }, "b")).toMatchObject({
+      state: "approved",
+      hostRepositoryId: "43",
+      installationId: null,
+    });
+    await expect(model.restore(link.id)).rejects.toThrow(GitLinkStateError);
+    expect(await model.markBroken("missing", "x")).toBeNull();
+  });
+
+  it("pins only an approved link", async () => {
+    const { model, link } = await pending();
+    expect(await model.pin(link.id, { hostRepositoryId: "1" })).toBeNull();
+    await model.approve(link.id, { hostRepositoryId: "1", installationId: "2" }, "a");
+    expect(await model.pin(link.id, { hostRepositoryId: "1", installationId: "3" })).toMatchObject({
+      installationId: "3",
+    });
+  });
+
+  it("returns an approved link to pending when its repository, connection or prefix changes", async () => {
+    const { model, link } = await pending();
+    const pins = { hostRepositoryId: "42", installationId: "7" };
+    await model.approve(link.id, pins, "a");
+    expect(await model.change(link.id, { owner: "ACME", repo: "web" })).toMatchObject({
+      state: "approved",
+    });
+    expect(await model.change(link.id, { repo: "Other" })).toMatchObject({
+      state: "pending",
+      repo: "other",
+      hostRepositoryId: null,
+      installationId: null,
+      approvedBy: null,
+      approvedAt: null,
+    });
+    await model.approve(link.id, pins, "a");
+    expect(await model.change(link.id, { connectionId: "c2" })).toMatchObject({
+      state: "pending",
+      connectionId: "c2",
+    });
+    await model.approve(link.id, pins, "a");
+    expect(await model.change(link.id, { prefix: "e2e" })).toMatchObject({
+      state: "pending",
+      prefix: "e2e",
+    });
+  });
+
+  it("refuses a change onto a key another link holds, and a change of a missing link", async () => {
+    const { model, link } = await pending();
+    await model.create({ ...INPUT, repo: "api" });
+    await expect(model.change(link.id, { repo: "api" })).rejects.toThrow(GitRepositoryTakenError);
+    await expect(model.change("missing", { repo: "x" })).rejects.toThrow(GitLinkStateError);
+  });
+
+  it("creates a link already approved, lists by state, stores outputs and removes", async () => {
+    const { model, link } = await pending();
+    const assigned = await model.create({ ...INPUT, repo: "api" }, { approvedBy: "admin" });
+    expect(assigned).toMatchObject({ state: "approved", approvedBy: "admin" });
+    expect((await model.listAll("pending")).map((row) => row.id)).toEqual([link.id]);
+    expect(await model.listAll()).toHaveLength(2);
+    expect(linkOutputsOf(link)).toEqual({ storybook: true, comment: "always", annotations: true });
+    const stored = await model.setOutputs(link.id, {
+      storybook: false,
+      comment: "on-changes",
+      annotations: false,
+    });
+    expect(linkOutputsOf(stored)).toEqual({
+      storybook: false,
+      comment: "on-changes",
+      annotations: false,
+    });
+    await model.remove(link.id);
+    expect(await model.get(link.id)).toBeNull();
   });
 });
 
