@@ -4,7 +4,12 @@ import type { DesignProvider } from "../adapters/design.ts";
 import type { IntegrationAvailability } from "../adapters/metadata.ts";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import { makeFakeDesign } from "../test-helpers/fake-design.ts";
-import { availabilityOf, offerIntegrations, TURNED_OFF_REASON } from "./availability.ts";
+import {
+  availabilityOf,
+  CHECK_FAILED_REASON,
+  offerIntegrations,
+  TURNED_OFF_REASON,
+} from "./availability.ts";
 import { BUILT_IN_INTEGRATIONS } from "./built-in.ts";
 
 function notifier(kind: string, availability?: () => IntegrationAvailability): NotifierProvider {
@@ -28,27 +33,27 @@ describe("availabilityOf", () => {
     });
   });
 
-  it("reads a throwing check as unavailable with its message", () => {
+  it("reads a throwing check as unavailable with a fixed reason", () => {
     const broken = notifier("email", () => {
       throw new Error("boom");
     });
-    expect(availabilityOf(broken)).toEqual({ unavailable: "boom" });
+    expect(availabilityOf(broken)).toEqual({ unavailable: CHECK_FAILED_REASON });
     const odd = notifier("email", () => {
       // oxlint-disable-next-line no-throw-literal -- a JavaScript provider can throw anything
       throw "odd";
     });
-    expect(availabilityOf(odd)).toEqual({ unavailable: "odd" });
+    expect(availabilityOf(odd)).toEqual({ unavailable: CHECK_FAILED_REASON });
   });
 
-  it("redacts and bounds a thrown message: it reaches project admins (#1126)", () => {
+  it("never carries exception text: it reaches project admins (#1126)", () => {
     const leaky = notifier("email", () => {
-      throw new Error(`smtp://mail:hunter2@relay.example failed; token=abc123 ${"x".repeat(400)}`);
+      throw new Error("relay refused Authorization: Bearer abc123; smtp://mail:hunter2@relay");
     });
     const result = availabilityOf(leaky);
     const reason = result === "available" ? "" : result.unavailable;
-    expect(reason).not.toContain("hunter2");
+    expect(reason).toBe(CHECK_FAILED_REASON);
     expect(reason).not.toContain("abc123");
-    expect(reason.length).toBeLessThanOrEqual(200);
+    expect(reason).not.toContain("hunter2");
   });
 });
 

@@ -18,6 +18,7 @@ import {
 export { BUILT_IN_INTEGRATIONS, type BuiltInIntegrations } from "./built-in.ts";
 export {
   availabilityOf,
+  CHECK_FAILED_REASON,
   offerIntegrations,
   TURNED_OFF_REASON,
   type IntegrationState,
