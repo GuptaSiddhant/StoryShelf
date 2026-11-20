@@ -232,7 +232,7 @@ describe("a remote CDP target", () => {
     );
     expect(fake.state.connects[0]).toMatchObject({
       browserWSEndpoint: "wss://farm.example/?token=sekret-key",
-      headers: { authorization: "Bearer sekret-token" },
+      wsOptions: { headers: { authorization: "Bearer sekret-token" } },
     });
     expect(fake.state.gotos[0]?.startsWith(`${URL_BASE}/iframe.html?`)).toBe(true);
     expect(fake.state.gotos.some((url) => url.includes("127.0.0.1"))).toBe(false);
