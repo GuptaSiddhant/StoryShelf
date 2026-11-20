@@ -558,6 +558,43 @@ CREATE TABLE IF NOT EXISTS content_uses (
   PRIMARY KEY (build_id, content_hash)
 );
 CREATE INDEX content_uses_hash_idx ON content_uses (content_hash);
+CREATE TABLE IF NOT EXISTS git_connections (
+  id VARCHAR(64) PRIMARY KEY,
+  provider VARCHAR(32) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  api_base TEXT,
+  config TEXT NOT NULL,
+  secret_encrypted TEXT,
+  created_by VARCHAR(64),
+  state VARCHAR(32) NOT NULL DEFAULT 'active',
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL
+);
+CREATE TABLE IF NOT EXISTS git_repository_links (
+  id VARCHAR(64) PRIMARY KEY,
+  project_id VARCHAR(64) NOT NULL,
+  connection_id VARCHAR(64) NOT NULL,
+  host VARCHAR(255) NOT NULL,
+  owner VARCHAR(128) NOT NULL,
+  repo VARCHAR(128) NOT NULL,
+  host_repository_id VARCHAR(128),
+  prefix VARCHAR(64) NOT NULL DEFAULT '',
+  state VARCHAR(32) NOT NULL DEFAULT 'pending',
+  reason TEXT,
+  outputs TEXT NOT NULL,
+  installation_id VARCHAR(64),
+  requested_by VARCHAR(64),
+  approved_by VARCHAR(64),
+  approved_at DATETIME(3),
+  last_delivered_at DATETIME(3),
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  CONSTRAINT fk_git_repository_links_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_git_repository_links_connection_id FOREIGN KEY (connection_id) REFERENCES git_connections(id)
+);
+CREATE UNIQUE INDEX git_repository_links_repository_idx ON git_repository_links (host, owner, repo, prefix);
+CREATE INDEX git_repository_links_project_id_idx ON git_repository_links (project_id);
+CREATE INDEX git_repository_links_connection_id_idx ON git_repository_links (connection_id);
 CREATE TABLE IF NOT EXISTS \`user\` (
   id VARCHAR(64) PRIMARY KEY,
   name TEXT NOT NULL,

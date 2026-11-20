@@ -6,7 +6,7 @@ import {
   signAppJwt,
   TOKEN_REFRESH_MARGIN_MS,
 } from "./github-app.ts";
-import { stubFetch } from "./test-fetch.ts";
+import { bodyOf, stubFetch } from "./test-fetch.ts";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./test-key.ts";
 
 const privateKey = TEST_PRIVATE_KEY;
@@ -87,6 +87,16 @@ describe("installationToken", () => {
       "https://api.github.com/app/installations/456/access_tokens",
       "https://api.github.com/app/installations/789/access_tokens",
     ]);
+  });
+
+  it("limits the token to pinned repository ids and caches it apart", async () => {
+    const calls = stubFetch(respond("2026-01-01T01:00:00Z"));
+    await installationToken(creds);
+    await installationToken({ ...creds, repositoryIds: ["42"] });
+    await installationToken({ ...creds, repositoryIds: ["42"] });
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.init.body).toBeUndefined();
+    expect(bodyOf(calls[1])).toEqual({ repository_ids: [42] });
   });
 
   it("fails when GitHub answers without a token", async () => {

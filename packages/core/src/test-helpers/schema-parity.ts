@@ -451,6 +451,8 @@ export const CORE_ROW_TABLES: CoreRowTables = {
   DesignLink: "design_links",
   DesignCredential: "design_credentials",
   DesignNode: "design_nodes",
+  GitConnectionRow: "git_connections",
+  GitRepositoryLinkRow: "git_repository_links",
   InsightRow: "insights",
   AiUsageRow: "ai_usage",
   AiBudgetAlertRow: "ai_budget_alerts",
