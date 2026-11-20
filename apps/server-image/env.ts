@@ -129,7 +129,16 @@ function rdsIamOptions(env: Env): RdsIamDatabaseOptions {
     throw new Error(`RDS IAM login is configured but ${missing.join(", ")} is missing`);
   }
   const port = positiveIntFromEnv(env, "DATABASE_IAM_PORT", 65_535);
-  return { host, user, database, region, ...(port === undefined ? {} : { port }) };
+  // The server certificate is always verified: the bundled RDS roots, or `DATABASE_CA` when set.
+  const ca = databaseCaFromEnv(env);
+  return {
+    host,
+    user,
+    database,
+    region,
+    ...(port === undefined ? {} : { port }),
+    ...(ca === undefined ? {} : { ca }),
+  };
 }
 
 /** The RDS IAM database the `DATABASE_IAM_*` variables describe; never combined with `DATABASE_URL`, never a fallback. */

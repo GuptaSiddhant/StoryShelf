@@ -93,6 +93,17 @@ describe("databaseFromEnv with DATABASE_IAM_HOST", () => {
     });
   });
 
+  it("verifies the IAM database against DATABASE_CA when set, else the bundled RDS roots", () => {
+    const { set, as } = factories();
+    databaseFromEnv({ ...iam, DATABASE_CA: "PEM" }, "/data", as);
+    expect(set.rdsIam).toHaveBeenLastCalledWith(expect.objectContaining({ ca: "PEM" }));
+    databaseFromEnv(iam, "/data", as);
+    expect(set.rdsIam.mock.lastCall?.[0]).not.toHaveProperty("ca");
+    expect(() =>
+      databaseFromEnv({ ...iam, DATABASE_CA: "a", DATABASE_CA_FILE: "/b" }, "/data", as),
+    ).toThrow("Set only one of DATABASE_CA and DATABASE_CA_FILE");
+  });
+
   it("refuses to boot when a variable is missing, naming it", () => {
     const { set, as } = factories();
     expect(() =>
