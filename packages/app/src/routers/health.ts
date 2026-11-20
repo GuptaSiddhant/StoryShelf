@@ -12,6 +12,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe } from "../credentials.ts";
 import { getStore, testingEnabled } from "../store.ts";
 import { collectHealthReport, type AdapterState } from "./health-report.ts";
+import { collectStatusRows, type StatusRow } from "./health-status.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 
 /** Dependencies for the health routes (no adapter I/O on the GET path). */
@@ -47,6 +48,8 @@ export interface AdapterReport {
 export interface ReadinessBody {
   status: "ok" | "starting" | "degraded";
   adapters: AdapterReport[];
+  /** Informational rows (telemetry, image engine, origin, hosting); never change `status`. */
+  statuses: StatusRow[];
 }
 
 /** Register `GET /api/v1/health` (open liveness) and `POST` (authed deep readiness). */
@@ -65,13 +68,14 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
 
   app.post("/api/v1/health", async (c) => {
     requireSiteAdmin(c);
-    const { db, config } = getStore();
+    const { db, config, publicOrigin } = getStore();
     const report = await collectHealthReport(
       deps.sources,
       deps.getSettled(),
       deps.bootTimeMs,
       deps.version,
       await loadCredentialProbe(db, config),
+      await collectStatusRows({ env: process.env, config, publicOrigin }),
     );
     const adapters: AdapterReport[] = report.adapters.map((adapter) => {
       const entry: AdapterReport = {
@@ -88,7 +92,7 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
       }
       return entry;
     });
-    const body: ReadinessBody = { status: report.status, adapters };
+    const body: ReadinessBody = { status: report.status, adapters, statuses: report.statuses };
     c.header("Cache-Control", "no-store");
     return c.json(body, body.status === "ok" ? 200 : 503);
   });

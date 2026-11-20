@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { Auth } from "@storyshelf/core/auth";
-import { ProjectModel } from "@storyshelf/core/models";
+import { type CredentialProbe, ProjectModel } from "@storyshelf/core/models";
 import { describeCaptureHost } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
@@ -15,6 +15,7 @@ import { getStore } from "../store.ts";
 import { runnerTargets } from "../targets.ts";
 import { flash } from "./flash.ts";
 import { collectHealthReport } from "./health-report.ts";
+import { collectStatusRows } from "./health-status.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 
@@ -26,19 +27,29 @@ export interface AdminPageDeps {
   version: string;
 }
 
+/** The full report with the admin-only status rows. */
+async function adminReport(
+  deps: AdminPageDeps,
+  credentials: CredentialProbe | null,
+): ReturnType<typeof collectHealthReport> {
+  const { config, publicOrigin } = getStore();
+  return await collectHealthReport(
+    deps.sources,
+    deps.getSettled(),
+    deps.bootTimeMs,
+    deps.version,
+    credentials,
+    await collectStatusRows({ env: process.env, config, publicOrigin }),
+  );
+}
+
 /** Register the site-admin System page (adapter inventory + in-depth health). */
 export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?: Auth): void {
   app.get("/admin", async (c) => {
     requireSiteAdmin(c);
     const { authEnabled, config, db, capturesHere, captureConcurrency, testing } = getStore();
     const credentials = await loadCredentialProbe(db, config);
-    const report = await collectHealthReport(
-      deps.sources,
-      deps.getSettled(),
-      deps.bootTimeMs,
-      deps.version,
-      credentials,
-    );
+    const report = await adminReport(deps, credentials);
     const authMethods = auth?.loginMethods().map((method) => method.label);
     c.header("Cache-Control", "no-store");
     return c.html(

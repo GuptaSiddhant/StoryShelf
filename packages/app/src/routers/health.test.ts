@@ -182,4 +182,38 @@ describe("health endpoints", () => {
     const response = await app.request("/api/v1/health", { method: "POST" });
     expect(response.status).toBe(200);
   });
+  it("POST /api/v1/health adds the AI probe and the status rows; GET gains neither", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const ai = { health: async () => ({ ok: true }), setup: async () => {} };
+    const app = createShelfApp({
+      database: db,
+      storage,
+      auth: adminAuth,
+      ai: ai as never,
+      logger: silentLogger,
+    });
+    await app.lifecycle.setup();
+    const deep = (await (await app.request("/api/v1/health", { method: "POST" })).json()) as {
+      adapters: { category: string; kind: string; state: string }[];
+      statuses: { id: string }[];
+    };
+    expect(deep.adapters).toContainEqual(
+      expect.objectContaining({ category: "ai", kind: "ai", state: "ok" }),
+    );
+    expect(deep.statuses.map((row) => row.id)).toEqual([
+      "telemetry",
+      "image-engine",
+      "public-origin",
+      "hosting",
+    ]);
+    const open = await (await app.request("/api/v1/health")).json();
+    expect(Object.keys(open as object).toSorted()).toEqual([
+      "auth",
+      "status",
+      "testing",
+      "uptimeSecs",
+      "version",
+    ]);
+  });
 });
