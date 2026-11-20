@@ -48,7 +48,9 @@ describe("providerChecksOf", () => {
   });
 
   it("is ok when the discovery document names an issuer, and says only the origin", async () => {
-    const fetchMock = vi.fn(async () => Response.json({ issuer: "https://idp.acme.example" }));
+    const fetchMock = vi.fn(async (_url: string) =>
+      Response.json({ issuer: "https://idp.acme.example" }),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const [check] = providerChecksOf(options({ sso: { providers: [sso] } }));
     const result = await check?.check();
