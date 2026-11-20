@@ -6,12 +6,11 @@
  * one (tokens live 15 minutes). Credentials come from the standard AWS chain (ECS task role,
  * instance role, web identity). Requires the optional `pg` and `@aws-sdk/rds-signer` peers.
  *
- * The server certificate is always verified, against the bundled Amazon RDS root certificates (GovCloud's for `us-gov-*`) or the
- * `ca` you give. The IAM token is a credential, so the preset never connects encrypted but
- * unverified unless `verifyServerCertificate: false` asks for it, and that logs a warning.
+ * The server certificate is always verified, against the bundled Amazon RDS root certificates
+ * (GovCloud's for `us-gov-*`) or the `ca` you give. The IAM token is a credential, so the preset
+ * never connects encrypted but unverified, and there is no option to ask for that.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import type { Logger } from "@storyshelf/core/logger";
 import { redactSecrets } from "@storyshelf/core/utils";
 import { createPgDatabase } from "./pg.ts";
 import { caBundleFor } from "./rds-ca-bundle.ts";
@@ -34,12 +33,6 @@ export interface RdsIamDatabaseOptions {
    * or a certificate AWS has not bundled yet. The server certificate is verified against them.
    */
   ca?: string | string[];
-  /**
-   * Set `false` to connect encrypted but without checking the server certificate. Off by default
-   * and logged as a warning: anyone who can intercept the connection can then take the IAM token.
-   * Ignored when `ca` is given, which always verifies.
-   */
-  verifyServerCertificate?: boolean;
   max?: number;
   idleTimeoutMillis?: number;
   connectionTimeoutMillis?: number;
@@ -57,7 +50,7 @@ const INSTALL_HINT =
  * @returns A DatabaseAdapter whose every new connection authenticates with a fresh IAM token.
  */
 export function createRdsIamDatabase(options: RdsIamDatabaseOptions): DatabaseAdapter {
-  const adapter = createPgDatabase({
+  return createPgDatabase({
     host: options.host,
     port: options.port ?? 5432,
     database: options.database,
@@ -68,66 +61,24 @@ export function createRdsIamDatabase(options: RdsIamDatabaseOptions): DatabaseAd
     idleTimeoutMillis: options.idleTimeoutMillis,
     connectionTimeoutMillis: options.connectionTimeoutMillis,
   });
-  return skipsVerification(options) ? warnWhenUnverified(adapter) : adapter;
 }
 
-/** Whether the options opt out of verifying the server certificate (and give no `ca` to verify by). */
-function skipsVerification(options: RdsIamDatabaseOptions): boolean {
-  return options.verifyServerCertificate === false && options.ca === undefined;
-}
-
-/** TLS settings: verified against `ca` or the bundled RDS roots; unverified only on an explicit opt-out. */
+/** TLS settings: always verified, against `ca` or the bundled RDS roots for the region. */
 function sslOf(options: RdsIamDatabaseOptions): {
-  ca?: string | string[];
-  rejectUnauthorized: boolean;
+  ca: string | string[];
+  rejectUnauthorized: true;
 } {
-  if (skipsVerification(options)) {
-    return { rejectUnauthorized: false };
+  if (options.ca !== undefined && isBlank(options.ca)) {
+    throw new Error(
+      "rds-iam: `ca` is empty; pass the PEM certificate(s) or omit it for the bundled RDS roots",
+    );
   }
   return { ca: options.ca ?? caBundleFor(options.region), rejectUnauthorized: true };
 }
 
-const UNVERIFIED_WARNING =
-  "rds-iam: verifyServerCertificate is false; the connection is encrypted but the database server is not verified, so a network attacker can take the IAM token. Remove the option to verify against the bundled Amazon RDS roots, or pass `ca`.";
-
-/**
- * Log the opt-out once, with the host's logger (bound by `setLogger` or handed to `setup`). The
- * result inherits from the adapter instead of copying it: its retention capability is a live getter
- * and its own properties are fixed, so a copy would freeze the one and could not replace the other.
- */
-function warnWhenUnverified(adapter: DatabaseAdapter): DatabaseAdapter {
-  let warned = false;
-  const warn = (logger: Logger | undefined): void => {
-    if (!warned && logger !== undefined) {
-      warned = true;
-      logger.warn(UNVERIFIED_WARNING);
-    }
-  };
-  const { lifecycle } = adapter;
-  const wrapped: PropertyDescriptorMap = {
-    setLogger: {
-      enumerable: true,
-      value: (logger: Logger): void => {
-        adapter.setLogger?.(logger);
-        warn(logger);
-      },
-    },
-  };
-  if (lifecycle !== undefined) {
-    wrapped["lifecycle"] = {
-      enumerable: true,
-      value: {
-        ...lifecycle,
-        setup: async (
-          context: Parameters<NonNullable<typeof lifecycle.setup>>[0],
-        ): Promise<void> => {
-          warn(context.logger);
-          await lifecycle.setup?.(context);
-        },
-      },
-    };
-  }
-  return Object.create(adapter, wrapped) as DatabaseAdapter;
+/** A `ca` with no certificate text would leave the server unverified against anything useful. */
+function isBlank(ca: string | string[]): boolean {
+  return (Array.isArray(ca) ? ca : [ca]).every((pem) => pem.trim() === "");
 }
 
 /** The password function `pg` calls per connection: a fresh token, never cached, never in errors. */

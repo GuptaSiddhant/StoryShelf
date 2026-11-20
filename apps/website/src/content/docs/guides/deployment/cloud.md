@@ -87,6 +87,8 @@ DATABASE_CA_FILE=/run/secrets/database-ca.pem   # or DATABASE_CA with the PEM te
 
 Set one of `DATABASE_CA` (PEM text) or `DATABASE_CA_FILE` (a path); setting both stops the server at startup. The CA is used for MySQL (`mysql://`) the same way. Without either, the server starts as before, and with `sslmode=require`, `prefer` or `allow` it logs one warning that the certificate is not verified. It never refuses to start over it.
 
+With `DATABASE_IAM_*` (RDS or Aurora with IAM tokens) the certificate is always verified, because the IAM token is a credential: against the Amazon RDS root certificates the image bundles, or against `DATABASE_CA` / `DATABASE_CA_FILE` when set (for an RDS Proxy or a custom domain). There is no setting that encrypts without verifying.
+
 Where the CA comes from:
 
 - **AWS RDS:** the [regional or global certificate bundle](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html) (`global-bundle.pem`).
