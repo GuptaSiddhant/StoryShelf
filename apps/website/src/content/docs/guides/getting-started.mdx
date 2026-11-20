@@ -89,6 +89,8 @@ Set the token first: `STORYSHELF_TOKEN=shelf_… npx storyshelf upload …` (the
 
 <Aside type="tip">
   To save the URL and slug so later runs need no flags, run `npx storyshelf init --url http://localhost:3000 --slug my-design-system`. It writes `.storybook/storyshelf.json`; keep the token in `STORYSHELF_TOKEN` (in CI, as a secret), never in the file. With the config in place, `npx storyshelf` alone uploads. For a complete pipeline, see [CI setup](/guides/ci/).
+
+  On a server with sign-in off (`SHELF_AUTH=none` on the image, or a scaffold without auth), `npx storyshelf create --url http://localhost:3000 --name "My Design System"` creates the project and a CI token and writes the config in one step. With sign-in on it creates the project only, then points you to the project's page for the token: a token made from the command line has no user behind it, so it could not upload.
 </Aside>
 
 ## 4. Review
