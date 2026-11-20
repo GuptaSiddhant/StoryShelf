@@ -4,7 +4,7 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+import { createEmailNotifier, gitFromEnv, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
@@ -14,7 +14,9 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  *
  * Everything comes from the environment: `DATABASE_URL` (SQLite on `/data` when unset), `AWS_BUCKET`
  * (local storage on `/data` when unset), `SECRET` (`SECRET_PREVIOUS` and `SECRET_MIGRATE` to rotate it),
- * `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`,
+ * `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`, the server's git connections (`SHELF_GITHUB_APP_ID` +
+ * `SHELF_GITHUB_APP_PRIVATE_KEY[_FILE]`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`,
+ * `SHELF_GITLAB_TOKEN[_FILE]` + `SHELF_GITLAB_TOKEN_EXPIRES`, `SHELF_GIT_CONFIG_FILE`; ADR 0054),
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
  * unless set), `SHELF_STORYBOOK_HOSTING` (`trusted` by default, or `sandboxed`; ADR 0051) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
  * `AUTH_PASSWORD` and `SECRET` are required unless `SHELF_AUTH=none` opts out explicitly, and a
@@ -66,6 +68,16 @@ if (unverifiedDatabaseTls(env)) {
 
 // Every built-in integration is registered (ADR 0049); with SMTP_* set the `email` notifier sends through it.
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
+// Git connections from the environment (ADR 0054, decision 9): a half-set one stops the server here,
+// naming the variable and never its value. The key and the token are read once and never logged.
+const git = gitFromEnv(env);
+shelfLogger.info(
+  {
+    gitConnections: (git.connections ?? []).map((connection) => connection.id),
+    gitLinks: git.links?.length ?? 0,
+  },
+  "git connections",
+);
 const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
@@ -89,6 +101,7 @@ const app = createShelfApp({
   database,
   storage,
   ...(testing ? { testing } : {}),
+  git,
   notifications: {
     notifiers: (builtIn) =>
       emailSender

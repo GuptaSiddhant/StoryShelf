@@ -112,8 +112,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `BuildStatePublisher.request(buildId)` (app: `requestBuildState`) queues one `notify` job per git
   channel. A new status is a new case in `statusesForBuild`; a refused write throws so the consumer
   retries. GitHub check runs share that mapper
-  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the channel secret and must
-  never appear in config, logs, errors or API output.
+  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the connection secret (a
+  per-project channel secret until it moves) and must never appear in config, logs, errors or API output.
 - **`cancelled` is terminal.** Cancel through `announceBuildStatus` (`build:cancelled`; no
   `build:failed` / `sys:capture-failed`). `BuildModel.update`/`setStatus` refuse other statuses for a
   cancelled build; `finalizeBuild` and the orchestrator skip it; only `resetStatus` (retry) leaves it.
@@ -135,7 +135,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   header only from `sandboxHeaders` (route family + `config.storybookHosting.mode`, ADR 0051: never
   `allow-same-origin`). Both token routes are rate-limited per IP in one bucket before the token is
   read; every refusal returns one identical 404 (`refuseToken`) with `Cache-Control: private,
-  no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
+no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
   what a token grants, or accept one purpose on the other's route (ADR 0051 allows only these two
   routes plus the content host's `/_x/` exchange, purpose `exchange`, with #358; nothing more). Only `signedCacheControl`
   (`packages/app/src/routers/capture-cache.ts`) may give a signed answer freshness: a success for a
