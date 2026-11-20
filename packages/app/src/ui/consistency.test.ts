@@ -126,7 +126,6 @@ function inlineForms(source: string): number {
  */
 const INLINE_FORM_ALLOWANCE: Record<string, number> = {
   "settings-design-links.tsx": 2,
-  "settings-general.tsx": 1,
   "settings-labels.tsx": 2,
   "settings-links.tsx": 1,
   "settings-notifications.tsx": 1,

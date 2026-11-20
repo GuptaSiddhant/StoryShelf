@@ -112,6 +112,10 @@ async function createMessageChannel(
   project: Project,
   form: FormData,
 ): Promise<Response> {
+  const unoffered = unofferedKindMessage(asString(form.get("provider")) ?? "");
+  if (unoffered !== undefined) {
+    return refusal(c, project, form, "provider", unoffered);
+  }
   const picked = parseOptionFields<{ provider: string; target: string }>(
     Object.fromEntries(form),
     "provider",
