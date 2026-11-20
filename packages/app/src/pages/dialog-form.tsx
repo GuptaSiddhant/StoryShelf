@@ -99,6 +99,7 @@ export function renderFormPage(
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <DocumentLayout
+      layout="form"
       title={`${title} · ${project.name}`}
       nav={{
         active: "settings",
@@ -111,7 +112,7 @@ export function renderFormPage(
       }}
     >
       <PageHeader title={title} />
-      <div class="max-w-form">{form}</div>
+      {form}
     </DocumentLayout>
   );
 }

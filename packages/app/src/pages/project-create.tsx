@@ -85,6 +85,7 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
   const errors = state.errors ?? {};
   return (
     <DocumentLayout
+      layout="form"
       title="New project"
       nav={{ active: "projects", trail: [{ label: "New project" }] }}
     >

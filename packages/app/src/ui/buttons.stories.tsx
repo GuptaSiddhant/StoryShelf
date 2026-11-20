@@ -1,5 +1,6 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
+import { onAPhone } from "../../.storybook/page.tsx";
 import { jsxStory } from "../../.storybook/render.tsx";
 import { Button, HStack, Tabs, VStack } from "./components.tsx";
 
@@ -74,3 +75,19 @@ const tabs = (active: string): { label: string; href: string; active: boolean }[
   }));
 
 export const TabBar = jsxStory(() => <Tabs label="Component sections" tabs={tabs("States")} />);
+
+/** Four settings tabs in 375px: the row scrolls, fades at its edge and opens on the current tab (#1133). */
+export const TabBarOverflowingOnAPhone = onAPhone(
+  jsxStory(() => (
+    <Tabs
+      label="Settings sections"
+      tabs={["General", "Capture & tests", "Review & notifications", "Access"].map(
+        (label, index) => ({
+          label,
+          href: `#${index}`,
+          active: label === "Review & notifications",
+        }),
+      )}
+    />
+  )),
+);
