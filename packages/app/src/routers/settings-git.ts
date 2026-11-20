@@ -224,8 +224,11 @@ async function saveLink(
 ): Promise<Response> {
   const form = await c.req.formData();
   const connections = await usableConnections();
-  const own = connections.find((candidate) => candidate.id === link.connectionId);
-  const read = readForm(form, connections, own);
+  const read = readForm(
+    form,
+    connections,
+    connections.find((candidate) => candidate.id === link.connectionId),
+  );
   if (!read.ok) {
     return formResponse(c, ctx, link.id, { errors: read.errors, values: read.values }, 400);
   }
