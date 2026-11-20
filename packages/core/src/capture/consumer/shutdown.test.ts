@@ -170,7 +170,7 @@ describe("bounded drain (stop with graceMs, #912)", () => {
     expect((await stateOf(r, id))?.status).toBe("done");
   });
 
-  it("hands back without waiting for a handler that never stops, within the grace", async () => {
+  it("leaves a job whose handler never stops to its lease, and still resolves within the grace", async () => {
     const r = rig({
       handlers: {
         capture: {
@@ -188,6 +188,35 @@ describe("bounded drain (stop with graceMs, #912)", () => {
     expect(stopping.done).toBe(true);
     await stopping.settled;
     await started;
-    expect(await stateOf(r, id)).toMatchObject({ status: "queued", attempt: 0 });
+    // The handler may still write: no other instance may claim the job before its lease ends.
+    expect(await stateOf(r, id)).toMatchObject({ status: "running", attempt: 1 });
+    expect(
+      r.log.calls.some(
+        (call) => call.message === "released job still running; leaving it to its lease",
+      ),
+    ).toBe(true);
+  });
+
+  it("resolves at the grace even when the hand-back stalls, and says so", async () => {
+    const h = untilStopped();
+    const r = rig({ handlers: { capture: h.handler } });
+    r.queue.handBack = async () => await new Promise<void>(() => {});
+    const consumer = r.consume();
+    const started = consumer.start();
+    await r.queue.enqueueJob({ kind: "capture", buildId: "b1" });
+    await r.clock.advance(100);
+    const stopping = track(consumer.stop({ graceMs: 6000 }));
+    await r.clock.advance(5999);
+    expect(stopping.done).toBe(false);
+    await r.clock.advance(1);
+    expect(stopping.done).toBe(true);
+    await stopping.settled;
+    await started;
+    expect(
+      r.log.calls.some(
+        (call) =>
+          call.message === "drain did not settle within the shutdown grace; stopping anyway",
+      ),
+    ).toBe(true);
   });
 });

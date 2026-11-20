@@ -192,28 +192,43 @@ async function awaitStop(rt: JobRuntime, run: Promise<Race>, logger: Logger): Pr
 }
 
 /**
- * The shutdown's grace ran out (#912): the job's signal is aborted; cancel its run, give the handler
- * the releaser's reserve to stop, then hand the job back (visible at once, no attempt spent). A
- * queue without `handBack` leaves the job to its lease. The process exits next, so a handler that
- * has not stopped by then is not waited for.
+ * The shutdown's grace ran out (#912): the job's signal is aborted; cancel its run and give the
+ * handler the releaser's reserve to stop. Only a stopped handler's job is handed back (visible at
+ * once, no attempt spent): while the handler may still write, another instance must not claim the
+ * job, so one that has not stopped is left to its lease, as before #912. A queue without
+ * `handBack` leaves the job to its lease as well.
  */
 async function handBackReleased(
   rt: JobRuntime,
   held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
   run: Promise<Race>,
 ): Promise<JobOutcome> {
-  const { job, logger } = held;
-  const reserveMs = rt.releaser?.reserveMs ?? 0;
-  logger.warn({ reserveMs }, "shutdown grace over; handing job back");
-  if (!(await within(rt, Promise.all([cancelQuietly(held), run]), reserveMs))) {
-    logger.warn({ reserveMs }, "released job still running; handing it back anyway");
-  }
-  if (rt.queue.handBack === undefined) {
-    logger.warn("queue cannot hand a job back; leaving it to its lease");
+  if (!(await stopsWithinReserve(rt, held, run))) {
     return "lost";
   }
-  await rt.queue.handBack(job, { delayMs: 0, reason: "shutdown" });
+  if (rt.queue.handBack === undefined) {
+    held.logger.warn("queue cannot hand a job back; leaving it to its lease");
+    return "lost";
+  }
+  await rt.queue.handBack(held.job, { delayMs: 0, reason: "shutdown" });
   return "handed-back";
+}
+
+/** Cancel a released job's run and wait the releaser's reserve for its handler; logs a stall. */
+async function stopsWithinReserve(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+  run: Promise<Race>,
+): Promise<boolean> {
+  const reserveMs = rt.releaser?.reserveMs ?? 0;
+  held.logger.warn({ reserveMs }, "shutdown grace over; handing job back");
+  // The cancel is not waited for: what decides the hand-back is whether the handler has stopped.
+  cancelQuietly(held).catch(() => {});
+  if (await within(rt, run, reserveMs)) {
+    return true;
+  }
+  held.logger.error({ reserveMs }, "released job still running; leaving it to its lease");
+  return false;
 }
 
 /** Cancel the handler's run; a failure is logged, never thrown. */

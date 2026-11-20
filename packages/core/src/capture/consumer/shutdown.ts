@@ -1,9 +1,10 @@
 /**
  * The bounded SIGTERM drain (#912). `stop({ graceMs })` waits for the jobs in flight until
  * {@link releaseAtMs}; each job still running then is released: its keeper aborts its signal, its
- * handler's `cancel` runs, and once the handler stopped (or the reserve ran out) the job is handed
- * back to the queue (`handBack`), visible again at once and without spending an attempt. The
- * reserve keeps the whole stop within `graceMs`, so the host can exit before the platform kills it.
+ * handler's `cancel` runs, and once the handler stopped (within the reserve) the job is handed back
+ * to the queue (`handBack`), visible again at once and without spending an attempt; a handler that
+ * did not stop leaves its job to its lease. The stop resolves by `graceMs` whatever is left, so the
+ * host can exit before the platform kills it.
  */
 import { REAL_TIMERS, type QueueTimers } from "../db-queue/timers.ts";
 
@@ -65,24 +66,62 @@ export function createReleaser(): Releaser {
 
 /**
  * Wait for `draining` (the loop's stop: no more polls, jobs in flight finishing). With a grace,
- * release what still runs at {@link releaseAtMs}, then wait for the hand-backs to settle.
+ * release what still runs at {@link releaseAtMs}, and stop waiting at `graceMs` whatever is left
+ * (a stalled hand-back or ack): resolves `false` then, so the host still exits within its grace
+ * and the lease recovers what was not settled.
  */
 export async function drainWithin(
   draining: Promise<void>,
   bound: { graceMs: number | undefined; releaser: Releaser; timers?: QueueTimers | undefined },
-): Promise<void> {
+): Promise<boolean> {
   const { graceMs, releaser } = bound;
   if (graceMs === undefined) {
     await draining;
-    return;
+    return true;
   }
-  const timers = bound.timers ?? REAL_TIMERS;
+  const armed = armShutdown(bound.timers ?? REAL_TIMERS, graceMs, releaser);
+  try {
+    return await Promise.race([draining.then(() => true), armed.deadline]);
+  } finally {
+    armed.disarm();
+  }
+}
+
+/**
+ * Arm the grace's two timers: release the running jobs at {@link releaseAtMs}, and resolve
+ * `deadline` to `false` at `graceMs`. `disarm` clears both.
+ */
+function armShutdown(
+  timers: QueueTimers,
+  graceMs: number,
+  releaser: Releaser,
+): { deadline: Promise<boolean>; disarm(): void } {
   const handle = timers.setTimeout(() => {
     releaser.releaseAll(reserveMs(graceMs));
   }, releaseAtMs(graceMs));
-  try {
-    await draining;
-  } finally {
-    timers.clearTimeout(handle);
-  }
+  const deadline = falseAfter(timers, graceMs);
+  return {
+    deadline: deadline.promise,
+    disarm: () => {
+      timers.clearTimeout(handle);
+      deadline.clear();
+    },
+  };
+}
+
+/** A promise that resolves `false` after `ms`, and the function that disarms it. */
+function falseAfter(timers: QueueTimers, ms: number): { promise: Promise<boolean>; clear(): void } {
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  const handle = timers.setTimeout(
+    () => {
+      resolve(false);
+    },
+    Math.max(0, ms),
+  );
+  return {
+    promise,
+    clear: () => {
+      timers.clearTimeout(handle);
+    },
+  };
 }

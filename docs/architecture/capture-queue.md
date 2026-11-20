@@ -59,10 +59,12 @@ new holder settles the job), a cancel ends the job `cancelled`. `stop()` (SIGTER
 and waits for the jobs in flight. `stop({ graceMs })` bounds that wait (#912, `consumer/shutdown.ts`):
 at the grace minus a reserve (`HAND_BACK_RESERVE_MS`, 2 s, or a quarter of a short grace) each job
 still running is released: its keeper ends `released` and aborts its signal, its handler's `cancel`
-runs, and once the handler stopped (or the reserve ran out) the job is handed back with
+runs, and once the handler stopped (within the reserve) the job is handed back with
 `handBack({ delayMs: 0 })`, visible to any instance at once with its attempt not spent (outcome
-`handed-back`). Only the current holder hands back: a superseded holder writes nothing, and a job
-whose cancel was asked ends `cancelled` instead. The app passes the grace through
+`handed-back`). A handler that has not stopped may still write, so its job is left to its lease
+instead (outcome `lost`). Only the current holder hands back: the job-row write is conditional on
+its running attempt, so a superseded holder writes nothing, and a job whose cancel was asked ends
+`cancelled` instead. The stop resolves by `graceMs` even when a hand-back or ack stalls. The app passes the grace through
 `lifecycle.teardown({ graceMs })`; the hosts read `SHUTDOWN_GRACE_SECONDS`, to be set a few seconds
 below the platform's stop timeout (the Fly host defaults to 3 s, under Fly's 5 s); unset waits for
 every job. The runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the

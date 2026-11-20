@@ -123,7 +123,9 @@ async function pollUntilStopped(c: Consuming): Promise<void> {
   });
   const { graceMs } = await c.stopped;
   stopSampling();
-  await drainWithin(loop.stop(), { graceMs, releaser, timers: rt.timers });
+  if (!(await drainWithin(loop.stop(), { graceMs, releaser, timers: rt.timers }))) {
+    rt.logger.error({ graceMs }, "drain did not settle within the shutdown grace; stopping anyway");
+  }
 }
 
 /** The database queue sets its own cadence; any other queue is polled in a slot loop. */
