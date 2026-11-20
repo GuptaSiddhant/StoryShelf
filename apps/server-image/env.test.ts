@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   authFromEnv,
+  BootRefusal,
   browsersFromEnv,
   captureEnabled,
   databaseCaFromEnv,
@@ -191,12 +192,30 @@ describe("authFromEnv", () => {
 });
 
 describe("describeBootFailure", () => {
-  it("prints the reason as the first line, then the stack frames", () => {
+  it("prints an unexpected error's reason first, then its stack frames", () => {
     const text = describeBootFailure(new Error("SECRET is unset: set it"));
     const [first, ...rest] = text.trimEnd().split("\n");
     expect(first).toBe("storyshelf: SECRET is unset: set it");
     expect(rest.length).toBeGreaterThan(0);
     expect(rest.every((line) => line.trimStart().startsWith("at "))).toBe(true);
+  });
+
+  it("prints a refusal as one line with no stack frames", () => {
+    expect(describeBootFailure(new BootRefusal("SECRET is unset: set it"))).toBe(
+      "storyshelf: SECRET is unset: set it\n",
+    );
+  });
+
+  it("refuses a missing SECRET or AUTH_PASSWORD with a BootRefusal", () => {
+    for (const env of [{}, { AUTH_PASSWORD: "a-long-password" }]) {
+      let caught: unknown;
+      try {
+        authFromEnv(env);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(BootRefusal);
+    }
   });
 
   it("prints a non-error value on one line", () => {

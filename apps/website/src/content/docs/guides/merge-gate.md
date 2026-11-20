@@ -59,6 +59,24 @@ Optional, GitHub only. Instead of a token that writes commit statuses, a **GitHu
 
 The private key is stored encrypted with the server `SECRET`, is never returned by the API or shown in the UI again, and is removed from logs and error text; to rotate it, add the channel again with a new key and delete the old one. A required check keeps its name, so branch protection (below) is the same in either mode.
 
+### Server-wide connection from configuration
+
+Optional, and the way to set a server up from code (Terraform, a container platform) without anyone pasting a key into a project (ADR 0054). The operator declares a **git connection**: one credential for a git host account that serves the whole server. The image reads it from its environment:
+
+| Variable                                                          | Meaning                                                                                                                                        |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_APP_PRIVATE_KEY` or `…_FILE` | A GitHub App (id `github`). The key is PEM text, or `_FILE` names a file that holds it.                                                        |
+| `SHELF_GITHUB_API_URL`                                            | GitHub Enterprise Server API base, for example `https://ghes.example.com/api/v3`. Unset means github.com.                                      |
+| `SHELF_GITLAB_TOKEN` or `…_FILE`, `SHELF_GITLAB_TOKEN_EXPIRES`    | A GitLab group or project access token with the `api` scope (id `gitlab`), and its expiry (`YYYY-MM-DD`).                                      |
+| `SHELF_GITLAB_HOST`                                               | A self-managed GitLab base URL. Unset means `https://gitlab.com`.                                                                              |
+| `SHELF_GIT_CONFIG_FILE`                                           | A JSON file with more connections and approved links (`{ "connections": [...], "links": [...] }`, secrets as `privateKeyFile` or `tokenFile`). |
+
+Setting only half of a connection, or both a secret and its `_FILE`, stops the server at start-up with a message that names the variable and never its value. The key and the token are read once at start, are never written to the database, and never appear in logs, errors or API answers; rotating one is a new secret value and a restart. A connection from configuration is listed as **managed by configuration** and wins over a stored one with the same id. A link declared in the file counts as approved.
+
+What StoryShelf reads is fixed and small: which pull request contains a commit, the pull request's own comments (to find its own), which installation covers a repository, the repository's numeric ID, and whether a commit is on the default branch. **It never reads your code, diffs or files**: captures come from the Storybook you upload, not from the git host. GitHub has no narrower permission for the branch check than **Contents: Read-only**, so the App requests it and only the comparison's status is read. Posting is limited by the permissions you give the connection: **Checks: Read and write** is required for the gate; **Pull requests** and **Commit statuses** write are optional.
+
+The [Terraform modules](/guides/deployment/cloud/) take the App ID and a **reference** to a secret-manager secret that holds the key (and the token): a Secrets Manager ARN on AWS, a Secret Manager secret id on GCP, a Key Vault secret name on Azure. The key never appears in Terraform variables or state.
+
 ## 2. Upload the PR head commit
 
 The status goes to the SHA you pass to `storyshelf upload --sha`. It has to be the commit the PR or MR is on.

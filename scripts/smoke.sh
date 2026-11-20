@@ -99,6 +99,10 @@ refuse_short_secret() {
     "storyshelf: SECRET "*) ;;
     *) fail "the first line does not name SECRET: $first" ;;
   esac
+  # A refusal is one line: a stack frame (`    at fn (file:line)`) would be a leaked crash report.
+  if grep -qE '^[[:space:]]+at ' "$log"; then
+    fail "the refusal printed a stack trace"
+  fi
   if grep -qF "$short" "$log"; then
     fail "the output contains the SECRET value"
   fi
@@ -106,7 +110,7 @@ refuse_short_secret() {
     fail "something answers on :$port"
   fi
   rm -rf "$dir" "$log"
-  echo "Smoke OK: the image refuses a short SECRET (exit $code, first line names SECRET)"
+  echo "Smoke OK: the image refuses a short SECRET (exit $code, first line names SECRET, no stack trace)"
 }
 
 if [ -z "${SMOKE_BASE_URL:-}" ]; then

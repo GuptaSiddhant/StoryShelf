@@ -12,6 +12,7 @@ import {
 import { assertPortalOutsideContentHosts, storybookHostingOf } from "./content-hosts.ts";
 import { offerIntegrations } from "./integrations/availability.ts";
 import { BUILT_IN_INTEGRATIONS } from "./integrations/built-in.ts";
+import { assertGitOptions } from "./integrations/git/connections/define.ts";
 import { resolveShelfIntegrations } from "./integrations/index.ts";
 import { validateStorybookHosting } from "./storybook-hosting.ts";
 
@@ -35,12 +36,18 @@ export function resolveShelfOptions(options: ShelfOptions): ResolvedShelfOptions
   assertStorybookUrlRateLimit(options.storybookUrlRateLimit, "storybookUrlRateLimit");
   assertStorybookHosting(options);
   assertTestingBackable(options);
-  assertNotificationsConfig(options.notifications?.config);
+  assertIntegrationOptions(options);
   const resolved = withIntegrations(options);
   if (options.config?.scratchDir !== undefined) {
     return resolved;
   }
   return { ...resolved, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };
+}
+
+/** The notification settings and the configured git connections and links (ADR 0054). */
+function assertIntegrationOptions(options: ShelfOptions): void {
+  assertNotificationsConfig(options.notifications?.config);
+  assertGitOptions(options.git ?? {});
 }
 
 /**
