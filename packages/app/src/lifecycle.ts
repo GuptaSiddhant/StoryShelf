@@ -79,13 +79,14 @@ export function startConsumer(cell: LifecycleCell, logger: Logger): void {
 }
 
 /**
- * Stop polling and wait for the jobs in flight to finish (the SIGTERM drain). Also invalidates
- * pending setup attempts, whose adapter hooks `drainBackground` then outwaits.
+ * Stop polling and wait for the jobs in flight to finish (the SIGTERM drain), at most `graceMs`
+ * when given: the jobs still running then are handed back (#912). Also invalidates pending setup
+ * attempts, whose adapter hooks `drainBackground` then outwaits.
  */
-async function stopConsumer(cell: LifecycleCell): Promise<void> {
+async function stopConsumer(cell: LifecycleCell, graceMs: number | undefined): Promise<void> {
   cell.teardowns = generationOf(cell) + 1;
   cell.consumerStopped = true;
-  await cell.consumer?.stop();
+  await cell.consumer?.stop(graceMs === undefined ? {} : { graceMs });
   await cell.consumerRun;
 }
 
@@ -415,9 +416,9 @@ function createLifecycle(
       const result = await rerunSetup(options, ctx, logger, cell);
       resumeAfterSetup(cell, generation, result, logger);
     },
-    teardown: async () => {
+    teardown: async (teardownOptions) => {
       timer?.stop();
-      await stopConsumer(cell);
+      await stopConsumer(cell, teardownOptions?.graceMs);
       await drainBackground(cell);
       await settleInsightJobs();
       await options.ai?.teardown();

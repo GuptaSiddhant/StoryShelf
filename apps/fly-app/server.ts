@@ -30,6 +30,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 import { mkdirSync } from "node:fs";
 import { aiFromEnv, aiLogFields } from "./ai.ts";
 import { refuseLegacyVariables } from "./legacy-env.ts";
+import { shutdownGraceMs } from "./shutdown.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
@@ -42,6 +43,8 @@ const authPassword = env["AUTH_PASSWORD"];
 const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
+// Bound of the SIGTERM drain: jobs still running then are handed back for another machine (#912).
+const graceMs = shutdownGraceMs(env);
 // Rate limits key on the client, not Fly's proxy (#911): on Fly (`FLY_APP_NAME` is set by the
 // platform) trust `Fly-Client-IP` unless `TRUST_PROXY` says otherwise; `TRUST_PROXY=false` opts out.
 const trustProxy =
@@ -193,7 +196,7 @@ const server = serve({ fetch: app.fetch, port }, () => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     app.lifecycle
-      .teardown()
+      .teardown(graceMs === undefined ? {} : { graceMs })
       .catch(() => {}) // Intentionally empty — teardown errors are already logged
       .finally(() => {
         server.close();

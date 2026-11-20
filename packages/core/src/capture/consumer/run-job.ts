@@ -1,6 +1,6 @@
 /**
  * Run one claimed job to its end: pick the handler by kind, keep the lease (heartbeat and progress), then settle
- * the job on the queue (ack, retry with backoff, fail, or leave it to whoever owns it now).
+ * the job on the queue (ack, retry with backoff, fail, hand it back on shutdown, or leave it to whoever owns it now).
  */
 import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
 import type { Logger } from "../../logger.ts";
@@ -9,6 +9,7 @@ import { keepJobLease, type JobLeaseKeeper, type LeaseEnd } from "../db-queue/ke
 import { REAL_TIMERS, type QueueTimers } from "../db-queue/timers.ts";
 import { reportFinished, type ConsumerMetrics, type JobOutcome } from "./metrics.ts";
 import { backoffDelayMs, DEFAULT_BACKOFF_MS, isFinalAttempt } from "./retry.ts";
+import type { Releaser } from "./shutdown.ts";
 import type { ConsumerJob, JobRunContext, KindHandler } from "./types.ts";
 
 /** What {@link runJob} needs from the consumer. */
@@ -26,6 +27,8 @@ export interface JobRuntime {
   lease?: { renewEveryMs?: number; checkMs?: number } | undefined;
   /** Wall-clock bound of one job in ms; absent means unbounded (tests). */
   maxJobMs?: number | undefined;
+  /** The session's releaser: a draining stop whose grace ran out releases the running jobs (#912). */
+  releaser?: Releaser | undefined;
 }
 
 /** Why a job's handler stopped: it finished (or threw), or the queue took the job away. */
@@ -159,6 +162,9 @@ async function abandonAndWait(
   held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
   stopped: { end: LeaseEnd; run: Promise<Race> },
 ): Promise<JobOutcome> {
+  if (stopped.end === "released") {
+    return await handBackReleased(rt, held, stopped.run);
+  }
   const outcome = await abandon(rt, held, stopped.end);
   // The slot is this job's until its work has stopped: never count it free while a render runs.
   await awaitStop(rt, stopped.run, held.logger);
@@ -185,7 +191,60 @@ async function awaitStop(rt: JobRuntime, run: Promise<Race>, logger: Logger): Pr
   );
 }
 
+/**
+ * The shutdown's grace ran out (#912): the job's signal is aborted; cancel its run, give the handler
+ * the releaser's reserve to stop, then hand the job back (visible at once, no attempt spent). A
+ * queue without `handBack` leaves the job to its lease. The process exits next, so a handler that
+ * has not stopped by then is not waited for.
+ */
+async function handBackReleased(
+  rt: JobRuntime,
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
+  run: Promise<Race>,
+): Promise<JobOutcome> {
+  const { job, logger } = held;
+  const reserveMs = rt.releaser?.reserveMs ?? 0;
+  logger.warn({ reserveMs }, "shutdown grace over; handing job back");
+  if (!(await within(rt, Promise.all([cancelQuietly(held), run]), reserveMs))) {
+    logger.warn({ reserveMs }, "released job still running; handing it back anyway");
+  }
+  if (rt.queue.handBack === undefined) {
+    logger.warn("queue cannot hand a job back; leaving it to its lease");
+    return "lost";
+  }
+  await rt.queue.handBack(job, { delayMs: 0, reason: "shutdown" });
+  return "handed-back";
+}
+
+/** Cancel the handler's run; a failure is logged, never thrown. */
+async function cancelQuietly(held: {
+  job: ConsumerJob;
+  handler: KindHandler;
+  logger: Logger;
+}): Promise<void> {
+  try {
+    await held.handler.cancel?.(held.job);
+  } catch (error) {
+    held.logger.warn({ err: error }, "failed to cancel the running job");
+  }
+}
+
+/** Keep the job's lease; the session's releaser can release it until the keeper stops. */
 function keepLease(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKeeper {
+  const keeper = leaseOf(rt, job, logger);
+  const untrack = rt.releaser?.register(() => {
+    keeper.release();
+  });
+  return {
+    ...keeper,
+    stop: () => {
+      untrack?.();
+      keeper.stop();
+    },
+  };
+}
+
+function leaseOf(rt: JobRuntime, job: ConsumerJob, logger: Logger): JobLeaseKeeper {
   return keepJobLease(rt.queue, job, {
     ...rt.lease,
     ...(rt.maxJobMs === undefined ? {} : { maxJobMs: rt.maxJobMs }),
@@ -275,7 +334,7 @@ async function requeue(
 async function abandon(
   rt: JobRuntime,
   held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
-  end: LeaseEnd,
+  end: Exclude<LeaseEnd, "released">,
 ): Promise<JobOutcome> {
   const { job, handler, logger } = held;
   if (end === "deadline") {

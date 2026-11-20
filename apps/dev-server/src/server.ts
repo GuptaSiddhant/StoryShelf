@@ -56,6 +56,19 @@ function purgeTtlDaysFromEnv(): number | undefined {
 }
 const purgeTtlDays = purgeTtlDaysFromEnv();
 
+// Bound of the SIGTERM drain (#912): `SHUTDOWN_GRACE_SECONDS` hands the jobs still running near its
+// end back to the queue, without spending an attempt. Unset waits for every job. Mirrors
+// apps/fly-app/shutdown.ts (without its Fly default).
+function shutdownGraceMsFromEnv(): number | undefined {
+  const raw = env["SHUTDOWN_GRACE_SECONDS"];
+  if (raw === undefined || raw === "") return undefined;
+  if (!/^\d+$/u.test(raw)) {
+    throw new Error("SHUTDOWN_GRACE_SECONDS must be a whole number of seconds");
+  }
+  return Number(raw) * 1000;
+}
+const graceMs = shutdownGraceMsFromEnv();
+
 function buildAuthUi(): Record<string, string> | undefined {
   const pairs: Array<[string, string | undefined]> = [
     ["title", env["SHELF_AUTH_TITLE"]],
@@ -178,7 +191,7 @@ const server = serve({ fetch: app.fetch, port }, () => {
 });
 
 const shutdown = async (): Promise<void> => {
-  await app.lifecycle.teardown();
+  await app.lifecycle.teardown(graceMs === undefined ? {} : { graceMs });
   server.close();
 };
 process.on("SIGTERM", () => {
