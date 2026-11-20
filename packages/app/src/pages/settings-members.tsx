@@ -1,20 +1,20 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
-import type { HtmlEscapedString } from "hono/utils/html";
+import type { FC } from "hono/jsx";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
-  Badge,
   Button,
-  Card,
-  Field,
-  FormActions,
+  DialogLink,
   Meta,
   SectionTitle,
-  SelectField,
-  Table,
+  SummaryList,
+  VStack,
   statusLabel,
+  type SummaryItem,
 } from "../ui/components.tsx";
+import { FormDialog } from "./dialog-form.tsx";
+import { ADD_GROUP_DIALOG, ADD_MEMBER_DIALOG } from "./member-forms.tsx";
 
 /** Project member row as rendered in the members settings tab. */
 export interface SettingsMember {
@@ -25,7 +25,52 @@ export interface SettingsMember {
   createdAt: string;
 }
 
-/** Members settings tab: member roster plus the add-member form. */
+/** A Remove button that posts its own form (confirm first). */
+const RemoveForm: FC<{ action: string; confirm: string }> = ({ action, confirm }) => {
+  return (
+    <form method="post" action={action} hx-post={action} hx-target="body" hx-confirm={confirm}>
+      {csrfField()}
+      <Button variant="ghost" size="sm" type="submit">
+        Remove
+      </Button>
+    </form>
+  );
+};
+
+function memberItems(project: Project, members: SettingsMember[], isAdmin: boolean): SummaryItem[] {
+  return members.map((member) => ({
+    id: member.id,
+    name: member.userId,
+    state: { label: statusLabel(member.role), tone: member.role === "admin" ? "danger" : "info" },
+    details: `Since ${new Date(member.createdAt).toLocaleDateString()}`,
+    actions: isAdmin ? (
+      <RemoveForm
+        action={`/projects/${project.slug}/settings/members/${member.userId}/remove`}
+        confirm="Remove this member from the project?"
+      />
+    ) : undefined,
+  }));
+}
+
+function mappingItems(
+  project: Project,
+  mappings: ProjectGroupMapping[],
+  isAdmin: boolean,
+): SummaryItem[] {
+  return mappings.map((mapping) => ({
+    id: mapping.id,
+    name: mapping.groupName,
+    state: { label: statusLabel(mapping.role), tone: mapping.role === "admin" ? "danger" : "info" },
+    actions: isAdmin ? (
+      <RemoveForm
+        action={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
+        confirm="Remove this group mapping?"
+      />
+    ) : undefined,
+  }));
+}
+
+/** Members settings tab: the roster and the group mappings as summaries; adding opens a dialog. */
 export function renderSettingsMembers(
   project: Project,
   members: SettingsMember[],
@@ -33,195 +78,58 @@ export function renderSettingsMembers(
   isAdmin: boolean,
   formState?: { globalError?: string },
 ): unknown {
+  const addMember = isAdmin ? (
+    <DialogLink
+      dialogId={ADD_MEMBER_DIALOG}
+      variant="primary"
+      icon="plus"
+      href={`/projects/${project.slug}/settings/members/new`}
+    >
+      Add member
+    </DialogLink>
+  ) : undefined;
+  const addMapping = isAdmin ? (
+    <DialogLink
+      dialogId={ADD_GROUP_DIALOG}
+      variant="primary"
+      icon="plus"
+      href={`/projects/${project.slug}/settings/members/groups/new`}
+    >
+      Add group mapping
+    </DialogLink>
+  ) : undefined;
   return (
-    <div class="grid max-w-form">
+    <VStack>
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <Card>
-        <SectionTitle>Members</SectionTitle>
-        <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
-        <Table label="Members">
-          <table>
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Role</th>
-                <th>Since</th>
-                <th>
-                  <span class="visually-hidden">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((member): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                <tr key={member.id}>
-                  <td>
-                    <code>{member.userId}</code>
-                  </td>
-                  <td>
-                    <Badge
-                      tone={
-                        member.role === "admin"
-                          ? "danger"
-                          : member.role === "viewer"
-                            ? "neutral"
-                            : "info"
-                      }
-                    >
-                      {statusLabel(member.role)}
-                    </Badge>
-                  </td>
-                  <td>{new Date(member.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    {isAdmin ? (
-                      <form
-                        method="post"
-                        action={`/projects/${project.slug}/settings/members/${member.userId}/remove`}
-                        hx-post={`/projects/${project.slug}/settings/members/${member.userId}/remove`}
-                        hx-target="body"
-                        hx-confirm="Remove this member from the project?"
-                      >
-                        {csrfField()}
-                        <Button variant="ghost" type="submit">
-                          Remove
-                        </Button>
-                      </form>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
-        {members.length === 0 ? <Meta>No members yet.</Meta> : null}
-      </Card>
-
+      <SectionTitle>Members</SectionTitle>
+      <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
+      <SummaryList
+        label="Members"
+        items={memberItems(project, members, isAdmin)}
+        emptyTitle="No members yet"
+        emptyDescription="Add the people who work on this project."
+        add={addMember}
+      />
+      {members.length > 0 ? addMember : null}
+      <SectionTitle>Identity-provider group mappings</SectionTitle>
+      <Meta>
+        Map an IdP group (name or provider ID, exact match) to a project role. Members sync at next
+        login; removing a mapping revokes synced grants but never manual ones. Wildcards are not
+        expanded.
+      </Meta>
+      <SummaryList
+        label="Identity-provider group mappings"
+        items={mappingItems(project, groupMappings, isAdmin)}
+        emptyTitle="No group mappings yet"
+        add={addMapping}
+      />
+      {groupMappings.length > 0 ? addMapping : null}
       {isAdmin ? (
-        <Card>
-          <SectionTitle level={3}>Add member</SectionTitle>
-          <form
-            method="post"
-            action={`/projects/${project.slug}/settings/members`}
-            hx-post={`/projects/${project.slug}/settings/members`}
-            hx-target="body"
-          >
-            {csrfField()}
-            <Field
-              label="Email"
-              name="email"
-              type="email"
-              required
-              placeholder="name@example.com"
-            />
-            <SelectField
-              label="Project role"
-              name="role"
-              options={[
-                { value: "viewer", label: "viewer" },
-                { value: "developer", label: "developer" },
-                { value: "approver", label: "approver" },
-                { value: "admin", label: "admin" },
-              ]}
-            />
-            <FormActions>
-              <Button variant="primary" type="submit" icon="plus">
-                Add member
-              </Button>
-            </FormActions>
-          </form>
-        </Card>
+        <>
+          <FormDialog id={ADD_MEMBER_DIALOG} title="Add member" submitLabel="Add member" />
+          <FormDialog id={ADD_GROUP_DIALOG} title="Add group mapping" submitLabel="Add mapping" />
+        </>
       ) : null}
-
-      <div class="mt-1">
-        <Card>
-          <SectionTitle level={3}>Identity-provider group mappings</SectionTitle>
-          <Meta>
-            Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
-            next login; removing a mapping revokes synced grants but never manual ones. Wildcards
-            are not expanded.
-          </Meta>
-          <Table label="Identity-provider group mappings">
-            <table>
-              <thead>
-                <tr>
-                  <th>Group</th>
-                  <th>Role</th>
-                  <th>
-                    <span class="visually-hidden">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupMappings.map((mapping): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                  <tr key={mapping.id}>
-                    <td>
-                      <code>{mapping.groupName}</code>
-                    </td>
-                    <td>
-                      <Badge tone={mapping.role === "admin" ? "danger" : "info"}>
-                        {statusLabel(mapping.role)}
-                      </Badge>
-                    </td>
-                    <td>
-                      {isAdmin ? (
-                        <form
-                          method="post"
-                          action={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
-                          hx-post={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
-                          hx-target="body"
-                          hx-confirm="Remove this group mapping?"
-                        >
-                          {csrfField()}
-                          <Button variant="ghost" type="submit">
-                            Remove
-                          </Button>
-                        </form>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Table>
-          {groupMappings.length === 0 ? <Meta>No group mappings yet.</Meta> : null}
-        </Card>
-      </div>
-
-      {isAdmin ? (
-        <div class="mt-1">
-          <Card>
-            <SectionTitle level={3}>Add group mapping</SectionTitle>
-            <form
-              method="post"
-              action={`/projects/${project.slug}/settings/members/groups`}
-              hx-post={`/projects/${project.slug}/settings/members/groups`}
-              hx-target="body"
-            >
-              {csrfField()}
-              <Field
-                label="Group name or ID (exact match)"
-                name="groupName"
-                required
-                placeholder="team-design"
-              />
-              <SelectField
-                label="Role for group members"
-                name="role"
-                options={[
-                  { value: "viewer", label: "viewer" },
-                  { value: "developer", label: "developer" },
-                  { value: "approver", label: "approver" },
-                  { value: "admin", label: "admin" },
-                ]}
-              />
-              <FormActions>
-                <Button variant="primary" type="submit" icon="plus">
-                  Add mapping
-                </Button>
-              </FormActions>
-            </form>
-          </Card>
-        </div>
-      ) : null}
-    </div>
+    </VStack>
   );
 }

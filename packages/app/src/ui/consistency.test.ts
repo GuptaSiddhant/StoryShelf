@@ -129,10 +129,8 @@ const INLINE_FORM_ALLOWANCE: Record<string, number> = {
   "settings-general.tsx": 1,
   "settings-labels.tsx": 2,
   "settings-links.tsx": 1,
-  "settings-members.tsx": 2,
   "settings-notifications.tsx": 2,
   "settings-tests.tsx": 1,
-  "settings-webhooks.tsx": 1,
 };
 
 describe("ui-building-blocks contract", () => {
