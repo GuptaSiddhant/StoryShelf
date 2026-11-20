@@ -106,8 +106,9 @@ jobs:
             # the interface that contract exercises (a locking regression must not merge).
             if grep -qE '^(packages/db-postgres/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then postgres=true; else postgres=false; fi
             # A schema or migration file (any dialect's DDL, migrations, Drizzle schema, the boot
-            # comparison) or the previous-release job itself: ADR 0053, decision 8.
-            if grep -qE '^(packages/db-(sqlite|postgres|mysql)/src/([^/]*(ddl|migrat)[^/]*|schema/)|packages/core/src/adapters/schema-level|scripts/previous-release|\.github/workflows/ci\.yml)' changed.txt; then schema=true; else schema=false; fi
+            # comparison), the job queue, its consumer or an enqueue path (the mixed-queue test), or
+            # the previous-release job itself: ADR 0053, decision 8.
+            if grep -qE '^(packages/db-(sqlite|postgres|mysql)/src/([^/]*(ddl|migrat)[^/]*|schema/)|packages/core/src/adapters/schema-level|packages/core/src/capture/(db-queue|consumer|build-state)/|packages/core/src/(models|schema)/capture-job|packages/app/src/(jobs-setup|job-queue|review-request-data)\.ts|scripts/previous-release|\.github/workflows/ci\.yml)' changed.txt; then schema=true; else schema=false; fi
             if grep -qE "$FULL" changed.txt; then force=true; else force=false; fi
             # A release PR often changes only versions and the changelog (all ignorable above), but it
             # is the deploy gate: the Fly dry run and its browser test must run for it.
@@ -371,7 +372,8 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Run the previous release against this schema
+      # Also the mixed-queue test (step 5): the previous release's consumers beside this code's.
+      - name: Run the previous release against this schema and queue
         env:
           DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
         run: bash scripts/previous-release.sh "${{ matrix.dialect }}"
