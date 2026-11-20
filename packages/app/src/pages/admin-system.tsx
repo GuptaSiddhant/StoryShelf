@@ -353,6 +353,27 @@ function IntegrationsSection(props: {
   ) : null;
 }
 
+/** The header's links: System → Git, AI usage when AI is on, and a recheck. */
+function SystemActions(props: {
+  aiEnabled: boolean;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <HStack>
+      <Button variant="secondary" size="sm" href="/admin/git">
+        Git
+      </Button>
+      {props.aiEnabled ? (
+        <Button variant="secondary" size="sm" href="/admin/ai">
+          AI usage
+        </Button>
+      ) : null}
+      <Button variant="secondary" size="sm" href="/admin">
+        Recheck
+      </Button>
+    </HStack>
+  );
+}
+
 /** Site-admin System page: adapter inventory with in-depth health. */
 export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
   const { report, config, credentials } = data;
@@ -367,18 +388,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
             {formatUptime(report.uptimeSecs)}
           </>
         }
-        actions={
-          <HStack>
-            {data.aiEnabled ? (
-              <Button variant="secondary" size="sm" href="/admin/ai">
-                AI usage
-              </Button>
-            ) : null}
-            <Button variant="secondary" size="sm" href="/admin">
-              Recheck
-            </Button>
-          </HStack>
-        }
+        actions={<SystemActions aiEnabled={data.aiEnabled === true} />}
       />
       <PausedNotices data={data} />
       <TestingNotice data={data} />

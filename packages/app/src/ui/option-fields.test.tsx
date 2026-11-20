@@ -25,6 +25,12 @@ describe("OptionFields", () => {
     expect(html).not.toMatch(/data-option-group="b"[^>]*disabled/u);
   });
 
+  it("shows the checked option's group through a selector that matches the radio", async () => {
+    const html = await render(<OptionFields name="k" label="Kind" options={options} />);
+    expect(html).toContain("input[type=radio]:nth-of-type(2):checked");
+    expect(html).not.toMatch(/type=\\?"\\?\\"radio/u);
+  });
+
   it("selects the first option by default and supports cards", async () => {
     const html = await render(
       <OptionFields name="k" label="Kind" variant="cards" options={options} />,
