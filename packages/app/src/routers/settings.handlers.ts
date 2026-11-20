@@ -208,7 +208,6 @@ async function loadNotificationSection(
     kind: candidate.metadata.kind,
     name: candidate.metadata.name,
     delivery: deliveryOf(notifiers, candidate.metadata.kind),
-    audience: candidate.metadata.audience,
   }));
   return { notificationChannels, notifyProviders, mySubscription };
 }

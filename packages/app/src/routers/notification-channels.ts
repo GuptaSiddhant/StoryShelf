@@ -4,7 +4,7 @@ import type { NotificationChannelRow } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
-import { unofferedKindMessage } from "../integrations.ts";
+import { unofferedKindMessage, unofferedReason } from "../integrations.ts";
 import { errorBody } from "../middleware/api-errors.ts";
 import { getStore } from "../store.ts";
 import { retryChannelState } from "./channel-retry.ts";
@@ -72,9 +72,9 @@ async function channelProblem(
   return valid.ok ? undefined : valid.message;
 }
 
-/** Whether the channel's kind is offered (a channel of an unknown kind stays listed). */
+/** Whether the channel's kind is offered: a registered, available notifier provides it. */
 function offered(row: NotificationChannelRow): boolean {
-  return unofferedKindMessage(row.provider) === undefined;
+  return unofferedReason(row.provider) === undefined;
 }
 
 const listChannelsRoute = createRoute({

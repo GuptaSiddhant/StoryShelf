@@ -104,9 +104,13 @@ const TESTING_SECTIONS: ReadonlySet<SettingsSection> = new Set([
 
 /**
  * Integration sections with nothing offered (issue #1126) are left out, unless a site admin is
- * told what is missing.
+ * told what is missing or a refused form of that section must say why.
  */
 function integrationShown(section: SettingsSection, data: ProjectSettingsData): boolean {
+  if (data.formSection === section) {
+    // A refused form still says why, even with nothing left to offer.
+    return true;
+  }
   if (section === "notifications") {
     return data.notifyProviders.length > 0 || (data.unoffered?.notifications.length ?? 0) > 0;
   }

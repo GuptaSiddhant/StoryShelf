@@ -5,6 +5,10 @@
 import type { DesignProvider } from "../adapters/design.ts";
 import type { IntegrationAvailability } from "../adapters/metadata.ts";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
+import { sanitizeErrorText } from "../utils/redact.ts";
+
+/** Longest reason kept from a throwing availability check. */
+const REASON_MAX_LENGTH = 200;
 
 /** How an integration stands on this server. */
 export type IntegrationState = "available" | "unavailable" | "disabled";
@@ -49,7 +53,9 @@ export function availabilityOf(provider: Offerable): IntegrationAvailability {
   try {
     return provider.availability();
   } catch (error) {
-    return { unavailable: error instanceof Error ? error.message : String(error) };
+    // The reason reaches project admins in a 400: never raw exception text.
+    const message = error instanceof Error ? error.message : String(error);
+    return { unavailable: sanitizeErrorText(message, REASON_MAX_LENGTH) };
   }
 }
 

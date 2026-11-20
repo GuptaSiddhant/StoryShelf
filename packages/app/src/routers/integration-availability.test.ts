@@ -66,6 +66,8 @@ async function seed() {
     config: { to: "team@example.com" },
   });
   await channels.create({ projectId: "p1", provider: "log", config: { style: "compact" } });
+  // A custom notifier the server's code no longer registers.
+  const removed = await channels.create({ projectId: "p1", provider: "pager", config: {} });
   const app = createShelfApp({
     database: db,
     storage,
@@ -73,7 +75,7 @@ async function seed() {
     logger: pino({ level: "silent" }),
     config: { secret },
   });
-  return { db, app, emailId: email.id };
+  return { db, app, emailId: email.id, removedId: removed.id };
 }
 
 const as = (who: "pa" | "sa", init: RequestInit = {}): RequestInit => ({
@@ -91,15 +93,16 @@ const API = "/api/v1/projects/notify-project/notification-channels";
 
 describe("integrations the server cannot deliver (#1126)", () => {
   it("hides email from a project admin, with no placeholder, and keeps the channel", async () => {
-    const { db, app, emailId } = await seed();
+    const { db, app, emailId, removedId } = await seed();
     const html = await (await app.request(SETTINGS, as("pa"))).text();
     expect(html).toContain("Add a message channel");
     expect(html).not.toContain(`channel-${emailId}`);
+    expect(html).not.toContain(`channel-${removedId}`);
     expect(html).not.toContain('value="email"');
     expect(html).not.toContain("not offered to projects");
     // The personal card sends by email, so it goes with it.
     expect(html).not.toContain("My notifications for this project");
-    expect(await new NotificationChannelModel(db).list("p1")).toHaveLength(2);
+    expect(await new NotificationChannelModel(db).list("p1")).toHaveLength(3);
   });
 
   it("tells a site admin in one line what is missing, linking to System", async () => {
@@ -149,5 +152,31 @@ describe("integrations the server cannot deliver (#1126)", () => {
     expect(html).toContain("Channels not delivered to");
     expect(html).toContain("Notify Project");
     expect(html).toContain("/projects/notify-project/settings/review");
+    // A kind no registered notifier provides is listed too, so nothing goes silent unseen.
+    expect(html).toContain("Not registered on this server");
+  });
+
+  it("says why a stale form is refused when nothing is offered any more", async () => {
+    const { db } = await seed();
+    const { storage } = makeStorage();
+    const bare = createShelfApp({
+      database: db,
+      storage,
+      auth,
+      notifications: { notifiers: false },
+      logger: pino({ level: "silent" }),
+      config: { secret },
+    });
+    const form = await bare.request(
+      "/projects/notify-project/settings/notifications",
+      as("pa", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ provider: "slack-webhook", target: "https://x" }).toString(),
+      }),
+    );
+    const text = await form.text();
+    expect(form.status).toBe(400);
+    expect(text).toContain("Slack is not available on this server");
   });
 });

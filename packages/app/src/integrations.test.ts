@@ -1,6 +1,12 @@
 import type { IntegrationStatus } from "@storyshelf/core/integrations";
 import { describe, expect, it } from "vitest";
-import { unofferedIntegrations, unofferedKindMessage, unofferedReason } from "./integrations.ts";
+import {
+  NOT_REGISTERED_REASON,
+  offeredKinds,
+  unofferedIntegrations,
+  unofferedKindMessage,
+  unofferedReason,
+} from "./integrations.ts";
 import { runWithStore, type Store } from "./store.ts";
 
 const STATUSES: IntegrationStatus[] = [
@@ -10,8 +16,11 @@ const STATUSES: IntegrationStatus[] = [
   { group: "design", kind: "figma", name: "Figma", state: "disabled", reason: "Turned off" },
 ];
 
+/** The store's notifiers are the offered (available) ones: here only Slack. */
+const notifiers = [{ metadata: { kind: "slack-webhook" } }];
+
 const inStore = <T>(integrations: IntegrationStatus[] | undefined, run: () => T): T =>
-  runWithStore({ config: {}, integrations } as unknown as Store, run);
+  runWithStore({ config: {}, integrations, notifiers } as unknown as Store, run);
 
 describe("unofferedIntegrations", () => {
   it("lists the group's kinds that are not available, with why", () => {
@@ -34,12 +43,17 @@ describe("unofferedIntegrations", () => {
 });
 
 describe("unofferedReason", () => {
-  it("answers for an unoffered notifier kind only", () => {
+  it("is undefined for an offered kind, the reason for an unoffered one", () => {
     inStore(STATUSES, () => {
-      expect(unofferedReason("email")).toBe("no sender");
+      expect(offeredKinds()).toEqual(["slack-webhook"]);
       expect(unofferedReason("slack-webhook")).toBeUndefined();
-      expect(unofferedReason("figma")).toBeUndefined();
-      expect(unofferedReason("nope")).toBeUndefined();
+      expect(unofferedReason("email")).toBe("no sender");
+    });
+  });
+
+  it("holds back a kind no registered notifier provides (#1126)", () => {
+    inStore(STATUSES, () => {
+      expect(unofferedReason("removed-custom")).toBe(NOT_REGISTERED_REASON);
     });
   });
 });

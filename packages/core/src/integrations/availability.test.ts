@@ -39,6 +39,17 @@ describe("availabilityOf", () => {
     });
     expect(availabilityOf(odd)).toEqual({ unavailable: "odd" });
   });
+
+  it("redacts and bounds a thrown message: it reaches project admins (#1126)", () => {
+    const leaky = notifier("email", () => {
+      throw new Error(`smtp://mail:hunter2@relay.example failed; token=abc123 ${"x".repeat(400)}`);
+    });
+    const result = availabilityOf(leaky);
+    const reason = result === "available" ? "" : result.unavailable;
+    expect(reason).not.toContain("hunter2");
+    expect(reason).not.toContain("abc123");
+    expect(reason.length).toBeLessThanOrEqual(200);
+  });
 });
 
 describe("offerIntegrations", () => {

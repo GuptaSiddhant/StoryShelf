@@ -19,7 +19,7 @@ export default meta;
 
 const providers: SettingsNotifyProvider[] = [
   { kind: "slack", name: "Slack", delivery: "message" },
-  { kind: "email", name: "Email", delivery: "message", audience: "person" },
+  { kind: "email", name: "Email", delivery: "message" },
   { kind: "github", name: "GitHub", delivery: "state" },
 ];
 
@@ -243,4 +243,32 @@ export const NoneOfferedProjectAdmin = pageStory(() =>
     mySubscription: null,
     isAdmin: true,
   }),
+);
+
+/** A stale form posts a kind no longer offered and nothing else is: the refusal still says why. */
+export const NoneOfferedRefusedForm = pageStory(() =>
+  renderProjectSettingsPage(
+    {
+      project,
+      activeTab: "review",
+      formSection: "notifications",
+      labelTypes: [],
+      links: [],
+      linkCandidates: [],
+      design: { files: [], components: [], providers: [] },
+      tokens: [],
+      members: [],
+      groupMappings: [],
+      webhooks: [],
+      notificationChannels: [],
+      notifyProviders: [],
+      mySubscription: null,
+      isAdmin: true,
+    },
+    {
+      errors: {
+        provider: "Email is not available on this server: Turned off by the operator",
+      },
+    },
+  ),
 );

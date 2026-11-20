@@ -9,7 +9,7 @@ import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
 import { countHiddenSnapshots } from "../hidden-data.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
 import { buildUsageReport } from "../insights/usage-report.ts";
-import { unofferedIntegrations } from "../integrations.ts";
+import { offeredKinds, unofferedIntegrations, unofferedReason } from "../integrations.ts";
 import { pausedBannerShown } from "../notifications-pause.ts";
 import { renderAdminAiPage } from "../pages/admin-ai.tsx";
 import type { IntegrationsView } from "../pages/admin-system-integrations.tsx";
@@ -94,10 +94,10 @@ function reencryptMessage(result: { reencrypted: number; failed: number }): stri
  * hidden from their project and not delivered to (issue #1126).
  */
 async function integrationsView(db: DatabaseAdapter): Promise<IntegrationsView> {
-  const unoffered = unofferedIntegrations("notifiers");
-  const reasons = new Map(unoffered.map((entry) => [entry.kind, entry.reason]));
-  const names = new Map(unoffered.map((entry) => [entry.kind, entry.name]));
-  const rows = await new NotificationChannelModel(db).listByProviders([...reasons.keys()]);
+  const names = new Map(
+    unofferedIntegrations("notifiers").map((entry) => [entry.kind, entry.name]),
+  );
+  const rows = await new NotificationChannelModel(db).listOutsideProviders(offeredKinds());
   const projects = rows.length > 0 ? await new ProjectModel(db).list() : [];
   const byId = new Map(projects.map((project) => [project.id, project]));
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
@@ -110,7 +110,7 @@ async function integrationsView(db: DatabaseAdapter): Promise<IntegrationsView> 
       project: project
         ? { name: project.name, href: urls.settingsTab(project.slug, "review") }
         : null,
-      reason: reasons.get(row.provider) ?? "",
+      reason: unofferedReason(row.provider) ?? "",
     };
   });
   return { statuses: getStore().integrations ?? [], channels };

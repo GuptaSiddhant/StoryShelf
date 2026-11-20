@@ -29,8 +29,6 @@ export interface SettingsNotifyProvider {
   name: string;
   /** `message` providers send a message once; `state` providers (git hosts) show a build's state. */
   delivery: "message" | "state";
-  /** `person` kinds (email) can carry a member's own subscription; absent is not `person`. */
-  audience?: "person" | "room" | undefined;
 }
 
 /** Channel row as rendered in the notifications settings tab. */
@@ -422,12 +420,19 @@ export function renderSettingsNotifications(
   unoffered?: readonly UnofferedIntegrationView[],
 ): unknown {
   if (providers.length === 0) {
-    return <UnofferedNotice area="Notifications are" integrations={unoffered} />;
+    // A refused form (a stale page posting a kind no longer offered) still says why.
+    const refusal = formState?.globalError ?? formState?.errors?.["provider"];
+    return (
+      <>
+        {refusal ? <Alert tone="danger">{refusal}</Alert> : null}
+        <UnofferedNotice area="Notifications are" integrations={unoffered} />
+      </>
+    );
   }
   const messageProviders = providers.filter((provider) => provider.delivery === "message");
   const gitProviders = providers.filter((provider) => provider.delivery === "state");
-  // The personal card sends by email: it shows only while a `person` kind is offered.
-  const personal = providers.some((provider) => provider.audience === "person");
+  // The personal card's switches are about email: it shows only while email is offered.
+  const personal = providers.some((provider) => provider.kind === "email");
   return (
     <div class="grid max-w-form">
       <UnofferedNotice area="Some integrations are" integrations={unoffered} />

@@ -1,5 +1,5 @@
 /** Project and site-wide notification channel subscriptions. */
-import { eq, inArray, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { isStateProvider, type NotifierProvider } from "../adapters/notifier/provider.ts";
@@ -68,16 +68,17 @@ export class NotificationChannelModel {
   }
 
   /**
-   * Every channel, project or site-wide, whose provider is one of `kinds`: the System page lists
-   * those of a kind the server does not offer (issue #1126). Empty `kinds` reads nothing.
+   * Every channel, project or site-wide, whose provider is none of `kinds` (the kinds the server
+   * offers): the System page lists them, as they are kept but not delivered to (issue #1126).
+   * Empty `kinds` reads every channel.
    */
-  async listByProviders(kinds: readonly string[]): Promise<NotificationChannelRow[]> {
-    if (kinds.length === 0) {
-      return [];
-    }
-    return (await this.db.list(this.tables.notificationChannels, {
-      where: inArray(col(this.tables.notificationChannels, "provider"), [...kinds]),
-    })) as unknown as NotificationChannelRow[];
+  async listOutsideProviders(kinds: readonly string[]): Promise<NotificationChannelRow[]> {
+    // Channels are few per server; filtering here keeps the query plain on every dialect.
+    const rows = (await this.db.list(
+      this.tables.notificationChannels,
+    )) as unknown as NotificationChannelRow[];
+    const offered = new Set(kinds);
+    return rows.filter((row) => !offered.has(row.provider));
   }
 
   /** Create a channel (secret encrypted at rest when provided). */

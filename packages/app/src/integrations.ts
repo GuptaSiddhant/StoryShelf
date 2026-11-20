@@ -26,9 +26,25 @@ export function unofferedIntegrations(group: IntegrationStatus["group"]): Unoffe
     }));
 }
 
-/** Why a notifier kind is not offered, or undefined when it is (or is unknown to the server). */
+/** The reason given for a stored channel whose kind no registered notifier provides. */
+export const NOT_REGISTERED_REASON = "Not registered on this server";
+
+/** The kinds projects are offered: the store's notifiers are the available ones. */
+export function offeredKinds(): string[] {
+  return getStore().notifiers.map((provider) => provider.metadata.kind);
+}
+
+/**
+ * Why a stored channel of `kind` is held back, or undefined when its kind is offered: its
+ * integration's reason, or {@link NOT_REGISTERED_REASON} when no registered notifier provides it
+ * (a custom notifier removed from the server's code).
+ */
 export function unofferedReason(kind: string): string | undefined {
-  return unofferedIntegrations("notifiers").find((entry) => entry.kind === kind)?.reason;
+  if (offeredKinds().includes(kind)) {
+    return undefined;
+  }
+  const entry = unofferedIntegrations("notifiers").find((candidate) => candidate.kind === kind);
+  return entry?.reason ?? NOT_REGISTERED_REASON;
 }
 
 /**
