@@ -191,11 +191,11 @@ function LibraryHeader(props: {
       actions={
         <HStack>
           <FilterInput label="Filter stories" placeholder="Filter stories…" />
-          <Button variant="ghost" size="sm" icon="external-link" href={urls.short(build.id)}>
+          <Button variant="ghost" icon="external-link" href={urls.short(build.id)}>
             View Storybook
           </Button>
           {getStore().design.length > 0 ? (
-            <Button variant="ghost" size="sm" href={urls.designCoverage(project.slug)}>
+            <Button variant="ghost" href={urls.designCoverage(project.slug)}>
               Design coverage
             </Button>
           ) : null}

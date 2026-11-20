@@ -378,7 +378,7 @@ const statGroup = css`
   display: grid;
   gap: var(--space-4);
   /* Stays a row down to phone width; the grid breakpoint would stack three short stats. */
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 `;
 
 /** A row of `Stat`s: auto-fits columns, one gap, no grid utility. */
