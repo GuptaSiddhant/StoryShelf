@@ -3,9 +3,19 @@
 /** Characters that would change the Markdown of a cell or a link text, escaped with a backslash. */
 const MARKDOWN_SPECIAL = /[\\`*_{}[\]<>|#]/gu;
 
-/** Text from a story or a user, safe in a table cell or a link text on GitHub and GitLab. */
+/** A zero-width joiner: after an `@` it keeps GitHub and GitLab from reading a mention. */
+const INERT_AT = "@\u200D";
+
+/**
+ * Text from a story or a user, safe in a table cell or a link text on GitHub and GitLab. An `@`
+ * never starts a mention: a story named `@acme/button` must not notify a git host user or team.
+ */
 export function escapeText(text: string): string {
-  return text.replaceAll(/\s+/gu, " ").trim().replaceAll(MARKDOWN_SPECIAL, "\\$&");
+  return text
+    .replaceAll(/\s+/gu, " ")
+    .trim()
+    .replaceAll(MARKDOWN_SPECIAL, "\\$&")
+    .replaceAll("@", INERT_AT);
 }
 
 /** `1 change`, `3 changes`. */
