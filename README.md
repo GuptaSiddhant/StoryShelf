@@ -112,6 +112,10 @@ npm start                        # start the server
 - `apps/website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
 - `docs/architecture/` is the full architecture spec; `docs/adr/` records design decisions (older ADRs and plans are under `docs/adr/archive/` and `docs/archive/`).
 
+## Help and support
+
+Ask questions and share ideas in [GitHub Discussions](https://github.com/GuptaSiddhant/StoryShelf/discussions). File a bug with the [bug form](https://github.com/GuptaSiddhant/StoryShelf/issues/new?template=bug-report.yml). What the project promises about upgrades and support is on the [Upgrading and support](https://storyshelf.js.org/guides/support/) page.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the toolchain, verify, and worktree flow. Report vulnerabilities privately per [SECURITY.md](SECURITY.md). Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).

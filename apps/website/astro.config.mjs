@@ -47,6 +47,7 @@ export default defineConfig({
         alt: "",
       },
       components: {
+        Footer: "./src/components/overrides/Footer.astro",
         Hero: "./src/components/overrides/Hero.astro",
         SocialIcons: "./src/components/overrides/SocialIcons.astro",
         Sidebar: "./src/components/overrides/Sidebar.astro",
@@ -120,6 +121,7 @@ export default defineConfig({
             { label: "How it works", slug: "concepts/how-it-works" },
             { label: "Common setups", slug: "guides/recipes" },
             { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
+            { label: "Upgrading & support", slug: "guides/support" },
             {
               label: "Coming from other tools",
               collapsed: true,
