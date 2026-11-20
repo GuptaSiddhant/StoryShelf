@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { detectPackageRunner } from "../../config.ts";
-import { printError } from "../../output.ts";
+import { createReporter, printError } from "../../output.ts";
 import type { Answers } from "./init/answers.ts";
 import { printNextSteps } from "./init/next-steps.ts";
 import { collectAnswers } from "./init/prompts.ts";
@@ -58,8 +58,9 @@ export async function runServerInit(options: ServerInitOptions): Promise<void> {
   }
 
   const outDir = resolve(answers.dir);
-  await mkdir(outDir, { recursive: true });
-
-  await writeFiles(outDir, answers);
+  await createReporter().phase("Writing server project", "Wrote server project", async () => {
+    await mkdir(outDir, { recursive: true });
+    await writeFiles(outDir, answers);
+  });
   printNextSteps(answers, await detectPackageRunner(process.cwd()));
 }
