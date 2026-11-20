@@ -34,7 +34,8 @@ export interface ShelfLifecycle {
   readonly logger: Logger;
   /**
    * Fail-fast await for server startup (`await app.lifecycle.setup()`).
-   * Re-runs setup so transient failures are retryable; throws AdapterLifecycleError.
+   * Awaits the eager run on the first call (hooks run once) and re-runs setup after a failure or on
+   * later calls, so transient failures are retryable; throws AdapterLifecycleError.
    * Optional — when skipped, the first request gates on `ready` instead.
    */
   setup(): Promise<void>;

@@ -40,6 +40,8 @@ export interface LifecycleCell {
   consumerRun?: Promise<void>;
   /** Teardown ran: the consumer stays stopped (a late "adapters are ready" must not restart it). */
   consumerStopped?: boolean;
+  /** The eager run `attachLifecycle` started and no `setup()` has adopted yet: the first `setup()` awaits it instead of running every hook a second time. */
+  eager?: Promise<AdapterSetupResult>;
   /** How many teardowns have started: a setup attempt begun before one is stale and stops. */
   teardowns?: number;
 }
@@ -175,6 +177,7 @@ function kickSetup(
       ? await runAdapterPhase(options, ctx, logger)
       : { ok: false, failures: [] };
   })();
+  cell.eager = cell.ready;
   trackSettlement(cell, cell.ready);
   trackBackground(cell, cell.ready);
 }
@@ -357,6 +360,24 @@ function refuseFailedBoot(
 }
 
 /**
+ * The eager run's result when the first `setup()` can adopt it (it succeeded), else null: a failed
+ * eager run, or any later call, runs the hooks again so a transient failure is retryable.
+ */
+async function adoptEagerRun(
+  eager: Promise<AdapterSetupResult>,
+): Promise<AdapterSetupResult | null> {
+  const result = await eager;
+  return result.ok ? result : null;
+}
+
+/** Take the unadopted eager run off the cell, synchronously (a later call must publish its rerun in the same tick). */
+function takeEagerRun(cell: LifecycleCell): Promise<AdapterSetupResult> | undefined {
+  const eager = cell.eager;
+  cell.eager = undefined;
+  return eager;
+}
+
+/**
  * Run the adapter setups again. The run is published on the cell before it is awaited: readers
  * (the retention timer among them) must never see the previous run's result while a new setup is
  * still preparing the adapters.
@@ -412,7 +433,10 @@ function createLifecycle(
       }
       // Checked here, in the continuation itself: a teardown may start in any microtask before it.
       assertCurrent(cell, generation);
-      const result = await rerunSetup(options, ctx, logger, cell);
+      const eager = takeEagerRun(cell);
+      const result =
+        (eager ? await adoptEagerRun(eager) : null) ??
+        (await rerunSetup(options, ctx, logger, cell));
       resumeAfterSetup(cell, generation, result, logger);
     },
     teardown: async () => {

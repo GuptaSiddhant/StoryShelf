@@ -224,10 +224,13 @@ function fakeConsumer() {
   };
 }
 
-function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
+function lifecycleOf(
+  consumer: ReturnType<typeof fakeConsumer> | null,
+  given?: ResolvedShelfOptions,
+) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+  const options = given ?? ({ database: db, storage } as unknown as ResolvedShelfOptions);
   const runtime = {
     config: { branchTtlDays: null },
     logger: silentLogger,
@@ -244,6 +247,20 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
 }
 
 describe("setup rerun", () => {
+  it("runs each adapter hook once when the first setup() adopts the eager run", async () => {
+    const { db } = makeDatabase();
+    let runs = 0;
+    const storage = withSetupHook(makeStorage().storage, () => {
+      runs += 1;
+    });
+    const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+    const lifecycle = lifecycleOf(null, options);
+    await lifecycle.setup();
+    expect(runs).toBe(1);
+    await lifecycle.setup();
+    expect(runs).toBe(2);
+  });
+
   it("publishes the new run on the cell before it finishes", async () => {
     const { db } = makeDatabase();
     const hold = Promise.withResolvers<null>();
@@ -268,6 +285,7 @@ describe("setup rerun", () => {
     attachLifecycle(app, options, runtime, cell);
     await cell.ready;
     const lifecycle = (app as unknown as { lifecycle: { setup(): Promise<void> } }).lifecycle;
+    await lifecycle.setup();
 
     const rerun = lifecycle.setup();
     const published = cell.ready;
@@ -462,6 +480,8 @@ describe("boot checks and the adapter phase", () => {
       app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
     ).lifecycle;
     await cell.ready;
+    await lifecycle.setup();
+    consumer.start.mockClear();
     const pending = lifecycle.setup();
     const closing = lifecycle.teardown();
     gate.resolve(null);
