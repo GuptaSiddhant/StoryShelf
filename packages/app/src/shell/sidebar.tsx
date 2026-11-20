@@ -36,7 +36,7 @@ const shellSidebar = css`
     min-height: 40px;
     padding: 0 var(--space-2);
     color: var(--text-primary);
-    font-weight: 650;
+    font-weight: var(--weight-semibold);
     font-size: var(--text-lg);
     letter-spacing: -0.01em;
     text-decoration: none;
@@ -73,7 +73,7 @@ const shellSidebar = css`
     padding: 0 var(--space-3);
     color: var(--text-secondary);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     white-space: nowrap;
@@ -87,7 +87,7 @@ const shellSidebar = css`
     border-radius: var(--radius);
     color: var(--text-secondary);
     font-size: var(--text-base);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
     text-decoration: none;
     white-space: nowrap;
     transition:
@@ -102,7 +102,7 @@ const shellSidebar = css`
   .sidebar__link--active {
     background: var(--accent-subtle);
     color: var(--accent-fg);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
   }
   .sidebar__link--active:hover {
     background: var(--accent-subtle);

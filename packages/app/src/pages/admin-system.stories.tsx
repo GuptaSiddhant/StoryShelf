@@ -2,6 +2,7 @@
 import type { Meta } from "@storybook/html-vite";
 import { pageStory } from "../../.storybook/page.tsx";
 import type { HealthReport } from "../routers/health-report.ts";
+import type { IntegrationsView } from "./admin-system-integrations.tsx";
 import { renderAdminSystemPage, type AdminSystemData } from "./admin-system.tsx";
 
 const meta: Meta = { title: "Pages/Admin/System" };
@@ -102,6 +103,71 @@ export const UnverifiedDefaultBranch = pageStory(() =>
         { name: "Design system", slug: "design-system" },
         { name: "Web app", slug: "web-app" },
       ],
+    }),
+  ),
+);
+
+const integrationStatuses: IntegrationsView["statuses"] = [
+  { group: "notifiers", kind: "github", name: "GitHub", state: "available" },
+  { group: "notifiers", kind: "gitlab", name: "GitLab", state: "available" },
+  {
+    group: "notifiers",
+    kind: "email",
+    name: "Email",
+    state: "unavailable",
+    reason: "Email has no transport: set SMTP_HOST and SMTP_FROM or configure a sender",
+  },
+  { group: "notifiers", kind: "slack-webhook", name: "Slack", state: "available" },
+  {
+    group: "notifiers",
+    kind: "teams-workflow",
+    name: "Microsoft Teams",
+    state: "disabled",
+    reason: "Turned off by the operator",
+  },
+  { group: "design", kind: "figma", name: "Figma", state: "available" },
+];
+
+/** Every integration offered: the card lists them all, and no channel is held back. */
+export const IntegrationsAllAvailable = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      integrations: {
+        statuses: integrationStatuses.map((status) => ({
+          group: status.group,
+          kind: status.kind,
+          name: status.name,
+          state: "available",
+        })),
+        channels: [],
+      },
+    }),
+  ),
+);
+
+/** Email has no sender and Teams is turned off: their channels are kept, listed here, not delivered to. */
+export const IntegrationsTurnedOffChannels = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      integrations: {
+        statuses: integrationStatuses,
+        channels: [
+          {
+            id: "01JD000000000000000000CHN010",
+            provider: "email",
+            providerName: "Email",
+            project: { name: "Design System", href: "/projects/design-system/settings/review" },
+            reason: "Email has no transport: set SMTP_HOST and SMTP_FROM or configure a sender",
+          },
+          {
+            id: "01JD000000000000000000CHN011",
+            provider: "teams-workflow",
+            providerName: "Microsoft Teams",
+            project: null,
+            reason: "Turned off by the operator",
+          },
+        ],
+      },
     }),
   ),
 );

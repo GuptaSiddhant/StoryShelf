@@ -25,7 +25,7 @@ const option = css`
   color: var(--text-primary);
   font: inherit;
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   text-align: left;
   cursor: pointer;
   &:hover {

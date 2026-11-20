@@ -106,3 +106,12 @@ export const MetaStyles = jsxStory(() => (
     <MetaText as="pre">{"as pre:\n  line one\n  line two"}</MetaText>
   </VStack>
 ));
+
+/** Roles, providers and verdicts read in sentence case, like build statuses. */
+export const SentenceCaseLabels = jsxStory(() => (
+  <HStack>
+    {["admin", "viewer", "via password", "github", "slack", "error", "resolved"].map((label) => (
+      <Badge key={label}>{statusLabel(label)}</Badge>
+    ))}
+  </HStack>
+));

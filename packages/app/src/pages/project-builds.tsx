@@ -14,6 +14,7 @@ import {
   Segmented,
   SelectField,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
 import { GetStarted } from "./get-started.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
@@ -128,7 +129,11 @@ function BuildsToolbar(props: {
       (status) =>
         (status !== "skipped" || showsSkipped(filters)) &&
         (count(status) > 0 || filters.status === status),
-    ).map((status) => ({ label: `${status} ${count(status)}`, value: status, status })),
+    ).map((status) => ({
+      label: `${statusLabel(status)} ${count(status)}`,
+      value: status,
+      status,
+    })),
   ];
   return (
     <HStack justify="between">

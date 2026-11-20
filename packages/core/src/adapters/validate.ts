@@ -106,6 +106,14 @@ function hasSchemaParse(provider: unknown): boolean {
   return typeof (schema as { parse?: unknown } | undefined)?.parse === "function";
 }
 
+/** Reasons an optional `availability` is not a function. */
+function availabilityReasons(record: Record<string, unknown>): string[] {
+  const availability = record["availability"];
+  return availability === undefined || typeof availability === "function"
+    ? []
+    : ["availability must be a function"];
+}
+
 /** Reasons a notifier provider lacks its descriptor shape. */
 export function notifierReasons(provider: unknown): string[] {
   const record = asRecord(provider);
@@ -119,7 +127,7 @@ export function notifierReasons(provider: unknown): string[] {
   if (!hasSchemaParse(provider)) {
     reasons.push("metadata.schema must be a zod schema");
   }
-  return reasons;
+  return [...reasons, ...availabilityReasons(record)];
 }
 
 /** Reasons an email sender lacks its transport shape. */
@@ -146,7 +154,7 @@ export function designReasons(provider: unknown): string[] {
   if (missing.length > 0) {
     reasons.push(`missing methods: ${missing.join(", ")}`);
   }
-  return reasons;
+  return [...reasons, ...availabilityReasons(record)];
 }
 
 /** Required methods for a slot category. */
