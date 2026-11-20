@@ -69,7 +69,7 @@ rather than pushing and waiting.
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `image`, `affected`, `runner-{playwright,puppeteer}`,
+  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `image`, `affected`, `runner-{playwright,puppeteer}` (puppeteer deprecated),
   `notify-{git,chat,email}`, `design-figma`, `observability`, `ai`, `mcp`.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
@@ -135,7 +135,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   header only from `sandboxHeaders` (route family + `config.storybookHosting.mode`, ADR 0051: never
   `allow-same-origin`). Both token routes are rate-limited per IP in one bucket before the token is
   read; every refusal returns one identical 404 (`refuseToken`) with `Cache-Control: private,
-  no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
+no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
   what a token grants, or accept one purpose on the other's route (ADR 0051 allows only these two
   routes plus the content host's `/_x/` exchange, purpose `exchange`, with #358; nothing more). Only `signedCacheControl`
   (`packages/app/src/routers/capture-cache.ts`) may give a signed answer freshness: a success for a
@@ -168,8 +168,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `a11yViolationsOf` / `a11yFindingsOf` / `a11ySummaryOf`. `axe unavailable: <reason>` is a note, not
   a finding. Never change a status, failure set or git state because of a11y results.
 - **Settling and Storybook tests.** Runners wait for Storybook's own events through the public
-  `Channel.on` (`packages/runner-*/src/settle.ts`), falling back to `delay ?? 500`; keep the two
-  runners' copies identical. `projects.run_tests` (default off) runs `subtype: "test"` entries through
+  `Channel.on` (`packages/runner-*/src/settle.ts`), falling back to `delay ?? 500`. Puppeteer is
+  deprecated and gets fixes only until it is removed in 0.15.0 (ADR 0001, amendment 2026-11-20), so the two
+  `settle.ts` copies no longer have to match and new capture features go into Playwright only. `projects.run_tests` (default off) runs `subtype: "test"` entries through
   `runProjectTests`/`CaptureRunner.runTests`; results are stored once as JSON in
   `builds.test_results` (`BuildModel.setTestResults`). A failing test is a blocking failure; never
   render a test entry as a story or add a test table.

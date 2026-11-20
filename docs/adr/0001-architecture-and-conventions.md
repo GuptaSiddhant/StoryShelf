@@ -198,3 +198,15 @@ snippet) and `HttpRequestOptions` (`method`, `headers`, `json`, `timeoutMs` defa
   URLs are not sources and need their own ADRs.
 - **Package target.** 19 published packages, as ADR 0049 counts them (with `@storyshelf/storybook-addon`,
   ADR 0042). `storage-local` stays its own package (#367).
+
+## Amendment, 2026-11-20 (Puppeteer runner deprecated; owner)
+
+- **Decision.** `@storyshelf/runner-puppeteer` is deprecated in 0.14.0 and removed in 0.15.0 (#1243,
+  #1244). Playwright is the one supported capture runner: it covers Chromium, Firefox and WebKit and
+  reaches remote browsers over its own protocol and CDP, so it does everything Puppeteer does here.
+  Nothing we deploy uses Puppeteer, and before launch nobody depends on it.
+- **Why.** Two runners at parity doubles every capture feature, and they had already drifted (Puppeteer
+  lacks the capture retry, sandbox isolation, signed asset cache and passkey integration tests).
+- **Until removal.** Puppeteer gets fixes only; new capture features go into Playwright only, so the
+  rule that the two runners' `settle.ts` copies stay identical is lifted. The runner logs one
+  deprecation warning when the host binds its logger. Users re-baseline once after switching.

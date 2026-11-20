@@ -5,6 +5,10 @@ description: Lightweight Puppeteer CaptureRunner — Chromium-only screenshots w
 
 import { PackageManagers } from "starlight-package-managers";
 
+:::caution[Deprecated]
+`@storyshelf/runner-puppeteer` is deprecated in 0.14.0 and will be removed in 0.15.0. Use [`@storyshelf/runner-playwright`](/packages/runner-playwright/); see [Switching from Puppeteer to Playwright](#switching-from-puppeteer-to-playwright). Until then it gets fixes only, no new capture features.
+:::
+
 `@storyshelf/runner-puppeteer` is a lightweight `CaptureRunner` that renders Storybook screenshots with Puppeteer (`puppeteer-core` + `chrome-headless-shell`). It produces Chromium-only captures at a smaller image size than the Playwright runner. Wire it into `createShelfApp` through the `testing` option.
 
 For what the runner reads from a built Storybook (the preview page, the story index, `play`), see [How Storybook works](/concepts/how-storybook-works/).
@@ -59,3 +63,19 @@ With the project's `runA11y` flag on (the default; a project admin turns it off 
 ## When to use it
 
 Choose Puppeteer when image size or cold-start time dominates — single-browser deploys, Fly/Railway deployments, or CI images where you already ship a system Chromium. Choose Playwright when you need Firefox, WebKit, or Chrome channel selection per project.
+
+## Switching from Puppeteer to Playwright
+
+1. Install `@storyshelf/runner-playwright`, run `playwright install chromium` (or use an image that has it) and remove `@storyshelf/runner-puppeteer`.
+2. Change the import and factory: `createPuppeteerCaptureRunner` becomes `createPlaywrightCaptureRunner` from `@storyshelf/runner-playwright`.
+3. Map the options:
+
+| Puppeteer                                                                               | Playwright                                                                                                                              |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `executablePath` for a system Chrome, or `local("chrome", { executablePath })`          | `local("chrome", { channel: "chrome" })` (bare `"chrome"` uses the same channel; `chrome-beta` and `msedge` also work)                  |
+| `executablePath` for any other Chromium                                                 | No path option: `playwright install chromium` and the bare `"chromium"` target                                                          |
+| `args` (launch flags)                                                                   | No equivalent option                                                                                                                    |
+| `cdp({ name, endpoint, headers, sessions })` from `@storyshelf/runner-puppeteer/remote` | `remote({ name, protocol: "cdp", reach: "url", sessions, connect: { endpoint, headers } })` from `@storyshelf/runner-playwright/remote` |
+| `concurrency`, `navigationTimeoutMs`, `recycleBrowserEvery`, `reusePages`               | The same options on `createPlaywrightCaptureRunner`                                                                                     |
+
+4. Expect one new baseline. The capture fingerprint (browser build, platform, fonts) changes with the runner, so the first build on the default branch is accepted as an environment migration, and branch builds show differences to review. A CDP remote keeps its `chromium@<name>` target and its own baselines.

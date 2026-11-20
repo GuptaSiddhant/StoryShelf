@@ -5,7 +5,7 @@ description: Render captures in browsers on other machines, a self-hosted Playwr
 
 A server that launches every browser itself pays for every browser, and can only render the engines it can install. A **remote target** moves the browser elsewhere: the runner connects to a browser over a WebSocket instead of launching one, and everything else (the capture pipeline, diffs, baselines, review) is unchanged. The decisions are in ADR 0007.
 
-With only remote targets in `browsers`, the host needs no installed browsers at all (`playwright-core` or `puppeteer-core` only). It is not idle: diffing, parameter extraction, unzipping and, for some targets, serving the Storybook over the connection still run on it, and every screenshot comes back over the WebSocket.
+With only remote targets in `browsers`, the host needs no installed browsers at all (`playwright-core` only). It is not idle: diffing, parameter extraction, unzipping and, for some targets, serving the Storybook over the connection still run on it, and every screenshot comes back over the WebSocket.
 
 ## Targets and baselines
 
@@ -51,7 +51,7 @@ Credentials are operator-level: they are passed in the server's code, from the e
 | `azurePlaywright(...)` (experimental)       | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
 | `browserstack(...)` (experimental)          | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
 | `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
-| `cdp(...)`                                  | `@storyshelf/runner-puppeteer/remote`  | CDP                            | a Storybook URL                                     |
+| `cdp(...)` (deprecated)                     | `@storyshelf/runner-puppeteer/remote`  | CDP                            | a Storybook URL                                     |
 
 `remote()` is the generic constructor every preset is sugar over, so a provider without a preset needs no new release. A fixed service declares how it is reached and where:
 
@@ -249,7 +249,7 @@ remote({
 - A `close` that throws or exceeds `closeTimeoutMs` (default 30 s) leaves the resource `unknown`: the next connection calls `open` again and the idle timer retries the close. The error's class is logged, never its message.
 - **Shutdown.** `lifecycle.teardown()` (what the app runs on SIGTERM) aborts pending `connect` signals, releases every held lease as `cancelled`, then closes every pool at once, ignoring `idleMs`. There is no `close()` on the runner. Pools register themselves in a process-wide registry, so two apps in one process would close each other's pools, and tests must call `pool.dispose()`.
 
-**On the Puppeteer runner.** `cdp()` takes the same lifecycle: pass `connect` as a function (with `release`, `retry`, `timeouts`) instead of `endpoint`, and import `RemoteConnectError` and `refCounted` from `@storyshelf/runner-puppeteer/remote`. The context, release outcomes, error handling and shutdown behave as above (`purpose` is `render` or `tests`; Puppeteer has no parameter pre-pass). What differs is the protocol: CDP drives Chromium only, so `reach` is always `url` and every render needs a signed Storybook URL (a confirmed public origin and a server secret). The server must speak CDP (Chrome or Chromium with remote debugging), not Playwright's `run-server`. Puppeteer's `connect` cannot be aborted mid-handshake, so `signal` only stops a `connect` that is still pending; an open handshake runs to `timeouts.connectMs`.
+**On the Puppeteer runner (deprecated, removed in 0.15.0).** `cdp()` takes the same lifecycle: pass `connect` as a function (with `release`, `retry`, `timeouts`) instead of `endpoint`, and import `RemoteConnectError` and `refCounted` from `@storyshelf/runner-puppeteer/remote`. The context, release outcomes, error handling and shutdown behave as above (`purpose` is `render` or `tests`; Puppeteer has no parameter pre-pass). What differs is the protocol: CDP drives Chromium only, so `reach` is always `url` and every render needs a signed Storybook URL (a confirmed public origin and a server secret). The server must speak CDP (Chrome or Chromium with remote debugging), not Playwright's `run-server`. Puppeteer's `connect` cannot be aborted mid-handshake, so `signal` only stops a `connect` that is still pending; an open handshake runs to `timeouts.connectMs`.
 
 ```ts
 import { cdp, refCounted } from "@storyshelf/runner-puppeteer/remote";
@@ -304,7 +304,7 @@ Keep the proxy's secret and the platform token in the host's secrets. Only the c
 
 **Experimental presets.** `azurePlaywright` and `browserstack` are marked experimental: they were written against the providers' documentation and are **not verified against live infrastructure**, because no provider credentials were available to check them. Treat a first run as a trial, pin versions, and report what you find. The mark is `experimental: true` on the returned service and shows in the run's sizing log (`verification: "not verified against live infrastructure"`). It changes no behavior; it is removed once someone verifies the preset.
 
-- **Browserless** and other CDP services: `cdp({ name, endpoint, headers, sessions })` on the Puppeteer runner, or `remote({ protocol: "cdp", reach: "url", connect: { endpoint } })` on the Playwright runner (Chromium only, and noticeably lower fidelity than Playwright's own protocol, which is acceptable because the target is its own engine with its own baselines). Both need a Storybook URL.
+- **Browserless** and other CDP services: `remote({ protocol: "cdp", reach: "url", connect: { endpoint, headers } })` on the Playwright runner (the deprecated Puppeteer runner has `cdp({ name, endpoint, headers, sessions })`) (Chromium only, and noticeably lower fidelity than Playwright's own protocol, which is acceptable because the target is its own engine with its own baselines). Both need a Storybook URL.
 - **Azure Playwright Workspaces** (experimental): `azurePlaywright({ endpoint, token, os, sessions })`, with the workspace's browser endpoint (`PLAYWRIGHT_SERVICE_URL`) and access token; it passes `os` and the API version as query parameters.
 - **BrowserStack** (experimental): `browserstack({ username, accessKey, os, browserVersion, engines, sessions })`; the credentials travel in the connection's capabilities and are scrubbed from messages. Needs a Storybook URL.
 - Real devices and real Safari go through WebDriver and Appium, not a connect endpoint, and are not covered.
