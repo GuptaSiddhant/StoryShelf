@@ -69,7 +69,10 @@ function cacheKey(creds: AppCredentials): string {
 }
 
 /** An App JWT (RS256), valid for nine minutes; `now` is in milliseconds. */
-export function signAppJwt(creds: AppCredentials, now: number): string {
+export function signAppJwt(
+  creds: Pick<AppCredentials, "appId" | "privateKey">,
+  now: number,
+): string {
   const seconds = Math.floor(now / 1000);
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   // `iat` is backdated a minute to allow for clock drift, as GitHub recommends.

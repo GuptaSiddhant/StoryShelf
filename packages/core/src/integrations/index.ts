@@ -81,6 +81,8 @@ export {
   logConfigSchema,
 } from "./git/index.ts";
 
+export * from "./git/connections/index.ts";
+
 export {
   assertUniqueKinds,
   resolveIntegrationGroup,

@@ -175,6 +175,13 @@ export {
   type GitRepositoryLinkTables,
 } from "./git-repository-link.ts";
 export { GitRepositoryTakenError } from "./git-repository-taken-error.ts";
+export {
+  GitConnectionModel,
+  type GitConnection,
+  type GitConnectionInput,
+  type GitConnectionTables,
+} from "./git-connection.ts";
+export { ManagedGitConnectionError } from "./managed-git-connection-error.ts";
 export { SiteSettingsModel, type SiteSettingsTables } from "./site-settings.ts";
 export {
   PUBLIC_ORIGIN_KEY,

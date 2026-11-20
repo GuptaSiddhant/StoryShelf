@@ -9,6 +9,7 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { ShelfGitOptions } from "./integrations/git/connections/types.ts";
 import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
   storybookHostingSchema,
@@ -633,6 +634,12 @@ export interface ShelfOptions {
   design?: IntegrationOption<DesignProvider>;
   /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
+  /**
+   * Server-wide git connections and approved repository links managed by configuration (ADR 0054,
+   * decision 9): `githubApp(...)`, `gitlabGroup(...)` or `gitFromEnv(env)` from
+   * `@storyshelf/core/integrations`. A configured connection wins over a stored one with its id.
+   */
+  git?: ShelfGitOptions;
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;
