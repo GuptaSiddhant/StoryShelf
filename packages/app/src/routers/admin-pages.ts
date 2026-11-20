@@ -96,6 +96,7 @@ function reencryptMessage(result: { reencrypted: number; failed: number }): stri
 async function integrationsView(db: DatabaseAdapter): Promise<IntegrationsView> {
   const unoffered = unofferedIntegrations("notifiers");
   const reasons = new Map(unoffered.map((entry) => [entry.kind, entry.reason]));
+  const names = new Map(unoffered.map((entry) => [entry.kind, entry.name]));
   const rows = await new NotificationChannelModel(db).listByProviders([...reasons.keys()]);
   const projects = rows.length > 0 ? await new ProjectModel(db).list() : [];
   const byId = new Map(projects.map((project) => [project.id, project]));
@@ -105,6 +106,7 @@ async function integrationsView(db: DatabaseAdapter): Promise<IntegrationsView> 
     return {
       id: row.id,
       provider: row.provider,
+      providerName: names.get(row.provider) ?? row.provider,
       project: project
         ? { name: project.name, href: urls.settingsTab(project.slug, "review") }
         : null,

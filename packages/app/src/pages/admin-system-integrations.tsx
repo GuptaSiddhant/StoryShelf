@@ -6,6 +6,8 @@ import { Badge, Card, Meta, SectionTitle, Table, VStack } from "../ui/components
 export interface UndeliveredChannelView {
   id: string;
   provider: string;
+  /** The provider's display name ("Email"), shown instead of its kind. */
+  providerName: string;
   /** The owning project and its notification settings, or null for a site-wide channel. */
   project: { name: string; href: string } | null;
   reason: string;
@@ -19,9 +21,9 @@ export interface IntegrationsView {
 }
 
 const STATE_LABEL: Record<IntegrationState, string> = {
-  available: "available",
-  unavailable: "unavailable",
-  disabled: "turned off",
+  available: "Available",
+  unavailable: "Unavailable",
+  disabled: "Turned off",
 };
 
 const STATE_TONE: Record<IntegrationState, "success" | "warning" | "neutral"> = {
@@ -92,7 +94,7 @@ function UndeliveredChannels(props: {
                     )}
                   </td>
                   <td>
-                    <Badge tone="neutral">{channel.provider}</Badge>
+                    <Badge tone="neutral">{channel.providerName}</Badge>
                   </td>
                   <td>
                     <Meta as="span">{channel.reason}</Meta>

@@ -155,12 +155,14 @@ export const IntegrationsTurnedOffChannels = pageStory(() =>
           {
             id: "01JD000000000000000000CHN010",
             provider: "email",
+            providerName: "Email",
             project: { name: "Design System", href: "/projects/design-system/settings/review" },
             reason: "Email has no transport: set SMTP_HOST and SMTP_FROM or configure a sender",
           },
           {
             id: "01JD000000000000000000CHN011",
             provider: "teams-workflow",
+            providerName: "Microsoft Teams",
             project: null,
             reason: "Turned off by the operator",
           },

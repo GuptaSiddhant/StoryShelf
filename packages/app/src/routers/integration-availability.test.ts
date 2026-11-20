@@ -144,7 +144,7 @@ describe("integrations the server cannot deliver (#1126)", () => {
     const { app } = await seed();
     const html = await (await app.request("/admin", as("sa"))).text();
     expect(html).toContain('id="integrations"');
-    expect(html).toContain("unavailable");
+    expect(html).toContain("Unavailable");
     expect(html).toContain("Email has no transport");
     expect(html).toContain("Channels not delivered to");
     expect(html).toContain("Notify Project");
