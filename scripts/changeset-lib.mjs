@@ -158,7 +158,7 @@ export function unknownReleases(changesets, known) {
 /** The body a new changeset starts with when no message is given: CI rejects a changeset that keeps it. */
 export const PLACEHOLDER_BODY = `<Kind>: <what a user sees, one line of at most ${SUMMARY_MAX} characters> (Kind: ${KINDS.join(", ")})
 
-<The details for CHANGELOG.md, with the issue numbers.>`;
+<The details for CHANGELOG.md, with the issue numbers. A schema change adds a line starting "Schema:"; a Chromium change adds "Browser: <old> → <new>".>`;
 
 /**
  * The text of a new changeset file.

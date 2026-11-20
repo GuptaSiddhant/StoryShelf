@@ -124,6 +124,7 @@ export default defineConfig({
             { label: "How it works", slug: "concepts/how-it-works" },
             { label: "Common setups", slug: "guides/recipes" },
             { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
+            { label: "When the browser changes", slug: "guides/browser-changes" },
             { label: "Upgrading & support", slug: "guides/support" },
             {
               label: "Coming from other tools",

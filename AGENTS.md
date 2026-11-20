@@ -257,6 +257,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   first and written one release later; backfills are batched, idempotent jobs, never boot work.
   Until the claim filter and payload version land, ship no new job kind or status value. A schema
   change's changeset carries a `Schema:` line.
+- **Browser changes are named in release notes.** A change that moves the Chromium build (a new `playwright-core`, a new base image) carries a `Browser:` line in its changeset details, e.g. `Browser: Chromium 130.0 → 131.0 (Playwright 1.62 → 1.63)`; operators then re-baseline per `apps/website/src/content/docs/guides/browser-changes.md`. Until ADR 0038 is built, no migration review exists.
 - **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 
 ## Conventions

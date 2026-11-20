@@ -47,6 +47,8 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 **Every story is `new` on a feature branch.** Baselines come from the default branch, so there must be a build of it first. Upload a build from your default branch, and check the project's default branch setting (`git_default_branch`, `main` unless you changed it) matches your repository. See [Baselines & branches](/concepts/baselines/).
 
+**Many stories changed at once after an upgrade.** A new image or `playwright-core` brings a new Chromium, which moves pixels. Look for the **Capture environment changed** notice on the build. See [When the browser changes](/guides/browser-changes/) for what happens and how to re-baseline a project.
+
 **Stories show tiny diffs that nobody changed.** The usual causes are animation, time, random data and fonts. The runner disables animations; for the rest, give a story a `delay`, a `diffThreshold` or `pauseAnimationAtEnd` parameter, make its data deterministic, or set the project's `pixel_threshold` and `max_diff_ratio`. Because capture runs on the server, screenshots do not differ because CI ran on a different machine. See [Modes](/guides/modes/) and [Interaction testing](/guides/interaction-testing/).
 
 **"Baseline changed since this build was captured", or an approval is refused with `409 baseline_changed`.** Another build moved the baseline after this one was captured. **Re-diff** compares the stored screenshots with the baseline that applies now, without rendering; **Retry capture** renders everything again. See [Baselines & branches](/concepts/baselines/).
