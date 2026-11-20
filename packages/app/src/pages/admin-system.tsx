@@ -26,6 +26,7 @@ import {
 import { UnverifiedDefaultNotice, type UnverifiedDefaultProject } from "./admin-system-branch.tsx";
 import { IntegrationsCard, type IntegrationsView } from "./admin-system-integrations.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
+import { RuntimeStatusCard } from "./admin-system-status.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { RetentionPausedNotice } from "./retention-paused.tsx";
@@ -120,7 +121,7 @@ function AdapterRow(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { adapter } = props;
   return (
-    <tr key={`${adapter.category}/${adapter.kind}`}>
+    <tr key={`${adapter.category}/${adapter.kind}/${adapter.name}`}>
       <td>
         <strong>{adapter.name}</strong>
         {adapter.description ? <Meta as="div">{adapter.description}</Meta> : null}
@@ -180,7 +181,10 @@ function AdapterTable(props: AdapterTableProps): HtmlEscapedString | Promise<Htm
         </thead>
         <tbody>
           {report.adapters.map((adapter) => (
-            <AdapterRow key={`${adapter.category}/${adapter.kind}`} adapter={adapter} />
+            <AdapterRow
+              key={`${adapter.category}/${adapter.kind}/${adapter.name}`}
+              adapter={adapter}
+            />
           ))}
         </tbody>
       </table>
@@ -341,6 +345,16 @@ function CaptureCards(props: {
   );
 }
 
+function RuntimeSection(props: {
+  rows: HealthReport["statuses"];
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <div class="mt-1">
+      <RuntimeStatusCard rows={props.rows} />
+    </div>
+  );
+}
+
 /** The integrations card, anchored for the settings pages' link; absent when no status is known. */
 function IntegrationsSection(props: {
   view: IntegrationsView | undefined;
@@ -384,6 +398,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
       <TestingNotice data={data} />
       <ServerFacts data={data} />
       <CaptureCards data={data} />
+      <RuntimeSection rows={report.statuses} />
       {credentials ? (
         <div class="mt-1">
           <CredentialsCard probe={credentials} config={config} />

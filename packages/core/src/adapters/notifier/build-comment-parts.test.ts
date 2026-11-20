@@ -34,6 +34,12 @@ describe("build-comment-text", () => {
   it("escapes Markdown and collapses whitespace", () => {
     expect(escapeText(" a|b\n*c* ")).toBe("a\\|b \\*c\\*");
   });
+
+  it("never leaves a bare @ that could mention a git host user or team", () => {
+    const escaped = escapeText("@acme/button and @team");
+    expect(escaped).not.toMatch(/@(?!\u200D)/u);
+    expect(escaped.replaceAll("\u200D", "")).toBe("@acme/button and @team");
+  });
 });
 
 describe("build-comment-headline", () => {

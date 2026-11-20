@@ -231,6 +231,20 @@ describe("buildCommentMarkdown: limits and safety", () => {
     expect(markdown).toContain("A \\| \\<b\\>x\\</b\\> \\[y\\](z) \\`c\\`");
   });
 
+  it("posts no live mention for a story, test or removed story named like a user", () => {
+    const markdown = buildCommentMarkdown(
+      input({
+        changes: [change(1, { story: "@acme/button / Primary", target: "@acme" })],
+        failedTests: ["@acme/form"],
+        removed: ["@acme/old"],
+        failure: "@acme",
+        status: "reviewing",
+      }),
+    );
+    expect(markdown).toContain("@\u200Dacme/button");
+    expect(markdown).not.toMatch(/@(?!\u200D)acme/u);
+  });
+
   it("is one line for a skipped build, with or without its source", () => {
     expect(skippedCommentMarkdown({ buildUrl: "u", source: { sha: "abc1234", url: "s" } })).toBe(
       "### ⏭️ StoryShelf: Skipped: no story changed since [`abc1234`](s) · [Build](u)",
