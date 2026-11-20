@@ -91,10 +91,10 @@ locals {
   # Environment variable -> Container App secret name.
   secret_env = merge(
     {
-      "SECRET"                   = "shelf-secret"
-      "ADMIN_TOKEN"              = "admin-token"
-      "OIDC_CLIENT_SECRET"       = "oidc-client-secret"
-      "DATABASE_URL"             = "database-url"
+      "SECRET"             = "shelf-secret"
+      "ADMIN_TOKEN"        = "admin-token"
+      "OIDC_CLIENT_SECRET" = "oidc-client-secret"
+      "DATABASE_URL"       = "database-url"
     },
     local.playwright ? {
       "PLAYWRIGHT_SERVICE_URL"          = "playwright-endpoint"
