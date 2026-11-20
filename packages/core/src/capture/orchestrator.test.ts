@@ -15,9 +15,12 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { verifyStorybookToken } from "../utils/storybook-token.ts";
+import { abortableLease } from "./job-lease.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
+import { leaseProgress } from "./progress.ts";
 import { buildScratchDir } from "./scratch.ts";
 import { parseTestResults, summarizeTests } from "./tests.ts";
 import { SignedUrlLifetimeError } from "./token-chunks.ts";
@@ -384,11 +387,12 @@ describe("executeCaptureJob", () => {
     const { db, buildId, options } = await setupBrowsers({});
     const progress = vi.fn();
 
-    // The fake runner hands its capture back at the end, not streamed: all progress is the persist.
+    // The fake runner hands its capture back at the end, not streamed: besides the check as the
+    // pass starts, all progress is the persist.
     await executeCaptureJob({ buildId, progress }, options);
 
     expect(await db.list(db.tables.snapshots)).toHaveLength(1);
-    expect(progress).toHaveBeenCalledTimes(1);
+    expect(progress).toHaveBeenCalledTimes(2);
   });
 
   it("records the runner's reported environment in the baseline fingerprint", async () => {
@@ -743,6 +747,32 @@ describe("executeCaptureJob", () => {
         expect.arrayContaining(["chromium", "chromium@grid"]),
       );
       expect(rows).toHaveLength(2);
+    });
+
+    it("stops a job cancelled mid-render: no further pass on any target, and nothing written (#1154)", async () => {
+      const { db, buildId, options } = await setupBrowsers({
+        browsers: '["chromium@sprite","chromium"]',
+      });
+      (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+        { target: "chromium@sprite", reach: "loopback", status: "ready" },
+        { target: "chromium", reach: "loopback", status: "ready" },
+      ];
+      const controller = new AbortController();
+      const render = vi.fn(async () => {
+        await Promise.resolve();
+        // The consumer saw the cancel: it aborted the job's signal, and `runner.cancel` ended this render.
+        controller.abort(new Error("job cancelled"));
+        throw new Error("Capture cancelled");
+      });
+      options.runner.render = render;
+      const progress = leaseProgress(abortableLease({ touch: () => {} }, controller.signal));
+
+      await expect(executeCaptureJob({ buildId, progress }, options)).rejects.toBeInstanceOf(
+        JobAbortedError,
+      );
+      expect(render).toHaveBeenCalledTimes(1);
+      expect((await db.get(db.tables.builds, buildId))?.status).not.toBe("failed");
+      expect(await db.list(db.tables.snapshots)).toEqual([]);
     });
 
     it("keeps a URL target unavailable until a secret and a public origin exist", async () => {

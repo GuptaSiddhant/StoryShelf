@@ -29,6 +29,8 @@ export interface LivenessBody {
   version: string;
   /** Whether this instance has the `testing` option (capture, compare, baselines; ADR 0006). */
   testing: boolean;
+  /** Whether this instance has an auth adapter; without one every operation is permitted (ADR 0008). */
+  auth: boolean;
 }
 
 /** Per-adapter readiness entry (error text sanitized — no secrets). */
@@ -66,6 +68,7 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
       uptimeSecs: Math.floor((Date.now() - deps.bootTimeMs) / 1000),
       version: deps.version,
       testing: testingEnabled(),
+      auth: getStore().authEnabled,
     };
     c.header("Cache-Control", "no-store");
     return c.json(body);

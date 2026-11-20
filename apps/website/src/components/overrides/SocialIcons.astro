@@ -2,7 +2,7 @@
 /** Header: text links to the docs, the packages and the HTTP API, then Starlight's social icons. */
 import Default from "@astrojs/starlight/components/SocialIcons.astro";
 
-import { sectionLinks, sectionOf } from "./sections";
+import { DISCUSSIONS_URL, sectionLinks, sectionOf } from "./sections";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/u, "");
 const section = sectionOf(Astro.url.pathname, base);
@@ -17,6 +17,7 @@ const links = sectionLinks(base);
       </a>
     ))
   }
+  <a href={DISCUSSIONS_URL}>Discussions</a>
 </nav>
 <Default {...Astro.props}><slot /></Default>
 

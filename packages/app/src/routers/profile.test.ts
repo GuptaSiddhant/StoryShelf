@@ -120,7 +120,7 @@ describe("profile page", () => {
     });
     const html = await (await app.request("/profile", { headers: session })).text();
     expect(html).not.toContain("javascript:");
-    expect(html).toContain("A</span>");
+    expect(html).toContain("AD</span>");
   });
 
   it("updates the display name override", async () => {

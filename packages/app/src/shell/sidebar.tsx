@@ -232,7 +232,7 @@ const shellSidebar = css`
     html[data-sidebar="rail"] & .sidebar__footer summary {
       justify-content: center;
     }
-    html[data-sidebar="rail"] & .sidebar__footer summary > svg:last-child {
+    html[data-sidebar="rail"] & .sidebar__footer summary > [data-dropdown-chevron] {
       display: none;
     }
     html[data-sidebar="rail"] & .sidebar__tools {

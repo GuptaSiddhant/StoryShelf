@@ -49,6 +49,17 @@ set_demo_ai_profile() {
   esac
 }
 
+# The demo is public (#809): the repository is public, so every branch's builds may be opened without
+# an account (diffs, Library, Storybook). Verdicts, comments and settings still need sign-in. The create
+# endpoint has no such field, so it is a PATCH, set only when it differs; a re-run is a no-op.
+set_demo_public() {
+  local current
+  current="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG" | jq -r '.publicBranchRegex // empty')"
+  [ "$current" = ".*" ] && return 0
+  curl -fsS "${AUTH[@]}" -X PATCH "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
+    -d '{"publicBranchRegex":".*"}'
+}
+
 sha_for() { printf '%s:%s' "$1" "$(sha256sum "$STATIC/index.json" | cut -c1-64)" | sha256sum | cut -c1-40; }
 MAIN_SHA="$(sha_for main)"
 FEATURE_SHA="$(sha_for feature/new-button)"
@@ -64,6 +75,7 @@ case "$CODE" in
       '[.[] | select(.status != "failed") | .gitSha] | (index($a) != null) and (index($b) != null)' \
       "$BUILDS_FILE" >/dev/null; then
       set_demo_browser
+      set_demo_public
       set_demo_ai_profile
       echo "Demo project is up to date; nothing to do."
       exit 0
@@ -84,6 +96,7 @@ curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
   -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main","requireVerifiedDefault":false}'
 # Before the first upload, so the first build already renders on the chosen target.
 set_demo_browser
+set_demo_public
 set_demo_ai_profile
 
 # --full on both uploads: the fixture now builds with preview-stats.json, and no source file

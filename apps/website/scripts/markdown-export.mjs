@@ -4,11 +4,13 @@ import { select, selectAll } from "hast-util-select";
 //   dist/<page>/index.md   the page as Markdown (what "Copy page as Markdown" copies)
 //   dist/llms.txt          an index of the docs, grouped like the sidebar (https://llmstxt.org)
 //   dist/llms-full.txt     every docs page in one file (without the long changelog)
+//   dist/llms-<name>.txt   section bundles (scripts/llms-config.mjs), each with a version stamp
 //
 // The Markdown comes from the rendered HTML, not the source files, so shared README sections,
 // components and generated tables are included exactly as readers see them. The generated
 // TypeScript reference (`/reference/**`) and the HTTP API pages (`/api/**`) are left out of the
 // full text: they are linked instead.
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import rehypeParse from "rehype-parse";
@@ -16,6 +18,7 @@ import rehypeRemark from "rehype-remark";
 import remarkGfm from "remark-gfm";
 import remarkStringify from "remark-stringify";
 import { unified } from "unified";
+import { BUNDLES } from "./llms-config.mjs";
 
 const DIST = "dist";
 const SITE = (process.env.SITE_URL ?? "https://storyshelf.js.org").replace(/\/$/u, "");
@@ -258,10 +261,31 @@ const packagesMenu = sidebarOf("packages/index.html");
 const apiGuides = ["/guides/api/", "/guides/webhooks/"].map((href) => `${BASE}${href}`);
 const referenceDirs = readdirSync(join(DIST, "reference")).toSorted();
 
+/** The short commit this build came from (CI sets `GITHUB_SHA`; a local build asks git). */
+function shortSha() {
+  const fromEnv = process.env.GITHUB_SHA;
+  if (fromEnv) return fromEnv.slice(0, 7);
+  try {
+    return execFileSync("git", ["rev-parse", "--short=7", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+/** "Describes StoryShelf 0.13.0 (built from abc1234 on 2026-11-19)": the version is the CLI's. */
+function versionStamp() {
+  const cli = JSON.parse(readFileSync("../../packages/cli/package.json", "utf8"));
+  const date = new Date().toISOString().slice(0, 10);
+  return `Describes StoryShelf ${cli.version} (built from ${shortSha()} on ${date})`;
+}
+
+const stamp = versionStamp();
+
 const index = [
   "# StoryShelf",
+  `> ${stamp}`,
   "> Self-hosted visual testing for Storybook: run visual regression tests in CI, review pixel diffs in the browser, approve changes before they ship, and publish the Storybook. Unlimited snapshots, no vendor lock-in.",
-  `Every page below is available as Markdown at its URL plus \`index.md\`. The whole documentation is in one file: [llms-full.txt](${SITE}/llms-full.txt).`,
+  `Every page below is available as Markdown at its URL plus \`index.md\`. The whole documentation is in one file: [llms-full.txt](${SITE}/llms-full.txt), or in parts: ${BUNDLES.map((bundle) => `[${bundle.file}](${SITE}/${bundle.file})`).join(", ")}. See [Set up with an AI agent](${SITE}${BASE}/guides/ai-agent-setup/).`,
   ...sections(docsMenu, pages),
   ...sections(packagesMenu, pages, "Packages: "),
   `## HTTP API\n\n${[
@@ -290,6 +314,32 @@ const full = ordered
   .filter((page) => !page.url.endsWith("/changelog/") && !seen.has(page.url) && seen.add(page.url))
   .map((page) => page.markdown.trim())
   .join("\n\n---\n\n");
-writeFileSync(join(DIST, "llms-full.txt"), `${full}\n`);
+writeFileSync(join(DIST, "llms-full.txt"), `> ${stamp}\n\n${full}\n`);
 
-process.stdout.write(`markdown export: ${pages.size} pages, llms.txt, llms-full.txt\n`);
+/** The pages of one bundle: its sidebar groups in order, then its extra pages. */
+function pagesOfBundle(bundle) {
+  const groups = bundle.groups.flatMap((label) => {
+    const group = docsMenu.find((entry) => entry.label === label);
+    return group ? orderOf(group.items ?? [], pages) : [];
+  });
+  const extra = (bundle.pages ?? []).flatMap((href) => pages.get(`${BASE}${href}`) ?? []);
+  const unique = new Map([...groups, ...extra].map((page) => [page.url, page]));
+  const dropped = new Set(
+    ["/changelog/", ...(bundle.exclude ?? [])].map((href) => `${SITE}${BASE}${href}`),
+  );
+  return [...unique.values()].filter((page) => !dropped.has(page.url));
+}
+
+for (const bundle of BUNDLES) {
+  const head = [
+    `# ${bundle.title}`,
+    `> ${stamp}`,
+    `${bundle.about} The index of every page is [llms.txt](${SITE}/llms.txt); the REST API is described by [openapi.json](${SITE}/openapi.json).`,
+  ].join("\n\n");
+  const body = pagesOfBundle(bundle).map((page) => page.markdown.trim());
+  writeFileSync(join(DIST, bundle.file), `${[head, ...body].join("\n\n---\n\n")}\n`);
+}
+
+process.stdout.write(
+  `markdown export: ${pages.size} pages, llms.txt, llms-full.txt, ${BUNDLES.map((bundle) => bundle.file).join(", ")}\n`,
+);

@@ -121,6 +121,18 @@ describe("trySkipUnchanged", () => {
     expect(lines).toEqual(["Skipped: no story changed since basesha (build b9)"]);
   });
 
+  it("prints the build page link when the server sent its path", async () => {
+    affected([], []);
+    const { client } = fakeClient({
+      createSkipped: async () => ({ build: { id: "b9" }, buildUrl: "/projects/demo/builds/b9" }),
+    });
+    await trySkipUnchanged(client, ctx({ url: "https://shelf.test/" }));
+    expect(lines).toEqual([
+      "Skipped: no story changed since basesha (build b9)",
+      "View the build: https://shelf.test/projects/demo/builds/b9",
+    ]);
+  });
+
   it("uploads normally when the hint is null", async () => {
     const { client, createSkipped } = fakeClient({ skipSource: async () => null });
     await expect(trySkipUnchanged(client, ctx())).resolves.toBe(false);

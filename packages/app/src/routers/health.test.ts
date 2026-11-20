@@ -103,6 +103,15 @@ describe("health endpoints", () => {
     expect(body.uptimeSecs).toBeGreaterThanOrEqual(0);
     expect(typeof body.version).toBe("string");
     expect((body as { testing?: boolean }).testing).toBe(false);
+    expect((body as { auth?: boolean }).auth).toBe(false);
+  });
+
+  it("GET /api/v1/health reports whether sign-in is on", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({ database: db, storage, auth: adminAuth, logger: silentLogger });
+    const body = (await (await app.request("/api/v1/health")).json()) as { auth: boolean };
+    expect(body.auth).toBe(true);
   });
 
   it("GET /api/v1/health stays 200 after failed setup", async () => {

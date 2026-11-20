@@ -1,7 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { ContentCollectingError, recordContentUses } from "@storyshelf/core/capture";
-import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
+import { contentHostSuffix, DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel, PackageUsageModel } from "@storyshelf/core/models";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import {
   CONTENT_HASH_PATTERN,
   contentKey,
@@ -146,8 +147,15 @@ export function registerBuilds(app: ShelfRouter): void {
     );
     const build = await createBuildRecord(project, c.req.valid("json"));
     const uploadUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/zip`;
+    const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
     return c.json(
-      { build, uploadUrl, baselineSha: build.baselineSha, testing: getStore().testing },
+      {
+        build,
+        uploadUrl,
+        buildUrl: urls.build(project.slug, build.id),
+        baselineSha: build.baselineSha,
+        testing: getStore().testing,
+      },
       202,
     );
   });
@@ -316,6 +324,10 @@ const buildCreatedSchema = z
   .object({
     build: buildSchema,
     uploadUrl: z.string(),
+    buildUrl: z.string().openapi({
+      description:
+        "Path of the build page, from the server's URL builder. Never absolute: a client joins it to the server URL it already uses.",
+    }),
     baselineSha: z.string().nullable(),
     testing: z.boolean().openapi({
       description:
