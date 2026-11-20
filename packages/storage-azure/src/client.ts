@@ -1,3 +1,4 @@
+import { DefaultAzureCredential, type TokenCredential } from "@azure/identity";
 import {
   BlobServiceClient,
   StorageSharedKeyCredential,
@@ -42,7 +43,23 @@ function resolveFromAccount(options: AzureStorageOptions, containerName: string)
     const token = options.sasToken.replace(/^\?/u, "");
     return new BlobServiceClient(`${url}?${token}`).getContainerClient(containerName);
   }
-  return new BlobServiceClient(url).getContainerClient(containerName);
+  return new BlobServiceClient(url, credentialFor(options)).getContainerClient(containerName);
+}
+
+/**
+ * The Entra credential for an account with no key or SAS token: the one given, else
+ * `DefaultAzureCredential` (managed identity on Azure, `az login` locally). `managedIdentityClientId`
+ * picks a user-assigned identity. The credential never appears in a message or a log.
+ */
+function credentialFor(options: AzureStorageOptions): TokenCredential {
+  return (
+    options.credential ??
+    new DefaultAzureCredential(
+      options.managedIdentityClientId === undefined
+        ? {}
+        : { managedIdentityClientId: options.managedIdentityClientId },
+    )
+  );
 }
 
 function buildAccountUrl(accountName: string | undefined): string | undefined {

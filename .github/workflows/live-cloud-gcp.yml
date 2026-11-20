@@ -69,8 +69,8 @@ jobs:
 
   # The customer path (#892, ADR 0050): apply the GCP module's `examples/minimal` with the current
   # release image, smoke-test the running stack, destroy it. Real GCP, billed: it runs only when the
-  # repository variable LIVE_GCP_MODULE_APPLY is "1", which stays off until the image selects GCS
-  # from GCS_BUCKET (see the module README, "Image contract"). Uses the same GCP secrets as live-gcp.
+  # repository variable LIVE_GCP_MODULE_APPLY is "1", which the owner turns on (billed). The image
+  # selects GCS from GCS_BUCKET (see the module README, "Image contract"). Uses the same GCP secrets as live-gcp.
   # Destroy runs even when the apply or the smoke test fails.
   module-apply:
     runs-on: ubuntu-latest

@@ -7,6 +7,8 @@ import { createPostgresDatabase } from "@storyshelf/db-postgres";
 import { createRdsIamDatabase, type RdsIamDatabaseOptions } from "@storyshelf/db-postgres/rds-iam";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { azurePlaywright } from "@storyshelf/runner-playwright/remote";
+import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage-azure";
+import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage-gcs";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
 /** Choices the product image makes from its environment (adapters, capture, remote browsers). */
@@ -27,6 +29,8 @@ export interface Factories {
   rdsIam(options: RdsIamDatabaseOptions): DatabaseAdapter;
   mysql(url: string, ca?: string): DatabaseAdapter;
   s3(options: S3StorageOptions): StorageAdapter;
+  gcs(options: GcsStorageOptions): StorageAdapter;
+  azure(options: AzureStorageOptions): StorageAdapter;
   local(dataDir: string): StorageAdapter;
 }
 
@@ -37,6 +41,8 @@ const DEFAULTS: Factories = {
   rdsIam: createRdsIamDatabase,
   mysql: (url, ca) => createMysqlDatabase({ url, ...(ca === undefined ? {} : { ssl: { ca } }) }),
   s3: createS3Storage,
+  gcs: createGcsStorage,
+  azure: createAzureStorage,
   local: createLocalStorage,
 };
 
@@ -198,12 +204,72 @@ export function databaseFromEnv(
   return urlDatabase(env, url, factories);
 }
 
-/** S3-compatible storage when `AWS_BUCKET` is set, else the data volume. Credentials come from the SDK chain. */
-export function storageFromEnv(
-  env: Env,
-  dataDir: string,
-  factories: Factories = DEFAULTS,
-): { storage: StorageAdapter; log: { storage: "local" | "s3"; endpointOrigin?: string | null } } {
+/** Which storage the image chose, and what it may log (never a key, a SAS token or a connection string). */
+export interface StorageChoice {
+  storage: StorageAdapter;
+  log: {
+    storage: "local" | "s3" | "gcs" | "azure";
+    endpointOrigin?: string | null;
+    auth?: "managed-identity" | "connection-string";
+  };
+}
+
+/** The storage variables, one set per backend; setting more than one backend refuses to boot. */
+const STORAGE_SELECTORS = [
+  ["AWS_BUCKET", "S3"],
+  ["GCS_BUCKET", "GCS"],
+  ["AZURE_STORAGE_ACCOUNT", "Azure Blob"],
+  ["AZURE_STORAGE_CONNECTION", "Azure Blob"],
+] as const;
+
+/** Refuses a second backend: the first match would silently win and hide a misconfiguration. */
+function assertOneStorage(env: Env): void {
+  const chosen = new Set(
+    STORAGE_SELECTORS.filter(([name]) => nonEmpty(env[name]) !== undefined).map(([, kind]) => kind),
+  );
+  if (chosen.size > 1) {
+    throw new Error(
+      "Set one storage backend: AWS_BUCKET, GCS_BUCKET, or AZURE_STORAGE_ACCOUNT/AZURE_STORAGE_CONNECTION",
+    );
+  }
+}
+
+/** Azure Blob: a connection string when given (other hosts), else the host's managed identity. */
+function azureFromEnv(env: Env, factories: Factories): StorageChoice {
+  const container = nonEmpty(env["AZURE_STORAGE_CONTAINER"]);
+  const connectionString = nonEmpty(env["AZURE_STORAGE_CONNECTION"]);
+  const accountName = nonEmpty(env["AZURE_STORAGE_ACCOUNT"]);
+  if (container === undefined) {
+    throw new Error("AZURE_STORAGE_CONTAINER is unset: Azure Blob storage needs a container name");
+  }
+  if (connectionString !== undefined) {
+    return {
+      storage: factories.azure({ container, connectionString }),
+      log: { storage: "azure", auth: "connection-string" },
+    };
+  }
+  const managedIdentityClientId = nonEmpty(env["AZURE_CLIENT_ID"]);
+  return {
+    storage: factories.azure({
+      container,
+      accountName,
+      ...(managedIdentityClientId === undefined ? {} : { managedIdentityClientId }),
+    }),
+    log: { storage: "azure", auth: "managed-identity" },
+  };
+}
+
+/** Google Cloud Storage from `GCS_BUCKET`; the project is optional (Application Default Credentials know it). */
+function gcsFromEnv(env: Env, bucket: string, factories: Factories): StorageChoice {
+  const projectId = nonEmpty(env["GOOGLE_CLOUD_PROJECT"]);
+  return {
+    storage: factories.gcs({ bucket, ...(projectId === undefined ? {} : { projectId }) }),
+    log: { storage: "gcs" },
+  };
+}
+
+/** S3-compatible storage from `AWS_BUCKET`, else the data volume. */
+function s3OrLocalFromEnv(env: Env, dataDir: string, factories: Factories): StorageChoice {
   const bucket = nonEmpty(env["AWS_BUCKET"]);
   if (bucket === undefined) {
     return { storage: factories.local(dataDir), log: { storage: "local" } };
@@ -213,6 +279,32 @@ export function storageFromEnv(
     storage: factories.s3({ bucket, endpoint, region: nonEmpty(env["AWS_REGION"]) ?? "auto" }),
     log: { storage: "s3", endpointOrigin: endpoint ? redactUrlForLog(endpoint) : null },
   };
+}
+
+/**
+ * The storage the environment names: S3-compatible with `AWS_BUCKET`, Google Cloud Storage with
+ * `GCS_BUCKET`, Azure Blob with `AZURE_STORAGE_ACCOUNT` (managed identity, `AZURE_CLIENT_ID` picks a
+ * user-assigned one) or `AZURE_STORAGE_CONNECTION`, else the data volume. Credentials come from each
+ * SDK's own chain; more than one backend refuses to boot.
+ */
+export function storageFromEnv(
+  env: Env,
+  dataDir: string,
+  factories: Factories = DEFAULTS,
+): StorageChoice {
+  assertOneStorage(env);
+  const gcsBucket = nonEmpty(env["GCS_BUCKET"]);
+  if (gcsBucket !== undefined) {
+    return gcsFromEnv(env, gcsBucket, factories);
+  }
+  if (
+    STORAGE_SELECTORS.some(
+      ([name, kind]) => kind === "Azure Blob" && nonEmpty(env[name]) !== undefined,
+    )
+  ) {
+    return azureFromEnv(env, factories);
+  }
+  return s3OrLocalFromEnv(env, dataDir, factories);
 }
 
 /** Capture is on unless `SHELF_CAPTURE=off` (the `-hosting` image sets it: it has no browser). */
