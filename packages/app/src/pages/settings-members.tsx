@@ -14,6 +14,7 @@ import {
   SelectField,
   Table,
   statusLabel,
+  Time,
 } from "../ui/components.tsx";
 
 /** Project member row as rendered in the members settings tab. */
@@ -70,7 +71,9 @@ export function renderSettingsMembers(
                       {statusLabel(member.role)}
                     </Badge>
                   </td>
-                  <td>{new Date(member.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <Time value={member.createdAt} format="date" />
+                  </td>
                   <td>
                     {isAdmin ? (
                       <form
