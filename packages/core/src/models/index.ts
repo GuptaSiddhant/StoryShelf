@@ -195,6 +195,12 @@ export {
 export { ManagedGitConnectionError } from "./managed-git-connection-error.ts";
 export { SiteSettingsModel, type SiteSettingsTables } from "./site-settings.ts";
 export {
+  GIT_SETUP_STATE_TTL_MS,
+  GitSetupStateModel,
+  type GitSetupPayload,
+  type GitSetupStateTables,
+} from "./git-setup-state.ts";
+export {
   PUBLIC_ORIGIN_KEY,
   createPublicOriginResolver,
   type PublicOriginOptions,
