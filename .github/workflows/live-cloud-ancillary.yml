@@ -2,7 +2,7 @@
 name: Live Cloud Ancillary
 
 # Phase 4 live tests: Turso + Postgres + MySQL + OAuth + GitHub + GitLab
-# against strictly real endpoints (no fakes, no stubs). No terraform scaffold
+# against strictly real endpoints (no fakes, no stubs). No Terraform module
 # covers these — resources are long-lived and shared, isolation is per-run
 # (unique row ids/slugs, unique status contexts).
 #
