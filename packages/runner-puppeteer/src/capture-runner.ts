@@ -8,6 +8,7 @@ import {
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
+import type { Logger } from "@storyshelf/core/logger";
 import { verifyLocalTargets } from "./availability.ts";
 import { cancelRuns, trackRun } from "./browser.ts";
 import { connectRemote } from "./connect.ts";
@@ -20,7 +21,11 @@ import type { PuppeteerRenderInput, PuppeteerTestsInput, TargetDriver } from "./
 
 declare const __PKG_VERSION__: string | undefined;
 
-/** Create a CaptureRunner that renders Storybook stories with Puppeteer (Chromium via chrome-headless-shell). */
+/**
+ * Create a CaptureRunner that renders Storybook stories with Puppeteer (Chromium via chrome-headless-shell).
+ *
+ * Deprecated: removed in 0.15.0; use `createPlaywrightCaptureRunner` from `@storyshelf/runner-playwright`.
+ */
 export function createPuppeteerCaptureRunner(
   options: {
     /**
@@ -55,6 +60,7 @@ export function createPuppeteerCaptureRunner(
   const settings = resolveSettings(options);
   return {
     metadata: runnerMetadata(offers),
+    setLogger: warnDeprecatedOnce(),
     lifecycle: withShutdown(
       offers.lifecycle(async () => await Promise.resolve(verifyTargets(declared, locals))),
     ),
@@ -73,6 +79,28 @@ export function createPuppeteerCaptureRunner(
         );
       }),
     cancel: cancelRuns,
+  };
+}
+
+/**
+ * `setLogger` for one runner instance: the host binds its scoped logger once at boot, and the
+ * deprecation warning goes out on the first bind only. Removed in 0.15.0 (#1244).
+ */
+function warnDeprecatedOnce(): (logger: Logger) => void {
+  let warned = false;
+  return (logger) => {
+    if (warned) {
+      return;
+    }
+    warned = true;
+    logger.warn(
+      {
+        package: "@storyshelf/runner-puppeteer",
+        removedIn: "0.15.0",
+        replacement: "@storyshelf/runner-playwright",
+      },
+      "runner-puppeteer is deprecated and will be removed in 0.15.0; switch to @storyshelf/runner-playwright (projects need one re-baseline)",
+    );
   };
 }
 

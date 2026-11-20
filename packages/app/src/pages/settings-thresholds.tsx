@@ -45,7 +45,7 @@ export function renderSettingsThresholds(
 ): unknown {
   const action = `/projects/${project.slug}/settings/thresholds`;
   return (
-    <div class="grid max-w-form">
+    <div class="grid">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>Diff thresholds</SectionTitle>

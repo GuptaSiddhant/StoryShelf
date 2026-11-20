@@ -1,6 +1,6 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Segmented, Thumbnail, statusTone } from "../ui/components.tsx";
+import { Icon, Segmented, Thumbnail, statusTone } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import {
   filmGroup,
@@ -12,6 +12,8 @@ import {
   filmstrip,
   filmstripHead,
   filmstripList,
+  filmToggleInput,
+  filmToggleLabel,
   statusDots,
 } from "../ui/styles/review-layout.ts";
 import { a11yBaselineShaOf, a11yCarrierOf, a11yFindingsOf } from "./a11y-violations.tsx";
@@ -179,7 +181,7 @@ function FilterChips(props: {
     (group) => a11yFindingsOf(a11yCarrierOf(group.representative, group.members)).length > 0,
   ).length;
   return (
-    <div class={filmstripHead}>
+    <div class={filmstripHead} data-film-head>
       <Segmented
         label="Filter snapshots"
         data-filter-switch
@@ -215,6 +217,11 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
         aria-label="Snapshots"
         hx-swap-oob={props.oob ? "true" : undefined}
       >
+        <input type="checkbox" id="film-toggle" class={filmToggleInput} />
+        <label for="film-toggle" class={filmToggleLabel}>
+          <Icon name="chevron-down" size="sm" />
+          Snapshots · {progress.pending > 0 ? `${progress.pending} to review` : `${groups.length}`}
+        </label>
         <FilterChips groups={groups} progress={progress} filter={filter} />
         <div data-diff-nav data-current={selectedId} data-filter={filter} class={filteredList}>
           {components.map(([title, list]): HtmlEscapedString | Promise<HtmlEscapedString> => (

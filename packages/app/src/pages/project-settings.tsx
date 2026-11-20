@@ -243,6 +243,7 @@ export function renderProjectSettingsPage(
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <DocumentLayout
+      layout="form"
       title={`${project.name} · Settings`}
       nav={{
         active: "settings",

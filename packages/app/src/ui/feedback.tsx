@@ -240,6 +240,7 @@ const metaPre = css`
   border-radius: var(--radius-sm);
   padding: var(--space-3);
   font-size: var(--text-sm);
+  position: relative;
   overflow: auto;
 `;
 

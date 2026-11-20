@@ -204,6 +204,21 @@ Runs compare when the machine, Node and Playwright versions match; quote them wi
 - PNG fixtures for the diff engine.
 - `index.json` fixtures for `discover()`.
 
+## Dependency audit (#47)
+
+`.github/workflows/audit.yml` runs weekly (Monday 06:17 UTC) and on demand (`workflow_dispatch`), one matrix leg per lockfile: `workspace` (`nub.lock`) and `storybook-8`, `storybook-9`, `storybook-10` (the fixtures' own pnpm lockfiles). It has `permissions: contents: read`, no secrets, and no other workflow depends on it, so a red run blocks no merge. It never upgrades, commits or publishes; a failing run is the notification.
+
+`scripts/audit-check.mjs` does the work. `nub audit` reads only the root importer (182 of the lockfile's 1581 packages), so the workspace is audited as `pnpm audit` over a copy of `nub.lock` (pnpm's lockfile format) and the workspace manifests, staged in `.tmp/`; the fixtures run `pnpm audit` in place. It reports advisory ids, packages, versions and advisory links only. A leg fails when:
+
+- an advisory is not a tracked exception for that target;
+- an exception is past its `reviewBy` date;
+- `scripts/audit-exceptions.json` is malformed, or an entry is missing from SECURITY.md, "Known advisories";
+- the audit could not run (registry error, no report). The exit code of `pnpm audit` is not the signal, because it exits 1 whenever it finds anything.
+
+An exception that matches nothing is a notice in the run summary; remove it once the fix is confirmed. The owner alone adds an exception or moves a date, with the reason in SECURITY.md and the tracking issue (#335).
+
+Run it locally with `node scripts/audit-check.mjs` (all targets), `--target storybook-9` for one, and `--today YYYY-MM-DD` to check how an expiry behaves. Its tests (`scripts/audit-check.test.mjs`, `node --test`) run in the `ci.yml` lint step and need no network.
+
 ## Live cloud tests (gated: `LIVE_CLOUD=1`)
 
 Strictly real providers — no injected fake clients, no emulators. Hermetic

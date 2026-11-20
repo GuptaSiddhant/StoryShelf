@@ -14,6 +14,7 @@ import {
   Meta,
   PageHeader,
   SectionTitle,
+  RelativeTime,
   Table,
   VStack,
   statusLabel,
@@ -108,7 +109,7 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
                 <td>
                   <Time value={key.createdAt} format="date" />
                 </td>
-                <td>
+                <td class="nowrap">
                   <HStack>
                     {key.backedUp ? <Badge>Synced</Badge> : null}
                     <form
@@ -143,10 +144,10 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
           <span class="mono">{session.ipAddress ?? "—"}</span>
         </div>
       </td>
-      <td>
-        <Time value={session.createdAt} />
+      <td class="nowrap">
+        <RelativeTime value={session.createdAt} />
       </td>
-      <td>
+      <td class="nowrap">
         {session.current ? (
           <Badge>This device</Badge>
         ) : (

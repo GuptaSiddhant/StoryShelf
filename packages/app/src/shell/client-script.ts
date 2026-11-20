@@ -530,6 +530,20 @@ function dialogPart(): string {
     inits.push(syncOptionGroups);`;
 }
 
+/** A scrolling tab row opens with its current tab in view (a phone cuts the row; #1133). */
+function scrollActivePart(): string {
+  return `
+    function scrollActive(){
+      document.querySelectorAll('[data-scroll-active]').forEach(function(row){
+        var cur=row.querySelector('[aria-current]');
+        if(cur && row.scrollWidth>row.clientWidth){
+          row.scrollLeft=cur.offsetLeft-(row.clientWidth-cur.offsetWidth)/2;
+        }
+      });
+    }
+    inits.push(scrollActive);`;
+}
+
 /** Page-end script wiring up the shell's interactive behavior (idempotent). */
 export function clientScript(): string {
   const parts = [
@@ -550,6 +564,7 @@ export function clientScript(): string {
     previewNoticePart(),
     loadingPart(),
     focusPart(),
+    scrollActivePart(),
     reviewScript(),
   ];
   return `

@@ -39,6 +39,26 @@ const messageLine = css`
   white-space: nowrap;
 `;
 
+/** At 880px and below the Author and Created columns fold into the Build cell's second line. */
+const hideNarrow = css`
+  /* build-hide-narrow */
+  @media (max-width: 880px) {
+    & {
+      display: none;
+    }
+  }
+`;
+
+const foldedMeta = css`
+  /* build-folded-meta */
+  display: none;
+  @media (max-width: 880px) {
+    & {
+      display: block;
+    }
+  }
+`;
+
 const authorCell = css`
   /* build-author */
   display: flex;
@@ -99,6 +119,12 @@ function BuildSummaryCell({
         </Meta>
       </strong>
       <span class={messageLine}>{build.message ?? "No message"}</span>
+      <span class={foldedMeta}>
+        <Meta as="span">
+          {build.authorName ? `${build.authorName} · ` : ""}
+          <RelativeTime value={build.createdAt} />
+        </Meta>
+      </span>
     </div>
   );
 }
@@ -154,7 +180,7 @@ function BuildRow({
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <tr>
-      <td>
+      <td class="nowrap">
         <BuildSummaryCell project={project} build={build} />
       </td>
       <td>
@@ -162,7 +188,7 @@ function BuildRow({
           {statusLabel(build.status)}
         </Badge>
       </td>
-      <td>
+      <td class="nowrap">
         <Meta as="span">
           {build.status === "skipped" ? (
             <SkippedSummary project={project} build={build} source={source} />
@@ -171,13 +197,13 @@ function BuildRow({
           )}
         </Meta>
       </td>
-      <td>
+      <td class={hideNarrow}>
         <div class={authorCell}>
           {build.authorName ? <Avatar name={build.authorName} size="sm" /> : null}
           <span>{build.authorName ?? "—"}</span>
         </div>
       </td>
-      <td class="nowrap">
+      <td class={hideNarrow}>
         <Meta as="span">
           <RelativeTime value={build.createdAt} />
         </Meta>
@@ -208,8 +234,8 @@ export function BuildsTable({
             <th>Build</th>
             <th>Status</th>
             <th>Changes</th>
-            <th>Author</th>
-            <th>Created</th>
+            <th class={hideNarrow}>Author</th>
+            <th class={hideNarrow}>Created</th>
             <th>
               <span class="visually-hidden">Actions</span>
             </th>

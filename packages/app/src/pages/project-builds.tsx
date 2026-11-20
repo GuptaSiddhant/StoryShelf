@@ -17,6 +17,7 @@ import {
   VStack,
   statusLabel,
 } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import { GetStarted } from "./get-started.tsx";
 import { CancelOlderBuilds, olderUnfinishedCount } from "./project-builds-cancel.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
@@ -65,14 +66,35 @@ function matches(build: Build, filters: BuildFilters): boolean {
   );
 }
 
+const wideOnly = css`
+  /* builds-filter-wide */
+  @media (max-width: 480px) {
+    & {
+      display: none;
+    }
+  }
+`;
+
+const phoneOnly = css`
+  /* builds-filter-phone */
+  display: none;
+  @media (max-width: 480px) {
+    & {
+      display: block;
+    }
+  }
+`;
+
 /** Branch select that submits on change and keeps the status filter. */
 function BranchFilter(props: {
   base: string;
   filters: BuildFilters;
   branches: string[];
   skippedTotal: number;
+  /** The status choices, as a select: the phone's stand-in for the segmented chips. */
+  statuses: { value: string; label: string }[];
 }): ReturnType<typeof SelectField> {
-  const { base, filters, branches, skippedTotal } = props;
+  const { base, filters, branches, skippedTotal, statuses } = props;
   return (
     <form
       method="get"
@@ -82,7 +104,15 @@ function BranchFilter(props: {
       hx-target="body"
       hx-push-url="true"
     >
-      {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
+      <div class={phoneOnly}>
+        <SelectField
+          label="Status"
+          name="status"
+          layout="inline"
+          value={filters.status ?? ""}
+          options={statuses}
+        />
+      </div>
       {skippedTotal > 0 ? (
         <CheckField
           label={`Show skipped (${skippedTotal})`}
@@ -105,6 +135,27 @@ function BranchFilter(props: {
   );
 }
 
+/** The status choices with their counts: "All" first, then each status that has builds (or is selected). */
+function statusItems(
+  inBranch: Build[],
+  filters: BuildFilters,
+): { label: string; value: string; status: string | undefined }[] {
+  const count = (status: string): number =>
+    inBranch.filter((build) => build.status === status).length;
+  return [
+    { label: `All ${inBranch.length}`, value: "", status: undefined },
+    ...STATUSES.filter(
+      (status) =>
+        (status !== "skipped" || showsSkipped(filters)) &&
+        (count(status) > 0 || filters.status === status),
+    ).map((status) => ({
+      label: `${statusLabel(status)} ${count(status)}`,
+      value: status,
+      status,
+    })),
+  ];
+}
+
 /** Status chips (with counts) plus a branch select that applies instantly. */
 function BuildsToolbar(props: {
   project: Project;
@@ -123,32 +174,27 @@ function BuildsToolbar(props: {
     ]),
   ].toSorted();
   const inBranch = visible.filter((build) => !filters.branch || build.gitBranch === filters.branch);
-  const count = (status: string): number =>
-    inBranch.filter((build) => build.status === status).length;
-  const items = [
-    { label: `All ${inBranch.length}`, value: "", status: undefined },
-    ...STATUSES.filter(
-      (status) =>
-        (status !== "skipped" || showsSkipped(filters)) &&
-        (count(status) > 0 || filters.status === status),
-    ).map((status) => ({
-      label: `${statusLabel(status)} ${count(status)}`,
-      value: status,
-      status,
-    })),
-  ];
+  const items = statusItems(inBranch, filters);
   return (
     <HStack justify="between">
-      <Segmented
-        label="Filter by status"
-        items={items.map((item) => ({
-          label: item.label,
-          value: item.value,
-          href: listHref(base, { ...filters, status: item.status }),
-          active: (filters.status ?? "") === item.value,
-        }))}
+      <div class={wideOnly}>
+        <Segmented
+          label="Filter by status"
+          items={items.map((item) => ({
+            label: item.label,
+            value: item.value,
+            href: listHref(base, { ...filters, status: item.status }),
+            active: (filters.status ?? "") === item.value,
+          }))}
+        />
+      </div>
+      <BranchFilter
+        base={base}
+        filters={filters}
+        branches={branches}
+        skippedTotal={skippedTotal}
+        statuses={items.map((item) => ({ value: item.value, label: item.label }))}
       />
-      <BranchFilter base={base} filters={filters} branches={branches} skippedTotal={skippedTotal} />
     </HStack>
   );
 }
