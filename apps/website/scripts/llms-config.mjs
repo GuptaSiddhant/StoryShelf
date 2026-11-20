@@ -27,6 +27,7 @@ export const BUNDLES = [
       "/concepts/hosting-only/",
       "/concepts/labels/",
       "/guides/support/",
+      "/guides/demo/",
     ],
     budget: 20_000,
   },
@@ -36,6 +37,8 @@ export const BUNDLES = [
     about:
       "Running a StoryShelf server: deployment, sizing, configuration, secrets, observability.",
     groups: ["Deploy & operate"],
+    // A one-off migration guide, one link away in llms.txt like the other migration guides.
+    exclude: ["/guides/deployment/migrate-terraform/"],
     budget: 25_000,
   },
   {
