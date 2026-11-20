@@ -19,7 +19,7 @@ import { type SkipSource, noStoryChangedText, skipSourceSha } from "./skipped-so
 const buildCell = css`
   /* build-cell */
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 0;
   max-width: 38ch;
   & strong a {

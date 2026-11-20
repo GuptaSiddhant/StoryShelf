@@ -13,8 +13,9 @@ const disclosureSummary = css`
   /* disclosure-summary */
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem;
+  gap: var(--space-2);
+  min-height: var(--control-md);
+  padding: var(--space-2) var(--space-4);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
   cursor: pointer;
@@ -29,7 +30,7 @@ const disclosureSummary = css`
 
 const disclosureBody = css`
   /* disclosure-body */
-  padding: 0.25rem 1rem 1rem;
+  padding: var(--space-1) var(--space-4) var(--space-4);
   border-top: 1px solid var(--border-subtle);
 `;
 
@@ -64,8 +65,8 @@ const definitionList = css`
   /* definition-list */
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 0.35rem 1.5rem;
-  margin: 0.75rem 0;
+  gap: var(--space-1) var(--space-6);
+  margin: var(--space-3) 0;
 `;
 
 const definitionTerm = css`

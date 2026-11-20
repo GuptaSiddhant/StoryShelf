@@ -38,7 +38,8 @@ export const comparisonCard = css`
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  @media (max-width: 720px) {
+  box-shadow: var(--shadow);
+  @media (max-width: 880px) {
     & {
       padding: var(--space-3) var(--space-3) 0;
     }
@@ -146,7 +147,7 @@ export const filmItem = css`
   grid-template-columns: 40px minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: center;
-  min-height: 44px;
+  min-height: var(--control-md);
   padding: 0 var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
   border-left: 3px solid transparent;
@@ -293,7 +294,7 @@ export const actionBar = css`
   background: var(--surface-card);
   border-top: 1px solid var(--border-subtle);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  @media (max-width: 720px) {
+  @media (max-width: 880px) {
     & {
       margin: 0 calc(var(--space-3) * -1);
       padding: var(--space-2) var(--space-3);
@@ -338,7 +339,7 @@ export const actionHints = css`
 export const actionKey = css`
   /* review-action-key */
   display: inline-flex;
-  @media (max-width: 720px) {
+  @media (max-width: 880px) {
     & {
       display: none;
     }
