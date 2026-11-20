@@ -119,4 +119,4 @@ StoryShelf ships a test fixture for each version (`fixtures/storybook-8`, `-9` a
 - [Capture & viewports](/concepts/capture/): the pipeline around the page load described here.
 - [Interaction testing](/guides/interaction-testing/): enabling `play` and the per-story controls.
 - [Modes](/guides/modes/): themes and viewports through globals.
-- [Playwright runner](/packages/runner-playwright/) and [Puppeteer runner](/packages/runner-puppeteer/): the packages that drive the page.
+- [Playwright runner](/packages/runner-playwright/) and [Puppeteer runner](/packages/runner-puppeteer/) (deprecated, removed in 0.15.0): the packages that drive the page.
