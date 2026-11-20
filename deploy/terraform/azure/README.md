@@ -20,7 +20,8 @@ module "storyshelf" {
 }
 ```
 
-The provider needs `features {}` and a subscription (`ARM_SUBSCRIPTION_ID`). Each stable release also
+The provider needs `features {}`, `storage_use_azuread = true` (the storage account refuses shared keys,
+see "Blob access") and a subscription (`ARM_SUBSCRIPTION_ID`). Each stable release also
 attaches `storyshelf-terraform-<version>.tar.gz` (the whole `deploy/terraform/` folder). Upgrade by
 changing both versions together and reading the release notes. A runnable example is in
 `examples/minimal/`.
@@ -106,11 +107,25 @@ Blob access uses the app's managed identity, not the account key. The image gets
 `AZURE_STORAGE_CONTAINER` and `AZURE_CLIENT_ID`, and `storage-azure` signs in with
 `DefaultAzureCredential` (the user-assigned identity, by client id), which holds `Storage Blob Data
 Contributor` on the container. No connection string or account key is stored in Key Vault or passed to
-the app. They **remain in the Terraform state**, because the provider records the storage account's
-keys as computed attributes: keep the state in an encrypted backend. The account itself still allows
-shared-key access (Terraform's own provider and your operators may use it); turn it off yourself if
-neither does, and rotate the keys if the state was ever exposed.
-Outside Azure, the image also takes `AZURE_STORAGE_CONNECTION` (a connection string) instead.
+the app.
+
+The storage account sets `shared_access_key_enabled = false`, so no account key or account SAS works
+against it, whoever holds one. The account keys and connection strings **remain in the Terraform
+state**, because the provider records them as computed attributes, but they cannot be used. Keep the
+state in an encrypted backend anyway.
+
+Terraform therefore manages the account through Azure AD: set `storage_use_azuread = true` in your
+`provider "azurerm"` block (the example does). The container, the role assignment and the account
+itself are management-plane resources and need no key. The identity running Terraform also needs a
+data-plane role on the account, because the provider reads the account's blob service settings through
+the data plane: grant it `Storage Blob Data Contributor` on the resource group or subscription **before
+the first apply**. The module cannot grant it, because the provider reads the account as soon as it is
+created, before a role assignment could take effect. That identity already needs `Owner` or `User Access
+Administrator` to create the module's role assignments. Operators who browse the container with `az
+storage` or the portal need the same role (`--auth-mode login`), not a key.
+
+Outside Azure, the image also takes `AZURE_STORAGE_CONNECTION` (a connection string) instead; that
+needs an account that allows shared keys, so it does not work against this module's account.
 
 ## Capture, scaling and shutdown
 

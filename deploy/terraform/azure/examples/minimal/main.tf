@@ -28,6 +28,11 @@ variable "image_version" {
 
 # The subscription comes from ARM_SUBSCRIPTION_ID (and the credentials from `az login` or ARM_*).
 provider "azurerm" {
+  # The module's storage account refuses shared keys, so the provider reaches Blob through Azure AD.
+  # The identity running Terraform needs a data-plane role on the account (see the module README,
+  # "Blob access").
+  storage_use_azuread = true
+
   features {
     resource_group {
       # A throwaway stack: let destroy remove the group with everything in it.
