@@ -8,7 +8,7 @@ import { postsComments } from "@storyshelf/core/capture";
 import { GitRepositoryLinkModel, linkOutputsOf, type GitConnection } from "@storyshelf/core/models";
 import type { GitRepositoryLinkRow, Project } from "@storyshelf/core/schema";
 import { gitConnectionModel } from "../git-admin.ts";
-import { proposedPrefix } from "../git-link-request.ts";
+import { proposedPrefix, webHostOf } from "../git-link-request.ts";
 import type { SettingsGitData, SettingsGitLink } from "../pages/settings-git.tsx";
 import { getStore } from "../store.ts";
 
@@ -23,6 +23,7 @@ function isManaged(project: Project, link: GitRepositoryLinkRow): boolean {
   return (getStore().gitConfiguredLinks ?? []).some(
     (entry) =>
       (entry.project === project.id || entry.project === project.slug) &&
+      entry.connection === link.connectionId &&
       entry.repository.toLowerCase() === `${link.owner}/${link.repo}` &&
       (entry.prefix ?? "") === link.prefix,
   );
@@ -37,6 +38,9 @@ function viewOf(
   return {
     id: link.id,
     repository: `${link.owner}/${link.repo}`,
+    url: connection
+      ? `https://${webHostOf(connection)}/${link.owner}/${link.repo}`
+      : `${link.owner}/${link.repo}`,
     prefix: link.prefix.length > 0 ? link.prefix : DEFAULT_STATUS_PREFIX,
     connectionName: connection?.name ?? "Removed connection",
     state: link.state,

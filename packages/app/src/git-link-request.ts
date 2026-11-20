@@ -63,15 +63,18 @@ export function connectionFor(
   return matches.length === 1 ? (matches[0] ?? null) : null;
 }
 
+const MAX_PREFIX_LENGTH = 40;
+
 /** The prefix a form proposes: the default while free, then the project slug, then slug-N. */
 export function proposedPrefix(slug: string, taken: ReadonlySet<string>): string {
   const base = slug.toLowerCase().replaceAll(/[^a-z0-9-]/gu, "-");
   if (!taken.has("storyshelf")) {
     return "storyshelf";
   }
-  let candidate = base;
+  let candidate = base.slice(0, MAX_PREFIX_LENGTH);
   for (let n = 2; taken.has(candidate); n += 1) {
-    candidate = `${base}-${n}`;
+    const suffix = `-${n}`;
+    candidate = `${base.slice(0, MAX_PREFIX_LENGTH - suffix.length)}${suffix}`;
   }
   return candidate;
 }

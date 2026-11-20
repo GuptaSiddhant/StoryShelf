@@ -15,6 +15,7 @@ export default meta;
 const base: SettingsGitLink = {
   id: "01JD00000000000000000LINK01",
   repository: "acme/design-system",
+  url: "https://github.com/acme/design-system",
   prefix: "storyshelf",
   connectionName: "Acme GitHub App",
   state: "approved",

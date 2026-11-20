@@ -4,6 +4,7 @@ import { linkBadge, linkDetails, requiredCheckOf, type SettingsGitLink } from ".
 const link: SettingsGitLink = {
   id: "l1",
   repository: "acme/widgets",
+  url: "https://github.com/acme/widgets",
   prefix: "web",
   connectionName: "Acme App",
   state: "approved",

@@ -4,6 +4,7 @@
  */
 import type { StateOutputs } from "@storyshelf/core/adapter/notifier";
 import type { Project } from "@storyshelf/core/schema";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { csrfField } from "../shell/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
@@ -82,7 +83,7 @@ function LinkFields(props: FormProps): Rendered {
         name="repository"
         required
         placeholder="https://github.com/acme/widgets"
-        value={state?.values?.repository ?? (link ? link.repository : "")}
+        value={state?.values?.repository ?? (link ? link.url : "")}
         error={errors["repository"]}
         hint="The repository's URL or owner/name."
       />
@@ -111,7 +112,8 @@ function LinkFields(props: FormProps): Rendered {
  */
 export function GitLinkForm(props: FormProps & { inDialog?: boolean }): Rendered {
   const { project, link, inDialog = false } = props;
-  const action = `/projects/${project.slug}/settings/git${link ? `/${link.id}` : ""}`;
+  const base = createUrlBuilder("/").settingsTab(project.slug, "git");
+  const action = link ? `${base}/${link.id}` : base;
   return (
     <form
       id="git-link-form"

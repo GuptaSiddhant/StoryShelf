@@ -105,9 +105,19 @@ describe("Project → Settings → Git", () => {
     expect((await post(app, BASE, body)).status).toBe(302);
     const again = await post(app, BASE, body);
     expect(again.status).toBe(400);
-    expect(await again.text()).toContain("Choose another prefix");
+    const html = await again.text();
+    expect(html).toContain("Choose another prefix");
+    expect(html).toContain('value="grp/web"');
     const bad = await post(app, BASE, { repository: "grp/other", prefix: "no spaces" });
     expect(bad.status).toBe(400);
+  });
+
+  it("prefills the edit form with the repository's URL on its connection's host", async () => {
+    const { app, project, links } = await setup();
+    await post(app, BASE, { repository: "grp/web", prefix: "web" });
+    const [link] = await links.list(project.id);
+    const form = await (await app.request(`${BASE}/${link?.id}/edit`)).text();
+    expect(form).toContain('value="https://gitlab.example.com/grp/web"');
   });
 
   it("edits outputs, and a changed prefix sends the link back to pending", async () => {

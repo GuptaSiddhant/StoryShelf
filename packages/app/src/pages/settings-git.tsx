@@ -5,6 +5,7 @@
  */
 import type { StateOutputs } from "@storyshelf/core/adapter/notifier";
 import type { Project } from "@storyshelf/core/schema";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
@@ -27,6 +28,8 @@ export interface SettingsGitLink {
   id: string;
   /** `owner/repo`. */
   repository: string;
+  /** The repository's web URL on its connection's host: what the edit form prefills. */
+  url: string;
   /** The status prefix in effect (`storyshelf` by default). */
   prefix: string;
   connectionName: string;
@@ -109,7 +112,7 @@ function linkActions(project: Project, link: SettingsGitLink, isAdmin: boolean):
   if (!isAdmin || link.managed) {
     return null;
   }
-  const base = `/projects/${project.slug}/settings/git`;
+  const base = createUrlBuilder("/").settingsTab(project.slug, "git");
   return (
     <HStack>
       <Button variant="secondary" size="sm" {...opener(`${base}/${link.id}/edit`)}>
@@ -148,7 +151,7 @@ export function renderSettingsGit(
   isAdmin: boolean,
   formState?: { globalError?: string },
 ): unknown {
-  const base = `/projects/${project.slug}/settings/git`;
+  const base = createUrlBuilder("/").settingsTab(project.slug, "git");
   const add = isAdmin ? <Button {...opener(`${base}/new`)}>Link a repository</Button> : null;
   return (
     <div class="grid max-w-form">

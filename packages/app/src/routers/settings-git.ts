@@ -83,7 +83,13 @@ async function handleForm(c: Context): Promise<Response> {
 }
 
 type LinkRead =
-  | { ok: true; repository: ParsedRepository; connection: GitConnection; prefix: string }
+  | {
+      ok: true;
+      repository: ParsedRepository;
+      connection: GitConnection;
+      typed: string;
+      prefix: string;
+    }
   | { ok: false; errors: Record<string, string>; values: { repository: string; prefix: string } };
 
 /** The repository a typed URL names and the connection that owns its host, or null. */
@@ -114,7 +120,7 @@ function readForm(form: FormData, connections: readonly GitConnection[]): LinkRe
   const found = findRepository(typed, connections);
   const problem = prefix.length === 0 ? null : prefixProblem(prefix);
   if (found !== null && problem === null) {
-    return { ok: true, ...found, prefix };
+    return { ok: true, ...found, typed, prefix };
   }
   return {
     ok: false,
@@ -133,7 +139,7 @@ async function handleCreate(c: Context): Promise<Response> {
     const link = await requestLink(ctx.project, read);
     flash(c, link.state === "approved" ? "Repository linked" : "Link requested");
   } catch (error) {
-    return takenOrThrow(c, ctx, undefined, error, read.prefix);
+    return takenOrThrow(c, ctx, undefined, error, read);
   }
   return hxRedirect(c, settingsHref(ctx.project.slug, "git"));
 }
@@ -174,7 +180,7 @@ function takenOrThrow(
   ctx: { project: Project; data: SettingsGitData },
   linkId: string | undefined,
   error: unknown,
-  prefix: string,
+  read: { typed: string; prefix: string },
 ): Response | Promise<Response> {
   if (!(error instanceof GitRepositoryTakenError)) {
     throw error;
@@ -182,7 +188,8 @@ function takenOrThrow(
   const errors = {
     prefix: "That repository is already linked with this prefix. Choose another prefix.",
   };
-  return formResponse(c, ctx, linkId, { errors, values: { prefix } }, 400);
+  const values = { repository: read.typed, prefix: read.prefix };
+  return formResponse(c, ctx, linkId, { errors, values }, 400);
 }
 
 /** The outputs the form chose, capped by what the connection may post. */
@@ -219,7 +226,7 @@ async function saveLink(
   try {
     await applyUpdate(link, read, form, connections);
   } catch (error) {
-    return takenOrThrow(c, ctx, link.id, error, read.prefix);
+    return takenOrThrow(c, ctx, link.id, error, read);
   }
   flash(c, "Link saved");
   return hxRedirect(c, settingsHref(ctx.project.slug, "git"));

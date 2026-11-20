@@ -67,6 +67,15 @@ describe("prefixes", () => {
     expect(proposedPrefix("web", new Set())).toBe("storyshelf");
     expect(proposedPrefix("web", new Set(["storyshelf"]))).toBe("web");
     expect(proposedPrefix("web", new Set(["storyshelf", "web"]))).toBe("web-2");
+    const long = "a".repeat(40);
+    expect(proposedPrefix(`${long}b`, new Set(["storyshelf"]))).toBe(long);
+    expect(proposedPrefix(long, new Set(["storyshelf", long]))).toBe(`${"a".repeat(38)}-2`);
+    const crowded = new Set([
+      "storyshelf",
+      long,
+      ...Array.from({ length: 8 }, (_, index) => `${"a".repeat(38)}-${index + 2}`),
+    ]);
+    expect(proposedPrefix(long, crowded)).toBe(`${"a".repeat(37)}-10`);
   });
 
   it("accepts letters, digits, dots, dashes and underscores", () => {
