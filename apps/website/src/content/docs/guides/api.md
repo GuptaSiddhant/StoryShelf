@@ -57,7 +57,7 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Insights    | `/api/v1/projects/{slug}/builds/{id}/insights`, `/api/v1/projects/{slug}/insights/health` | AI build triage and project health ([AI insights](/ai/)) |
 | Admin       | `/api/v1/admin`                                                                           | Site-wide operations (retention purge)                   |
 
-`POST /api/v1/projects/{slug}/builds/cancel` cancels older unfinished builds in one call (`testing` class, developer role). The optional JSON body takes `branch`, `keepNewest` (default 1 per branch) and `dryRun`; the answer is `{ "cancelled": [ids], "count": n, "dryRun": false }`. See [Clearing a backlog](/concepts/builds/#clearing-a-backlog).
+`POST /api/v1/projects/{slug}/builds/cancel` cancels older unfinished builds in one call (`testing` class, developer role). The optional JSON body takes `branch`, `keepNewest` (default 1 per branch) and `dryRun`; the answer is `{ "cancelled": [ids], "count": n, "dryRun": false }`. See [Clearing a backlog](#clearing-a-backlog).
 
 AI agents can use this API through the [MCP server](/ai/mcp/), which wraps the read and comment endpoints.
 
@@ -182,3 +182,13 @@ curl -sS $STORYSHELF_URL/api/v1/openapi.json > openapi.json
 ```
 
 Point your favorite OpenAPI generator (or the Swagger UI console at `/api/v1/docs`) at the file. The schemas at the bottom of the document (e.g. `Project`, `Build`, `Snapshot`) are the canonical shapes for the API types.
+
+## Clearing a backlog
+
+A stopped machine, a runner outage or a burst of pushes can leave many builds `pending` or `capturing` ahead of the one you care about. Cancel the older ones in one step:
+
+- **Builds page:** when some branch has more than one unfinished build, **Cancel older unfinished builds (N)** appears. It asks for confirmation with the count.
+- **CLI:** `storyshelf cancel [--branch <name>] [--keep-newest <n>] [--dry-run]`. Run it with `--dry-run` first to see the IDs.
+- **API:** `POST /api/v1/projects/{slug}/builds/cancel` with `{ "branch"?, "keepNewest"?, "dryRun"? }`.
+
+It keeps the newest `keepNewest` unfinished builds of each branch (default 1; `0` cancels them all) and cancels the rest of the `pending`, `capturing` and `comparing` ones, each exactly as a single cancel does (its jobs end, it ends `cancelled`, `build:cancelled` is raised and git statuses settle), a batch at a time. Other builds are left alone, and one that reaches a verdict meanwhile is skipped. It needs the `testing` option and the developer role. Supersede on [Builds](/concepts/builds/) covers only the same branch and at most 50 builds per upload; this is the way out of a larger backlog.
