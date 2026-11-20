@@ -58,8 +58,8 @@ jobs:
 
   # The customer path (#893, ADR 0050): apply the Azure module's `examples/minimal` with the current
   # release image, smoke-test the running stack, destroy it. Real Azure, billed: it runs only when the
-  # repository variable LIVE_AZURE_MODULE_APPLY is "1", which stays off until the image reads the
-  # module's Blob settings (see the module README, "Image contract"). Needs a service principal that
+  # repository variable LIVE_AZURE_MODULE_APPLY is "1", which the owner turns on (billed). The image
+  # reads the module's Blob settings (see the module README, "Image contract"). Needs a service principal that
   # may create resources and role assignments in the subscription: secrets ARM_CLIENT_ID,
   # ARM_CLIENT_SECRET, ARM_TENANT_ID, ARM_SUBSCRIPTION_ID. Destroy runs even when the apply or the
   # smoke test fails. The Azure Playwright Workspace capture (experimental preset) is not part of

@@ -27,15 +27,15 @@ changing both versions together and reading the release notes. A runnable exampl
 
 ## What it creates
 
-| Part     | Resources                                                                                                   |
-| -------- | ----------------------------------------------------------------------------------------------------------- |
-| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                                           |
-| Compute  | Container Apps environment (Consumption profile), one app of identical copies                               |
-| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL)                        |
-| Storage  | Storage account and a private `storybook` Blob container                                                    |
-| Identity | One user-assigned managed identity for the app                                                              |
-| Secrets  | Key Vault (RBAC): `SECRET`, `ADMIN-TOKEN`, `OIDC-CLIENT-SECRET`, `DATABASE-URL`, `AZURE-STORAGE-CONNECTION` |
-| Logs     | Log Analytics workspace                                                                                     |
+| Part     | Resources                                                                            |
+| -------- | ------------------------------------------------------------------------------------ |
+| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                    |
+| Compute  | Container Apps environment (Consumption profile), one app of identical copies        |
+| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL) |
+| Storage  | Storage account and a private `storybook` Blob container                             |
+| Identity | One user-assigned managed identity for the app                                       |
+| Secrets  | Key Vault (RBAC): `SECRET`, `ADMIN-TOKEN`, `OIDC-CLIENT-SECRET`, `DATABASE-URL`      |
+| Logs     | Log Analytics workspace                                                              |
 
 The app is served on the Container Apps default domain over HTTPS; `allowed_cidr_blocks` becomes its
 ingress IP restrictions. A custom domain and sign-in federation (Entra) are not part of the module.
@@ -74,7 +74,7 @@ The app gets every secret as a Container Apps secret that is a **Key Vault refer
 managed identity. No output carries a value.
 
 - **`SECRET`, `ADMIN-TOKEN`** are generated. Their values, the database password and the storage
-  connection string are also in the Terraform state: keep the state in an encrypted backend with
+  database password are also in the Terraform state: keep the state in an encrypted backend with
   restricted access.
 - **`OIDC-CLIENT-SECRET`** is an operator step. Terraform writes `change-me` once and never
   overwrites it:
@@ -101,11 +101,13 @@ User` for `identity_principal_id` on that vault; the module does not grant it.
 
 ## Blob access
 
-Blob access should use the identity, not the account key, and the role above is in place for it. The
-storage adapter does not support that yet: `storage-azure` takes a connection string, an account key,
-a SAS token or an anonymous account URL, and has no Entra credential (no `@azure/identity`). Until it
-does, the app receives the connection string from Key Vault (`AZURE_STORAGE_CONNECTION`, a reference)
-and the account keeps shared-key access on. This is tracked on #893; the module adds no SDK code.
+Blob access uses the app's managed identity, not the account key. The image gets `AZURE_STORAGE_ACCOUNT`,
+`AZURE_STORAGE_CONTAINER` and `AZURE_CLIENT_ID`, and `storage-azure` signs in with
+`DefaultAzureCredential` (the user-assigned identity, by client id), which holds `Storage Blob Data
+Contributor` on the container. No connection string or account key is stored in Key Vault, passed to
+the app or written to the Terraform state by this module. The account itself still allows shared-key
+access (Terraform's own provider and your operators may use it); turn it off yourself if neither does.
+Outside Azure, the image also takes `AZURE_STORAGE_CONNECTION` (a connection string) instead.
 
 ## Capture, scaling and shutdown
 
@@ -123,17 +125,19 @@ and the account keeps shared-key access on. This is tracked on #893; the module 
 
 ## Image contract
 
-| Variable                                                                                          | Source                          | Status  |
-| ------------------------------------------------------------------------------------------------- | ------------------------------- | ------- |
-| `PUBLIC_BASE_URL`, `TRUST_PROXY`, `SHUTDOWN_GRACE_SECONDS`                                        | module                          | read    |
-| `SECRET`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                                                     | Key Vault                       | read    |
-| `DATABASE_URL`, `DATABASE_POOL_MAX`                                                               | Key Vault, `database_pool_size` | read    |
-| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`                                       | Key Vault references (optional) | read    |
-| `AZURE_STORAGE_CONNECTION`, `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID` | the module                      | pending |
+| Variable                                                              | Source                          | Status |
+| --------------------------------------------------------------------- | ------------------------------- | ------ |
+| `PUBLIC_BASE_URL`, `TRUST_PROXY`, `SHUTDOWN_GRACE_SECONDS`            | module                          | read   |
+| `SECRET`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                         | Key Vault                       | read   |
+| `DATABASE_URL`, `DATABASE_POOL_MAX`                                   | Key Vault, `database_pool_size` | read   |
+| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`           | Key Vault references (optional) | read   |
+| `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID` | the module                      | read   |
 
-**The image does not read the Azure Blob variables yet.** It stores uploads on its data volume unless
-`AWS_BUCKET` is set, so until the image wires `storage-azure` the stack keeps Storybooks on the
-container's ephemeral disk and loses them on a restart. The nightly apply stays off for that reason.
+The image stores uploads in the Blob container when `AZURE_STORAGE_ACCOUNT` is set (managed identity),
+or `AZURE_STORAGE_CONNECTION` for a host without one. Setting more than one storage backend refuses to
+boot. The module's live apply stays behind the repository variable `LIVE_AZURE_MODULE_APPLY`: it is
+billed, so the owner turns it on. No live Azure run has confirmed this path yet; the adapter is tested
+against a faked SDK.
 
 ## Existing database
 

@@ -20,6 +20,8 @@
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
+    "@storyshelf/storage-azure": "workspace:*",
+    "@storyshelf/storage-gcs": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
     "@storyshelf/storage-s3": "workspace:*",
     "pg": "^8.0.0",

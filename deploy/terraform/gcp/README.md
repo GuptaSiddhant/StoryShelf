@@ -129,12 +129,15 @@ a Cloud Run domain mapping) and pass `public_base_url`.
 | `PUBLIC_BASE_URL`, `TRUST_PROXY`                  | module                               | read    |
 | `DATABASE_URL`, `DATABASE_POOL_MAX`               | Secret Manager, `database_pool_size` | read    |
 | `SECRET`, `ADMIN_TOKEN`                           | Secret Manager                       | read    |
-| `GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT`              | the created bucket                   | pending |
+| `GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT`              | the created bucket                   | read    |
 | `SHUTDOWN_GRACE_SECONDS`                          | `shutdown_grace_seconds`             | read    |
 | `REMOTE_BROWSER_ENDPOINT`, `REMOTE_BROWSER_TOKEN` | secret references                    | pending |
 
-_Pending_ variables are set by the module but read by the image only once it wires them: until the
-image selects GCS from `GCS_BUCKET`, the nightly apply stays off (see Checks).
+The image selects Google Cloud Storage from `GCS_BUCKET` (credentials from the service account via
+Application Default Credentials) and refuses to boot when another storage backend is also set. _Pending_
+variables are set by the module but not read by the image yet. The live apply stays behind the
+repository variable `LIVE_GCP_MODULE_APPLY`: it is billed, so the owner turns it on. No live GCP run has
+confirmed this path yet; the adapter is tested against a faked SDK.
 
 ## Checks
 

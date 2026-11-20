@@ -73,15 +73,6 @@ resource "azurerm_key_vault_secret" "database_url" {
   depends_on = [time_sleep.role_propagation, azurerm_postgresql_flexible_server_database.shelf]
 }
 
-# Until the image reads the identity-based Blob settings, it takes the account's connection string.
-resource "azurerm_key_vault_secret" "storage_connection" {
-  name         = "AZURE-STORAGE-CONNECTION"
-  value        = azurerm_storage_account.main.primary_connection_string
-  key_vault_id = azurerm_key_vault.main.id
-
-  depends_on = [time_sleep.role_propagation]
-}
-
 locals {
   # Container App secret name -> versionless Key Vault secret id.
   app_secrets = merge(
@@ -89,7 +80,6 @@ locals {
       "shelf-secret"       = azurerm_key_vault_secret.shelf_secret.versionless_id
       "admin-token"        = azurerm_key_vault_secret.admin_token.versionless_id
       "oidc-client-secret" = azurerm_key_vault_secret.oidc_client_secret.versionless_id
-      "storage-connection" = azurerm_key_vault_secret.storage_connection.versionless_id
       "database-url"       = local.create_database ? azurerm_key_vault_secret.database_url[0].versionless_id : var.existing_database_url_secret_id
     },
     local.playwright ? {
@@ -104,7 +94,6 @@ locals {
       "SECRET"                   = "shelf-secret"
       "ADMIN_TOKEN"              = "admin-token"
       "OIDC_CLIENT_SECRET"       = "oidc-client-secret"
-      "AZURE_STORAGE_CONNECTION" = "storage-connection"
       "DATABASE_URL"             = "database-url"
     },
     local.playwright ? {

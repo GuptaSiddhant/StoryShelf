@@ -23,6 +23,8 @@ function factories() {
     rdsIam: make("rds-iam"),
     mysql: make("mysql"),
     s3: make("s3"),
+    gcs: make("gcs"),
+    azure: make("azure"),
     local: make("local"),
   };
   return { set, as: set as unknown as Factories };
@@ -182,6 +184,81 @@ describe("storageFromEnv", () => {
       storage: "s3",
       endpointOrigin: null,
     });
+  });
+});
+
+describe("storageFromEnv: GCS and Azure", () => {
+  it("uses GCS from GCS_BUCKET, with the project when given", () => {
+    const { set, as } = factories();
+    expect(storageFromEnv({ GCS_BUCKET: "b", GOOGLE_CLOUD_PROJECT: "p" }, "/d", as).log).toEqual({
+      storage: "gcs",
+    });
+    expect(set.gcs).toHaveBeenCalledWith({ bucket: "b", projectId: "p" });
+    storageFromEnv({ GCS_BUCKET: "b" }, "/d", as);
+    expect(set.gcs).toHaveBeenLastCalledWith({ bucket: "b" });
+  });
+
+  it("uses Azure Blob with the managed identity, naming the user-assigned one", () => {
+    const { set, as } = factories();
+    const env = {
+      AZURE_STORAGE_ACCOUNT: "acct",
+      AZURE_STORAGE_CONTAINER: "storybook",
+      AZURE_CLIENT_ID: "cid",
+    };
+    expect(storageFromEnv(env, "/d", as).log).toEqual({
+      storage: "azure",
+      auth: "managed-identity",
+    });
+    expect(set.azure).toHaveBeenCalledWith({
+      container: "storybook",
+      accountName: "acct",
+      managedIdentityClientId: "cid",
+    });
+    storageFromEnv({ ...env, AZURE_CLIENT_ID: "" }, "/d", as);
+    expect(set.azure).toHaveBeenLastCalledWith({ container: "storybook", accountName: "acct" });
+  });
+
+  it("takes an Azure connection string for hosts without an identity, and never logs it", () => {
+    const { set, as } = factories();
+    const chosen = storageFromEnv(
+      { AZURE_STORAGE_CONNECTION: "AccountKey=secret", AZURE_STORAGE_CONTAINER: "c" },
+      "/d",
+      as,
+    );
+    expect(set.azure).toHaveBeenCalledWith({
+      container: "c",
+      connectionString: "AccountKey=secret",
+    });
+    expect(JSON.stringify(chosen.log)).not.toContain("secret");
+    expect(chosen.log).toEqual({ storage: "azure", auth: "connection-string" });
+  });
+
+  it("refuses Azure without a container", () => {
+    const { as } = factories();
+    expect(() => storageFromEnv({ AZURE_STORAGE_ACCOUNT: "a" }, "/d", as)).toThrow(
+      "AZURE_STORAGE_CONTAINER is unset",
+    );
+  });
+
+  it("refuses more than one backend", () => {
+    const { as } = factories();
+    expect(() => storageFromEnv({ AWS_BUCKET: "b", GCS_BUCKET: "g" }, "/d", as)).toThrow(
+      "Set one storage backend",
+    );
+    expect(() => storageFromEnv({ GCS_BUCKET: "g", AZURE_STORAGE_ACCOUNT: "a" }, "/d", as)).toThrow(
+      "Set one storage backend",
+    );
+  });
+
+  it("allows both Azure variables together: they are one backend", () => {
+    const { as } = factories();
+    expect(
+      storageFromEnv(
+        { AZURE_STORAGE_ACCOUNT: "a", AZURE_STORAGE_CONNECTION: "x", AZURE_STORAGE_CONTAINER: "c" },
+        "/d",
+        as,
+      ).log.storage,
+    ).toBe("azure");
   });
 });
 
