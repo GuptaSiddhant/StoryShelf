@@ -98,6 +98,18 @@ Rules:
   the same way: PGlite always, a real server (same gates, same CI job) for the rest. Only the real server
   runs the mirrored race tests (an interrupted preparation that resumes, a fenced writer in flight, two
   instances booting). The unit test pins that PGlite never exposes the capability.
+- MySQL (`db-mysql/src/build-reference-lifecycle.live.test.ts`) has no in-process stand-in: it runs
+  `buildReferenceContractSuite`, `retentionActivationContractSuite` and `retentionSkippedContractSuite`
+  only against a real MySQL 8 server, every party on its own pool, plus the mirrored race tests
+  (interrupted preparation, a writer in flight, two instances booting, a claim against preparation)
+  and a use of a hash racing a collector's claim. Gates: `LIVE_CLOUD=1`, `MYSQL_SCHEMA_MUTATION_TEST=1`
+  and `MYSQL_DATABASE_URL` (a user that may `CREATE DATABASE`: the skipped-build cases each get a
+  scratch database). CI runs it on every pull request that touches `packages/db-mysql/`,
+  `packages/core/src/test-helpers/` or `packages/core/src/adapters/database.ts` (job `mysql-lifecycle`,
+  a `mysql:8.0` service container), and the nightly MySQL job runs it with the rest of the live suite.
+  Removing the row locks or the named content locks fails it. The hermetic half
+  (`retention-activation.test.ts`) only refuses: MariaDB, TiDB, Vitess, MySQL other than 8, statement
+  binlogs, non-InnoDB tables, a single injected connection and the PlanetScale and TiDB presets.
 - The boot step that prepares the baseline pins before a dialect exposes the capability (ADR 0039,
   "activation") is proven with `retentionActivationContractSuite`. Activation stays each adapter's
   own step (it is on neither `DatabaseAdapter` nor `BuildReferenceLifecycle`); the dialect hands

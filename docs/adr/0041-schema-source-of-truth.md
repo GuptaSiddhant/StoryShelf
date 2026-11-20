@@ -32,11 +32,10 @@ columns declared in that dialect's Drizzle schema, and the three DDLs with each 
   exist in SQLite only. Postgres and MySQL lack them in both DDL and Drizzle, although core
   (`core/src/schema/user.ts`) and auth (`setUserDisabled`, `resolveAuthUser`) depend on them, so
   disabling a user is not persisted on those backends. Tracked as #418 (p0).
-- **Intentional, SQLite and Postgres only until #376 (MySQL).** `builds.retention_state`, `build_references`,
-  `build_reference_generations`, `build_deletions` and `build_content_releases` (ADR 0039). The
-  last two have DDL only, like `build_references`: the lifecycle capability reads and writes them
-  with its own SQL, so they need no Drizzle schema or core `Tables` entry until another dialect
-  implements the capability.
+- **Intentional, DDL only.** `build_references`, `build_reference_generations`, `build_deletions`
+  and `build_content_releases` (ADR 0039) exist in every dialect's DDL (MySQL since #376) but in no
+  Drizzle schema: the lifecycle capability reads and writes them with its own SQL, so they need no
+  Drizzle schema or core `Tables` entry. `builds.retention_state` is in every DDL and Drizzle schema.
 - **By design.** The auth engine tables (`user`, `session`, `account`, `verification`, `passkey`,
   `ssoProvider`) have DDL in every dialect but no Drizzle schema in the database packages; the auth
   bridge addresses them through its own model registry.
@@ -44,8 +43,7 @@ columns declared in that dialect's Drizzle schema, and the three DDLs with each 
   agree between DDL and Drizzle in all three dialects, and `users` now carries the four access
   columns everywhere (#418 is fixed). Eight DDL indexes (`notification_*`, `insights_*`,
   `ai_usage_*`) are declared in no Drizzle schema (#833), and SQLite's `user_invite_tokens` index
-  likewise. The remaining differences are the allowlisted ones above. MySQL lacks
-  `builds.retention_state` and the four lifecycle tables until #376; the parity test names them.
+  likewise. The remaining differences are the allowlisted ones above.
 - Otherwise DDL and Drizzle column names agree within each dialect. Types, nullability, defaults
   and indexes were not compared; the parity test in decision 1 must.
 

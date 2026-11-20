@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. SQLite (#536) and the postgres.js preset (#375) activated; the other Postgres presets and MySQL are open. This ADR amends ADR 0009 decision 4 (Retention and purge) for
+Accepted. SQLite (#536), the postgres.js, `pg` and `./neon` presets (#375) and MySQL 8 (#376) activated. This ADR amends ADR 0009 decision 4 (Retention and purge) for
 deployments with `testing`; hosting-only retention is unchanged.
 
 Merged: source-build provenance (#345), frozen comparison references and fail-closed testing purge
@@ -10,7 +10,7 @@ Merged: source-build provenance (#345), frozen comparison references and fail-cl
 references (#397), sealing of the capability to fenced mutations (#372) and resumable deletion with
 exactly-once content release (#374), per-build content uses (#564), SQLite activation (#536) and Postgres activation on the postgres.js
 preset, then on the `pg` and `./neon` presets (#375).
-Open: MySQL (#376) and investigations (#377 to #381).
+MySQL lifecycle and activation (#376). Open: investigations (#377 to #381).
 
 Source of the decisions: the architect resolution on issue #343
 (<https://github.com/GuptaSiddhant/StoryShelf/issues/343#issuecomment-6521055220>) and the #343 epic.
@@ -120,7 +120,7 @@ by preset, so it cannot by itself carry this guarantee.
   deployment with `testing` skips automatic build deletion and branch GC with an actionable admin
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
   reference-sensitive path. Presets are enabled one at a time: SQLite first (#536, done), then
-  Postgres (#375) and MySQL (#376).
+  Postgres (#375, done) and MySQL (#376, done).
 - **Postgres lifecycle** (`db-postgres/src/build-reference-lifecycle.ts`, #375). Where SQLite
   serializes through its write lock, Postgres takes row locks in one fixed order: each owner's
   generation row `FOR UPDATE` (the fence), then the referenced builds `FOR SHARE`, which conflicts
@@ -146,6 +146,21 @@ by preset, so it cannot by itself carry this guarantee.
   (`transactions: "sequential"`) and stays fail closed. The activation suite
   runs unchanged on PGlite and on a real server; the race tests (interrupted preparation, a writer
   in flight, two instances) need the real server.
+- **MySQL lifecycle and activation** (`db-mysql/src/build-reference-lifecycle.ts`,
+  `retention-activation.ts`, #376). The Postgres lock order on InnoDB, every transaction at READ
+  COMMITTED on a pooled connection of its own (InnoDB's REPEATABLE READ would answer a domain
+  write's plain reads from a snapshot older than the fence). The fence row is created with
+  `INSERT ... ON DUPLICATE KEY UPDATE`, which takes its exclusive lock at once (`INSERT IGNORE`
+  takes a shared one, and two writers upgrading it deadlock). MySQL's named locks belong to the
+  session, so a use and a claim of shared content take `GET_LOCK` on 64 hash stripes, in order,
+  before their transaction and release them after the commit. Operations that run only their own
+  SQL repeat an InnoDB deadlock victim; a caller's domain callback is never repeated. A `deleting`
+  build's steps are read after its row lock, never in a join with it. Activation is the Postgres
+  sequence, but only on `createMysqlDatabase` with a pool on MySQL 8 whose lifecycle tables are
+  InnoDB and whose binary log is not statement-based; the PlanetScale and TiDB presets, a single
+  injected `Connection`, MariaDB, TiDB and Vitess stay fail closed and say why once at boot. Proven
+  with both suites, the skipped-build suite and the race tests on MySQL 8.0, every party on its
+  own pool (CI job `mysql-lifecycle`).
 - **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
   adapter's setup has migrated the schema, it runs `prepareBaselineReferences` once and only then
   exposes `buildReferenceLifecycle`. A shared file is required, so an in-memory database never has
@@ -181,13 +196,13 @@ by preset, so it cannot by itself carry this guarantee.
 
 All writers use the fenced capability when it is present:
 
-| Path                                                      | Mutation                                                                                                                                                                          |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `approveSnapshot` (`app/src/routers/builds.handlers.ts`)  | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`)                                                                       |
-| `core/src/capture/pipeline.ts`                            | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict        |
-| `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                      |
-| `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                      |
-| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                     |
+| Path                                                      | Mutation                                                                                                                                                                                                     |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `approveSnapshot` (`app/src/routers/builds.handlers.ts`)  | Review decision and promotion; drift is rechecked inside the promotion transaction (`approveInTransaction`)                                                                                                  |
+| `core/src/capture/pipeline.ts`                            | Default-branch auto-accept and environment migration (`BaselineModel.upsert`); legacy fingerprint backfill (`backfillFingerprint`) skips on a write or generation conflict                                   |
+| `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                                                 |
+| `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                                                 |
+| `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                                                |
 | `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; invoked once at every SQLite boot, before the capability is exposed (#536) |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check
@@ -228,9 +243,9 @@ could leave them, and they would keep an unrelated build protected.
 
 **Negative**
 
-- MySQL, and Postgres on `./neon-http`, PGlite and a single injected connection, still do not purge
-  builds or garbage-collect branches with `testing` (#375, #376); their storage grows and operators must be
-  told.
+- Postgres on `./neon-http`, PGlite and a single injected connection, and MySQL other than MySQL 8
+  on a pool (PlanetScale, TiDB, MariaDB, a single connection), still do not purge builds or
+  garbage-collect branches with `testing` (#375, #376); their storage grows and operators must be told.
 - Each of those needs its own multi-connection proof before it regains automatic retention.
 - Pinning whole builds keeps more storage than pinning artifacts would.
 - Every baseline writer pays for a fenced transaction.

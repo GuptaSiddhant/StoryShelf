@@ -175,7 +175,12 @@ export function createDrizzleMySqlAdapter(
   };
 }
 
-/** CRUD subset bound to a Postgres transaction handle. */
+/** The {@link TxStore} of a Drizzle MySQL instance bound to one connection, for the lifecycle's own transactions. */
+export function transactionStore(db: unknown): TxStore {
+  return buildTxStore(db as DrizzleMySqlLike);
+}
+
+/** CRUD subset bound to a MySQL transaction handle. */
 function buildTxStore(drizzle: DrizzleMySqlLike): TxStore {
   return {
     insert: async (table, values) => await insertOne(drizzle, table, values as never),
