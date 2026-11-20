@@ -1,6 +1,6 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
-import { pageStory } from "../../.storybook/page.tsx";
+import { onAPhone, pageStory } from "../../.storybook/page.tsx";
 import { renderProfilePage, type ProfilePageState } from "./profile.tsx";
 
 const meta: Meta = { title: "Pages/Account/Profile" };
@@ -57,6 +57,11 @@ const state = (overrides: Partial<ProfilePageState> = {}): ProfilePageState => (
 export const Default = pageStory(() => renderProfilePage(state()), {
   store: { authEnabled: true },
 });
+
+/** The Devices table at 375px: the status badge stays whole and the table scrolls in its region. */
+export const OnAPhone = onAPhone(
+  pageStory(() => renderProfilePage(state()), { store: { authEnabled: true } }),
+);
 
 export const NoMemberships = pageStory(
   () => renderProfilePage(state({ memberships: [], subscribedSlugs: [] })),

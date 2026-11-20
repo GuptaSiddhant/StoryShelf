@@ -401,6 +401,24 @@ describe("type and colour tokens", () => {
     expect(blocks.filter(([block]) => /margin:(?!\s*0;)/u.test(block))).toEqual([]);
   });
 
+  it("positions every scroller (a .visually-hidden child is absolute)", async () => {
+    // `overflow: auto` / `overflow-x: auto` without a positioned ancestor lets an absolute
+    // child escape the scroller and widen the page (#1133, P1). A `css` template that scrolls
+    // also sets `position: relative` (or sticky/absolute/fixed) at its top level (two-space indent).
+    const offenders: string[] = [];
+    for (const { file, source } of await styledSources()) {
+      for (const [, body = ""] of source.matchAll(/css`([^`]*)`/gu)) {
+        const label = /\/\* ([\w-]+) \*\//u.exec(body)?.[1] ?? "unlabeled";
+        const scrolls = /\n {2}overflow(?:-x)?:\s*(?:auto|scroll)/u.test(body);
+        const positioned = /\n {2}position:\s*(?:relative|sticky|absolute|fixed)/u.test(body);
+        if (scrolls && !positioned) {
+          offenders.push(`${file}: ${label}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("uses only the three named breakpoints", async () => {
     expect(await offendersOf(/@media \(max-width:(?!\s*(?:480|880|1024)px\))[^)]*\)/gu)).toEqual(
       [],

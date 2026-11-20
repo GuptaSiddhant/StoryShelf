@@ -206,7 +206,7 @@ export function renderSettingsLabels(
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const editing = isAdmin ? labelTypes.find((item) => item.key === formState?.editKey) : undefined;
   return (
-    <div class="grid max-w-form">
+    <div class="grid">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <LabelTypesCard
         project={project}

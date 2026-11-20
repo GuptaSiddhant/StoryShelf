@@ -97,9 +97,9 @@ function formPage(
   form: unknown,
 ): unknown {
   return (
-    <DocumentLayout title={pageTitle} nav={nav}>
+    <DocumentLayout layout="form" title={pageTitle} nav={nav}>
       <PageHeader title={title} />
-      <div class="max-w-form">{form}</div>
+      {form}
     </DocumentLayout>
   );
 }

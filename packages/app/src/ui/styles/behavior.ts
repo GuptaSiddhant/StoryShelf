@@ -26,12 +26,16 @@ function dataCss(): string {
     .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
     .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    @media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: minmax(0, 1fr); } }`;
+    @media (max-width: 880px) { .grid--2 { grid-template-columns: minmax(0, 1fr); } }
+    @media (max-width: 480px) { .grid--3 { grid-template-columns: minmax(0, 1fr); } }`;
 }
 
 /** Truly global chrome rules (depend on ancestors outside any one subtree). */
 function chromeCss(): string {
   return `
+    @property --edge-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+    @property --edge-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+    @keyframes ss-edge-fade { 0% { --edge-fade-start: 0px; --edge-fade-end: 24px; } 8% { --edge-fade-start: 24px; --edge-fade-end: 24px; } 92% { --edge-fade-start: 24px; --edge-fade-end: 24px; } 100% { --edge-fade-start: 24px; --edge-fade-end: 0px; } }
     @media (min-width: 881px) { html[data-sidebar="rail"] { --sidebar-width: 68px; } }
     [data-theme-icon] { display: none; }
     [data-theme="light"] [data-theme-icon="light"], [data-theme="dark"] [data-theme-icon="dark"], [data-theme="system"] [data-theme-icon="system"] { display: inline-flex; }`;

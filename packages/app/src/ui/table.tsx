@@ -2,6 +2,7 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 const tableWrap = css`
   /* table */
+  position: relative;
   overflow: auto;
   background: var(--surface-card);
   border: 1px solid var(--border);
