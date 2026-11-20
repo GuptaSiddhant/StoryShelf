@@ -17,6 +17,3 @@ page lists each connection with its account, linked repositories, health, token 
 may post and whether configuration manages it; lists pending and broken links with their coverage,
 to approve, reconnect or refuse; and holds the operator switch. Keys, tokens, codes and states never
 appear in HTML, logs or errors (epic #1117, ADR 0054).
-
-`OptionFields` now shows the selected option's fields: its stylesheet quoted `input[type="radio"]`,
-which hono/css escaped into a selector that matched nothing.
