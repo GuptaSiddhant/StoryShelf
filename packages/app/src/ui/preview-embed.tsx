@@ -13,7 +13,7 @@ export const PREVIEW_SANDBOX = "allow-scripts";
 const previewWrap = css`
   /* preview-embed-wrap */
   display: grid;
-  gap: 0.5rem;
+  gap: var(--space-2);
   min-width: 0;
 `;
 
@@ -30,10 +30,10 @@ const previewHost = css`
 const previewIdle = css`
   /* preview-embed-idle */
   display: grid;
-  gap: 0.5rem;
+  gap: var(--space-2);
   place-items: center;
   align-content: center;
-  padding: 2rem 1rem;
+  padding: var(--space-8) var(--space-4);
   text-align: center;
 `;
 

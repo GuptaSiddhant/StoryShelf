@@ -19,6 +19,7 @@ import {
   PageHeader,
   SectionTitle,
   Stat,
+  StatGroup,
   Table,
   VStack,
   statusLabel,
@@ -68,9 +69,9 @@ function PausedNotices(props: {
   if (!notificationsPaused && !retentionPause) {
     return null;
   }
-  // A stack keeps the alerts apart; the margin keeps the last one off the card below.
+  // A stack keeps the alerts apart; the page column keeps the last one off the card below.
   return (
-    <div class="mb-1">
+    <div>
       <VStack>
         <NotificationsPausedNotice paused={notificationsPaused} />
         <RetentionPausedNotice pause={retentionPause} />
@@ -212,11 +213,11 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
   return (
     <Card>
       <SectionTitle>Server</SectionTitle>
-      <div class="grid grid--3">
+      <StatGroup>
         <Stat label="Status" value={statusLabel(report.status)} />
         <Stat label="Uptime" value={formatUptime(report.uptimeSecs)} />
         <Stat label="Version" value={report.version} />
-      </div>
+      </StatGroup>
       <Meta>
         Auth {authEnabled ? "enabled" : "disabled — all operations permitted"} · Purge TTL{" "}
         {formatOptional(config.purgeTtlDays)} days · Branch TTL{" "}
@@ -254,11 +255,11 @@ function CredentialsCard(props: {
       <Meta>
         Webhook secrets, git tokens and notification secrets are encrypted with the server secret.
       </Meta>
-      <div class="grid grid--3">
+      <StatGroup>
         <Stat label="Current secret" value={String(probe.current)} />
         <Stat label="Previous secret" value={String(probe.previous)} />
         <Stat label="Unreadable" value={String(probe.unreadable.length)} />
-      </div>
+      </StatGroup>
       {probe.unreadable.length > 0 ? (
         <Alert tone="danger" title="Some credentials cannot be decrypted">
           No configured secret matches {probe.unreadable.length} stored credential(s) (
@@ -295,7 +296,7 @@ function HostingOnlyNotice(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { hiddenSnapshots } = props;
   return (
-    <div class="mt-1">
+    <div>
       <Alert tone="info" title="Testing is off: Storybook hosting only">
         This instance publishes and serves Storybooks, but does not capture, compare or keep
         baselines, and no testing status is posted. Set the <code>testing</code> option to turn
@@ -328,12 +329,12 @@ function CaptureCards(props: {
   return (
     <>
       {publicOrigin ? (
-        <div class="mt-1">
+        <div>
           <PublicOriginCard origin={publicOrigin} />
         </div>
       ) : null}
       {targets && targets.length > 0 ? (
-        <div class="mt-1">
+        <div>
           <CaptureTargetsCard targets={targets} />
         </div>
       ) : null}
@@ -347,7 +348,7 @@ function IntegrationsSection(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> | null {
   const { view } = props;
   return view && view.statuses.length > 0 ? (
-    <div class="mt-1" id="integrations">
+    <div id="integrations">
       <IntegrationsCard view={view} />
     </div>
   ) : null;
@@ -385,12 +386,12 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
       <ServerFacts data={data} />
       <CaptureCards data={data} />
       {credentials ? (
-        <div class="mt-1">
+        <div>
           <CredentialsCard probe={credentials} config={config} />
         </div>
       ) : null}
       <IntegrationsSection view={data.integrations} />
-      <div class="mt-1">
+      <div>
         <Card>
           <SectionTitle>Adapters</SectionTitle>
           <Meta>
