@@ -27,6 +27,7 @@ import {
 import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
+import { gitConnectionsOf } from "./git-connections.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
@@ -368,6 +369,8 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       design,
       notifiers,
       integrations: options.integrations,
+      gitConnections: gitConnectionsOf(options, config),
+      gitConfiguredLinks: options.git?.links,
       notificationsConfig: options.notifications?.config,
       ai: options.ai,
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),

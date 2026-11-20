@@ -9,7 +9,7 @@ export {
   type LinkApproval,
   type LinkApprovalDeps,
 } from "./link-approval.ts";
-export { linkChannel } from "./link-channel.ts";
+export { linkChannel, postsComments } from "./link-channel.ts";
 export { approvedLinks, deliverToLink, linkTarget, linkTargets } from "./link-target.ts";
 export {
   createNotifyEnqueuer,

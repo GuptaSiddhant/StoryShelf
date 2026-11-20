@@ -3,6 +3,7 @@ import { registerAiSettings } from "./settings-ai.ts";
 import { registerCaptureSettings } from "./settings-capture.ts";
 import { registerDesignSettings } from "./settings-design.ts";
 import { registerGeneralSettings } from "./settings-general.ts";
+import { registerGitSettings } from "./settings-git.ts";
 import { registerLabelSettings } from "./settings-labels.ts";
 import { registerLinkSettings } from "./settings-links.ts";
 import { registerMemberSettings } from "./settings-members.ts";
@@ -19,6 +20,7 @@ export function registerSettingsPages(app: ShelfRouter): void {
   registerTokenSettings(app);
   registerWebhookSettings(app);
   registerNotificationSettings(app);
+  registerGitSettings(app);
   registerMemberSettings(app);
   registerAiSettings(app);
 }
