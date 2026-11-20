@@ -55,6 +55,11 @@ describe("generatePackageJson", () => {
     expect(pkg().dependencies["@storyshelf/app"]).toBe("0.0.0");
   });
 
+  it("pins @hono/node-server past GHSA-rmxm-3fg6-px4f", () => {
+    const { dependencies } = pkg({ database: "sqlite", storage: "local" });
+    expect(dependencies["@hono/node-server"]).toBe("^2.1.11");
+  });
+
   it("runs entries with plain node and requires Node 24+", () => {
     const { scripts, engines } = pkg({ database: "postgres", storage: "s3" });
     expect(scripts["start"]).toBe("node src/index.ts");

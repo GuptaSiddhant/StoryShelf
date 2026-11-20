@@ -3,7 +3,8 @@
  * database queue, the IPC queue of a forked capture child) and runs a handler per
  * job `kind`. A slot is taken before polling, a failing job is retried with exponential backoff
  * until its last attempt, the lease is kept by the job's progress, a lost lease or a cancel stops
- * the run, and `stop()` drains the jobs in flight.
+ * the run, and `stop()` drains the jobs in flight: until they end, or with `graceMs` until the grace
+ * runs out, when the jobs still running are handed back to the queue (`shutdown.ts`, #912).
  *
  * ```ts
  * const consumer = createCaptureConsumer({
@@ -12,7 +13,7 @@
  *   config: { concurrency: 2 },
  * });
  * consumer.start(); // resolves after stop()
- * // on SIGTERM: await consumer.stop();
+ * // on SIGTERM: await consumer.stop({ graceMs: 20_000 });
  * ```
  */
 import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
@@ -32,11 +33,13 @@ import {
   DEFAULT_WAIT_TIME_SECONDS,
 } from "./retry.ts";
 import { runJob, type JobRuntime } from "./run-job.ts";
+import { createReleaser, drainWithin, type Releaser } from "./shutdown.ts";
 import { applyImageSettings, ensureImageEngine, sweepScratch } from "./startup.ts";
 import type {
   CaptureConsumer,
   CaptureConsumerOptions,
   ConsumerJob,
+  ConsumerStopOptions,
   JobHandlers,
   KindHandler,
 } from "./types.ts";
@@ -50,7 +53,7 @@ export function createCaptureConsumer(options: CaptureConsumerOptions): CaptureC
   claimHandledKinds(options.queue, rt);
   const slots = options.config?.concurrency ?? recommendedBuildConcurrency();
   let session: Promise<void> | null = null;
-  let requestStop: (() => void) | null = null;
+  let requestStop: ((stop: ConsumerStopOptions) => void) | null = null;
   let stopRequested = false;
   return {
     isRunning: () => session !== null,
@@ -58,11 +61,11 @@ export function createCaptureConsumer(options: CaptureConsumerOptions): CaptureC
       if (session !== null) {
         return;
       }
-      const stopped = Promise.withResolvers<null>();
+      const stopped = Promise.withResolvers<ConsumerStopOptions>();
       stopRequested = false;
-      requestStop = (): void => {
+      requestStop = (stop): void => {
         stopRequested = true;
-        stopped.resolve(null);
+        stopped.resolve(stop);
       };
       session = consume({
         options,
@@ -75,8 +78,8 @@ export function createCaptureConsumer(options: CaptureConsumerOptions): CaptureC
         session = null;
       });
     },
-    stop: async () => {
-      requestStop?.();
+    stop: async (stop = {}) => {
+      requestStop?.(stop);
       await session?.catch(() => {});
     },
   };
@@ -86,8 +89,8 @@ interface Consuming {
   options: CaptureConsumerOptions;
   rt: JobRuntime;
   slots: number;
-  /** Resolves when `stop()` was called. */
-  stopped: Promise<null>;
+  /** Resolves with the stop's options when `stop()` was called. */
+  stopped: Promise<ConsumerStopOptions>;
   isStopped: () => boolean;
 }
 
@@ -105,23 +108,30 @@ async function consume(c: Consuming): Promise<void> {
   }
 }
 
-/** Poll (and sample the queue) until `stop()`, then drain the jobs in flight. */
+/**
+ * Poll (and sample the queue) until `stop()`, then drain the jobs in flight: with a grace, the jobs
+ * still running when it runs out are handed back (`drainWithin`).
+ */
 async function pollUntilStopped(c: Consuming): Promise<void> {
   const { options, rt } = c;
-  const loop = startLoop(c);
+  const releaser = createReleaser();
+  const loop = startLoop(c, releaser);
   const stopSampling = startQueueSampling(options.queue, options.metrics, {
     now: rt.now,
     timers: rt.timers ?? REAL_TIMERS,
     logger: rt.logger,
   });
-  await c.stopped;
+  const { graceMs } = await c.stopped;
   stopSampling();
-  await loop.stop();
+  if (!(await drainWithin(loop.stop(), { graceMs, releaser, timers: rt.timers }))) {
+    rt.logger.error({ graceMs }, "drain did not settle within the shutdown grace; stopping anyway");
+  }
 }
 
 /** The database queue sets its own cadence; any other queue is polled in a slot loop. */
-function startLoop(c: Consuming): PollLoop {
-  const { options, rt } = c;
+function startLoop(c: Consuming, releaser: Releaser): PollLoop {
+  const { options } = c;
+  const rt: JobRuntime = { ...c.rt, releaser };
   const run = async (job: ConsumerJob): Promise<void> => {
     await runJob(rt, job);
   };
@@ -229,6 +239,7 @@ export type {
   CaptureConsumerOptions,
   ConsumerConfig,
   ConsumerJob,
+  ConsumerStopOptions,
   JobHandlers,
   JobRunContext,
   KindHandler,

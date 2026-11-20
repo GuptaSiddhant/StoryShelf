@@ -66,6 +66,15 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 
 ## Icons, tokens, and the shell
 
+- **Type and weight come from tokens.** `font-size` is always `var(--text-xs|sm|base|lg|xl|2xl)` and
+  `font-weight` `var(--weight-normal|medium|semibold|bold)`; no rem/px/em literals and no 650.
+  A section heading inside a card is `SectionTitle`, never a level-2 `PageHeader`. Text in a status
+  colour uses `--status-*-fg`, never the raw status colour; no hex in styles outside `theme.ts` and
+  `styles/tokens.ts` (use `--accent-contrast` or `--status-rejected-contrast`). `consistency.test.ts` enforces all of it.
+- **Capitalisation.** Sentence case for buttons, tabs, titles, badges and filters; product names
+  keep their capital ("View in Library", "Open in Figma", "View Storybook"). Never print a raw enum
+  (status, verdict, role, kind, provider, log level): pass it through `statusLabel()`.
+
 - **Icons are sprite-backed.** Add the SVG body to `ui/icons/paths.ts`
   (24×24, stroke-based, inherits `currentColor`); `IconName` and the sprite
   update automatically. Render with `<Icon name="…" />` (decorative by

@@ -16,6 +16,7 @@ import {
   TextareaField,
   VStack,
   statusTone,
+  statusLabel,
 } from "../ui/components.tsx";
 import { openChangeRequests, openRequestsLabel } from "./review-change-requests.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -39,7 +40,7 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
         {data.state.latest.map((review): Rendered => (
           <HStack key={review.id} align="baseline" wrap={false}>
             <Badge tone={review.verdict === "approved" ? "success" : "danger"}>
-              {review.verdict}
+              {statusLabel(review.verdict)}
             </Badge>
             <strong>
               {review.userId ? (data.names.get(review.userId) ?? review.userId) : "anonymous"}

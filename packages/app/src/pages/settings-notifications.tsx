@@ -17,6 +17,7 @@ import {
   SelectField,
   Table,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
 import { UnofferedNotice, type UnofferedIntegrationView } from "./integrations-unoffered.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
@@ -200,14 +201,14 @@ const LastDelivered: FC<{ at: string | null }> = ({ at }) => (
 const HealthStatus: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => {
   if (channel.lastError === null) {
     return channel.lastDeliveredAt === null ? (
-      <Badge tone="neutral">no delivery yet</Badge>
+      <Badge tone="neutral">No delivery yet</Badge>
     ) : (
-      <Badge tone="success">ok</Badge>
+      <Badge tone="success">OK</Badge>
     );
   }
   return (
     <>
-      <Badge tone="danger">failing</Badge>
+      <Badge tone="danger">Failing</Badge>
       <span class="truncate max-w-cell">
         <Meta as="span">
           Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
@@ -286,7 +287,7 @@ const ChannelRow: FC<{
 }> = ({ project, channel, isAdmin, paused }) => (
   <tr key={channel.id} id={`channel-${channel.id}`} tabIndex={-1}>
     <td>
-      <Badge tone="neutral">{channel.provider}</Badge>
+      <Badge tone="neutral">{statusLabel(channel.provider)}</Badge>
     </td>
     <td class="truncate max-w-cell" title={targetOf(channel)}>
       {targetOf(channel)}

@@ -99,7 +99,7 @@ describe("runCreate without a token", () => {
     await runCreate({ url: "https://shelf.example.com", name: "demo", cwd: dir });
 
     expect(process.exitCode).toBeUndefined();
-    expect(auth).toEqual([undefined, undefined, undefined]);
+    expect(auth).toEqual([undefined, undefined, undefined, undefined]);
     await expect(loadStorybookConfig(dir)).resolves.toEqual({
       slug: "demo",
       url: "https://shelf.example.com",
@@ -133,6 +133,36 @@ describe("runCreate without a token", () => {
   });
 });
 
+describe("runCreate with sign-in on", () => {
+  it("creates the project but mints no token, and points at the project's page", async () => {
+    setupProject();
+    const seen: string[] = [];
+    mockFetch((url: string) => {
+      seen.push(url);
+      return url.endsWith("/health") ? { status: "ok", auth: true } : { slug: "demo" };
+    });
+    let out = "";
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      out += String(chunk);
+      return true;
+    });
+
+    await runCreate({
+      url: "https://shelf.example.com/",
+      name: "demo",
+      token: "admin-token",
+      cwd: dir,
+    });
+
+    expect(process.exitCode).toBeUndefined();
+    expect(seen.some((url) => url.endsWith("/tokens"))).toBe(false);
+    expect(out).toContain("https://shelf.example.com/projects/demo/builds");
+    expect(out).toContain("STORYSHELF_TOKEN");
+    expect(out).not.toContain("CI token:");
+    await expect(loadStorybookConfig(dir)).resolves.toMatchObject({ slug: "demo" });
+  });
+});
+
 describe("runCreate success", () => {
   it("creates the project, mints a token, and writes the config", async () => {
     setupProject();
@@ -155,6 +185,7 @@ describe("runCreate success", () => {
     expect(process.exitCode).toBeUndefined();
     expect(seen).toEqual([
       "https://shelf.example.com/api/v1/projects",
+      "https://shelf.example.com/api/v1/health",
       "https://shelf.example.com/api/v1/projects/demo/tokens",
     ]);
     await expect(loadStorybookConfig(dir)).resolves.toEqual({
