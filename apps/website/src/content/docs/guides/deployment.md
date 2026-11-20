@@ -108,7 +108,17 @@ Set the host to keep at least one instance running, and, where the platform bill
 | Railway | Turn off **Settings → Deploy → Serverless** and redeploy; Railway applies the setting when it creates a container |
 | Docker Compose, a VM, `npm start` | Nothing to change, provided the process is not stopped |
 
-The GCP and Azure reference stacks below already do this. Hosts that cannot do it are not suitable for capture: see [Capture refuses to start on a serverless host](/guides/troubleshooting/#capture).
+The GCP and Azure modules ([GCP](/guides/deployment/gcp/), [Azure](/guides/deployment/azure/)) already do this, and the AWS module keeps its service at one task or more. Hosts that cannot do it are not suitable for capture: see [Capture refuses to start on a serverless host](/guides/troubleshooting/#capture).
+
+### Shutdown
+
+A deploy or a scale-down sends SIGTERM. The app stops taking jobs and drains running captures for `SHUTDOWN_GRACE_SECONDS`, then hands the rest back to the queue, so a restart does not cost an attempt. Keep the value below the platform's stop window, because a process killed anyway loses its lease and counts an attempt:
+
+| Platform | SIGTERM window | `SHUTDOWN_GRACE_SECONDS` |
+| --- | --- | --- |
+| AWS ECS Fargate | `stopTimeout`, up to 120 seconds | The module sets 30, and `stopTimeout` to the grace plus 10 |
+| Google Cloud Run | 10 seconds, not configurable | 1 to 9, default 8 (the process exits 1 second after the drain) |
+| Azure Container Apps | The termination grace, which the module sets to the grace plus 10 seconds | 30 |
 
 **The symptom** is builds that stay `pending` or `capturing`, and jobs on the **Compute jobs** page that look running, until someone opens the app, when they move for a while and then stall again. See [Troubleshooting](/guides/troubleshooting/#capture).
 
@@ -225,13 +235,26 @@ Storing the uploaded Storybook for the published preview handles at most 8 files
 
 If builds still run out of memory, lower the runner concurrency first, then add RAM.
 
-## Cloud reference stacks
+## Supported targets
 
-Enterprise Terraform stacks are available per cloud — each scaffolds one app (it also runs the captures from the database queue), database, storage, auth, and optional DNS/TLS. See the dedicated pages for commands, env wiring, and stable output contracts:
+These targets are documented and tested in CI or nightly ([ADR 0050](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0050-cloud-deployment.md), decision 5).
 
-- [AWS — ECS + S3 + Postgres + Cognito](./aws/) — `s3_bucket`, `db_endpoint`, `user_pool_id`
-- [Azure — Container Apps + Blob + Postgres + Entra](./azure/) — `storage_connection_string`, `entra_application_id`
-- [GCP — Cloud Run + GCS + Postgres + Identity Platform](./gcp/) — `run_url`, `gcs_bucket`, `database_url`
-- [Cloud assembly — all clouds equal](./cloud/) — swap each layer independently, with serverless hosting only on Vercel, Cloudflare Workers and Lambda, plus Postgres provider recipes
+| Target | What runs | Status |
+| --- | --- | --- |
+| Docker or Compose | The full product, with capture | Supported. See [Docker Compose](/guides/deployment/docker-compose/). |
+| Fly | The full product, with capture | Supported. |
+| AWS ECS Fargate | The full product, with capture | Supported. See [AWS](/guides/deployment/aws/). |
+| GCP Cloud Run | The full product, with capture | Supported. See [GCP](/guides/deployment/gcp/). |
+| Azure Container Apps | The full product, with capture | Supported. See [Azure](/guides/deployment/azure/). |
+| Vercel, Netlify, AWS Lambda | The app **without capture** (hosting and review) | Supported. A runner is refused on Lambda and warned on Vercel and Netlify. |
+| Kubernetes (a Helm chart) | | **Not supported yet.** Run the image yourself; a chart follows when users ask. |
+| Cloudflare Workers | | **Not supported yet.** It waits on the blockers reported in #396. |
 
-For single-host Docker Compose or a bare `npm start` on Fly/Railway/Render/VPS, the [Docker Compose](./docker-compose/) page covers the compose file, subdomains, and auth. The cloud assembly page also includes minimal `Turso + S3` and `Postgres + S3` recipes that run on any `fetch`+`crypto` platform.
+The three clouds each have a versioned Terraform module in `deploy/terraform/` that deploys the published image on one container service with a managed Postgres, a storage bucket and a secret store. Each page also lists the exact permissions and the environment to copy if your team won't use the module.
+
+- [AWS: ECS Fargate, S3, RDS Postgres, Cognito](/guides/deployment/aws/)
+- [GCP: Cloud Run, GCS, Cloud SQL Postgres](/guides/deployment/gcp/)
+- [Azure: Container Apps, Blob, PostgreSQL Flexible Server](/guides/deployment/azure/)
+- [Cloud assembly](/guides/deployment/cloud/): swap each layer on its own, with Postgres provider recipes
+
+The modules use Postgres only. Capture runs in the app's container, and remote browsers are optional. For single-host Docker Compose or a bare `npm start` on Fly, Railway, Render or a VPS, the [Docker Compose](/guides/deployment/docker-compose/) page covers the compose file, subdomains and auth.

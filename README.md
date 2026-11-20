@@ -55,6 +55,7 @@ Then get a first build:
 Prefer Node.js over Docker? `npx storyshelf server init` scaffolds a server (local accounts by default) with a `.env.example` and a README; it needs the same three values. The full walkthrough, for both paths, is the [getting-started guide](https://storyshelf.js.org/guides/getting-started/).
 
 SQLite and local storage live on the `/data` volume, and capture uses the image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64` (`:<version>`, `:latest`, and `-hosting` variants without a browser); see the [Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose. `SHELF_AUTH=none` (instead of `AUTH_PASSWORD`) runs without sign-in; the image never turns sign-in off because a variable is missing.
+For AWS, GCP and Azure, and the list of supported targets, see the [deployment guide](https://storyshelf.js.org/guides/deployment/#supported-targets).
 
 ## StoryShelf vs Chromatic
 
