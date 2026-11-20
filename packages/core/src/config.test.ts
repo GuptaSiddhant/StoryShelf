@@ -127,13 +127,13 @@ describe("trustProxy", () => {
   });
 });
 
-describe("ui.auth.publicLink", () => {
-  const parse = (href: string) =>
-    uiConfigSchema.safeParse({ auth: { publicLink: { href, label: "Browse" } } }).success;
+const parsesAsPublicLink = (href: string): boolean =>
+  uiConfigSchema.safeParse({ auth: { publicLink: { href, label: "Browse" } } }).success;
 
+describe("ui.auth.publicLink", () => {
   it("accepts an https URL or a path on this server", () => {
-    expect(parse("https://storyshelf.fly.dev/_/demo/")).toBe(true);
-    expect(parse("/_/demo-design-system/")).toBe(true);
+    expect(parsesAsPublicLink("https://storyshelf.fly.dev/_/demo/")).toBe(true);
+    expect(parsesAsPublicLink("/_/demo-design-system/")).toBe(true);
   });
 
   it("refuses anything that could run script or leave for another scheme or host", () => {
@@ -145,7 +145,7 @@ describe("ui.auth.publicLink", () => {
       "",
       "/a b",
     ]) {
-      expect(parse(href), href).toBe(false);
+      expect(parsesAsPublicLink(href), href).toBe(false);
     }
   });
 
