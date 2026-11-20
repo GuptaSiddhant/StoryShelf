@@ -4,6 +4,7 @@ import type { NotificationChannelRow } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
+import { unofferedKindMessage } from "../integrations.ts";
 import { errorBody } from "../middleware/api-errors.ts";
 import { getStore } from "../store.ts";
 import { retryChannelState } from "./channel-retry.ts";
@@ -47,6 +48,33 @@ function toPublic(row: NotificationChannelRow): {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/**
+ * Why a new channel is refused (400): a kind the server does not offer (#1126), or input the
+ * provider rejects. Undefined when it may be created.
+ */
+async function channelProblem(
+  body: { provider: string; config: Record<string, unknown>; secret?: string | undefined },
+  projectId: string | null,
+): Promise<string | undefined> {
+  const unoffered = unofferedKindMessage(body.provider);
+  if (unoffered !== undefined) {
+    return unoffered;
+  }
+  const valid = await NotificationChannelModel.validateInput(
+    getStore().notifiers,
+    body.provider,
+    body.config,
+    { projectId, hasSecret: body.secret !== undefined },
+    body.secret,
+  );
+  return valid.ok ? undefined : valid.message;
+}
+
+/** Whether the channel's kind is offered (a channel of an unknown kind stays listed). */
+function offered(row: NotificationChannelRow): boolean {
+  return unofferedKindMessage(row.provider) === undefined;
 }
 
 const listChannelsRoute = createRoute({
@@ -137,21 +165,16 @@ export function registerNotificationChannels(app: ShelfRouter): void {
   app.openapi(listChannelsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const rows = await notificationChannelModel().list(project.id);
-    return c.json(rows.map((row) => toPublic(row)));
+    // A channel whose kind the server cannot deliver is hidden, not deleted (#1126); System lists it.
+    return c.json(rows.filter((row) => offered(row)).map((row) => toPublic(row)));
   });
 
   app.openapi(createChannelRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    const valid = await NotificationChannelModel.validateInput(
-      getStore().notifiers,
-      body.provider,
-      body.config,
-      { projectId: project.id, hasSecret: body.secret !== undefined },
-      body.secret,
-    );
-    if (!valid.ok) {
-      return c.json(errorBody(valid.message), 400);
+    const problem = await channelProblem(body, project.id);
+    if (problem !== undefined) {
+      return c.json(errorBody(problem), 400);
     }
     const row = await notificationChannelModel().create({ projectId: project.id, ...body });
     return c.json(toPublic(row), 201);
@@ -245,15 +268,9 @@ export function registerSystemChannels(app: ShelfRouter): void {
   app.openapi(createSystemRoute, async (c) => {
     requireSiteAdmin(c);
     const body = c.req.valid("json");
-    const valid = await NotificationChannelModel.validateInput(
-      getStore().notifiers,
-      body.provider,
-      body.config,
-      { projectId: null, hasSecret: body.secret !== undefined },
-      body.secret,
-    );
-    if (!valid.ok) {
-      return c.json(errorBody(valid.message), 400);
+    const problem = await channelProblem(body, null);
+    if (problem !== undefined) {
+      return c.json(errorBody(problem), 400);
     }
     const row = await notificationChannelModel().create({ projectId: null, ...body });
     return c.json(toPublic(row), 201);

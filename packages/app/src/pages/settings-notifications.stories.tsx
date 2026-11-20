@@ -3,7 +3,11 @@ import type { Meta } from "@storybook/html-vite";
 import { onAPhone, pageStory } from "../../.storybook/page.tsx";
 import type { RenderedContent } from "../shell/document.tsx";
 import { project } from "../stories-fixtures/dataset.ts";
-import { renderProjectSettingsPage, type ProjectSettingsData } from "./project-settings.tsx";
+import {
+  renderProjectSettingsPage,
+  type ProjectSettingsData,
+  type SettingsUnoffered,
+} from "./project-settings.tsx";
 import type {
   SettingsMySubscription,
   SettingsNotificationChannel,
@@ -15,7 +19,7 @@ export default meta;
 
 const providers: SettingsNotifyProvider[] = [
   { kind: "slack", name: "Slack", delivery: "message" },
-  { kind: "email", name: "Email", delivery: "message" },
+  { kind: "email", name: "Email", delivery: "message", audience: "person" },
   { kind: "github", name: "GitHub", delivery: "state" },
 ];
 
@@ -86,6 +90,7 @@ const settingsPage = (
     | "mySubscription"
     | "isAdmin"
     | "notificationsPaused"
+    | "unoffered"
   >,
 ): RenderedContent =>
   renderProjectSettingsPage({
@@ -171,7 +176,10 @@ export const DeliveryPausedRetryDisabled = pageStory(() =>
   oneChannel(githubChannel, { notificationsPaused: true }),
 );
 
-/** No email transport is wired: the create-channel form offers the chat webhook only. */
+/**
+ * No email sender, seen by a project admin: email is not offered, so the create form lists the chat
+ * webhook only and the email-only personal card is left out, with no placeholder (#1126).
+ */
 export const EmailOff = pageStory(() =>
   settingsPage({
     notificationChannels: channels.filter((channel) => channel.provider !== "email"),
@@ -191,4 +199,48 @@ export const OnAPhone = onAPhone(
       isAdmin: true,
     }),
   ),
+);
+
+const emailUnavailable: SettingsUnoffered = {
+  notifications: [
+    {
+      kind: "email",
+      name: "Email",
+      reason: "Email has no transport: set SMTP_HOST and SMTP_FROM or configure a sender",
+    },
+    { kind: "teams-workflow", name: "Microsoft Teams", reason: "Turned off by the operator" },
+  ],
+  design: [],
+};
+
+/** The same server seen by a site admin: one line names what is not offered and links to System. */
+export const EmailOffSiteAdmin = pageStory(() =>
+  settingsPage({
+    notificationChannels: channels.filter((channel) => channel.provider !== "email"),
+    notifyProviders: providersWithoutEmail,
+    mySubscription: subscribed,
+    isAdmin: true,
+    unoffered: emailUnavailable,
+  }),
+);
+
+/** Every notifier turned off, seen by a site admin: the section is that one line only. */
+export const NoneOfferedSiteAdmin = pageStory(() =>
+  settingsPage({
+    notificationChannels: [],
+    notifyProviders: [],
+    mySubscription: null,
+    isAdmin: true,
+    unoffered: emailUnavailable,
+  }),
+);
+
+/** Every notifier turned off, seen by a project admin: the Notifications section is not shown. */
+export const NoneOfferedProjectAdmin = pageStory(() =>
+  settingsPage({
+    notificationChannels: [],
+    notifyProviders: [],
+    mySubscription: null,
+    isAdmin: true,
+  }),
 );

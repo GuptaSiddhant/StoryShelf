@@ -1,15 +1,18 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { Auth } from "@storyshelf/core/auth";
-import { ProjectModel } from "@storyshelf/core/models";
+import { NotificationChannelModel, ProjectModel } from "@storyshelf/core/models";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import { describeCaptureHost } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
 import { countHiddenSnapshots } from "../hidden-data.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
 import { buildUsageReport } from "../insights/usage-report.ts";
+import { unofferedIntegrations } from "../integrations.ts";
 import { pausedBannerShown } from "../notifications-pause.ts";
 import { renderAdminAiPage } from "../pages/admin-ai.tsx";
+import type { IntegrationsView } from "../pages/admin-system-integrations.tsx";
 import { renderAdminSystemPage, type AdminSystemData } from "../pages/admin-system.tsx";
 import { getStore } from "../store.ts";
 import { runnerTargets } from "../targets.ts";
@@ -86,11 +89,40 @@ function reencryptMessage(result: { reencrypted: number; failed: number }): stri
   return result.failed > 0 ? `${base}; ${result.failed} failed — see server logs` : base;
 }
 
-/** The System page's capture browsers and public origin (ADR 0007). */
+/**
+ * Every integration's standing, and the stored channels of a kind the server does not offer: kept,
+ * hidden from their project and not delivered to (issue #1126).
+ */
+async function integrationsView(db: DatabaseAdapter): Promise<IntegrationsView> {
+  const unoffered = unofferedIntegrations("notifiers");
+  const reasons = new Map(unoffered.map((entry) => [entry.kind, entry.reason]));
+  const rows = await new NotificationChannelModel(db).listByProviders([...reasons.keys()]);
+  const projects = rows.length > 0 ? await new ProjectModel(db).list() : [];
+  const byId = new Map(projects.map((project) => [project.id, project]));
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const channels = rows.map((row) => {
+    const project = row.projectId === null ? undefined : byId.get(row.projectId);
+    return {
+      id: row.id,
+      provider: row.provider,
+      project: project
+        ? { name: project.name, href: urls.settingsTab(project.slug, "review") }
+        : null,
+      reason: reasons.get(row.provider) ?? "",
+    };
+  });
+  return { statuses: getStore().integrations ?? [], channels };
+}
+
+/** The System page's capture browsers, public origin (ADR 0007) and integrations (#1126). */
 async function captureView(): Promise<
-  Pick<AdminSystemData, "targets" | "publicOrigin" | "notificationsPaused" | "retentionPause">
+  Pick<
+    AdminSystemData,
+    "targets" | "publicOrigin" | "notificationsPaused" | "retentionPause" | "integrations"
+  >
 > {
   return {
+    integrations: await integrationsView(getStore().db),
     retentionPause: getStore().db.retentionPause,
     targets: await runnerTargets(),
     publicOrigin: await publicOriginView(),

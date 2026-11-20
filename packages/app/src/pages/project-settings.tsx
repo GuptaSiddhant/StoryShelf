@@ -8,6 +8,7 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore, testingEnabled } from "../store.ts";
 import { PageHeader, Tabs, VStack } from "../ui/components.tsx";
+import type { UnofferedIntegrationView } from "./integrations-unoffered.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
 import { renderSettingsCapture } from "./settings-capture.tsx";
 import { ComponentOwnersCard } from "./settings-component-owners.tsx";
@@ -66,6 +67,17 @@ export interface ProjectSettingsData {
   ai?: SettingsAiData;
   /** What the capture runner offers (ADR 0007); omitted when it publishes no list. */
   targets?: readonly RunnerTarget[] | undefined;
+  /**
+   * Integrations the server does not offer projects (issue #1126), by section. Set only for a site
+   * admin, who sees one line naming them; project admins see nothing.
+   */
+  unoffered?: SettingsUnoffered | undefined;
+}
+
+/** The integrations a site admin is told are not offered, per settings section. */
+export interface SettingsUnoffered {
+  notifications: readonly UnofferedIntegrationView[];
+  design: readonly UnofferedIntegrationView[];
 }
 
 /** Form state shared by the settings tabs (field errors, global error, one-time secret). */
@@ -90,9 +102,29 @@ const TESTING_SECTIONS: ReadonlySet<SettingsSection> = new Set([
   "ai",
 ]);
 
-/** A section shows when its page exists: `testing` sections need testing, and the AI section needs AI. */
+/**
+ * Integration sections with nothing offered (issue #1126) are left out, unless a site admin is
+ * told what is missing.
+ */
+function integrationShown(section: SettingsSection, data: ProjectSettingsData): boolean {
+  if (section === "notifications") {
+    return data.notifyProviders.length > 0 || (data.unoffered?.notifications.length ?? 0) > 0;
+  }
+  if (section === "design") {
+    return data.design.providers.length > 0 || (data.unoffered?.design.length ?? 0) > 0;
+  }
+  return true;
+}
+
+/**
+ * A section shows when its page exists: `testing` sections need testing, the AI section needs AI,
+ * and an integration section needs an offered provider (or a site admin to tell).
+ */
 function sectionShown(section: SettingsSection, data: ProjectSettingsData): boolean {
   if (TESTING_SECTIONS.has(section) && !testingEnabled()) {
+    return false;
+  }
+  if (!integrationShown(section, data)) {
     return false;
   }
   return section !== "ai" || data.ai?.available === true;
@@ -132,6 +164,7 @@ const REVIEW_SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
       data.isAdmin,
       formState,
       data.notificationsPaused,
+      data.unoffered?.notifications,
     ),
 };
 
@@ -146,7 +179,13 @@ const SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
   tests: (data, formState) => renderSettingsTests(data.project, data.isAdmin, formState),
   ai: (data, formState) => renderSettingsAi(data.project, data.ai, formState),
   design: (data, formState) =>
-    renderSettingsDesign(data.project, data.design, data.isAdmin, formState),
+    renderSettingsDesign(
+      data.project,
+      data.design,
+      data.isAdmin,
+      formState,
+      data.unoffered?.design,
+    ),
   members: (data, formState) =>
     renderSettingsMembers(data.project, data.members, data.groupMappings, data.isAdmin, formState),
   tokens: (data, formState) =>

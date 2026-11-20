@@ -32,6 +32,10 @@ describe("the built-in email notifier", () => {
     expect(builtInEmailNotifier().metadata.kind).toBe("email");
   });
 
+  it("is unavailable, naming the fix, so projects are not offered it (#1126)", () => {
+    expect(builtInEmailNotifier().availability?.()).toEqual({ unavailable: NOT_CONFIGURED });
+  });
+
   it("delivers nothing through a channel while no transport is configured", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);

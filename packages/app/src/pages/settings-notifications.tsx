@@ -18,6 +18,7 @@ import {
   Table,
   VStack,
 } from "../ui/components.tsx";
+import { UnofferedNotice, type UnofferedIntegrationView } from "./integrations-unoffered.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
 
@@ -27,6 +28,8 @@ export interface SettingsNotifyProvider {
   name: string;
   /** `message` providers send a message once; `state` providers (git hosts) show a build's state. */
   delivery: "message" | "state";
+  /** `person` kinds (email) can carry a member's own subscription; absent is not `person`. */
+  audience?: "person" | "room" | undefined;
 }
 
 /** Channel row as rendered in the notifications settings tab. */
@@ -402,7 +405,11 @@ const CreateChannelCard: FC<{
   </Card>
 );
 
-/** Notifications settings tab: channel list, create forms, and my preferences. */
+/**
+ * Notifications settings tab: channel list, create forms, and my preferences. Only the providers the
+ * server offers are listed (issue #1126); with none, a site admin sees one line naming what is
+ * missing (`unoffered`, site admins only) and a project admin sees nothing.
+ */
 export function renderSettingsNotifications(
   project: Project,
   channels: SettingsNotificationChannel[],
@@ -411,14 +418,21 @@ export function renderSettingsNotifications(
   isAdmin: boolean,
   formState?: NotificationsFormState,
   paused?: boolean,
+  unoffered?: readonly UnofferedIntegrationView[],
 ): unknown {
+  if (providers.length === 0) {
+    return <UnofferedNotice area="Notifications are" integrations={unoffered} />;
+  }
   const messageProviders = providers.filter((provider) => provider.delivery === "message");
   const gitProviders = providers.filter((provider) => provider.delivery === "state");
+  // The personal card sends by email: it shows only while a `person` kind is offered.
+  const personal = providers.some((provider) => provider.audience === "person");
   return (
     <div class="grid max-w-form">
+      <UnofferedNotice area="Some integrations are" integrations={unoffered} />
       <NotificationsPausedNotice paused={paused} />
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <MyNotificationsCard project={project} mySubscription={mySubscription} />
+      {personal ? <MyNotificationsCard project={project} mySubscription={mySubscription} /> : null}
       <ChannelsCard
         project={project}
         channels={channels}

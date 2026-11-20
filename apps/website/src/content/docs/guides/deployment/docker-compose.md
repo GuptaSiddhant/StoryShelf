@@ -43,6 +43,7 @@ Everything comes from the environment:
 | `PUBLIC_BASE_URL`                                         | The public origin; required for notification links.                      |
 | `AUTH_PASSWORD`, `AUTH_EMAIL`                             | Bootstrap the local admin (needs `SECRET`).                              |
 | `SMTP_*`                                                  | Email notifications and invites.                                         |
+| `SHELF_INTEGRATIONS_DISABLED`                             | Kinds projects are not offered, comma-separated (`slack,teams,figma`). An unknown kind stops startup. |
 | `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` | Adds `chromium@azure` (Azure Playwright Workspaces, experimental). Off unless both are set. |
 | `SHELF_CAPTURE=off`                                       | Hosting only: no capture, compare or baselines.                          |
 

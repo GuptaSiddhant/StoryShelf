@@ -51,6 +51,17 @@ describe("NotificationChannelModel", () => {
     expect(await model(db).listSystem()).toHaveLength(1);
   });
 
+  it("lists channels of the given kinds across projects and site-wide (#1126)", async () => {
+    const { db } = makeDatabase();
+    await model(db).create({ projectId: "p1", provider: "email", config: {} });
+    await model(db).create({ projectId: "p2", provider: "log", config: {} });
+    await model(db).create({ projectId: null, provider: "email", config: {} });
+    const rows = await model(db).listByProviders(["email", "teams-workflow"]);
+    expect(new Set(rows.map((row) => row.projectId))).toEqual(new Set(["p1", null]));
+    expect(rows).toHaveLength(2);
+    expect(await model(db).listByProviders([])).toEqual([]);
+  });
+
   it("round-trips the secret and removes by id", async () => {
     const { db } = makeDatabase();
     const created = await model(db).create({

@@ -1,5 +1,5 @@
 /** Project and site-wide notification channel subscriptions. */
-import { eq, isNull } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { isStateProvider, type NotifierProvider } from "../adapters/notifier/provider.ts";
@@ -64,6 +64,19 @@ export class NotificationChannelModel {
   async listSystem(): Promise<NotificationChannelRow[]> {
     return (await this.db.list(this.tables.notificationChannels, {
       where: isNull(col(this.tables.notificationChannels, "projectId")),
+    })) as unknown as NotificationChannelRow[];
+  }
+
+  /**
+   * Every channel, project or site-wide, whose provider is one of `kinds`: the System page lists
+   * those of a kind the server does not offer (issue #1126). Empty `kinds` reads nothing.
+   */
+  async listByProviders(kinds: readonly string[]): Promise<NotificationChannelRow[]> {
+    if (kinds.length === 0) {
+      return [];
+    }
+    return (await this.db.list(this.tables.notificationChannels, {
+      where: inArray(col(this.tables.notificationChannels, "provider"), [...kinds]),
     })) as unknown as NotificationChannelRow[];
   }
 

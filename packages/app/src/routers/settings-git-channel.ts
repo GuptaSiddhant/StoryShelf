@@ -2,6 +2,7 @@
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
+import { unofferedKindMessage } from "../integrations.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
@@ -85,6 +86,10 @@ async function gitChannelProblem(
   config: Record<string, string>,
   secret: { token: string | undefined; secretField: "token" | "privateKey" },
 ): Promise<Record<string, string> | null> {
+  const unoffered = unofferedKindMessage(provider);
+  if (unoffered !== undefined) {
+    return { gitProvider: unoffered };
+  }
   const { notifiers } = getStore();
   if (!NotificationChannelModel.isStateKind(notifiers, provider)) {
     return { gitProvider: `Unknown git provider: ${provider}` };

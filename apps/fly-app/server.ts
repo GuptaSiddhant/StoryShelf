@@ -6,7 +6,11 @@ import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
 import { parseTrustProxy } from "@storyshelf/core/config";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+import {
+  createEmailNotifier,
+  integrationsFromEnv,
+  smtpPresetFromEnv,
+} from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -128,21 +132,26 @@ shelfLogger.info(aiLogFields(ai), "ai insights");
 // SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
 // (undefined keeps invites out-of-band).
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
+// SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
+const integrations = integrationsFromEnv(env);
 
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
   ai,
+  design: integrations.design,
   notifications: {
     notifiers: (builtIn) =>
-      emailSender
-        ? builtIn.map((provider) =>
-            provider.metadata.kind === "email"
-              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
-              : provider,
-          )
-        : builtIn,
+      integrations.notifiers(
+        emailSender
+          ? builtIn.map((provider) =>
+              provider.metadata.kind === "email"
+                ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+                : provider,
+            )
+          : builtIn,
+      ),
     ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   auth:
