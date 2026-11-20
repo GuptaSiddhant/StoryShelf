@@ -58,17 +58,17 @@ const pageHeaderRow = css`
 const pageHeaderTitle = css`
   /* page-header-title */
   margin: 0;
-  font-size: 1.45rem;
+  font-size: var(--text-2xl);
   line-height: 1.2;
   letter-spacing: -0.02em;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 `;
 
 const pageHeaderDesc = css`
   /* page-header-desc */
   margin: 0.35rem 0 0;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   max-width: 65ch;
   /* Links inside running text must not rely on colour alone. */
   & a {
@@ -81,7 +81,7 @@ const pageHeaderMeta = css`
   /* page-header-meta */
   margin: 0.4rem 0 0;
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   display: flex;
   gap: 0.4rem;
   align-items: center;
@@ -100,21 +100,21 @@ const pageHeaderActions = css`
 const sectionTitleH2 = css`
   /* section-title */
   margin: 0 0 0.5rem;
-  font-size: 1.05rem;
-  font-weight: 650;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
 `;
 
 const sectionTitleH3 = css`
   /* section-title-sm */
   ${sectionTitleH2}
-  font-size: 0.95rem;
+  font-size: var(--text-base);
 `;
 
 const sectionTitleDanger = css`
   /* section-title-danger */
   ${sectionTitleH3}
-  color: var(--status-rejected);
+  color: var(--status-rejected-fg);
 `;
 
 /** Card or section heading (h2 by default, h3 for subsections). */
@@ -210,7 +210,7 @@ const stripTitle = css`
   align-items: center;
   margin: 0;
   font-size: var(--text-lg);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
 `;
 const stripMeta = css`

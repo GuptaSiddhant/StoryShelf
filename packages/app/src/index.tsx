@@ -367,6 +367,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       publicOrigin,
       design,
       notifiers,
+      integrations: options.integrations,
       notificationsConfig: options.notifications?.config,
       ai: options.ai,
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),

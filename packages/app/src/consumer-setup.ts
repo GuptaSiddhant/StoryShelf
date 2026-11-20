@@ -7,6 +7,7 @@ import {
   type CaptureConsumer,
   type CaptureConsumerOptions,
   type ConsumerMetrics,
+  type ConsumerStopOptions,
 } from "@storyshelf/core/capture";
 import { captureMetrics } from "@storyshelf/core/telemetry";
 
@@ -22,8 +23,9 @@ export function lazyConsumer(
       await built.start();
     },
     // Stopping one never started is a no-op; the closers (forked child, queue wake) still run.
-    stop: async () => {
-      await built?.stop();
+    // The stop's options (the drain's `graceMs`, #912) reach the consumer as given.
+    stop: async (stopOptions?: ConsumerStopOptions) => {
+      await built?.stop(stopOptions);
       for (const close of closers) {
         // oxlint-disable-next-line no-await-in-loop -- close in order, after the drain
         await close();
@@ -33,7 +35,7 @@ export function lazyConsumer(
   };
 }
 
-/** Several consumers as one: they start together and drain together. */
+/** Several consumers as one: they start together and drain together, under the same grace. */
 export function combineConsumers(consumers: CaptureConsumer[]): CaptureConsumer | null {
   const [only, ...rest] = consumers;
   if (only === undefined) {
@@ -50,10 +52,10 @@ export function combineConsumers(consumers: CaptureConsumer[]): CaptureConsumer 
         }),
       );
     },
-    stop: async () => {
+    stop: async (stopOptions?: ConsumerStopOptions) => {
       await Promise.all(
         consumers.map(async (consumer) => {
-          await consumer.stop();
+          await consumer.stop(stopOptions);
         }),
       );
     },

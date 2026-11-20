@@ -153,6 +153,27 @@ These rules come over from the packages as they are:
 - **For third parties:** they still write providers against the same contracts and pass them through
   the function form.
 
+## Amendment 2026-11-20: offered only when available (#1126)
+
+Owner, 2026-11-16: a project never shows an integration the server does not support or has turned
+off. Built-ins are still registered, but offered to projects only when available.
+
+- A notifier or design provider may declare `availability()`: `available`, or
+  `{ unavailable: reason }`. Absent means available. It is evaluated once at startup
+  (`offerIntegrations` in `resolveShelfOptions`); the app registers only available providers and
+  keeps a status for every kind.
+- The built-in `email` notifier is unavailable until a transport replaces it. Figma is available
+  (personal tokens); its OAuth button still needs the client id and secret. Git stays available
+  until ADR 0054's connections land, when it follows the server's connection (#1119).
+- `SHELF_INTEGRATIONS_DISABLED` (`integrationsFromEnv`) turns kinds off without code, for the
+  server image and the Fly demo. A built-in kind missing after resolution reads as turned off.
+- Project settings, the channel API and MCP offer only available kinds; creating one of another
+  kind answers 400 with the reason. A stored channel of such a kind is kept, hidden from its project
+  and not delivered to; the System page lists it with the reason. No schema change, no deletion.
+- The System page and the site-admin deep health list every integration as available,
+  unavailable (reason) or turned off. Site admins see one line in a project's settings in place of
+  what is missing; project admins see nothing.
+
 ## Alternatives considered
 
 - **Keep the packages (ADR 0014, ADR 0018).** Rejected: the SDK risk they guarded against is absent,

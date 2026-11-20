@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 import type { z } from "zod";
-import type { Adapter, AdapterMetadata } from "../metadata.ts";
+import type { Adapter, AdapterMetadata, IntegrationAvailability } from "../metadata.ts";
 import type {
   FormattedNotification,
   NotificationChannel,
@@ -41,11 +41,23 @@ export interface StateNotifierMetadata extends NotifierMetadata {
 
 /** Descriptor of a `message` provider, registered at startup. */
 export interface MessageNotifierProvider extends Adapter<MessageNotifierMetadata> {
+  /**
+   * Whether this server can deliver the kind (issue #1126). Optional: absent means available.
+   * Evaluated once at startup and cached, so it must not do I/O. An unavailable kind is not
+   * offered to projects and its channels are not delivered to.
+   */
+  availability?(): IntegrationAvailability;
   create(opts: { config: unknown; secret?: string; logger?: Logger }): MessageNotifierAdapter;
 }
 
 /** Descriptor of a `state` provider, registered at startup. */
 export interface StateNotifierProvider extends Adapter<StateNotifierMetadata> {
+  /**
+   * Whether this server can deliver the kind (issue #1126). Optional: absent means available.
+   * Evaluated once at startup and cached, so it must not do I/O. An unavailable kind is not
+   * offered to projects and its channels are not delivered to.
+   */
+  availability?(): IntegrationAvailability;
   create(opts: { config: unknown; secret?: string; logger?: Logger }): StateNotifierAdapter;
 }
 

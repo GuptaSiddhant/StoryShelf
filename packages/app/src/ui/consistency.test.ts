@@ -103,6 +103,38 @@ function hasNestedCard(source: string): boolean {
   return false;
 }
 
+/** Settings and admin pages: the ones that must open forms from summaries (ADR 0012, decision 10). */
+function isSettingsPage(file: string): boolean {
+  return /settings|^admin/u.test(file);
+}
+
+/** `<form>` elements with more than one input, on a page. A page with a form page of its own renders it outside these files. */
+function inlineForms(source: string): number {
+  const forms = [...source.matchAll(/<form\b[\s\S]*?<\/form>/gu)].map(([form]) => form);
+  return forms.filter(
+    (form) =>
+      countMatches(
+        form,
+        /<(?:Field|TextareaField|SelectField|CheckField|input|select|textarea)\b/gu,
+      ) > 1,
+  ).length;
+}
+
+/**
+ * Pages that still render a multi-input form inline: the ratchet's current allowance. It can only
+ * shrink (move the form into a `Dialog` or its own page, then delete the entry).
+ */
+const INLINE_FORM_ALLOWANCE: Record<string, number> = {
+  "settings-design-links.tsx": 2,
+  "settings-general.tsx": 1,
+  "settings-labels.tsx": 2,
+  "settings-links.tsx": 1,
+  "settings-members.tsx": 2,
+  "settings-notifications.tsx": 2,
+  "settings-tests.tsx": 1,
+  "settings-webhooks.tsx": 1,
+};
+
 describe("ui-building-blocks contract", () => {
   it("has no raw component or retired utility classes in pages/", async () => {
     const forbidden =
@@ -190,6 +222,22 @@ describe("ui-building-blocks contract", () => {
     expect(erased.filter((source) => usesUrlsAtRuntime(source))).toEqual([]);
   });
 
+  it("renders no multi-input form inline on a settings or admin page beyond the allowance", async () => {
+    const found: Record<string, number> = {};
+    for (const { file, source } of await pageSources()) {
+      const count = isSettingsPage(file) ? inlineForms(source) : 0;
+      if (count > 0) {
+        found[file] = count;
+      }
+    }
+    expect(found).toEqual(INLINE_FORM_ALLOWANCE);
+  });
+
+  it("counts a form with two inputs and ignores a single-input one", () => {
+    expect(inlineForms("<form><Field /><Field /></form>")).toBe(1);
+    expect(inlineForms("<form><input /><Button /></form>")).toBe(0);
+  });
+
   it("has no inline styles in pages/", async () => {
     const over = (await pageSources())
       .map(({ file, source }) => ({ file, count: countMatches(source, /style="/gu) }))
@@ -250,5 +298,86 @@ describe("ui-building-blocks contract", () => {
     expect(hasNestedCard("<Card><Card>x</Card></Card>")).toBe(true);
     expect(hasNestedCard('<Card id="a"><p>x</p><Card padded={false} /></Card>')).toBe(false);
     expect(hasNestedCard("<Card><CardSection>x</CardSection></Card><Card>y</Card>")).toBe(false);
+  });
+});
+
+/** Type and colour rules from the visual review (#1127, #1129). */
+describe("type and colour tokens", () => {
+  const srcDir = fileURLToPath(new URL("..", import.meta.url));
+
+  /** Non-test, non-story sources of ui/, shell/ and pages/, minus the standalone Storybook frame page. */
+  async function styledSources(): Promise<Array<{ file: string; source: string }>> {
+    const groups = await Promise.all(
+      ["ui", "shell", "pages"].map(async (dir) => {
+        const entries = await readdir(`${srcDir}${dir}`, { recursive: true });
+        const files = entries
+          .filter((entry) => /\.tsx?$/u.test(entry) && !/\.(?:test|stories)\.tsx?$/u.test(entry))
+          .filter((entry) => !(dir === "pages" && entry === "storybook.tsx"))
+          .toSorted();
+        return await Promise.all(
+          files.map(async (file) => ({
+            file: `${dir}/${file}`,
+            source: await readFile(`${srcDir}${dir}/${file}`, "utf8"),
+          })),
+        );
+      }),
+    );
+    return groups.flat();
+  }
+
+  const offendersOf = async (pattern: RegExp, skip: RegExp | null = null): Promise<string[]> =>
+    (await styledSources())
+      .filter(({ file }) => !skip?.test(file))
+      .flatMap(({ file, source }) =>
+        [...source.matchAll(pattern)].map((hit) => `${file}: ${hit[0]}`),
+      );
+
+  it("sets every font-size from the text scale", async () => {
+    expect(
+      await offendersOf(/font-size:\s+(?!var\(--text-(?:xs|sm|base|lg|xl|2xl)\))[^;}\n]+/gu),
+    ).toEqual([]);
+  });
+
+  it("sets every font-weight from the weight tokens", async () => {
+    expect(
+      await offendersOf(
+        /font-weight:\s+(?!var\(--weight-(?:normal|medium|semibold|bold)\))[^;}\n]+/gu,
+      ),
+    ).toEqual([]);
+  });
+
+  it("renders no section header as a level-2 PageHeader in a page", async () => {
+    const offenders = (await pageSources()).filter(({ source }) =>
+      /<PageHeader\s[^>]*?level=\{2\}/u.test(source),
+    );
+    expect(offenders.map(({ file }) => file)).toEqual([]);
+  });
+
+  it("renders a PageHeader at most once per page file, bar the files whose branches are exclusive", async () => {
+    // These render one header per mutually exclusive branch (empty, populated, error), never two at once.
+    const exclusiveBranches: Record<string, number> = {
+      "invite.tsx": 2,
+      "label-detail.tsx": 2,
+      "library.tsx": 3,
+    };
+    const offenders = (await pageSources())
+      .map(({ file, source }) => ({ file, count: source.match(/<PageHeader[\s>]/gu)?.length ?? 0 }))
+      .filter(({ file, count }) => count > (exclusiveBranches[file] ?? 1));
+    expect(offenders).toEqual([]);
+  });
+
+  it("prints no raw status, verdict, role, kind or provider enum as a badge label", async () => {
+    const raw =
+      /<Badge[^>]*>\s*\{[^{}()]*\.(?:status|verdict|role|kind|provider|level)\}\s*<\/Badge>/gu;
+    expect(await offendersOf(raw)).toEqual([]);
+  });
+
+  it("writes no hex colour in styles outside the theme and token modules", async () => {
+    expect(
+      await offendersOf(
+        /(?:color|background|border|fill|stroke|outline|shadow|mix)[\w-]*[:(][^;\n]*#[0-9a-fA-F]{3,8}\b/gu,
+        /^ui\/(?:theme|styles\/tokens)\.ts$|^ui\/design-reference|assets\//u,
+      ),
+    ).toEqual([]);
   });
 });

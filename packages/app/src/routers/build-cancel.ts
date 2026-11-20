@@ -55,7 +55,7 @@ export function registerBuildCancel(app: ShelfRouter): void {
  * stops; whatever it still writes cannot move the build off `cancelled`. The jobs end first so the
  * cancel's own notification job is not cancelled.
  */
-async function cancelBuild(buildId: string): Promise<Build> {
+export async function cancelBuild(buildId: string): Promise<Build> {
   const { db, cancelBuildJobs } = getStore();
   await cancelBuildJobs?.(buildId);
   await new CaptureAttemptModel(db).closeOthers(buildId, null, "Cancelled by a user");

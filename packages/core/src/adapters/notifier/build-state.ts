@@ -7,7 +7,9 @@
  */
 import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import type { UrlBuilder } from "../../urls.ts";
-import { buildCommentMarkdown } from "./build-comment.ts";
+import { percentOf } from "./build-comment-text.ts";
+import { buildCommentMarkdown, skippedCommentMarkdown } from "./build-comment.ts";
+import type { CommentChange } from "./build-comment.ts";
 import type { NotifierState, StateAnnotation } from "./types.ts";
 
 /** Most per-snapshot annotations a build state carries; the rest are counted (`omitted`). */
@@ -47,6 +49,10 @@ export interface BuildStateBuild {
   isDefault?: boolean | undefined;
   /** The git host's answer to a default-branch claim; null or absent when nothing was claimed. */
   branchVerified?: string | null | undefined;
+  /** Snapshots inherited from the baseline without rendering; with `snapshotCount` it tells a partial capture. */
+  inheritedCount?: number | undefined;
+  /** When the build row last changed (the footer's time; the function reads no clock). */
+  updatedAt?: string | undefined;
 }
 
 /**
@@ -72,6 +78,10 @@ export interface BuildStateChange {
   storyImportPath: string | null;
   viewportName: string;
   browser?: string | undefined;
+  /** The Storybook entry id, for the link to the story in the published Storybook. */
+  storyId?: string | undefined;
+  /** Share of pixels that differ (0 to 1), shown as a percent. */
+  diffRatio?: number | null | undefined;
 }
 
 /** Inputs of {@link statusesForBuild}. */
@@ -84,7 +94,17 @@ export interface BuildStateInput {
    * Absolute links (`createUrlBuilder(publicOrigin)`). A build's state is only ever shown once a
    * public origin is resolved (ADR 0014, decision 11), so every status links and the comment exists.
    */
-  urls: Pick<UrlBuilder, "build" | "storybookBuild" | "snapshot">;
+  urls: Pick<
+    UrlBuilder,
+    | "build"
+    | "buildDiff"
+    | "buildLog"
+    | "buildRetry"
+    | "storybookBuild"
+    | "storybookIndex"
+    | "storybookStory"
+    | "snapshot"
+  >;
   flags: BuildStateFlags;
   publishing: PublishingState;
   /**
@@ -101,6 +121,24 @@ export interface BuildStateInput {
    * `cancelled` outcome, described `Superseded by <short sha>`, and the comment links that build.
    */
   supersededBy?: { id: string; sha: string } | undefined;
+  /** Extra facts for the comment; each is omitted from it while absent. */
+  extras?: BuildStateExtras | undefined;
+}
+
+/** What the comment shows beyond the build row and its snapshots; the caller reads them. */
+export interface BuildStateExtras {
+  /** Who gave the verdict of an approved or rejected build. */
+  reviewer?: string | undefined;
+  /** Short reason of a failed capture. */
+  failure?: string | undefined;
+  /** Names of failing Storybook tests. */
+  failedTests?: readonly string[] | undefined;
+  /** Titles of stories the baseline had and this build lacks. */
+  removed?: readonly string[] | undefined;
+  /** Snapshots with accessibility findings (`a11yCount` of the comment). */
+  a11yCount?: number | undefined;
+  /** Earlier builds of the pull request, newest first. */
+  earlier?: readonly { state: string; sha: string; url: string }[] | undefined;
 }
 
 /** One commit status to show. */
@@ -120,6 +158,8 @@ export interface DesiredStatus {
   annotations?: StateAnnotation[];
   /** Changes beyond the cap. */
   omitted?: number;
+  /** On a gate: the comment's Markdown, which the GitHub check run shows as its summary. */
+  summary?: string;
 }
 
 /** The pull-request comment to show. */
@@ -154,7 +194,17 @@ export function statusesForBuild(input: BuildStateInput): BuildStateSet {
     ...withAnnotations(withSuperseded(gateStatus(input, links.build), input), input),
     storybookStatus(input.publishing, input.prefix, links),
   ].map((status) => withProgress(status, input.build));
-  return { statuses, comment: commentOf(input, statuses, links) };
+  return withSummary(statuses, commentOf(input, statuses, links));
+}
+
+/** The gates carry the comment as their check-run summary; the informational Storybook status does not. */
+function withSummary(statuses: DesiredStatus[], comment: DesiredComment): BuildStateSet {
+  for (const status of statuses) {
+    if (status.name !== "storybook") {
+      status.summary = comment.markdown;
+    }
+  }
+  return { statuses, comment };
 }
 
 /** A superseded build (cancelled by a newer one) says which commit replaced it; the outcome stays `cancelled`. */
@@ -250,18 +300,20 @@ function sourceLinks(input: BuildStateInput, source: BuildStateSource): Links {
   const { urls, projectSlug } = input;
   return {
     build: urls.build(projectSlug, source.id),
-    storybook: `${urls.storybookBuild(projectSlug, source.id).replace(/\/+$/u, "")}/`,
+    storybook: urls.storybookIndex(projectSlug, source.id),
   };
 }
 
 /** One line linking both builds. */
 function skippedComment(input: BuildStateInput, links: Links, sourceBuildUrl?: string): string {
   const { source } = input;
-  const compared =
-    source === undefined || sourceBuildUrl === undefined
-      ? "a build that no longer exists"
-      : `[${shortSha(source.gitSha)}](${sourceBuildUrl})`;
-  return `**StoryShelf** — [Build skipped](${links.build}): no story changed since ${compared}, so it repeats that build's result.`;
+  return skippedCommentMarkdown({
+    buildUrl: links.build,
+    source:
+      source === undefined || sourceBuildUrl === undefined
+        ? undefined
+        : { sha: shortSha(source.gitSha), url: sourceBuildUrl },
+  });
 }
 
 /** The first seven characters of a commit. */
@@ -311,20 +363,58 @@ function commentOf(
   statuses: DesiredStatus[],
   links: Links,
 ): DesiredComment {
-  const gates = statuses.filter((status) => status.name !== "storybook");
+  const gate = statuses.find((status) => status.name !== "storybook");
+  const { build, flags, urls, projectSlug } = input;
+  const extras = input.extras ?? {};
+  const testing = flags.testing;
   return {
     url: links.build,
-    projectSlug: input.projectSlug,
-    buildId: input.build.id,
-    state: gates[0]?.state ?? "success",
+    projectSlug,
+    buildId: build.id,
+    state: gate?.state ?? "success",
     markdown: buildCommentMarkdown({
+      testing,
+      status: build.status,
+      sha: shortSha(build.gitSha),
+      reviewUrl: testing ? urls.buildDiff(projectSlug, build.id) : links.build,
       buildUrl: links.build,
       storybookUrl: input.publishing === "success" ? links.storybook : undefined,
-      gates,
-      counts: input.flags.testing || input.flags.review ? input.build : undefined,
+      logUrl: urls.buildLog(projectSlug, build.id),
+      retryUrl: urls.buildRetry(projectSlug, build.id),
+      counts: build,
+      changes: testing ? commentChanges(input) : undefined,
+      approvals: input.approvals,
+      capture: captureOf(build),
+      updatedAt: build.updatedAt,
       supersededBy: supersededLink(input),
+      ...extras,
     }),
   };
+}
+
+/** Stories rendered of the total, only for a build that inherited part of its snapshots. */
+function captureOf(build: BuildStateBuild): { rendered: number; total: number } | undefined {
+  const inherited = build.inheritedCount ?? 0;
+  return inherited > 0
+    ? { rendered: Math.max(0, build.snapshotCount - inherited), total: build.snapshotCount }
+    : undefined;
+}
+
+/** One table row per changed or new snapshot, with its review page and its story's link. */
+function commentChanges(input: BuildStateInput): CommentChange[] {
+  const { urls, projectSlug, build, publishing } = input;
+  return (input.changes ?? [])
+    .filter((change) => change.status === "changed" || change.status === "new")
+    .map((change) => ({
+      story: `${change.storyTitle} / ${change.storyName}`,
+      target: [change.browser, change.viewportName].filter(Boolean).join(", "),
+      change: change.status === "new" ? "new" : (percentOf(change.diffRatio) ?? "changed"),
+      reviewUrl: urls.snapshot(projectSlug, build.id, change.id),
+      storyUrl:
+        publishing === "success" && change.storyId
+          ? urls.storybookStory(projectSlug, build.id, change.storyId, "story")
+          : undefined,
+    }));
 }
 
 /** The newer build's link and short commit, when this cancelled build was superseded by it. */
@@ -349,7 +439,7 @@ function linksOf(input: BuildStateInput): Links {
   const { urls, projectSlug, build } = input;
   return {
     build: urls.build(projectSlug, build.id),
-    storybook: `${urls.storybookBuild(projectSlug, build.id).replace(/\/+$/u, "")}/`,
+    storybook: urls.storybookIndex(projectSlug, build.id),
   };
 }
 

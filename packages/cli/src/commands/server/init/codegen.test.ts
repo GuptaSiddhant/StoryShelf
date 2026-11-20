@@ -125,4 +125,18 @@ describe("generateServer", () => {
     expect(code.indexOf("function getD1Binding()")).toBeGreaterThan(-1);
     expect(code.indexOf("function getD1Binding()")).toBeLessThan(code.indexOf("const database ="));
   });
+
+  it("stops with one line when a required variable is unset (local accounts)", () => {
+    const code = server({ auth: "password" });
+    expect(code).toContain('["SECRET", "PUBLIC_BASE_URL", "AUTH_PASSWORD"]');
+    expect(code).toContain("process.exit(1)");
+    expect(code.indexOf("process.exit(1)")).toBeLessThan(code.indexOf("createShelfApp({"));
+  });
+
+  it("passes PUBLIC_BASE_URL and the admin token into config", () => {
+    const code = server({ auth: "none" });
+    expect(code).toContain("publicBaseUrl: process.env.PUBLIC_BASE_URL || undefined");
+    expect(code).toContain("adminToken: process.env.STORYSHELF_ADMIN_TOKEN || undefined");
+    expect(code).not.toContain("process.exit(1)");
+  });
 });

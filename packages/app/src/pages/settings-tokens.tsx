@@ -12,6 +12,7 @@ import {
   Meta,
   SectionTitle,
   Table,
+  Time,
 } from "../ui/components.tsx";
 import { uploadCommand } from "./get-started.tsx";
 
@@ -61,9 +62,11 @@ export function renderSettingsTokens(
               {tokens.map((token): HtmlEscapedString | Promise<HtmlEscapedString> => (
                 <tr key={token.id}>
                   <td>{token.name}</td>
-                  <td>{new Date(token.createdAt).toLocaleDateString()}</td>
                   <td>
-                    {token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : "—"}
+                    <Time value={token.createdAt} format="date" />
+                  </td>
+                  <td>
+                    {token.lastUsedAt ? <Time value={token.lastUsedAt} format="date" /> : "—"}
                   </td>
                   <td>
                     {isAdmin ? (

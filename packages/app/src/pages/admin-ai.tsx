@@ -72,7 +72,7 @@ export function renderAdminAiPage(report: UsageReport): RenderedContent {
   const today =
     cap === null ? `${report.todayTokens} tokens` : `${report.todayTokens} / ${cap} tokens`;
   return (
-    <DocumentLayout title="AI usage" nav={{ active: "admin" }}>
+    <DocumentLayout title="AI usage" nav={{ active: "admin", trail: [{ label: "AI usage" }] }}>
       <PageHeader
         title="AI usage"
         description="Tokens counted toward the daily budget (UTC days). Visible to site admins only."

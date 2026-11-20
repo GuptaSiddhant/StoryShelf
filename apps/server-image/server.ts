@@ -4,7 +4,11 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+import {
+  createEmailNotifier,
+  integrationsFromEnv,
+  smtpPresetFromEnv,
+} from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
@@ -66,6 +70,8 @@ if (unverifiedDatabaseTls(env)) {
 
 // Every built-in integration is registered (ADR 0049); with SMTP_* set the `email` notifier sends through it.
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
+// SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
+const integrations = integrationsFromEnv(env);
 const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
@@ -89,15 +95,18 @@ const app = createShelfApp({
   database,
   storage,
   ...(testing ? { testing } : {}),
+  design: integrations.design,
   notifications: {
     notifiers: (builtIn) =>
-      emailSender
-        ? builtIn.map((provider) =>
-            provider.metadata.kind === "email"
-              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
-              : provider,
-          )
-        : builtIn,
+      integrations.notifiers(
+        emailSender
+          ? builtIn.map((provider) =>
+              provider.metadata.kind === "email"
+                ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+                : provider,
+            )
+          : builtIn,
+      ),
   },
   ...(auth ? { auth } : {}),
   logger: shelfLogger,

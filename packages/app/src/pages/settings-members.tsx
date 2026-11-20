@@ -13,6 +13,8 @@ import {
   SectionTitle,
   SelectField,
   Table,
+  statusLabel,
+  Time,
 } from "../ui/components.tsx";
 
 /** Project member row as rendered in the members settings tab. */
@@ -66,10 +68,12 @@ export function renderSettingsMembers(
                             : "info"
                       }
                     >
-                      {member.role}
+                      {statusLabel(member.role)}
                     </Badge>
                   </td>
-                  <td>{new Date(member.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <Time value={member.createdAt} format="date" />
+                  </td>
                   <td>
                     {isAdmin ? (
                       <form
@@ -157,7 +161,7 @@ export function renderSettingsMembers(
                     </td>
                     <td>
                       <Badge tone={mapping.role === "admin" ? "danger" : "info"}>
-                        {mapping.role}
+                        {statusLabel(mapping.role)}
                       </Badge>
                     </td>
                     <td>
