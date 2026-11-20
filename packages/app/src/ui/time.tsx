@@ -37,3 +37,41 @@ export const RelativeTime: FC<{ value: string | Date }> = ({ value }) => {
     </time>
   );
 };
+
+/** The one locale and zone every absolute time renders in, whatever the host's `TZ` and `LANG`. */
+const LOCALE = "en";
+const TIME_ZONE = "UTC";
+
+const FORMATS = {
+  datetime: { dateStyle: "medium", timeStyle: "short" },
+  date: { dateStyle: "medium" },
+  time: { timeStyle: "medium" },
+} as const satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+export type TimeFormat = keyof typeof FORMATS;
+
+/** Absolute time ("Jan 15, 2026, 12:00 PM UTC"), identical on every host; "unknown" if invalid. */
+export function formatAbsolute(value: string | Date, format: TimeFormat = "datetime"): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "unknown";
+  }
+  const text = new Intl.DateTimeFormat(LOCALE, {
+    ...FORMATS[format],
+    timeZone: TIME_ZONE,
+  }).format(date);
+  return format === "date" ? text : `${text} ${TIME_ZONE}`;
+}
+
+/** `<time datetime>` with an explicit locale and zone (UTC, `en`), never the server's. */
+export const Time: FC<{ value: string | Date; format?: TimeFormat }> = ({
+  value,
+  format = "datetime",
+}) => {
+  const date = new Date(value);
+  return (
+    <time datetime={Number.isNaN(date.getTime()) ? undefined : date.toISOString()}>
+      {formatAbsolute(value, format)}
+    </time>
+  );
+};
