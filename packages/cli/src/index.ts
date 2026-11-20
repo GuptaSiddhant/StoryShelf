@@ -14,6 +14,7 @@ import type { ServerCheckStorageOptions } from "./commands/server/check-storage.
 import type { ServerInitOptions } from "./commands/server/init.ts";
 import type { ServerServeOptions } from "./commands/server/serve.ts";
 import type { UploadOptions } from "./commands/upload.ts";
+import { WAIT_EXIT_HELP } from "./commands/wait-help.ts";
 import { cliVersion } from "./config.ts";
 import { isMainModule } from "./is-main.ts";
 
@@ -156,7 +157,7 @@ function buildPurgeCommand(): Command {
 }
 
 function buildUploadCommand(): Command {
-  return (
+  return addWaitOptions(
     new Command("upload")
       .description("Create a build record for a StoryShelf project")
       .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
@@ -199,8 +200,19 @@ function buildUploadCommand(): Command {
         (value: string, previous: string[]) => [...previous, value],
         [] as string[],
       )
-      .action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload))
+      .action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload)),
   );
+}
+
+/** `--wait`, `--timeout` and the exit-code help of `upload`. */
+function addWaitOptions(command: Command): Command {
+  return command
+    .option("--wait", "follow the build after the upload and exit by how it ended (see below)")
+    .option(
+      "--timeout <duration>",
+      "with --wait, stop waiting after 90, 90s, 30m or 2h (default 30m)",
+    )
+    .addHelpText("after", `\n${WAIT_EXIT_HELP}`);
 }
 
 function buildBuildCommand(): Command {

@@ -39,10 +39,13 @@ export function apiErrorText(body: string): string {
 export class RequestError extends Error {
   override readonly name = "RequestError";
   readonly status: number;
+  /** The server's `Retry-After`, in milliseconds, when it sent a valid one. */
+  readonly retryAfterMs?: number;
 
-  constructor(status: number, body: string) {
+  constructor(status: number, body: string, retryAfterMs?: number) {
     super(`Request failed (${status}): ${body}`);
     this.status = status;
+    if (retryAfterMs !== undefined) this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -119,6 +122,21 @@ export interface BuildCreated {
   testing?: boolean;
 }
 
+/** The parts of `GET …/builds/:buildId` that `upload --wait` reads; the server adds the last two (ADR 0053). */
+export interface BuildState {
+  id: string;
+  status: string;
+  changedCount: number;
+  /** JSON array of the build's Storybook test results; null when none ran. */
+  testResults?: string | null;
+  /** The newer build that replaced this one, when it was cancelled as superseded (ADR 0045). */
+  supersededByBuildId?: string | null;
+  /** Absent on servers that predate the field. */
+  publishing?: "pending" | "success" | "failure" | "unavailable";
+  /** Stories with a snapshot over the catalog's stories; null when nothing captures; absent on older servers. */
+  capture?: { done: number; total: number | null } | null;
+}
+
 /** The absolute build page URL: the server URL joined to `buildUrl`, or `null` without both. */
 export function buildPageUrl(
   serverUrl: string | undefined,
@@ -164,6 +182,8 @@ interface Client {
     };
     builds: {
       createJson: (slug: string, json: BuildCreateInput) => Promise<BuildCreated>;
+      /** The build row with its publishing and capture state: what `upload --wait` polls. */
+      get: (slug: string, buildId: string) => Promise<BuildState>;
       /** The branch's builds still working, as `{ id, sha }` (404 on an old server or testing off). */
       inFlight: (slug: string, branch: string) => Promise<{ id: string; sha: string }[]>;
       uploadZip: (uploadUrl: string, body: NodeJS.ReadableStream) => Promise<unknown>;
@@ -247,17 +267,26 @@ async function readJson(url: string, res: Response): Promise<unknown> {
   }
 }
 
+/** `Retry-After` in milliseconds: a count of seconds (an HTTP date is not honoured), else undefined. */
+function retryAfterOf(res: Response): number | undefined {
+  const seconds = Number(res.headers?.get("retry-after"));
+  return Number.isFinite(seconds) && seconds >= 0 && res.headers?.get("retry-after") !== null
+    ? seconds * 1000
+    : undefined;
+}
+
 /** The error for a failed status: an HTML page is described, not read, and its body released. */
 async function failedRequest(
   url: string,
   res: Response,
   contentType: string,
 ): Promise<RequestError> {
+  const retryAfterMs = retryAfterOf(res);
   if (!/html/iu.test(contentType)) {
-    return new RequestError(res.status, apiErrorText(await res.text()));
+    return new RequestError(res.status, apiErrorText(await res.text()), retryAfterMs);
   }
   await res.body?.cancel().catch(() => {});
-  return new RequestError(res.status, notJsonMessage(url, contentType));
+  return new RequestError(res.status, notJsonMessage(url, contentType), retryAfterMs);
 }
 
 /** What to tell the user when a JSON endpoint answered with something else (origin only, no path). */
@@ -393,6 +422,10 @@ function createBuildsApi(
         body: JSON.stringify(json),
       })) as BuildCreated,
     ...createInFlightApi(baseUrl, requestHeaders),
+    get: async (slug: string, buildId: string) =>
+      (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${encodeURIComponent(buildId)}`, {
+        headers: requestHeaders(),
+      })) as BuildState,
     uploadZip: async (uploadUrl: string, body: NodeJS.ReadableStream) => {
       const init = {
         method: "PUT",

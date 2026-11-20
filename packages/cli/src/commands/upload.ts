@@ -12,6 +12,7 @@ import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
 import {
+  buildPageUrl,
   createClient,
   describeBuildLink,
   normalizeBaseUrl,
@@ -39,6 +40,8 @@ import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 import { findSupersedes } from "./supersede.ts";
 import { trySkipUnchanged } from "./upload-skip.ts";
+import { parseTimeout, reportOutcome, waitForBuild, DEFAULT_WAIT_TIMEOUT_MS } from "./wait.ts";
+import type { WaitOptions } from "./wait.ts";
 
 /**
  * Upload a built Storybook and create a build record.
@@ -61,12 +64,21 @@ export async function runUpload(options: UploadOptions): Promise<void> {
       return null;
     }
     assertUploadOptions(found);
+    assertWaitOptions(options);
     return found;
   });
   if (collected === null) {
     return;
   }
-  await buildAndPost(reporter, cwd, collected, options.forceBuild, options.dryRun);
+  await buildAndPost(reporter, cwd, collected, options.forceBuild, options.dryRun, options);
+}
+
+/** `--timeout` needs `--wait` and must parse, so a typo fails before any build work. */
+function assertWaitOptions(options: UploadOptions): void {
+  if (options.timeout !== undefined && options.wait !== true) {
+    throw new Error("--timeout only applies with --wait");
+  }
+  if (options.timeout !== undefined) parseTimeout(options.timeout);
 }
 
 /** Options for the `upload` command. */
@@ -119,6 +131,12 @@ export interface UploadOptions {
   dryRun?: boolean;
   /** Working directory (defaults to process.cwd()). Test seam for fs access. */
   cwd?: string;
+  /** After the upload, follow the build until it stops needing the server and exit by how it ended. */
+  wait?: boolean;
+  /** How long `wait` follows the build: `90`, `90s`, `30m` or `2h` (default 30m). Never cancels the build. */
+  timeout?: string;
+  /** Test seam: the clock, sleep and abort signal of the wait. */
+  waitDeps?: Pick<WaitOptions, "now" | "sleep" | "signal">;
   /** Phase reporter (defaults to one writing to stderr). Test seam for the clock and terminal. */
   reporter?: Reporter;
 }
@@ -317,6 +335,7 @@ async function buildAndPost(
   collected: ResolvedUploadOptions,
   force?: boolean,
   dryRun?: boolean,
+  waitOptions?: Pick<UploadOptions, "wait" | "timeout" | "waitDeps">,
 ): Promise<void> {
   await reporter.phase("Building Storybook", "Built Storybook", async () => {
     await ensureBuildDir({
@@ -350,7 +369,7 @@ async function buildAndPost(
     });
     return await createBuild(client, collected, supersedes);
   });
-  await finishUpload(reporter, { client, created, cwd, collected });
+  await finishUpload(reporter, { client, created, cwd, collected, wait: waitOptions });
 }
 
 /** Everything a phase after the build exists needs. */
@@ -359,6 +378,7 @@ interface UploadContext {
   created: BuildCreated;
   cwd: string;
   collected: ResolvedUploadOptions;
+  wait?: Pick<UploadOptions, "wait" | "timeout" | "waitDeps"> | undefined;
 }
 
 /** The affected, package-usage and upload phases, then the summary. */
@@ -383,6 +403,40 @@ async function finishUpload(reporter: Reporter, ctx: UploadContext): Promise<voi
   ]);
   if (hostingOnly) {
     printLine(HOSTING_ONLY_NOTICE);
+  }
+  if (ctx.wait?.wait === true) {
+    await followBuild(reporter, ctx, hostingOnly);
+  }
+}
+
+/** Follow the build (`--wait`); Ctrl+C stops the wait only. The exit code says how it ended. */
+async function followBuild(
+  reporter: Reporter,
+  ctx: UploadContext,
+  hostingOnly: boolean,
+): Promise<void> {
+  const { client, created, collected, wait } = ctx;
+  const controller = new AbortController();
+  const stop = (): void => {
+    controller.abort();
+  };
+  process.once("SIGINT", stop);
+  try {
+    const result = await waitForBuild({
+      client,
+      slug: collected.slug,
+      buildId: created.build.id,
+      buildLink: buildPageUrl(collected.url, created.buildUrl),
+      hostingOnly,
+      timeoutMs: wait?.timeout === undefined ? DEFAULT_WAIT_TIMEOUT_MS : parseTimeout(wait.timeout),
+      reporter,
+      signal: controller.signal,
+      ...wait?.waitDeps,
+    });
+    const code = reportOutcome(result);
+    if (code !== 0) process.exitCode = code;
+  } finally {
+    process.off("SIGINT", stop);
   }
 }
 

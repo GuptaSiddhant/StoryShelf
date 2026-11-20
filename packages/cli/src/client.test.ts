@@ -268,3 +268,43 @@ describe("apiErrorText", () => {
     }
   });
 });
+
+describe("builds.get", () => {
+  it("reads one build with the bearer token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: "b1", status: "capturing" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const state = await createClient("https://shelf.test", "tok").projects.builds.get("demo", "b1");
+    expect(state.status).toBe("capturing");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://shelf.test/api/v1/projects/demo/builds/b1");
+    expect(init.headers).toMatchObject({ Authorization: "Bearer tok" });
+  });
+
+  it("keeps Retry-After seconds on a throttled answer", async () => {
+    const throttled = new Response("{}", { status: 429, headers: { "retry-after": "7" } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(throttled));
+    const error = await createClient("https://shelf.test")
+      .projects.builds.get("demo", "b1")
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(RequestError);
+    expect((error as RequestError).retryAfterMs).toBe(7000);
+  });
+
+  it.each([{}, { "retry-after": "Wed, 21 Oct 2026 07:28:00 GMT" }])(
+    "has no retryAfterMs without a usable header (%j)",
+    async (headers) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response("{}", { status: 503, headers: headers as Record<string, string> }),
+          ),
+      );
+      const error = await createClient("https://shelf.test")
+        .projects.builds.get("demo", "b1")
+        .catch((caught: unknown) => caught);
+      expect((error as RequestError).retryAfterMs).toBeUndefined();
+    },
+  );
+});
