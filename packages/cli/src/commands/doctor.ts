@@ -3,7 +3,7 @@ import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClient, RequestError } from "../client.ts";
 import { findStorybookMain, loadStorybookConfig, type StorybookConfig } from "../config.ts";
-import { printLine } from "../output.ts";
+import { createReporter, printLine, type Reporter } from "../output.ts";
 import {
   resolveConnection,
   type ConnectionOptions,
@@ -156,18 +156,27 @@ function resolveBuildInputs(options: DoctorOptions, cfg: StorybookConfig | null)
  *
  * @param options - Connection and build options (flags, config, or env).
  */
-export async function runDoctor(options: DoctorOptions): Promise<void> {
+export async function runDoctor(
+  options: DoctorOptions,
+  reporter: Reporter = createReporter(),
+): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
-  const cfg = await loadStorybookConfig(cwd, options.config);
-  const checks: Check[] = [await checkSetup(cwd), checkConfigFile(cfg)];
-  const connection = await tryResolveConnection(options, checks);
-  if (connection) {
-    checks.push(...(await checkConnection(connection)));
+  const checks: Check[] = [];
+  const connection = await reporter.phase("Checking config", "Checked config", async () => {
+    const cfg = await loadStorybookConfig(cwd, options.config);
+    checks.push(await checkSetup(cwd), checkConfigFile(cfg));
+    return { cfg, connection: await tryResolveConnection(options, checks) };
+  });
+  if (connection.connection) {
+    const resolved = connection.connection;
+    await reporter.phase("Checking server", "Checked server", async () => {
+      checks.push(...(await checkConnection(resolved)));
+    });
   }
-  checks.push(
-    await checkBuildOutput(cwd, resolveBuildInputs(options, cfg)),
-    await checkAffected(cwd, resolveBuildInputs(options, cfg).buildDir),
-  );
+  await reporter.phase("Checking Storybook build", "Checked Storybook build", async () => {
+    const inputs = resolveBuildInputs(options, connection.cfg);
+    checks.push(await checkBuildOutput(cwd, inputs), await checkAffected(cwd, inputs.buildDir));
+  });
   reportChecks(checks);
 }
 

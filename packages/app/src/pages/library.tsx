@@ -18,6 +18,7 @@ import {
   statusLabel,
   statusTone,
   Badge,
+  Time,
 } from "../ui/components.tsx";
 import { ProjectDesignLinks } from "./design-links.tsx";
 import { GetStarted } from "./get-started.tsx";
@@ -184,7 +185,7 @@ function LibraryHeader(props: {
           <a href={urls.build(project.slug, build.id)}>
             {build.gitBranch} · {build.gitSha.slice(0, 7)}
           </a>{" "}
-          · {new Date(build.createdAt).toLocaleString()}{" "}
+          · <Time value={build.createdAt} />{" "}
           <Badge tone={statusTone(build.status)}>{statusLabel(build.status)}</Badge>
         </>
       }

@@ -12,6 +12,7 @@ import {
   Table,
   statusLabel,
   statusTone,
+  Time,
 } from "../ui/components.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
@@ -58,7 +59,9 @@ function LabelBuildRow(props: {
         <Meta as="div">{build.authorEmail ?? ""}</Meta>
       </td>
       <td>
-        <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
+        <Meta as="span">
+          <Time value={build.createdAt} />
+        </Meta>
       </td>
       <td class="nowrap">
         <HStack wrap={false}>

@@ -14,6 +14,7 @@ import {
   VStack,
   statusTone,
   statusLabel,
+  Time,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import {
@@ -215,7 +216,7 @@ export async function renderSkippedBuildPage(
             {build.authorName
               ? `· ${build.authorName}${build.authorEmail ? ` <${build.authorEmail}>` : ""}`
               : ""}{" "}
-            · {new Date(build.createdAt).toLocaleString()}
+            · <Time value={build.createdAt} />
           </>
         }
         actions={

@@ -1,12 +1,18 @@
+import { readFile, stat } from "node:fs/promises";
 /**
  * File-by-file upload (`/dedup`, `/content`, `/manifest`): stores a build's files content-addressed
  * and needs no zip extraction on the server, so it publishes on any host, serverless included.
  * `upload` uses it by default, and also when the server refuses a zip over its inline limit.
  */
-import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { RequestError, type createClient } from "../client.ts";
+import { describeFileProgress } from "../output.ts";
 import { hashFiles, walkFiles, type HashedFile } from "./dedup.ts";
+
+/** Progress sink for callers that show none. */
+function noProgress(): void {
+  // nothing to show
+}
 
 /** Files sent in one `/content` request. */
 const BATCH_FILES = 50;
@@ -14,6 +20,17 @@ const BATCH_FILES = 50;
 const BATCH_BYTES = 16 * 1024 * 1024;
 /** Hashes asked about in one `/dedup` request. */
 const DEDUP_CHUNK = 5000;
+
+/** File count and total bytes of a build directory (for the summary and zip progress). */
+export async function measureBuild(
+  cwd: string,
+  buildDir: string,
+): Promise<{ files: number; bytes: number }> {
+  const root = resolve(cwd, buildDir);
+  const files = await walkFiles(cwd, buildDir);
+  const sizes = await Promise.all(files.map(async (rel) => (await stat(join(root, rel))).size));
+  return { files: files.length, bytes: sizes.reduce((sum, size) => sum + size, 0) };
+}
 
 /** What the server answers a zip it cannot extract inline and cannot hand to a job. */
 export function isOverInlineLimit(error: unknown): boolean {
@@ -38,6 +55,7 @@ export async function uploadFileByFile(
   client: ReturnType<typeof createClient>,
   target: FileUploadTarget,
   log: (line: string) => void,
+  progress: (text: string) => void = noProgress,
 ): Promise<void> {
   const files = await hashFiles(
     target.cwd,
@@ -52,11 +70,25 @@ export async function uploadFileByFile(
   });
   const toSend = firstFileOfEach(files, needed);
   log(`Uploading ${toSend.length} of ${files.length} files (the server has the rest)`);
+  await sendAll(client, target, toSend, progress);
+  await client.projects.builds.postManifest(target.slug, target.buildId, files);
+}
+
+/** Send the files in batches, reporting `sent/total files` after each. */
+async function sendAll(
+  client: ReturnType<typeof createClient>,
+  target: FileUploadTarget,
+  toSend: HashedFile[],
+  progress: (text: string) => void,
+): Promise<void> {
+  let sent = 0;
+  progress(describeFileProgress(sent, toSend.length));
   for (const batch of batches(toSend)) {
     // oxlint-disable-next-line no-await-in-loop -- batches go one after another to bound memory
     await sendBatch(client, target, batch);
+    sent += batch.length;
+    progress(describeFileProgress(sent, toSend.length));
   }
-  await client.projects.builds.postManifest(target.slug, target.buildId, files);
 }
 
 async function neededHashes(
