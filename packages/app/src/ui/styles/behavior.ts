@@ -12,7 +12,7 @@ function htmxCss(): string {
     .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
     button.htmx-request, form.htmx-request button, [hx-post].htmx-request { pointer-events: none; opacity: .7; }
     form.htmx-request { opacity: .9; }
-    form.htmx-request button[type="submit"]::after { content: ""; width: .85em; height: .85em; margin-left: .4rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ss-spin .7s linear infinite; }
+    form.htmx-request button[type="submit"]::after { content: ""; width: .85em; height: .85em; margin-left: var(--space-2); border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ss-spin .7s linear infinite; }
     @keyframes ss-spin { to { transform: rotate(360deg); } }
     .skeleton { position: relative; overflow: hidden; background: var(--surface-muted); border-radius: var(--radius-sm); min-height: 1rem; }
     .skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: skeleton 1.4s infinite; }
@@ -23,7 +23,7 @@ function htmxCss(): string {
 
 function dataCss(): string {
   return `
-    .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
     .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     @media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: minmax(0, 1fr); } }`;

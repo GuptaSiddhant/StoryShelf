@@ -53,7 +53,7 @@ import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { packageVersion } from "./package-version.ts";
 import { registerAdminGit } from "./routers/admin-git.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
-import { registerPublicOriginRoutes } from "./routers/admin-public-origin.ts";
+import { registerPublicOriginRoutes } from "./routers/admin-public-origin.tsx";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerEngineAuth } from "./routers/auth.ts";

@@ -100,6 +100,22 @@ export class NotificationChannelModel {
     })) as unknown as NotificationChannelRow;
   }
 
+  /**
+   * Change a channel's settings: its config and event filter always, its secret only when one is
+   * given (a blank edit keeps the stored secret). The provider never changes.
+   */
+  async update(
+    id: string,
+    input: { config: Record<string, unknown>; events?: string[]; secret?: string },
+  ): Promise<void> {
+    await this.db.update(this.tables.notificationChannels, id, {
+      config: JSON.stringify(input.config),
+      events: input.events && input.events.length > 0 ? JSON.stringify(input.events) : null,
+      ...(input.secret ? { secretEncrypted: encrypt(this.secret, input.secret) } : {}),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   /** Fetch a channel by id, or null. */
   async get(id: string): Promise<NotificationChannelRow | null> {
     const rows = (await this.db.list(this.tables.notificationChannels, {

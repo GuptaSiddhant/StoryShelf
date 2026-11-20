@@ -60,7 +60,7 @@ const avatarGroup = css`
   /* avatar-group */
   display: inline-flex;
   & > * + * {
-    margin-left: -0.4rem;
+    margin-left: calc(-1 * var(--space-2));
     box-shadow: 0 0 0 2px var(--surface-card);
   }
 `;

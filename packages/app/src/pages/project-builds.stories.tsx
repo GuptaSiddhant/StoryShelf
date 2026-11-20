@@ -52,3 +52,12 @@ export const EveryBuildSkippedShown = pageStory(
   () => renderProjectBuildsPage("design-system", { skipped: "1" }),
   { dataset: "skipped-only" },
 );
+
+/** Several unfinished builds are queued: the "Cancel older unfinished builds (N)" action shows. */
+export const BacklogCancelAction = pageStory(() => renderProjectBuildsPage("design-system"), {
+  dataset: "backlog",
+});
+
+export const BacklogCancelActionOnAPhone = onAPhone(
+  pageStory(() => renderProjectBuildsPage("design-system"), { dataset: "backlog" }),
+);

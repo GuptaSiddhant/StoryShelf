@@ -1,8 +1,14 @@
-import type { HtmlEscapedString } from "hono/utils/html";
-import { csrfField } from "../shell/csrf-field.tsx";
-import { Badge, Button, Card, Field, FormActions, Meta, SectionTitle } from "../ui/components.tsx";
-import { RemoveForm, type DesignFormState } from "./settings-design-links.tsx";
-type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
+import type { FC } from "hono/jsx";
+import {
+  DialogLink,
+  SectionTitle,
+  SummaryList,
+  VStack,
+  type SummaryItem,
+} from "../ui/components.tsx";
+import { DESIGN_TOKEN_DIALOG } from "./design-forms.tsx";
+import { FormDialog } from "./dialog-form.tsx";
+import { RemoveForm } from "./settings-design-links.tsx";
 
 /** Last observed outcome of a design credential. */
 export type DesignCredentialState = "unknown" | "ok" | "unauthorized" | "forbidden";
@@ -38,85 +44,61 @@ const STATUS_BADGES: Record<
   forbidden: { tone: "warning", text: "No access to a linked file" },
 };
 
-/** Settings card for one provider's project-wide credential (admin only). */
-export function CredentialCard(props: {
-  base: string;
-  provider: SettingsDesignProvider;
-  formState?: DesignFormState;
-}): Rendered {
-  const { base, provider, formState } = props;
-  const action = `${base}/${provider.kind}/token`;
-  return (
-    <Card>
-      <SectionTitle>{provider.credentialLabel}</SectionTitle>
-      <Meta>{provider.credentialHelp}</Meta>
-      {provider.credential ? (
-        <CredentialStatus action={action} provider={provider} credential={provider.credential} />
-      ) : (
-        <Meta>No credential set.</Meta>
-      )}
-      <CredentialForm
-        action={action}
-        provider={provider}
-        error={formState?.errors?.[`token:${provider.kind}`]}
-      />
-    </Card>
-  );
-}
-
-function CredentialStatus(props: {
-  action: string;
-  provider: SettingsDesignProvider;
-  credential: SettingsDesignCredential;
-}): Rendered {
-  const { action, provider, credential } = props;
-  const badge = STATUS_BADGES[credential.status];
+function credentialDetails(provider: SettingsDesignProvider): string {
+  const { credential } = provider;
+  if (credential === null) {
+    return `No credential set. ${provider.credentialHelp}`;
+  }
   const days = credential.daysLeft;
-  return (
-    <>
-      <p>
-        <Badge tone={badge.tone}>{badge.text}</Badge>{" "}
-        {days === null ? null : (
-          <Meta as="span">
-            {days >= 0
-              ? `Rotate within ${days} day${days === 1 ? "" : "s"}`
-              : `Past the ${provider.maxAgeDays}-day cap — rotate now`}
-          </Meta>
-        )}
-      </p>
-      <RemoveForm
-        action={`${action}/delete`}
-        confirm={`Remove the ${provider.name} credential?`}
-        label={`Remove ${provider.name} credential`}
-      />
-    </>
-  );
+  if (days === null) {
+    return provider.credentialHelp;
+  }
+  return days >= 0
+    ? `Rotate within ${days} day${days === 1 ? "" : "s"}`
+    : `Past the ${provider.maxAgeDays}-day cap — rotate now`;
 }
 
-function CredentialForm(props: {
-  action: string;
-  provider: SettingsDesignProvider;
-  error?: string;
-}): Rendered {
-  const { action, provider } = props;
-  const replace = provider.credential !== null;
+/** Each provider's project-wide credential as a summary row (admin only); Set or Rotate opens a dialog. */
+export const CredentialsSection: FC<{
+  base: string;
+  providers: SettingsDesignProvider[];
+}> = ({ base, providers }) => {
+  const items: SummaryItem[] = providers.map((provider) => ({
+    id: provider.kind,
+    name: provider.credentialLabel,
+    state: provider.credential
+      ? {
+          label: STATUS_BADGES[provider.credential.status].text,
+          tone: STATUS_BADGES[provider.credential.status].tone,
+        }
+      : { label: "Not set", tone: "neutral" },
+    details: credentialDetails(provider),
+    actions: (
+      <>
+        <DialogLink
+          dialogId={DESIGN_TOKEN_DIALOG}
+          href={`${base}/${provider.kind}/token/edit`}
+          variant="secondary"
+          size="sm"
+          aria-label={`${provider.credential ? "Rotate" : "Set"} ${provider.name} token`}
+        >
+          {provider.credential ? "Rotate token" : "Set token"}
+        </DialogLink>
+        {provider.credential ? (
+          <RemoveForm
+            action={`${base}/${provider.kind}/token/delete`}
+            confirm={`Remove the ${provider.name} credential?`}
+            label={`Remove ${provider.name} credential`}
+          />
+        ) : null}
+      </>
+    ),
+  }));
   return (
-    <form method="post" action={action} hx-post={action} hx-target="body">
-      {csrfField()}
-      <Field
-        label={replace ? "Replace token" : "Token"}
-        name="token"
-        type="password"
-        required
-        autocomplete="off"
-        placeholder={provider.credentialPlaceholder}
-        error={props.error}
-      />
-      <FormActions>
-        <Button variant="primary" type="submit">
-          {replace ? "Rotate token" : "Save token"}
-        </Button>
-      </FormActions>
-    </form>
+    <VStack>
+      <SectionTitle>Design tokens</SectionTitle>
+      <SummaryList label="Design tokens" items={items} emptyTitle="No design providers" />
+      <FormDialog id={DESIGN_TOKEN_DIALOG} title="Design token" submitLabel="Save token" />
+    </VStack>
   );
-}
+};

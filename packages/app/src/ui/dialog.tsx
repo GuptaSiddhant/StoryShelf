@@ -1,6 +1,8 @@
 import type { FC } from "hono/jsx";
+import { Button, type ButtonSize, type ButtonVariant } from "./buttons.tsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
+import type { IconName } from "./icons/paths.ts";
 
 const dialogRoot = css`
   /* dialog */
@@ -22,8 +24,8 @@ const dialogHeader = css`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 `;
 
@@ -41,7 +43,7 @@ const dialogClose = css`
   align-items: center;
   justify-content: center;
   width: 32px;
-  height: 32px;
+  height: var(--control-sm);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -55,15 +57,15 @@ const dialogClose = css`
 
 const dialogBody = css`
   /* dialog-body */
-  padding: 1rem;
+  padding: var(--space-4);
 `;
 
 const dialogFooter = css`
   /* dialog-footer */
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border);
 `;
 
@@ -79,10 +81,12 @@ export const Dialog: FC<{
   /** Accessible name of the close button. */
   closeLabel?: string;
   footer?: unknown;
+  /** Render it showing (non-modal): for a form page or a story that shows the open state. */
+  open?: boolean;
   children?: unknown;
-}> = ({ id, title, closeLabel = "Close", footer, children }) => {
+}> = ({ id, title, closeLabel = "Close", footer, open, children }) => {
   return (
-    <dialog id={id} class={dialogRoot} aria-labelledby={`${id}-title`} data-dialog>
+    <dialog id={id} class={dialogRoot} aria-labelledby={`${id}-title`} data-dialog open={open}>
       <div class={dialogHeader}>
         <h2 id={`${id}-title`} class={dialogTitle}>
           {title}
@@ -106,9 +110,31 @@ export const Dialog: FC<{
 export const DialogLink: FC<{
   dialogId: string;
   href: string;
+  /** Style the opener as a button. */
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  icon?: IconName;
   children?: unknown;
   [key: string]: unknown;
-}> = ({ dialogId, href, children, ...rest }) => {
+}> = ({ dialogId, href, variant, size, icon, children, ...rest }) => {
+  if (variant) {
+    return (
+      <Button
+        variant={variant}
+        size={size ?? "md"}
+        icon={icon}
+        href={href}
+        hx-get={href}
+        hx-target={`#${dialogId}-body`}
+        hx-swap="innerHTML"
+        hx-push-url="false"
+        data-dialog-open={dialogId}
+        {...rest}
+      >
+        {children}
+      </Button>
+    );
+  }
   return (
     <a
       href={href}

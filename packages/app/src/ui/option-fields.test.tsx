@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { Style } from "./css.ts";
 import { MAX_OPTIONS, OptionFields, parseOptionFields } from "./option-fields.tsx";
 
 async function render(node: unknown): Promise<string> {
@@ -25,10 +26,16 @@ describe("OptionFields", () => {
     expect(html).not.toMatch(/data-option-group="b"[^>]*disabled/u);
   });
 
-  it("shows the checked option's group through a selector that matches the radio", async () => {
-    const html = await render(<OptionFields name="k" label="Kind" options={options} />);
-    expect(html).toContain("input[type=radio]:nth-of-type(2):checked");
-    expect(html).not.toMatch(/type=\\?"\\?\\"radio/u);
+  it("writes the show-the-selected-group rules the browser accepts", async () => {
+    const html = await render(
+      <>
+        <OptionFields name="k" label="Kind" options={options} />
+        <Style />
+      </>,
+    );
+    // A quote in an interpolated string comes out as `\"` and the browser drops the whole rule.
+    expect(html).not.toContain('\\"');
+    expect(html).toContain("&:has(input[type=radio]:nth-of-type(2):checked)");
   });
 
   it("selects the first option by default and supports cards", async () => {

@@ -17,6 +17,10 @@ PORT = '3000'
 # Daily purge of builds older than 14 days (baselines and pinned builds are kept; ADR 0039).
 PURGE_TTL_DAYS = '14'
 PUBLIC_BASE_URL = 'https://storyshelf.fly.dev'
+# Sign-in page link to the demo's Storybook (the latest approved `main` build; public hosting only, no review).
+SHELF_AUTH_PUBLIC_LINK_URL = '/_/demo-design-system/'
+SHELF_AUTH_PUBLIC_LINK_LABEL = "Browse the demo's Storybook without an account"
+SHELF_AUTH_HELP_TEXT = 'Reviewing builds and diffs needs an account.'
 
 [[mounts]]
 source = 'storyshelf_data'
