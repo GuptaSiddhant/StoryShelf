@@ -386,7 +386,9 @@ export const SelectField: FC<{
   disabled?: boolean;
   required?: boolean;
   layout?: FieldLayout;
-}> = ({ label, name, value, options, hint, disabled, required, layout = "stack" }) => {
+  /** HTMX attributes for the select (`hx-get`, `hx-target`, …), for a field that re-renders others. */
+  hx?: Record<string, string>;
+}> = ({ label, name, value, options, hint, disabled, required, layout = "stack", hx }) => {
   return (
     <div class={layout === "inline" ? fieldWrapInline : fieldWrap}>
       <label class={fieldLabel} for={name}>
@@ -399,6 +401,7 @@ export const SelectField: FC<{
         disabled={disabled}
         required={required}
         aria-describedby={hint ? `${name}-hint` : undefined}
+        {...hx}
       >
         {options.map((opt) => (
           <option value={opt.value} selected={opt.value === value}>
