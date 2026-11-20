@@ -87,7 +87,9 @@ describe("providerChecksOf", () => {
     });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Promise.reject(timeout)),
+      vi.fn(async () => {
+        throw timeout;
+      }),
     );
     const [check] = providerChecksOf(options({ sso: { providers: [sso] } }));
     expect(await check?.check()).toEqual({
@@ -99,9 +101,9 @@ describe("providerChecksOf", () => {
   it("says unreachable for any other failure, without the error text", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        Promise.reject(new Error("connect ECONNREFUSED https://u:pw@idp.acme.example/x?k=1")),
-      ),
+      vi.fn(async () => {
+        throw new Error("connect ECONNREFUSED https://u:pw@idp.acme.example/x?k=1");
+      }),
     );
     const [check] = providerChecksOf(options({ sso: { providers: [sso] } }));
     const result = await check?.check();
