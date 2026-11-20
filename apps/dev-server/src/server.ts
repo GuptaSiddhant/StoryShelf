@@ -131,10 +131,11 @@ const app = createShelfApp({
   // AUTH_PASSWORD must be at least 12 characters; AUTH_EMAIL overrides the
   // admin address (defaults to admin@example.com). No viewer tier exists anymore.
   auth:
-    authPassword && secret
+    // AUTH_PASSWORD without a valid SECRET refuses to start (createShelfAuth throws); never auth off.
+    authPassword
       ? createShelfAuth({
           db: database,
-          secret,
+          secret: secret ?? "",
           baseURL: publicBaseUrl ?? `http://localhost:${port}`,
           passkeys: {},
           emailSender,
@@ -167,7 +168,7 @@ const app = createShelfApp({
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
 
-if (authPassword && secret) {
+if (authPassword) {
   await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
   logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
 }

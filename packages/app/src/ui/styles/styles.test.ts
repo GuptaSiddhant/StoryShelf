@@ -152,6 +152,12 @@ describe("baseStyle", () => {
     }
   });
 
+  it("keeps text on the filled accent marker and avatar readable (WCAG AA), one character included", () => {
+    for (const theme of [LIGHT_THEME, DARK_THEME]) {
+      expect(contrast(theme.accentContrast ?? "", theme.accent)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it("keeps default accent text readable (WCAG AA) on cards in both themes", () => {
     for (const theme of [LIGHT_THEME, DARK_THEME]) {
       const fg = mix(theme.accent, 0.88, theme.text.primary);

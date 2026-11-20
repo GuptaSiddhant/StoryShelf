@@ -40,6 +40,7 @@ describe("generatePackageJson", () => {
       "@storyshelf/app",
       "@storyshelf/db-sqlite",
       "@storyshelf/runner-playwright",
+      "@storyshelf/storage-local",
     ]);
   });
 
@@ -99,8 +100,8 @@ describe("generatePackageJson", () => {
     }
   });
 
-  it("adds the storage package only for a remote store", () => {
-    expect(pkg({ storage: "local" }).dependencies["@storyshelf/storage-local"]).toBeUndefined();
+  it("adds the storage package the scaffold imports, local included", () => {
+    expect(pkg({ storage: "local" }).dependencies["@storyshelf/storage-local"]).toBeDefined();
     expect(pkg({ storage: "s3" }).dependencies["@storyshelf/storage-s3"]).toBeDefined();
     expect(pkg({ storage: "azure" }).dependencies["@storyshelf/storage-azure"]).toBeDefined();
     expect(pkg({ storage: "gcs" }).dependencies["@storyshelf/storage-gcs"]).toBeDefined();
@@ -142,6 +143,17 @@ describe("generatePackageJson", () => {
     expect(scripts["docker:run"]).toContain("docker run");
     expect(scripts["docker:up"]).toBeUndefined();
     expect(scripts["infra:plan"]).toBeUndefined();
+  });
+
+  it("forwards SECRET, and AUTH_PASSWORD for password auth, from the shell to docker:run", () => {
+    const open = pkg({ deployTarget: "docker", docker: true }).scripts["docker:run"];
+    const password = pkg({ deployTarget: "docker", docker: true, auth: "password" }).scripts[
+      "docker:run"
+    ];
+    expect(open).toMatch(/ -e SECRET /u);
+    expect(open).not.toContain("AUTH_PASSWORD");
+    expect(password).toMatch(/ -e SECRET -e AUTH_PASSWORD /u);
+    expect(`${open} ${password}`).not.toMatch(/SECRET=|change-me/u);
   });
 
   it("has compose scripts when the stack has more than one service", () => {

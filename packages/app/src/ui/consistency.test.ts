@@ -220,6 +220,25 @@ describe("ui-building-blocks contract", () => {
     expect(over).toEqual([]);
   });
 
+  it("keeps one focus ring: no `outline: none` and no `&:focus {` in ui css outside the field ring", async () => {
+    const offenders = (await uiSources())
+      .filter(({ file }) => file.endsWith(".tsx") && !file.includes(".stories."))
+      .filter(({ source }) => /outline:\s*none|&:focus\s*\{/u.test(source))
+      .map(({ file }) => file);
+    // compare-stage.tsx drops the decorative outline of a scaled image, which is not a focus ring.
+    expect(offenders.toSorted()).toEqual(["compare-stage.tsx"]);
+  });
+
+  it("styles `[aria-disabled]` wherever `&:disabled` is styled in a component that can render a link", async () => {
+    const offenders = (await uiSources())
+      .filter(({ file }) => file === "buttons.tsx")
+      .filter(
+        ({ source }) => source.includes("&:disabled") && !source.includes('[aria-disabled="true"]'),
+      )
+      .map(({ file }) => file);
+    expect(offenders).toEqual([]);
+  });
+
   it("has no card inside a card in pages/", async () => {
     const nested = (await pageSources())
       .filter(({ source }) => hasNestedCard(source))

@@ -516,6 +516,21 @@ describe("runUpload affected capture", () => {
     expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
   });
 
+  it("prints the build page link joined to the server URL", async () => {
+    writeBuild(dir);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    stubFetch({ build: { id: "b1" }, uploadUrl: "/x", buildUrl: "/projects/demo/builds/b1" });
+
+    await runUpload({ ...baseOptions(), buildDir: "storybook-static" });
+
+    const output = write.mock.calls.map(([chunk]) => String(chunk)).join("");
+    write.mockRestore();
+    expect(output).toMatch(
+      /View the build: https?:\/\/[^\s/]+(:\d+)?\/projects\/demo\/builds\/b1/u,
+    );
+    expect(output).not.toContain("Build created");
+  });
+
   it("prints no notice when the server has testing on", async () => {
     writeBuild(dir);
     const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);

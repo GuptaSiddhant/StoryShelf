@@ -1,6 +1,6 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
-type AvatarSize = "sm" | "md" | "lg";
+type AvatarSize = "sm" | "md" | "lg" | "xl";
 
 const avatarBase = css`
   /* avatar */
@@ -37,7 +37,20 @@ const avatarLg = css`
   font-size: var(--text-base);
 `;
 
+const avatarXl = css`
+  /* avatar-xl */
+  ${avatarBase}
+  width: 4rem;
+  height: 4rem;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  font-size: 1.5rem;
+  font-weight: 700;
+`;
+
 const avatarSizes: Record<AvatarSize, Promise<string>> = {
+  xl: avatarXl,
   sm: avatarSm,
   md: avatarBase,
   lg: avatarLg,

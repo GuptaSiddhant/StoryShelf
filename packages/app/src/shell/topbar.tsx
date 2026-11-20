@@ -101,7 +101,7 @@ const shellTopbar = css`
       justify-content: center;
       padding: 0.25rem 0.5rem;
     }
-    & .topbar__pick[data-single] summary > svg:last-child {
+    & .topbar__pick[data-single] summary > [data-dropdown-chevron] {
       display: none;
     }
     & .crumbs a {

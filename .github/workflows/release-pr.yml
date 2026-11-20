@@ -5,10 +5,22 @@
 # - an epic branch (`epic/…`) merged into `main`;
 # - otherwise, the daily run: the last minor release (`vX.Y.0`) is 7 or more days old.
 #
-# Nothing happens without pending changesets or while a `release/v*` pull request is open. The bump
-# (minor or patch) comes from the changesets; a `major` is refused before 1.0 (no v1 until the owner
-# has dogfood proof). The job runs `nub run release:prepare` on `main`, pushes `release/v<version>`
-# and opens the pull request. Only the owner merges it; merging is what publishes (`release.yml`).
+# Nothing happens without pending changesets. The bump (minor or patch) comes from the changesets; a
+# `major` is refused before 1.0 (no v1 until the owner has dogfood proof). The job runs
+# `nub run release:prepare` on `main`, pushes `release/v<version>` and opens the pull request. Only
+# the owner merges it; merging is what publishes (`release.yml`).
+#
+# Refresh (#1098): release branches are append-only; nothing here ever force-pushes. While one
+# `release/v*` pull request is open and `main` has gained changesets that branch does not consume,
+# the job prepares the release again on `main` (the result is what a fresh release would be) and
+# - same version: adds one merge commit to the open branch. Its parents are the open pull request's
+#   head (what this workflow last pushed) and `main`, its tree is the freshly prepared release, and
+#   a plain fast-forward push delivers it. A branch someone else moved since makes the push fail the
+#   job with a message; nothing is overwritten. The pull request keeps its number and the owner's
+#   auto-merge.
+# - new version (patch to minor): pushes the new `release/v<version>`, opens its pull request and
+#   closes the old one, deleting the old branch only if it still sits at the planned sha.
+# Without a refresh, a conflict after `main` moved had to be cleared by hand.
 #
 # pull_request_target runs this file from `main` and checks out `main`, never the pull request's
 # code. The branch is pushed with AUTOUPDATE_TOKEN when it is set, so CI runs on the release pull
@@ -58,17 +70,21 @@ jobs:
         run: |
           set -e
           OPEN_RELEASE_PRS=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-            --jq '[.[] | select(.head.ref | startswith("release/v"))] | length')
+            --jq '[.[] | select(.head.ref | startswith("release/v")) | {number, ref: .head.ref, sha: .head.sha}]')
           export OPEN_RELEASE_PRS
           node scripts/release-due.mjs "$EVENT"
 
       - name: Setup workspace
-        if: steps.due.outputs.due == 'true'
+        if: steps.due.outputs.action != 'none'
         uses: ./.github/actions/setup-workspace
 
       - name: Prepare the release branch
-        if: steps.due.outputs.due == 'true'
+        if: steps.due.outputs.action != 'none'
         id: prepare
+        env:
+          ACTION: ${{ steps.due.outputs.action }}
+          OPEN_REF: ${{ steps.due.outputs.open_ref }}
+          OPEN_SHA: ${{ steps.due.outputs.open_sha }}
         run: |
           set -e
           git config user.name "github-actions[bot]"
@@ -76,10 +92,35 @@ jobs:
           nub run release:prepare
           version=$(node -p "require('./packages/core/package.json').version")
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          git push -u origin "release/v${version}"
+          outcome=open
+          if [ "$ACTION" = refresh ]; then
+            outcome=$(node scripts/release-due.mjs --outcome "$OPEN_REF" "release/v${version}")
+          fi
+          echo "outcome=${outcome}" >> "$GITHUB_OUTPUT"
+          if [ "$outcome" = update ]; then
+            # Append-only: a merge commit on top of the open head (what this workflow last pushed)
+            # and main, carrying the freshly prepared tree. A plain push, so a moved branch is refused.
+            git fetch origin "$OPEN_REF"
+            # The new tree is a fresh release, so a commit someone else added would be dropped from
+            # it. Refuse unless every commit the branch has beyond main came from this workflow.
+            others=$(git log --format='%an' "origin/main..${OPEN_SHA}" | grep -vxc 'github-actions\[bot\]' || true)
+            if [ "$others" != 0 ]; then
+              echo "::error::${OPEN_REF} has commits not made by this workflow; refusing to refresh it. Close the pull request or fold those commits into main."
+              exit 1
+            fi
+            commit=$(git commit-tree "release/v${version}^{tree}" \
+              -p "$OPEN_SHA" -p "release/v${version}^" \
+              -m "chore(release): refresh v${version} with main")
+            if ! git push origin "${commit}:refs/heads/release/v${version}"; then
+              echo "::error::release/v${version} moved since this workflow last pushed it, or is not a fast-forward; nothing was overwritten. Resolve it by hand or close the pull request."
+              exit 1
+            fi
+          else
+            git push -u origin "release/v${version}"
+          fi
 
       - name: Open the release pull request
-        if: steps.due.outputs.due == 'true'
+        if: steps.due.outputs.action != 'none' && steps.prepare.outputs.outcome != 'update'
         env:
           VERSION: ${{ steps.prepare.outputs.version }}
           REASON: ${{ steps.due.outputs.reason }}
@@ -89,3 +130,18 @@ jobs:
             "$VERSION" "$REASON" "$VERSION" > body.md
           gh pr create --base main --head "release/v${VERSION}" \
             --title "chore(release): v${VERSION}" --body-file body.md
+
+      - name: Close the replaced release pull request
+        if: steps.prepare.outputs.outcome == 'replace'
+        env:
+          OLD_NUMBER: ${{ steps.due.outputs.open_number }}
+          OLD_REF: ${{ steps.due.outputs.open_ref }}
+          OLD_SHA: ${{ steps.due.outputs.open_sha }}
+          VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          set -e
+          gh pr close "$OLD_NUMBER" --comment "Superseded: the changesets now call for v${VERSION}, so a new release pull request replaces this one."
+          # Only this workflow pushes release/*; delete only the sha this run planned against.
+          case "$OLD_REF" in
+            release/v*) git push --force-with-lease="${OLD_REF}:${OLD_SHA}" origin --delete "$OLD_REF" ;;
+          esac
