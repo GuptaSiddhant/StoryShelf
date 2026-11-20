@@ -40,6 +40,7 @@ export const gitRepositoryLinks = mysqlTable(
     requestedBy: text("requested_by"),
     approvedBy: text("approved_by"),
     approvedAt: datetime("approved_at", { mode: "string", fsp: 3 }),
+    lastDeliveredAt: datetime("last_delivered_at", { mode: "string", fsp: 3 }),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },

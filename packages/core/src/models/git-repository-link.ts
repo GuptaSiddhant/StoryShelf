@@ -116,9 +116,18 @@ export class GitRepositoryLinkModel {
       requestedBy: input.requestedBy ?? null,
       approvedBy: approved?.approvedBy ?? null,
       approvedAt: approved ? now : null,
+      lastDeliveredAt: null,
       createdAt: now,
       updatedAt: now,
     })) as unknown as GitRepositoryLinkRow;
+  }
+
+  /**
+   * Stamp the time delivery last posted through the link. Touches nothing else (not `updatedAt`):
+   * it is a diagnostic, never a state change.
+   */
+  async markDelivered(id: string, at: string = new Date().toISOString()): Promise<void> {
+    await this.#db.update(this.#tables.gitRepositoryLinks, id, { lastDeliveredAt: at });
   }
 
   /** One link, or null. */

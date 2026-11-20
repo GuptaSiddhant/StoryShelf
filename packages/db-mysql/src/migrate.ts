@@ -152,6 +152,7 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   { table: "notification_channels", column: "last_error", definition: "TEXT" },
   { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
   { table: "notification_channels", column: "last_delivered_at", definition: "DATETIME(3)" },
+  { table: "git_repository_links", column: "last_delivered_at", definition: "DATETIME(3)" },
 ];
 
 /** A run in flight when `builds.capture_job_id` was added owns the build it was started for. */

@@ -34,6 +34,22 @@ describe("delivery through an approved repository link", () => {
     expect(w.git.calls).toHaveLength(0);
   });
 
+  it("records the time of a delivery on the link, and not for a refused one", async () => {
+    const w = await linkWorld();
+    const link = await approvedGitHubLink(w);
+    expect(link.lastDeliveredAt).toBeNull();
+    await deliverBuildState(w.deps, { buildId: w.build.id, linkId: link.id });
+    const delivered = await w.links.get(link.id);
+    expect(Date.parse(delivered?.lastDeliveredAt ?? "")).not.toBeNaN();
+    expect(delivered?.updatedAt).toBe(link.updatedAt);
+    const other = await approvedGitHubLink(w, { prefix: "other" });
+    w.github.refuse.status = 500;
+    await expect(
+      deliverBuildState(w.deps, { buildId: w.build.id, linkId: other.id }),
+    ).rejects.toBeInstanceOf(HttpError);
+    expect((await w.links.get(other.id))?.lastDeliveredAt).toBeNull();
+  });
+
   it("follows the link's outputs: the gate stays, the rest can be off", async () => {
     const w = await linkWorld();
     const link = await approvedGitHubLink(w);

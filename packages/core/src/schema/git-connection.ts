@@ -66,6 +66,8 @@ export interface GitRepositoryLinkRow {
   requestedBy: string | null;
   approvedBy: string | null;
   approvedAt: string | null;
+  /** When delivery last posted for this link; null until it has (expand step, ADR 0053). */
+  lastDeliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

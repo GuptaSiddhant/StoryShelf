@@ -198,6 +198,17 @@ describe("GitRepositoryLinkModel transitions", () => {
     await expect(model.change("missing", { repo: "x" })).rejects.toThrow(GitLinkStateError);
   });
 
+  it("stamps a delivery without touching the link's state or update time", async () => {
+    const { model, link } = await pending();
+    expect(link.lastDeliveredAt).toBeNull();
+    await model.markDelivered(link.id, "2026-11-20T10:00:00.000Z");
+    expect(await model.get(link.id)).toMatchObject({
+      lastDeliveredAt: "2026-11-20T10:00:00.000Z",
+      state: link.state,
+      updatedAt: link.updatedAt,
+    });
+  });
+
   it("creates a link already approved, lists by state, stores outputs and removes", async () => {
     const { model, link } = await pending();
     const assigned = await model.create({ ...INPUT, repo: "api" }, { approvedBy: "admin" });

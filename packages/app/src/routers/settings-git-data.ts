@@ -46,7 +46,7 @@ function viewOf(
     state: link.state,
     managed: isManaged(project, link),
     reason: link.reason,
-    lastDeliveredAt: null,
+    lastDeliveredAt: link.lastDeliveredAt,
     outputs: linkOutputsOf(link),
     commentAllowed: connection === undefined ? false : postsComments(connection),
   };
