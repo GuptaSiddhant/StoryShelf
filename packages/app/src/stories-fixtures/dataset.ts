@@ -2,6 +2,8 @@ import type { CatalogEntry } from "@storyshelf/core/capture";
 import type {
   Baseline,
   Build,
+  BuildLabel,
+  LabelType,
   BuildComponent,
   CaptureAttempt,
   CaptureLog,
@@ -468,4 +470,42 @@ export const captureLogs: CaptureLog[] = [
     fields: null,
     createdAt: hoursAgo(19.8),
   },
+];
+
+/** The project's label types: one with a link template, one without (the label pages' table and links). */
+export const labelTypes: LabelType[] = [
+  {
+    id: id("LBT001"),
+    projectId: PROJECT_ID,
+    key: "pr",
+    name: "Pull request",
+    linkTemplate: "https://github.com/{repo}/pull/{value}",
+    color: null,
+    createdAt: hoursAgo(24 * 60),
+  },
+  {
+    id: id("LBT002"),
+    projectId: PROJECT_ID,
+    key: "release",
+    name: "Release",
+    linkTemplate: null,
+    color: null,
+    createdAt: hoursAgo(24 * 60),
+  },
+];
+
+const buildLabel = (n: number, buildId: string, typeKey: string, value: string): BuildLabel => ({
+  id: id(`LBL00${n}`),
+  projectId: PROJECT_ID,
+  buildId,
+  typeKey,
+  value,
+  createdAt: hoursAgo(24),
+});
+
+/** `pr=482` on two builds of the feature branches, `release=1.4` on the default-branch build. */
+export const buildLabels: BuildLabel[] = [
+  buildLabel(1, BUILD_REVIEW, "pr", "482"),
+  buildLabel(2, BUILD_CAPTURING, "pr", "482"),
+  buildLabel(3, BUILD_MAIN, "release", "1.4"),
 ];

@@ -8,8 +8,10 @@ import {
   BUILD_PURGED,
   builds,
   captureAttempts,
+  buildLabels,
   captureLogs,
   catalogEntries,
+  labelTypes,
   comments,
   otherProject,
   project,
@@ -58,6 +60,8 @@ async function insertBuilds(db: DatabaseAdapter): Promise<void> {
   await insertAll(db, db.tables.comments, comments);
   await insertAll(db, db.tables.captureAttempts, captureAttempts);
   await insertAll(db, db.tables.captureLogs, captureLogs);
+  await insertAll(db, db.tables.labelTypes, labelTypes);
+  await insertAll(db, db.tables.buildLabels, buildLabels);
 }
 
 /** What every populated build publishes, except the build whose Storybook retention removed. */
