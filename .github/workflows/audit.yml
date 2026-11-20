@@ -1,0 +1,41 @@
+name: Dependency audit
+
+# Weekly audit of the workspace lockfile and each Storybook fixture (#47). A failing run is the
+# notification: it fails on an advisory that is not a tracked exception and on an exception past its
+# review date (scripts/audit-exceptions.json, reasons in SECURITY.md "Known advisories", #335).
+# It only reads: it never upgrades, commits or publishes, and no other workflow depends on it, so a
+# red audit blocks no merge. Also runnable on demand. See docs/testing.md, "Dependency audit".
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: audit (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      # One leg per lockfile, so each failure shows on its own and one never hides another.
+      fail-fast: false
+      matrix:
+        target: [workspace, storybook-8, storybook-9, storybook-10]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        # `pnpm audit` reads the fixtures' pnpm lockfiles and, for the workspace, a copy of nub.lock.
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Audit ${{ matrix.target }}
+        run: node scripts/audit-check.mjs --target ${{ matrix.target }}

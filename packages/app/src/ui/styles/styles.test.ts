@@ -27,8 +27,12 @@ describe("baseStyle", () => {
     const css = baseStyle(LIGHT_THEME, DARK_THEME);
     // An `auto` track is as wide as its widest child (a nowrap table header), so it must be minmax(0, 1fr).
     expect(css).toContain(".grid { display: grid; grid-template-columns: minmax(0, 1fr);");
+    // Two columns stack at 880px; three stay a row on a tablet and stack on a phone (#1133, P7).
     expect(css).toContain(
-      "@media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: minmax(0, 1fr); } }",
+      "@media (max-width: 880px) { .grid--2 { grid-template-columns: minmax(0, 1fr); } }",
+    );
+    expect(css).toContain(
+      "@media (max-width: 480px) { .grid--3 { grid-template-columns: minmax(0, 1fr); } }",
     );
   });
 

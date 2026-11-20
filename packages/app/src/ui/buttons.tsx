@@ -1,5 +1,6 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { edgeFade } from "./edge-fade.ts";
 import { Icon } from "./icons/icon.tsx";
 import type { IconName } from "./icons/paths.ts";
 export type ButtonVariant =
@@ -184,6 +185,8 @@ const btnClasses: Record<ButtonVariant, Record<ButtonSize, Promise<string>>> = {
 
 const tabsNav = css`
   /* tabs */
+  ${edgeFade}
+  position: relative;
   display: flex;
   gap: var(--space-1);
   border-bottom: 1px solid var(--border);
@@ -263,7 +266,7 @@ export const Tabs: FC<{
   label?: string;
 }> = ({ tabs, label = "Sections" }) => {
   return (
-    <nav class={tabsNav} aria-label={label}>
+    <nav class={tabsNav} aria-label={label} data-scroll-active>
       {tabs.map((tab) => (
         <a
           class={tab.active ? tabsLinkActive : tabsLink}

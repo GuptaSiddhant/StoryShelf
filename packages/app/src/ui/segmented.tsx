@@ -1,7 +1,10 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { edgeFade } from "./edge-fade.ts";
 const segmentedRoot = css`
   /* segmented */
+  ${edgeFade}
+  position: relative;
   display: inline-flex;
   padding: var(--space-1);
   gap: var(--space-1);
