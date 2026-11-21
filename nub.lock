@@ -662,21 +662,12 @@ importers:
       '@storyshelf/affected':
         specifier: workspace:*
         version: link:../affected
-      axe-core:
-        specifier: 4.13.0
-        version: 4.13.0
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)(zod@4.6.7)
       pino:
         specifier: 'catalog:'
         version: 10.4.0
-      pixelmatch:
-        specifier: ^7.1.0
-        version: 7.2.0
-      pngjs:
-        specifier: ^7.0.0
-        version: 7.0.0
       unzipper:
         specifier: 0.12.5
         version: 0.12.5
@@ -693,9 +684,6 @@ importers:
       '@opentelemetry/sdk-trace-base':
         specifier: 'catalog:'
         version: 2.11.0(@opentelemetry/api@1.10.0)
-      '@types/jsdom':
-        specifier: ^30.0.0
-        version: 30.0.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -714,21 +702,24 @@ importers:
       adm-zip:
         specifier: ^0.6.1
         version: 0.6.1
-      jsdom:
-        specifier: ^30.0.1
-        version: 30.1.3
       nodemailer:
         specifier: ^10.2.1
         version: 10.2.1
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
-      oxlint:
-        specifier: 'catalog:'
-        version: 1.90.0(oxlint-tsgolint@7.0.2005)
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2005
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.90.0(oxlint-tsgolint@7.0.2005)
+      pixelmatch:
+        specifier: ^7.1.0
+        version: 7.2.0
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
       sharp:
         specifier: 'catalog:'
         version: 0.35.5(@types/node@26.6.5)
@@ -992,9 +983,18 @@ importers:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
+      axe-core:
+        specifier: 4.13.0
+        version: 4.13.0
+      pixelmatch:
+        specifier: ^7.1.0
+        version: 7.2.0
       playwright-core:
         specifier: 1.63.0
         version: 1.63.0
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
     devDependencies:
       '@hono/node-server':
         specifier: 'catalog:'
@@ -1008,6 +1008,9 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
+      '@types/jsdom':
+        specifier: ^30.0.0
+        version: 30.0.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -1017,15 +1020,18 @@ importers:
       adm-zip:
         specifier: 'catalog:'
         version: 0.6.1
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.1.3
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
-      oxlint:
-        specifier: 'catalog:'
-        version: 1.90.0(oxlint-tsgolint@7.0.2005)
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2005
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.90.0(oxlint-tsgolint@7.0.2005)
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(typescript@7.0.2)

@@ -1,5 +1,6 @@
 /** Codec registry: engines load on demand so an unused engine's dependencies are never imported. */
 import type { ImageCodec, ImageEngine } from "./codec.ts";
+import { importPeer } from "./peers.ts";
 
 const loaded = new Map<ImageEngine, Promise<ImageCodec>>();
 
@@ -20,7 +21,7 @@ export async function loadCodec(engine: ImageEngine): Promise<ImageCodec> {
 }
 
 async function importPngjsCodec(): Promise<ImageCodec> {
-  return (await import("./pngjs.ts")).pngjsCodec;
+  return await importPeer("pngjs", async () => (await import("./pngjs.ts")).pngjsCodec);
 }
 
 async function importSharpCodec(): Promise<ImageCodec> {

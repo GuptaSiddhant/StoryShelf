@@ -313,8 +313,14 @@ async function aiStep(
     };
   }
 }
-/** Load the configured image engine now, so a missing `sharp` fails readiness instead of the first diff. */
-async function runImagesSetup(): Promise<AdapterSetupResult | null> {
+/**
+ * Load the image libraries now, so a missing peer (`sharp`, or the `pngjs` and `pixelmatch` the runner
+ * brings) fails readiness instead of the first diff. Only with `testing`: hosting only loads none.
+ */
+async function runImagesSetup(options: ResolvedShelfOptions): Promise<AdapterSetupResult | null> {
+  if (!options.testing) {
+    return null;
+  }
   try {
     await verifyImageEngine();
     return null;

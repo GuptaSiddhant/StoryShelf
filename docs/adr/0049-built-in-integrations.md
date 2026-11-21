@@ -204,7 +204,7 @@ The amendment also records the test for every later "fold into core or keep as a
    - it is shared by core and the CLI, which must not depend on core: `affected`;
    - it is **a layer core is built on**, with its own test infrastructure and no imports from core:
      `db` (persistence: tables, dialects, migrations, drivers). This mirrors `app` and needs both
-     halves; code that only *could* be a lower layer stays in core.
+     halves; code that only _could_ be a lower layer stays in core.
 3. **Retiring.** A package folded into core is published as a deprecated re-export for **one minor
    release**, then no longer published. The owner runs `npm deprecate` on it. Until 2027-01-01 the
    amendment "No shims until 2027" below applies instead: no re-export is published at all.
@@ -252,6 +252,19 @@ env vars and properties or columns." This changes rule 3 (Retiring) for every re
 
 From 2027-01-01 rule 3 applies again: one minor release as a deprecated re-export, then no longer
 published. ADR 0053 has the matching amendment for the schema.
+
+## Amendment 2026-11-21: testing-only libraries follow the runner (#1335)
+
+Folding `@storyshelf/image` into core made a hosting-only deployment (no `testing` option) install
+libraries it never loads: `axe-core` (3.1 MB), `pngjs` (0.7 MB) and `pixelmatch`. The image _code_ stays
+in core; its _libraries_ move to the package a testing deployment already needs:
+
+- `axe-core` is a `@storyshelf/runner` dependency. `axeInjectionScript` and `loadAxeSource` live in the
+  runner (`a11y-source.ts`); core keeps the a11y types, the in-page helpers and the stored-result readers.
+- `pngjs` and `pixelmatch` are optional peers of core, used only by `./diff`, and runner `dependencies`,
+  so a testing install gets them. `./diff` imports them lazily on first use, never at module load;
+  `verifyImageEngine` runs only with `testing`, and a missing peer fails readiness with a message naming
+  it and the install line. `sharp` is unchanged (optional peer).
 
 ## Alternatives considered
 

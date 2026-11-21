@@ -9,6 +9,7 @@
  *  1. pack every public package (manifests rewritten as the release does, then restored),
  *     and check each archive holds every export and bin target (#1265),
  *     and that `@storyshelf/app/node` imports from the installed scaffold with no side effects (#394),
+ *     and that a hosting-only install of the app holds none of axe-core, pngjs and pixelmatch (#1335),
  *  2. install the CLI from its tarball in an empty directory outside this checkout,
  *  3. run the default `storyshelf server init` (answers: all defaults, so local accounts),
  *  4. `npm install` the scaffold, with every @storyshelf/* dependency (direct or transitive)
@@ -273,6 +274,44 @@ function assertS3OnlyInstall(scratch, tarballs) {
   run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
 }
 
+/**
+ * `@storyshelf/app` installed from its tarball with no runner (#1335): a hosting-only install must hold no
+ * `axe-core`, `pngjs` or `pixelmatch` (the runner brings them), yet import the app and `./diff`. Logs the install size.
+ */
+function assertHostingOnlyInstall(scratch, tarballs) {
+  const dir = join(scratch, "hosting-only");
+  mkdirSync(dir);
+  const manifest = {
+    name: "hosting-only",
+    private: true,
+    type: "module",
+    dependencies: { "@storyshelf/app": `file:${tarballs["@storyshelf/app"]}` },
+    overrides: tarballOverrides(tarballs),
+  };
+  writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  log("installing @storyshelf/app without the runner (hosting only)");
+  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: dir });
+  for (const absent of [
+    "axe-core",
+    "pngjs",
+    "pixelmatch",
+    "@storyshelf/runner",
+    "playwright-core",
+  ]) {
+    if (existsSync(join(dir, "node_modules", absent))) {
+      fail(`a hosting-only install of @storyshelf/app pulled in ${absent}`);
+    }
+  }
+  const check = [
+    'await import("@storyshelf/app");',
+    'const diff = await import("@storyshelf/core/diff");',
+    'if (typeof diff.diffImagesAsync !== "function") throw new Error("bad exports");',
+  ].join("\n");
+  run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
+  const size = run("du", ["-sk", join(dir, "node_modules")]).split("\t")[0];
+  log(`hosting-only install: node_modules is ${size} KB, with none of axe-core, pngjs, pixelmatch`);
+}
+
 /** The CLI installed from its tarball, and the scaffold installed from the tarballs. */
 async function installFromTarballs(scratch, tarballs) {
   const tool = join(scratch, "tool");
@@ -449,6 +488,7 @@ async function main() {
     log(`packed ${Object.keys(tarballs).length} packages`);
     assertArchives(tarballs);
     assertS3OnlyInstall(scratch, tarballs);
+    assertHostingOnlyInstall(scratch, tarballs);
     const { cli, project } = await installFromTarballs(scratch, tarballs);
     server = await startServer(project);
     const ciToken = await createAndUpload(cli, server.url, copyStorybook(scratch));

@@ -23,7 +23,7 @@ interface DiffResult {
 }
 ```
 
-Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`testing.images.engine`, ADR 0008). The engine (codecs, worker pool) is internal to `core/diff`; `@storyshelf/image` is a deprecated re-export.
+Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`testing.images.engine`, ADR 0008). `pngjs` and `pixelmatch` are optional peers of core that `@storyshelf/runner` brings, imported lazily on the first comparison and checked by `verifyImageEngine` only with `testing` (ADR 0049, amendment 2026-11-21). The engine (codecs, worker pool) is internal to `core/diff`; `@storyshelf/image` is a deprecated re-export.
 
 ### Diff Overlay
 
