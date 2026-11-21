@@ -21,7 +21,6 @@
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
-    "@storyshelf/storage-local": "workspace:*",
     "@storyshelf/storage-s3": "workspace:*",
     "nodemailer": "^10.2.1",
     "reflect-metadata": "^0.2.2"

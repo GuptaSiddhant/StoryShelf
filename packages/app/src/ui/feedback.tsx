@@ -83,6 +83,11 @@ const alertBase = css`
   border: 1px solid var(--border);
   background: var(--surface-card);
   font-size: var(--text-base);
+  /* A link in the message is underlined: colour alone fails WCAG 1.4.1. */
+  & a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 `;
 
 const alertTones: Record<AlertTone, Promise<string>> = {
@@ -228,6 +233,8 @@ const metaCode = css`
   /* meta-code */
   ${metaMono}
   font-size: var(--text-xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
 `;
 
 const metaPre = css`

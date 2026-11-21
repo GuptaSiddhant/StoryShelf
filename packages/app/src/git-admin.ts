@@ -185,5 +185,6 @@ export function linkView(
       "a removed connection",
     reason: link.reason,
     requestedAt: link.createdAt,
+    updatedAt: link.updatedAt,
   };
 }

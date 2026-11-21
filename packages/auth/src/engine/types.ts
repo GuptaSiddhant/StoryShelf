@@ -56,6 +56,13 @@ export interface ShelfAuthOptions {
   hostSessionCookie?: boolean;
   /** Session lifetime in days. Defaults to 7 (current parity). */
   sessionExpiresInDays?: number;
+  /**
+   * Emails of shared read-only accounts (compared case-insensitively), e.g. a demo account whose
+   * password is published. Such an account may sign in, sign out and read; every write it attempts
+   * is refused with a 403, by the engine's own endpoints and by the app. Configured here, never in
+   * the database. Defaults to none.
+   */
+  readOnlyAccounts?: string[];
 }
 
 /** One OAuth/OIDC login method (Keycloak preset or explicit endpoints). */

@@ -1,9 +1,12 @@
+import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import { AdapterLifecycleError } from "@storyshelf/core/adapter/setup";
+import { reachabilityOf } from "@storyshelf/core/capture";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
+import { stubRunner } from "../test-runner.ts";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -222,5 +225,47 @@ describe("health endpoints", () => {
       "uptimeSecs",
       "version",
     ]);
+  });
+
+  it("POST /api/v1/health lists each target for admins; GET and non-admins never see it", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const base = stubRunner();
+    const runner = {
+      ...base,
+      metadata: {
+        ...base.metadata,
+        targets: [{ target: "chromium@sprite", reach: "loopback", status: "ready" }],
+      },
+    } as CaptureRunner;
+    const app = createShelfApp({
+      database: db,
+      storage,
+      auth: adminAuth,
+      testing: { runner },
+      logger: silentLogger,
+    });
+    await app.lifecycle.setup();
+    const read = async (): Promise<{ targets: Record<string, string> }> =>
+      (await (await app.request("/api/v1/health", { method: "POST" })).json()) as {
+        targets: Record<string, string>;
+      };
+    expect((await read()).targets).toEqual({ "chromium@sprite": "ok" });
+    await reachabilityOf(runner).failed("chromium@sprite", "connection");
+    const body = await read();
+    expect(body.targets).toEqual({ "chromium@sprite": "unreachable" });
+    // The class and time are for the System page: the API answers only ok or unreachable.
+    expect(JSON.stringify(body)).not.toContain("connection");
+    const open = await (await app.request("/api/v1/health")).json();
+    expect(JSON.stringify(open)).not.toContain("targets");
+  });
+
+  it("POST /api/v1/health refuses a signed-in user who is not a site admin", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const member = stubAuth({ ...admin, role: "member" as never });
+    const app = createShelfApp({ database: db, storage, auth: member, logger: silentLogger });
+    await app.lifecycle.setup();
+    expect((await app.request("/api/v1/health", { method: "POST" })).status).toBe(403);
   });
 });

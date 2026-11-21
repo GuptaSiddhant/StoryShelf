@@ -5,7 +5,13 @@ import {
   type CaptureTarget,
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
-import { MAX_BROWSERS, assertSupportedBrowsers, offeredTargets } from "@storyshelf/core/capture";
+import {
+  MAX_BROWSERS,
+  assertSupportedBrowsers,
+  offeredTargets,
+  reachabilityOf,
+  type UnreachableTarget,
+} from "@storyshelf/core/capture";
 import { HTTPException } from "hono/http-exception";
 import { publicMessage } from "./routers/helpers.ts";
 import { getStore, type Store } from "./store.ts";
@@ -25,6 +31,28 @@ export async function runnerTargets(
     publicOrigin: await store.publicOrigin?.url(),
     hasSecret: store.config.secret !== undefined,
   });
+}
+
+/** The targets that failed to launch or connect and have not rendered since, with when and why. */
+export function unreachableTargets(
+  store: Store = getStore(),
+): ReadonlyMap<CaptureTarget, UnreachableTarget> {
+  return store.runner === undefined ? new Map() : reachabilityOf(store.runner).unreachable();
+}
+
+/** Each offered target as `ok` or `unreachable`, for the admin health answer. */
+export async function targetStates(
+  store: Store = getStore(),
+): Promise<Record<string, "ok" | "unreachable">> {
+  const down = unreachableTargets(store);
+  const states: Record<string, "ok" | "unreachable"> = {};
+  for (const entry of (await runnerTargets(store)) ?? []) {
+    states[entry.target] = down.has(entry.target) ? "unreachable" : "ok";
+  }
+  for (const target of down.keys()) {
+    states[target] = "unreachable";
+  }
+  return states;
 }
 
 /** Engine label for a target (`Chromium`), plus the remote's name (`Chromium on grid`). */

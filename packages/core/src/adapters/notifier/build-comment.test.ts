@@ -112,6 +112,22 @@ describe("buildCommentMarkdown: testing on", () => {
     `);
   });
 
+  it("never lets a commit id escape its code span or mention anyone", () => {
+    const hostile = "`]@bob";
+    const markdown = [
+      buildCommentMarkdown(
+        input({ status: "cancelled", supersededBy: { sha: hostile, url: "https://s/b2" } }),
+      ),
+      buildCommentMarkdown(input({ sha: hostile })),
+      buildCommentMarkdown(
+        input({ earlier: [{ state: "✅ approved", sha: hostile, url: "https://s/b0" }] }),
+      ),
+      skippedCommentMarkdown({ buildUrl: "u", source: { sha: hostile, url: "s" } }),
+    ].join("\n");
+    expect(markdown).not.toContain("@bob");
+    expect(markdown).toContain("`bob`");
+  });
+
   it("says a cancelled build was superseded", () => {
     expect(
       buildCommentMarkdown(

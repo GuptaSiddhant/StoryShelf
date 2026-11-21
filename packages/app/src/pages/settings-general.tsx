@@ -54,7 +54,7 @@ function generalItems(project: Project, isAdmin: boolean): SummaryItem[] {
   ];
 }
 
-/** Project deletion (admins only). */
+/** Project deletion (site admins only, as `DELETE /api/v1/projects/:slug`). */
 function DangerZoneCard(props: { project: Project }): Rendered {
   const { project } = props;
   return (
@@ -87,6 +87,7 @@ export function renderSettingsGeneral(
   project: Project,
   formState: SettingsFormState | undefined,
   isAdmin: boolean,
+  canDeleteProject = false,
 ): unknown {
   return (
     <VStack>
@@ -96,7 +97,7 @@ export function renderSettingsGeneral(
       {isAdmin ? (
         <>
           <FormDialog id={EDIT_GENERAL_DIALOG} title="Edit project" submitLabel="Save changes" />
-          <DangerZoneCard project={project} />
+          {canDeleteProject ? <DangerZoneCard project={project} /> : null}
         </>
       ) : (
         <Meta>You need admin access to edit settings.</Meta>

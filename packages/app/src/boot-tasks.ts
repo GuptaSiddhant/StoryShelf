@@ -11,6 +11,7 @@ import { syncGitLinks } from "./git-connections.ts";
 import { logHostingOnlyMode } from "./hidden-data.ts";
 import { startConsumer, trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import { NOTIFICATIONS_PAUSED_TEXT } from "./notifications-pause.ts";
+import { warnMissingReadOnlyAccountsAfterSetup } from "./read-only-accounts.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 /**
@@ -32,6 +33,7 @@ export function runBootTasks(
   logHostingOnlyAfterSetup(cell, scoped, runtime.logger);
   logPausedAfterSetup(cell, runtime);
   backfillContentUsesAfterSetup(cell, scoped, runtime.logger);
+  warnMissingReadOnlyAccountsAfterSetup(cell, scoped.auth, scoped.database, runtime.logger);
   const linksSynced = syncGitLinksAfterSetup(cell, scoped, runtime);
   if (buildState) {
     replayGitStateAfterSetup(cell, scoped, runtime, { buildState, after: linksSynced });

@@ -110,6 +110,50 @@ export interface Auth {
    * bounded batches. Better Auth never sweeps them itself, so the retention timer calls this.
    */
   purgeExpired?: (cutoffIso: string) => Promise<{ sessions: number; verifications: number }>;
+  /**
+   * Whether `email` names a shared read-only account (compared case-insensitively). The app refuses
+   * every write such an account attempts, whether it arrives with the session or a bearer token.
+   * Absent: no account is read-only.
+   */
+  isReadOnlyAccount?: (email: string) => boolean;
+  /**
+   * The configured read-only account emails (normalized), for the boot check that warns about an
+   * account with no user row. Absent or empty: no account is read-only.
+   */
+  readOnlyAccounts?: () => readonly string[];
+}
+
+/** The one refusal a read-only account gets for any write (403), from the app and the engine alike. */
+export const READ_ONLY_ACCOUNT_MESSAGE =
+  "This is a shared read-only account: it can sign in, sign out and read, but it cannot change anything.";
+
+/**
+ * The read-only account emails of a comma-separated list (`SHELF_READ_ONLY_ACCOUNTS`), in the form
+ * {@link normalizeAccountEmail} gives; empty entries are dropped. An unset or blank value is no account.
+ */
+export function parseReadOnlyAccounts(value?: string): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => normalizeAccountEmail(entry))
+    .filter((entry) => entry !== "");
+}
+
+/** A case-insensitive membership test over `emails`; a missing or empty email never matches. */
+export function readOnlyAccountMatcher(
+  emails?: readonly string[],
+): (email?: string | null) => boolean {
+  const accounts = new Set((emails ?? []).map((entry) => normalizeAccountEmail(entry)));
+  accounts.delete("");
+  return (email) =>
+    typeof email === "string" && email !== "" && accounts.has(normalizeAccountEmail(email));
+}
+
+/**
+ * The form two read-only account emails are compared in: Unicode NFKC (so an address typed in
+ * another normalization, or with compatibility characters, still matches), trimmed and lowercased.
+ */
+export function normalizeAccountEmail(email: string): string {
+  return email.normalize("NFKC").trim().toLowerCase();
 }
 
 /** Minimum password length for local accounts (matches legacy policy). */

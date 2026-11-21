@@ -15,7 +15,25 @@ Before any upgrade, [back up](/guides/backup-restore/) the database and the stor
 
 **Who is affected:** a server that builds its capture runner with `createPuppeteerCaptureRunner` from `@storyshelf/runner-puppeteer`. If you use `@storyshelf/runner-playwright`, nothing changes.
 
-0.14.0 deprecated the package and 0.15.0 removes it ([ADR 0001](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0001-architecture-and-conventions.md), amendment 2026-11-20). Switch to the Playwright runner while you are still on 0.14.x, then upgrade. The steps, the option mapping and the note about the new baseline are in [Switching from Puppeteer to Playwright](/packages/runner-puppeteer/#switching-from-puppeteer-to-playwright).
+0.14.0 deprecated the package and 0.15.0 removes it ([ADR 0001](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0001-architecture-and-conventions.md), amendment 2026-11-20). Switch to the Playwright runner while you are still on 0.14.x, then upgrade. The steps, the option mapping and the note about the new baseline are in [Switching from Puppeteer to Playwright](#switching-from-puppeteer-to-playwright).
+
+### Switching from Puppeteer to Playwright
+
+Playwright is the one capture runner. Do this on 0.14.x, before you upgrade to 0.15.0.
+
+1. Install `@storyshelf/runner-playwright`, run `playwright install chromium` (or use an image that has it) and remove `@storyshelf/runner-puppeteer`.
+2. Change the import and factory: `createPuppeteerCaptureRunner` becomes `createPlaywrightCaptureRunner` from `@storyshelf/runner-playwright`.
+3. Map the options:
+
+| Puppeteer                                                                               | Playwright                                                                                                                              |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `executablePath` for a system Chrome, or `local("chrome", { executablePath })`          | `local("chrome", { channel: "chrome" })` (bare `"chrome"` uses the same channel; `chrome-beta` and `msedge` also work)                  |
+| `executablePath` for any other Chromium                                                 | No path option: `playwright install chromium` and the bare `"chromium"` target                                                          |
+| `args` (launch flags)                                                                   | No equivalent option                                                                                                                    |
+| `cdp({ name, endpoint, headers, sessions })` from `@storyshelf/runner-puppeteer/remote` | `remote({ name, protocol: "cdp", reach: "url", sessions, connect: { endpoint, headers } })` from `@storyshelf/runner-playwright/remote` |
+| `concurrency`, `navigationTimeoutMs`, `recycleBrowserEvery`, `reusePages`               | The same options on `createPlaywrightCaptureRunner`                                                                                     |
+
+4. Expect one new baseline. The capture fingerprint (browser build, platform, fonts) changes with the runner, so the first build on the default branch is accepted as an environment migration, and branch builds show differences to review. A CDP remote keeps its `chromium@<name>` target and its own baselines.
 
 ### Nothing else is pending
 
@@ -50,7 +68,7 @@ Sign-in is now on by default and a missing variable never turns it off. The imag
 The runner now requires `puppeteer-core` `^25` (it was `^24`) and passes remote-connection headers as `wsOptions.headers`. Puppeteer 24 is no longer supported. The runner is also deprecated in this release: it logs one warning when the host binds its logger, gets fixes only, and is removed in [0.15.0](#nothing-else-is-pending).
 
 1. Either install `puppeteer-core@^25` next to the runner to stay on it for now, or
-2. switch to Playwright now, following [Switching from Puppeteer to Playwright](/packages/runner-puppeteer/#switching-from-puppeteer-to-playwright). That section also covers the one new baseline you should expect.
+2. switch to Playwright now, following [Switching from Puppeteer to Playwright](#switching-from-puppeteer-to-playwright). That section also covers the one new baseline you should expect.
 
 ### Git connections are set up by the operator
 
@@ -100,8 +118,8 @@ View the build: https://shelf.example.com/…
 ```
 
 - **`Build created: <id>` is gone from a current server.** The last line is now `View the build: <url>`. The old line appears only when the server predates the `buildUrl` field in the create-build answer. A script that greps for `Build created:` finds nothing against a current server.
-- **Read the id from the `Build:` row.** For example `grep -oE '^ *Build: +[0-9A-Z]{26}'`, as the repository's own [Storybook upload workflow](https://github.com/GuptaSiddhant/StoryShelf/blob/main/.github/workflows/app-storybook.yml) does.
-- **There is no `--json` option in 0.14.0.** Until one ships, match the `Build:` row, or use `--wait` and its exit codes (next section) when all you need is the verdict.
+- **Read the id with `--json`.** `storyshelf upload --json` prints `{ "buildId", "url", "status", "skipped" }` on stdout and every other message on stderr, so `npx storyshelf upload … --json | jq -r .buildId` replaces the grep. On GitHub Actions the upload step also sets the `build-id` and `build-url` outputs, so a later step reads `steps.<id>.outputs.build-id`. See [Machine-readable output](/guides/cli/client/#machine-readable-output).
+- **On 0.14.0 and earlier there is no `--json`.** Match the `Build:` row instead, for example `grep -oE '^ *Build: +[0-9A-Z]{26}'`, or use `--wait` and its exit codes (next section) when all you need is the verdict.
 
 ### `storyshelf upload --wait` follows the build
 
@@ -135,7 +153,7 @@ A CI step fails on any non-zero exit, so decide what `2` should mean for your pi
 - **`storyshelf create`** on a server with sign-in on creates the project but no longer mints a token that cannot upload. It prints the project's page, where **Get your first build** creates one.
 - **`SHELF_STORYBOOK_HOSTING=sandboxed`** is available to the image. Unset or `trusted` keeps today's behaviour; any other value stops boot. See [Security](/guides/security/).
 - **Times in the app** render in UTC and English, not in the server's time zone.
-- **A scaffold from an older `server init`** that fails with `ERR_MODULE_NOT_FOUND` for `@storyshelf/storage-local` needs that package added to its `package.json`.
+- **`@storyshelf/storage-local` is deprecated.** Local storage is built into core: import `createLocalStorage` from `@storyshelf/core/storage/local` and drop the package. The old package re-exports it for one minor release, then is no longer published.
 
 ## Related
 

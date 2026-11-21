@@ -4,6 +4,7 @@ import "reflect-metadata";
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
+import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
 import { parseTrustProxy } from "@storyshelf/core/config";
 import {
@@ -189,6 +190,8 @@ const app = createShelfApp({
           fromEmail: env["SMTP_FROM"],
           onAuthSystemEvent: createAuthSystemHook(),
           logger: shelfLogger,
+          // Shared accounts that sign in and read but never write (#1274), comma-separated emails.
+          readOnlyAccounts: parseReadOnlyAccounts(env["SHELF_READ_ONLY_ACCOUNTS"]),
         }).adapter
       : undefined,
   ui,
